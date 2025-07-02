@@ -21,7 +21,7 @@ export async function getRepairs(token, status = null) {
 }
 
 export async function getRepairById(token, repairId) {
-  const response = await fetch(`http://127.0.0.1:8000/api/repairs/${repairId}/`, {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/${repairId}/`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new Error('Failed to fetch repair');
@@ -60,4 +60,39 @@ export async function deleteOffer(token, offerId) {
   }
 
   return true;
+}
+
+
+// PATCH /api/repairs/<id>/
+export async function updateRepair(token, repairId, data) {
+  const res = await fetch(`${API_BASE_URL}/api/repairs/${repairId}/`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to update repair');
+  }
+  return res.json();
+}
+
+// POST /api/repairs/<id>/confirm/
+export async function confirmRepair(token, repairId, data) {
+  const res = await fetch(`${API_BASE_URL}/api/repairs/${repairId}/confirm/`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to confirm repair');
+  }
+  return res.json();
 }
