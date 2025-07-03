@@ -21,6 +21,8 @@ import CreateRepairScreen from '../screens/CreateRepairScreen';
 import CreateVehicleScreen from '../screens/CreateVehicleScreen';
 import CreatePromotionScreen from '../screens/CreatePromotionScreen';
 import ShopRegisterClientScreen from '../screens/ShopRegisterClientScreen';
+import ChooseShopScreen from '../screens/ChooseShopScreen';
+
 
 // ✅ THIS LINE is what was missing
 const Stack = createNativeStackNavigator();
@@ -47,6 +49,7 @@ export default function AppNavigator() {
         <Stack.Screen name="CreateVehicle" component={CreateVehicleScreen} />
         <Stack.Screen name="CreatePromotion" component={CreatePromotionScreen} />
         <Stack.Screen name="ShopRegisterClient" component={ShopRegisterClientScreen} />
+        <Stack.Screen name="ChooseShop" component={ChooseShopScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -1,3 +1,4 @@
+// PATH: src/screens/ShopHomeScreen.js
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -49,6 +50,8 @@ export default function ShopHomeScreen() {
       blurRadius={5}
     >
       <View style={BASE_STYLES.overlay}>
+
+        {/* ✅ TAB BAR */}
         <View style={BASE_STYLES.tabBar}>
           <TouchableOpacity
             style={activeTab === 'repairs' ? BASE_STYLES.activeTab : BASE_STYLES.inactiveTab}
@@ -79,6 +82,17 @@ export default function ShopHomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* ✅ SWITCH SHOP BUTTON */}
+        <View style={{ marginVertical: 10, alignItems: 'center' }}>
+          <TouchableOpacity
+            style={BASE_STYLES.inactiveTab}
+            onPress={() => navigation.navigate('ChooseShop')}
+          >
+            <Text>Switch Shop</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ✅ MAIN CONTENT */}
         <View style={{ flex: 1 }}>
           {renderContent()}
         </View>

@@ -1,4 +1,4 @@
-// src/components/shop/RepairsList.js
+// PATH: src/components/shop/RepairsList.js
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -9,30 +9,38 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRepairs } from '../../api/repairs';
+import { getMyOffers } from '../../api/offers';
 import { useNavigation } from '@react-navigation/native';
 import BASE_STYLES from '../../styles/base';
 
 export default function RepairsList() {
   const [repairs, setRepairs] = useState([]);
+  const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('open');
+  const [selectedTab, setSelectedTab] = useState('open');
   const navigation = useNavigation();
 
   useEffect(() => {
-    const fetchRepairs = async () => {
+    const fetchData = async () => {
+      setLoading(true);
       const token = await AsyncStorage.getItem('@access_token');
       try {
-        const data = await getRepairs(token, statusFilter);
-        setRepairs(data);
+        if (selectedTab === 'offers') {
+          const offersData = await getMyOffers(token);
+          setOffers(offersData);
+        } else {
+          const repairsData = await getRepairs(token, selectedTab);
+          setRepairs(repairsData);
+        }
       } catch (err) {
-        console.error('Failed to load repairs', err);
+        console.error('Failed to load data', err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchRepairs();
-  }, [statusFilter]);
+    fetchData();
+  }, [selectedTab]);
 
   const renderRepair = ({ item }) => (
     <TouchableOpacity
@@ -48,24 +56,52 @@ export default function RepairsList() {
     </TouchableOpacity>
   );
 
+  const renderOffer = ({ item }) => (
+    <TouchableOpacity
+      style={BASE_STYLES.listItem}
+      onPress={() => navigation.navigate('RepairDetail', { repairId: item.repair })}
+    >
+      <Text style={BASE_STYLES.subText}>
+        Vehicle: {item.vehicle_brand} {item.vehicle_model} ({item.vehicle_license_plate})
+      </Text>
+      <Text>Price: {item.price} BGN</Text>
+      <Text>Description: {item.description}</Text>
+    </TouchableOpacity>
+  );
+
+  const tabOptions = ['open', 'ongoing', 'done', 'offers'];
+
   return (
     <View style={BASE_STYLES.overlay}>
-      <Text style={BASE_STYLES.title}>Repairs ({statusFilter.toUpperCase()})</Text>
+      <Text style={BASE_STYLES.title}>
+        {selectedTab === 'offers' ? 'My Sent Offers' : `Repairs (${selectedTab.toUpperCase()})`}
+      </Text>
 
       <View style={BASE_STYLES.tabBar}>
-        {['open', 'ongoing', 'done'].map((status) => (
+        {tabOptions.map((tab) => (
           <TouchableOpacity
-            key={status}
-            style={status === statusFilter ? BASE_STYLES.activeTab : BASE_STYLES.inactiveTab}
-            onPress={() => setStatusFilter(status)}
+            key={tab}
+            style={tab === selectedTab ? BASE_STYLES.activeTab : BASE_STYLES.inactiveTab}
+            onPress={() => setSelectedTab(tab)}
           >
-            <Text>{status.toUpperCase()}</Text>
+            <Text>{tab.toUpperCase()}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
       {loading ? (
         <ActivityIndicator size="large" />
+      ) : selectedTab === 'offers' ? (
+        <FlatList
+          data={offers}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderOffer}
+          ListEmptyComponent={
+            <Text style={{ textAlign: 'center', marginVertical: 20 }}>
+              No offers sent yet
+            </Text>
+          }
+        />
       ) : (
         <FlatList
           data={repairs}
@@ -73,7 +109,7 @@ export default function RepairsList() {
           renderItem={renderRepair}
           ListEmptyComponent={
             <Text style={{ textAlign: 'center', marginVertical: 20 }}>
-              No repairs found for status "{statusFilter}"
+              No repairs found for status "{selectedTab}"
             </Text>
           }
         />

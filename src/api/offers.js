@@ -1,5 +1,6 @@
 // src/api/offers.js
 import { API_BASE_URL } from './config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export async function getPromotions(token) {
   const response = await fetch(`${API_BASE_URL}/api/offers/?is_promotion=1`, {
@@ -84,4 +85,31 @@ export async function deleteOffer(token, offerId) {
     const error = await response.json();
     throw new Error(error.detail || 'Delete failed');
   }
+}
+
+export async function getMyOffers(token) {
+  const shopId = await AsyncStorage.getItem('@current_shop_id');
+
+  if (!shopId) {
+    console.error('No current shop selected in AsyncStorage');
+    throw new Error('No current shop selected. Please choose a shop.');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/offers/?shop=${shopId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    let errorDetail = '';
+    try {
+      const err = await response.json();
+      errorDetail = JSON.stringify(err);
+    } catch (e) {
+      errorDetail = await response.text();
+    }
+    console.error(`getMyOffers error: ${response.status} - ${errorDetail}`);
+    throw new Error(errorDetail || 'Failed to fetch offers');
+  }
+
+  return await response.json();
 }
