@@ -1,6 +1,6 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BASE_URL } from '../constants/api';  // Base URL for your API
+import { API_BASE_URL } from '../constants/api';  // Base URL for your API
 
 // ✅ Updated register function
 export const register = async (emailOrPhone, password, isClient, isShop) => {
@@ -33,10 +33,10 @@ export const register = async (emailOrPhone, password, isClient, isShop) => {
     }
 
     // Step 1: Register the user
-    await axios.post(`${BASE_URL}api/users/register/`, registerData);
+    await axios.post(`${API_BASE_URL}api/users/register/`, registerData);
 
     // Step 2: Log in immediately
-    const loginResponse = await axios.post(`${BASE_URL}api/token/`, loginData);
+    const loginResponse = await axios.post(`${API_BASE_URL}api/token/`, loginData);
 
     const { access, refresh, is_client, is_shop } = loginResponse.data;
 
@@ -70,7 +70,7 @@ export const login = async (emailOrPhone, password) => {
       body = { email: emailOrPhone.trim(), password };
     }
 
-    const response = await axios.post(`${BASE_URL}api/token/`, body);
+    const response = await axios.post(`${API_BASE_URL}api/token/`, body);
 
     const { access, refresh, is_client, is_shop, user_id } = response.data;
 
@@ -97,7 +97,7 @@ export const getVehicles = async () => {
   }
 
   try {
-    const response = await axios.get(`${BASE_URL}api/vehicles/`, {
+    const response = await axios.get(`${API_BASE_URL}api/vehicles/`, {
       headers: {
         Authorization: `Bearer ${token}`, // Attach the token as an Authorization header
       },

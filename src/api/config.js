@@ -1,1 +1,4 @@
-export const API_BASE_URL = 'http://127.0.0.1:8000';
+// PATH: src/api/config.js
+import { API_BASE_URL, WS_BASE_URL } from '../env';
+
+export { API_BASE_URL, WS_BASE_URL };

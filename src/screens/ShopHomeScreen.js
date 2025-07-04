@@ -1,5 +1,5 @@
 // PATH: src/screens/ShopHomeScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,20 @@ import { logout } from '../api/auth';
 import PendingRepairs from '../components/shop/RepairsList';
 import AuthorizedClients from '../components/shop/AuthorizedClients';
 import ShopPromotions from '../components/shop/ShopPromotions';
+import NotificationsList from '../components/shop/NotificationsList';
+
+import { WebSocketContext } from '../context/WebSocketManager';
 import BASE_STYLES from '../styles/base';
 
 export default function ShopHomeScreen() {
   const [activeTab, setActiveTab] = useState('repairs');
   const navigation = useNavigation();
+
+  // ✅ Access live websocket notifications
+  const { notifications } = useContext(WebSocketContext);
+
+  // ✅ Count unread notifications
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   useEffect(() => {
     navigation.setOptions({
@@ -38,6 +47,8 @@ export default function ShopHomeScreen() {
         return <AuthorizedClients navigation={navigation} />;
       case 'promotions':
         return <ShopPromotions />;
+      case 'notifications':
+        return <NotificationsList />;
       default:
         return null;
     }
@@ -50,30 +61,16 @@ export default function ShopHomeScreen() {
       blurRadius={5}
     >
       <View style={BASE_STYLES.overlay}>
-
-        {/* ✅ TAB BAR */}
         <View style={BASE_STYLES.tabBar}>
-          <TouchableOpacity
-            style={activeTab === 'repairs' ? BASE_STYLES.activeTab : BASE_STYLES.inactiveTab}
-            onPress={() => setActiveTab('repairs')}
-          >
-            <Text>Repairs</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={activeTab === 'clients' ? BASE_STYLES.activeTab : BASE_STYLES.inactiveTab}
-            onPress={() => setActiveTab('clients')}
-          >
-            <Text>Clients</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={activeTab === 'promotions' ? BASE_STYLES.activeTab : BASE_STYLES.inactiveTab}
-            onPress={() => setActiveTab('promotions')}
-          >
-            <Text>Promotions</Text>
-          </TouchableOpacity>
-
+          <TabButton label="Repairs" activeTab={activeTab} setActiveTab={setActiveTab} />
+          <TabButton label="Clients" activeTab={activeTab} setActiveTab={setActiveTab} />
+          <TabButton label="Promotions" activeTab={activeTab} setActiveTab={setActiveTab} />
+          <TabButton 
+            label="Notifications" 
+            activeTab={activeTab} 
+            setActiveTab={setActiveTab} 
+            badgeCount={unreadCount}
+          />
           <TouchableOpacity
             style={BASE_STYLES.inactiveTab}
             onPress={() => navigation.navigate('ShopMap')}
@@ -82,7 +79,6 @@ export default function ShopHomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ✅ SWITCH SHOP BUTTON */}
         <View style={{ marginVertical: 10, alignItems: 'center' }}>
           <TouchableOpacity
             style={BASE_STYLES.inactiveTab}
@@ -92,7 +88,6 @@ export default function ShopHomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ✅ MAIN CONTENT */}
         <View style={{ flex: 1 }}>
           {renderContent()}
         </View>
@@ -100,3 +95,43 @@ export default function ShopHomeScreen() {
     </ImageBackground>
   );
 }
+
+// ✅ Extracted component for clean badge logic
+function TabButton({ label, activeTab, setActiveTab, badgeCount }) {
+  const isActive = activeTab.toLowerCase() === label.toLowerCase();
+
+  return (
+    <TouchableOpacity
+      style={isActive ? BASE_STYLES.activeTab : BASE_STYLES.inactiveTab}
+      onPress={() => setActiveTab(label.toLowerCase())}
+    >
+      <View style={styles.tabButtonContent}>
+        <Text>{label}</Text>
+        {badgeCount > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{badgeCount}</Text>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  tabButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  badge: {
+    marginLeft: 6,
+    backgroundColor: 'red',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+});
