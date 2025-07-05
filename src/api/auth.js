@@ -1,3 +1,4 @@
+// src/api/auth.js
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../constants/api';  // Base URL for your API
@@ -110,17 +111,9 @@ export const getVehicles = async () => {
 
 // Logout function
 export const logout = async (navigation) => {
-  // Remove the authentication tokens from AsyncStorage
-  await AsyncStorage.multiRemove([
-    '@access_token',
-    '@refresh_token',
-    '@is_client',
-    '@is_shop',
-  ]);
-
-  // Reset the navigation stack and navigate to the Home screen
+  await AsyncStorage.clear();
   navigation.reset({
     index: 0,
-    routes: [{ name: 'Home' }], // Navigate to Home with no back option
+    routes: [{ name: 'Home' }],
   });
 };

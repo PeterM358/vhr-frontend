@@ -1,13 +1,7 @@
 import { StyleSheet } from 'react-native';
 
 export default StyleSheet.create({
-  // General background with subtle color
-  background: {
-    flex: 1,
-    backgroundColor: '#f6f8fa',
-  },
-
-  // Page container with constrained width
+  // Brighter semi-transparent overlay
   overlay: {
     flex: 1,
     alignItems: 'center',
@@ -15,42 +9,48 @@ export default StyleSheet.create({
     paddingVertical: 24,
     maxWidth: 900,
     alignSelf: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',  // <<< Brighter with slight transparency
   },
 
-  // Big page title
+  // Full background fallback
+  background: {
+    flex: 1,
+    backgroundColor: '#fefefe',  // subtle light fallback
+  },
+
+  // Titles
   title: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: 'bold',
     marginBottom: 20,
+    textAlign: 'center',
+    color: '#111',
+  },
+
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 12,
     textAlign: 'center',
     color: '#222',
   },
 
-  // Section titles in forms / cards
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '600',
-    marginBottom: 12,
-    textAlign: 'center',
-    color: '#333',
-  },
-
-  // Input labels
+  // Labels
   label: {
-    fontWeight: '500',
+    fontWeight: '600',
     marginTop: 12,
     marginBottom: 6,
     fontSize: 16,
-    color: '#555',
+    color: '#333',
     alignSelf: 'flex-start',
     maxWidth: 400,
   },
 
-  // Form input boxes
+  // Inputs
   formInput: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 6,
+    borderColor: '#bbb',
+    borderRadius: 8,
     padding: 12,
     marginBottom: 16,
     backgroundColor: '#fff',
@@ -60,12 +60,12 @@ export default StyleSheet.create({
     fontSize: 16,
   },
 
-  // Button styling
+  // Buttons
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#007BFF',
     paddingVertical: 12,
     paddingHorizontal: 20,
-    borderRadius: 6,
+    borderRadius: 8,
     alignItems: 'center',
     width: '100%',
     maxWidth: 400,
@@ -76,11 +76,11 @@ export default StyleSheet.create({
 
   buttonText: {
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 16,
   },
 
-  // Tab bar for nav
+  // Tab Bar
   tabBar: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -90,40 +90,43 @@ export default StyleSheet.create({
   },
 
   activeTab: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#007BFF',
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 6,
+    borderRadius: 8,
     color: '#fff',
     cursor: 'pointer',
   },
 
   inactiveTab: {
-    backgroundColor: '#eaeaea',
+    backgroundColor: '#f0f0f0',
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 6,
-    color: '#333',
+    borderRadius: 8,
+    color: '#444',
     cursor: 'pointer',
   },
 
-  // Items in lists
+  // List Items
   listItem: {
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 6,
+    borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     width: '100%',
     maxWidth: 700,
     alignSelf: 'center',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
   },
 
   itemBox: {
     padding: 16,
-    borderRadius: 6,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
     marginBottom: 12,
@@ -135,25 +138,23 @@ export default StyleSheet.create({
 
   subText: {
     fontSize: 16,
-    color: '#555',
+    color: '#333',
     marginBottom: 8,
     textAlign: 'center',
   },
 
-  // Price text
   price: {
-    color: 'green',
+    color: '#28a745',
     fontSize: 18,
     fontWeight: 'bold',
     marginVertical: 8,
     textAlign: 'center',
   },
 
-  // Pickers
   picker: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 6,
+    borderColor: '#bbb',
+    borderRadius: 8,
     padding: 10,
     marginBottom: 16,
     backgroundColor: '#fff',
@@ -162,10 +163,9 @@ export default StyleSheet.create({
     alignSelf: 'center',
   },
 
-  // Offer card
   offerCard: {
     backgroundColor: '#fff',
-    borderRadius: 6,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
     padding: 20,
@@ -173,25 +173,28 @@ export default StyleSheet.create({
     width: '100%',
     maxWidth: 700,
     alignSelf: 'center',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
   },
 
   offerTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 6,
-    color: '#222',
+    color: '#111',
   },
 
   offerDetail: {
     fontSize: 16,
     marginBottom: 6,
-    color: '#444',
+    color: '#333',
   },
 
   sectionBox: {
     backgroundColor: '#fff',
-    borderRadius: 6,
+    borderRadius: 8,
     padding: 20,
     marginBottom: 20,
     borderWidth: 1,
@@ -199,6 +202,9 @@ export default StyleSheet.create({
     width: '100%',
     maxWidth: 800,
     alignSelf: 'center',
-    boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
   },
 });

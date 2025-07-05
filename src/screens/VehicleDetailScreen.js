@@ -1,4 +1,5 @@
-// src/screens/VehicleDetailScreen.js
+// PATH: src/screens/VehicleDetailScreen.js
+
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -35,10 +36,16 @@ export default function VehicleDetailScreen({ route, navigation }) {
   if (loading) return <ActivityIndicator size="large" />;
   if (!vehicle) return <Text>Vehicle not found.</Text>;
 
-  // Filter by tab
-  const filteredRepairs = repairs.filter(r =>
-    activeTab === 'repairs' ? r.status !== 'offer' : r.status === 'offer'
-  );
+  // ✅ NEW: Filter by tab
+  const filteredRepairs = repairs.filter(r => {
+    if (activeTab === 'repairs') {
+      return r.status === 'done';           // ✅ ONLY show DONE repairs here
+    }
+    if (activeTab === 'offers') {
+      return r.status === 'offer';          // ✅ Only offer status here
+    }
+    return false;
+  });
 
   return (
     <View style={BASE_STYLES.overlay}>

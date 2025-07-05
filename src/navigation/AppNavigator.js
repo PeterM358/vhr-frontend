@@ -22,6 +22,7 @@ import CreateVehicleScreen from '../screens/CreateVehicleScreen';
 import CreatePromotionScreen from '../screens/CreatePromotionScreen';
 import ShopRegisterClientScreen from '../screens/ShopRegisterClientScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
+import OffersScreen from '../screens/OffersScreen';
 
 
 // ✅ THIS LINE is what was missing
@@ -50,6 +51,7 @@ export default function AppNavigator() {
         <Stack.Screen name="CreatePromotion" component={CreatePromotionScreen} />
         <Stack.Screen name="ShopRegisterClient" component={ShopRegisterClientScreen} />
         <Stack.Screen name="ChooseShop" component={ChooseShopScreen} />
+         <Stack.Screen name="OffersScreen" component={OffersScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

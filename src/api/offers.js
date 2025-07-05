@@ -113,3 +113,11 @@ export async function getMyOffers(token) {
 
   return await response.json();
 }
+
+export async function getMyBookedPromotionIds(token) {
+  const response = await fetch(`${API_BASE_URL}/api/offers/my-booked-promotions/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch booked promotions');
+  return await response.json();  // array of offer IDs
+}

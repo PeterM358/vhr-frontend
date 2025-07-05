@@ -1,85 +1,48 @@
-// src/screens/HomeScreen.js
-import React, { useEffect, useState } from 'react';
+// PATH: src/screens/HomeScreen.js
+
+import React, { useEffect, useState, useContext } from 'react';
 import {
   View,
   Text,
-  FlatList,
   TouchableOpacity,
-  Alert,
   ImageBackground,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logout } from '../api/auth';
-import { getRepairs } from '../api/repairs';
-import { getVehicles } from '../api/vehicles';
-import { getPromotions } from '../api/offers';
-import ClientRepairsList from '../components/client/ClientRepairsList';
+import { WebSocketContext } from '../context/WebSocketManager';
 import BASE_STYLES from '../styles/base';
 import CommonButton from '../components/CommonButton';
 
 export default function HomeScreen({ navigation }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
-  const [repairs, setRepairs] = useState([]);
-  const [vehicles, setVehicles] = useState([]);
-  const [promotions, setPromotions] = useState([]);
-  const [activeTab, setActiveTab] = useState('repairs');
+  const [userEmailOrPhone, setUserEmailOrPhone] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const { notifications } = useContext(WebSocketContext);
+
+  // Calculate unseen counts
+  const unseenPromotions = notifications.filter(n => !n.is_read && n.repair == null).length;
+  const unseenOffers = notifications.filter(n => !n.is_read && n.repair != null).length;
+  const totalOffersBadge = unseenPromotions + unseenOffers;
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const token = await AsyncStorage.getItem('@access_token');
-      const email = await AsyncStorage.getItem('@user_email');
-      setIsAuthenticated(!!token);
-      if (email) setUserEmail(email);
-
-      if (token) {
-        try {
-          const [repairsData, vehiclesData, promotionsData] = await Promise.all([
-            getRepairs(token),
-            getVehicles(token),
-            getPromotions(token),
-          ]);
-          setRepairs(repairsData);
-          setVehicles(vehiclesData);
-          setPromotions(promotionsData);
-        } catch (error) {
-          console.error('Failed to fetch data:', error);
-        }
-      }
-    };
-
     const unsubscribe = navigation.addListener('focus', checkAuth);
     return unsubscribe;
   }, [navigation]);
 
+  const checkAuth = async () => {
+    const token = await AsyncStorage.getItem('@access_token');
+    const emailOrPhone = await AsyncStorage.getItem('@user_email_or_phone');
+    setIsAuthenticated(!!token);
+    setUserEmailOrPhone(emailOrPhone || '');
+    setLoading(false);
+  };
+
   const handleLogout = async () => {
     await logout(navigation);
   };
-
-  const renderVehicleItem = ({ item }) => (
-    <TouchableOpacity
-      style={BASE_STYLES.listItem}
-      onPress={() => navigation.navigate('VehicleDetail', { vehicleId: item.id })}
-    >
-      <Text style={BASE_STYLES.subText}>Plate: {item.license_plate}</Text>
-      <Text style={BASE_STYLES.subText}>Make: {item.brand_name}</Text>
-      <Text style={BASE_STYLES.subText}>Model: {item.model_name}</Text>
-      <Text style={BASE_STYLES.subText}>Year: {item.year}</Text>
-    </TouchableOpacity>
-  );
-
-  const renderPromotionItem = ({ item }) => (
-    <TouchableOpacity
-      style={BASE_STYLES.offerCard}
-      onPress={() => navigation.navigate('PromotionDetail', { promotion: item })}
-    >
-      <Text style={BASE_STYLES.offerTitle}>{item.repair_type_name}</Text>
-      <Text style={BASE_STYLES.offerDetail}>{item.description}</Text>
-      <Text style={BASE_STYLES.price}>Price: {item.price} BGN</Text>
-      <Text style={BASE_STYLES.offerDetail}>Shop: {item.shop_name}</Text>
-    </TouchableOpacity>
-  );
 
   if (!isAuthenticated) {
     return (
@@ -96,6 +59,20 @@ export default function HomeScreen({ navigation }) {
     );
   }
 
+  if (loading) {
+    return (
+      <ImageBackground
+        source={require('../assets/background.jpg')}
+        style={BASE_STYLES.background}
+        blurRadius={5}
+      >
+        <View style={BASE_STYLES.overlay}>
+          <ActivityIndicator size="large" />
+        </View>
+      </ImageBackground>
+    );
+  }
+
   return (
     <ImageBackground
       source={require('../assets/background.jpg')}
@@ -103,62 +80,60 @@ export default function HomeScreen({ navigation }) {
       blurRadius={5}
     >
       <View style={BASE_STYLES.overlay}>
-        <Text style={BASE_STYLES.title}>Welcome, {userEmail}</Text>
+        <Text style={BASE_STYLES.title}>Welcome, {userEmailOrPhone}</Text>
 
         <View style={BASE_STYLES.tabBar}>
           <TouchableOpacity
-            onPress={() => setActiveTab('repairs')}
-            style={activeTab === 'repairs' ? BASE_STYLES.activeTab : BASE_STYLES.inactiveTab}
+            onPress={() => navigation.navigate('ClientRepairs')}
+            style={BASE_STYLES.inactiveTab}
           >
             <Text>Repairs</Text>
           </TouchableOpacity>
+
           <TouchableOpacity
-            onPress={() => setActiveTab('vehicles')}
-            style={activeTab === 'vehicles' ? BASE_STYLES.activeTab : BASE_STYLES.inactiveTab}
+            onPress={() => navigation.navigate('ClientVehicles')}
+            style={BASE_STYLES.inactiveTab}
           >
             <Text>Vehicles</Text>
           </TouchableOpacity>
+
           <TouchableOpacity
-            onPress={() => setActiveTab('promotions')}
-            style={activeTab === 'promotions' ? BASE_STYLES.activeTab : BASE_STYLES.inactiveTab}
+            onPress={() => navigation.navigate('OffersScreen')}
+            style={BASE_STYLES.inactiveTab}
           >
-            <Text>Promotions</Text>
+            <View style={styles.tabButtonContent}>
+              <Text>Offers</Text>
+              {totalOffersBadge > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{totalOffersBadge}</Text>
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
         </View>
 
         <CommonButton title="Find Shops on Map" onPress={() => navigation.navigate('ShopMap')} />
-
-        {activeTab === 'repairs' && (
-          <ClientRepairsList navigation={navigation} />
-        )}
-
-        {activeTab === 'vehicles' && (
-          <>
-            <CommonButton
-              title="➕ Add New Vehicle"
-              onPress={() => navigation.navigate('CreateVehicle')}
-            />
-
-            <FlatList
-              data={vehicles}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={renderVehicleItem}
-              ListEmptyComponent={<Text style={{ textAlign: 'center', marginVertical: 20 }}>No vehicles found. Add one!</Text>}
-            />
-          </>
-        )}
-
-        {activeTab === 'promotions' && (
-          <FlatList
-            data={promotions}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={renderPromotionItem}
-            ListEmptyComponent={<Text style={{ textAlign: 'center', marginVertical: 20 }}>No promotions available</Text>}
-          />
-        )}
-
         <CommonButton title="Logout" color="red" onPress={handleLogout} />
       </View>
     </ImageBackground>
   );
 }
+
+const styles = StyleSheet.create({
+  tabButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  badge: {
+    marginLeft: 6,
+    backgroundColor: 'red',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+});

@@ -1,3 +1,5 @@
+// PATH: src/context/WebSocketManager.js
+
 import React, { createContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WS_BASE_URL } from '../env';
@@ -28,7 +30,7 @@ export const WebSocketProvider = ({ children }) => {
       console.log('📨 Received:', e.data);
       try {
         const data = JSON.parse(e.data);
-        setNotifications(prev => [data, ...prev]);
+        setNotifications((prev) => [data, ...prev]);
       } catch (error) {
         console.error('❌ Error parsing WebSocket message:', error);
       }
@@ -50,13 +52,18 @@ export const WebSocketProvider = ({ children }) => {
     };
   }, []);
 
-  // ✅ Add removeNotification
+  // ✅ Clear all notifications
+  const clearNotifications = () => {
+    setNotifications([]);
+  };
+
+  // ✅ Remove single notification by ID
   const removeNotification = (id) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
   return (
-    <WebSocketContext.Provider value={{ notifications, setNotifications, removeNotification }}>
+    <WebSocketContext.Provider value={{ notifications, setNotifications, clearNotifications, removeNotification }}>
       {children}
     </WebSocketContext.Provider>
   );
