@@ -1,92 +1,107 @@
+// PATH: src/screens/RegisterScreen.js
+
 import React, { useState } from 'react';
-import { View, TextInput, Text, ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
+import { Text, TextInput, Button, useTheme, ToggleButton } from 'react-native-paper';
 import { register } from '../api/auth';
-import SegmentedControlTab from 'react-native-segmented-control-tab';
-import BASE_STYLES from '../styles/base';
-import CommonButton from '../components/CommonButton';
 
 export default function RegisterScreen({ navigation }) {
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [selection, setSelection] = useState(0); // 0: Client, 1: Shop
+  const [role, setRole] = useState('client'); // 'client' or 'shop'
   const [error, setError] = useState('');
 
+  const theme = useTheme();
+
   const handleRegister = async () => {
-    if (!email.trim() && !phone.trim()) {
+    if (!emailOrPhone.trim()) {
       setError('Email or Phone number is required.');
       return;
     }
 
-    const isClient = selection === 0;
-    const isShop = selection === 1;
+    const isClient = role === 'client';
+    const isShop = role === 'shop';
 
     try {
-      await register(email.trim(), phone.trim(), password, isClient, isShop);
+      await register(emailOrPhone.trim(), password, isClient, isShop);
       navigation.reset({
         index: 0,
-        routes: [{ name: isShop ? 'ShopHome' : 'ClientVehicles' }],
+        routes: [{ name: isShop ? 'ShopHome' : 'Home' }],
       });
     } catch (err) {
+      console.error('Registration error:', err);
       setError(err.message);
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={BASE_STYLES.overlay}>
-      <Text style={BASE_STYLES.title}>Register New Account</Text>
-      {error ? <Text style={BASE_STYLES.error}>{error}</Text> : null}
-
-      <Text style={BASE_STYLES.label}>Email (optional)</Text>
-      <TextInput
-        style={BASE_STYLES.formInput}
-        placeholder="Enter your email"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-
-      <Text style={BASE_STYLES.label}>Phone (optional)</Text>
-      <TextInput
-        style={BASE_STYLES.formInput}
-        placeholder="+359..."
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-      />
-
-      <Text style={BASE_STYLES.subText}>
-        Email or Phone is required.
+    <ScrollView
+      contentContainerStyle={{
+        flexGrow: 1,
+        backgroundColor: theme.colors.background,
+        justifyContent: 'center',
+        padding: 20,
+      }}
+    >
+      <Text variant="headlineMedium" style={{ textAlign: 'center', marginBottom: 20, color: theme.colors.primary }}>
+        Register New Account
       </Text>
 
-      <Text style={BASE_STYLES.label}>Password</Text>
+      {error ? (
+        <Text style={{ color: theme.colors.error, textAlign: 'center', marginBottom: 12 }}>
+          {error}
+        </Text>
+      ) : null}
+
       <TextInput
-        style={BASE_STYLES.formInput}
-        placeholder="Enter password"
+        label="Email or Phone"
+        mode="outlined"
+        value={emailOrPhone}
+        onChangeText={setEmailOrPhone}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        style={{ marginBottom: 16 }}
+      />
+
+      <TextInput
+        label="Password"
+        mode="outlined"
         secureTextEntry
         value={password}
         onChangeText={setPassword}
+        style={{ marginBottom: 24 }}
       />
 
-      <Text style={BASE_STYLES.label}>Register as:</Text>
-      <SegmentedControlTab
-        values={['Client', 'Shop']}
-        selectedIndex={selection}
-        onTabPress={setSelection}
-        tabsContainerStyle={styles.segmented}
-      />
+      <Text style={{ marginBottom: 8, color: theme.colors.onBackground }}>
+        Register as:
+      </Text>
+      <ToggleButton.Row
+        onValueChange={setRole}
+        value={role}
+        style={styles.toggleGroup}
+      >
+        <ToggleButton icon="account" value="client">
+          Client
+        </ToggleButton>
+        <ToggleButton icon="store" value="shop">
+          Shop
+        </ToggleButton>
+      </ToggleButton.Row>
 
-      <CommonButton title="Register" onPress={handleRegister} />
+      <Button
+        mode="contained"
+        onPress={handleRegister}
+        style={{ marginTop: 24 }}
+      >
+        Register
+      </Button>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  segmented: {
-    marginVertical: 16,
-    maxWidth: 400,
-    alignSelf: 'center',
-    width: '100%',
+  toggleGroup: {
+    justifyContent: 'center',
+    marginBottom: 20,
   },
 });

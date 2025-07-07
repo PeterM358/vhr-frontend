@@ -1,15 +1,12 @@
+// PATH: src/components/shop/ShopPromotions.js
+
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  ActivityIndicator,
-  FlatList,
-  Alert,
-} from 'react-native';
+import { View, FlatList, Alert, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { API_BASE_URL } from '../../api/config';
 import { deleteOffer } from '../../api/offers';
+import { Card, Text, Button, ActivityIndicator, useTheme } from 'react-native-paper';
 import CommonButton from '../CommonButton';
 import BASE_STYLES from '../../styles/base';
 
@@ -18,6 +15,7 @@ export default function ShopPromotions() {
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();
   const isFocused = useIsFocused();
+  const theme = useTheme();
 
   useEffect(() => {
     if (isFocused) {
@@ -35,7 +33,7 @@ export default function ShopPromotions() {
       const data = await response.json();
       setOffers(data);
     } catch (err) {
-      console.error('Failed to fetch promotions', err);
+      console.error('❌ Failed to fetch promotions', err);
       Alert.alert('Error', 'Failed to load promotions');
     } finally {
       setLoading(false);
@@ -49,48 +47,51 @@ export default function ShopPromotions() {
       setOffers((prev) => prev.filter((o) => o.id !== offerId));
       Alert.alert('Deleted', 'Promotion deleted successfully');
     } catch (err) {
-      console.error('Failed to delete offer', err);
+      console.error('❌ Failed to delete offer', err);
       Alert.alert('Error', err.message || 'Failed to delete promotion');
     }
   };
 
   const renderOffer = ({ item }) => (
-    <View style={BASE_STYLES.offerCard}>
-      <Text style={BASE_STYLES.offerTitle}>{item.title}</Text>
-      <Text style={BASE_STYLES.offerDetail}>{item.description}</Text>
-      <Text style={BASE_STYLES.offerDetail}>Repair Type: {item.repair_type_name}</Text>
-      <Text style={BASE_STYLES.price}>Price: {item.price} BGN</Text>
-      <Text style={BASE_STYLES.offerDetail}>Valid: {item.valid_from} to {item.valid_until}</Text>
-      <Text style={BASE_STYLES.offerDetail}>Max Bookings: {item.max_bookings || 'Unlimited'}</Text>
-      <View style={{ marginTop: 10 }}>
-        <CommonButton
-          title="🗑️ Delete"
-          color="red"
+    <Card style={styles.card} mode="outlined">
+      <Card.Title title={item.title} titleStyle={styles.cardTitle} />
+      <Card.Content>
+        <Text style={styles.detail}>{item.description}</Text>
+        <Text style={styles.detail}>Repair Type: {item.repair_type_name}</Text>
+        <Text style={styles.price}>Price: {item.price} BGN</Text>
+        <Text style={styles.detail}>Valid: {item.valid_from} to {item.valid_until}</Text>
+        <Text style={styles.detail}>Max Bookings: {item.max_bookings || 'Unlimited'}</Text>
+      </Card.Content>
+      <Card.Actions>
+        <Button
           onPress={() => handleDelete(item.id)}
-        />
-      </View>
-    </View>
+          textColor={theme.colors.error}
+          icon="delete"
+        >
+          Delete
+        </Button>
+      </Card.Actions>
+    </Card>
   );
 
   return (
     <View style={BASE_STYLES.overlay}>
-      <Text style={BASE_STYLES.title}>Your Promotional Offers</Text>
-
       <CommonButton
-        title="➕ Add New Promotion"
+        title="➕ Create Promotion"
         onPress={() => navigation.navigate('CreatePromotion')}
       />
 
       {loading ? (
-        <ActivityIndicator size="large" />
+        <ActivityIndicator animating={true} size="large" style={styles.loading} />
       ) : (
         <FlatList
           data={offers}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
           renderItem={renderOffer}
+          contentContainerStyle={styles.listContent}
           ListEmptyComponent={
-            <Text style={{ textAlign: 'center', marginVertical: 20 }}>
-              No promotions available
+            <Text style={styles.emptyText}>
+              No promotions available.
             </Text>
           }
         />
@@ -98,3 +99,34 @@ export default function ShopPromotions() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  title: {
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  loading: {
+    marginTop: 50,
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
+  card: {
+    marginVertical: 8,
+    marginHorizontal: 16,
+  },
+  cardTitle: {
+    fontWeight: 'bold',
+  },
+  detail: {
+    marginVertical: 2,
+  },
+  price: {
+    marginVertical: 2,
+    fontWeight: 'bold',
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginVertical: 20,
+  },
+});

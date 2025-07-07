@@ -1,20 +1,16 @@
-// src/screens/ShopMapScreen.native.js
+// PATH: src/screens/ShopMapScreen.native.js
+
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  Alert,
-  TextInput,
-  Button,
-} from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { TextInput, Button, Surface, useTheme, Text } from 'react-native-paper';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 
 export default function ShopMapScreen({ navigation }) {
+  const theme = useTheme();
+
   const [location, setLocation] = useState(null);
   const [shops, setShops] = useState([]);
   const [addressQuery, setAddressQuery] = useState('');
@@ -85,16 +81,6 @@ export default function ShopMapScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <TextInput
-          placeholder="Search by address..."
-          value={addressQuery}
-          onChangeText={setAddressQuery}
-          style={styles.searchInput}
-        />
-        <Button title="Search" onPress={handleSearch} />
-      </View>
-
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -116,42 +102,61 @@ export default function ShopMapScreen({ navigation }) {
             >
               <Callout onPress={() => navigation.navigate('ShopDetail', { shopId: shop.id })}>
                 <View style={{ maxWidth: 200 }}>
-                  <Text style={{ fontWeight: 'bold' }}>{shop.name}</Text>
-                  <Text>{shop.address}</Text>
-                  <Text style={{ color: 'blue', marginTop: 5 }}>Tap for details</Text>
+                  <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>{shop.name}</Text>
+                  <Text variant="bodySmall">{shop.address}</Text>
+                  <Text style={{ color: theme.colors.primary, marginTop: 5 }}>Tap for details</Text>
                 </View>
               </Callout>
             </Marker>
         ))}
       </MapView>
+
+      <Surface style={styles.searchContainer}>
+        <TextInput
+          mode="outlined"
+          dense
+          placeholder="Search by address..."
+          value={addressQuery}
+          onChangeText={setAddressQuery}
+          style={styles.searchInput}
+        />
+        <Button
+          mode="contained"
+          icon="magnify"
+          onPress={handleSearch}
+          style={styles.searchButton}
+          compact
+        >
+          Search
+        </Button>
+      </Surface>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  map: { flex: 1 },
   searchContainer: {
     position: 'absolute',
-    top: 10,
-    left: 10,
-    right: 10,
+    top: 20,
+    left: 20,
+    right: 20,
     padding: 10,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    zIndex: 10,
+    borderRadius: 12,
     flexDirection: 'row',
-    gap: 8,
     alignItems: 'center',
+    elevation: 5,
+    backgroundColor: '#fff',
   },
   searchInput: {
     flex: 1,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    marginRight: 8,
   },
-  map: { flex: 1 },
+  searchButton: {
+    height: 40,
+    justifyContent: 'center',
+  },
   loader: {
     flex: 1,
     justifyContent: 'center',

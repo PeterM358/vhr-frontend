@@ -4,7 +4,6 @@ import React, { useEffect, useState, useContext } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   ImageBackground,
   StyleSheet,
   ActivityIndicator,
@@ -13,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logout } from '../api/auth';
 import { WebSocketContext } from '../context/WebSocketManager';
 import BASE_STYLES from '../styles/base';
-import CommonButton from '../components/CommonButton';
+import { Appbar, Badge, Button } from 'react-native-paper';
 
 export default function HomeScreen({ navigation }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -22,7 +21,6 @@ export default function HomeScreen({ navigation }) {
 
   const { notifications } = useContext(WebSocketContext);
 
-  // Calculate unseen counts
   const unseenPromotions = notifications.filter(n => !n.is_read && n.repair == null).length;
   const unseenOffers = notifications.filter(n => !n.is_read && n.repair != null).length;
   const totalOffersBadge = unseenPromotions + unseenOffers;
@@ -44,20 +42,7 @@ export default function HomeScreen({ navigation }) {
     await logout(navigation);
   };
 
-  if (!isAuthenticated) {
-    return (
-      <ImageBackground
-        source={require('../assets/background.jpg')}
-        style={BASE_STYLES.background}
-        blurRadius={5}
-      >
-        <View style={BASE_STYLES.overlay}>
-          <CommonButton title="Login" onPress={() => navigation.navigate('Login')} />
-          <CommonButton title="Register" onPress={() => navigation.navigate('Register')} />
-        </View>
-      </ImageBackground>
-    );
-  }
+  /** ---------- RENDER ---------- */
 
   if (loading) {
     return (
@@ -73,67 +58,122 @@ export default function HomeScreen({ navigation }) {
     );
   }
 
+  /** ---------- NOT AUTHENTICATED ---------- */
+  if (!isAuthenticated) {
+    return (
+      <ImageBackground
+        source={require('../assets/background.jpg')}
+        style={BASE_STYLES.background}
+        blurRadius={5}
+      >
+        <View style={BASE_STYLES.overlay}>
+          <Text style={styles.welcomeText}>
+            Welcome! Please Login or Register.
+          </Text>
+        </View>
+      </ImageBackground>
+    );
+  }
+
+  /** ---------- AUTHENTICATED ---------- */
+  let username = userEmailOrPhone.trim();
+  if (username.includes('@')) {
+    username = username.split('@')[0];
+  }
+
   return (
     <ImageBackground
       source={require('../assets/background.jpg')}
       style={BASE_STYLES.background}
       blurRadius={5}
     >
-      <View style={BASE_STYLES.overlay}>
-        <Text style={BASE_STYLES.title}>Welcome, {userEmailOrPhone}</Text>
+      <Appbar.Header style={styles.appbar}>
+        <Appbar.Action
+          icon="menu"
+          color="#fff"
+          onPress={() => navigation.openDrawer()}
+        />
+        <Appbar.Content
+          title={username}
+          titleStyle={styles.appbarTitle}
+        />
 
-        <View style={BASE_STYLES.tabBar}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('ClientRepairs')}
-            style={BASE_STYLES.inactiveTab}
-          >
-            <Text>Repairs</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => navigation.navigate('ClientVehicles')}
-            style={BASE_STYLES.inactiveTab}
-          >
-            <Text>Vehicles</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
+        <View style={styles.iconWithBadge}>
+          <Appbar.Action
+            icon="bell-outline"
+            color="#fff"
             onPress={() => navigation.navigate('OffersScreen')}
-            style={BASE_STYLES.inactiveTab}
-          >
-            <View style={styles.tabButtonContent}>
-              <Text>Offers</Text>
-              {totalOffersBadge > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{totalOffersBadge}</Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
+          />
+          {totalOffersBadge > 0 && (
+            <Badge style={styles.notificationBadge}>{totalOffersBadge}</Badge>
+          )}
         </View>
 
-        <CommonButton title="Find Shops on Map" onPress={() => navigation.navigate('ShopMap')} />
-        <CommonButton title="Logout" color="red" onPress={handleLogout} />
+        <Appbar.Action
+          icon="logout"
+          color="#fff"
+          onPress={handleLogout}
+        />
+      </Appbar.Header>
+
+      <View style={BASE_STYLES.overlay}>
+        <Text style={styles.welcomeText}>
+          Welcome to Vehicle Repair Hub
+        </Text>
+        <Text style={styles.subText}>
+          Use the menu or map below to navigate
+        </Text>
+
+        <Button
+          mode="contained"
+          icon="map-marker"
+          onPress={() => navigation.navigate('ShopMap')}
+          style={styles.button}
+        >
+          Find Shops on Map
+        </Button>
       </View>
     </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  tabButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  appbar: {
+    backgroundColor: '#007AFF',
   },
-  badge: {
-    marginLeft: 6,
-    backgroundColor: 'red',
-    borderRadius: 8,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
-  badgeText: {
-    color: 'white',
-    fontSize: 12,
+  appbarTitle: {
+    color: '#fff',
+    fontSize: 18,
     fontWeight: 'bold',
+  },
+  iconWithBadge: {
+    position: 'relative',
+    marginRight: 8,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'red',
+    color: 'white',
+  },
+  welcomeText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+    color: '#333',
+  },
+  subText: {
+    fontSize: 16,
+    textAlign: 'center',
+    color: '#555',
+    marginBottom: 20,
+  },
+  button: {
+    marginVertical: 12,
+    alignSelf: 'center',
+    width: '80%',
+    maxWidth: 400,
   },
 });

@@ -1,12 +1,8 @@
-// src/components/shop/AuthorizedClients.js
+// PATH: src/components/shop/AuthorizedClients.js
 
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
-  Text,
-  ActivityIndicator,
-  FlatList,
-  TouchableOpacity,
   LayoutAnimation,
   UIManager,
   Platform,
@@ -15,12 +11,19 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { API_BASE_URL } from '../../api/config';
+import { FlatList } from 'react-native';
+import {
+  Card,
+  Text,
+  ActivityIndicator,
+  Button,
+  useTheme,
+} from 'react-native-paper';
 import CommonButton from '../CommonButton';
 import BASE_STYLES from '../../styles/base';
 
 const API_URL = `${API_BASE_URL}/api/shops/authorized-clients/`;
 
-// Enable Layout Animation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
@@ -29,6 +32,7 @@ export default function AuthorizedClients({ navigation }) {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedClientIds, setExpandedClientIds] = useState([]);
+  const theme = useTheme();
 
   const fetchAuthorized = useCallback(async () => {
     setLoading(true);
@@ -46,7 +50,6 @@ export default function AuthorizedClients({ navigation }) {
     }
   }, []);
 
-  // Fetch on mount + when screen refocuses
   useFocusEffect(
     useCallback(() => {
       fetchAuthorized();
@@ -62,12 +65,70 @@ export default function AuthorizedClients({ navigation }) {
     );
   };
 
-  if (loading) return <ActivityIndicator size="large" />;
+  const renderClient = ({ item }) => {
+    const expanded = expandedClientIds.includes(item.client.id);
+    const clientLabel = item.client.email
+      ? item.client.email
+      : item.client.phone
+      ? item.client.phone
+      : 'Unnamed Client';
+
+    return (
+      <Card
+        mode="outlined"
+        style={[styles.card, { borderColor: theme.colors.primary }]}
+        onPress={() => toggleExpand(item.client.id)}
+      >
+        <Card.Content style={styles.clientHeader}>
+          <Text variant="titleMedium" style={styles.clientLabel} numberOfLines={3}>
+            {clientLabel}
+          </Text>
+        </Card.Content>
+
+        {expanded && (
+          <View style={styles.expandedContent}>
+            {item.vehicles.map((vehicle) => (
+              <Card
+                key={vehicle.id}
+                mode="contained"
+                style={styles.vehicleCard}
+                onPress={() => navigation.navigate('VehicleDetail', { vehicleId: vehicle.id })}
+              >
+                <Card.Content>
+                  <Text style={styles.vehicleTitle}>{vehicle.license_plate}</Text>
+                  <Text>{vehicle.brand_name} {vehicle.model_name}</Text>
+                  <Text>Year: {vehicle.year}</Text>
+                  <Text>Kilometers: {vehicle.kilometers}</Text>
+                </Card.Content>
+              </Card>
+            ))}
+
+            <Button
+              mode="contained"
+              icon="plus"
+              onPress={() =>
+                navigation.navigate('CreateVehicle', {
+                  clientId: item.client.id,
+                  clientEmail: item.client.email,
+                  clientPhone: item.client.phone,
+                })
+              }
+              style={styles.addVehicleButton}
+            >
+              Add Vehicle
+            </Button>
+          </View>
+        )}
+      </Card>
+    );
+  };
+
+  if (loading) {
+    return <ActivityIndicator animating={true} size="large" style={styles.loading} />;
+  }
 
   return (
     <View style={BASE_STYLES.overlay}>
-      <Text style={BASE_STYLES.title}>Authorized Clients</Text>
-
       <CommonButton
         title="➕ Add Client"
         onPress={() => navigation.navigate('ShopRegisterClient')}
@@ -76,56 +137,11 @@ export default function AuthorizedClients({ navigation }) {
 
       <FlatList
         data={clients}
-        keyExtractor={(item) => item.client.id.toString()}
-        renderItem={({ item }) => {
-          const expanded = expandedClientIds.includes(item.client.id);
-          const clientLabel = item.client.email
-            ? item.client.email
-            : item.client.phone
-            ? item.client.phone
-            : 'Unnamed Client';
-
-          return (
-            <View style={BASE_STYLES.sectionBox}>
-              <TouchableOpacity onPress={() => toggleExpand(item.client.id)}>
-                <Text style={BASE_STYLES.subText}>{clientLabel}</Text>
-              </TouchableOpacity>
-
-              {expanded && (
-                <View style={{ marginTop: 8 }}>
-                  {item.vehicles.map((vehicle) => (
-                    <TouchableOpacity
-                      key={vehicle.id}
-                      onPress={() => navigation.navigate('VehicleDetail', { vehicleId: vehicle.id })}
-                      style={BASE_STYLES.listItem}
-                    >
-                      <Text style={BASE_STYLES.subText}>{vehicle.license_plate}</Text>
-                      <Text>{vehicle.brand_name} {vehicle.model_name}</Text>
-                      <Text>Year: {vehicle.year}</Text>
-                      <Text>Kilometers: {vehicle.kilometers}</Text>
-                    </TouchableOpacity>
-                  ))}
-
-                  <CommonButton
-                    title="➕ Add Vehicle"
-                    onPress={() =>
-                      navigation.navigate('CreateVehicle', {
-                        clientId: item.client.id,
-                        clientEmail: item.client.email,
-                        clientPhone: item.client.phone,
-                      })
-                    }
-                    style={styles.addVehicleButton}
-                  />
-                </View>
-              )}
-            </View>
-          );
-        }}
+        keyExtractor={(item) => item.client.id?.toString() ?? Math.random().toString()}
+        renderItem={renderClient}
+        contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <Text style={{ textAlign: 'center', marginVertical: 20 }}>
-            No authorized clients
-          </Text>
+          <Text style={styles.emptyText}>No authorized clients</Text>
         }
       />
     </View>
@@ -133,6 +149,40 @@ export default function AuthorizedClients({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  title: {
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  loading: {
+    marginTop: 50,
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
+  card: {
+    marginVertical: 10,
+    marginHorizontal: 16,
+    borderWidth: 1,
+  },
+  clientHeader: {
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+  },
+  clientLabel: {
+    fontSize: 16,
+    flexWrap: 'wrap',
+  },
+  expandedContent: {
+    padding: 12,
+  },
+  vehicleCard: {
+    marginVertical: 6,
+    backgroundColor: '#f5f5f5',
+  },
+  vehicleTitle: {
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
   addButton: {
     marginVertical: 12,
     alignSelf: 'center',
@@ -140,5 +190,9 @@ const styles = StyleSheet.create({
   addVehicleButton: {
     marginTop: 12,
     alignSelf: 'center',
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginVertical: 20,
   },
 });

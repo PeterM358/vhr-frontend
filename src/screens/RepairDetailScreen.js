@@ -1,13 +1,22 @@
+// PATH: src/screens/RepairDetailScreen.js
+
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
-  Text,
-  TextInput,
-  ActivityIndicator,
-  FlatList,
   Alert,
+  FlatList,
+  ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  Card,
+  Text,
+  TextInput,
+  Button,
+  Divider,
+  useTheme,
+} from 'react-native-paper';
 
 import {
   getOffersForRepair,
@@ -22,11 +31,9 @@ import {
   confirmRepair,
 } from '../api/repairs';
 
-import BASE_STYLES from '../styles/base';
-import CommonButton from '../components/CommonButton';
-
 export default function RepairDetailScreen({ route, navigation }) {
   const { repairId } = route.params;
+  const theme = useTheme();
 
   const [repair, setRepair] = useState(null);
   const [offers, setOffers] = useState([]);
@@ -79,7 +86,6 @@ export default function RepairDetailScreen({ route, navigation }) {
     setEditDescription(repairData.description || '');
   };
 
-  // Determine if this is *my* repair as shop
   const isMyShopRepair = useMemo(() => {
     return isShop && repair && repair.shop === shopUserId;
   }, [isShop, repair, shopUserId]);
@@ -171,37 +177,30 @@ export default function RepairDetailScreen({ route, navigation }) {
     );
 
     return (
-      <View style={BASE_STYLES.offerCard}>
-        <Text style={BASE_STYLES.offerTitle}>{item.description}</Text>
-        <Text style={BASE_STYLES.price}>Price: {item.price} BGN</Text>
-        <Text style={BASE_STYLES.offerDetail}>Shop: {item.shop_name}</Text>
-
-        <View style={BASE_STYLES.buttonGroup}>
+      <Card style={styles.offerCard} mode="outlined">
+        <Card.Content>
+          <Text variant="titleMedium">{item.description}</Text>
+          <Text variant="bodyMedium">Price: {item.price} BGN</Text>
+          <Text variant="bodyMedium">Shop: {item.shop_name}</Text>
+        </Card.Content>
+        <Card.Actions>
           {isShop && !isMyShopRepair && (
-            <CommonButton
-              title="Delete"
-              color="red"
-              onPress={() => handleDeleteOffer(item.id)}
-            />
+            <Button textColor={theme.colors.error} onPress={() => handleDeleteOffer(item.id)}>
+              Delete
+            </Button>
           )}
 
           {isClient && !alreadyBooked && (
-            <CommonButton
-              title="Book Offer"
-              onPress={() => handleBookOffer(item.id)}
-              color="#007AFF"
-            />
+            <Button onPress={() => handleBookOffer(item.id)}>Book Offer</Button>
           )}
 
           {isClient && alreadyBooked && (
-            <CommonButton
-              title="Unbook Offer"
-              onPress={() => handleUnbookOffer(item.id)}
-              color="orange"
-            />
+            <Button onPress={() => handleUnbookOffer(item.id)} textColor="orange">
+              Unbook Offer
+            </Button>
           )}
-        </View>
-      </View>
+        </Card.Actions>
+      </Card>
     );
   };
 
@@ -210,83 +209,92 @@ export default function RepairDetailScreen({ route, navigation }) {
     if (isMyShopRepair) return null;
 
     return (
-      <View style={BASE_STYLES.sectionBox}>
-        <Text style={BASE_STYLES.sectionTitle}>Send Offer</Text>
-        <TextInput
-          style={BASE_STYLES.formInput}
-          placeholder="Description"
-          value={form.description}
-          onChangeText={(text) =>
-            setForm((prev) => ({ ...prev, description: text }))
-          }
-        />
-        <TextInput
-          style={BASE_STYLES.formInput}
-          placeholder="Price"
-          keyboardType="numeric"
-          value={form.price}
-          onChangeText={(text) =>
-            setForm((prev) => ({ ...prev, price: text }))
-          }
-        />
-        <CommonButton title="Submit Offer" onPress={handleOfferSubmit} />
-      </View>
+      <Card mode="outlined" style={styles.formCard}>
+        <Card.Content>
+          <Text variant="titleMedium">Send Offer</Text>
+          <TextInput
+            mode="outlined"
+            placeholder="Description"
+            value={form.description}
+            onChangeText={(text) => setForm((prev) => ({ ...prev, description: text }))}
+            style={styles.input}
+          />
+          <TextInput
+            mode="outlined"
+            placeholder="Price"
+            keyboardType="numeric"
+            value={form.price}
+            onChangeText={(text) => setForm((prev) => ({ ...prev, price: text }))}
+            style={styles.input}
+          />
+          <Button mode="contained" onPress={handleOfferSubmit}>
+            Submit Offer
+          </Button>
+        </Card.Content>
+      </Card>
     );
   }, [form.description, form.price, isShop, isMyShopRepair]);
 
   if (loading) return <ActivityIndicator size="large" style={{ flex: 1 }} />;
 
   return (
-    <View style={BASE_STYLES.overlay}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <FlatList
         ListHeaderComponent={
-          <View style={BASE_STYLES.sectionBox}>
-            <Text style={BASE_STYLES.title}>Repair #{repairId}</Text>
-            <Text style={BASE_STYLES.subText}>
-              {repair.vehicle_brand} {repair.vehicle_model} ({repair.vehicle_license_plate})
-            </Text>
-            <Text style={BASE_STYLES.subText}>Status: {repair.status}</Text>
-            <Text style={BASE_STYLES.subText}>Description: {repair.description}</Text>
-            <Text style={BASE_STYLES.subText}>Kilometers: {repair.kilometers}</Text>
-            {repair.final_kilometers !== null && (
-              <Text style={BASE_STYLES.subText}>Final Kilometers: {repair.final_kilometers}</Text>
-            )}
+          <Card mode="outlined" style={styles.headerCard}>
+            <Card.Title
+              title={`Repair #${repairId}`}
+              subtitle={`${repair.vehicle_brand} ${repair.vehicle_model} (${repair.vehicle_license_plate})`}
+            />
+            <Card.Content>
+              <Divider style={{ marginVertical: 8 }} />
+              <Text variant="bodyMedium">Status: {repair.status}</Text>
+              <Text variant="bodyMedium">Description: {repair.description}</Text>
+              <Text variant="bodyMedium">Kilometers: {repair.kilometers}</Text>
+              {repair.final_kilometers !== null && (
+                <Text variant="bodyMedium">Final Kilometers: {repair.final_kilometers}</Text>
+              )}
 
-            {isMyShopRepair && (
-              <>
-                <Text style={BASE_STYLES.sectionTitle}>Edit Description</Text>
-                <TextInput
-                  style={BASE_STYLES.formInput}
-                  placeholder="New description"
-                  value={editDescription}
-                  onChangeText={setEditDescription}
-                />
-                <CommonButton
-                  title="Save Changes"
-                  onPress={handleUpdateRepair}
-                />
+              {isMyShopRepair && (
+                <>
+                  <Divider style={{ marginVertical: 12 }} />
+                  <Text variant="titleSmall">Edit Description</Text>
+                  <TextInput
+                    mode="outlined"
+                    placeholder="New description"
+                    value={editDescription}
+                    onChangeText={setEditDescription}
+                    style={styles.input}
+                  />
+                  <Button mode="contained" onPress={handleUpdateRepair} style={styles.button}>
+                    Save Changes
+                  </Button>
 
-                {repair.status === 'ongoing' && (
-                  <>
-                    <TextInput
-                      style={BASE_STYLES.formInput}
-                      placeholder="Final kilometers"
-                      keyboardType="numeric"
-                      value={finalKilometers}
-                      onChangeText={setFinalKilometers}
-                    />
-                    <CommonButton
-                      title="Confirm as Done"
-                      color="green"
-                      onPress={handleConfirmRepair}
-                    />
-                  </>
-                )}
-              </>
-            )}
-          </View>
+                  {repair.status === 'ongoing' && (
+                    <>
+                      <TextInput
+                        mode="outlined"
+                        placeholder="Final kilometers"
+                        keyboardType="numeric"
+                        value={finalKilometers}
+                        onChangeText={setFinalKilometers}
+                        style={styles.input}
+                      />
+                      <Button
+                        mode="contained"
+                        buttonColor="green"
+                        onPress={handleConfirmRepair}
+                      >
+                        Confirm as Done
+                      </Button>
+                    </>
+                  )}
+                </>
+              )}
+            </Card.Content>
+          </Card>
         }
-        contentContainerStyle={BASE_STYLES.listContent}
+        contentContainerStyle={styles.listContent}
         data={offers}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderOfferItem}
@@ -300,3 +308,26 @@ export default function RepairDetailScreen({ route, navigation }) {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  headerCard: {
+    margin: 10,
+  },
+  offerCard: {
+    marginHorizontal: 10,
+    marginVertical: 6,
+  },
+  formCard: {
+    margin: 10,
+    paddingBottom: 10,
+  },
+  input: {
+    marginVertical: 8,
+  },
+  button: {
+    marginTop: 8,
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
+});

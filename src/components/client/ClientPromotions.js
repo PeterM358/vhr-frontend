@@ -1,20 +1,17 @@
+// PATH: src/components/client/ClientPromotions.js
 import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
   Alert,
   RefreshControl,
-  StyleSheet,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FlatList } from 'react-native';
+import { Card, Text, ActivityIndicator, useTheme } from 'react-native-paper';
 import { API_BASE_URL } from '../../api/config';
 import { WebSocketContext } from '../../context/WebSocketManager';
 import { markNotificationRead } from '../../api/notifications';
 import { getMyBookedPromotionIds } from '../../api/offers';
-import BASE_STYLES from '../../styles/base';
 
 export default function ClientPromotions({ navigation }) {
   const [offers, setOffers] = useState([]);
@@ -22,8 +19,8 @@ export default function ClientPromotions({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { notifications, setNotifications } = useContext(WebSocketContext);
+  const theme = useTheme();
 
-  // ✅ Fetch promotions + booked IDs
   const fetchPromotions = async () => {
     setLoading(true);
     try {
@@ -59,12 +56,10 @@ export default function ClientPromotions({ navigation }) {
     setRefreshing(false);
   };
 
-  // ✅ User taps a promotion
   const handlePressPromotion = async (item) => {
     try {
       const token = await AsyncStorage.getItem('@access_token');
 
-      // Find matching unread notifications for this offer
       const unreadNotifs = notifications.filter(
         n => !n.is_read && n.offer === item.id
       );
@@ -73,16 +68,13 @@ export default function ClientPromotions({ navigation }) {
         await markNotificationRead(token, notif.id);
       }
 
-      // Update local notification state
       setNotifications(prev =>
         prev.map(n =>
           n.offer === item.id ? { ...n, is_read: true } : n
         )
       );
 
-      // Navigate to PromotionDetail to book
       navigation.navigate('PromotionDetail', { promotion: item });
-
     } catch (err) {
       console.error('Error marking promotion notification', err);
       Alert.alert('Error', 'Failed to open promotion.');
@@ -90,65 +82,63 @@ export default function ClientPromotions({ navigation }) {
   };
 
   const renderItem = ({ item }) => {
-    // Is booked by this user
     const isBooked = bookedIds.has(item.id);
-
-    // Is unread notification present for this promotion
     const hasUnreadNotification = notifications.some(
       n => !n.is_read && n.offer === item.id
     );
 
-    let cardStyle = [BASE_STYLES.offerCard];
+    let opacity = 1;
     if (isBooked) {
-      cardStyle.push(styles.bookedCard);
+      opacity = 1;
     } else if (!hasUnreadNotification) {
-      cardStyle.push(styles.readCard);
+      opacity = 0.4;
     }
 
     return (
-      <TouchableOpacity
-        style={cardStyle}
+      <Card
+        style={{ marginVertical: 6, opacity }}
         onPress={() => handlePressPromotion(item)}
       >
-        <Text style={[
-          BASE_STYLES.offerTitle,
-          hasUnreadNotification ? styles.unreadTitle : {}
-        ]}>
-          {item.repair_type_name}
-        </Text>
-        <Text style={BASE_STYLES.offerDetail}>{item.description}</Text>
-        <Text style={BASE_STYLES.price}>Price: {item.price} BGN</Text>
-        <Text style={BASE_STYLES.offerDetail}>Shop: {item.shop_name}</Text>
-      </TouchableOpacity>
+        <Card.Title
+          title={item.repair_type_name}
+          titleStyle={hasUnreadNotification ? { fontWeight: 'bold' } : {}}
+        />
+        <Card.Content>
+          <Text>{item.description}</Text>
+          <Text>Price: {item.price} BGN</Text>
+          <Text>Shop: {item.shop_name}</Text>
+          {isBooked && (
+            <Text style={{ color: theme.colors.primary, marginTop: 4 }}>
+              ✅ Already booked
+            </Text>
+          )}
+        </Card.Content>
+      </Card>
     );
   };
 
-  if (loading) {
-    return <ActivityIndicator size="large" />;
-  }
-
   return (
-    <View style={BASE_STYLES.overlay}>
-      <Text style={BASE_STYLES.title}>Promotions</Text>
-      <FlatList
-        data={offers}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={renderItem}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-        ListEmptyComponent={<Text style={{ textAlign: 'center', marginVertical: 20 }}>No promotions available.</Text>}
-      />
+    <View style={{ flex: 1, padding: 10, backgroundColor: theme.colors.background }}>
+      <Text variant="headlineSmall" style={{ textAlign: 'center', marginBottom: 10 }}>
+        Promotions
+      </Text>
+      {loading ? (
+        <ActivityIndicator size="large" />
+      ) : (
+        <FlatList
+          data={offers}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderItem}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          ListEmptyComponent={
+            <Text style={{ textAlign: 'center', marginVertical: 20 }}>
+              No promotions available.
+            </Text>
+          }
+        />
+      )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  unreadTitle: {
-    fontWeight: 'bold',
-  },
-  readCard: {
-    opacity: 0.4,
-  },
-  bookedCard: {
-    backgroundColor: '#FFFACD',
-  },
-});

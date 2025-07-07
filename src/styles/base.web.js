@@ -1,7 +1,8 @@
+// PATH: src/styles/base.web.js
 import { StyleSheet } from 'react-native';
+import { AppTheme } from './theme';
 
 export default StyleSheet.create({
-  // Brighter semi-transparent overlay
   overlay: {
     flex: 1,
     alignItems: 'center',
@@ -9,63 +10,52 @@ export default StyleSheet.create({
     paddingVertical: 24,
     maxWidth: 900,
     alignSelf: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',  // <<< Brighter with slight transparency
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
   },
-
-  // Full background fallback
   background: {
     flex: 1,
-    backgroundColor: '#fefefe',  // subtle light fallback
+    backgroundColor: AppTheme.colors.background,
   },
-
-  // Titles
   title: {
     fontSize: 30,
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
-    color: '#111',
+    color: AppTheme.colors.text,
   },
-
   sectionTitle: {
     fontSize: 22,
     fontWeight: '700',
     marginBottom: 12,
     textAlign: 'center',
-    color: '#222',
+    color: AppTheme.colors.text,
   },
-
-  // Labels
   label: {
     fontWeight: '600',
     marginTop: 12,
     marginBottom: 6,
     fontSize: 16,
-    color: '#333',
+    color: AppTheme.colors.text,
     alignSelf: 'flex-start',
     maxWidth: 400,
   },
-
-  // Inputs
   formInput: {
     borderWidth: 1,
-    borderColor: '#bbb',
-    borderRadius: 8,
+    borderColor: AppTheme.colors.placeholder,
+    borderRadius: AppTheme.roundness,
     padding: 12,
     marginBottom: 16,
-    backgroundColor: '#fff',
+    backgroundColor: AppTheme.colors.surface,
     width: '100%',
     maxWidth: 400,
     alignSelf: 'center',
     fontSize: 16,
   },
-
-  // Buttons
   button: {
-    backgroundColor: '#007BFF',
+    backgroundColor: AppTheme.colors.primary,
     paddingVertical: 12,
     paddingHorizontal: 20,
-    borderRadius: 8,
+    borderRadius: AppTheme.roundness,
     alignItems: 'center',
     width: '100%',
     maxWidth: 400,
@@ -73,14 +63,11 @@ export default StyleSheet.create({
     marginBottom: 16,
     cursor: 'pointer',
   },
-
   buttonText: {
-    color: '#fff',
+    color: AppTheme.colors.surface,
     fontWeight: '700',
     fontSize: 16,
   },
-
-  // Tab Bar
   tabBar: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -88,31 +75,27 @@ export default StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
   },
-
   activeTab: {
-    backgroundColor: '#007BFF',
+    backgroundColor: AppTheme.colors.primary,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 8,
-    color: '#fff',
+    borderRadius: AppTheme.roundness,
+    color: AppTheme.colors.surface,
     cursor: 'pointer',
   },
-
   inactiveTab: {
     backgroundColor: '#f0f0f0',
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: AppTheme.roundness,
     color: '#444',
     cursor: 'pointer',
   },
-
-  // List Items
   listItem: {
-    backgroundColor: '#fff',
+    backgroundColor: AppTheme.colors.surface,
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
+    borderRadius: AppTheme.roundness,
     padding: 16,
     marginBottom: 12,
     width: '100%',
@@ -123,49 +106,44 @@ export default StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
   },
-
   itemBox: {
     padding: 16,
-    borderRadius: 8,
+    borderRadius: AppTheme.roundness,
     borderWidth: 1,
     borderColor: '#ddd',
     marginBottom: 12,
-    backgroundColor: '#fff',
+    backgroundColor: AppTheme.colors.surface,
     maxWidth: 700,
     width: '100%',
     alignSelf: 'center',
   },
-
   subText: {
     fontSize: 16,
-    color: '#333',
+    color: AppTheme.colors.text,
     marginBottom: 8,
     textAlign: 'center',
   },
-
   price: {
-    color: '#28a745',
+    color: 'green',
     fontSize: 18,
     fontWeight: 'bold',
     marginVertical: 8,
     textAlign: 'center',
   },
-
   picker: {
     borderWidth: 1,
-    borderColor: '#bbb',
-    borderRadius: 8,
+    borderColor: AppTheme.colors.placeholder,
+    borderRadius: AppTheme.roundness,
     padding: 10,
     marginBottom: 16,
-    backgroundColor: '#fff',
+    backgroundColor: AppTheme.colors.surface,
     width: '100%',
     maxWidth: 400,
     alignSelf: 'center',
   },
-
   offerCard: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    backgroundColor: AppTheme.colors.surface,
+    borderRadius: AppTheme.roundness,
     borderWidth: 1,
     borderColor: '#ddd',
     padding: 20,
@@ -178,23 +156,20 @@ export default StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
   },
-
   offerTitle: {
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 6,
-    color: '#111',
+    color: AppTheme.colors.text,
   },
-
   offerDetail: {
     fontSize: 16,
     marginBottom: 6,
-    color: '#333',
+    color: AppTheme.colors.text,
   },
-
   sectionBox: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    backgroundColor: AppTheme.colors.surface,
+    borderRadius: AppTheme.roundness,
     padding: 20,
     marginBottom: 20,
     borderWidth: 1,

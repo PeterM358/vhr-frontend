@@ -1,17 +1,12 @@
 // PATH: src/components/shop/RepairsList.js
+
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  ActivityIndicator,
-  FlatList,
-  TouchableOpacity,
-} from 'react-native';
+import { View, FlatList } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRepairs } from '../../api/repairs';
 import { getMyOffers } from '../../api/offers';
 import { useNavigation } from '@react-navigation/native';
-import BASE_STYLES from '../../styles/base';
+import { Text, ActivityIndicator, Button, Chip, Card, useTheme } from 'react-native-paper';
 
 export default function RepairsList() {
   const [repairs, setRepairs] = useState([]);
@@ -19,6 +14,7 @@ export default function RepairsList() {
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState('open');
   const navigation = useNavigation();
+  const theme = useTheme();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -43,54 +39,52 @@ export default function RepairsList() {
   }, [selectedTab]);
 
   const renderRepair = ({ item }) => (
-    <TouchableOpacity
-      style={BASE_STYLES.listItem}
+    <Card
+      style={{ marginVertical: 6 }}
       onPress={() => navigation.navigate('RepairDetail', { repairId: item.id })}
     >
-      <Text style={BASE_STYLES.subText}>
-        {item.vehicle_brand} {item.vehicle_model} ({item.vehicle_license_plate})
-      </Text>
-      <Text>Status: {item.status}</Text>
-      <Text>Description: {item.description}</Text>
-      <Text>Kilometers: {item.kilometers}</Text>
-    </TouchableOpacity>
+      <Card.Title title={`${item.vehicle_brand} ${item.vehicle_model} (${item.vehicle_license_plate})`} />
+      <Card.Content>
+        <Text>Status: {item.status}</Text>
+        <Text>Description: {item.description}</Text>
+        <Text>Kilometers: {item.kilometers}</Text>
+      </Card.Content>
+    </Card>
   );
 
   const renderOffer = ({ item }) => (
-    <TouchableOpacity
-      style={BASE_STYLES.listItem}
+    <Card
+      style={{ marginVertical: 6 }}
       onPress={() => navigation.navigate('RepairDetail', { repairId: item.repair })}
     >
-      <Text style={BASE_STYLES.subText}>
-        Vehicle: {item.vehicle_brand} {item.vehicle_model} ({item.vehicle_license_plate})
-      </Text>
-      <Text>Price: {item.price} BGN</Text>
-      <Text>Description: {item.description}</Text>
-    </TouchableOpacity>
+      <Card.Title title={`Vehicle: ${item.vehicle_brand} ${item.vehicle_model} (${item.vehicle_license_plate})`} />
+      <Card.Content>
+        <Text>Price: {item.price} BGN</Text>
+        <Text>Description: {item.description}</Text>
+      </Card.Content>
+    </Card>
   );
 
   const tabOptions = ['open', 'ongoing', 'done', 'offers'];
 
   return (
-    <View style={BASE_STYLES.overlay}>
-      <Text style={BASE_STYLES.title}>
-        {selectedTab === 'offers' ? 'My Sent Offers' : `Repairs (${selectedTab.toUpperCase()})`}
-      </Text>
+    <View style={{ flex: 1, padding: 10, backgroundColor: theme.colors.background }}>
 
-      <View style={BASE_STYLES.tabBar}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginBottom: 12 }}>
         {tabOptions.map((tab) => (
-          <TouchableOpacity
+          <Chip
             key={tab}
-            style={tab === selectedTab ? BASE_STYLES.activeTab : BASE_STYLES.inactiveTab}
+            selected={tab === selectedTab}
             onPress={() => setSelectedTab(tab)}
+            style={{ margin: 4 }}
           >
-            <Text>{tab.toUpperCase()}</Text>
-          </TouchableOpacity>
+            {tab.toUpperCase()}
+          </Chip>
         ))}
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" style={{ marginTop: 20 }} />
       ) : selectedTab === 'offers' ? (
         <FlatList
           data={offers}

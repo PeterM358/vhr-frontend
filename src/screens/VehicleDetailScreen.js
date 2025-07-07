@@ -1,9 +1,9 @@
 // PATH: src/screens/VehicleDetailScreen.js
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import BASE_STYLES from '../styles/base';
+import { Card, Text, Button, useTheme, Surface } from 'react-native-paper';
 import CommonButton from '../components/CommonButton';
 
 export default function VehicleDetailScreen({ route, navigation }) {
@@ -12,6 +12,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
   const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('repairs');
+  const theme = useTheme();
 
   useEffect(() => {
     const fetchVehicleDetails = async () => {
@@ -33,64 +34,109 @@ export default function VehicleDetailScreen({ route, navigation }) {
     fetchVehicleDetails();
   }, [vehicleId]);
 
-  if (loading) return <ActivityIndicator size="large" />;
-  if (!vehicle) return <Text>Vehicle not found.</Text>;
+  if (loading) {
+    return <ActivityIndicator size="large" style={styles.loading} />;
+  }
 
-  // ✅ NEW: Filter by tab
+  if (!vehicle) {
+    return <Text style={styles.emptyText}>Vehicle not found.</Text>;
+  }
+
+  // Filtered repairs by tab
   const filteredRepairs = repairs.filter(r => {
-    if (activeTab === 'repairs') {
-      return r.status === 'done';           // ✅ ONLY show DONE repairs here
-    }
-    if (activeTab === 'offers') {
-      return r.status === 'offer';          // ✅ Only offer status here
-    }
+    if (activeTab === 'repairs') return r.status === 'done';
+    if (activeTab === 'offers') return r.status === 'offer';
     return false;
   });
 
   return (
-    <View style={BASE_STYLES.overlay}>
-      <Text style={BASE_STYLES.title}>Plate: {vehicle.license_plate}</Text>
-      <Text style={BASE_STYLES.subText}>Make: {vehicle.brand_name}</Text>
-      <Text style={BASE_STYLES.subText}>Model: {vehicle.model_name}</Text>
-      <Text style={BASE_STYLES.subText}>Year: {vehicle.year}</Text>
+    <Surface style={styles.container}>
+      <Card mode="outlined" style={styles.vehicleCard}>
+        <Card.Title title={`Plate: ${vehicle.license_plate}`} />
+        <Card.Content>
+          <Text>Make: {vehicle.brand_name}</Text>
+          <Text>Model: {vehicle.model_name}</Text>
+          <Text>Year: {vehicle.year}</Text>
+        </Card.Content>
+      </Card>
 
       <CommonButton
         title="➕ Create Repair for This Vehicle"
         onPress={() => navigation.navigate('CreateRepair', { vehicleId })}
       />
 
-      <View style={BASE_STYLES.tabBar}>
-        <TouchableOpacity
-          style={activeTab === 'repairs' ? BASE_STYLES.activeTab : BASE_STYLES.inactiveTab}
+      <Surface style={styles.tabBar}>
+        <Button
+          mode={activeTab === 'repairs' ? 'contained' : 'outlined'}
           onPress={() => setActiveTab('repairs')}
+          style={styles.tabButton}
         >
-          <Text>Repairs</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={activeTab === 'offers' ? BASE_STYLES.activeTab : BASE_STYLES.inactiveTab}
+          Repairs
+        </Button>
+        <Button
+          mode={activeTab === 'offers' ? 'contained' : 'outlined'}
           onPress={() => setActiveTab('offers')}
+          style={styles.tabButton}
         >
-          <Text>Offers</Text>
-        </TouchableOpacity>
-      </View>
+          Offers
+        </Button>
+      </Surface>
 
       <FlatList
         data={filteredRepairs}
         keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            style={BASE_STYLES.listItem}
+          <Card
+            mode="outlined"
+            style={styles.repairCard}
             onPress={() => navigation.navigate('RepairDetail', { repairId: item.id })}
           >
-            <Text style={BASE_STYLES.offerTitle}>{item.repair_type_name}</Text>
-            <Text style={BASE_STYLES.subText}>Status: {item.status}</Text>
-            <Text style={BASE_STYLES.offerDetail}>{item.description}</Text>
-          </TouchableOpacity>
+            <Card.Content>
+              <Text style={styles.repairTitle}>{item.repair_type_name}</Text>
+              <Text>Status: {item.status}</Text>
+              <Text>{item.description}</Text>
+            </Card.Content>
+          </Card>
         )}
         ListEmptyComponent={
-          <Text style={{ textAlign: 'center', marginVertical: 20 }}>No {activeTab} found.</Text>
+          <Text style={styles.emptyText}>No {activeTab} found.</Text>
         }
       />
-    </View>
+    </Surface>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 12,
+  },
+  vehicleCard: {
+    marginBottom: 12,
+  },
+  loading: {
+    marginTop: 50,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginVertical: 8,
+  },
+  tabButton: {
+    marginHorizontal: 6,
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
+  repairCard: {
+    marginVertical: 6,
+  },
+  repairTitle: {
+    fontWeight: 'bold',
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginVertical: 20,
+  },
+});

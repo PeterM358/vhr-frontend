@@ -1,24 +1,18 @@
+// PATH: src/screens/CreateVehicleScreen.js
+
 import React, { useEffect, useState } from 'react';
-import {
-  ScrollView,
-  View,
-  Text,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { ScrollView, View, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { API_BASE_URL } from '../api/config';
-import BASE_STYLES from '../styles/base';
-import CommonButton from '../components/CommonButton';
+import { Surface, Text, TextInput, Button, ActivityIndicator, Card, useTheme } from 'react-native-paper';
 
 export default function CreateVehicleScreen({ navigation, route }) {
-  // Get passed client info
+  const theme = useTheme();
+
   const clientEmail = route.params?.clientEmail || '';
   const clientPhone = route.params?.clientPhone || '';
 
-  // Form state
   const [licensePlate, setLicensePlate] = useState('');
   const [year, setYear] = useState('');
   const [vin, setVin] = useState('');
@@ -47,7 +41,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
       setBrands(data);
     } catch (err) {
       console.error(err);
-      Alert.alert('Error', 'Could not load brands');
+      alert('Error: Could not load brands');
     } finally {
       setLoadingBrands(false);
     }
@@ -69,7 +63,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
       setModels(data);
     } catch (err) {
       console.error(err);
-      Alert.alert('Error', 'Could not load models');
+      alert('Error: Could not load models');
     } finally {
       setLoadingModels(false);
     }
@@ -88,7 +82,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
 
   const handleSubmit = async () => {
     if (!licensePlate.trim() || !selectedBrand || !selectedModel) {
-      Alert.alert('Missing Info', 'Please fill out all required fields.');
+      alert('Please fill out all required fields.');
       return;
     }
 
@@ -103,7 +97,6 @@ export default function CreateVehicleScreen({ navigation, route }) {
         kilometers: kilometers ? parseInt(kilometers) : null,
       };
 
-      // Only pass client info if provided
       if (clientEmail) payload.client_email = clientEmail;
       if (clientPhone) payload.client_phone = clientPhone;
 
@@ -122,103 +115,142 @@ export default function CreateVehicleScreen({ navigation, route }) {
         throw new Error('Failed to create vehicle');
       }
 
-      Alert.alert('Success', 'Vehicle created!');
+      alert('Vehicle created!');
       navigation.goBack();
     } catch (err) {
       console.error(err);
-      Alert.alert('Error', err.message || 'Failed to save vehicle');
+      alert(err.message || 'Failed to save vehicle');
     }
   };
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: 'rgba(210,255,255,0.9)' }}
+      style={{ flex: 1, backgroundColor: theme.colors.background }}
       contentContainerStyle={{ padding: 16, paddingBottom: 50 }}
       keyboardShouldPersistTaps="handled"
     >
-      <Text style={BASE_STYLES.title}>Add New Vehicle</Text>
+      <Surface style={styles.surface}>
+        {(clientEmail || clientPhone) && (
+          <Card style={styles.card}>
+            <Card.Content>
+              <Text variant="bodyMedium">
+                Adding for: {clientEmail || clientPhone}
+              </Text>
+            </Card.Content>
+          </Card>
+        )}
 
-      {(clientEmail || clientPhone) && (
-        <View style={BASE_STYLES.card}>
-          <Text style={BASE_STYLES.subText}>
-            Adding for: {clientEmail ? clientEmail : clientPhone}
-          </Text>
-        </View>
-      )}
+        <Text variant="labelLarge" style={styles.label}>License Plate *</Text>
+        <TextInput
+          mode="outlined"
+          placeholder="e.g. CA1234XX"
+          value={licensePlate}
+          onChangeText={setLicensePlate}
+          style={styles.input}
+        />
 
-      <Text style={BASE_STYLES.label}>License Plate *</Text>
-      <TextInput
-        style={BASE_STYLES.formInput}
-        placeholder="e.g. CA1234XX"
-        value={licensePlate}
-        onChangeText={setLicensePlate}
-      />
+        <Text variant="labelLarge" style={styles.label}>Brand *</Text>
+        {loadingBrands ? (
+          <ActivityIndicator size="small" />
+        ) : (
+          <Picker
+            selectedValue={selectedBrand}
+            onValueChange={(val) => handleBrandChange(val)}
+            style={styles.picker}
+          >
+            <Picker.Item label="Select Brand..." value="" />
+            {brands.map((b) => (
+              <Picker.Item key={b.id} label={b.name} value={String(b.id)} />
+            ))}
+          </Picker>
+        )}
 
-      <Text style={BASE_STYLES.label}>Brand *</Text>
-      {loadingBrands ? (
-        <ActivityIndicator size="small" />
-      ) : (
-        <Picker
-          selectedValue={selectedBrand || ''}
-          onValueChange={(val) => handleBrandChange(val)}
-          style={BASE_STYLES.picker}
+        <Text variant="labelLarge" style={styles.label}>Model *</Text>
+        {loadingModels ? (
+          <ActivityIndicator size="small" />
+        ) : (
+          <Picker
+            selectedValue={selectedModel}
+            onValueChange={(val) => setSelectedModel(val || '')}
+            style={styles.picker}
+            enabled={!!selectedBrand}
+          >
+            <Picker.Item
+              label={selectedBrand ? 'Select Model...' : 'Choose Brand First'}
+              value=""
+            />
+            {models.map((m) => (
+              <Picker.Item key={m.id} label={m.name} value={String(m.id)} />
+            ))}
+          </Picker>
+        )}
+
+        <Text variant="labelLarge" style={styles.label}>Year</Text>
+        <TextInput
+          mode="outlined"
+          placeholder="e.g. 2019"
+          value={year}
+          onChangeText={setYear}
+          keyboardType="numeric"
+          style={styles.input}
+        />
+
+        <Text variant="labelLarge" style={styles.label}>VIN (optional)</Text>
+        <TextInput
+          mode="outlined"
+          placeholder="Vehicle Identification Number"
+          value={vin}
+          onChangeText={setVin}
+          style={styles.input}
+        />
+
+        <Text variant="labelLarge" style={styles.label}>Kilometers</Text>
+        <TextInput
+          mode="outlined"
+          placeholder="e.g. 85000"
+          value={kilometers}
+          onChangeText={setKilometers}
+          keyboardType="numeric"
+          style={styles.input}
+        />
+
+        <Button
+          mode="contained"
+          icon="check"
+          onPress={handleSubmit}
+          style={styles.saveButton}
         >
-          <Picker.Item label="Select Brand..." value="" />
-          {brands.map((b) => (
-            <Picker.Item key={b.id} label={b.name} value={String(b.id)} />
-          ))}
-        </Picker>
-      )}
-
-      <Text style={BASE_STYLES.label}>Model *</Text>
-      {loadingModels ? (
-        <ActivityIndicator size="small" />
-      ) : (
-        <Picker
-          selectedValue={selectedModel || ''}
-          onValueChange={(val) => setSelectedModel(val || '')}
-          style={BASE_STYLES.picker}
-          enabled={!!selectedBrand}
-        >
-          <Picker.Item
-            label={selectedBrand ? 'Select Model...' : 'Choose Brand First'}
-            value=""
-          />
-          {models.map((m) => (
-            <Picker.Item key={m.id} label={m.name} value={String(m.id)} />
-          ))}
-        </Picker>
-      )}
-
-      <Text style={BASE_STYLES.label}>Year</Text>
-      <TextInput
-        style={BASE_STYLES.formInput}
-        placeholder="e.g. 2019"
-        value={year}
-        onChangeText={setYear}
-        keyboardType="numeric"
-      />
-
-      <Text style={BASE_STYLES.label}>VIN (optional)</Text>
-      <TextInput
-        style={BASE_STYLES.formInput}
-        placeholder="Vehicle Identification Number"
-        value={vin}
-        onChangeText={setVin}
-      />
-
-      <Text style={BASE_STYLES.label}>Kilometers</Text>
-      <TextInput
-        style={BASE_STYLES.formInput}
-        placeholder="e.g. 85000"
-        value={kilometers}
-        onChangeText={setKilometers}
-        keyboardType="numeric"
-      />
-
-      <View style={{ marginTop: 20 }}>
-        <CommonButton title="✅ Save Vehicle" onPress={handleSubmit} />
-      </View>
+          Save Vehicle
+        </Button>
+      </Surface>
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  surface: {
+    flex: 1,
+  },
+  title: {
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  card: {
+    marginVertical: 10,
+  },
+  label: {
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  input: {
+    marginBottom: 8,
+  },
+  picker: {
+    backgroundColor: '#f4f4f4',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  saveButton: {
+    marginTop: 20,
+  },
+});

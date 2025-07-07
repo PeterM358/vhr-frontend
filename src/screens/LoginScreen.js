@@ -1,17 +1,16 @@
 // PATH: src/screens/LoginScreen.js
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import {
   View,
-  Text,
-  TextInput,
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import { useTheme, Text, TextInput, Button } from 'react-native-paper';
 import { login } from '../api/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import BASE_STYLES from '../styles/base';
-import CommonButton from '../components/CommonButton';
 
 export default function LoginScreen({ navigation }) {
   const [emailOrPhone, setEmailOrPhone] = useState('');
@@ -19,14 +18,25 @@ export default function LoginScreen({ navigation }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const theme = useTheme();
+
+  useEffect(() => {
+    const loadLastLogin = async () => {
+      const lastEmail = await AsyncStorage.getItem('@last_login_email');
+      if (lastEmail) setEmailOrPhone(lastEmail);
+    };
+    loadLastLogin();
+  }, []);
+
   const handleLogin = async () => {
     setError('');
     setLoading(true);
     try {
+      await AsyncStorage.setItem('@last_login_email', emailOrPhone.trim());
+
       const data = await login(emailOrPhone.trim(), password);
       const { access, refresh, is_client, is_shop, user_id, shop_profiles } = data;
 
-      // Store basic info
       await AsyncStorage.multiSet([
         [STORAGE_KEYS.ACCESS_TOKEN, access],
         [STORAGE_KEYS.REFRESH_TOKEN, refresh],
@@ -36,7 +46,6 @@ export default function LoginScreen({ navigation }) {
         [STORAGE_KEYS.SHOP_PROFILES, JSON.stringify(shop_profiles || [])]
       ]);
 
-      // If user is shop and has shops, set the current one
       if (is_shop && shop_profiles && shop_profiles.length === 1) {
         await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_SHOP_ID, shop_profiles[0].id.toString());
       }
@@ -54,38 +63,65 @@ export default function LoginScreen({ navigation }) {
   const goToRegister = () => navigation.navigate('Register');
 
   return (
-    <ScrollView contentContainerStyle={BASE_STYLES.overlay}>
-      <Text style={BASE_STYLES.title}>Login</Text>
+    <ScrollView
+      contentContainerStyle={{
+        flexGrow: 1,
+        backgroundColor: theme.colors.background,
+        justifyContent: 'center',
+        padding: 20,
+      }}
+    >
+      <Text variant="headlineMedium" style={{ textAlign: 'center', marginBottom: 20, color: theme.colors.primary }}>
+        Login
+      </Text>
 
-      {error ? <Text style={BASE_STYLES.error}>{error}</Text> : null}
+      {error ? (
+        <Text style={{ color: theme.colors.error, textAlign: 'center', marginBottom: 12 }}>
+          {error}
+        </Text>
+      ) : null}
 
-      <Text style={BASE_STYLES.label}>Email or Phone</Text>
       <TextInput
-        style={BASE_STYLES.formInput}
-        placeholder="Enter email or phone"
+        label="Email or Phone"
+        mode="outlined"
         value={emailOrPhone}
         onChangeText={setEmailOrPhone}
-        autoCapitalize="none"
         keyboardType="email-address"
+        autoCapitalize="none"
+        style={{ marginBottom: 16 }}
       />
 
-      <Text style={BASE_STYLES.label}>Password</Text>
       <TextInput
-        style={BASE_STYLES.formInput}
-        placeholder="Enter password"
+        label="Password"
+        mode="outlined"
         secureTextEntry
         value={password}
         onChangeText={setPassword}
+        style={{ marginBottom: 24 }}
       />
 
       {loading ? (
         <ActivityIndicator size="large" style={{ marginVertical: 20 }} />
       ) : (
-        <CommonButton title="Login" onPress={handleLogin} />
+        <Button
+          mode="contained"
+          onPress={handleLogin}
+          style={{ marginBottom: 16 }}
+        >
+          Login
+        </Button>
       )}
 
-      <Text style={BASE_STYLES.subText}>Don't have an account?</Text>
-      <CommonButton title="Register" onPress={goToRegister} color="#555" />
+      <Text style={{ textAlign: 'center', marginBottom: 8 }}>
+        Don't have an account?
+      </Text>
+      <Button
+        mode="outlined"
+        onPress={goToRegister}
+        textColor={theme.colors.primary}
+      >
+        Register
+      </Button>
     </ScrollView>
   );
 }

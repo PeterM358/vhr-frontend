@@ -1,93 +1,73 @@
 // PATH: src/screens/OffersScreen.js
 
 import React, { useState, useContext } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Text, Badge, useTheme, SegmentedButtons, Button } from 'react-native-paper';
 import { WebSocketContext } from '../context/WebSocketManager';
 import ClientPromotions from '../components/client/ClientPromotions';
 import ClientRepairOffers from '../components/client/ClientRepairOffers';
-import BASE_STYLES from '../styles/base';
-import CommonButton from '../components/CommonButton';
 
 export default function OffersScreen({ navigation }) {
+  const theme = useTheme();
   const [activeTab, setActiveTab] = useState('promotions');
-  const { notifications, markNotificationRead } = useContext(WebSocketContext);
+  const { notifications } = useContext(WebSocketContext);
 
   const unseenPromotions = notifications.filter(n => !n.is_read && n.repair == null).length;
   const unseenOffers = notifications.filter(n => !n.is_read && n.repair != null).length;
 
-  const handleTabPress = (tab) => {
-    setActiveTab(tab);
-    // Optionally mark these as read
-    // markNotificationReadForType(tab)
-  };
-
   return (
-    <View style={BASE_STYLES.overlay}>
-      <Text style={BASE_STYLES.title}>Offers</Text>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
 
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={activeTab === 'promotions' ? BASE_STYLES.activeTab : BASE_STYLES.inactiveTab}
-          onPress={() => handleTabPress('promotions')}
-        >
-          <View style={styles.tabButtonContent}>
-            <Text>Promotions</Text>
-            {unseenPromotions > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unseenPromotions}</Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
+      <SegmentedButtons
+        value={activeTab}
+        onValueChange={setActiveTab}
+        buttons={[
+          {
+            value: 'promotions',
+            label: `Promotions${unseenPromotions ? ` (${unseenPromotions})` : ''}`,
+          },
+          {
+            value: 'offers',
+            label: `Repair Offers${unseenOffers ? ` (${unseenOffers})` : ''}`,
+          },
+        ]}
+        style={styles.segmented}
+      />
 
-        <TouchableOpacity
-          style={activeTab === 'offers' ? BASE_STYLES.activeTab : BASE_STYLES.inactiveTab}
-          onPress={() => handleTabPress('offers')}
-        >
-          <View style={styles.tabButtonContent}>
-            <Text>Repair Offers</Text>
-            {unseenOffers > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unseenOffers}</Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
+      <View style={styles.content}>
+        {activeTab === 'promotions' && <ClientPromotions navigation={navigation} />}
+        {activeTab === 'offers' && <ClientRepairOffers navigation={navigation} />}
       </View>
 
-      {activeTab === 'promotions' && <ClientPromotions navigation={navigation} />}
-      {activeTab === 'offers' && <ClientRepairOffers navigation={navigation} />}
-
-      <CommonButton title="Back" onPress={() => navigation.goBack()} />
+      <Button
+        mode="outlined"
+        icon="arrow-left"
+        onPress={() => navigation.goBack()}
+        style={styles.backButton}
+      >
+        Back
+      </Button>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  tabBar: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginVertical: 10,
+  container: {
+    flex: 1,
+    padding: 16,
   },
-  tabButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  title: {
+    textAlign: 'center',
+    marginBottom: 16,
   },
-  badge: {
-    marginLeft: 6,
-    backgroundColor: 'red',
-    borderRadius: 8,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
+  segmented: {
+    marginBottom: 16,
   },
-  badgeText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
+  content: {
+    flex: 1,
+  },
+  backButton: {
+    marginTop: 16,
+    alignSelf: 'center',
   },
 });

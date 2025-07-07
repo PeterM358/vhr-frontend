@@ -114,6 +114,6 @@ export const logout = async (navigation) => {
   await AsyncStorage.clear();
   navigation.reset({
     index: 0,
-    routes: [{ name: 'Home' }],
+    routes: [{ name: 'Login' }],
   });
 };

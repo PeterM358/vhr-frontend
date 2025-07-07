@@ -1,22 +1,17 @@
 // PATH: src/components/client/ClientRepairOffers.js
-
 import React, { useEffect, useState, useContext } from 'react';
 import {
   View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
   Alert,
   RefreshControl,
-  StyleSheet,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { API_BASE_URL } from '../../api/config';
 import { WebSocketContext } from '../../context/WebSocketManager';
 import { markNotificationRead } from '../../api/notifications';
-import BASE_STYLES from '../../styles/base';
+import { FlatList } from 'react-native';
+import { Card, Text, ActivityIndicator, useTheme } from 'react-native-paper';
 
 export default function ClientRepairOffers() {
   const [offers, setOffers] = useState([]);
@@ -26,31 +21,25 @@ export default function ClientRepairOffers() {
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const { notifications, setNotifications } = useContext(WebSocketContext);
+  const theme = useTheme();
 
-  // 🔄 Fetch offers and booked
   const fetchRepairOffers = async () => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
 
-      // 1️⃣ All repair offers
       const res = await fetch(`${API_BASE_URL}/api/offers/?is_promotion=0`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-
       setOffers(data);
 
-      // 2️⃣ Fetch user's booked repairs (repairs with status 'ongoing')
       const repairsRes = await fetch(`${API_BASE_URL}/api/repairs/?status=ongoing`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const repairsData = await repairsRes.json();
 
-      // Collect repair IDs that are "booked"
-      const bookedIds = new Set(repairsData.map(r => r.id));
-      setBookedRepairIds(bookedIds);
-
+      setBookedRepairIds(new Set(repairsData.map(r => r.id)));
     } catch (err) {
       console.error('Failed to load repair offers', err);
       Alert.alert('Error', 'Could not load repair offers');
@@ -95,55 +84,56 @@ export default function ClientRepairOffers() {
     const isUnread = notifications.some(
       n => !n.is_read && n.repair === item.repair
     );
-
     const isBooked = bookedRepairIds.has(item.repair);
 
-    const cardStyles = [
-      BASE_STYLES.offerCard,
-      isBooked && styles.bookedCard,
-      !isUnread && !isBooked && { opacity: 0.4 },
-    ];
+    let opacity = 1;
+    if (!isUnread && !isBooked) opacity = 0.4;
 
     return (
-      <TouchableOpacity
-        style={cardStyles}
+      <Card
+        style={{ marginVertical: 6, opacity, backgroundColor: isBooked ? 'yellow' : theme.colors.surface }}
         onPress={() => handlePressOffer(item)}
       >
-        <Text style={[
-          BASE_STYLES.offerTitle,
-          isUnread ? { fontWeight: 'bold' } : { fontWeight: 'normal' }
-        ]}>
-          {item.repair_type_name}
-        </Text>
-        <Text style={BASE_STYLES.offerDetail}>{item.description}</Text>
-        <Text style={BASE_STYLES.price}>Price: {item.price} BGN</Text>
-        <Text style={BASE_STYLES.offerDetail}>Shop: {item.shop_name}</Text>
-      </TouchableOpacity>
+        <Card.Title
+          title={item.repair_type_name}
+          titleStyle={isUnread ? { fontWeight: 'bold' } : {}}
+        />
+        <Card.Content>
+          <Text>{item.description}</Text>
+          <Text>Price: {item.price} BGN</Text>
+          <Text>Shop: {item.shop_name}</Text>
+          {isBooked && (
+            <Text style={{ color: theme.colors.primary, marginTop: 4 }}>
+              ✅ Already booked
+            </Text>
+          )}
+        </Card.Content>
+      </Card>
     );
   };
 
-  if (loading) return <ActivityIndicator size="large" />;
-
   return (
-    <View style={BASE_STYLES.overlay}>
-      <Text style={BASE_STYLES.title}>Repair Offers</Text>
-      <FlatList
-        data={offers}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={renderItem}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-        ListEmptyComponent={
-          <Text style={{ textAlign: 'center', marginVertical: 20 }}>
-            No repair offers available.
-          </Text>
-        }
-      />
+    <View style={{ flex: 1, padding: 10, backgroundColor: theme.colors.background }}>
+      <Text variant="headlineSmall" style={{ textAlign: 'center', marginBottom: 10 }}>
+        Repair Offers
+      </Text>
+      {loading ? (
+        <ActivityIndicator size="large" />
+      ) : (
+        <FlatList
+          data={offers}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderItem}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          ListEmptyComponent={
+            <Text style={{ textAlign: 'center', marginVertical: 20 }}>
+              No repair offers available.
+            </Text>
+          }
+        />
+      )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  bookedCard: {
-    backgroundColor: 'yellow',
-  },
-});

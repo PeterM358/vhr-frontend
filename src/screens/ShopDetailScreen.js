@@ -1,25 +1,27 @@
+// PATH: src/screens/ShopDetailScreen.js
+
 import React, { useEffect, useState } from 'react';
 import {
   View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
   Alert,
   Image,
   FlatList,
   ScrollView,
   TouchableOpacity,
+  StyleSheet,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+
 import { getShopById, uploadShopImage, deleteShopImage } from '../api/shops';
 import { getVehicles, updateVehicle } from '../api/vehicles';
-import CommonButton from '../components/CommonButton';
-import { COLORS } from '../styles/colors';
-import BASE_STYLES from '../styles/base';
+
+import { Card, Text, Button, ActivityIndicator, useTheme, Divider } from 'react-native-paper';
 
 export default function ShopDetailScreen({ route }) {
   const { shopId } = route.params;
+  const theme = useTheme();
+
   const [shop, setShop] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,20 +44,17 @@ export default function ShopDetailScreen({ route }) {
     setIsClientAccount(!isShopAccount);
 
     try {
-      // Load shop details first
       const shopData = await getShopById(shopId, token);
       setShop(shopData);
 
-      // Determine ownership of THIS shop
       const ownerCheck = shopData.users.includes(parseInt(storedUserId));
       setIsOwner(ownerCheck);
 
-      // Only load vehicles if user is client
       if (!isShopAccount) {
         const vehicleData = await getVehicles(token);
         setVehicles(vehicleData);
       } else {
-        setVehicles([]);  // clear out
+        setVehicles([]);
       }
 
     } catch (error) {
@@ -67,19 +66,18 @@ export default function ShopDetailScreen({ route }) {
 
   const toggleAuthorization = async (vehicle) => {
     const token = await AsyncStorage.getItem('@access_token');
-
-    const isCurrentlyAuthorized = vehicle.shared_with_shops.some(
+    const isAuthorized = vehicle.shared_with_shops.some(
       (s) => Number(s.id) === Number(shopId)
     );
 
-    const updatedSharedWithIds = isCurrentlyAuthorized
+    const updatedIds = isAuthorized
       ? vehicle.shared_with_shops.filter((s) => Number(s.id) !== Number(shopId)).map((s) => s.id)
       : [...vehicle.shared_with_shops.map((s) => s.id), Number(shopId)];
 
     try {
       await updateVehicle(
         vehicle.id,
-        { shared_with_shops_ids: updatedSharedWithIds },
+        { shared_with_shops_ids: updatedIds },
         token
       );
 
@@ -88,7 +86,7 @@ export default function ShopDetailScreen({ route }) {
           v.id === vehicle.id
             ? {
                 ...v,
-                shared_with_shops: isCurrentlyAuthorized
+                shared_with_shops: isAuthorized
                   ? v.shared_with_shops.filter((s) => Number(s.id) !== Number(shopId))
                   : [...v.shared_with_shops, { id: shopId, name: shop.name }],
               }
@@ -144,33 +142,43 @@ export default function ShopDetailScreen({ route }) {
     }
   };
 
-  if (loading || !shop) return <ActivityIndicator size="large" style={{ flex: 1 }} />;
+  if (loading || !shop) {
+    return <ActivityIndicator animating={true} size="large" style={{ flex: 1 }} />;
+  }
 
   const renderVehicle = ({ item }) => {
     const isAuthorized = item.shared_with_shops.some(
       (s) => Number(s.id) === Number(shopId)
     );
     return (
-      <View style={styles.vehicleBox}>
-        <Text style={styles.vehicleText}>
-          {item.brand_name} {item.model_name} ({item.license_plate})
-        </Text>
-        <CommonButton
-          title={isAuthorized ? 'Unauthorize' : 'Authorize'}
-          onPress={() => toggleAuthorization(item)}
-          color={isAuthorized ? COLORS.danger : undefined}
-        />
-      </View>
+      <Card mode="outlined" style={styles.vehicleCard}>
+        <Card.Content>
+          <Text variant="bodyMedium">
+            {item.brand_name} {item.model_name} ({item.license_plate})
+          </Text>
+          <Button
+            mode="contained"
+            onPress={() => toggleAuthorization(item)}
+            style={styles.authButton}
+            buttonColor={isAuthorized ? theme.colors.error : theme.colors.primary}
+          >
+            {isAuthorized ? 'Unauthorize' : 'Authorize'}
+          </Button>
+        </Card.Content>
+      </Card>
     );
   };
 
   const renderHeader = () => (
     <View>
-      <Text style={styles.title}>{shop.name}</Text>
-      <Text>Address: {shop.address}</Text>
-      <Text>Phone: {shop.phone_number}</Text>
+      <Card mode="outlined" style={styles.card}>
+        <Card.Title title={shop.name} subtitle={shop.address} />
+        <Card.Content>
+          <Text variant="bodyMedium">Phone: {shop.phone_number}</Text>
+        </Card.Content>
+      </Card>
 
-      <Text style={styles.subTitle}>Photos of this Shop:</Text>
+      <Text variant="titleMedium" style={styles.sectionTitle}>Photos of this Shop:</Text>
       {shop.images && shop.images.length > 0 ? (
         <ScrollView horizontal style={styles.imageScroll}>
           {shop.images.map((img) => (
@@ -196,17 +204,23 @@ export default function ShopDetailScreen({ route }) {
 
       {isOwner && (
         uploading ? (
-          <ActivityIndicator size="small" color="#007AFF" />
+          <ActivityIndicator size="small" color={theme.colors.primary} />
         ) : (
-          <TouchableOpacity style={styles.uploadButton} onPress={handlePickAndUploadImage}>
-            <Text style={styles.uploadText}>+ Add Image</Text>
-          </TouchableOpacity>
+          <Button
+            mode="contained"
+            icon="plus"
+            onPress={handlePickAndUploadImage}
+            style={styles.uploadButton}
+          >
+            Add Image
+          </Button>
         )
       )}
 
       {isClientAccount && (
         <>
-          <Text style={styles.subTitle}>Authorize This Shop for Your Vehicles:</Text>
+          <Divider style={{ marginVertical: 16 }} />
+          <Text variant="titleMedium" style={styles.sectionTitle}>Authorize This Shop for Your Vehicles:</Text>
           {vehicles.length === 0 && <Text>You have no vehicles.</Text>}
         </>
       )}
@@ -226,11 +240,11 @@ export default function ShopDetailScreen({ route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 10 },
-  subTitle: { marginTop: 20, fontSize: 18, fontWeight: '600', marginBottom: 6 },
+  container: { flex: 1, padding: 12 },
+  card: { marginBottom: 16 },
+  sectionTitle: { marginVertical: 12 },
   imageScroll: {
-    marginBottom: 20,
+    marginVertical: 12,
   },
   imageContainer: {
     position: 'relative',
@@ -255,31 +269,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   uploadButton: {
-    backgroundColor: '#007AFF',
-    padding: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 20,
+    marginTop: 12,
   },
-  uploadText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  vehicleCard: {
+    marginBottom: 12,
   },
-  vehicleBox: {
-    padding: 12,
-    marginVertical: 8,
-    borderWidth: 1,
-    borderRadius: 8,
-  },
-  vehicleText: { marginBottom: 6, fontSize: 16 },
   authButton: {
-    padding: 8,
-    borderRadius: 6,
-    marginTop: 6,
-    alignItems: 'center',
-  },
-  authButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    marginTop: 10,
   },
 });

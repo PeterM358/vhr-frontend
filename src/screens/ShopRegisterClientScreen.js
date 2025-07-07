@@ -1,10 +1,19 @@
+// PATH: src/screens/ShopRegisterClientScreen.js
+
 import React, { useState } from 'react';
-import { TextInput, Text, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  Alert,
+  View,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import BASE_STYLES from '../styles/base';
+import { Text, TextInput, ActivityIndicator, useTheme } from 'react-native-paper';
 import CommonButton from '../components/CommonButton';
 
 export default function ShopRegisterClientScreen({ navigation }) {
+  const theme = useTheme();
+
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -60,44 +69,52 @@ export default function ShopRegisterClientScreen({ navigation }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={BASE_STYLES.overlay}>
-      <Text style={BASE_STYLES.title}>Register New Client</Text>
-      {error ? <Text style={BASE_STYLES.error}>{error}</Text> : null}
+    <ScrollView
+      style={{ flex: 1, backgroundColor: theme.colors.background }}
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+    >
+      {error ? (
+        <Text variant="bodyMedium" style={styles.error}>{error}</Text>
+      ) : null}
 
-      <Text style={BASE_STYLES.label}>Email (optional)</Text>
+      <Text variant="labelLarge" style={styles.label}>Email (optional)</Text>
       <TextInput
-        style={BASE_STYLES.formInput}
+        mode="outlined"
         placeholder="Enter client email"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
         autoCapitalize="none"
+        style={styles.input}
       />
 
-      <Text style={BASE_STYLES.label}>Phone (optional)</Text>
+      <Text variant="labelLarge" style={styles.label}>Phone (optional)</Text>
       <TextInput
-        style={BASE_STYLES.formInput}
+        mode="outlined"
         placeholder="+359..."
         value={phone}
         onChangeText={setPhone}
         keyboardType="phone-pad"
+        style={styles.input}
       />
 
-      <Text style={BASE_STYLES.subText}>
+      <Text variant="bodySmall" style={styles.subText}>
         Email or Phone is required.
       </Text>
 
-      <Text style={BASE_STYLES.label}>Password</Text>
+      <Text variant="labelLarge" style={styles.label}>Password</Text>
       <TextInput
-        style={BASE_STYLES.formInput}
+        mode="outlined"
         placeholder="Enter password"
         secureTextEntry
         value={password}
         onChangeText={setPassword}
+        style={styles.input}
       />
 
       {loading ? (
-        <ActivityIndicator size="large" style={styles.loader} />
+        <ActivityIndicator animating={true} size="large" style={styles.loader} />
       ) : (
         <CommonButton title="Register Client" onPress={handleRegister} />
       )}
@@ -106,5 +123,32 @@ export default function ShopRegisterClientScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  loader: { marginTop: 20 },
+  container: {
+    padding: 16,
+    paddingBottom: 50,
+  },
+  title: {
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  label: {
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  input: {
+    marginBottom: 8,
+  },
+  subText: {
+    marginBottom: 16,
+    textAlign: 'center',
+    color: 'gray',
+  },
+  error: {
+    color: 'red',
+    textAlign: 'center',
+    marginVertical: 8,
+  },
+  loader: {
+    marginTop: 20,
+  },
 });

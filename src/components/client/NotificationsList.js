@@ -1,23 +1,19 @@
+// PATH: src/components/client/NotificationsList.js
 import React, { useEffect, useState, useContext } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  ActivityIndicator,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
+import { View, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { getNotifications, markNotificationRead } from '../../api/notifications';
 import { WebSocketContext } from '../../context/WebSocketManager';
-import BASE_STYLES from '../../styles/base';
+import { FlatList } from 'react-native';
+import { Card, Text, ActivityIndicator, useTheme } from 'react-native-paper';
 
 export default function NotificationsList() {
   const [loading, setLoading] = useState(true);
   const [remoteNotifications, setRemoteNotifications] = useState([]);
   const { notifications: liveNotifications, setNotifications } = useContext(WebSocketContext);
   const navigation = useNavigation();
+  const theme = useTheme();
 
   useEffect(() => {
     fetchNotifications();
@@ -40,11 +36,8 @@ export default function NotificationsList() {
   const handlePress = async (item) => {
     try {
       const token = await AsyncStorage.getItem('@access_token');
-
       if (!item.is_read) {
         await markNotificationRead(token, item.id);
-
-        // Remove from WebSocket context so badge updates
         setNotifications(prev => prev.filter(n => n.id !== item.id));
       }
 
@@ -59,7 +52,6 @@ export default function NotificationsList() {
     }
   };
 
-  // Merge live and remote notifications, de-duplicated by ID
   const mergedNotificationsMap = new Map();
   [...remoteNotifications, ...liveNotifications].forEach((notif) =>
     mergedNotificationsMap.set(notif.id, notif)
@@ -68,8 +60,10 @@ export default function NotificationsList() {
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   return (
-    <View style={BASE_STYLES.overlay}>
-      <Text style={BASE_STYLES.title}>Notifications</Text>
+    <View style={{ flex: 1, padding: 10, backgroundColor: theme.colors.background }}>
+      <Text variant="headlineSmall" style={{ textAlign: 'center', marginBottom: 10 }}>
+        Notifications
+      </Text>
       {loading ? (
         <ActivityIndicator size="large" />
       ) : mergedNotifications.length === 0 ? (
@@ -81,19 +75,21 @@ export default function NotificationsList() {
           data={mergedNotifications}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                BASE_STYLES.listItem,
-                item.is_read ? { opacity: 0.5 } : { opacity: 1 },
-              ]}
+            <Card
+              style={{
+                marginVertical: 6,
+                opacity: item.is_read ? 0.5 : 1,
+              }}
               onPress={() => handlePress(item)}
             >
-              <Text style={BASE_STYLES.subText}>{item.title}</Text>
-              <Text>{item.body}</Text>
-              <Text style={{ fontSize: 12, color: '#666' }}>
-                {new Date(item.created_at).toLocaleString()}
-              </Text>
-            </TouchableOpacity>
+              <Card.Title title={item.title} />
+              <Card.Content>
+                <Text>{item.body}</Text>
+                <Text style={{ fontSize: 12, color: theme.colors.onSurfaceVariant }}>
+                  {new Date(item.created_at).toLocaleString()}
+                </Text>
+              </Card.Content>
+            </Card>
           )}
         />
       )}

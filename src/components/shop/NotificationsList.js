@@ -1,18 +1,12 @@
 // PATH: src/components/shop/NotificationsList.js
 
 import React, { useEffect, useState, useContext } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  ActivityIndicator,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
+import { View, FlatList, Alert, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { getNotifications, markNotificationRead } from '../../api/notifications';
 import { WebSocketContext } from '../../context/WebSocketManager';
+import { Card, Text, ActivityIndicator, useTheme } from 'react-native-paper';
 import BASE_STYLES from '../../styles/base';
 
 export default function NotificationsList() {
@@ -20,6 +14,7 @@ export default function NotificationsList() {
   const [remoteNotifications, setRemoteNotifications] = useState([]);
   const { notifications: liveNotifications = [], removeNotification } = useContext(WebSocketContext);
   const navigation = useNavigation();
+  const theme = useTheme();
 
   useEffect(() => {
     fetchNotifications();
@@ -34,7 +29,6 @@ export default function NotificationsList() {
       if (Array.isArray(data)) {
         setRemoteNotifications(data);
       } else if (data && Array.isArray(data.results)) {
-        // Handles paginated DRF response
         setRemoteNotifications(data.results);
       } else {
         console.warn('⚠️ Unexpected notifications API shape:', data);
@@ -54,11 +48,7 @@ export default function NotificationsList() {
 
       if (!item.is_read) {
         await markNotificationRead(token, item.id);
-
-        if (typeof removeNotification === 'function') {
-          removeNotification(item.id);
-        }
-
+        if (typeof removeNotification === 'function') removeNotification(item.id);
         await fetchNotifications();
       }
 
@@ -73,46 +63,36 @@ export default function NotificationsList() {
     }
   };
 
+  // ✅ Merge live + remote notifications
+  const mergedMap = new Map();
+  [...(remoteNotifications || []), ...(liveNotifications || [])].forEach((n) => {
+    if (n?.id != null) mergedMap.set(n.id, n);
+  });
+  const mergedNotifications = Array.from(mergedMap.values())
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
   const renderItem = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        BASE_STYLES.listItem,
-        item.is_read ? { opacity: 0.5 } : { opacity: 1 },
-      ]}
+    <Card
+      mode="outlined"
+      style={[styles.card, item.is_read && { opacity: 0.5 }]}
       onPress={() => handlePress(item)}
     >
-      <Text style={BASE_STYLES.subText}>{item.title}</Text>
-      <Text>{item.body}</Text>
-      <Text style={{ fontSize: 12, color: '#666' }}>
-        {new Date(item.created_at).toLocaleString()}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  // ✅ Defensive merging with checks
-  const safeRemote = Array.isArray(remoteNotifications) ? remoteNotifications : [];
-  const safeLive = Array.isArray(liveNotifications) ? liveNotifications : [];
-
-  console.log('✅ Merging notifications:', { remote: safeRemote.length, live: safeLive.length });
-
-  const mergedNotificationsMap = new Map();
-  [...safeRemote, ...safeLive].forEach((notif) => {
-    if (notif && notif.id != null) {
-      mergedNotificationsMap.set(notif.id, notif);
-    }
-  });
-
-  const mergedNotifications = Array.from(mergedNotificationsMap.values()).sort(
-    (a, b) => new Date(b.created_at) - new Date(a.created_at)
+      <Card.Title title={item.title || 'Notification'} />
+      <Card.Content>
+        <Text>{item.body}</Text>
+        <Text style={styles.timestamp}>
+          {new Date(item.created_at).toLocaleString()}
+        </Text>
+      </Card.Content>
+    </Card>
   );
 
   return (
     <View style={BASE_STYLES.overlay}>
-      <Text style={BASE_STYLES.title}>Notifications</Text>
       {loading ? (
-        <ActivityIndicator size="large" />
+        <ActivityIndicator animating={true} size="large" style={styles.loading} />
       ) : mergedNotifications.length === 0 ? (
-        <Text style={{ textAlign: 'center', marginVertical: 20 }}>
+        <Text style={styles.emptyText}>
           No notifications found
         </Text>
       ) : (
@@ -120,8 +100,35 @@ export default function NotificationsList() {
           data={mergedNotifications}
           keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
           renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
         />
       )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  title: {
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  loading: {
+    marginTop: 50,
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
+  card: {
+    marginVertical: 8,
+    marginHorizontal: 16,
+  },
+  timestamp: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#666',
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginVertical: 20,
+  },
+});
