@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { getNotifications, markNotificationRead } from '../../api/notifications';
 import { WebSocketContext } from '../../context/WebSocketManager';
-import { Card, Text, ActivityIndicator, useTheme } from 'react-native-paper';
+import { Card, Text, ActivityIndicator } from 'react-native-paper';
 import BASE_STYLES from '../../styles/base';
 
 export default function NotificationsList() {
@@ -14,7 +14,6 @@ export default function NotificationsList() {
   const [remoteNotifications, setRemoteNotifications] = useState([]);
   const { notifications: liveNotifications = [], removeNotification } = useContext(WebSocketContext);
   const navigation = useNavigation();
-  const theme = useTheme();
 
   useEffect(() => {
     fetchNotifications();
@@ -63,7 +62,6 @@ export default function NotificationsList() {
     }
   };
 
-  // ✅ Merge live + remote notifications
   const mergedMap = new Map();
   [...(remoteNotifications || []), ...(liveNotifications || [])].forEach((n) => {
     if (n?.id != null) mergedMap.set(n.id, n);
@@ -92,9 +90,7 @@ export default function NotificationsList() {
       {loading ? (
         <ActivityIndicator animating={true} size="large" style={styles.loading} />
       ) : mergedNotifications.length === 0 ? (
-        <Text style={styles.emptyText}>
-          No notifications found
-        </Text>
+        <Text style={styles.emptyText}>No notifications found</Text>
       ) : (
         <FlatList
           data={mergedNotifications}
@@ -108,10 +104,6 @@ export default function NotificationsList() {
 }
 
 const styles = StyleSheet.create({
-  title: {
-    marginBottom: 16,
-    textAlign: 'center',
-  },
   loading: {
     marginTop: 50,
   },

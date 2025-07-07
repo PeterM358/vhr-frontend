@@ -1,11 +1,10 @@
+// PATH: src/navigation/AppNavigator.js
+
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-
-
 // Screens
-
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import ClientVehiclesScreen from '../screens/ClientVehiclesScreen';
@@ -28,11 +27,10 @@ import ShopPromotions from '../components/shop/ShopPromotions';
 import NotificationsList from '../components/shop/NotificationsList';
 import RepairsList from '../components/shop/RepairsList';
 
-
 import ShopDrawer from './ShopDrawer';
-import HomeDrawer from './HomeDrawer';  // ✅ NEW
+import HomeDrawer from './HomeDrawer';
+import NotificationsWithAppbar from '../components/shop/NotificationsWithAppbar';
 
-// ✅ THIS LINE is what was missing
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
@@ -41,13 +39,16 @@ export default function AppNavigator() {
       <Stack.Navigator initialRouteName="AuthLoading">
         <Stack.Screen name="AuthLoading" component={AuthLoadingScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Home" component={HomeDrawer} options={{ headerShown: false }} />
-        <Stack.Screen name="ShopHome" component={ShopDrawer} options={{ headerShown: false }} />
         <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="Home" component={HomeDrawer} options={{ headerShown: false }} />
+        <Stack.Screen name="ShopHome" component={ShopDrawer} options={{ headerShown: false, title: 'Home'}} />
+        
+        {/* 👇 Add title so header shows Back + title */}
+        <Stack.Screen name="ShopMap" component={ShopMapScreen} options={{ title: 'Find Shops on Map' }} />
+
         <Stack.Screen name="ClientVehicles" component={ClientVehiclesScreen} options={{ title: 'My Vehicles' }}/>
-        <Stack.Screen name="ShopMap" component={ShopMapScreen} />
-        <Stack.Screen name="VehicleDetail" component={VehicleDetailScreen} options={{ title: 'Details' }}/> 
-        <Stack.Screen name="ShopDetail" component={ShopDetailScreen} options={{title: 'Details'}}/>
+        <Stack.Screen name="VehicleDetail" component={VehicleDetailScreen} options={{ title: 'Vehicle Details' }}/> 
+        <Stack.Screen name="ShopDetail" component={ShopDetailScreen} options={{ title: 'Shop Details' }}/>
         <Stack.Screen name="PromotionDetail" component={PromotionDetailScreen} options={{ title: 'Promotion Details' }}/>
         <Stack.Screen name="RepairDetail" component={RepairDetailScreen} options={{ title: 'Repair Details' }}/>
         <Stack.Screen name="ClientRepairs" component={ClientRepairsList} />
@@ -56,11 +57,19 @@ export default function AppNavigator() {
         <Stack.Screen name="CreatePromotion" component={CreatePromotionScreen} options={{ title: 'Create Promotion' }}/>
         <Stack.Screen name="ShopRegisterClient" component={ShopRegisterClientScreen} options={{ title: 'Register Client' }}/>
         <Stack.Screen name="ChooseShop" component={ChooseShopScreen} options={{ title: '' }}/>
-        <Stack.Screen name="OffersScreen" component={OffersScreen} options={{title: 'Offers'}}/>
+        <Stack.Screen name="OffersScreen" component={OffersScreen} options={{ title: 'Offers' }}/>
         <Stack.Screen name="AuthorizedClients" component={AuthorizedClients} options={{ title: 'Authorized Clients' }}/>
         <Stack.Screen name="ShopPromotions" component={ShopPromotions} options={{ title: 'Promotions' }}/>
         <Stack.Screen name="RepairsList" component={RepairsList} options={{ title: 'Repairs' }}/>
         <Stack.Screen name="NotificationsList" component={NotificationsList} options={{ title: 'Notifications' }}/>
+        <Stack.Screen
+          name="ShopNotificationsScreen"
+          component={NotificationsWithAppbar}
+          options={{
+            title: 'Notifications',
+            headerBackTitle: 'Back',
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -26,17 +26,14 @@ export default function ShopHomeScreen() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const token = await AsyncStorage.getItem('@access_token');
       const storedEmailOrPhone = await AsyncStorage.getItem('@user_email_or_phone');
 
       let displayName = 'Shop';
 
       if (storedEmailOrPhone) {
         if (storedEmailOrPhone.includes('@')) {
-          // email: take part before @
           displayName = storedEmailOrPhone.split('@')[0];
         } else {
-          // phone number
           displayName = storedEmailOrPhone;
         }
       }
@@ -86,7 +83,8 @@ export default function ShopHomeScreen() {
           <Appbar.Action
             icon="bell-outline"
             color="#fff"
-            onPress={() => navigation.navigate('NotificationsList')}
+            // ✅ Change: navigate to the standalone screen with Appbar
+            onPress={() => navigation.navigate('ShopNotificationsScreen')}
           />
           {unreadCount > 0 && (
             <Badge style={styles.notificationBadge}>{unreadCount}</Badge>
