@@ -29,7 +29,7 @@ export async function getRepairById(token, repairId) {
 }
 
 export async function submitOfferForRepair(token, offerData) {
-  const response = await fetch(`http://127.0.0.1:8000/api/offers/`, {
+  const response = await fetch(`${API_BASE_URL}/api/offers/`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,

@@ -1,7 +1,7 @@
 // PATH: src/api/auth.js
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '../constants/api';
+import { API_BASE_URL } from '../env';
 
 // ✅ Register
 export const register = async (emailOrPhone, password, isClient, isShop) => {

@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TextInput, Button, Surface, useTheme, Text } from 'react-native-paper';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { API_BASE_URL } from '../api/config';
 
 export default function ShopMapScreen({ navigation }) {
   const theme = useTheme();
@@ -22,7 +23,7 @@ export default function ShopMapScreen({ navigation }) {
     const userId = parseInt(userIdStr, 10);
 
     try {
-      const url = `http://127.0.0.1:8000/api/shops/${address ? `?address=${encodeURIComponent(address)}` : ''}`;
+      const url = `${API_BASE_URL}/api/shops/${address ? `?address=${encodeURIComponent(address)}` : ''}`;
       const response = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });

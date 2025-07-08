@@ -13,6 +13,7 @@ import {
   Dialog,
 } from 'react-native-paper';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { API_BASE_URL } from '../api/config';
 
 export default function ShopRegisterClientScreen({ navigation }) {
   const theme = useTheme();
@@ -63,8 +64,10 @@ export default function ShopRegisterClientScreen({ navigation }) {
       };
       if (email.trim()) payload.email = email.trim();
       if (phone.trim()) payload.phone = phone.trim();
+      
+      
 
-      const response = await fetch('http://127.0.0.1:8000/api/users/register/', {
+      const response = await fetch(`${API_BASE_URL}/api/users/register/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

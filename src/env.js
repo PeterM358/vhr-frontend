@@ -1,21 +1,17 @@
 // PATH: src/env.js
-// ✅ Switch environment automatically
-// Or hardcode ENV = 'prod' for production build
 
-const ENV = __DEV__ ? 'dev' : 'prod';  // Automatic switch based on React Native dev mode
+// Automatically choose dev or prod based on React Native __DEV__ global
+const ENV = __DEV__ ? 'dev' : 'prod';
 
 /**
  * IMPORTANT:
- * Replace 192.168.x.x with your actual computer's LAN IP.
- * You can get it by running `ipconfig` or `ifconfig`.
+ * Replace 192.168.x.x with your actual computer's LAN IP for local network testing.
+ * Example: '192.168.0.104'
  */
-
 const CONFIG = {
   dev: {
-    // API_BASE_URL: 'http://185.189.199.172:8000',  // Replace with your local machine's IP and Django port
-    // WS_BASE_URL: 'ws://185.189.199.172:8001',     // Replace with your local machine's IP and Daphne port
-    API_BASE_URL: 'http://localhost:8000',
-    WS_BASE_URL: 'ws://localhost:8001',
+    API_BASE_URL: 'http://192.168.0.104:8000',  // YOUR LOCAL LAN IP
+    WS_BASE_URL: 'ws://192.168.0.104:8001',
   },
   prod: {
     API_BASE_URL: 'https://your-production-api.com',

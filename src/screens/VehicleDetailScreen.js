@@ -5,6 +5,7 @@ import { FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Card, Text, Button, useTheme, Surface } from 'react-native-paper';
 import CommonButton from '../components/CommonButton';
+import { API_BASE_URL } from '../api/config';
 
 export default function VehicleDetailScreen({ route, navigation }) {
   const { vehicleId } = route.params;
@@ -18,7 +19,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
     const fetchVehicleDetails = async () => {
       const token = await AsyncStorage.getItem('@access_token');
       try {
-        const res = await fetch(`http://127.0.0.1:8000/api/vehicles/${vehicleId}/`, {
+        const res = await fetch(`${API_BASE_URL}/api/vehicles/${vehicleId}/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();

@@ -21,6 +21,7 @@ import L from 'leaflet';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useNavigation } from '@react-navigation/native';
+import { API_BASE_URL } from '../api/config';
 // import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet's default icon URLs
@@ -74,7 +75,7 @@ export default function ShopMapScreen() {
       const userIdStr = await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
       const userId = parseInt(userIdStr, 10);
 
-      const url = `http://127.0.0.1:8000/api/shops/${address ? `?address=${encodeURIComponent(address)}` : ''}`;
+      const url = `${API_BASE_URL}/api/shops/${address ? `?address=${encodeURIComponent(address)}` : ''}`;
       const response = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });

@@ -1,8 +1,8 @@
 // src/api/shops.js
-import axios from 'axios';
+import { API_BASE_URL } from './config';
 
 export const getShops = async (token, address = '') => {
-  let url = `http://127.0.0.1:8000/api/shops/`;
+  let url = `${API_BASE_URL}/api/shops/`;
   if (address) {
     url += `?address=${encodeURIComponent(address)}`;
   }
@@ -18,7 +18,7 @@ export const getShops = async (token, address = '') => {
 
 // api/shops.js
 export async function getShopById(shopId, token) {
-  const response = await fetch(`http://127.0.0.1:8000/api/shops/${shopId}/`, {
+  const response = await fetch(`${API_BASE_URL}/api/shops/${shopId}/`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -40,7 +40,7 @@ export async function uploadShopImage(shopId, token, imageUri) {
     type: 'image/jpeg',
   });
 
-  const response = await fetch(`http://127.0.0.1:8000/api/shops/${shopId}/images/`, {
+  const response = await fetch(`${API_BASE_URL}/api/shops/${shopId}/images/`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -60,7 +60,7 @@ export async function uploadShopImage(shopId, token, imageUri) {
 
 export async function deleteShopImage(shopId, imageId, token) {
   const response = await fetch(
-    `http://127.0.0.1:8000/api/shops/${shopId}/images/${imageId}/delete/`,
+    `${API_BASE_URL}/api/shops/${shopId}/images/${imageId}/delete/`,
     {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
