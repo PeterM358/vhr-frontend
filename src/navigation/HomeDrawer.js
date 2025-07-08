@@ -39,18 +39,18 @@ function CustomDrawerContent(props) {
         icon={() => <Text>🚗</Text>}
       />
 
-      <TouchableOpacity
-        style={styles.drawerRow}
+      <DrawerItem
+        label="Offers"
         onPress={() => navigation.navigate('OffersScreen')}
-      >
-        <View style={styles.drawerItemInner}>
-          <Text style={styles.drawerIcon}>🏷️</Text>
-          <Text style={styles.drawerLabel}>Offers</Text>
-        </View>
-        {totalOffersBadge > 0 && (
-          <Badge style={styles.drawerBadge}>{totalOffersBadge}</Badge>
+        icon={({ color }) => (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={{ color }}>🏷️</Text>
+            {totalOffersBadge > 0 && (
+              <Badge>{totalOffersBadge}</Badge>
+            )}
+          </View>
         )}
-      </TouchableOpacity>
+      />
 
       <DrawerItem
         label="Find Shops on Map"

@@ -21,7 +21,7 @@ import L from 'leaflet';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useNavigation } from '@react-navigation/native';
-import 'leaflet/dist/leaflet.css';
+// import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet's default icon URLs
 delete L.Icon.Default.prototype._getIconUrl;

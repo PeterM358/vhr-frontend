@@ -1,5 +1,4 @@
 // PATH: src/screens/ShopHomeScreen.js
-
 import React, { useContext, useEffect, useState } from 'react';
 import {
   View,
@@ -8,45 +7,54 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Appbar, Badge, Button } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logout } from '../api/auth';
 
 import { WebSocketContext } from '../context/WebSocketManager';
+import { AuthContext } from '../context/AuthManager';
 import BASE_STYLES from '../styles/base';
 
 export default function ShopHomeScreen() {
   const navigation = useNavigation();
+  const {
+    setAuthToken,
+    setIsAuthenticated,
+    setUserEmailOrPhone,
+  } = useContext(AuthContext);
+
   const [loading, setLoading] = useState(true);
   const [shopDisplayName, setShopDisplayName] = useState('Shop');
 
   const { notifications } = useContext(WebSocketContext);
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const storedEmailOrPhone = await AsyncStorage.getItem('@user_email_or_phone');
+  // Runs on mount AND when you come back to this screen
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadShopUser = async () => {
+        const storedEmailOrPhone = await AsyncStorage.getItem('@user_email_or_phone');
+        let displayName = 'Shop';
 
-      let displayName = 'Shop';
-
-      if (storedEmailOrPhone) {
-        if (storedEmailOrPhone.includes('@')) {
-          displayName = storedEmailOrPhone.split('@')[0];
-        } else {
-          displayName = storedEmailOrPhone;
+        if (storedEmailOrPhone && storedEmailOrPhone.trim()) {
+          if (storedEmailOrPhone.includes('@')) {
+            displayName = storedEmailOrPhone.split('@')[0];
+          } else {
+            displayName = storedEmailOrPhone;
+          }
         }
-      }
 
-      setShopDisplayName(displayName);
-      setLoading(false);
-    };
+        setShopDisplayName(displayName);
+        setLoading(false);
+      };
 
-    fetchData();
-  }, []);
+      loadShopUser();
+    }, [])
+  );
 
   const handleLogout = async () => {
-    await logout(navigation);
+    await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
   };
 
   if (loading) {
@@ -83,7 +91,6 @@ export default function ShopHomeScreen() {
           <Appbar.Action
             icon="bell-outline"
             color="#fff"
-            // ✅ Change: navigate to the standalone screen with Appbar
             onPress={() => navigation.navigate('ShopNotificationsScreen')}
           />
           {unreadCount > 0 && (

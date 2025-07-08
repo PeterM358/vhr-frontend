@@ -1,20 +1,16 @@
 // PATH: src/screens/LoginScreen.js
 
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
+import React, { useState, useEffect, useContext } from 'react';
+import { View, Text, TextInput, ScrollView, ActivityIndicator } from 'react-native';
 import { login } from '../api/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { STORAGE_KEYS } from '../constants/storageKeys';
 import BASE_STYLES from '../styles/base';
 import CommonButton from '../components/CommonButton';
+import { AuthContext } from '../context/AuthManager';
 
 export default function LoginScreen({ navigation }) {
+  const { setIsAuthenticated, setAuthToken, setUserEmailOrPhone } = useContext(AuthContext);
+
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -33,24 +29,14 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     try {
       await AsyncStorage.setItem('@last_login_email', emailOrPhone.trim());
-
       const data = await login(emailOrPhone.trim(), password);
-      const { access, refresh, is_client, is_shop, user_id, shop_profiles } = data;
 
-      await AsyncStorage.multiSet([
-        [STORAGE_KEYS.ACCESS_TOKEN, access],
-        [STORAGE_KEYS.REFRESH_TOKEN, refresh],
-        [STORAGE_KEYS.IS_CLIENT, JSON.stringify(is_client)],
-        [STORAGE_KEYS.IS_SHOP, JSON.stringify(is_shop)],
-        [STORAGE_KEYS.USER_ID, user_id.toString()],
-        [STORAGE_KEYS.SHOP_PROFILES, JSON.stringify(shop_profiles || [])]
-      ]);
+      console.log('✅ Login: setting AuthContext state');
+      setAuthToken(data.access);
+      setIsAuthenticated(true);
+      setUserEmailOrPhone(emailOrPhone.trim());
 
-      if (is_shop && shop_profiles && shop_profiles.length === 1) {
-        await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_SHOP_ID, shop_profiles[0].id.toString());
-      }
-
-      const targetScreen = is_shop ? 'ShopHome' : 'Home';
+      const targetScreen = data.is_shop ? 'ShopHome' : 'Home';
       navigation.reset({ index: 0, routes: [{ name: targetScreen }] });
     } catch (err) {
       console.error('Login error', err);
@@ -65,7 +51,6 @@ export default function LoginScreen({ navigation }) {
   return (
     <ScrollView contentContainerStyle={BASE_STYLES.overlay}>
       <Text style={BASE_STYLES.title}>Login</Text>
-
       {error ? <Text style={BASE_STYLES.error}>{error}</Text> : null}
 
       <Text style={BASE_STYLES.label}>Email or Phone</Text>
