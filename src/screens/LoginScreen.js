@@ -3,22 +3,22 @@
 import React, { useState, useEffect } from 'react';
 import {
   View,
+  Text,
+  TextInput,
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { useTheme, Text, TextInput, Button } from 'react-native-paper';
 import { login } from '../api/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import BASE_STYLES from '../styles/base';
+import CommonButton from '../components/CommonButton';
 
 export default function LoginScreen({ navigation }) {
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const theme = useTheme();
 
   useEffect(() => {
     const loadLastLogin = async () => {
@@ -63,65 +63,38 @@ export default function LoginScreen({ navigation }) {
   const goToRegister = () => navigation.navigate('Register');
 
   return (
-    <ScrollView
-      contentContainerStyle={{
-        flexGrow: 1,
-        backgroundColor: theme.colors.background,
-        justifyContent: 'center',
-        padding: 20,
-      }}
-    >
-      <Text variant="headlineMedium" style={{ textAlign: 'center', marginBottom: 20, color: theme.colors.primary }}>
-        Login
-      </Text>
+    <ScrollView contentContainerStyle={BASE_STYLES.overlay}>
+      <Text style={BASE_STYLES.title}>Login</Text>
 
-      {error ? (
-        <Text style={{ color: theme.colors.error, textAlign: 'center', marginBottom: 12 }}>
-          {error}
-        </Text>
-      ) : null}
+      {error ? <Text style={BASE_STYLES.error}>{error}</Text> : null}
 
+      <Text style={BASE_STYLES.label}>Email or Phone</Text>
       <TextInput
-        label="Email or Phone"
-        mode="outlined"
+        style={BASE_STYLES.formInput}
+        placeholder="Enter email or phone"
         value={emailOrPhone}
         onChangeText={setEmailOrPhone}
-        keyboardType="email-address"
         autoCapitalize="none"
-        style={{ marginBottom: 16 }}
+        keyboardType="email-address"
       />
 
+      <Text style={BASE_STYLES.label}>Password</Text>
       <TextInput
-        label="Password"
-        mode="outlined"
+        style={BASE_STYLES.formInput}
+        placeholder="Enter password"
         secureTextEntry
         value={password}
         onChangeText={setPassword}
-        style={{ marginBottom: 24 }}
       />
 
       {loading ? (
         <ActivityIndicator size="large" style={{ marginVertical: 20 }} />
       ) : (
-        <Button
-          mode="contained"
-          onPress={handleLogin}
-          style={{ marginBottom: 16 }}
-        >
-          Login
-        </Button>
+        <CommonButton title="Login" onPress={handleLogin} />
       )}
 
-      <Text style={{ textAlign: 'center', marginBottom: 8 }}>
-        Don't have an account?
-      </Text>
-      <Button
-        mode="outlined"
-        onPress={goToRegister}
-        textColor={theme.colors.primary}
-      >
-        Register
-      </Button>
+      <Text style={BASE_STYLES.subText}>Don't have an account?</Text>
+      <CommonButton title="Register" onPress={goToRegister} color="#555" />
     </ScrollView>
   );
 }

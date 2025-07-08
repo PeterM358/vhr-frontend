@@ -1,18 +1,25 @@
 // PATH: src/screens/CreatePromotionScreen.js
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useLayoutEffect } from 'react';
 import {
-  ScrollView,
-  View,
   StyleSheet,
+  View,
+  SafeAreaView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
-import { ActivityIndicator, Text, TextInput, Button, useTheme } from 'react-native-paper';
+import {
+  ActivityIndicator,
+  Text,
+  TextInput,
+  useTheme,
+  Portal,
+  Dialog,
+  Button,
+} from 'react-native-paper';
 import { API_BASE_URL } from '../api/config';
 import { STORAGE_KEYS } from '../constants/storageKeys';
-
-import DropDown from "react-native-paper-dropdown";
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 export default function CreatePromotionScreen({ navigation }) {
   const theme = useTheme();
@@ -25,23 +32,67 @@ export default function CreatePromotionScreen({ navigation }) {
   const [maxBookings, setMaxBookings] = useState('');
 
   const [repairTypes, setRepairTypes] = useState([]);
-  const [selectedRepairType, setSelectedRepairType] = useState('');
+  const [selectedRepairType, setSelectedRepairType] = useState(null);
   const [loadingTypes, setLoadingTypes] = useState(true);
 
-  
+  const [dialogVisible, setDialogVisible] = useState(false);
+  const [dialogMessage, setDialogMessage] = useState('');
+
   useEffect(() => {
     fetchRepairTypes();
   }, []);
 
+  useLayoutEffect(() => {
+    const handleHeaderSave = () => {
+      if (!title.trim()) {
+        setDialogMessage('Title is required.');
+        setDialogVisible(true);
+        return;
+      }
+
+      if (!price || isNaN(parseFloat(price))) {
+        setDialogMessage('Valid price is required.');
+        setDialogVisible(true);
+        return;
+      }
+
+      if (!selectedRepairType) {
+        setDialogMessage('Repair type is required.');
+        setDialogVisible(true);
+        return;
+      }
+
+      savePromotion();
+    };
+
+    navigation.setOptions({
+      headerRight: () => (
+        <Button
+          mode="text"
+          compact
+          onPress={handleHeaderSave}
+          labelStyle={{ color: theme.colors.primary,
+          fontSize: 16 }}
+        >
+          Save
+        </Button>
+      ),
+    });
+  }, [navigation, title, price, selectedRepairType, description, validFrom, validUntil, maxBookings]);
+
   const fetchRepairTypes = async () => {
     setLoadingTypes(true);
     try {
-      const token = await AsyncStorage.getItem('@access_token');
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const res = await fetch(`${API_BASE_URL}/api/repairs/types/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
+
       setRepairTypes(data);
+      if (data.length) {
+        setSelectedRepairType(String(data[0].id));
+      }
     } catch (err) {
       console.error('Error fetching repair types:', err);
     } finally {
@@ -49,12 +100,7 @@ export default function CreatePromotionScreen({ navigation }) {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!title.trim() || !price || !selectedRepairType) {
-      alert('Please fill out all required fields.');
-      return;
-    }
-
+  const savePromotion = async () => {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const response = await fetch(`${API_BASE_URL}/api/offers/`, {
@@ -75,115 +121,138 @@ export default function CreatePromotionScreen({ navigation }) {
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to create promotion');
-      alert('Promotion created!');
-      navigation.goBack();
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(errorText);
+        throw new Error('Failed to create promotion');
+      }
+
+      setDialogMessage('Promotion created!');
+      setDialogVisible(true);
+
+      setTimeout(() => {
+        setDialogVisible(false);
+        navigation.goBack();
+      }, 1500);
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Failed to save promotion');
+      setDialogMessage(err.message || 'Failed to save promotion');
+      setDialogVisible(true);
     }
   };
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: theme.colors.background }}
-      contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Text variant="labelLarge" style={styles.label}>Title *</Text>
-      <TextInput
-        mode="outlined"
-        placeholder="e.g. Oil Change Special"
-        value={title}
-        onChangeText={setTitle}
-        style={styles.input}
-      />
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <View style={{ flex: 1 }}>
+        <KeyboardAwareScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="always"
+          enableOnAndroid
+          extraScrollHeight={20}
+        >
+          <Text variant="labelLarge" style={styles.label}>Title *</Text>
+          <TextInput
+            mode="outlined"
+            value={title}
+            onChangeText={setTitle}
+            placeholder="e.g. Oil Change Special"
+            style={styles.input}
+          />
 
-      <Text variant="labelLarge" style={styles.label}>Description</Text>
-      <TextInput
-        mode="outlined"
-        placeholder="Promotion details"
-        value={description}
-        onChangeText={setDescription}
-        multiline
-        style={styles.input}
-      />
+          <Text variant="labelLarge" style={styles.label}>Description</Text>
+          <TextInput
+            mode="outlined"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            placeholder="Promotion details"
+            style={styles.input}
+          />
 
-      <Text variant="labelLarge" style={styles.label}>Repair Type *</Text>
-      {loadingTypes ? (
-        <ActivityIndicator animating={true} size="small" />
-      ) : (
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={selectedRepairType}
-            onValueChange={(val) => setSelectedRepairType(val || '')}
+          <Text variant="labelLarge" style={styles.label}>Repair Type *</Text>
+          {loadingTypes ? (
+            <ActivityIndicator animating size="small" />
+          ) : (
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={selectedRepairType}
+                onValueChange={(val) => setSelectedRepairType(val)}
+              >
+                {repairTypes.map((rt) => (
+                  <Picker.Item key={rt.id} label={rt.name} value={String(rt.id)} />
+                ))}
+              </Picker>
+            </View>
+          )}
+
+          <Text variant="labelLarge" style={styles.label}>Price (BGN) *</Text>
+          <TextInput
+            mode="outlined"
+            value={price}
+            onChangeText={setPrice}
+            keyboardType="numeric"
+            placeholder="e.g. 50"
+            style={styles.input}
+          />
+
+          <Text variant="labelLarge" style={styles.label}>Valid From (YYYY-MM-DD)</Text>
+          <TextInput
+            mode="outlined"
+            value={validFrom}
+            onChangeText={setValidFrom}
+            placeholder="e.g. 2024-06-01"
+            style={styles.input}
+          />
+
+          <Text variant="labelLarge" style={styles.label}>Valid Until (YYYY-MM-DD)</Text>
+          <TextInput
+            mode="outlined"
+            value={validUntil}
+            onChangeText={setValidUntil}
+            placeholder="e.g. 2024-12-31"
+            style={styles.input}
+          />
+
+          <Text variant="labelLarge" style={styles.label}>Max Bookings (optional)</Text>
+          <TextInput
+            mode="outlined"
+            value={maxBookings}
+            onChangeText={setMaxBookings}
+            keyboardType="numeric"
+            placeholder="e.g. 10"
+            style={styles.input}
+          />
+        </KeyboardAwareScrollView>
+
+        <Portal>
+          <Dialog
+            visible={dialogVisible}
+            onDismiss={() => setDialogVisible(false)}
           >
-            <Picker.Item label="Select Repair Type..." value="" />
-            {repairTypes.map((rt) => (
-              <Picker.Item key={rt.id} label={rt.name} value={String(rt.id)} />
-            ))}
-          </Picker>
-        </View>
-      )}
-
-      <Text variant="labelLarge" style={styles.label}>Price (BGN) *</Text>
-      <TextInput
-        mode="outlined"
-        placeholder="e.g. 50"
-        value={price}
-        onChangeText={setPrice}
-        keyboardType="numeric"
-        style={styles.input}
-      />
-
-      <Text variant="labelLarge" style={styles.label}>Valid From (YYYY-MM-DD)</Text>
-      <TextInput
-        mode="outlined"
-        placeholder="e.g. 2024-06-01"
-        value={validFrom}
-        onChangeText={setValidFrom}
-        style={styles.input}
-      />
-
-      <Text variant="labelLarge" style={styles.label}>Valid Until (YYYY-MM-DD)</Text>
-      <TextInput
-        mode="outlined"
-        placeholder="e.g. 2024-12-31"
-        value={validUntil}
-        onChangeText={setValidUntil}
-        style={styles.input}
-      />
-
-      <Text variant="labelLarge" style={styles.label}>Max Bookings (optional)</Text>
-      <TextInput
-        mode="outlined"
-        placeholder="e.g. 10"
-        value={maxBookings}
-        onChangeText={setMaxBookings}
-        keyboardType="numeric"
-        style={styles.input}
-      />
-
-      <Button
-        mode="contained"
-        icon="check"
-        onPress={handleSubmit}
-        style={styles.button}
-      >
-        Save Promotion
-      </Button>
-    </ScrollView>
+            <Dialog.Title>Notice</Dialog.Title>
+            <Dialog.Content>
+              <Text>{dialogMessage}</Text>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button
+                mode="text"
+                onPress={() => setDialogVisible(false)}
+              >
+                OK
+              </Button>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     padding: 16,
-    paddingBottom: 50,
-  },
-  title: {
-    marginBottom: 16,
-    textAlign: 'center',
+    paddingBottom: 100,
   },
   label: {
     marginTop: 16,
@@ -198,8 +267,5 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
     backgroundColor: '#fff',
-  },
-  button: {
-    marginTop: 20,
   },
 });

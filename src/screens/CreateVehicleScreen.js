@@ -1,11 +1,28 @@
 // PATH: src/screens/CreateVehicleScreen.js
 
-import React, { useEffect, useState } from 'react';
-import { ScrollView, View, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useLayoutEffect } from 'react';
+import {
+  StyleSheet,
+  View,
+  SafeAreaView,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
-import { API_BASE_URL } from '../api/config';
-import { Surface, Text, TextInput, Button, ActivityIndicator, Card, useTheme } from 'react-native-paper';
+import {
+  API_BASE_URL
+} from '../api/config';
+import {
+  Surface,
+  Text,
+  TextInput,
+  ActivityIndicator,
+  Card,
+  useTheme,
+  Button,
+  Portal,
+  Dialog,
+} from 'react-native-paper';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 export default function CreateVehicleScreen({ navigation, route }) {
   const theme = useTheme();
@@ -25,10 +42,54 @@ export default function CreateVehicleScreen({ navigation, route }) {
 
   const [loadingBrands, setLoadingBrands] = useState(true);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [dialogVisible, setDialogVisible] = useState(false);
+  const [dialogMessage, setDialogMessage] = useState('');
 
   useEffect(() => {
     loadBrands();
   }, []);
+
+  useLayoutEffect(() => {
+    const handleHeaderSave = () => {
+      if (!licensePlate.trim()) {
+        setDialogMessage('License plate is required.');
+        setDialogVisible(true);
+        return;
+      }
+
+      if (!selectedBrand) {
+        setDialogMessage('Brand is required.');
+        setDialogVisible(true);
+        return;
+      }
+
+      if (!selectedModel) {
+        setDialogMessage('Model is required.');
+        setDialogVisible(true);
+        return;
+      }
+
+      saveVehicle();
+    };
+
+    navigation.setOptions({
+      headerRight: () => (
+        <Button
+          mode="text"
+          compact
+          onPress={handleHeaderSave}
+          labelStyle={{
+            color: theme.colors.primary,
+            fontSize: 16,
+          }}
+        >
+          Save
+        </Button>
+      ),
+    });
+  }, [navigation, licensePlate, selectedBrand, selectedModel, year, vin, kilometers]);
 
   const loadBrands = async () => {
     try {
@@ -41,7 +102,8 @@ export default function CreateVehicleScreen({ navigation, route }) {
       setBrands(data);
     } catch (err) {
       console.error(err);
-      alert('Error: Could not load brands');
+      setDialogMessage('Error: Could not load brands');
+      setDialogVisible(true);
     } finally {
       setLoadingBrands(false);
     }
@@ -63,7 +125,8 @@ export default function CreateVehicleScreen({ navigation, route }) {
       setModels(data);
     } catch (err) {
       console.error(err);
-      alert('Error: Could not load models');
+      setDialogMessage('Error: Could not load models');
+      setDialogVisible(true);
     } finally {
       setLoadingModels(false);
     }
@@ -80,12 +143,8 @@ export default function CreateVehicleScreen({ navigation, route }) {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!licensePlate.trim() || !selectedBrand || !selectedModel) {
-      alert('Please fill out all required fields.');
-      return;
-    }
-
+  const saveVehicle = async () => {
+    setSaving(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
       const payload = {
@@ -115,125 +174,148 @@ export default function CreateVehicleScreen({ navigation, route }) {
         throw new Error('Failed to create vehicle');
       }
 
-      alert('Vehicle created!');
-      navigation.goBack();
+      setDialogMessage('Vehicle created!');
+      setDialogVisible(true);
+
+      setTimeout(() => {
+        setDialogVisible(false);
+        navigation.goBack();
+      }, 1500);
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Failed to save vehicle');
+      setDialogMessage(err.message || 'Failed to save vehicle');
+      setDialogVisible(true);
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: theme.colors.background }}
-      contentContainerStyle={{ padding: 16, paddingBottom: 50 }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Surface style={styles.surface}>
-        {(clientEmail || clientPhone) && (
-          <Card style={styles.card}>
-            <Card.Content>
-              <Text variant="bodyMedium">
-                Adding for: {clientEmail || clientPhone}
-              </Text>
-            </Card.Content>
-          </Card>
-        )}
-
-        <Text variant="labelLarge" style={styles.label}>License Plate *</Text>
-        <TextInput
-          mode="outlined"
-          placeholder="e.g. CA1234XX"
-          value={licensePlate}
-          onChangeText={setLicensePlate}
-          style={styles.input}
-        />
-
-        <Text variant="labelLarge" style={styles.label}>Brand *</Text>
-        {loadingBrands ? (
-          <ActivityIndicator size="small" />
-        ) : (
-          <Picker
-            selectedValue={selectedBrand}
-            onValueChange={(val) => handleBrandChange(val)}
-            style={styles.picker}
-          >
-            <Picker.Item label="Select Brand..." value="" />
-            {brands.map((b) => (
-              <Picker.Item key={b.id} label={b.name} value={String(b.id)} />
-            ))}
-          </Picker>
-        )}
-
-        <Text variant="labelLarge" style={styles.label}>Model *</Text>
-        {loadingModels ? (
-          <ActivityIndicator size="small" />
-        ) : (
-          <Picker
-            selectedValue={selectedModel}
-            onValueChange={(val) => setSelectedModel(val || '')}
-            style={styles.picker}
-            enabled={!!selectedBrand}
-          >
-            <Picker.Item
-              label={selectedBrand ? 'Select Model...' : 'Choose Brand First'}
-              value=""
-            />
-            {models.map((m) => (
-              <Picker.Item key={m.id} label={m.name} value={String(m.id)} />
-            ))}
-          </Picker>
-        )}
-
-        <Text variant="labelLarge" style={styles.label}>Year</Text>
-        <TextInput
-          mode="outlined"
-          placeholder="e.g. 2019"
-          value={year}
-          onChangeText={setYear}
-          keyboardType="numeric"
-          style={styles.input}
-        />
-
-        <Text variant="labelLarge" style={styles.label}>VIN (optional)</Text>
-        <TextInput
-          mode="outlined"
-          placeholder="Vehicle Identification Number"
-          value={vin}
-          onChangeText={setVin}
-          style={styles.input}
-        />
-
-        <Text variant="labelLarge" style={styles.label}>Kilometers</Text>
-        <TextInput
-          mode="outlined"
-          placeholder="e.g. 85000"
-          value={kilometers}
-          onChangeText={setKilometers}
-          keyboardType="numeric"
-          style={styles.input}
-        />
-
-        <Button
-          mode="contained"
-          icon="check"
-          onPress={handleSubmit}
-          style={styles.saveButton}
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <View style={{ flex: 1 }}>
+        <KeyboardAwareScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          keyboardShouldPersistTaps="always"
+          enableOnAndroid
+          extraScrollHeight={20}
         >
-          Save Vehicle
-        </Button>
-      </Surface>
-    </ScrollView>
+          <Surface style={styles.surface}>
+            {(clientEmail || clientPhone) && (
+              <Card style={styles.card}>
+                <Card.Content>
+                  <Text variant="bodyMedium">
+                    Adding for: {clientEmail || clientPhone}
+                  </Text>
+                </Card.Content>
+              </Card>
+            )}
+
+            <Text variant="labelLarge" style={styles.label}>License Plate *</Text>
+            <TextInput
+              mode="outlined"
+              placeholder="e.g. CA1234XX"
+              value={licensePlate}
+              onChangeText={setLicensePlate}
+              style={styles.input}
+            />
+
+            <Text variant="labelLarge" style={styles.label}>Brand *</Text>
+            {loadingBrands ? (
+              <ActivityIndicator size="small" />
+            ) : (
+              <Picker
+                selectedValue={selectedBrand}
+                onValueChange={handleBrandChange}
+                style={styles.picker}
+              >
+                <Picker.Item label="Select Brand..." value="" />
+                {brands.map((b) => (
+                  <Picker.Item key={b.id} label={b.name} value={String(b.id)} />
+                ))}
+              </Picker>
+            )}
+
+            <Text variant="labelLarge" style={styles.label}>Model *</Text>
+            {loadingModels ? (
+              <ActivityIndicator size="small" />
+            ) : (
+              <Picker
+                selectedValue={selectedModel}
+                onValueChange={(val) => setSelectedModel(val || '')}
+                style={styles.picker}
+                enabled={!!selectedBrand}
+              >
+                <Picker.Item
+                  label={selectedBrand ? 'Select Model...' : 'Choose Brand First'}
+                  value=""
+                />
+                {models.map((m) => (
+                  <Picker.Item key={m.id} label={m.name} value={String(m.id)} />
+                ))}
+              </Picker>
+            )}
+
+            <Text variant="labelLarge" style={styles.label}>Year</Text>
+            <TextInput
+              mode="outlined"
+              placeholder="e.g. 2019"
+              value={year}
+              onChangeText={setYear}
+              keyboardType="numeric"
+              style={styles.input}
+            />
+
+            <Text variant="labelLarge" style={styles.label}>VIN (optional)</Text>
+            <TextInput
+              mode="outlined"
+              placeholder="Vehicle Identification Number"
+              value={vin}
+              onChangeText={setVin}
+              style={styles.input}
+            />
+
+            <Text variant="labelLarge" style={styles.label}>Kilometers</Text>
+            <TextInput
+              mode="outlined"
+              placeholder="e.g. 85000"
+              value={kilometers}
+              onChangeText={setKilometers}
+              keyboardType="numeric"
+              style={styles.input}
+            />
+
+            {saving && <ActivityIndicator animating size="small" />}
+          </Surface>
+        </KeyboardAwareScrollView>
+
+        <Portal>
+          <Dialog
+            visible={dialogVisible}
+            onDismiss={() => setDialogVisible(false)}
+          >
+            <Dialog.Title>Notice</Dialog.Title>
+            <Dialog.Content>
+              <Text>{dialogMessage}</Text>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button
+                mode="text"
+                onPress={() => setDialogVisible(false)}
+              >
+                OK
+              </Button>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   surface: {
     flex: 1,
-  },
-  title: {
-    textAlign: 'center',
-    marginBottom: 16,
   },
   card: {
     marginVertical: 10,
@@ -249,8 +331,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#f4f4f4',
     borderRadius: 8,
     marginBottom: 8,
-  },
-  saveButton: {
-    marginTop: 20,
   },
 });

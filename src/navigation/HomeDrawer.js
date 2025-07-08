@@ -1,7 +1,5 @@
-// PATH: src/navigation/HomeDrawer.js
-
 import React, { useContext } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import { useNavigation } from '@react-navigation/native';
 import { Text, Badge } from 'react-native-paper';
@@ -41,17 +39,18 @@ function CustomDrawerContent(props) {
         icon={() => <Text>🚗</Text>}
       />
 
-      <View style={styles.drawerItemWithBadge}>
-        <DrawerItem
-          label="Offers"
-          onPress={() => navigation.navigate('OffersScreen')}
-          icon={() => <Text>🏷️</Text>}
-          style={{ flex: 1 }}
-        />
+      <TouchableOpacity
+        style={styles.drawerRow}
+        onPress={() => navigation.navigate('OffersScreen')}
+      >
+        <View style={styles.drawerItemInner}>
+          <Text style={styles.drawerIcon}>🏷️</Text>
+          <Text style={styles.drawerLabel}>Offers</Text>
+        </View>
         {totalOffersBadge > 0 && (
           <Badge style={styles.drawerBadge}>{totalOffersBadge}</Badge>
         )}
-      </View>
+      </TouchableOpacity>
 
       <DrawerItem
         label="Find Shops on Map"
@@ -98,14 +97,28 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  drawerItemWithBadge: {
+  drawerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: 10,
+    paddingVertical: 8,
+  },
+  drawerItemInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  drawerIcon: {
+    marginRight: 12,
+    fontSize: 16,
+  },
+  drawerLabel: {
+    fontSize: 16,
   },
   drawerBadge: {
-    marginRight: 16,
     backgroundColor: 'red',
     color: 'white',
+    marginRight: 16,
+    alignSelf: 'center',
   },
 });

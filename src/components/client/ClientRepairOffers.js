@@ -1,4 +1,5 @@
 // PATH: src/components/client/ClientRepairOffers.js
+
 import React, { useEffect, useState, useContext } from 'react';
 import {
   View,
@@ -81,36 +82,35 @@ export default function ClientRepairOffers() {
   };
 
   const renderItem = ({ item }) => {
-    const isUnread = notifications.some(
-      n => !n.is_read && n.repair === item.repair
-    );
-    const isBooked = bookedRepairIds.has(item.repair);
+  const isUnread = notifications.some(
+    n => !n.is_read && n.repair === item.repair
+  );
+  const isBooked = bookedRepairIds.has(item.repair);
 
-    let opacity = 1;
-    if (!isUnread && !isBooked) opacity = 0.4;
+  let opacity = isUnread || isBooked ? 1 : 0.4;
 
-    return (
-      <Card
-        style={{ marginVertical: 6, opacity, backgroundColor: isBooked ? 'yellow' : theme.colors.surface }}
-        onPress={() => handlePressOffer(item)}
-      >
-        <Card.Title
-          title={item.repair_type_name}
-          titleStyle={isUnread ? { fontWeight: 'bold' } : {}}
-        />
-        <Card.Content>
-          <Text>{item.description}</Text>
-          <Text>Price: {item.price} BGN</Text>
-          <Text>Shop: {item.shop_name}</Text>
-          {isBooked && (
-            <Text style={{ color: theme.colors.primary, marginTop: 4 }}>
-              ✅ Already booked
-            </Text>
-          )}
-        </Card.Content>
-      </Card>
-    );
-  };
+  return (
+    <Card
+      style={{ marginVertical: 6, opacity, backgroundColor: isBooked ? 'yellow' : theme.colors.surface }}
+      onPress={() => handlePressOffer(item)}
+    >
+      <Card.Title
+        title={item.repair_type_name}
+        titleStyle={isUnread ? { fontWeight: 'bold' } : {}}
+      />
+      <Card.Content>
+        <Text>{item.description}</Text>
+        <Text>Price: {item.price} BGN</Text>
+        <Text>Shop: {item.shop_name}</Text>
+        {isBooked && (
+          <Text style={{ color: theme.colors.primary, marginTop: 4 }}>
+            ✅ Already booked
+          </Text>
+        )}
+      </Card.Content>
+    </Card>
+  );
+};
 
   return (
     <View style={{ flex: 1, padding: 10, backgroundColor: theme.colors.background }}>

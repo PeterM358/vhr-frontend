@@ -1,9 +1,11 @@
 // PATH: src/components/client/ClientPromotions.js
+
 import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Alert,
   RefreshControl,
+  StyleSheet,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FlatList } from 'react-native';
@@ -82,40 +84,36 @@ export default function ClientPromotions({ navigation }) {
   };
 
   const renderItem = ({ item }) => {
-    const isBooked = bookedIds.has(item.id);
-    const hasUnreadNotification = notifications.some(
-      n => !n.is_read && n.offer === item.id
-    );
+  const hasUnreadNotification = notifications.some(
+    n => !n.is_read && n.offer === item.id
+  );
 
-    let opacity = 1;
-    if (isBooked) {
-      opacity = 1;
-    } else if (!hasUnreadNotification) {
-      opacity = 0.4;
-    }
+  const isBooked = bookedIds.has(item.id);
 
-    return (
-      <Card
-        style={{ marginVertical: 6, opacity }}
-        onPress={() => handlePressPromotion(item)}
-      >
-        <Card.Title
-          title={item.repair_type_name}
-          titleStyle={hasUnreadNotification ? { fontWeight: 'bold' } : {}}
-        />
-        <Card.Content>
-          <Text>{item.description}</Text>
-          <Text>Price: {item.price} BGN</Text>
-          <Text>Shop: {item.shop_name}</Text>
-          {isBooked && (
-            <Text style={{ color: theme.colors.primary, marginTop: 4 }}>
-              ✅ Already booked
-            </Text>
-          )}
-        </Card.Content>
-      </Card>
-    );
-  };
+  let opacity = hasUnreadNotification || isBooked ? 1 : 0.4;
+
+  return (
+    <Card
+      style={{ marginVertical: 6, opacity }}
+      onPress={() => handlePressPromotion(item)}
+    >
+      <Card.Title
+        title={item.repair_type_name}
+        titleStyle={hasUnreadNotification ? { fontWeight: 'bold' } : {}}
+      />
+      <Card.Content>
+        <Text>{item.description}</Text>
+        <Text>Price: {item.price} BGN</Text>
+        <Text>Shop: {item.shop_name}</Text>
+        {isBooked && (
+          <Text style={{ color: theme.colors.primary, marginTop: 4 }}>
+            ✅ Already booked
+          </Text>
+        )}
+      </Card.Content>
+    </Card>
+  );
+};
 
   return (
     <View style={{ flex: 1, padding: 10, backgroundColor: theme.colors.background }}>

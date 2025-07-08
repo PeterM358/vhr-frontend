@@ -30,7 +30,7 @@ export const WebSocketProvider = ({ children }) => {
       console.log('📨 Received:', e.data);
       try {
         const data = JSON.parse(e.data);
-        setNotifications((prev) => [data, ...prev]);
+        setNotifications(prev => [data, ...prev]);
       } catch (error) {
         console.error('❌ Error parsing WebSocket message:', error);
       }
@@ -52,18 +52,8 @@ export const WebSocketProvider = ({ children }) => {
     };
   }, []);
 
-  // ✅ Clear all notifications
-  const clearNotifications = () => {
-    setNotifications([]);
-  };
-
-  // ✅ Remove single notification by ID
-  const removeNotification = (id) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  };
-
   return (
-    <WebSocketContext.Provider value={{ notifications, setNotifications, clearNotifications, removeNotification }}>
+    <WebSocketContext.Provider value={{ notifications, setNotifications }}>
       {children}
     </WebSocketContext.Provider>
   );
