@@ -16,9 +16,9 @@ export const register = async (emailOrPhone, password, isClient, isShop) => {
       loginData = { email: emailOrPhone.trim(), password };
     }
 
-    await axios.post(`${API_BASE_URL}api/users/register/`, registerData);
+    await axios.post(`${API_BASE_URL}/api/users/register/`, registerData);
 
-    const loginResponse = await axios.post(`${API_BASE_URL}api/token/`, loginData);
+    const loginResponse = await axios.post(`${API_BASE_URL}/api/token/`, loginData);
 
     await storeLoginData(loginResponse.data, emailOrPhone.trim());
 
@@ -41,7 +41,7 @@ export const login = async (emailOrPhone, password) => {
 
     console.log('🟢 Logging in with:', body);
 
-    const response = await axios.post(`${API_BASE_URL}api/token/`, body);
+    const response = await axios.post(`${API_BASE_URL}/api/token/`, body);
     console.log('🟢 Login response received:', response.data);
 
     await storeLoginData(response.data, emailOrPhone.trim());
@@ -97,7 +97,7 @@ export const getVehicles = async () => {
   if (!token) throw new Error('No token found');
 
   try {
-    const response = await axios.get(`${API_BASE_URL}api/vehicles/`, {
+    const response = await axios.get(`${API_BASE_URL}/api/vehicles/`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;
