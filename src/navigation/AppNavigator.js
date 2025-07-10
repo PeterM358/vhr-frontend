@@ -1,8 +1,11 @@
-// PATH: src/navigation/AppNavigator.js
+/**
+ * PATH: src/navigation/AppNavigator.js
+ */
 
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useTheme } from 'react-native-paper';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -34,24 +37,31 @@ import NotificationsWithAppbar from '../components/shop/NotificationsWithAppbar'
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
+  const theme = useTheme();
+
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="AuthLoading">
+      <Stack.Navigator
+        initialRouteName="AuthLoading"
+        screenOptions={{
+          headerStyle: { backgroundColor: theme.colors.primary },
+          headerTintColor: theme.colors.onPrimary,
+          headerTitleStyle: { color: theme.colors.onPrimary },
+        }}
+      >
         <Stack.Screen name="AuthLoading" component={AuthLoadingScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="Login" component={LoginScreen} options={{ title: '' }}/>
+        <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Sign Up' }}/>
         <Stack.Screen name="Home" component={HomeDrawer} options={{ headerShown: false }} />
-        <Stack.Screen name="ShopHome" component={ShopDrawer} options={{ headerShown: false, title: 'Home'}} />
-        
-        {/* 👇 Add title so header shows Back + title */}
-        <Stack.Screen name="ShopMap" component={ShopMapScreen} options={{ title: 'Find Shops on Map' }} />
+        <Stack.Screen name="ShopHome" component={ShopDrawer} options={{ headerShown: false, title: 'Home' }} />
 
+        <Stack.Screen name="ShopMap" component={ShopMapScreen} options={{ title: 'Find Shops on Map' }} />
         <Stack.Screen name="ClientVehicles" component={ClientVehiclesScreen} options={{ title: 'My Vehicles' }}/>
         <Stack.Screen name="VehicleDetail" component={VehicleDetailScreen} options={{ title: 'Vehicle Details' }}/> 
         <Stack.Screen name="ShopDetail" component={ShopDetailScreen} options={{ title: 'Shop Details' }}/>
         <Stack.Screen name="PromotionDetail" component={PromotionDetailScreen} options={{ title: 'Promotion Details' }}/>
         <Stack.Screen name="RepairDetail" component={RepairDetailScreen} options={{ title: 'Repair Details' }}/>
-        <Stack.Screen name="ClientRepairs" component={ClientRepairsList} />
+        <Stack.Screen name="ClientRepairs" component={ClientRepairsList} options={{ title: 'Repairs' }}/>
         <Stack.Screen name="CreateRepair" component={CreateRepairScreen} options={{ title: 'Create Repair' }}/>
         <Stack.Screen name="CreateVehicle" component={CreateVehicleScreen} options={{ title: 'Create Vehicle' }}/>
         <Stack.Screen name="CreatePromotion" component={CreatePromotionScreen} options={{ title: 'Create Promotion' }}/>

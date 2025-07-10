@@ -1,8 +1,8 @@
 // PATH: src/screens/RegisterScreen.js
 
 import React, { useState, useLayoutEffect } from 'react';
-import { StyleSheet, View, SafeAreaView } from 'react-native';
-import { Text, TextInput, useTheme, ToggleButton, Button, Portal, Dialog } from 'react-native-paper';
+import { StyleSheet, View, SafeAreaView, Pressable } from 'react-native';
+import { Text, TextInput, useTheme, Button, Portal, Dialog, ActivityIndicator } from 'react-native-paper';
 import { register } from '../api/auth';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
@@ -11,8 +11,7 @@ export default function RegisterScreen({ navigation }) {
 
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('client'); // 'client' or 'shop'
-
+  const [role, setRole] = useState('client');
   const [saving, setSaving] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
@@ -33,10 +32,7 @@ export default function RegisterScreen({ navigation }) {
           mode="text"
           compact
           onPress={handleHeaderSave}
-          labelStyle={{
-            color: theme.colors.primary,
-            fontSize: 16,
-          }}
+          labelStyle={{ color: theme.colors.primary, fontSize: 16 }}
         >
           Save
         </Button>
@@ -46,11 +42,8 @@ export default function RegisterScreen({ navigation }) {
 
   const saveRegistration = async () => {
     setSaving(true);
-    const isClient = role === 'client';
-    const isShop = role === 'shop';
-
     try {
-      await register(emailOrPhone.trim(), password, isClient, isShop);
+      await register(emailOrPhone.trim(), password, role === 'client', role === 'shop');
       setDialogMessage('Registration successful!');
       setDialogVisible(true);
 
@@ -58,7 +51,7 @@ export default function RegisterScreen({ navigation }) {
         setDialogVisible(false);
         navigation.reset({
           index: 0,
-          routes: [{ name: isShop ? 'ShopHome' : 'Home' }],
+          routes: [{ name: role === 'shop' ? 'ShopHome' : 'Home' }],
         });
       }, 1500);
     } catch (err) {
@@ -74,26 +67,11 @@ export default function RegisterScreen({ navigation }) {
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <View style={{ flex: 1 }}>
         <KeyboardAwareScrollView
-          contentContainerStyle={{
-            flexGrow: 1,
-            justifyContent: 'center',
-            padding: 20,
-          }}
+          contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="always"
           enableOnAndroid
           extraScrollHeight={20}
         >
-          <Text
-            variant="headlineMedium"
-            style={{
-              textAlign: 'center',
-              marginBottom: 20,
-              color: theme.colors.primary,
-            }}
-          >
-            Register New Account
-          </Text>
-
           <TextInput
             label="Email or Phone"
             mode="outlined"
@@ -101,7 +79,7 @@ export default function RegisterScreen({ navigation }) {
             onChangeText={setEmailOrPhone}
             keyboardType="email-address"
             autoCapitalize="none"
-            style={{ marginBottom: 16 }}
+            style={styles.input}
           />
 
           <TextInput
@@ -110,26 +88,66 @@ export default function RegisterScreen({ navigation }) {
             secureTextEntry
             value={password}
             onChangeText={setPassword}
-            style={{ marginBottom: 24 }}
+            style={styles.input}
           />
 
-          <Text style={{ marginBottom: 8, color: theme.colors.onBackground }}>
-            Register as:
-          </Text>
-          <ToggleButton.Row
-            onValueChange={setRole}
-            value={role}
-            style={styles.toggleGroup}
-          >
-            <ToggleButton icon="account" value="client">
-              Client
-            </ToggleButton>
-            <ToggleButton icon="store" value="shop">
-              Shop
-            </ToggleButton>
-          </ToggleButton.Row>
+          <Text style={styles.rolePrompt}>Select your role:</Text>
 
-          {saving && <ActivityIndicator animating size="small" />}
+          <View style={styles.roleContainer}>
+            <Pressable
+              onPress={() => setRole('client')}
+              style={({ pressed }) => [
+                styles.roleButton,
+                {
+                  backgroundColor: role === 'client'
+                    ? theme.colors.primaryContainer
+                    : 'transparent',
+                  borderColor: role === 'client'
+                    ? theme.colors.primary
+                    : '#ccc',
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.roleText,
+                  role === 'client' && { color: theme.colors.primary }
+                ]}
+              >
+                👤 Client
+              </Text>
+              <Text style={styles.roleSubtext}>Manage your vehicles & repairs</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => setRole('shop')}
+              style={({ pressed }) => [
+                styles.roleButton,
+                {
+                  backgroundColor: role === 'shop'
+                    ? theme.colors.primaryContainer
+                    : 'transparent',
+                  borderColor: role === 'shop'
+                    ? theme.colors.primary
+                    : '#ccc',
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.roleText,
+                  role === 'shop' && { color: theme.colors.primary }
+                ]}
+              >
+                🛠️ Repair Shop
+              </Text>
+              <Text style={styles.roleSubtext}>Offer services & manage client fleet</Text>
+            </Pressable>
+          </View>
+
+          {saving && <ActivityIndicator animating size="small" color={theme.colors.primary} />}
         </KeyboardAwareScrollView>
 
         <Portal>
@@ -154,8 +172,43 @@ export default function RegisterScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  toggleGroup: {
+  container: {
+    flexGrow: 1,
     justifyContent: 'center',
+    padding: 20,
+  },
+  input: {
+    marginBottom: 16,
+  },
+  rolePrompt: {
+    fontSize: 16,
+    marginBottom: 10,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  roleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
     marginBottom: 20,
+  },
+  roleButton: {
+    flex: 1,
+    borderWidth: 2,
+    borderRadius: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roleText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  roleSubtext: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+    textAlign: 'center',
   },
 });

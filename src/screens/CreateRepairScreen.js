@@ -16,6 +16,7 @@ import {
   useTheme,
   Portal,
   Dialog,
+  SegmentedButtons,
 } from 'react-native-paper';
 import { API_BASE_URL } from '../api/config';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -164,7 +165,11 @@ export default function CreateRepairScreen({ navigation, route }) {
         >
           <Text variant="labelLarge" style={styles.label}>Vehicle *</Text>
           <View style={styles.pickerContainer}>
-            <Picker selectedValue={vehicleId} onValueChange={setVehicleId}>
+            <Picker
+              selectedValue={vehicleId}
+              onValueChange={setVehicleId}
+              style={styles.picker}
+            >
               {vehicles.map((v) => (
                 <Picker.Item
                   key={v.id}
@@ -177,7 +182,11 @@ export default function CreateRepairScreen({ navigation, route }) {
 
           <Text variant="labelLarge" style={styles.label}>Repair Type *</Text>
           <View style={styles.pickerContainer}>
-            <Picker selectedValue={repairTypeId} onValueChange={setRepairTypeId}>
+            <Picker
+              selectedValue={repairTypeId}
+              onValueChange={setRepairTypeId}
+              style={styles.picker}
+            >
               {repairTypes.map((t) => (
                 <Picker.Item key={t.id} label={t.name} value={t.id.toString()} />
               ))}
@@ -205,12 +214,15 @@ export default function CreateRepairScreen({ navigation, route }) {
           />
 
           <Text variant="labelLarge" style={styles.label}>Status</Text>
-          <View style={styles.pickerContainer}>
-            <Picker selectedValue={status} onValueChange={setStatus}>
-              <Picker.Item label="Done" value="done" />
-              <Picker.Item label="Open" value="open" />
-            </Picker>
-          </View>
+          <SegmentedButtons
+            value={status}
+            onValueChange={setStatus}
+            buttons={[
+              { value: 'done', label: 'Done', icon: 'check-circle-outline' },
+              { value: 'open', label: 'Open', icon: 'alert-circle-outline' },
+            ]}
+            style={styles.segmented}
+          />
 
           {saving && <ActivityIndicator animating size="small" />}
         </KeyboardAwareScrollView>
@@ -247,6 +259,7 @@ const styles = StyleSheet.create({
   label: {
     marginTop: 16,
     marginBottom: 4,
+    fontWeight: '600',
   },
   input: {
     marginBottom: 8,
@@ -257,5 +270,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
     backgroundColor: '#fff',
+  },
+  picker: {
+    width: '100%',
+  },
+  segmented: {
+    marginVertical: 12,
+    alignSelf: 'center',
+    width: '90%',
   },
 });

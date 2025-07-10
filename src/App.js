@@ -15,7 +15,7 @@ export default function App() {
         <AuthManager>
           <WebSocketProvider>
             <ImageBackground
-              source={require('./assets/background.jpg')}
+              source={require('../assets/background.jpg')}
               style={styles.background}
               resizeMode="cover"
             >

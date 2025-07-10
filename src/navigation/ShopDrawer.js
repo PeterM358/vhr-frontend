@@ -1,7 +1,9 @@
-// PATH: src/navigation/ShopDrawer.js
+/**
+ * PATH: src/navigation/ShopDrawer.js
+ */
 
 import React, { useContext } from 'react';
-import { StyleSheet } from 'react-native';
+import { View, StyleSheet, Image } from 'react-native';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import { useNavigation } from '@react-navigation/native';
 import { Text, Badge } from 'react-native-paper';
@@ -14,6 +16,7 @@ import NotificationsList from '../components/shop/NotificationsList';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
 
 import { WebSocketContext } from '../context/WebSocketManager';
+import MainText from '../../assets/main-text.png'; // ✅ Branding image at bottom
 
 const Drawer = createDrawerNavigator();
 
@@ -23,55 +26,40 @@ function CustomDrawerContent(props) {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContainer}>
-      <Text style={styles.drawerTitle}>Menu</Text>
+    <DrawerContentScrollView
+      {...props}
+      contentContainerStyle={styles.drawerContainer}
+    >
+      <View style={styles.menuContainer}>
+        <Text style={styles.drawerTitle}>Menu</Text>
 
-      <DrawerItem
-        label="Home"
-        onPress={() => props.navigation.closeDrawer()}
-        icon={() => <Text>🏠</Text>}
-      />
-      <DrawerItem
-        label="Repairs"
-        onPress={() => navigation.navigate('RepairsList')}
-        icon={() => <Text>🛠️</Text>}
-      />
-      <DrawerItem
-        label="Clients"
-        onPress={() => navigation.navigate('AuthorizedClients')}
-        icon={() => <Text>👥</Text>}
-      />
-      <DrawerItem
-        label="Promotions"
-        onPress={() => navigation.navigate('ShopPromotions')}
-        icon={() => <Text>🏷️</Text>}
-      />
+        <DrawerItem label="Home" onPress={() => props.navigation.closeDrawer()} icon={() => <Text>🏠</Text>} />
+        <DrawerItem label="Repairs" onPress={() => navigation.navigate('RepairsList')} icon={() => <Text>🛠️</Text>} />
+        <DrawerItem label="Clients" onPress={() => navigation.navigate('AuthorizedClients')} icon={() => <Text>👥</Text>} />
+        <DrawerItem label="Promotions" onPress={() => navigation.navigate('ShopPromotions')} icon={() => <Text>🏷️</Text>} />
 
-      <DrawerItem
-        label="Notifications"
-        onPress={() => navigation.navigate('NotificationsList')}
-        icon={() => <Text>🔔</Text>}
-      />
-      {unreadCount > 0 && (
-        <Badge style={styles.drawerBadge}>{unreadCount}</Badge>
-      )}
+        <DrawerItem
+          label="Notifications"
+          onPress={() => navigation.navigate('NotificationsList')}
+          icon={() => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text>🔔</Text>
+              {unreadCount > 0 && <Badge>{unreadCount}</Badge>}
+            </View>
+          )}
+        />
 
-      <DrawerItem
-        label="Switch Shop"
-        onPress={() => navigation.navigate('ChooseShop')}
-        icon={() => <Text>🏪</Text>}
-      />
+        <DrawerItem label="Switch Shop" onPress={() => navigation.navigate('ChooseShop')} icon={() => <Text>🏪</Text>} />
+        <DrawerItem
+          label="Logout"
+          onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })}
+          icon={() => <Text>🚪</Text>}
+        />
+      </View>
 
-      <DrawerItem
-        label="Logout"
-        onPress={() =>
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-          })
-        }
-        icon={() => <Text>🚪</Text>}
-      />
+      <View style={styles.logoBottomContainer}>
+        <Image source={MainText} style={styles.logoImage} resizeMode="contain" />
+      </View>
     </DrawerContentScrollView>
   );
 }
@@ -94,7 +82,13 @@ export default function ShopDrawer() {
 
 const styles = StyleSheet.create({
   drawerContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
     paddingTop: 40,
+    paddingBottom: 20,
+  },
+  menuContainer: {
+    flexGrow: 1,
   },
   drawerTitle: {
     marginLeft: 16,
@@ -102,9 +96,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  drawerBadge: {
-    marginLeft: 16,
-    backgroundColor: 'red',
-    color: 'white',
+  logoBottomContainer: {
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  logoImage: {
+    width: 140,
+    height: 50,
   },
 });

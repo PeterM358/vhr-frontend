@@ -1,5 +1,5 @@
 // PATH: src/screens/ShopMapScreen.web.js
-
+import 'leaflet/dist/leaflet.css';
 import React, { useEffect, useState } from 'react';
 import {
   View,

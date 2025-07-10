@@ -1,10 +1,16 @@
+/**
+ * PATH: src/navigation/HomeDrawer.js
+ */
+
 import React, { useContext } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Image } from 'react-native';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import { useNavigation } from '@react-navigation/native';
 import { Text, Badge } from 'react-native-paper';
 import HomeScreen from '../screens/HomeScreen';
 import { WebSocketContext } from '../context/WebSocketManager';
+
+import MainText from '../../assets/main-text.png'; // ✅ Your bottom branding image
 
 const Drawer = createDrawerNavigator();
 
@@ -12,60 +18,60 @@ function CustomDrawerContent(props) {
   const navigation = useNavigation();
   const { notifications } = useContext(WebSocketContext);
 
-  // Calculate unseen counts
   const unseenPromotions = notifications.filter(n => !n.is_read && n.repair == null).length;
   const unseenOffers = notifications.filter(n => !n.is_read && n.repair != null).length;
   const totalOffersBadge = unseenPromotions + unseenOffers;
 
   return (
-    <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContainer}>
-      <Text style={styles.drawerTitle}>Menu</Text>
+    <DrawerContentScrollView
+      {...props}
+      contentContainerStyle={styles.drawerContainer}
+    >
+      <View style={styles.menuContainer}>
+        <Text style={styles.drawerTitle}>Menu</Text>
 
-      <DrawerItem
-        label="Home"
-        onPress={() => props.navigation.closeDrawer()}
-        icon={() => <Text>🏠</Text>}
-      />
+        <DrawerItem
+          label="Home"
+          onPress={() => props.navigation.closeDrawer()}
+          icon={() => <Text>🏠</Text>}
+        />
+        <DrawerItem
+          label="Repairs"
+          onPress={() => navigation.navigate('ClientRepairs')}
+          icon={() => <Text>🛠️</Text>}
+        />
+        <DrawerItem
+          label="Vehicles"
+          onPress={() => navigation.navigate('ClientVehicles')}
+          icon={() => <Text>🚗</Text>}
+        />
+        <DrawerItem
+          label="Offers"
+          onPress={() => navigation.navigate('OffersScreen')}
+          icon={({ color }) => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={{ color }}>🏷️</Text>
+              {totalOffersBadge > 0 && <Badge>{totalOffersBadge}</Badge>}
+            </View>
+          )}
+        />
+        <DrawerItem
+          label="Find Shops on Map"
+          onPress={() => navigation.navigate('ShopMap')}
+          icon={() => <Text>🗺️</Text>}
+        />
+        <DrawerItem
+          label="Logout"
+          onPress={() =>
+            navigation.reset({ index: 0, routes: [{ name: 'Login' }] })
+          }
+          icon={() => <Text>🚪</Text>}
+        />
+      </View>
 
-      <DrawerItem
-        label="Repairs"
-        onPress={() => navigation.navigate('ClientRepairs')}
-        icon={() => <Text>🛠️</Text>}
-      />
-
-      <DrawerItem
-        label="Vehicles"
-        onPress={() => navigation.navigate('ClientVehicles')}
-        icon={() => <Text>🚗</Text>}
-      />
-
-      <DrawerItem
-        label="Offers"
-        onPress={() => navigation.navigate('OffersScreen')}
-        icon={({ color }) => (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Text style={{ color }}>🏷️</Text>
-            {totalOffersBadge > 0 && (
-              <Badge>{totalOffersBadge}</Badge>
-            )}
-          </View>
-        )}
-      />
-
-      <DrawerItem
-        label="Find Shops on Map"
-        onPress={() => navigation.navigate('ShopMap')}
-        icon={() => <Text>🗺️</Text>}
-      />
-
-      <DrawerItem
-        label="Logout"
-        onPress={() => navigation.reset({
-          index: 0,
-          routes: [{ name: 'Login' }],
-        })}
-        icon={() => <Text>🚪</Text>}
-      />
+      <View style={styles.logoBottomContainer}>
+        <Image source={MainText} style={styles.logoImage} resizeMode="contain" />
+      </View>
     </DrawerContentScrollView>
   );
 }
@@ -73,23 +79,23 @@ function CustomDrawerContent(props) {
 export default function HomeDrawer() {
   return (
     <Drawer.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
+      screenOptions={{ headerShown: false }}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
-      <Drawer.Screen
-        name="HomeMain"
-        component={HomeScreen}
-        options={{ title: 'Home' }}
-      />
+      <Drawer.Screen name="HomeMain" component={HomeScreen} />
     </Drawer.Navigator>
   );
 }
 
 const styles = StyleSheet.create({
   drawerContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
     paddingTop: 40,
+    paddingBottom: 20,
+  },
+  menuContainer: {
+    flexGrow: 1,
   },
   drawerTitle: {
     marginLeft: 16,
@@ -97,28 +103,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  drawerRow: {
-    flexDirection: 'row',
+  logoBottomContainer: {
     alignItems: 'center',
-    paddingLeft: 10,
-    paddingVertical: 8,
+    marginTop: 16,
   },
-  drawerItemInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  drawerIcon: {
-    marginRight: 12,
-    fontSize: 16,
-  },
-  drawerLabel: {
-    fontSize: 16,
-  },
-  drawerBadge: {
-    backgroundColor: 'red',
-    color: 'white',
-    marginRight: 16,
-    alignSelf: 'center',
+  logoImage: {
+    width: 140,
+    height: 50,
   },
 });

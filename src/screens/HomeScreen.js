@@ -1,15 +1,21 @@
-// PATH: src/screens/HomeScreen.js
+/**
+ * PATH: src/screens/HomeScreen.js
+ */
+
 import React, { useContext } from 'react';
 import { View, Text, ImageBackground, StyleSheet, ActivityIndicator } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
+import { Appbar, Badge, Button, useTheme } from 'react-native-paper';
 import { logout } from '../api/auth';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import BASE_STYLES from '../styles/base';
-import { Appbar, Badge, Button } from 'react-native-paper';
+import Logo from '../../assets/logo.svg';
 
 export default function HomeScreen({ navigation }) {
+  const theme = useTheme();
+
   const {
     isAuthenticated,
     isLoading,
@@ -24,9 +30,9 @@ export default function HomeScreen({ navigation }) {
   useFocusEffect(
     React.useCallback(() => {
       const loadUser = async () => {
-        const emailOrPhone = await AsyncStorage.getItem('@user_email_or_phone');
+        const last = await AsyncStorage.getItem('@user_email_or_phone');
         if (setUserEmailOrPhone) {
-          setUserEmailOrPhone(emailOrPhone || '');
+          setUserEmailOrPhone(last || '');
         }
       };
       loadUser();
@@ -44,12 +50,12 @@ export default function HomeScreen({ navigation }) {
   if (isLoading) {
     return (
       <ImageBackground
-        source={require('../assets/background.jpg')}
+        source={require('../../assets/background.jpg')}
         style={BASE_STYLES.background}
         blurRadius={5}
       >
         <View style={BASE_STYLES.overlay}>
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       </ImageBackground>
     );
@@ -58,7 +64,7 @@ export default function HomeScreen({ navigation }) {
   if (!isAuthenticated) {
     return (
       <ImageBackground
-        source={require('../assets/background.jpg')}
+        source={require('../../assets/background.jpg')}
         style={BASE_STYLES.background}
         blurRadius={5}
       >
@@ -74,35 +80,39 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <ImageBackground
-      source={require('../assets/background.jpg')}
+      source={require('../../assets/background.jpg')}
       style={BASE_STYLES.background}
       blurRadius={5}
     >
-      <Appbar.Header style={styles.appbar}>
-        <Appbar.Action icon="menu" color="#fff" onPress={() => navigation.openDrawer()} />
-        <Appbar.Content title={username} titleStyle={styles.appbarTitle} />
+      <Appbar.Header style={{ backgroundColor: theme.colors.primary }}>
+        <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color={theme.colors.onPrimary} />
+        <Appbar.Content title={username} titleStyle={{ color: theme.colors.onPrimary }} />
         <View style={styles.iconWithBadge}>
           <Appbar.Action
             icon="bell-outline"
-            color="#fff"
             onPress={() => navigation.navigate('OffersScreen')}
+            color={theme.colors.onPrimary}
           />
           {totalOffersBadge > 0 && (
             <Badge style={styles.notificationBadge}>{totalOffersBadge}</Badge>
           )}
         </View>
-        <Appbar.Action icon="logout" color="#fff" onPress={handleLogout} />
+        <Appbar.Action icon="logout" onPress={handleLogout} color={theme.colors.onPrimary} />
       </Appbar.Header>
 
       <View style={BASE_STYLES.overlay}>
+        <Logo width={120} height={120} style={styles.homeLogo} />
+
         <Text style={styles.welcomeText}>Welcome to Vehicle Repair Hub</Text>
         <Text style={styles.subText}>Use the menu or map below to navigate</Text>
 
         <Button
           mode="contained"
-          icon="map-marker"
+          icon="map"
           onPress={() => navigation.navigate('ShopMap')}
-          style={styles.button}
+          style={[styles.mapButton, { backgroundColor: theme.colors.primary }]}
+          contentStyle={styles.mapButtonContent}
+          labelStyle={styles.mapButtonLabel}
         >
           Find Shops on Map
         </Button>
@@ -112,11 +122,49 @@ export default function HomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  appbar: { backgroundColor: '#007AFF' },
-  appbarTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  iconWithBadge: { position: 'relative', marginRight: 8 },
-  notificationBadge: { position: 'absolute', top: 4, right: 4, backgroundColor: 'red', color: 'white' },
-  welcomeText: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 8, color: '#333' },
-  subText: { fontSize: 16, textAlign: 'center', color: '#555', marginBottom: 20 },
-  button: { marginVertical: 12, alignSelf: 'center', width: '80%', maxWidth: 400 },
+  iconWithBadge: {
+    position: 'relative',
+    marginRight: 8,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'red',
+    color: 'white',
+  },
+  homeLogo: {
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  welcomeText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+    color: '#333',
+  },
+  subText: {
+    fontSize: 16,
+    textAlign: 'center',
+    color: '#555',
+    marginBottom: 20,
+  },
+  mapButton: {
+    marginVertical: 16,
+    alignSelf: 'center',
+    width: '85%',
+    maxWidth: 400,
+    borderRadius: 12,
+    elevation: 2,
+  },
+  mapButtonContent: {
+    flexDirection: 'row-reverse',
+    height: 50,
+  },
+  mapButtonLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
 });

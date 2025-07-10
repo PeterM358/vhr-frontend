@@ -45,10 +45,6 @@ export default function ClientRepairsList({ navigation }) {
 
   return (
     <View style={{ flex: 1, padding: 10, backgroundColor: theme.colors.background }}>
-      <Text variant="headlineSmall" style={{ textAlign: 'center', marginBottom: 10 }}>
-        My Repairs ({statusFilter.toUpperCase()})
-      </Text>
-
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginBottom: 12 }}>
         {['open', 'ongoing', 'done'].map((status) => (
           <Chip

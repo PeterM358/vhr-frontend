@@ -1,54 +1,42 @@
-// PATH: src/screens/ShopHomeScreen.js
-import React, { useContext, useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  ImageBackground,
-  StyleSheet,
-  ActivityIndicator,
-} from 'react-native';
+/**
+ * PATH: src/screens/ShopHomeScreen.js
+ */
+
+import React, { useContext, useState } from 'react';
+import { View, Text, ImageBackground, StyleSheet, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { Appbar, Badge, Button } from 'react-native-paper';
+import { Appbar, Badge, Button, useTheme } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logout } from '../api/auth';
 
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import BASE_STYLES from '../styles/base';
+import Logo from '../../assets/logo.svg';
 
 export default function ShopHomeScreen() {
   const navigation = useNavigation();
-  const {
-    setAuthToken,
-    setIsAuthenticated,
-    setUserEmailOrPhone,
-  } = useContext(AuthContext);
+  const theme = useTheme();
+
+  const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
+  const { notifications } = useContext(WebSocketContext);
 
   const [loading, setLoading] = useState(true);
   const [shopDisplayName, setShopDisplayName] = useState('Shop');
 
-  const { notifications } = useContext(WebSocketContext);
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  // Runs on mount AND when you come back to this screen
   useFocusEffect(
     React.useCallback(() => {
       const loadShopUser = async () => {
-        const storedEmailOrPhone = await AsyncStorage.getItem('@user_email_or_phone');
-        let displayName = 'Shop';
-
-        if (storedEmailOrPhone && storedEmailOrPhone.trim()) {
-          if (storedEmailOrPhone.includes('@')) {
-            displayName = storedEmailOrPhone.split('@')[0];
-          } else {
-            displayName = storedEmailOrPhone;
-          }
+        const stored = await AsyncStorage.getItem('@user_email_or_phone');
+        let display = 'Shop';
+        if (stored?.trim()) {
+          display = stored.includes('@') ? stored.split('@')[0] : stored;
         }
-
-        setShopDisplayName(displayName);
+        setShopDisplayName(display);
         setLoading(false);
       };
-
       loadShopUser();
     }, [])
   );
@@ -60,12 +48,12 @@ export default function ShopHomeScreen() {
   if (loading) {
     return (
       <ImageBackground
-        source={require('../assets/background.jpg')}
+        source={require('../../assets/background.jpg')}
         style={BASE_STYLES.background}
         blurRadius={5}
       >
-        <View style={BASE_STYLES.overlay}>
-          <ActivityIndicator size="large" />
+        <View style={[BASE_STYLES.overlay, { backgroundColor: theme.colors.background + 'CC' }]}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       </ImageBackground>
     );
@@ -73,50 +61,43 @@ export default function ShopHomeScreen() {
 
   return (
     <ImageBackground
-      source={require('../assets/background.jpg')}
+      source={require('../../assets/background.jpg')}
       style={BASE_STYLES.background}
       blurRadius={5}
-    >
-      <Appbar.Header style={styles.appbar}>
-        <Appbar.Action
-          icon="menu"
-          color="#fff"
-          onPress={() => navigation.openDrawer()}
-        />
-        <Appbar.Content
-          title={shopDisplayName}
-          titleStyle={styles.appbarTitle}
-        />
+    > 
+      <Appbar.Header style={{ backgroundColor: theme.colors.primary }}>
+        <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color={theme.colors.onPrimary} />
+        <Appbar.Content title={shopDisplayName} titleStyle={{ color: theme.colors.onPrimary }} />
         <View style={styles.iconWithBadge}>
           <Appbar.Action
             icon="bell-outline"
-            color="#fff"
             onPress={() => navigation.navigate('ShopNotificationsScreen')}
+            color={theme.colors.onPrimary}
           />
           {unreadCount > 0 && (
             <Badge style={styles.notificationBadge}>{unreadCount}</Badge>
           )}
         </View>
-        <Appbar.Action
-          icon="logout"
-          color="#fff"
-          onPress={handleLogout}
-        />
+        <Appbar.Action icon="logout" onPress={handleLogout} color={theme.colors.onPrimary} />
       </Appbar.Header>
 
-      <View style={BASE_STYLES.overlay}>
-        <Text style={styles.welcomeText}>
+      <View style={[BASE_STYLES.overlay, { backgroundColor: theme.colors.background + 'CC' }]}>
+        <Logo width={120} height={120} style={styles.shopLogo} />
+
+        <Text style={[styles.welcomeText, { color: theme.colors.onBackground }]}>
           Welcome to Your Shop Dashboard
         </Text>
-        <Text style={styles.subText}>
+        <Text style={[styles.subText, { color: theme.colors.onBackground }]}>
           Use the menu or map below to navigate
         </Text>
 
         <Button
           mode="contained"
-          icon="map-marker"
+          icon="map"
           onPress={() => navigation.navigate('ShopMap')}
-          style={styles.button}
+          style={[styles.mapButton, { backgroundColor: theme.colors.primary }]}
+          contentStyle={styles.mapButtonContent}
+          labelStyle={styles.mapButtonLabel}
         >
           Find Shops on Map
         </Button>
@@ -126,14 +107,6 @@ export default function ShopHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  appbar: {
-    backgroundColor: '#007AFF',
-  },
-  appbarTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
   iconWithBadge: {
     position: 'relative',
     marginRight: 8,
@@ -145,23 +118,36 @@ const styles = StyleSheet.create({
     backgroundColor: 'red',
     color: 'white',
   },
+  shopLogo: {
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
   welcomeText: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 8,
-    color: '#333',
   },
   subText: {
     fontSize: 16,
     textAlign: 'center',
-    color: '#555',
     marginBottom: 20,
   },
-  button: {
-    marginVertical: 12,
+  mapButton: {
+    marginVertical: 16,
     alignSelf: 'center',
-    width: '80%',
+    width: '85%',
     maxWidth: 400,
+    borderRadius: 12,
+    elevation: 2,
+  },
+  mapButtonContent: {
+    flexDirection: 'row-reverse',
+    height: 50,
+  },
+  mapButtonLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
   },
 });
