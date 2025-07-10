@@ -129,11 +129,15 @@ export default function AuthorizedClients({ navigation }) {
 
   return (
     <View style={BASE_STYLES.overlay}>
-      <CommonButton
-        title="➕ Add Client"
+      <Button
+        mode="contained"
+        icon="plus"
         onPress={() => navigation.navigate('ShopRegisterClient')}
-        style={styles.addButton}
-      />
+        style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+        labelStyle={{ color: theme.colors.onPrimary }}
+      >
+        Add Client
+      </Button>
 
       <FlatList
         data={clients}

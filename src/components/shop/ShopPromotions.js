@@ -1,4 +1,6 @@
-// PATH: src/components/shop/ShopPromotions.js
+/**
+ * PATH: src/components/shop/ShopPromotions.js
+ */
 
 import React, { useEffect, useState } from 'react';
 import { View, FlatList, Alert, StyleSheet } from 'react-native';
@@ -53,8 +55,17 @@ export default function ShopPromotions() {
   };
 
   const renderOffer = ({ item }) => (
-    <Card style={styles.card} mode="outlined">
-      <Card.Title title={item.title} titleStyle={styles.cardTitle} />
+    <Card
+      style={[
+        styles.card,
+        { borderColor: theme.colors.primary, borderWidth: 1 }
+      ]}
+      mode="outlined"
+    >
+      <Card.Title
+        title={item.title}
+        titleStyle={[styles.cardTitle, { color: theme.colors.primary }]}
+      />
       <Card.Content>
         <Text style={styles.detail}>{item.description}</Text>
         <Text style={styles.detail}>Repair Type: {item.repair_type_name}</Text>
@@ -79,10 +90,12 @@ export default function ShopPromotions() {
       <CommonButton
         title="➕ Create Promotion"
         onPress={() => navigation.navigate('CreatePromotion')}
+        style={{ backgroundColor: theme.colors.primary }}
+        labelStyle={{ color: theme.colors.onPrimary }}
       />
 
       {loading ? (
-        <ActivityIndicator animating={true} size="large" style={styles.loading} />
+        <ActivityIndicator animating={true} size="large" style={styles.loading} color={theme.colors.primary} />
       ) : (
         <FlatList
           data={offers}
@@ -101,10 +114,6 @@ export default function ShopPromotions() {
 }
 
 const styles = StyleSheet.create({
-  title: {
-    marginBottom: 16,
-    textAlign: 'center',
-  },
   loading: {
     marginTop: 50,
   },
@@ -114,9 +123,11 @@ const styles = StyleSheet.create({
   card: {
     marginVertical: 8,
     marginHorizontal: 16,
+    borderRadius: 8,
   },
   cardTitle: {
     fontWeight: 'bold',
+    fontSize: 18,
   },
   detail: {
     marginVertical: 2,

@@ -52,7 +52,7 @@ export default function ShopHomeScreen() {
         style={BASE_STYLES.background}
         blurRadius={5}
       >
-        <View style={[BASE_STYLES.overlay, { backgroundColor: theme.colors.background + 'CC' }]}>
+        <View style={BASE_STYLES.overlay}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       </ImageBackground>
@@ -64,10 +64,17 @@ export default function ShopHomeScreen() {
       source={require('../../assets/background.jpg')}
       style={BASE_STYLES.background}
       blurRadius={5}
-    > 
+    >
       <Appbar.Header style={{ backgroundColor: theme.colors.primary }}>
-        <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color={theme.colors.onPrimary} />
-        <Appbar.Content title={shopDisplayName} titleStyle={{ color: theme.colors.onPrimary }} />
+        <Appbar.Action
+          icon="menu"
+          onPress={() => navigation.openDrawer()}
+          color={theme.colors.onPrimary}
+        />
+        <Appbar.Content
+          title={shopDisplayName}
+          titleStyle={{ color: theme.colors.onPrimary }}
+        />
         <View style={styles.iconWithBadge}>
           <Appbar.Action
             icon="bell-outline"
@@ -78,10 +85,14 @@ export default function ShopHomeScreen() {
             <Badge style={styles.notificationBadge}>{unreadCount}</Badge>
           )}
         </View>
-        <Appbar.Action icon="logout" onPress={handleLogout} color={theme.colors.onPrimary} />
+        <Appbar.Action
+          icon="logout"
+          onPress={handleLogout}
+          color={theme.colors.onPrimary}
+        />
       </Appbar.Header>
 
-      <View style={[BASE_STYLES.overlay, { backgroundColor: theme.colors.background + 'CC' }]}>
+      <View style={BASE_STYLES.overlay}>
         <Logo width={120} height={120} style={styles.shopLogo} />
 
         <Text style={[styles.welcomeText, { color: theme.colors.onBackground }]}>

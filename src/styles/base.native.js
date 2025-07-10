@@ -9,7 +9,7 @@ export default StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: 'rgba(255,255,255,0.4)',
     padding: 16,
     alignItems: 'center',
   },

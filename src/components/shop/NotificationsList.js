@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { getNotifications, markNotificationRead } from '../../api/notifications';
 import { WebSocketContext } from '../../context/WebSocketManager';
-import { Card, Text, ActivityIndicator } from 'react-native-paper';
+import { Card, Text, ActivityIndicator, useTheme } from 'react-native-paper';
 import BASE_STYLES from '../../styles/base';
 
 export default function NotificationsList() {
@@ -14,6 +14,7 @@ export default function NotificationsList() {
   const [remoteNotifications, setRemoteNotifications] = useState([]);
   const { notifications: liveNotifications = [], removeNotification } = useContext(WebSocketContext);
   const navigation = useNavigation();
+  const theme = useTheme();
 
   useEffect(() => {
     fetchNotifications();
@@ -72,13 +73,20 @@ export default function NotificationsList() {
   const renderItem = ({ item }) => (
     <Card
       mode="outlined"
-      style={[styles.card, item.is_read && { opacity: 0.5 }]}
+      style={[
+        styles.card,
+        { borderColor: theme.colors.primary },
+        item.is_read && { opacity: 0.5 },
+      ]}
       onPress={() => handlePress(item)}
     >
-      <Card.Title title={item.title || 'Notification'} />
+      <Card.Title
+        title={item.title || 'Notification'}
+        titleStyle={{ color: theme.colors.primary }}
+      />
       <Card.Content>
         <Text>{item.body}</Text>
-        <Text style={styles.timestamp}>
+        <Text style={[styles.timestamp, { color: theme.colors.onSurface + '99' }]}>
           {new Date(item.created_at).toLocaleString()}
         </Text>
       </Card.Content>
@@ -88,9 +96,11 @@ export default function NotificationsList() {
   return (
     <View style={BASE_STYLES.overlay}>
       {loading ? (
-        <ActivityIndicator animating={true} size="large" style={styles.loading} />
+        <ActivityIndicator animating={true} size="large" style={styles.loading} color={theme.colors.primary} />
       ) : mergedNotifications.length === 0 ? (
-        <Text style={styles.emptyText}>No notifications found</Text>
+        <Text style={[styles.emptyText, { color: theme.colors.onSurface }]}>
+          No notifications found
+        </Text>
       ) : (
         <FlatList
           data={mergedNotifications}
@@ -113,11 +123,11 @@ const styles = StyleSheet.create({
   card: {
     marginVertical: 8,
     marginHorizontal: 16,
+    borderWidth: 1,
   },
   timestamp: {
     marginTop: 4,
     fontSize: 12,
-    color: '#666',
   },
   emptyText: {
     textAlign: 'center',

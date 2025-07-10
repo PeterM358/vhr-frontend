@@ -1,12 +1,12 @@
 // PATH: src/components/shop/RepairsList.js
 
 import React, { useEffect, useState } from 'react';
-import { View, FlatList } from 'react-native';
+import { View, FlatList, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRepairs } from '../../api/repairs';
 import { getMyOffers } from '../../api/offers';
 import { useNavigation } from '@react-navigation/native';
-import { Text, ActivityIndicator, Button, Chip, Card, useTheme } from 'react-native-paper';
+import { Text, ActivityIndicator, Chip, Card, useTheme } from 'react-native-paper';
 
 export default function RepairsList() {
   const [repairs, setRepairs] = useState([]);
@@ -40,10 +40,14 @@ export default function RepairsList() {
 
   const renderRepair = ({ item }) => (
     <Card
-      style={{ marginVertical: 6 }}
+      mode="outlined"
+      style={[styles.card, { borderColor: theme.colors.primary }]}
       onPress={() => navigation.navigate('RepairDetail', { repairId: item.id })}
     >
-      <Card.Title title={`${item.vehicle_brand} ${item.vehicle_model} (${item.vehicle_license_plate})`} />
+      <Card.Title
+        title={`${item.vehicle_brand} ${item.vehicle_model} (${item.vehicle_license_plate})`}
+        titleStyle={{ color: theme.colors.primary }}
+      />
       <Card.Content>
         <Text>Status: {item.status}</Text>
         <Text>Description: {item.description}</Text>
@@ -54,10 +58,14 @@ export default function RepairsList() {
 
   const renderOffer = ({ item }) => (
     <Card
-      style={{ marginVertical: 6 }}
+      mode="outlined"
+      style={[styles.card, { borderColor: theme.colors.primary }]}
       onPress={() => navigation.navigate('RepairDetail', { repairId: item.repair })}
     >
-      <Card.Title title={`Vehicle: ${item.vehicle_brand} ${item.vehicle_model} (${item.vehicle_license_plate})`} />
+      <Card.Title
+        title={`Vehicle: ${item.vehicle_brand} ${item.vehicle_model} (${item.vehicle_license_plate})`}
+        titleStyle={{ color: theme.colors.primary }}
+      />
       <Card.Content>
         <Text>Price: {item.price} BGN</Text>
         <Text>Description: {item.description}</Text>
@@ -68,30 +76,41 @@ export default function RepairsList() {
   const tabOptions = ['open', 'ongoing', 'done', 'offers'];
 
   return (
-    <View style={{ flex: 1, padding: 10, backgroundColor: theme.colors.background }}>
-
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginBottom: 12 }}>
-        {tabOptions.map((tab) => (
-          <Chip
-            key={tab}
-            selected={tab === selectedTab}
-            onPress={() => setSelectedTab(tab)}
-            style={{ margin: 4 }}
-          >
-            {tab.toUpperCase()}
-          </Chip>
-        ))}
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={styles.tabContainer}>
+        {tabOptions.map((tab) => {
+          const isSelected = tab === selectedTab;
+          return (
+            <Chip
+              key={tab}
+              selected={isSelected}
+              onPress={() => setSelectedTab(tab)}
+              style={[
+                styles.chip,
+                isSelected
+                  ? { backgroundColor: theme.colors.primary }
+                  : { borderColor: theme.colors.primary, borderWidth: 1 },
+              ]}
+              textStyle={{
+                color: isSelected ? theme.colors.onPrimary : theme.colors.primary,
+              }}
+            >
+              {tab.toUpperCase()}
+            </Chip>
+          );
+        })}
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" style={{ marginTop: 20 }} />
+        <ActivityIndicator size="large" style={styles.loading} color={theme.colors.primary} />
       ) : selectedTab === 'offers' ? (
         <FlatList
           data={offers}
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderOffer}
+          contentContainerStyle={styles.listContent}
           ListEmptyComponent={
-            <Text style={{ textAlign: 'center', marginVertical: 20 }}>
+            <Text style={styles.emptyText}>
               No offers sent yet
             </Text>
           }
@@ -101,8 +120,9 @@ export default function RepairsList() {
           data={repairs}
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderRepair}
+          contentContainerStyle={styles.listContent}
           ListEmptyComponent={
-            <Text style={{ textAlign: 'center', marginVertical: 20 }}>
+            <Text style={styles.emptyText}>
               No repairs found for status "{selectedTab}"
             </Text>
           }
@@ -111,3 +131,35 @@ export default function RepairsList() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 10,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  chip: {
+    margin: 4,
+    borderRadius: 16,
+  },
+  card: {
+    marginVertical: 6,
+    marginHorizontal: 8,
+    borderRadius: 8,
+  },
+  loading: {
+    marginTop: 20,
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginVertical: 20,
+  },
+});
