@@ -10,7 +10,7 @@ import { Text, Badge } from 'react-native-paper';
 import HomeScreen from '../screens/HomeScreen';
 import { WebSocketContext } from '../context/WebSocketManager';
 
-import MainText from '../../assets/main-text.png'; // ✅ Your bottom branding image
+import MainText from '../../assets/main-text.png'; // ✅ Your bottom makeing image
 
 const Drawer = createDrawerNavigator();
 
@@ -35,6 +35,13 @@ function CustomDrawerContent(props) {
           onPress={() => props.navigation.closeDrawer()}
           icon={() => <Text>🏠</Text>}
         />
+
+        <DrawerItem
+          label="Profile"
+          onPress={() => navigation.navigate('ClientProfile')}
+          icon={() => <Text>👤</Text>}
+        />
+
         <DrawerItem
           label="Repairs"
           onPress={() => navigation.navigate('ClientRepairs')}

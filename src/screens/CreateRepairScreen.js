@@ -173,7 +173,7 @@ export default function CreateRepairScreen({ navigation, route }) {
               {vehicles.map((v) => (
                 <Picker.Item
                   key={v.id}
-                  label={`${v.license_plate} (${v.brand_name} ${v.model_name})`}
+                  label={`${v.license_plate} (${v.make_name} ${v.model_name})`}
                   value={v.id.toString()}
                 />
               ))}

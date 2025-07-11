@@ -10,8 +10,8 @@ export const AppTheme = {
   colors: {
     ...DefaultTheme.colors,
 
-    // ✅ Brand colors
-    primary: '#429bdb',         // Main brand blue (buttons, Appbar, icons)
+    // ✅ Make colors
+    primary: '#429bdb',         // Main make blue (buttons, Appbar, icons)
     onPrimary: '#ffffff',       // Text/icons on primary
 
     secondary: '#007ACC',       // Stronger blue for accents like "Find Shops on Map"

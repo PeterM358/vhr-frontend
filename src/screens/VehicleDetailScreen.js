@@ -59,7 +59,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
             titleStyle={{ color: theme.colors.onSurface }} 
           />
           <Card.Content>
-            <Text style={{ color: theme.colors.onSurface }}>Make: {vehicle.brand_name}</Text>
+            <Text style={{ color: theme.colors.onSurface }}>Make: {vehicle.make_name}</Text>
             <Text style={{ color: theme.colors.onSurface }}>Model: {vehicle.model_name}</Text>
             <Text style={{ color: theme.colors.onSurface }}>Year: {vehicle.year}</Text>
           </Card.Content>

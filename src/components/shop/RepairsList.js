@@ -45,7 +45,7 @@ export default function RepairsList() {
       onPress={() => navigation.navigate('RepairDetail', { repairId: item.id })}
     >
       <Card.Title
-        title={`${item.vehicle_brand} ${item.vehicle_model} (${item.vehicle_license_plate})`}
+        title={`${item.vehicle_make} ${item.vehicle_model} (${item.vehicle_license_plate})`}
         titleStyle={{ color: theme.colors.primary }}
       />
       <Card.Content>
@@ -63,7 +63,7 @@ export default function RepairsList() {
       onPress={() => navigation.navigate('RepairDetail', { repairId: item.repair })}
     >
       <Card.Title
-        title={`Vehicle: ${item.vehicle_brand} ${item.vehicle_model} (${item.vehicle_license_plate})`}
+        title={`Vehicle: ${item.vehicle_make} ${item.vehicle_model} (${item.vehicle_license_plate})`}
         titleStyle={{ color: theme.colors.primary }}
       />
       <Card.Content>

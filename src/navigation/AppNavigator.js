@@ -34,6 +34,9 @@ import ShopDrawer from './ShopDrawer';
 import HomeDrawer from './HomeDrawer';
 import NotificationsWithAppbar from '../components/shop/NotificationsWithAppbar';
 
+import ShopProfileScreen from '../screens/ShopProfileScreen';
+import ClientProfileScreen from '../screens/ClientProfileScreen';
+
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
@@ -78,6 +81,14 @@ export default function AppNavigator() {
           options={{
             title: 'Notifications',
             headerBackTitle: 'Back',
+          }}
+        />
+        <Stack.Screen name="ShopProfile" component={ShopProfileScreen} options={{ title: 'Profile' }}/>
+        <Stack.Screen
+          name="ClientProfile"
+          component={ClientProfileScreen}
+          options={{
+            title: 'Profile',
           }}
         />
       </Stack.Navigator>

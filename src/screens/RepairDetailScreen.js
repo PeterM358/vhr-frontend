@@ -244,7 +244,7 @@ export default function RepairDetailScreen({ route, navigation }) {
           <Card mode="outlined" style={styles.headerCard}>
             <Card.Title
               title={`Repair #${repairId}`}
-              subtitle={`${repair.vehicle_brand} ${repair.vehicle_model} (${repair.vehicle_license_plate})`}
+              subtitle={`${repair.vehicle_make} ${repair.vehicle_model} (${repair.vehicle_license_plate})`}
             />
             <Card.Content>
               <Divider style={{ marginVertical: 8 }} />

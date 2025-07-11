@@ -34,7 +34,7 @@ export default function ClientRepairsList({ navigation }) {
       style={{ marginVertical: 6 }}
       onPress={() => navigation.navigate('RepairDetail', { repairId: item.id })}
     >
-      <Card.Title title={`${item.vehicle_brand} ${item.vehicle_model} (${item.vehicle_license_plate})`} />
+      <Card.Title title={`${item.vehicle_make} ${item.vehicle_model} (${item.vehicle_license_plate})`} />
       <Card.Content>
         <Text>Status: {item.status}</Text>
         <Text>Description: {item.description}</Text>

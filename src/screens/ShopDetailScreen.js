@@ -154,7 +154,7 @@ export default function ShopDetailScreen({ route }) {
       <Card mode="outlined" style={styles.vehicleCard}>
         <Card.Content>
           <Text variant="bodyMedium">
-            {item.brand_name} {item.model_name} ({item.license_plate})
+            {item.make_name} {item.model_name} ({item.license_plate})
           </Text>
           <Button
             mode="contained"

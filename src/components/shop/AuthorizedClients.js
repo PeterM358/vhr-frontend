@@ -96,7 +96,7 @@ export default function AuthorizedClients({ navigation }) {
               >
                 <Card.Content>
                   <Text style={styles.vehicleTitle}>{vehicle.license_plate}</Text>
-                  <Text>{vehicle.brand_name} {vehicle.model_name}</Text>
+                  <Text>{vehicle.make_name} {vehicle.model_name}</Text>
                   <Text>Year: {vehicle.year}</Text>
                   <Text>Kilometers: {vehicle.kilometers}</Text>
                 </Card.Content>

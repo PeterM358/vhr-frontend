@@ -49,7 +49,7 @@ export default function ClientVehiclesScreen({ navigation }) {
           >
             <Card.Content>
               <Text variant="titleMedium">Plate: {item.license_plate}</Text>
-              <Text>Make: {item.brand_name}</Text>
+              <Text>Make: {item.make_name}</Text>
               <Text>Model: {item.model_name}</Text>
               <Text>Year: {item.year}</Text>
             </Card.Content>

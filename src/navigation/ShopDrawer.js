@@ -14,9 +14,10 @@ import AuthorizedClients from '../components/shop/AuthorizedClients';
 import ShopPromotions from '../components/shop/ShopPromotions';
 import NotificationsList from '../components/shop/NotificationsList';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
+import ShopProfileScreen from '../screens/ShopProfileScreen';
 
 import { WebSocketContext } from '../context/WebSocketManager';
-import MainText from '../../assets/main-text.png'; // ✅ Branding image at bottom
+import MainText from '../../assets/main-text.png'; // ✅ Makeing image at bottom
 
 const Drawer = createDrawerNavigator();
 
@@ -34,6 +35,11 @@ function CustomDrawerContent(props) {
         <Text style={styles.drawerTitle}>Menu</Text>
 
         <DrawerItem label="Home" onPress={() => props.navigation.closeDrawer()} icon={() => <Text>🏠</Text>} />
+        <DrawerItem
+          label="Profile"
+          onPress={() => navigation.navigate('ShopProfile')}
+          icon={() => <Text>🏢</Text>}
+        />
         <DrawerItem label="Repairs" onPress={() => navigation.navigate('RepairsList')} icon={() => <Text>🛠️</Text>} />
         <DrawerItem label="Clients" onPress={() => navigation.navigate('AuthorizedClients')} icon={() => <Text>👥</Text>} />
         <DrawerItem label="Promotions" onPress={() => navigation.navigate('ShopPromotions')} icon={() => <Text>🏷️</Text>} />

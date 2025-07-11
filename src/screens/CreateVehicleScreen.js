@@ -6,11 +6,9 @@ import {
   View,
   SafeAreaView,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
-import {
-  API_BASE_URL
-} from '../api/config';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Surface,
   Text,
@@ -22,7 +20,11 @@ import {
   Portal,
   Dialog,
 } from 'react-native-paper';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import {
+  getMakes,
+  getModelsForMake,
+} from '../api/vehicles';
+import { API_BASE_URL } from '../api/config';
 
 export default function CreateVehicleScreen({ navigation, route }) {
   const theme = useTheme();
@@ -31,16 +33,20 @@ export default function CreateVehicleScreen({ navigation, route }) {
   const clientPhone = route.params?.clientPhone || '';
 
   const [licensePlate, setLicensePlate] = useState('');
-  const [year, setYear] = useState('');
   const [vin, setVin] = useState('');
   const [kilometers, setKilometers] = useState('');
+  const [year, setYear] = useState('');
+  const [engineDisplacement, setEngineDisplacement] = useState('');
+  const [engineHp, setEngineHp] = useState('');
+  const [gearbox, setGearbox] = useState('');
+  const [fuelType, setFuelType] = useState('');
 
-  const [brands, setBrands] = useState([]);
-  const [selectedBrand, setSelectedBrand] = useState('');
+  const [makes, setMakes] = useState([]);
+  const [selectedMake, setSelectedMake] = useState('');
   const [models, setModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState('');
 
-  const [loadingBrands, setLoadingBrands] = useState(true);
+  const [loadingMakes, setLoadingMakes] = useState(true);
   const [loadingModels, setLoadingModels] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -48,28 +54,17 @@ export default function CreateVehicleScreen({ navigation, route }) {
   const [dialogMessage, setDialogMessage] = useState('');
 
   useEffect(() => {
-    loadBrands();
+    loadMakes();
   }, []);
 
   useLayoutEffect(() => {
     const handleHeaderSave = () => {
-      if (!licensePlate.trim()) {
-        setDialogMessage('License plate is required.');
-        setDialogVisible(true);
-        return;
-      }
-
-      if (!selectedBrand) {
-        setDialogMessage('Brand is required.');
-        setDialogVisible(true);
-        return;
-      }
-
-      if (!selectedModel) {
-        setDialogMessage('Model is required.');
-        setDialogVisible(true);
-        return;
-      }
+      if (!licensePlate.trim()) return showError('License plate is required.');
+      if (!selectedMake) return showError('Make is required.');
+      if (!selectedModel) return showError('Model is required.');
+      if (!year) return showError('Year is required.');
+      if (!gearbox) return showError('Gearbox is required.');
+      if (!fuelType) return showError('Fuel type is required.');
 
       saveVehicle();
     };
@@ -80,67 +75,53 @@ export default function CreateVehicleScreen({ navigation, route }) {
           mode="text"
           compact
           onPress={handleHeaderSave}
-          labelStyle={{
-            color: theme.colors.primary,
-            fontSize: 16,
-          }}
+          labelStyle={{ color: '#fff', fontSize: 16 }} // White button text
         >
           Save
         </Button>
       ),
     });
-  }, [navigation, licensePlate, selectedBrand, selectedModel, year, vin, kilometers]);
+  }, [navigation, licensePlate, selectedMake, selectedModel, year, gearbox, fuelType, engineDisplacement, engineHp, vin, kilometers]);
 
-  const loadBrands = async () => {
+  const showError = (message) => {
+    setDialogMessage(message);
+    setDialogVisible(true);
+  };
+
+  const loadMakes = async () => {
     try {
-      const token = await AsyncStorage.getItem('@access_token');
-      const res = await fetch(`${API_BASE_URL}/api/vehicles/brands/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Failed to load brands');
-      const data = await res.json();
-      setBrands(data);
+      const data = await getMakes();
+      setMakes(data);
     } catch (err) {
       console.error(err);
-      setDialogMessage('Error: Could not load brands');
-      setDialogVisible(true);
+      showError('Error: Could not load Makes');
     } finally {
-      setLoadingBrands(false);
+      setLoadingMakes(false);
     }
   };
 
-  const loadModelsForBrand = async (brandId) => {
+  const loadModelsForMake = async (makeId) => {
     setModels([]);
     setSelectedModel('');
-    if (!brandId) return;
+
+    if (!makeId) return;
 
     setLoadingModels(true);
     try {
-      const token = await AsyncStorage.getItem('@access_token');
-      const res = await fetch(`${API_BASE_URL}/api/vehicles/brands/${brandId}/models/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Failed to load models');
-      const data = await res.json();
+      const data = await getModelsForMake(makeId);
       setModels(data);
     } catch (err) {
       console.error(err);
-      setDialogMessage('Error: Could not load models');
-      setDialogVisible(true);
+      showError('Error: Could not load models');
     } finally {
       setLoadingModels(false);
     }
   };
 
-  const handleBrandChange = (value) => {
-    if (value) {
-      setSelectedBrand(value);
-      loadModelsForBrand(value);
-    } else {
-      setSelectedBrand('');
-      setModels([]);
-      setSelectedModel('');
-    }
+  const handleMakeChange = (value) => {
+    setSelectedMake(value);
+    if (value) loadModelsForMake(value);
+    else setModels([]);
   };
 
   const saveVehicle = async () => {
@@ -149,15 +130,21 @@ export default function CreateVehicleScreen({ navigation, route }) {
       const token = await AsyncStorage.getItem('@access_token');
       const payload = {
         license_plate: licensePlate,
-        brand: parseInt(selectedBrand),
+        make: parseInt(selectedMake),
         model: parseInt(selectedModel),
-        year: year ? parseInt(year) : null,
+        year: parseInt(year),
+        engine_displacement: engineDisplacement ? parseInt(engineDisplacement) : null,
+        engine_hp: engineHp ? parseInt(engineHp) : null,
+        gearbox,
+        fuel_type: fuelType,
         vin,
         kilometers: kilometers ? parseInt(kilometers) : null,
       };
 
       if (clientEmail) payload.client_email = clientEmail;
       if (clientPhone) payload.client_phone = clientPhone;
+
+      console.log('Saving vehicle with payload:', payload);
 
       const response = await fetch(`${API_BASE_URL}/api/vehicles/`, {
         method: 'POST',
@@ -183,8 +170,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
       }, 1500);
     } catch (err) {
       console.error(err);
-      setDialogMessage(err.message || 'Failed to save vehicle');
-      setDialogVisible(true);
+      showError(err.message || 'Failed to save vehicle');
     } finally {
       setSaving(false);
     }
@@ -220,17 +206,17 @@ export default function CreateVehicleScreen({ navigation, route }) {
               style={styles.input}
             />
 
-            <Text variant="labelLarge" style={styles.label}>Brand *</Text>
-            {loadingBrands ? (
+            <Text variant="labelLarge" style={styles.label}>Make *</Text>
+            {loadingMakes ? (
               <ActivityIndicator size="small" />
             ) : (
               <Picker
-                selectedValue={selectedBrand}
-                onValueChange={handleBrandChange}
+                selectedValue={selectedMake}
+                onValueChange={handleMakeChange}
                 style={styles.picker}
               >
-                <Picker.Item label="Select Brand..." value="" />
-                {brands.map((b) => (
+                <Picker.Item label="Select Make..." value="" />
+                {makes.map((b) => (
                   <Picker.Item key={b.id} label={b.name} value={String(b.id)} />
                 ))}
               </Picker>
@@ -244,19 +230,16 @@ export default function CreateVehicleScreen({ navigation, route }) {
                 selectedValue={selectedModel}
                 onValueChange={(val) => setSelectedModel(val || '')}
                 style={styles.picker}
-                enabled={!!selectedBrand}
+                enabled={!!selectedMake}
               >
-                <Picker.Item
-                  label={selectedBrand ? 'Select Model...' : 'Choose Brand First'}
-                  value=""
-                />
+                <Picker.Item label={selectedMake ? 'Select Model...' : 'Choose Make First'} value="" />
                 {models.map((m) => (
                   <Picker.Item key={m.id} label={m.name} value={String(m.id)} />
                 ))}
               </Picker>
             )}
 
-            <Text variant="labelLarge" style={styles.label}>Year</Text>
+            <Text variant="labelLarge" style={styles.label}>Year *</Text>
             <TextInput
               mode="outlined"
               placeholder="e.g. 2019"
@@ -265,6 +248,51 @@ export default function CreateVehicleScreen({ navigation, route }) {
               keyboardType="numeric"
               style={styles.input}
             />
+
+            <Text variant="labelLarge" style={styles.label}>Engine Displacement (cc)</Text>
+            <TextInput
+              mode="outlined"
+              placeholder="e.g. 2000"
+              value={engineDisplacement}
+              onChangeText={setEngineDisplacement}
+              keyboardType="numeric"
+              style={styles.input}
+            />
+
+            <Text variant="labelLarge" style={styles.label}>Engine HP</Text>
+            <TextInput
+              mode="outlined"
+              placeholder="e.g. 150"
+              value={engineHp}
+              onChangeText={setEngineHp}
+              keyboardType="numeric"
+              style={styles.input}
+            />
+
+            <Text variant="labelLarge" style={styles.label}>Gearbox *</Text>
+            <Picker
+              selectedValue={gearbox}
+              onValueChange={(val) => setGearbox(val || '')}
+              style={styles.picker}
+            >
+              <Picker.Item label="Select Gearbox..." value="" />
+              <Picker.Item label="Manual" value="Manual" />
+              <Picker.Item label="Automatic" value="Automatic" />
+            </Picker>
+
+            <Text variant="labelLarge" style={styles.label}>Fuel Type *</Text>
+            <Picker
+              selectedValue={fuelType}
+              onValueChange={(val) => setFuelType(val || '')}
+              style={styles.picker}
+            >
+              <Picker.Item label="Select Fuel Type..." value="" />
+              <Picker.Item label="Petrol" value="Petrol" />
+              <Picker.Item label="Diesel" value="Diesel" />
+              <Picker.Item label="Electric" value="Electric" />
+              <Picker.Item label="Hybrid" value="Hybrid" />
+              <Picker.Item label="LPG" value="LPG" />
+            </Picker>
 
             <Text variant="labelLarge" style={styles.label}>VIN (optional)</Text>
             <TextInput
@@ -299,10 +327,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
               <Text>{dialogMessage}</Text>
             </Dialog.Content>
             <Dialog.Actions>
-              <Button
-                mode="text"
-                onPress={() => setDialogVisible(false)}
-              >
+              <Button mode="text" onPress={() => setDialogVisible(false)}>
                 OK
               </Button>
             </Dialog.Actions>
