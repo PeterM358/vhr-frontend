@@ -23,7 +23,7 @@ export default function ShopMapScreen({ navigation }) {
     const userId = parseInt(userIdStr, 10);
 
     try {
-      const url = `${API_BASE_URL}/api/shops/${address ? `?address=${encodeURIComponent(address)}` : ''}`;
+      const url = `${API_BASE_URL}/api/profiles/shops/${address ? `?address=${encodeURIComponent(address)}` : ''}`;
       const response = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });

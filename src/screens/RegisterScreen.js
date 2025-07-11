@@ -43,16 +43,35 @@ export default function RegisterScreen({ navigation }) {
   const saveRegistration = async () => {
     setSaving(true);
     try {
-      await register(emailOrPhone.trim(), password, role === 'client', role === 'shop');
+      const result = await register(
+        emailOrPhone.trim(),
+        password,
+        role === 'client',
+        role === 'shop'
+      );
+
       setDialogMessage('Registration successful!');
       setDialogVisible(true);
 
       setTimeout(() => {
         setDialogVisible(false);
-        navigation.reset({
-          index: 0,
-          routes: [{ name: role === 'shop' ? 'ShopHome' : 'Home' }],
-        });
+        if (result.is_shop) {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'ShopHome' }],
+          });
+        } else if (result.is_client) {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Home' }],
+          });
+        } else {
+          // fallback
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+        }
       }, 1500);
     } catch (err) {
       console.error('Registration error:', err);

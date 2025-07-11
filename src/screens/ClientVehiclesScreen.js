@@ -62,9 +62,10 @@ export default function ClientVehiclesScreen({ navigation }) {
 
       <FAB
         icon="plus"
-        style={styles.fab}
+        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
         onPress={() => navigation.navigate('CreateVehicle')}
         label="Add Vehicle"
+        color={theme.colors.onPrimary} 
       />
     </Surface>
   );

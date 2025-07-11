@@ -22,7 +22,7 @@ import {
 import CommonButton from '../CommonButton';
 import BASE_STYLES from '../../styles/base';
 
-const API_URL = `${API_BASE_URL}/api/shops/authorized-clients/`;
+const API_URL = `${API_BASE_URL}/api/profiles/shops/authorized-clients/`;
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
