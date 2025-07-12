@@ -18,7 +18,7 @@ import { getVehicles, updateVehicle } from '../api/vehicles';
 
 import { Card, Text, Button, ActivityIndicator, useTheme, Divider } from 'react-native-paper';
 
-export default function ShopDetailScreen({ route }) {
+export default function ShopDetailScreen({ route, navigation }) {
   const { shopId } = route.params;
   const theme = useTheme();
 
@@ -170,13 +170,16 @@ export default function ShopDetailScreen({ route }) {
   };
 
   const renderHeader = () => (
-    <View>
-      <Card mode="outlined" style={styles.card}>
-        <Card.Title title={shop.name} subtitle={shop.address} />
-        <Card.Content>
-          <Text variant="bodyMedium">Phone: {shop.phone_number}</Text>
-        </Card.Content>
-      </Card>
+  <View>
+    <Card mode="outlined" style={styles.card}>
+      <Card.Title
+        title={`Shop Name: ${shop?.name || 'No Name'}`}
+        subtitle={`Address: ${shop?.address || 'No Address'}`}
+      />
+      <Card.Content>
+        <Text variant="bodyMedium">Phone: {shop?.phone || 'No Phone'}</Text>
+      </Card.Content>
+    </Card>
 
       <Text variant="titleMedium" style={styles.sectionTitle}>Photos of this Shop:</Text>
       {shop.images && shop.images.length > 0 ? (
@@ -203,18 +206,13 @@ export default function ShopDetailScreen({ route }) {
       )}
 
       {isOwner && (
-        uploading ? (
-          <ActivityIndicator size="small" color={theme.colors.primary} />
-        ) : (
-          <Button
-            mode="contained"
-            icon="plus"
-            onPress={handlePickAndUploadImage}
-            style={styles.uploadButton}
-          >
-            Add Image
-          </Button>
-        )
+        <Button
+          mode="contained"
+          onPress={() => navigation.navigate('ShopProfile')}
+          style={styles.uploadButton}
+        >
+          Modify Shop Profile
+        </Button>
       )}
 
       {isClientAccount && (

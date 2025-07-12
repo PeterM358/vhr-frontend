@@ -4,6 +4,9 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
+  Image,
+  TouchableOpacity,
+  Alert
 } from 'react-native';
 import {
   Text,
@@ -15,7 +18,10 @@ import {
   useTheme,
 } from 'react-native-paper';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { Picker } from '@react-native-picker/picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import {
   getMyShopProfiles,
   updateShopProfile,
@@ -23,16 +29,19 @@ import {
   getCitiesForCountry,
 } from '../api/profiles';
 
+import {
+  uploadShopImage,
+  deleteShopImage
+} from '../api/shops';
+
 export default function ShopProfileScreen({ navigation }) {
   const theme = useTheme();
 
   const [profile, setProfile] = useState(null);
   const [countries, setCountries] = useState([]);
   const [cities, setCities] = useState([]);
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
 
@@ -54,10 +63,10 @@ export default function ShopProfileScreen({ navigation }) {
     });
   }, [navigation, profile]);
 
-function roundCoordinate(value) {
-if (value == null) return null;
-return Math.round(value * 1e6) / 1e6;
-}
+  function roundCoordinate(value) {
+    if (value == null) return null;
+    return Math.round(value * 1e6) / 1e6;
+  }
 
   const loadData = async () => {
     setLoading(true);
@@ -120,6 +129,7 @@ return Math.round(value * 1e6) / 1e6;
       await updateShopProfile(profile.id, payload);
       setDialogMessage('Profile updated successfully!');
       setDialogVisible(true);
+      navigation.goBack();
     } catch (err) {
       console.error(err);
       setDialogMessage('Error saving profile');
@@ -148,6 +158,62 @@ return Math.round(value * 1e6) / 1e6;
       console.error(err);
       setDialogMessage('Error getting location');
       setDialogVisible(true);
+    }
+  };
+
+  const handlePickAndUploadImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Allow access to photos to upload.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.7,
+      });
+
+      if (!result.canceled && result.assets.length > 0) {
+        const uri = result.assets[0].uri;
+
+        const token = await AsyncStorage.getItem('@access_token');
+        if (!token) {
+          Alert.alert('Error', 'You are not logged in. Please log in again.');
+          return;
+        }
+
+        setSaving(true);
+        await uploadShopImage(profile.id, token, uri);  // profile.id = shopProfileId
+        await loadData();
+        Alert.alert('Success', 'Image uploaded!');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', err.message || 'Upload failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteImage = async (imageId) => {
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      if (!token) {
+        Alert.alert('Error', 'You are not logged in. Please log in again.');
+        return;
+      }
+
+      setSaving(true);
+      await deleteShopImage(profile.id, imageId, token);  // profile.id = shopProfileId
+      await loadData();
+      Alert.alert('Deleted', 'Image deleted.');
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', err.message || 'Delete failed');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -183,7 +249,7 @@ return Math.round(value * 1e6) / 1e6;
         />
 
         <TextInput
-          label="Phone Number"
+          label="Phone"
           mode="outlined"
           value={profile.phone || ''}
           onChangeText={(text) => setProfile({ ...profile, phone: text })}
@@ -243,6 +309,33 @@ return Math.round(value * 1e6) / 1e6;
           ))}
         </Picker>
 
+        <Text variant="labelLarge" style={styles.label}>Photos</Text>
+        <ScrollView horizontal style={{ marginVertical: 12 }}>
+          {profile.images?.map((img) => (
+            <View key={img.id} style={{ marginRight: 10 }}>
+              <Image
+                source={{ uri: img.image_url }}
+                style={{ width: 120, height: 90, borderRadius: 8 }}
+              />
+              <TouchableOpacity
+                style={styles.deleteBtn}
+                onPress={() => handleDeleteImage(img.id)}
+              >
+                <Text style={styles.deleteText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </ScrollView>
+
+        <Button
+          mode="contained"
+          icon="plus"
+          onPress={handlePickAndUploadImage}
+          style={styles.uploadButton}
+        >
+          Add Image
+        </Button>
+
         {saving && <ActivityIndicator animating size="small" />}
       </ScrollView>
 
@@ -265,32 +358,21 @@ return Math.round(value * 1e6) / 1e6;
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
+  container: { padding: 16 },
+  input: { marginBottom: 12 },
+  label: { marginTop: 12, marginBottom: 4, fontWeight: 'bold' },
+  picker: { backgroundColor: '#f4f4f4', borderRadius: 8, marginBottom: 12 },
+  locateButton: { marginBottom: 12 },
+  loading: { flex: 1, justifyContent: 'center' },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  uploadButton: { marginVertical: 12 },
+  deleteBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(255,0,0,0.7)',
+    borderRadius: 12,
+    padding: 4,
   },
-  input: {
-    marginBottom: 12,
-  },
-  label: {
-    marginTop: 12,
-    marginBottom: 4,
-    fontWeight: 'bold',
-  },
-  picker: {
-    backgroundColor: '#f4f4f4',
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  locateButton: {
-    marginBottom: 12,
-  },
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  deleteText: { color: '#fff', fontWeight: 'bold' },
 });

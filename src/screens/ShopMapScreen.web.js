@@ -119,11 +119,6 @@ export default function ShopMapScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Back button in top-left corner */}
-      <Pressable style={styles.backButton} onPress={() => navigation.navigate('Home')}>
-        <Text style={styles.backButtonText}>← Back</Text>
-      </Pressable>
-
       {/* Search box */}
       <View style={styles.searchContainer}>
         <TextInput
@@ -249,7 +244,7 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     position: 'absolute',
-    top: 70,
+    top: 5,
     left: 20,
     right: 20,
     zIndex: 1000,

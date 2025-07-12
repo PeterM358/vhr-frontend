@@ -32,7 +32,7 @@ export async function getShopById(shopId, token) {
 }
 
 
-export async function uploadShopImage(shopId, token, imageUri) {
+export async function uploadShopImage(shopProfileId, token, imageUri) {
   const formData = new FormData();
   formData.append('image', {
     uri: imageUri,
@@ -40,14 +40,17 @@ export async function uploadShopImage(shopId, token, imageUri) {
     type: 'image/jpeg',
   });
 
-  const response = await fetch(`${API_BASE_URL}/api/profiles/shops/${shopId}/images/`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'multipart/form-data',
-    },
-    body: formData,
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/api/profiles/shop_profiles/${shopProfileId}/images/`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+      body: formData,
+    }
+  );
 
   if (!response.ok) {
     const err = await response.json();
@@ -58,9 +61,9 @@ export async function uploadShopImage(shopId, token, imageUri) {
 }
 
 
-export async function deleteShopImage(shopId, imageId, token) {
+export async function deleteShopImage(shopProfileId, imageId, token) {
   const response = await fetch(
-    `${API_BASE_URL}/api/profiles/shops/${shopId}/images/${imageId}/delete/`,
+    `${API_BASE_URL}/api/profiles/shop_profiles/${shopProfileId}/images/${imageId}/delete/`,
     {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
