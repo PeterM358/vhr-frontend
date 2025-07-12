@@ -167,7 +167,12 @@ export default function ShopMapScreen() {
         )}
 
         {shops
-          .filter(s => typeof s.latitude === 'number' && typeof s.longitude === 'number')
+          .map(shop => ({
+            ...shop,
+            latitude: shop.latitude ? parseFloat(shop.latitude) : null,
+            longitude: shop.longitude ? parseFloat(shop.longitude) : null,
+          }))
+          .filter(s => !isNaN(s.latitude) && !isNaN(s.longitude))
           .map(shop => (
             <Marker
               key={shop.id}
