@@ -5,7 +5,15 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, ActivityIndicator, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Card, Text, Button, useTheme, Surface, FAB, SegmentedButtons } from 'react-native-paper';
+import {
+  Card,
+  Text,
+  Button,
+  useTheme,
+  Surface,
+  FAB,
+  SegmentedButtons
+} from 'react-native-paper';
 import { API_BASE_URL } from '../api/config';
 
 export default function VehicleDetailScreen({ route, navigation }) {
@@ -14,7 +22,35 @@ export default function VehicleDetailScreen({ route, navigation }) {
   const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('repairs');
+  const [isShop, setIsShop] = useState(false);
+
   const theme = useTheme();
+
+  // ✅ Load isShop flag from storage
+  useEffect(() => {
+    const loadRole = async () => {
+      const val = await AsyncStorage.getItem('@is_shop');
+      setIsShop(val === 'true');
+    };
+    loadRole();
+  }, []);
+
+  // ✅ Intercept system back button only for shops with empty history
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (!isShop) return;
+
+      if (navigation.canGoBack()) {
+        return;
+      }
+
+      // prevent default back and navigate instead
+      e.preventDefault();
+      navigation.navigate('AuthorizedClients');
+    });
+
+    return unsubscribe;
+  }, [navigation, isShop]);
 
   useEffect(() => {
     const fetchVehicleDetails = async () => {
@@ -54,9 +90,9 @@ export default function VehicleDetailScreen({ route, navigation }) {
     <View style={{ flex: 1 }}>
       <Surface style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <Card mode="outlined" style={[styles.vehicleCard, { borderColor: theme.colors.primary }]}>
-          <Card.Title 
-            title={`Plate: ${vehicle.license_plate}`} 
-            titleStyle={{ color: theme.colors.onSurface }} 
+          <Card.Title
+            title={`Plate: ${vehicle.license_plate}`}
+            titleStyle={{ color: theme.colors.onSurface }}
           />
           <Card.Content>
             <Text style={{ color: theme.colors.onSurface }}>Make: {vehicle.make_name}</Text>

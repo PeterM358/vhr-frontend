@@ -1,72 +1,107 @@
-// PATH: src/screens/CreateVehicleScreen.js
+// PATH: src/screens/CreateRepairScreen.js
 
-import React, { useEffect, useState, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import {
   StyleSheet,
   View,
   SafeAreaView,
+  Pressable,
+  ScrollView,
+  Alert,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Picker } from '@react-native-picker/picker';
 import {
-  Surface,
   Text,
   TextInput,
-  ActivityIndicator,
-  Card,
-  useTheme,
   Button,
+  ActivityIndicator,
+  useTheme,
   Portal,
   Dialog,
+  SegmentedButtons,
+  Card,
+  Divider,
 } from 'react-native-paper';
-import {
-  getMakes,
-  getModelsForMake,
-} from '../api/vehicles';
 import { API_BASE_URL } from '../api/config';
+import { createRepair, createShopPart, getShopParts } from '../api/repairs';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
-export default function CreateVehicleScreen({ navigation, route }) {
+export default function CreateRepairScreen({ navigation, route }) {
   const theme = useTheme();
 
-  const clientEmail = route.params?.clientEmail || '';
-  const clientPhone = route.params?.clientPhone || '';
+  // Navigation param for preselect
+  const preselectedVehicleId = route.params?.vehicleId?.toString() || '';
+  const returnedParts = route.params?.addedParts || [];
 
-  const [licensePlate, setLicensePlate] = useState('');
-  const [vin, setVin] = useState('');
+  const [vehicles, setVehicles] = useState([]);
+  const [repairTypes, setRepairTypes] = useState([]);
+  const [selectedParts, setSelectedParts] = useState([]);
+  const [shopParts, setShopParts] = useState([]);
+
+  const [vehicleId, setVehicleId] = useState(preselectedVehicleId);
+  const [repairTypeId, setRepairTypeId] = useState('');
+  const [description, setDescription] = useState('');
   const [kilometers, setKilometers] = useState('');
-  const [year, setYear] = useState('');
-  const [engineDisplacement, setEngineDisplacement] = useState('');
-  const [engineHp, setEngineHp] = useState('');
-  const [gearbox, setGearbox] = useState('');
-  const [fuelType, setFuelType] = useState('');
-
-  const [makes, setMakes] = useState([]);
-  const [selectedMake, setSelectedMake] = useState('');
-  const [models, setModels] = useState([]);
-  const [selectedModel, setSelectedModel] = useState('');
-
-  const [loadingMakes, setLoadingMakes] = useState(true);
-  const [loadingModels, setLoadingModels] = useState(false);
+  const [status, setStatus] = useState('done');
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
 
+  // Handle returned parts from SelectRepairPartsScreen
   useEffect(() => {
-    loadMakes();
+    if (returnedParts.length) {
+      setSelectedParts(returnedParts);
+    }
+  }, [returnedParts]);
+
+  useEffect(() => {
+    const fetchFormData = async () => {
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        const [vehicleRes, typeRes, shopPartsData] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/vehicles/`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/api/repairs/types/`, { headers: { Authorization: `Bearer ${token}` } }),
+          getShopParts(token),
+        ]);
+
+        if (!vehicleRes.ok || !typeRes.ok) throw new Error('Failed to fetch form data');
+
+        const vehicleData = await vehicleRes.json();
+        const typeData = await typeRes.json();
+
+        setVehicles(vehicleData);
+        setRepairTypes(typeData);
+        setShopParts(shopPartsData);
+
+        if (!preselectedVehicleId && vehicleData.length > 0) setVehicleId(vehicleData[0].id.toString());
+        if (typeData.length > 0) setRepairTypeId(typeData[0].id.toString());
+      } catch (err) {
+        console.error(err);
+        setDialogMessage('Error loading form data');
+        setDialogVisible(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFormData();
   }, []);
 
   useLayoutEffect(() => {
     const handleHeaderSave = () => {
-      if (!licensePlate.trim()) return showError('License plate is required.');
-      if (!selectedMake) return showError('Make is required.');
-      if (!selectedModel) return showError('Model is required.');
-      if (!year) return showError('Year is required.');
-      if (!gearbox) return showError('Gearbox is required.');
-      if (!fuelType) return showError('Fuel type is required.');
-
-      saveVehicle();
+      if (!vehicleId) {
+        setDialogMessage('Vehicle is required.');
+        setDialogVisible(true);
+        return;
+      }
+      if (!repairTypeId) {
+        setDialogMessage('Repair type is required.');
+        setDialogVisible(true);
+        return;
+      }
+      saveRepair();
     };
 
     navigation.setOptions({
@@ -75,93 +110,64 @@ export default function CreateVehicleScreen({ navigation, route }) {
           mode="text"
           compact
           onPress={handleHeaderSave}
-          labelStyle={{ color: '#fff', fontSize: 16 }} // White button text
+          labelStyle={{ color: '#fff', fontSize: 16 }}
         >
           Save
         </Button>
       ),
     });
-  }, [navigation, licensePlate, selectedMake, selectedModel, year, gearbox, fuelType, engineDisplacement, engineHp, vin, kilometers]);
+  }, [navigation, vehicleId, repairTypeId, description, kilometers, status, selectedParts]);
 
-  const showError = (message) => {
-    setDialogMessage(message);
-    setDialogVisible(true);
+  const openAddPartsScreen = () => {
+    navigation.navigate('SelectRepairPartsScreen', {
+      returnTo: 'CreateRepairScreen',
+    });
   };
 
-  const loadMakes = async () => {
-    try {
-      const data = await getMakes();
-      setMakes(data);
-    } catch (err) {
-      console.error(err);
-      showError('Error: Could not load Makes');
-    } finally {
-      setLoadingMakes(false);
-    }
-  };
-
-  const loadModelsForMake = async (makeId) => {
-    setModels([]);
-    setSelectedModel('');
-
-    if (!makeId) return;
-
-    setLoadingModels(true);
-    try {
-      const data = await getModelsForMake(makeId);
-      setModels(data);
-    } catch (err) {
-      console.error(err);
-      showError('Error: Could not load models');
-    } finally {
-      setLoadingModels(false);
-    }
-  };
-
-  const handleMakeChange = (value) => {
-    setSelectedMake(value);
-    if (value) loadModelsForMake(value);
-    else setModels([]);
-  };
-
-  const saveVehicle = async () => {
+  const saveRepair = async () => {
     setSaving(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
-      const payload = {
-        license_plate: licensePlate,
-        make: parseInt(selectedMake),
-        model: parseInt(selectedModel),
-        year: parseInt(year),
-        engine_displacement: engineDisplacement ? parseInt(engineDisplacement) : null,
-        engine_hp: engineHp ? parseInt(engineHp) : null,
-        gearbox,
-        fuel_type: fuelType,
-        vin,
-        kilometers: kilometers ? parseInt(kilometers) : null,
-      };
+      const shopProfileId = await AsyncStorage.getItem('@shop_profile_id');
 
-      if (clientEmail) payload.client_email = clientEmail;
-      if (clientPhone) payload.client_phone = clientPhone;
+      // Check or create ShopParts
+      const repairPartsData = [];
+      for (let part of selectedParts) {
+        if (!part.partsMasterId) continue;
 
-      console.log('Saving vehicle with payload:', payload);
+        let shopPart = shopParts.find(sp => sp.part.id === parseInt(part.partsMasterId));
+        if (!shopPart) {
+          // Create new ShopPart if missing
+          shopPart = await createShopPart(token, {
+            shop_profile: parseInt(shopProfileId),
+            part: parseInt(part.partsMasterId),
+            price: part.price || '0',
+            labor: part.labor || '0',
+            shop_sku: '',
+          });
+          setShopParts(prev => [...prev, shopPart]);
+        }
 
-      const response = await fetch(`${API_BASE_URL}/api/vehicles/`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error data:', errorData);
-        throw new Error('Failed to create vehicle');
+        repairPartsData.push({
+          shop_part_id: shopPart.id,
+          quantity: parseInt(part.quantity),
+          price_per_item_at_use: part.price,
+          note: part.note,
+        });
       }
 
-      setDialogMessage('Vehicle created!');
+      const body = {
+        vehicle: parseInt(vehicleId),
+        repair_type: parseInt(repairTypeId),
+        description,
+        kilometers: kilometers ? parseInt(kilometers) : null,
+        status,
+        repair_parts_data: repairPartsData,
+      };
+
+      await createRepair(token, body);
+
+      setDialogMessage('Repair created!');
       setDialogVisible(true);
 
       setTimeout(() => {
@@ -170,151 +176,114 @@ export default function CreateVehicleScreen({ navigation, route }) {
       }, 1500);
     } catch (err) {
       console.error(err);
-      showError(err.message || 'Failed to save vehicle');
+      setDialogMessage(err.message || 'Submission failed');
+      setDialogVisible(true);
     } finally {
       setSaving(false);
     }
   };
+
+  if (loading) {
+    return <ActivityIndicator animating={true} size="large" style={{ flex: 1 }} />;
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <View style={{ flex: 1 }}>
         <KeyboardAwareScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="always"
           enableOnAndroid
           extraScrollHeight={20}
         >
-          <Surface style={styles.surface}>
-            {(clientEmail || clientPhone) && (
-              <Card style={styles.card}>
-                <Card.Content>
-                  <Text variant="bodyMedium">
-                    Adding for: {clientEmail || clientPhone}
-                  </Text>
-                </Card.Content>
-              </Card>
-            )}
-
-            <Text variant="labelLarge" style={styles.label}>License Plate *</Text>
-            <TextInput
-              mode="outlined"
-              placeholder="e.g. CA1234XX"
-              value={licensePlate}
-              onChangeText={setLicensePlate}
-              style={styles.input}
-            />
-
-            <Text variant="labelLarge" style={styles.label}>Make *</Text>
-            {loadingMakes ? (
-              <ActivityIndicator size="small" />
-            ) : (
-              <Picker
-                selectedValue={selectedMake}
-                onValueChange={handleMakeChange}
-                style={styles.picker}
-              >
-                <Picker.Item label="Select Make..." value="" />
-                {makes.map((b) => (
-                  <Picker.Item key={b.id} label={b.name} value={String(b.id)} />
-                ))}
-              </Picker>
-            )}
-
-            <Text variant="labelLarge" style={styles.label}>Model *</Text>
-            {loadingModels ? (
-              <ActivityIndicator size="small" />
-            ) : (
-              <Picker
-                selectedValue={selectedModel}
-                onValueChange={(val) => setSelectedModel(val || '')}
-                style={styles.picker}
-                enabled={!!selectedMake}
-              >
-                <Picker.Item label={selectedMake ? 'Select Model...' : 'Choose Make First'} value="" />
-                {models.map((m) => (
-                  <Picker.Item key={m.id} label={m.name} value={String(m.id)} />
-                ))}
-              </Picker>
-            )}
-
-            <Text variant="labelLarge" style={styles.label}>Year *</Text>
-            <TextInput
-              mode="outlined"
-              placeholder="e.g. 2019"
-              value={year}
-              onChangeText={setYear}
-              keyboardType="numeric"
-              style={styles.input}
-            />
-
-            <Text variant="labelLarge" style={styles.label}>Engine Displacement (cc)</Text>
-            <TextInput
-              mode="outlined"
-              placeholder="e.g. 2000"
-              value={engineDisplacement}
-              onChangeText={setEngineDisplacement}
-              keyboardType="numeric"
-              style={styles.input}
-            />
-
-            <Text variant="labelLarge" style={styles.label}>Engine HP</Text>
-            <TextInput
-              mode="outlined"
-              placeholder="e.g. 150"
-              value={engineHp}
-              onChangeText={setEngineHp}
-              keyboardType="numeric"
-              style={styles.input}
-            />
-
-            <Text variant="labelLarge" style={styles.label}>Gearbox *</Text>
+          <Text variant="labelLarge" style={styles.label}>Vehicle *</Text>
+          <View style={styles.pickerContainer}>
             <Picker
-              selectedValue={gearbox}
-              onValueChange={(val) => setGearbox(val || '')}
+              selectedValue={vehicleId}
+              onValueChange={setVehicleId}
               style={styles.picker}
             >
-              <Picker.Item label="Select Gearbox..." value="" />
-              <Picker.Item label="Manual" value="Manual" />
-              <Picker.Item label="Automatic" value="Automatic" />
+              {vehicles.map((v) => (
+                <Picker.Item
+                  key={v.id}
+                  label={`${v.license_plate} (${v.make_name} ${v.model_name})`}
+                  value={v.id.toString()}
+                />
+              ))}
             </Picker>
+          </View>
 
-            <Text variant="labelLarge" style={styles.label}>Fuel Type *</Text>
+          <Text variant="labelLarge" style={styles.label}>Repair Type *</Text>
+          <View style={styles.pickerContainer}>
             <Picker
-              selectedValue={fuelType}
-              onValueChange={(val) => setFuelType(val || '')}
+              selectedValue={repairTypeId}
+              onValueChange={setRepairTypeId}
               style={styles.picker}
             >
-              <Picker.Item label="Select Fuel Type..." value="" />
-              <Picker.Item label="Petrol" value="Petrol" />
-              <Picker.Item label="Diesel" value="Diesel" />
-              <Picker.Item label="Electric" value="Electric" />
-              <Picker.Item label="Hybrid" value="Hybrid" />
-              <Picker.Item label="LPG" value="LPG" />
+              {repairTypes.map((t) => (
+                <Picker.Item key={t.id} label={t.name} value={t.id.toString()} />
+              ))}
             </Picker>
+          </View>
 
-            <Text variant="labelLarge" style={styles.label}>VIN (optional)</Text>
-            <TextInput
-              mode="outlined"
-              placeholder="Vehicle Identification Number"
-              value={vin}
-              onChangeText={setVin}
-              style={styles.input}
-            />
+          <Text variant="labelLarge" style={styles.label}>Description</Text>
+          <TextInput
+            mode="outlined"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Optional description"
+            style={styles.input}
+            multiline
+          />
 
-            <Text variant="labelLarge" style={styles.label}>Kilometers</Text>
-            <TextInput
-              mode="outlined"
-              placeholder="e.g. 85000"
-              value={kilometers}
-              onChangeText={setKilometers}
-              keyboardType="numeric"
-              style={styles.input}
-            />
+          <Text variant="labelLarge" style={styles.label}>Kilometers</Text>
+          <TextInput
+            mode="outlined"
+            value={kilometers}
+            onChangeText={setKilometers}
+            placeholder="e.g. 95000"
+            keyboardType="numeric"
+            style={styles.input}
+          />
 
-            {saving && <ActivityIndicator animating size="small" />}
-          </Surface>
+          <Text variant="labelLarge" style={styles.label}>Status</Text>
+          <SegmentedButtons
+            value={status}
+            onValueChange={setStatus}
+            buttons={[
+              { value: 'done', label: 'Done', icon: 'check-circle-outline' },
+              { value: 'open', label: 'Open', icon: 'alert-circle-outline' },
+            ]}
+            style={styles.segmented}
+          />
+
+          <Divider style={{ marginVertical: 20 }} />
+
+          <Button mode="contained" onPress={openAddPartsScreen} style={{ marginBottom: 10 }}>
+            Add Parts
+          </Button>
+
+          {selectedParts.length > 0 && (
+            <>
+              <Text variant="titleMedium" style={styles.label}>
+                Selected Parts
+              </Text>
+              {selectedParts.map((part, index) => (
+                <Card key={index} style={styles.partCard}>
+                  <Card.Title title={`${part.name} (${part.brand})`} />
+                  <Card.Content>
+                    <Text>Quantity: {part.quantity}</Text>
+                    <Text>Price: {part.price}</Text>
+                    <Text>Labor: {part.labor}</Text>
+                    <Text>Note: {part.note}</Text>
+                  </Card.Content>
+                </Card>
+              ))}
+            </>
+          )}
+
+          {saving && <ActivityIndicator animating size="small" />}
         </KeyboardAwareScrollView>
 
         <Portal>
@@ -339,22 +308,35 @@ export default function CreateVehicleScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  surface: {
-    flex: 1,
-  },
-  card: {
-    marginVertical: 10,
+  container: {
+    padding: 16,
+    paddingBottom: 100,
   },
   label: {
-    marginTop: 12,
+    marginTop: 16,
     marginBottom: 4,
+    fontWeight: '600',
   },
   input: {
     marginBottom: 8,
   },
-  picker: {
-    backgroundColor: '#f4f4f4',
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ccc',
     borderRadius: 8,
-    marginBottom: 8,
+    marginBottom: 16,
+    backgroundColor: '#fff',
+  },
+  picker: {
+    width: '100%',
+  },
+  segmented: {
+    marginVertical: 12,
+    alignSelf: 'center',
+    width: '90%',
+  },
+  partCard: {
+    marginVertical: 6,
+    padding: 10,
   },
 });

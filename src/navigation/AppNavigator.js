@@ -36,6 +36,11 @@ import NotificationsWithAppbar from '../components/shop/NotificationsWithAppbar'
 
 import ShopProfileScreen from '../screens/ShopProfileScreen';
 import ClientProfileScreen from '../screens/ClientProfileScreen';
+import AddShopPartScreen from '../screens/AddShopPartScreen';
+
+import SelectRepairPartsScreen from '../screens/SelectRepairPartsScreen';
+import CreateMasterPartScreen from '../screens/CreateMasterPartScreen';
+
 
 const Stack = createNativeStackNavigator();
 
@@ -84,6 +89,10 @@ export default function AppNavigator() {
           }}
         />
         <Stack.Screen name="ShopProfile" component={ShopProfileScreen} options={{ title: 'Profile' }}/>
+        
+        <Stack.Screen name="AddShopPartScreen" component={AddShopPartScreen} options={{ title: 'Add Parts to Inventory' }}/>
+        <Stack.Screen name="SelectRepairParts" component={SelectRepairPartsScreen} options={{ title: 'Select / Add Parts' }}/>
+        <Stack.Screen name="CreateMasterPart" component={CreateMasterPartScreen} options={{ title: 'Add New Part to Catalog' }}/>
         <Stack.Screen
           name="ClientProfile"
           component={ClientProfileScreen}

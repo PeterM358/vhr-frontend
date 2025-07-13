@@ -6,7 +6,8 @@ import { Text, TextInput, Button, ActivityIndicator, useTheme } from 'react-nati
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { login } from '../api/auth';
 import { AuthContext } from '../context/AuthManager';
-import Logo from '../../assets/logo.svg'; // ✅ Correct relative path!
+import Logo from '../../assets/logo.svg';
+import { STORAGE_KEYS } from '../constants/storageKeys'; // ✅ Make sure you have these constants
 
 export default function LoginScreen({ navigation }) {
   const theme = useTheme();
@@ -32,14 +33,34 @@ export default function LoginScreen({ navigation }) {
       await AsyncStorage.setItem('@last_login_email', emailOrPhone.trim());
       const data = await login(emailOrPhone.trim(), password);
 
+      console.log('✅ Login Response:', data);
+
       setAuthToken(data.access);
       setIsAuthenticated(true);
       setUserEmailOrPhone(emailOrPhone.trim());
 
+      // Save tokens
+      await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.access);
+      await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refresh);
+      await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, data.user_id.toString());
+      await AsyncStorage.setItem(STORAGE_KEYS.IS_SHOP, data.is_shop ? 'true' : 'false');
+      await AsyncStorage.setItem(STORAGE_KEYS.IS_CLIENT, data.is_client ? 'true' : 'false');
+
+      // Save shop profiles
+      if (data.shop_profiles && data.shop_profiles.length > 0) {
+        await AsyncStorage.setItem(STORAGE_KEYS.SHOP_PROFILES, JSON.stringify(data.shop_profiles));
+        await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_SHOP_ID, data.shop_profiles[0].id.toString());
+        console.log('✅ Default CURRENT_SHOP_ID set to:', data.shop_profiles[0].id);
+      } else {
+        await AsyncStorage.removeItem(STORAGE_KEYS.SHOP_PROFILES);
+        await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SHOP_ID);
+        console.log('⚠️ No shop profiles found');
+      }
+
       const target = data.is_shop ? 'ShopHome' : 'Home';
       navigation.reset({ index: 0, routes: [{ name: target }] });
     } catch (err) {
-      console.error('Login error', err);
+      console.error('❌ Login error', err);
       setError('Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
