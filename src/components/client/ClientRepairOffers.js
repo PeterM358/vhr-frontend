@@ -1,5 +1,3 @@
-// PATH: src/components/client/ClientRepairOffers.js
-
 import React, { useEffect, useState, useContext } from 'react';
 import {
   View,
@@ -18,7 +16,6 @@ export default function ClientRepairOffers() {
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [bookedRepairIds, setBookedRepairIds] = useState(new Set());
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const { notifications, setNotifications } = useContext(WebSocketContext);
@@ -35,12 +32,6 @@ export default function ClientRepairOffers() {
       const data = await res.json();
       setOffers(data);
 
-      const repairsRes = await fetch(`${API_BASE_URL}/api/repairs/?status=ongoing`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const repairsData = await repairsRes.json();
-
-      setBookedRepairIds(new Set(repairsData.map(r => r.id)));
     } catch (err) {
       console.error('Failed to load repair offers', err);
       Alert.alert('Error', 'Could not load repair offers');
@@ -75,7 +66,7 @@ export default function ClientRepairOffers() {
         );
       }
 
-      navigation.navigate('RepairDetail', { repairId: item.repair });
+      navigation.navigate('RepairChat', { repairId: item.repair });
     } catch (err) {
       Alert.alert('Error', 'Could not open detail');
     }
@@ -85,7 +76,7 @@ export default function ClientRepairOffers() {
   const isUnread = notifications.some(
     n => !n.is_read && n.repair === item.repair
   );
-  const isBooked = bookedRepairIds.has(item.repair);
+  const isBooked = item.is_booked;
 
   let opacity = isUnread || isBooked ? 1 : 0.4;
 

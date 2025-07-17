@@ -1,5 +1,3 @@
-// PATH: src/screens/RepairDetailScreen.js
-
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
@@ -20,12 +18,6 @@ import {
 import { Picker } from '@react-native-picker/picker';
 
 import {
-  getOffersForRepair,
-  deleteOffer,
-  bookPromotion,
-  unbookPromotion,
-} from '../api/offers';
-import {
   getRepairById,
   getRepairParts,
   addRepairPart,
@@ -35,6 +27,8 @@ import {
   confirmRepair,
 } from '../api/repairs';
 import { getShopParts } from '../api/parts';
+import { getOffersForRepair, bookOffer, unbookOffer } from '../api/offers';
+
 
 export default function RepairDetailScreen({ route, navigation }) {
   const { repairId } = route.params;
@@ -53,29 +47,47 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [isShop, setIsShop] = useState(false);
   const [shopUserId, setShopUserId] = useState(null);
+  const [shopProfileId, setShopProfileId] = useState(null);
   const [editDescription, setEditDescription] = useState('');
   const [finalKilometers, setFinalKilometers] = useState('');
+  const [offers, setOffers] = useState([]);
 
   useEffect(() => {
     const loadData = async () => {
       const token = await AsyncStorage.getItem('@access_token');
       const shopFlag = await AsyncStorage.getItem('@is_shop');
       const userIdStored = await AsyncStorage.getItem('@user_id');
-
       setIsShop(shopFlag === 'true');
       setShopUserId(parseInt(userIdStored));
 
+      // Fetch shop profile id if isShop
+      if (shopFlag === 'true') {
+        const shopProfileIdStored = await AsyncStorage.getItem('@current_shop_id');
+        setShopProfileId(parseInt(shopProfileIdStored));
+      } else {
+        setShopProfileId(null);
+      }
+
       try {
-        const [repairData, partsData, shopPartsData] = await Promise.all([
-          getRepairById(token, repairId),
-          getRepairParts(token, repairId),
-          getShopParts(token),
-        ]);
+        let repairData;
+        if (shopFlag === 'true') {
+          const [r, partsData, shopPartsData] = await Promise.all([
+            getRepairById(token, repairId),
+            getRepairParts(token, repairId),
+            getShopParts(token),
+          ]);
+          repairData = r;
+          setRepairParts(partsData);
+          setAvailableShopParts(shopPartsData);
+        } else {
+          repairData = await getRepairById(token, repairId);
+          setRepairParts(repairData.repair_parts || []);
+        }
 
         setRepair(repairData);
         setEditDescription(repairData.description || '');
-        setRepairParts(partsData);
-        setAvailableShopParts(shopPartsData);
+        const offersData = await getOffersForRepair(token, repairId);
+        setOffers(offersData);
       } catch (error) {
         console.error(error);
         Alert.alert('Error', 'Failed to load repair data.');
@@ -86,6 +98,21 @@ export default function RepairDetailScreen({ route, navigation }) {
 
     loadData();
   }, [repairId]);
+
+  // Refresh offers and repair when coming back to this screen
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refreshRepair();
+      refreshOffers();
+    });
+    return unsubscribe;
+  }, [navigation, repairId]);
+
+  const refreshOffers = async () => {
+    const token = await AsyncStorage.getItem('@access_token');
+    const offersData = await getOffersForRepair(token, repairId);
+    setOffers(offersData);
+  };
 
   const refreshRepair = async () => {
     const token = await AsyncStorage.getItem('@access_token');
@@ -144,14 +171,62 @@ export default function RepairDetailScreen({ route, navigation }) {
     }
   };
 
+  const handleBookOffer = async (selectedOfferId) => {
+    console.log("💥 handleBookOffer called");
+    console.log("📌 FULL repair object:", JSON.stringify(repair, null, 2));
+    console.log("📌 repair.offer:", repair?.offer);
+    console.log("📌 repair.vehicle:", repair?.vehicle);
+
+    if (!selectedOfferId || !repair?.vehicle) {
+      Alert.alert('Error', 'Missing offer or vehicle information.');
+      return;
+    }
+
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      await bookOffer(token, selectedOfferId, repair.vehicle);
+      console.log("✅ Booking request sent:", selectedOfferId, repair.vehicle);
+      Alert.alert('Success', 'Offer booked!');
+      await refreshRepair();
+      await refreshOffers();
+    } catch (err) {
+      console.error("❌ Booking failed:", err);
+      Alert.alert('Error', err.message || 'Failed to book offer');
+    }
+  };
+
+  const handleUnbookOffer = async (selectedOfferId) => {
+    console.log("💥 handleUnbookOffer called");
+    console.log("📌 selectedOfferId:", selectedOfferId);
+    console.log("📌 repair.vehicle:", repair?.vehicle);
+
+    if (!selectedOfferId || !repair?.vehicle) {
+      Alert.alert('Error', 'Missing offer or vehicle information.');
+      return;
+    }
+
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      await unbookOffer(token, selectedOfferId, repair.vehicle);
+      Alert.alert('Booking Cancelled', 'You have cancelled your booking.');
+      await refreshRepair();
+      await refreshOffers();
+    } catch (err) {
+      console.error("❌ Cancel failed:", err);
+      Alert.alert('Error', err.message || 'Failed to cancel booking');
+    }
+  };
+
   const renderRepairPartItem = ({ item }) => (
     <Card style={styles.partCard} mode="outlined">
       <Card.Content>
-        <Text variant="titleSmall">{item.shop_part_detail?.part?.name}</Text>
+        <Text variant="titleSmall">
+          {item.shop_part_detail?.part?.name || item.part_master_detail?.name || 'Unnamed Part'}
+        </Text>
         <TextInput
           mode="outlined"
           label="Quantity"
-          value={item.quantity.toString()}
+          value={item.quantity?.toString() ?? '1'}
           keyboardType="numeric"
           onChangeText={(val) => handleUpdatePart(item.id, 'quantity', parseInt(val))}
           disabled={repair.status === 'done'}
@@ -160,7 +235,7 @@ export default function RepairDetailScreen({ route, navigation }) {
         <TextInput
           mode="outlined"
           label="Price"
-          value={item.price_per_item_at_use}
+          value={item.price_per_item_at_use?.toString() ?? ''}
           keyboardType="numeric"
           onChangeText={(val) => handleUpdatePart(item.id, 'price_per_item_at_use', val)}
           disabled={repair.status === 'done'}
@@ -169,7 +244,7 @@ export default function RepairDetailScreen({ route, navigation }) {
         <TextInput
           mode="outlined"
           label="Note"
-          value={item.note || ''}
+          value={item.note ?? ''}
           onChangeText={(val) => handleUpdatePart(item.id, 'note', val)}
           disabled={repair.status === 'done'}
           style={styles.input}
@@ -209,6 +284,8 @@ export default function RepairDetailScreen({ route, navigation }) {
                 {repair.final_kilometers !== null && (
                   <Text variant="bodyMedium">Final Kilometers: {repair.final_kilometers}</Text>
                 )}
+
+
 
                 {isMyShopRepair && (
                   <>
@@ -254,47 +331,95 @@ export default function RepairDetailScreen({ route, navigation }) {
             </Card>
 
             <Text style={styles.sectionTitle}>Parts Used</Text>
-            {isMyShopRepair && repair.status !== 'done' && (
-              <Card mode="outlined" style={styles.addPartCard}>
-                <Card.Content>
-                  <Text variant="titleSmall">Add Part</Text>
-                  <View style={styles.pickerContainer}>
-                    <Picker
-                      selectedValue={newPart.shopPartId}
-                      onValueChange={(val) => setNewPart({ ...newPart, shopPartId: val })}
-                    >
-                      <Picker.Item label="Select Part" value="" />
-                      {availableShopParts.map(p => (
-                        <Picker.Item key={p.id} label={`${p.part.name} (${p.price} BGN)`} value={p.id} />
-                      ))}
-                    </Picker>
-                  </View>
-                  <TextInput
-                    mode="outlined"
-                    label="Quantity"
-                    keyboardType="numeric"
-                    value={newPart.quantity}
-                    onChangeText={(val) => setNewPart({ ...newPart, quantity: val })}
-                    style={styles.input}
-                  />
-                  <TextInput
-                    mode="outlined"
-                    label="Price"
-                    keyboardType="numeric"
-                    value={newPart.price}
-                    onChangeText={(val) => setNewPart({ ...newPart, price: val })}
-                    style={styles.input}
-                  />
-                  <TextInput
-                    mode="outlined"
-                    label="Note"
-                    value={newPart.note}
-                    onChangeText={(val) => setNewPart({ ...newPart, note: val })}
-                    style={styles.input}
-                  />
-                  <Button mode="contained" onPress={handleAddPart}>Add Part</Button>
-                </Card.Content>
-              </Card>
+            {repairParts.length === 0 ? (
+              <Text style={{ textAlign: 'center', marginVertical: 10 }}>No parts recorded yet.</Text>
+            ) : (
+              repairParts.map((item) => renderRepairPartItem({ item }))
+            )}
+
+            <Text style={styles.sectionTitle}>Offers</Text>
+            {offers.length === 0 ? (
+              <Text style={{ textAlign: 'center', marginVertical: 10 }}>No offers yet.</Text>
+            ) : (
+              (() => {
+                // Compute if any offer is booked
+                const hasBooked = offers.some((o) => o.is_booked);
+                // Sort offers so that the booked offer is at the top
+                const sortedOffers = [...offers].sort((a, b) => (b.is_booked ? 1 : 0) - (a.is_booked ? 1 : 0));
+                return sortedOffers.map((offer) => {
+                  // Visual and console logging for is_booked
+                  console.log('🟨 Offer', offer.id, '→ is_booked:', offer.is_booked);
+                  return (
+                    <Card key={offer.id} style={styles.offerCard} mode="outlined">
+                      <Card.Title
+                        title={offer.description || 'Offer'}
+                        subtitle={`Price: ${offer.price ?? 'N/A'} BGN`}
+                      />
+                      <Text style={{ color: 'gray' }}>
+                        🧠 is_booked: {offer.is_booked ? '✅' : '❌'}
+                      </Text>
+                      <Card.Content>
+                        {offer.parts && offer.parts.length > 0 && (
+                          <>
+                            <Text>Included Parts:</Text>
+                            {offer.parts.map((part, idx) => (
+                              <Text key={idx} style={{ marginLeft: 8 }}>
+                                - {part.parts_master_detail?.name || 'Unnamed'} x{part.quantity}
+                              </Text>
+                            ))}
+                          </>
+                        )}
+                        <Button
+                          mode="contained"
+                          onPress={() => navigation.navigate('OfferChat', { offerId: offer.id })}
+                          style={{ marginTop: 8 }}
+                        >
+                          Open Chat
+                        </Button>
+                        {isShop && shopProfileId !== null && parseInt(offer.shop) === shopProfileId && (
+                          <Button
+                            mode="outlined"
+                            onPress={() =>
+                              navigation.navigate('CreateOrUpdateOffer', {
+                                repairId,
+                                offerId: offer.id,
+                                existingOffer: offer,
+                                selectedOfferParts: offer.parts || [],
+                              })
+                            }
+                            style={{ marginTop: 8 }}
+                          >
+                            Update Offer
+                          </Button>
+                        )}
+                        {/* NEW LOGIC: Show Cancel/Book buttons as per booking status */}
+                        {!isShop && (
+                          <>
+                            {offer.is_booked && (
+                              <Button
+                                mode="outlined"
+                                onPress={() => handleUnbookOffer(offer.id)}
+                                style={{ marginTop: 8 }}
+                              >
+                                Cancel Booking
+                              </Button>
+                            )}
+                            {!hasBooked && !offer.is_booked && (
+                              <Button
+                                mode="contained"
+                                onPress={() => handleBookOffer(offer.id)}
+                                style={{ marginTop: 8 }}
+                              >
+                                {offer.is_promotion ? 'Book Promotion' : 'Book Offer'}
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </Card.Content>
+                    </Card>
+                  );
+                });
+              })()
             )}
           </View>
         }
@@ -304,6 +429,28 @@ export default function RepairDetailScreen({ route, navigation }) {
         ListEmptyComponent={<Text style={{ textAlign: 'center', marginVertical: 20 }}>No parts recorded yet.</Text>}
         contentContainerStyle={styles.listContent}
       />
+      {/* Floating button for shops to send offer */}
+      {isShop && (
+        <Button
+          icon="plus"
+          mode="contained"
+          onPress={() =>
+            navigation.navigate('CreateOrUpdateOffer', {
+              repairId,
+              returnTo: 'ShopRepairsList',
+            })
+          }
+          style={{
+            position: 'absolute',
+            bottom: 20,
+            right: 20,
+            borderRadius: 30,
+            padding: 6,
+          }}
+        >
+          Send Offer
+        </Button>
+      )}
     </View>
   );
 }
@@ -337,5 +484,9 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 20,
+  },
+  offerCard: {
+    marginHorizontal: 10,
+    marginVertical: 10,
   },
 });

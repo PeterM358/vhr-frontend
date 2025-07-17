@@ -112,3 +112,26 @@ export async function updateRepairPart(token, repairId, repairPartId, data) {
   if (!response.ok) throw new Error('Failed to update repair part');
   return await response.json();
 }
+
+// ✅ Get messages for a repair
+export async function getRepairMessages(token, repairId) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair/${repairId}/messages/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch messages');
+  return await response.json();
+}
+
+// ✅ Send message
+export async function sendRepairMessage(token, repairId, data) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair/${repairId}/messages/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to send message');
+  return await response.json();
+}

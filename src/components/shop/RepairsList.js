@@ -1,12 +1,10 @@
-// PATH: src/components/shop/RepairsList.js
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useLayoutEffect } from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRepairs } from '../../api/repairs';
 import { getMyOffers } from '../../api/offers';
 import { useNavigation } from '@react-navigation/native';
-import { Text, ActivityIndicator, Chip, Card, useTheme } from 'react-native-paper';
+import { Text, ActivityIndicator, Chip, Card, useTheme, Button, IconButton } from 'react-native-paper';
 
 export default function RepairsList() {
   const [repairs, setRepairs] = useState([]);
@@ -15,6 +13,17 @@ export default function RepairsList() {
   const [selectedTab, setSelectedTab] = useState('open');
   const navigation = useNavigation();
   const theme = useTheme();
+
+useLayoutEffect(() => {
+  navigation.setOptions({
+    headerTitle: 'Repairs',
+    headerBackTitleVisible: false,
+    headerStyle: {
+      backgroundColor: theme.colors.primary,
+    },
+    headerTintColor: theme.colors.onPrimary,
+  });
+}, [navigation, theme.colors.primary, theme.colors.onPrimary]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -42,7 +51,9 @@ export default function RepairsList() {
     <Card
       mode="outlined"
       style={[styles.card, { borderColor: theme.colors.primary }]}
-      onPress={() => navigation.navigate('RepairDetail', { repairId: item.id })}
+      onPress={() => navigation.navigate('RepairDetail', {
+        repairId: item.id,
+      })}
     >
       <Card.Title
         title={`${item.vehicle_make} ${item.vehicle_model} (${item.vehicle_license_plate})`}

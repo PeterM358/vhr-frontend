@@ -10,8 +10,12 @@ export async function getPromotions(token) {
   return await response.json();
 }
 
-export async function bookPromotion(token, offerId, vehicleId) {
-  const response = await fetch(`${API_BASE_URL}/api/offers/${offerId}/book/`, {
+export async function bookOffer(token, offerId, vehicleId) {
+  console.log("📣 bookOffer called with:", { offerId, vehicleId });
+  const url = `${API_BASE_URL}/api/offers/${offerId}/book/`;
+  console.log("📣 URL:", url);
+
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -21,32 +25,46 @@ export async function bookPromotion(token, offerId, vehicleId) {
   });
 
   if (!response.ok) {
-    const err = await response.json();
+    let err;
+    try {
+      err = await response.json();
+    } catch (e) {
+      console.error("❌ Failed to parse error JSON:", e);
+      throw new Error('Booking failed');
+    }
     throw new Error(err.detail || 'Booking failed');
   }
 
   return await response.json();
 }
 
+export async function unbookOffer(token, offerId) {
+  const url = `${API_BASE_URL}/api/offers/${offerId}/unbook/`;
+  console.log("📣 unbookOffer URL:", url);
 
-export async function unbookPromotion(token, offerId, vehicleId) {
-  const response = await fetch(`${API_BASE_URL}/api/offers/${offerId}/unbook/${vehicleId}/`, {
-    method: 'DELETE',
+  const response = await fetch(url, {
+    method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
 
   if (!response.ok) {
-    const err = await response.json();
+    let err;
+    try {
+      err = await response.json();
+    } catch (e) {
+      console.error("❌ Failed to parse error JSON:", e);
+      throw new Error('Unbooking failed');
+    }
     throw new Error(err.detail || 'Unbooking failed');
   }
 
-  return true;
+  return await response.json();
 }
 
 export async function getOffersForRepair(token, repairId) {
-  const response = await fetch(`${API_BASE_URL}/api/offers/repair/${repairId}/`, {
+  const response = await fetch(`${API_BASE_URL}/api/offers/?repair=${encodeURIComponent(repairId)}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -77,8 +95,7 @@ export async function deleteOffer(token, offerId) {
   const response = await fetch(`${API_BASE_URL}/api/offers/${offerId}/delete/`, {
     method: 'DELETE',
     headers: {
-      Authorization: `Bearer ${token}`,
-    },
+      Authorization: `Bearer ${token}` },
   });
 
   if (!response.ok) {
@@ -114,10 +131,45 @@ export async function getMyOffers(token) {
   return await response.json();
 }
 
-export async function getMyBookedPromotionIds(token) {
-  const response = await fetch(`${API_BASE_URL}/api/offers/my-booked-promotions/`, {
+
+export async function createOffer(token, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/offers/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.detail || 'Failed to create offer');
+  }
+
+  return await response.json();
+}
+
+export async function getOfferMessages(token, offerId) {
+  const response = await fetch(`${API_BASE_URL}/api/offers/${offerId}/messages/`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!response.ok) throw new Error('Failed to fetch booked promotions');
-  return await response.json();  // array of offer IDs
+  if (!response.ok) throw new Error('Failed to fetch offer messages');
+  return await response.json();
+}
+
+export async function sendOfferMessage(token, offerId, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/offers/${offerId}/messages/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let err = await response.json();
+    throw new Error(err.detail || 'Failed to send message');
+  }
+  return await response.json();
 }

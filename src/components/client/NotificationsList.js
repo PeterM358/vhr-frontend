@@ -42,7 +42,7 @@ export default function NotificationsList() {
       }
 
       if (item.repair) {
-        navigation.navigate('RepairDetail', { repairId: item.repair });
+        navigation.navigate('RepairChat', { repairId: item.repair });
       } else {
         Alert.alert('Info', 'No linked detail for this notification.');
       }

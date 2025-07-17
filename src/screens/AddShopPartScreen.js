@@ -1,5 +1,3 @@
-// PATH: src/screens/AddShopPartScreen.js
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -26,8 +24,14 @@ import {
   createShopPart
 } from '../api/parts';
 
-export default function AddShopPartScreen({ navigation }) {
+export default function AddShopPartScreen({ navigation, route }) {
   const theme = useTheme();
+
+  const [isShop, setIsShop] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('@is_shop').then(flag => setIsShop(flag === 'true'));
+  }, []);
 
   // Search state
   const [query, setQuery] = useState('');
@@ -48,18 +52,19 @@ export default function AddShopPartScreen({ navigation }) {
   const [creating, setCreating] = useState(false);
 
   // Search global catalog
-  const handleSearch = async () => {
-    setSearching(true);
-    try {
-      const data = await getPartsCatalog(query);
-      setCatalogResults(data);
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Error', 'Failed to search parts catalog');
-    } finally {
-      setSearching(false);
-    }
-  };
+ const handleSearch = async () => {
+  setSearching(true);
+  try {
+    const token = await AsyncStorage.getItem('@access_token');
+    const data = await getPartsCatalog(token, { q: query });
+    setCatalogResults(data);
+  } catch (err) {
+    console.error(err);
+    Alert.alert('Error', 'Failed to search parts catalog');
+  } finally {
+    setSearching(false);
+  }
+};
 
   // Add existing PartsMaster to selection
   const handleSelectPart = (part) => {
@@ -67,6 +72,7 @@ export default function AddShopPartScreen({ navigation }) {
       ...prev,
       {
         partMaster: part,
+        partsMasterId: part.id,
         price: '',
         labor: '',
         shopSku: '',
@@ -88,15 +94,83 @@ export default function AddShopPartScreen({ navigation }) {
     setSelectedParts(updated);
   };
 
-  // Create new PartsMaster
+  // Create new PartsMaster and optionally ShopPart if shop
   const handleCreateNewPart = async () => {
+    // Save these NOW so they don't get lost
+    const {
+      returnTo,
+      repairId,
+      vehicleId,
+      repairTypeId,
+      description,
+      kilometers,
+      status
+    } = route.params || {};
+
     setCreating(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
       const part = await createPartsMaster(token, newPartData);
-      handleSelectPart(part);
+
+      if (isShop) {
+        const shopProfileId = await AsyncStorage.getItem('@shop_profile_id');
+        const newShopPart = await createShopPart(token, {
+          shop_profile: parseInt(shopProfileId),
+          part: part.id,
+          price: '',
+          labor: '',
+          shop_sku: '',
+        });
+
+        setSelectedParts((prev) => [
+          ...prev,
+          {
+            partMaster: part,
+            partsMasterId: part.id,
+            shopPartId: newShopPart.id,
+            price: '',
+            labor: '',
+            shopSku: '',
+          },
+        ]);
+      } else {
+        setSelectedParts((prev) => [
+          ...prev,
+          {
+            partsMasterId: part.id,
+            quantity: 1,
+            price: '',
+            labor: '',
+            note: '',
+            partsMaster: part,
+          },
+        ]);
+      }
+
       setNewPartData({ name: '', brand: '', category: '', description: '' });
       Alert.alert('Success', 'New part added to catalog and selected!');
+
+      // Re-navigate immediately to keep all params
+      navigation.navigate({
+        name: returnTo || 'SelectRepairParts',
+        merge: true,
+        params: {
+          newClientSelectedParts: [{
+            partsMasterId: part.id,
+            quantity: 1,
+            price: '',
+            labor: '',
+            note: '',
+            partsMaster: part,
+          }],
+          ...(repairId !== undefined && repairId !== null ? { repairId } : {}),
+          vehicleId,
+          repairTypeId,
+          description,
+          kilometers,
+          status,
+        },
+      });
     } catch (err) {
       console.error(err);
       Alert.alert('Error', 'Failed to create new part');
@@ -114,21 +188,57 @@ export default function AddShopPartScreen({ navigation }) {
 
     try {
       const token = await AsyncStorage.getItem('@access_token');
-      const shopProfileId = await AsyncStorage.getItem('@shop_profile_id');
 
-      for (let p of selectedParts) {
-        if (!p.price) throw new Error('Price is required for all parts');
-        await createShopPart(token, {
-          shop_profile: parseInt(shopProfileId),
-          part: p.partMaster.id,
-          price: p.price,
-          labor: p.labor || '0',
-          shop_sku: p.shopSku,
+      if (isShop) {
+        const shopProfileId = await AsyncStorage.getItem('@shop_profile_id');
+
+        for (let p of selectedParts) {
+          if (!p.price) throw new Error('Price is required for all parts');
+          await createShopPart(token, {
+            shop_profile: parseInt(shopProfileId),
+            part: p.partMaster.id,
+            price: p.price,
+            labor: p.labor || '0',
+            shop_sku: p.shopSku,
+          });
+        }
+
+        Alert.alert('Success', 'All parts saved!');
+        navigation.goBack();
+      } else {
+        // Capture incoming route params if any
+        const {
+          returnTo,
+          repairId,
+          vehicleId,
+          repairTypeId,
+          description,
+          kilometers,
+          status
+        } = route.params || {};
+
+        // Client: pass selected PartsMasters back without creating ShopParts
+        navigation.navigate({
+          name: returnTo || 'SelectRepairParts',
+          merge: true,
+          params: {
+            newClientSelectedParts: selectedParts.map(p => ({
+              partsMasterId: p.partMaster.id,
+              quantity: 1,
+              price: '',
+              labor: '',
+              note: '',
+              partsMaster: p.partMaster,
+            })),
+            ...(repairId !== undefined && repairId !== null ? { repairId } : {}),
+            vehicleId,
+            repairTypeId,
+            description,
+            kilometers,
+            status,
+          },
         });
       }
-
-      Alert.alert('Success', 'All parts saved!');
-      navigation.goBack();
     } catch (err) {
       console.error(err);
       Alert.alert('Error', err.message || 'Failed to save parts');

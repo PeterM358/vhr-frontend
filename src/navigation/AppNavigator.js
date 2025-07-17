@@ -16,8 +16,8 @@ import VehicleDetailScreen from '../screens/VehicleDetailScreen';
 import ShopDetailScreen from '../screens/ShopDetailScreen';
 import AuthLoadingScreen from '../screens/AuthLoadingScreen';
 import PromotionDetailScreen from '../screens/PromotionDetailScreen';
-import RepairDetailScreen from '../screens/RepairDetailScreen';
 import ClientRepairsList from '../components/client/ClientRepairsList';
+import RepairDetailScreen from '../screens/RepairDetailScreen';
 import CreateRepairScreen from '../screens/CreateRepairScreen';
 import CreateVehicleScreen from '../screens/CreateVehicleScreen';
 import CreatePromotionScreen from '../screens/CreatePromotionScreen';
@@ -40,7 +40,18 @@ import AddShopPartScreen from '../screens/AddShopPartScreen';
 
 import SelectRepairPartsScreen from '../screens/SelectRepairPartsScreen';
 import CreateMasterPartScreen from '../screens/CreateMasterPartScreen';
+import RepairChatScreen from '../screens/RepairChatScreen';
 
+// import SelectPartsForCreateScreen from '../screens/SelectPartsForCreateScreen';
+// import ManageRepairPartsScreen from '../screens/ManageRepairPartsScreen';
+
+
+import ClientLogRepairScreen from '../screens/ClientLogRepairScreen';
+import ClientRequestRepairScreen from '../screens/ClientRequestRepairScreen';
+
+import OfferChatScreen from '../screens/OfferChatScreen';
+import CreateOrUpdateOfferScreen from '../screens/CreateOrUpdateOfferScreen';
+import SelectOfferPartsScreen from '../screens/SelectOfferPartsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -68,8 +79,8 @@ export default function AppNavigator() {
         <Stack.Screen name="VehicleDetail" component={VehicleDetailScreen} options={{ title: 'Vehicle Details' }}/> 
         <Stack.Screen name="ShopDetail" component={ShopDetailScreen} options={{ title: 'Shop Details' }}/>
         <Stack.Screen name="PromotionDetail" component={PromotionDetailScreen} options={{ title: 'Promotion Details' }}/>
-        <Stack.Screen name="RepairDetail" component={RepairDetailScreen} options={{ title: 'Repair Details' }}/>
         <Stack.Screen name="ClientRepairs" component={ClientRepairsList} options={{ title: 'Repairs' }}/>
+        <Stack.Screen name="RepairDetail" component={RepairDetailScreen} options={{ title: 'Repair Details' }}/>
         <Stack.Screen name="CreateRepair" component={CreateRepairScreen} options={{ title: 'Create Repair' }}/>
         <Stack.Screen name="CreateVehicle" component={CreateVehicleScreen} options={{ title: 'Create Vehicle' }}/>
         <Stack.Screen name="CreatePromotion" component={CreatePromotionScreen} options={{ title: 'Create Promotion' }}/>
@@ -100,6 +111,25 @@ export default function AppNavigator() {
             title: 'Profile',
           }}
         />
+         <Stack.Screen name="OfferChat" component={OfferChatScreen} options={{ title: 'Details' }}/>
+        <Stack.Screen name="RepairChat" component={RepairChatScreen} options={{ title: 'Details' }}/>
+        {/* <Stack.Screen name="SelectPartsForCreate" component={SelectPartsForCreateScreen} />
+        <Stack.Screen name="ManageRepairParts" component={ManageRepairPartsScreen} /> */}
+
+        <Stack.Screen name="ClientLogRepair" component={ClientLogRepairScreen} options={{ title: 'Log Repair' }}/>
+        <Stack.Screen name="ClientRequestRepair" component={ClientRequestRepairScreen} options={{ title: 'Request Repair' }}/>
+        
+        <Stack.Screen
+          name="CreateOrUpdateOffer"
+          component={CreateOrUpdateOfferScreen}
+          options={{ title: 'Send or Update Offer' }}
+        />
+        <Stack.Screen
+          name="SelectOfferParts"
+          component={SelectOfferPartsScreen}
+          options={{ headerShown: false }} // or true if you want default header
+        />
+
       </Stack.Navigator>
     </NavigationContainer>
   );

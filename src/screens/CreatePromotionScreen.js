@@ -71,8 +71,7 @@ export default function CreatePromotionScreen({ navigation }) {
           mode="text"
           compact
           onPress={handleHeaderSave}
-          labelStyle={{ color: theme.colors.primary,
-          fontSize: 16 }}
+          labelStyle={{ color: '#fff', fontSize: 16 }}
         >
           Save
         </Button>

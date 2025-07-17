@@ -2,8 +2,8 @@
  * PATH: src/screens/VehicleDetailScreen.js
  */
 
-import React, { useEffect, useState } from 'react';
-import { FlatList, ActivityIndicator, StyleSheet, View } from 'react-native';
+import React, { useEffect, useState, useLayoutEffect } from 'react';
+import { FlatList, ActivityIndicator, StyleSheet, View, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Card,
@@ -12,7 +12,8 @@ import {
   useTheme,
   Surface,
   FAB,
-  SegmentedButtons
+  SegmentedButtons,
+  IconButton
 } from 'react-native-paper';
 import { API_BASE_URL } from '../api/config';
 
@@ -26,6 +27,16 @@ export default function VehicleDetailScreen({ route, navigation }) {
 
   const theme = useTheme();
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerBackTitleVisible: false,
+      headerTintColor: theme.colors.onPrimary,
+      headerStyle: {
+        backgroundColor: theme.colors.primary,
+      },
+      headerLeft: undefined,
+    });
+  }, [navigation, isShop, theme.colors.primary, theme.colors.onPrimary]);
   // ✅ Load isShop flag from storage
   useEffect(() => {
     const loadRole = async () => {
@@ -34,23 +45,6 @@ export default function VehicleDetailScreen({ route, navigation }) {
     };
     loadRole();
   }, []);
-
-  // ✅ Intercept system back button only for shops with empty history
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-      if (!isShop) return;
-
-      if (navigation.canGoBack()) {
-        return;
-      }
-
-      // prevent default back and navigate instead
-      e.preventDefault();
-      navigation.navigate('AuthorizedClients');
-    });
-
-    return unsubscribe;
-  }, [navigation, isShop]);
 
   useEffect(() => {
     const fetchVehicleDetails = async () => {
@@ -165,7 +159,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
             <Card
               mode="outlined"
               style={[styles.repairCard, { borderColor: theme.colors.primary }]}
-              onPress={() => navigation.navigate('RepairDetail', { repairId: item.id })}
+              onPress={() => navigation.navigate('RepairChat', { repairId: item.id })}
             >
               <Card.Content>
                 <Text style={[styles.repairTitle, { color: theme.colors.onSurface }]}>{item.repair_type_name}</Text>
@@ -185,7 +179,38 @@ export default function VehicleDetailScreen({ route, navigation }) {
         label="Add Repair"
         style={[styles.fab, { backgroundColor: theme.colors.primary }]}
         color={theme.colors.onPrimary}
-        onPress={() => navigation.navigate('CreateRepair', { vehicleId })}
+        onPress={() => {
+          if (isShop) {
+            navigation.navigate('CreateRepair', {
+              vehicleId,
+              preselectedStatus: 'done',
+            });
+          } else {
+            Alert.alert(
+              'New Repair',
+              'What type of repair do you want to add?',
+              [
+                {
+                  text: 'Log Personal Repair',
+                  onPress: () =>
+                    navigation.navigate('ClientLogRepair', {
+                      vehicleId,
+                      preselectedStatus: 'done',
+                    }),
+                },
+                {
+                  text: 'Request from Shop',
+                  onPress: () =>
+                    navigation.navigate('ClientRequestRepair', {
+                      vehicleId,
+                      preselectedStatus: 'open',
+                    }),
+                },
+                { text: 'Cancel', style: 'cancel' },
+              ]
+            );
+          }
+        }}
       />
     </View>
   );

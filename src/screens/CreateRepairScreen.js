@@ -128,7 +128,7 @@ export default function CreateRepairScreen({ navigation, route }) {
 
   // ✅ Navigate to add/select parts
   const openAddPartsScreen = () => {
-    navigation.push('SelectRepairParts', {
+    navigation.navigate('SelectRepairParts', {
       currentParts: selectedParts,
       vehicleId,
       repairTypeId,
@@ -164,6 +164,11 @@ export default function CreateRepairScreen({ navigation, route }) {
         repair_parts_data: repairPartsData,
       };
 
+      const isShop = await AsyncStorage.getItem('@is_shop');
+      if (isShop === 'true' && shopProfileId) {
+        body.shop_profile_id = parseInt(shopProfileId);
+      }
+
       await createRepair(token, body);
 
       setDialogMessage('Repair created!');
@@ -171,9 +176,12 @@ export default function CreateRepairScreen({ navigation, route }) {
 
       setTimeout(() => {
         setDialogVisible(false);
+        const isShopUser = isShop === 'true';
         navigation.reset({
-          index: 0,
+          index: 2,
           routes: [
+            { name: isShopUser ? 'ShopHome' : 'Home' },
+            { name: 'AuthorizedClients' },
             { name: 'VehicleDetail', params: { vehicleId: parseInt(vehicleId) } }
           ]
         });
@@ -293,7 +301,7 @@ export default function CreateRepairScreen({ navigation, route }) {
         <Divider style={{ marginVertical: 20 }} />
 
         <Button mode="contained" onPress={openAddPartsScreen} style={{ marginBottom: 10 }}>
-          Add Parts
+          Manage Parts
         </Button>
 
         {selectedParts.length > 0 && (

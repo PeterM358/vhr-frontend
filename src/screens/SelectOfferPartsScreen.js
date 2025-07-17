@@ -1,7 +1,3 @@
-/**
- * PATH: src/screens/SelectRepairPartsScreen.js
- */
-
 import React, { useState, useEffect, useLayoutEffect } from 'react';
 import {
   ScrollView,
@@ -24,29 +20,25 @@ import {
 
 import { getPartsCatalog } from '../api/parts';
 
-export default function SelectRepairPartsScreen({ route, navigation }) {
+export default function SelectOfferPartsScreen({ route, navigation }) {
   const theme = useTheme();
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTitle: 'Manage Parts',
+      headerTitle: 'Manage Offer Parts',
       headerBackTitleVisible: true,
       headerBackTitle: 'Back',
       headerTintColor: theme.colors.onPrimary,
       headerStyle: {
         backgroundColor: theme.colors.primary,
       },
-      headerBackImage: undefined, // Use default system arrow
     });
   }, [navigation, theme.colors.primary, theme.colors.onPrimary]);
 
   const {
     currentParts = [],
-    vehicleId,
-    repairTypeId,
-    description,
-    kilometers,
-    status,
+    offerId,
+    existingOffer,
   } = route.params || {};
 
   const newCreatedPart = route.params?.newCreatedPart;
@@ -89,8 +81,6 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
       const params = {};
       params.search = query;
       if (shopProfileId) params.shop_profile = shopProfileId;
-
-      console.log('🔍 Fetching Parts Catalog with:', params);
 
       const data = await getPartsCatalog(token, params);
       setResults(data);
@@ -155,7 +145,6 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
       }
     }
 
-    // Map selected to send both part_master_id and shop_part_id if present
     const cleanedParts = selected.map(p => ({
       partsMasterId: parseInt(p.partsMasterId),
       partsMaster: p.partsMaster,
@@ -166,39 +155,15 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
       note: p.note,
     }));
 
-      console.log('Returning to:', route.params?.returnTo, 'with repairId:', route.params?.repairId);
-
-      navigation.navigate({
-        name: route.params?.returnTo || 'RepairChat',
-        merge: true,
-        params: {
-          addedParts: cleanedParts,
-          repairId: route.params?.repairId,
-          vehicleId,
-          repairTypeId,
-          description,
-          kilometers,
-          status,
-        },
-      });
-    };
-
-  const navigateToAddNewPartScreen = () => {
-    navigation.navigate('CreateMasterPart', {
-      returnTo: 'SelectRepairParts',
+    navigation.navigate({
+      name: 'CreateOrUpdateOffer',
+      merge: true,
+      params: {
+        selectedOfferParts: cleanedParts,
+        offerId,
+        existingOffer,
+      },
     });
-  };
-
-  // ✅ Determine card color based on value
-  const getBorderStyle = (part) => {
-    const fields = [part.quantity, part.price, part.labor];
-    if (fields.some(v => v === '' || v === null)) {
-      return { borderColor: theme.colors.error, borderWidth: 2 };  // RED
-    }
-    if (fields.some(v => parseFloat(v) === 0)) {
-      return { borderColor: 'orange', borderWidth: 2 };  // YELLOW
-    }
-    return {};
   };
 
   return (
@@ -208,7 +173,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
     >
       <ScrollView contentContainerStyle={styles.container}>
         <Text variant="headlineSmall" style={styles.title}>
-          Search & Select Parts
+          Search & Select Offer Parts
         </Text>
 
         <TextInput
@@ -272,12 +237,8 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
         </Text>
         {selected.map((part, index) => {
           const expanded = expandedSelectedIndexes.includes(index);
-
           return (
-            <Card
-              key={index}
-              style={[styles.selectedCard, getBorderStyle(part)]}
-            >
+            <Card key={index} style={[styles.selectedCard]}>
               <Card.Title
                 title={part.partsMaster?.name || ''}
                 subtitle={part.partsMaster?.brand || ''}
@@ -299,9 +260,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
               />
               {expanded && (
                 <Card.Content>
-                  <Text variant="bodyMedium" style={styles.detailLabel}>
-                    Part Number: {part.partsMaster?.part_number || 'N/A'}
-                  </Text>
+                  <Text variant="bodyMedium">Part Number: {part.partsMaster?.part_number || 'N/A'}</Text>
                   <TextInput
                     mode="outlined"
                     label="Quantity"
@@ -339,11 +298,13 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
           );
         })}
 
-        <Divider style={{ marginVertical: 20 }} />
-
         <Button
-          mode="contained"
-          onPress={navigateToAddNewPartScreen}
+          mode="outlined"
+          onPress={() => {
+            navigation.navigate('CreateMasterPart', {
+              returnTo: 'SelectOfferParts',
+            });
+          }}
           style={{ marginBottom: 16 }}
         >
           Can't find it? Add New Part to Catalog
@@ -352,7 +313,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
         <Button
           mode="contained"
           onPress={handleConfirmAndReturn}
-          style={{ marginBottom: 30 }}
+          style={{ marginTop: 20, marginBottom: 30 }}
         >
           Confirm Selection
         </Button>
@@ -369,9 +330,5 @@ const styles = StyleSheet.create({
   selectedCard: {
     marginVertical: 8,
     backgroundColor: '#f9f9f9',
-  },
-  detailLabel: {
-    marginBottom: 8,
-    fontWeight: '600',
   },
 });

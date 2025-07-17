@@ -1,5 +1,3 @@
-// PATH: src/components/client/ClientPromotions.js
-
 import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
@@ -13,11 +11,9 @@ import { Card, Text, ActivityIndicator, useTheme } from 'react-native-paper';
 import { API_BASE_URL } from '../../api/config';
 import { WebSocketContext } from '../../context/WebSocketManager';
 import { markNotificationRead } from '../../api/notifications';
-import { getMyBookedPromotionIds } from '../../api/offers';
 
 export default function ClientPromotions({ navigation }) {
   const [offers, setOffers] = useState([]);
-  const [bookedIds, setBookedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { notifications, setNotifications } = useContext(WebSocketContext);
@@ -28,18 +24,14 @@ export default function ClientPromotions({ navigation }) {
     try {
       const token = await AsyncStorage.getItem('@access_token');
 
-      const [offersRes, bookedRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/offers/?is_promotion=1`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        getMyBookedPromotionIds(token),
-      ]);
+      const offersRes = await fetch(`${API_BASE_URL}/api/offers/?is_promotion=1`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (!offersRes.ok) throw new Error('Failed to fetch promotions');
       const offersData = await offersRes.json();
 
       setOffers(offersData);
-      setBookedIds(new Set(bookedRes));
     } catch (err) {
       console.error('Failed to load promotions', err);
       Alert.alert('Error', 'Could not load promotions');
@@ -88,7 +80,7 @@ export default function ClientPromotions({ navigation }) {
     n => !n.is_read && n.offer === item.id
   );
 
-  const isBooked = bookedIds.has(item.id);
+  const isBooked = item.is_booked;
 
   let opacity = hasUnreadNotification || isBooked ? 1 : 0.4;
 

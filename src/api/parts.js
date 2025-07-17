@@ -1,5 +1,4 @@
-// PATH: src/api/parts.js
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from './config';
 
 // ✅ Get global PartsMaster catalog with query params object
@@ -107,28 +106,39 @@ export async function deleteShopPart(token, shopPartId) {
 }
 
 export async function prepareRepairPartsData(token, shopProfileId, selectedParts, shopParts) {
+  const isShop = (await AsyncStorage.getItem('@is_shop')) === 'true';
+
   const repairPartsData = [];
   const newShopParts = [...shopParts];
 
   for (let part of selectedParts) {
     if (!part.partsMasterId) continue;
 
+    if (!isShop) {
+      // Client user → just append directly, no ShopPart creation
+      repairPartsData.push({
+        quantity: parseInt(part.quantity),
+        price_per_item_at_use: part.price,
+        labor_cost: part.labor,
+        note: part.note,
+        part_master_id: parseInt(part.partsMasterId),
+      });
+      continue;
+    }
+
     let shopPart = newShopParts.find(sp => sp.part.id === parseInt(part.partsMasterId));
 
     if (shopPart) {
-      // UPDATE EXISTING LOCAL
       await updateShopPart(token, shopPart.id, {
         price: part.price,
         default_labor_cost: part.labor,
       });
     } else {
-      // TRY FETCHING FROM SERVER
       const url = `${API_BASE_URL}/api/parts/shop-parts/?part=${part.partsMasterId}&shop_profile=${shopProfileId}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const data = await res.json();
         if (data.length > 0) {
-          // FOUND REMOTELY, UPDATE
           shopPart = data[0];
           await updateShopPart(token, shopPart.id, {
             price: part.price,
@@ -138,7 +148,6 @@ export async function prepareRepairPartsData(token, shopProfileId, selectedParts
       }
 
       if (!shopPart) {
-        // REALLY DOESN'T EXIST → CREATE
         shopPart = await createShopPart(token, {
           shop_profile: parseInt(shopProfileId),
           part_id: parseInt(part.partsMasterId),
@@ -152,7 +161,8 @@ export async function prepareRepairPartsData(token, shopProfileId, selectedParts
     }
 
     repairPartsData.push({
-      shop_part_id: shopPart.id,
+      part_master_id: parseInt(part.partsMasterId),
+      shop_part_id: part.shopPartId,
       quantity: parseInt(part.quantity),
       price_per_item_at_use: part.price,
       labor_cost: part.labor,
@@ -161,4 +171,15 @@ export async function prepareRepairPartsData(token, shopProfileId, selectedParts
   }
 
   return { repairPartsData, newShopParts };
+}
+
+// ✅ Utility to strip undefined shop_part_id for client-side submissions
+export function cleanRepairPartsData(data) {
+  return data.map(item => {
+    if (item.shop_part_id === undefined) {
+      const { shop_part_id, ...rest } = item;
+      return rest;
+    }
+    return item;
+  });
 }

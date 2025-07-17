@@ -1,6 +1,7 @@
 // PATH: src/components/shop/AuthorizedClients.js
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { useLayoutEffect } from 'react';
 import {
   View,
   LayoutAnimation,
@@ -18,6 +19,7 @@ import {
   ActivityIndicator,
   Button,
   useTheme,
+  IconButton,
 } from 'react-native-paper';
 import CommonButton from '../CommonButton';
 import BASE_STYLES from '../../styles/base';
@@ -33,6 +35,16 @@ export default function AuthorizedClients({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [expandedClientIds, setExpandedClientIds] = useState([]);
   const theme = useTheme();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitle: 'Authorized Clients',
+      headerLeft: undefined,
+      headerStyle: {
+        backgroundColor: theme.colors.primary,
+      },
+    });
+  }, [navigation, theme.colors.primary]);
 
   const fetchAuthorized = useCallback(async () => {
     setLoading(true);

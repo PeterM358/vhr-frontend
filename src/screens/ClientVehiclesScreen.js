@@ -1,15 +1,53 @@
-// PATH: src/screens/ClientVehiclesScreen.js
-
-import React, { useEffect, useState } from 'react';
-import { FlatList, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useLayoutEffect } from 'react';
+import { FlatList, ActivityIndicator, StyleSheet, TouchableOpacity, View, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getVehicles } from '../api/vehicles';
-import { Surface, Text, Card, Button, FAB, useTheme } from 'react-native-paper';
+import { Surface, Text, Card, Button, FAB, useTheme, IconButton } from 'react-native-paper';
 
 export default function ClientVehiclesScreen({ navigation }) {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isShop, setIsShop] = useState(false);
   const theme = useTheme();
+
+  // Detect if user is shop or client
+  useEffect(() => {
+    const fetchIsShop = async () => {
+      const shopFlag = await AsyncStorage.getItem('@is_shop');
+      setIsShop(shopFlag === 'true');
+    };
+    fetchIsShop();
+  }, []);
+
+  // Set custom back button in header depending on user type
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerStyle: { backgroundColor: theme.colors.primary },
+      headerTintColor: theme.colors.onPrimary,
+      headerTitle: 'My Vehicles',
+      headerLeft: () => (
+        <IconButton
+          icon="home"
+          size={28}
+          onPress={() => {
+            if (isShop) {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'AuthorizedClients' }],
+              });
+            } else {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Home' }],
+              });
+            }
+          }}
+          iconColor={theme.colors.onPrimary}
+          style={{ marginLeft: 8 }}
+        />
+      ),
+    });
+  }, [navigation, isShop, theme.colors.primary, theme.colors.onPrimary]);
 
   useEffect(() => {
     const fetchVehicles = async () => {
