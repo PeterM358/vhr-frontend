@@ -1,5 +1,3 @@
-// PATH: src/screens/ShopMapScreen.native.js
-
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
@@ -9,18 +7,32 @@ import { TextInput, Button, Surface, useTheme, Text } from 'react-native-paper';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { API_BASE_URL } from '../api/config';
 
+const getNow = () => new Date().toISOString();
+
+function withTimeout(promise, ms = 5000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms)),
+  ]);
+}
+
 export default function ShopMapScreen({ navigation }) {
   const theme = useTheme();
 
   const [location, setLocation] = useState(null);
   const [shops, setShops] = useState([]);
   const [addressQuery, setAddressQuery] = useState('');
+  const [loading, setLoading] = useState(true);
   const mapRef = useRef(null);
 
   const fetchShops = async (address = '') => {
+    const fetchStart = Date.now();
+    console.log(`[${getNow()}] 📡 ShopMapScreen: Sending request to fetch shops...`);
+    setLoading(true);
     const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     const userIdStr = await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
     const userId = parseInt(userIdStr, 10);
+    console.log(`[${getNow()}] 👤 ShopMapScreen: User ID is ${userId}`);
 
     try {
       const url = `${API_BASE_URL}/api/profiles/shops/${address ? `?address=${encodeURIComponent(address)}` : ''}`;
@@ -38,18 +50,32 @@ export default function ShopMapScreen({ navigation }) {
     } catch (error) {
       console.error('Error fetching shops:', error);
       Alert.alert('Error', 'Could not load shops');
+    } finally {
+      setLoading(false);
+      const elapsed = Date.now() - fetchStart;
+      const totalElapsed = Date.now() - startTime;
+      console.log(`[${getNow()}] ✅ ShopMapScreen: Finished fetching shops. Elapsed: ${elapsed}ms, Total since open: ${totalElapsed}ms`);
     }
   };
 
   const fetchEverything = async () => {
+    const startTime = Date.now();
+    console.log(`[${getNow()}] 🟡 ShopMapScreen: Starting fetchEverything...`);
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission denied', 'Location access is required.');
       return;
     }
 
-    const position = await Location.getCurrentPositionAsync({});
+    let position;
+    try {
+      position = await withTimeout(Location.getCurrentPositionAsync({}), 5000);
+    } catch (err) {
+      console.warn('⚠️ Location fetch timed out:', err);
+      position = await Location.getLastKnownPositionAsync({});
+    }
     setLocation(position.coords);
+    console.log(`[${getNow()}] 🟢 ShopMapScreen: Location fetched, now fetching shops...`);
     await fetchShops();
   };
 
@@ -78,7 +104,7 @@ export default function ShopMapScreen({ navigation }) {
     mapRef.current?.animateToRegion(region, 1000);
   }, [location, shops]);
 
-  if (!location) return <ActivityIndicator size="large" style={styles.loader} />;
+  if (!location || loading) return <ActivityIndicator size="large" style={styles.loader} />;
 
   return (
     <View style={styles.container}>
