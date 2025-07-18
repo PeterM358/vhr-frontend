@@ -1,5 +1,3 @@
-// PATH: src/api/vehicles.js
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from './config';
 
@@ -45,4 +43,24 @@ export async function getModelsForMake(makeId) {
   });
   if (!res.ok) throw new Error('Failed to fetch models');
   return res.json();
+}
+
+export async function createVehicle(token, data, clientInfo = {}) {
+  const payload = { ...data, ...clientInfo };
+
+  const response = await fetch(`${API_BASE_URL}/api/vehicles/`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Create vehicle failed: ${response.status} ${errorText}`);
+  }
+
+  return await response.json();
 }

@@ -1,16 +1,11 @@
-// PATH: src/screens/CreateRepairScreen.js
-
 import React, { useState, useEffect, useLayoutEffect } from 'react';
 import {
   StyleSheet,
   View,
   SafeAreaView,
-  Pressable,
   ScrollView,
   Alert,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Picker } from '@react-native-picker/picker';
 import {
   Text,
   TextInput,
@@ -19,155 +14,102 @@ import {
   useTheme,
   Portal,
   Dialog,
-  SegmentedButtons,
-  Card,
-  Divider,
 } from 'react-native-paper';
-import { API_BASE_URL } from '../api/config';
-import { createRepair, createShopPart, getShopParts } from '../api/repairs';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Picker } from '@react-native-picker/picker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { createVehicle, getMakes, getModelsForMake } from '../api/vehicles';
 
-export default function CreateRepairScreen({ navigation, route }) {
+export default function CreateVehicleScreen({ navigation, route }) {
   const theme = useTheme();
 
-  // Navigation param for preselect
-  const preselectedVehicleId = route.params?.vehicleId?.toString() || '';
-  const returnedParts = route.params?.addedParts || [];
+  const clientEmail = route?.params?.clientEmail || null;
+  const clientPhone = route?.params?.clientPhone || null;
 
-  const [vehicles, setVehicles] = useState([]);
-  const [repairTypes, setRepairTypes] = useState([]);
-  const [selectedParts, setSelectedParts] = useState([]);
-  const [shopParts, setShopParts] = useState([]);
+  const [makes, setMakes] = useState([]);
+  const [models, setModels] = useState([]);
 
-  const [vehicleId, setVehicleId] = useState(preselectedVehicleId);
-  const [repairTypeId, setRepairTypeId] = useState('');
-  const [description, setDescription] = useState('');
+  const [selectedMake, setSelectedMake] = useState('');
+  const [selectedModel, setSelectedModel] = useState('');
+  const [year, setYear] = useState('');
   const [kilometers, setKilometers] = useState('');
-  const [status, setStatus] = useState('done');
-  const [loading, setLoading] = useState(true);
+  const [licensePlate, setLicensePlate] = useState('');
+  const [fuelType, setFuelType] = useState('');
+  const [gearbox, setGearbox] = useState('');
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
 
-  // Handle returned parts from SelectRepairPartsScreen
-  useEffect(() => {
-    if (returnedParts.length) {
-      setSelectedParts(returnedParts);
-    }
-  }, [returnedParts]);
+  const fuelTypes = ['Petrol', 'Diesel', 'Hybrid', 'Electric', 'LPG', 'CNG', 'Hydrogen', 'Other'];
+  const gearboxTypes = ['Manual', 'Automatic', 'Semi-Automatic', 'CVT', 'Dual-Clutch', 'Other'];
 
   useEffect(() => {
-    const fetchFormData = async () => {
+    const fetchMakes = async () => {
       try {
         const token = await AsyncStorage.getItem('@access_token');
-        const [vehicleRes, typeRes, shopPartsData] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/vehicles/`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${API_BASE_URL}/api/repairs/types/`, { headers: { Authorization: `Bearer ${token}` } }),
-          getShopParts(token),
-        ]);
-
-        if (!vehicleRes.ok || !typeRes.ok) throw new Error('Failed to fetch form data');
-
-        const vehicleData = await vehicleRes.json();
-        const typeData = await typeRes.json();
-
-        setVehicles(vehicleData);
-        setRepairTypes(typeData);
-        setShopParts(shopPartsData);
-
-        if (!preselectedVehicleId && vehicleData.length > 0) setVehicleId(vehicleData[0].id.toString());
-        if (typeData.length > 0) setRepairTypeId(typeData[0].id.toString());
+        const data = await getMakes(token);
+        setMakes(data);
+        if (data.length > 0) setSelectedMake(data[0].id.toString());
       } catch (err) {
         console.error(err);
-        setDialogMessage('Error loading form data');
+        setDialogMessage('Error loading vehicle makes');
         setDialogVisible(true);
       } finally {
         setLoading(false);
       }
     };
-    fetchFormData();
+    fetchMakes();
   }, []);
 
-  useLayoutEffect(() => {
-    const handleHeaderSave = () => {
-      if (!vehicleId) {
-        setDialogMessage('Vehicle is required.');
+  useEffect(() => {
+    const fetchModels = async () => {
+      if (!selectedMake) return;
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        const data = await getModelsForMake(selectedMake, token);
+        setModels(data);
+        if (data.length > 0) setSelectedModel(data[0].id.toString());
+      } catch (err) {
+        console.error(err);
+        setDialogMessage('Error loading models');
         setDialogVisible(true);
-        return;
       }
-      if (!repairTypeId) {
-        setDialogMessage('Repair type is required.');
-        setDialogVisible(true);
-        return;
-      }
-      saveRepair();
     };
+    fetchModels();
+  }, [selectedMake]);
 
+  useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => (
-        <Button
-          mode="text"
-          compact
-          onPress={handleHeaderSave}
-          labelStyle={{ color: '#fff', fontSize: 16 }}
-        >
-          Save
-        </Button>
-      ),
+      headerTitle: 'Add Vehicle',
+      headerStyle: { backgroundColor: theme.colors.primary },
+      headerTintColor: theme.colors.onPrimary,
     });
-  }, [navigation, vehicleId, repairTypeId, description, kilometers, status, selectedParts]);
+  }, [navigation, theme.colors.primary, theme.colors.onPrimary]);
 
-  const openAddPartsScreen = () => {
-    navigation.navigate('SelectRepairPartsScreen', {
-      returnTo: 'CreateRepairScreen',
-    });
-  };
+  const handleSave = async () => {
+    if (!selectedMake || !selectedModel || !year) {
+      Alert.alert('Validation', 'Make, Model, and Year are required.');
+      return;
+    }
 
-  const saveRepair = async () => {
     setSaving(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
-      const shopProfileId = await AsyncStorage.getItem('@shop_profile_id');
+      await createVehicle(token, {
+        make: parseInt(selectedMake),
+        model: parseInt(selectedModel),
+        year: parseInt(year),
+        kilometers: kilometers ? parseInt(kilometers) : 0,
+        license_plate: licensePlate,
+        fuel_type: fuelType,
+        gearbox,
+        client_email: clientEmail || '',
+        client_phone: clientPhone || '',
+      });
 
-      // Check or create ShopParts
-      const repairPartsData = [];
-      for (let part of selectedParts) {
-        if (!part.partsMasterId) continue;
-
-        let shopPart = shopParts.find(sp => sp.part.id === parseInt(part.partsMasterId));
-        if (!shopPart) {
-          // Create new ShopPart if missing
-          shopPart = await createShopPart(token, {
-            shop_profile: parseInt(shopProfileId),
-            part: parseInt(part.partsMasterId),
-            price: part.price || '0',
-            labor: part.labor || '0',
-            shop_sku: '',
-          });
-          setShopParts(prev => [...prev, shopPart]);
-        }
-
-        repairPartsData.push({
-          shop_part_id: shopPart.id,
-          quantity: parseInt(part.quantity),
-          price_per_item_at_use: part.price,
-          note: part.note,
-        });
-      }
-
-      const body = {
-        vehicle: parseInt(vehicleId),
-        repair_type: parseInt(repairTypeId),
-        description,
-        kilometers: kilometers ? parseInt(kilometers) : null,
-        status,
-        repair_parts_data: repairPartsData,
-      };
-
-      await createRepair(token, body);
-
-      setDialogMessage('Repair created!');
+      setDialogMessage('Vehicle created!');
       setDialogVisible(true);
 
       setTimeout(() => {
@@ -197,44 +139,41 @@ export default function CreateRepairScreen({ navigation, route }) {
           enableOnAndroid
           extraScrollHeight={20}
         >
-          <Text variant="labelLarge" style={styles.label}>Vehicle *</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={vehicleId}
-              onValueChange={setVehicleId}
-              style={styles.picker}
-            >
-              {vehicles.map((v) => (
-                <Picker.Item
-                  key={v.id}
-                  label={`${v.license_plate} (${v.make_name} ${v.model_name})`}
-                  value={v.id.toString()}
-                />
-              ))}
-            </Picker>
-          </View>
-
-          <Text variant="labelLarge" style={styles.label}>Repair Type *</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={repairTypeId}
-              onValueChange={setRepairTypeId}
-              style={styles.picker}
-            >
-              {repairTypes.map((t) => (
-                <Picker.Item key={t.id} label={t.name} value={t.id.toString()} />
-              ))}
-            </Picker>
-          </View>
-
-          <Text variant="labelLarge" style={styles.label}>Description</Text>
+          <Text variant="labelLarge" style={styles.label}>License Plate</Text>
           <TextInput
             mode="outlined"
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Optional description"
+            value={licensePlate}
+            onChangeText={setLicensePlate}
+            placeholder="e.g. CA1234AB"
             style={styles.input}
-            multiline
+          />
+
+          <Text variant="labelLarge" style={styles.label}>Make *</Text>
+          <View style={styles.pickerContainer}>
+            <Picker selectedValue={selectedMake} onValueChange={setSelectedMake} style={styles.picker}>
+              {makes.map((m) => (
+                <Picker.Item key={m.id} label={m.name} value={m.id.toString()} />
+              ))}
+            </Picker>
+          </View>
+
+          <Text variant="labelLarge" style={styles.label}>Model *</Text>
+          <View style={styles.pickerContainer}>
+            <Picker selectedValue={selectedModel} onValueChange={setSelectedModel} style={styles.picker}>
+              {models.map((m) => (
+                <Picker.Item key={m.id} label={m.name} value={m.id.toString()} />
+              ))}
+            </Picker>
+          </View>
+
+          <Text variant="labelLarge" style={styles.label}>Year *</Text>
+          <TextInput
+            mode="outlined"
+            value={year}
+            onChangeText={setYear}
+            placeholder="e.g. 2016"
+            keyboardType="numeric"
+            style={styles.input}
           />
 
           <Text variant="labelLarge" style={styles.label}>Kilometers</Text>
@@ -247,58 +186,39 @@ export default function CreateRepairScreen({ navigation, route }) {
             style={styles.input}
           />
 
-          <Text variant="labelLarge" style={styles.label}>Status</Text>
-          <SegmentedButtons
-            value={status}
-            onValueChange={setStatus}
-            buttons={[
-              { value: 'done', label: 'Done', icon: 'check-circle-outline' },
-              { value: 'open', label: 'Open', icon: 'alert-circle-outline' },
-            ]}
-            style={styles.segmented}
-          />
-
-          <Divider style={{ marginVertical: 20 }} />
-
-          <Button mode="contained" onPress={openAddPartsScreen} style={{ marginBottom: 10 }}>
-            Add Parts
-          </Button>
-
-          {selectedParts.length > 0 && (
-            <>
-              <Text variant="titleMedium" style={styles.label}>
-                Selected Parts
-              </Text>
-              {selectedParts.map((part, index) => (
-                <Card key={index} style={styles.partCard}>
-                  <Card.Title title={`${part.name} (${part.brand})`} />
-                  <Card.Content>
-                    <Text>Quantity: {part.quantity}</Text>
-                    <Text>Price: {part.price}</Text>
-                    <Text>Labor: {part.labor}</Text>
-                    <Text>Note: {part.note}</Text>
-                  </Card.Content>
-                </Card>
+          <Text variant="labelLarge" style={styles.label}>Fuel Type</Text>
+          <View style={styles.pickerContainer}>
+            <Picker selectedValue={fuelType} onValueChange={setFuelType} style={styles.picker}>
+              {fuelTypes.map((f) => (
+                <Picker.Item key={f} label={f} value={f} />
               ))}
-            </>
-          )}
+            </Picker>
+          </View>
+
+          <Text variant="labelLarge" style={styles.label}>Gearbox</Text>
+          <View style={styles.pickerContainer}>
+            <Picker selectedValue={gearbox} onValueChange={setGearbox} style={styles.picker}>
+              {gearboxTypes.map((g) => (
+                <Picker.Item key={g} label={g} value={g} />
+              ))}
+            </Picker>
+          </View>
+
+          <Button mode="contained" onPress={handleSave} style={{ marginVertical: 20 }}>
+            Save Vehicle
+          </Button>
 
           {saving && <ActivityIndicator animating size="small" />}
         </KeyboardAwareScrollView>
 
         <Portal>
-          <Dialog
-            visible={dialogVisible}
-            onDismiss={() => setDialogVisible(false)}
-          >
+          <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)}>
             <Dialog.Title>Notice</Dialog.Title>
             <Dialog.Content>
               <Text>{dialogMessage}</Text>
             </Dialog.Content>
             <Dialog.Actions>
-              <Button mode="text" onPress={() => setDialogVisible(false)}>
-                OK
-              </Button>
+              <Button mode="text" onPress={() => setDialogVisible(false)}>OK</Button>
             </Dialog.Actions>
           </Dialog>
         </Portal>
@@ -318,7 +238,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   input: {
-    marginBottom: 8,
+    marginBottom: 12,
   },
   pickerContainer: {
     borderWidth: 1,
@@ -329,14 +249,5 @@ const styles = StyleSheet.create({
   },
   picker: {
     width: '100%',
-  },
-  segmented: {
-    marginVertical: 12,
-    alignSelf: 'center',
-    width: '90%',
-  },
-  partCard: {
-    marginVertical: 6,
-    padding: 10,
   },
 });

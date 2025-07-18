@@ -19,35 +19,14 @@ export default function ClientVehiclesScreen({ navigation }) {
     fetchIsShop();
   }, []);
 
-  // Set custom back button in header depending on user type
+  // Set header title and colors only
   useLayoutEffect(() => {
     navigation.setOptions({
       headerStyle: { backgroundColor: theme.colors.primary },
       headerTintColor: theme.colors.onPrimary,
       headerTitle: 'My Vehicles',
-      headerLeft: () => (
-        <IconButton
-          icon="home"
-          size={28}
-          onPress={() => {
-            if (isShop) {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'AuthorizedClients' }],
-              });
-            } else {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Home' }],
-              });
-            }
-          }}
-          iconColor={theme.colors.onPrimary}
-          style={{ marginLeft: 8 }}
-        />
-      ),
     });
-  }, [navigation, isShop, theme.colors.primary, theme.colors.onPrimary]);
+  }, [navigation, theme.colors.primary, theme.colors.onPrimary]);
 
   useEffect(() => {
     const fetchVehicles = async () => {
