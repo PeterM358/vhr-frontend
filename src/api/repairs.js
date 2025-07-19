@@ -1,5 +1,3 @@
-// PATH: /api/repairs.js
-
 import { API_BASE_URL } from './config';
 
 // ✅ Get all repairs
@@ -113,18 +111,42 @@ export async function updateRepairPart(token, repairId, repairPartId, data) {
   return await response.json();
 }
 
-// ✅ Get messages for a repair
-export async function getRepairMessages(token, repairId) {
-  const response = await fetch(`${API_BASE_URL}/api/repairs/repair/${repairId}/messages/`, {
-    headers: { Authorization: `Bearer ${token}` },
+// ✅ Get or create RepairChat
+export async function getOrCreateRepairChat(token, repairId, shopId = null) {
+  if (!shopId) {
+    // Client fetching existing chats
+    const response = await fetch(`${API_BASE_URL}/api/repairs/repair-chats/?repair=${repairId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Failed to fetch repair chats');
+    return await response.json();
+  }
+
+  // Shop creating chat
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair-chats/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ repair: repairId, shop: shopId }),
   });
-  if (!response.ok) throw new Error('Failed to fetch messages');
+  if (!response.ok) throw new Error('Failed to get/create chat');
   return await response.json();
 }
 
-// ✅ Send message
-export async function sendRepairMessage(token, repairId, data) {
-  const response = await fetch(`${API_BASE_URL}/api/repairs/repair/${repairId}/messages/`, {
+// ✅ Get messages for a chat
+export async function getRepairChatMessages(token, chatId) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair-chats/${chatId}/messages/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch chat messages');
+  return await response.json();
+}
+
+// ✅ Send a message in chat
+export async function sendRepairChatMessage(token, chatId, data) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair-chats/${chatId}/messages/`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -132,6 +154,23 @@ export async function sendRepairMessage(token, repairId, data) {
     },
     body: JSON.stringify(data),
   });
-  if (!response.ok) throw new Error('Failed to send message');
+  if (!response.ok) throw new Error('Failed to send chat message');
+  return await response.json();
+}
+// ✅ Get all chats for a repair (for client side)
+export async function getRepairChatsByRepairId(token, repairId) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair-chats/?repair=${repairId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch repair chats');
+  return await response.json();
+}
+
+// ✅ Get a specific chat by ID
+export async function getRepairChatById(token, chatId) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair-chats/${chatId}/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch repair chat');
   return await response.json();
 }

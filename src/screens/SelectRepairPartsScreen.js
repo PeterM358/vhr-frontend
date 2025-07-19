@@ -168,18 +168,24 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
 
       console.log('Returning to:', route.params?.returnTo, 'with repairId:', route.params?.repairId);
 
-      navigation.navigate({
-        name: route.params?.returnTo || 'RepairChat',
-        merge: true,
-        params: {
-          addedParts: cleanedParts,
-          repairId: route.params?.repairId,
-          vehicleId,
-          repairTypeId,
-          description,
-          kilometers,
-          status,
-        },
+      navigation.reset({
+        index: 2,
+        routes: [
+          { name: 'Home' },
+          { name: 'RepairsList' },
+          {
+            name: 'RepairDetail',
+            params: {
+              addedParts: cleanedParts,
+              repairId: route.params?.repairId,
+              vehicleId,
+              repairTypeId,
+              description,
+              kilometers,
+              status,
+            },
+          },
+        ],
       });
     };
 
