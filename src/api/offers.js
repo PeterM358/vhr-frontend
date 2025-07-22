@@ -74,6 +74,12 @@ export async function getOffersForRepair(token, repairId) {
 
 // Update an existing offer (for shop users)
 export async function updateOffer(token, offerId, payload) {
+  const shopId = await AsyncStorage.getItem('@current_shop_id');
+  if (!shopId) {
+    throw new Error('No current shop selected. Please choose a shop.');
+  }
+  payload.shop_profile_id = parseInt(shopId);
+
   const response = await fetch(`${API_BASE_URL}/api/offers/${offerId}/`, {
     method: 'PATCH',
     headers: {
@@ -133,6 +139,12 @@ export async function getMyOffers(token) {
 
 
 export async function createOffer(token, payload) {
+  const shopId = await AsyncStorage.getItem('@current_shop_id');
+  if (!shopId) {
+    throw new Error('No current shop selected. Please choose a shop.');
+  }
+  payload.shop_profile_id = parseInt(shopId);
+
   const response = await fetch(`${API_BASE_URL}/api/offers/`, {
     method: 'POST',
     headers: {

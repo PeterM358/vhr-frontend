@@ -1,7 +1,9 @@
-// PATH: src/api/auth.js
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../env';
+import { getFirebaseToken } from '../notifications/firebaseMessaging';
+import { sendFirebaseTokenToBackend } from './notifications';
+
 
 // ✅ Register
 export const register = async (emailOrPhone, password, isClient, isShop) => {
@@ -45,6 +47,21 @@ export const login = async (emailOrPhone, password) => {
     console.log('🟢 Login response received:', response.data);
 
     await storeLoginData(response.data, emailOrPhone.trim());
+
+    // Retrieve token from AsyncStorage after it's saved
+    const access = await AsyncStorage.getItem('@access_token');
+    const userId = response.data.user_id;
+    const isShop = response.data.is_shop;
+    const shopProfiles = response.data.shop_profiles;
+
+    const fcmToken = await getFirebaseToken();
+    console.log('📲 FCM Token:', fcmToken);
+    console.log('🔐 Retrieved access token:', access);
+
+    if (fcmToken && access) {
+      const shopProfileId = isShop && Array.isArray(shopProfiles) && shopProfiles.length > 0 ? shopProfiles[0].id : null;
+      await sendFirebaseTokenToBackend(fcmToken, userId, shopProfileId, access);
+    }
 
     return response.data;
   } catch (error) {

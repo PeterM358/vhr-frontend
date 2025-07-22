@@ -1,10 +1,11 @@
-// PATH: src/screens/LoginScreen.js
-
 import React, { useState, useEffect, useContext } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View, Platform } from 'react-native';
 import { Text, TextInput, Button, ActivityIndicator, useTheme } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { login } from '../api/auth';
+import { sendFirebaseTokenToBackend } from '../api/notifications';
+
+import { getFirebaseToken } from '../notifications/firebaseMessaging';
 import { AuthContext } from '../context/AuthManager';
 import Logo from '../../assets/logo.svg';
 import { STORAGE_KEYS } from '../constants/storageKeys'; // ✅ Make sure you have these constants
@@ -57,7 +58,9 @@ export default function LoginScreen({ navigation }) {
         console.log('⚠️ No shop profiles found');
       }
 
+
       const target = data.is_shop ? 'ShopHome' : 'Home';
+
       navigation.reset({ index: 0, routes: [{ name: target }] });
     } catch (err) {
       console.error('❌ Login error', err);

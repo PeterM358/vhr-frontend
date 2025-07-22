@@ -10,8 +10,8 @@ const ENV = __DEV__ ? 'dev' : 'prod';
  */
 const CONFIG = {
   dev: {
-    API_BASE_URL: 'http://192.168.0.104:8000',  // YOUR LOCAL LAN IP
-    WS_BASE_URL: 'ws://192.168.0.104:8001',
+    API_BASE_URL: 'http://192.168.0.103:8000',  // YOUR LOCAL LAN IP
+    WS_BASE_URL: 'ws://192.168.0.103:8001',
   },
   prod: {
     API_BASE_URL: 'https://your-production-api.com',

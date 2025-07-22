@@ -741,27 +741,61 @@ export default function RepairDetailScreen({ route, navigation }) {
         }
         contentContainerStyle={styles.listContent}
       />
-      {/* Floating button for shops to send offer */}
+      {/* Floating buttons for shops: Send Offer and Test Notification */}
       {isShop && (
-        <Button
-          icon="plus"
-          mode="contained"
-          onPress={() =>
-            navigation.navigate('CreateOrUpdateOffer', {
-              repairId,
-              returnTo: 'RepairsList',
-            })
-          }
-          style={{
-            position: 'absolute',
-            bottom: 20,
-            right: 20,
-            borderRadius: 30,
-            padding: 6,
-          }}
-        >
-          Send Offer
-        </Button>
+        <>
+          <Button
+            icon="plus"
+            mode="contained"
+            onPress={() =>
+              navigation.navigate('CreateOrUpdateOffer', {
+                repairId,
+                returnTo: 'RepairsList',
+              })
+            }
+            style={{
+              position: 'absolute',
+              bottom: 80,
+              right: 20,
+              borderRadius: 30,
+              padding: 6,
+            }}
+          >
+            Send Offer
+          </Button>
+
+          <Button
+            icon="bell"
+            mode="outlined"
+            onPress={async () => {
+              console.log('📣 Scheduling local notification...');
+              try {
+                const result = await Notifications.scheduleNotificationAsync({
+                  content: {
+                    title: '🔔 Local Test',
+                    body: 'This is a local scheduled notification',
+                    data: { dummy: true },
+                  },
+                  trigger: { seconds: 5 },
+                });
+                console.log('✅ Notification scheduled:', result);
+                Alert.alert('Scheduled', 'Test notification will fire in 5 seconds');
+              } catch (err) {
+                console.error('❌ Failed to schedule notification:', err);
+                Alert.alert('Error', 'Could not schedule notification.');
+              }
+            }}
+            style={{
+              position: 'absolute',
+              bottom: 20,
+              right: 20,
+              borderRadius: 30,
+              padding: 6,
+            }}
+          >
+            Test Notification
+          </Button>
+        </>
       )}
     </View>
   );
