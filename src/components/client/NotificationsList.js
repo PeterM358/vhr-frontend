@@ -53,9 +53,11 @@ export default function NotificationsList() {
   };
 
   const mergedNotificationsMap = new Map();
-  [...remoteNotifications, ...liveNotifications].forEach((notif) =>
-    mergedNotificationsMap.set(notif.id, notif)
-  );
+  [...remoteNotifications, ...liveNotifications].forEach((notif) => {
+    if (!mergedNotificationsMap.has(notif.id)) {
+      mergedNotificationsMap.set(notif.id, notif);
+    }
+  });
   const mergedNotifications = Array.from(mergedNotificationsMap.values())
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 

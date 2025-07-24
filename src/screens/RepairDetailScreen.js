@@ -24,7 +24,6 @@ import {
   deleteRepairPart,
   updateRepairPart,
   updateRepair,
-  confirmRepair,
   getOrCreateRepairChat,
   getRepairChatMessages,
   sendRepairChatMessage,
@@ -54,6 +53,7 @@ export default function RepairDetailScreen({ route, navigation }) {
     price: '',
     note: '',
   });
+  const [shopDescription, setShopDescription] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [isShop, setIsShop] = useState(false);
@@ -75,6 +75,10 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [expandedChats, setExpandedChats] = useState({});
 
   const handleUpdateRepair = async () => {
+    if (repair.status === 'done') {
+      Alert.alert("This repair is completed and can no longer be edited.");
+      return;
+    }
     console.log("💾 Save button clicked");
     const partsToSend = selectedParts.length > 0 ? selectedParts : repairParts;
     try {
@@ -90,6 +94,7 @@ export default function RepairDetailScreen({ route, navigation }) {
 
       const body = {
         description: editDescription,
+        shop_description: shopDescription,
         repair_parts_data: repairPartsData,
       };
       console.log('📦 Body to send:', JSON.stringify(body, null, 2));
@@ -152,6 +157,7 @@ export default function RepairDetailScreen({ route, navigation }) {
 
         setRepair(repairData);
         setEditDescription(repairData.description || '');
+        setShopDescription(repairData.shop_description || '');
         const offersData = await getOffersForRepair(token, repairId);
         setOffers(offersData);
 
@@ -268,8 +274,8 @@ export default function RepairDetailScreen({ route, navigation }) {
   };
 
   const isMyShopRepair = useMemo(() => {
-    return isShop && repair && repair.shop === shopUserId;
-  }, [isShop, repair, shopUserId]);
+    return isShop && repair && repair.shop_profile === shopProfileId;
+  }, [isShop, repair, shopProfileId]);
 
   const handleAddPart = async () => {
     if (!newPart.shopPartId) {
@@ -379,6 +385,26 @@ export default function RepairDetailScreen({ route, navigation }) {
     return <ActivityIndicator size="large" style={{ flex: 1 }} />;
   }
 
+  // Debugging: Button/visibility debug logs for shops
+  console.log("🔍 isShop:", isShop);
+  console.log("🔍 repair.status:", repair?.status);
+  console.log("🔍 repair.shop_profile:", repair?.shop_profile);
+  console.log("🔍 shopProfileId:", shopProfileId);
+  if (repair && isShop) {
+    console.log("🧠 DEBUG MATCH:", {
+      status: repair.status,
+      repairShop: repair.shop_profile,
+      myShop: shopProfileId,
+      isOwner: repair.shop_profile === shopProfileId,
+    });
+  }
+
+  // Show minimal view if only limited serializer returned (for shops)
+  if (!repair.vehicle_license_plate) {
+    const LimitedRepairView = require('./RepairDetailLimitedScreen').default;
+    return <LimitedRepairView repair={repair} />;
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <FlatList
@@ -390,7 +416,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                 subtitle={`${repair.vehicle_make} ${repair.vehicle_model} (${repair.vehicle_license_plate})`}
                 right={(props) => (
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    {isShop && repair.status !== 'done' && (
+                    {isShop && repair && repair.status === 'ongoing' && repair.shop_profile === shopProfileId && (
                       <Button
                         compact
                         mode="contained"
@@ -400,7 +426,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                         }}
                         style={{ marginRight: 8 }}
                       >
-                        Save
+                        Update
                       </Button>
                     )}
                     <Button onPress={() => toggleSection('repair')}>
@@ -422,33 +448,39 @@ export default function RepairDetailScreen({ route, navigation }) {
                   {/* Parts Used section inside the Repair Card */}
                   <Divider style={{ marginVertical: 12 }} />
                   <Text variant="titleSmall" style={{ marginBottom: 6 }}>Parts Used</Text>
-                  <View style={{ alignItems: 'flex-start', marginBottom: 8 }}>
-                    <Button
-                      mode="outlined"
-                      onPress={() => {
-                        navigation.navigate('SelectRepairParts', {
-                          currentParts: (selectedParts.length > 0 ? selectedParts : repairParts).map(p => ({
-                            partsMasterId: p.partsMasterId || p.part_master || p.part_master_detail?.id || p.partsMaster?.id || p.shop_part?.part?.id,
-                            shopPartId: p.shopPartId || p.shop_part_id || p.shop_part?.id,
-                            quantity: p.quantity || 1,
-                            price: p.price || p.price_per_item_at_use || '',
-                            labor: p.labor || p.labor_cost || '',
-                            note: p.note || '',
-                            partsMaster: p.partsMaster || p.part_master_detail || p.parts_master_detail || p.shop_part_detail?.part || {},
-                          })),
-                          vehicleId: repair.vehicle?.toString() || '',
-                          repairTypeId: repair.repair_type?.toString() || '',
-                          description: editDescription || '',
-                          kilometers: repair.kilometers?.toString() || '',
-                          status: repair.status || 'open',
-                          returnTo: 'RepairDetail',
-                          repairId: repairId,
-                        });
-                      }}
-                    >
-                      Manage Parts
-                    </Button>
-                  </View>
+                  {isShop && repair && repair.status === 'ongoing' && repair.shop_profile === shopProfileId && (
+                    <View style={{ alignItems: 'flex-start', marginBottom: 8 }}>
+                      <Button
+                        mode="outlined"
+                        onPress={() => {
+                          if (repair.status === 'done') {
+                            Alert.alert("This repair is completed and can no longer be edited.");
+                            return;
+                          }
+                          navigation.navigate('SelectRepairParts', {
+                            currentParts: (selectedParts.length > 0 ? selectedParts : repairParts).map(p => ({
+                              partsMasterId: p.partsMasterId || p.part_master || p.part_master_detail?.id || p.partsMaster?.id || p.shop_part?.part?.id,
+                              shopPartId: p.shopPartId || p.shop_part_id || p.shop_part?.id,
+                              quantity: p.quantity || 1,
+                              price: p.price || p.price_per_item_at_use || '',
+                              labor: p.labor || p.labor_cost || '',
+                              note: p.note || '',
+                              partsMaster: p.partsMaster || p.part_master_detail || p.parts_master_detail || p.shop_part_detail?.part || {},
+                            })),
+                            vehicleId: repair.vehicle?.toString() || '',
+                            repairTypeId: repair.repair_type?.toString() || '',
+                            description: editDescription || '',
+                            kilometers: repair.kilometers?.toString() || '',
+                            status: repair.status || 'open',
+                            returnTo: 'RepairDetail',
+                            repairId: repairId,
+                          });
+                        }}
+                      >
+                        Manage Parts
+                      </Button>
+                    </View>
+                  )}
                   {(selectedParts.length > 0 ? selectedParts : repairParts).length === 0 ? (
                     <Text style={{ fontStyle: 'italic', color: 'gray' }}>No parts recorded yet.</Text>
                   ) : (
@@ -484,27 +516,18 @@ export default function RepairDetailScreen({ route, navigation }) {
                     </>
                   )}
 
-                  {isMyShopRepair && (
+                  {(isMyShopRepair || (isShop && repair.status === 'ongoing' && repair.shop_profile === shopProfileId)) && (
                     <>
-                      <Divider style={{ marginVertical: 12 }} />
-                      <Text variant="titleSmall">Edit Description</Text>
-                      <TextInput
-                        mode="outlined"
-                        placeholder="New description"
-                        value={editDescription}
-                        onChangeText={setEditDescription}
-                        style={styles.input}
-                      />
-                      <Button mode="contained" onPress={async () => {
-                        await updateRepair(await AsyncStorage.getItem('@access_token'), repairId, { description: editDescription });
-                        Alert.alert('Updated', 'Description saved.');
-                        await refreshRepair();
-                      }} style={styles.button}>
-                        Save Changes
-                      </Button>
-
-                      {repair.status === 'ongoing' && (
+                      {repair.status === 'ongoing' && isShop && repair.shop_profile === shopProfileId && (
                         <>
+                          <TextInput
+                            mode="outlined"
+                            placeholder="Shop Notes"
+                            value={shopDescription}
+                            onChangeText={setShopDescription}
+                            style={styles.input}
+                            multiline
+                          />
                           <TextInput
                             mode="outlined"
                             placeholder="Final kilometers"
@@ -516,7 +539,32 @@ export default function RepairDetailScreen({ route, navigation }) {
                           <Button
                             mode="contained"
                             buttonColor="green"
-                            onPress={handleConfirmRepair}
+                            onPress={() => {
+                              Alert.alert(
+                                'Confirm Completion',
+                                'Are you sure you want to mark this repair as done? You will not be able to update it afterwards.',
+                                [
+                                  {
+                                    text: 'Cancel',
+                                    style: 'cancel',
+                                  },
+                                  {
+                                    text: 'Yes, Mark as Done',
+                                    style: 'destructive',
+                                    onPress: async () => {
+                                      if (repair.status === 'done') {
+                                        Alert.alert("This repair is already completed.");
+                                        return;
+                                      }
+                                      const token = await AsyncStorage.getItem('@access_token');
+                                      await updateRepair(token, repairId, { status: 'done' });
+                                      Alert.alert('Success', 'Repair marked as done.');
+                                      await refreshRepair();
+                                    },
+                                  },
+                                ]
+                              );
+                            }}
                           >
                             Confirm as Done
                           </Button>
@@ -614,46 +662,56 @@ export default function RepairDetailScreen({ route, navigation }) {
               )}
             </Card>
 
-            {/* Shop: Start Chat with Client button (only if no chatId and no chat messages) */}
-            {isShop && !chatId && chatMessages.length === 0 && (
-              <Button
-                mode="contained"
-                style={{ marginHorizontal: 10, marginVertical: 10 }}
-                onPress={handleStartChat}
-              >
-                Chat
-              </Button>
-            )}
-
-            {/* Shop: Show chat directly after button if chat started */}
-            {isShop && chatId && chatMessages.length > 0 && (
-              <Card style={{ marginHorizontal: 10, marginBottom: 10 }} mode="outlined">
-                <Card.Title title="Chat with Client" />
-                <Card.Content>
-                  {chatMessages.map((msg) => (
-                    <View key={msg.id} style={{ marginBottom: 8 }}>
-                      <Text style={{ fontWeight: 'bold' }}>{msg.sender_email || 'Unknown'}</Text>
-                      <Text>{msg.text}</Text>
-                      <Text style={{ fontSize: 10, color: '#666' }}>{new Date(msg.created_at).toLocaleString()}</Text>
-                    </View>
-                  ))}
-                  <TextInput
-                    mode="outlined"
-                    label="Write a message"
-                    value={newChatMessage}
-                    onChangeText={setNewChatMessage}
-                    style={{ marginTop: 10 }}
-                  />
-                  <Button
-                    mode="contained"
-                    onPress={handleSendChatMessage}
-                    loading={sendingMessage}
-                    disabled={sendingMessage || !newChatMessage.trim()}
-                    style={{ marginTop: 10 }}
-                  >
-                    Send
-                  </Button>
-                </Card.Content>
+            {/* Shop: Expandable Chat section with client */}
+            {isShop && (
+              <Card mode="outlined" style={styles.headerCard}>
+                <Card.Title
+                  title="Chat with Client"
+                  right={(props) => (
+                    <Button onPress={() => toggleSection('chats')}>
+                      {sectionExpanded.chats ? 'Hide' : 'Show'}
+                    </Button>
+                  )}
+                />
+                {sectionExpanded.chats && (
+                  <Card.Content>
+                    {!chatId ? (
+                      <Button mode="contained" onPress={handleStartChat}>
+                        Start Chat
+                      </Button>
+                    ) : (
+                      <>
+                        {chatMessages.length === 0 ? (
+                          <Text>No messages yet.</Text>
+                        ) : (
+                          chatMessages.map((msg) => (
+                            <View key={msg.id} style={{ marginBottom: 8 }}>
+                              <Text style={{ fontWeight: 'bold' }}>{msg.sender_email || 'Unknown'}</Text>
+                              <Text>{msg.text}</Text>
+                              <Text style={{ fontSize: 10, color: '#666' }}>{new Date(msg.created_at).toLocaleString()}</Text>
+                            </View>
+                          ))
+                        )}
+                        <TextInput
+                          mode="outlined"
+                          label="Write a message"
+                          value={newChatMessage}
+                          onChangeText={setNewChatMessage}
+                          style={{ marginTop: 10 }}
+                        />
+                        <Button
+                          mode="contained"
+                          onPress={handleSendChatMessage}
+                          loading={sendingMessage}
+                          disabled={sendingMessage || !newChatMessage.trim()}
+                          style={{ marginTop: 10 }}
+                        >
+                          Send
+                        </Button>
+                      </>
+                    )}
+                  </Card.Content>
+                )}
               </Card>
             )}
 
@@ -671,65 +729,67 @@ export default function RepairDetailScreen({ route, navigation }) {
                 {sectionExpanded.chats && (
                   <Card.Content>
                     {/* Client: List repair chats from shops, collapsible per chat */}
-                    {repairChats.length > 0 && (
+                    {repairChats.filter((chat) => (chat.messages && chat.messages.length > 0)).length > 0 && (
                       <>
                         <Text style={styles.sectionTitle}>Chats from Shops</Text>
-                        {repairChats.map((chat) => {
-                          const isExpanded = expandedChats[chat.id];
-                          return (
-                            <Card
-                              key={chat.id}
-                              style={{ marginHorizontal: 10, marginBottom: 10 }}
-                              onPress={async () => {
-                                if (!isExpanded) {
-                                  const token = await AsyncStorage.getItem('@access_token');
-                                  const messages = await getRepairChatMessages(token, chat.id);
-                                  setSelectedChatId(chat.id);
-                                  setChatMessages(messages);
-                                }
-                                setExpandedChats(prev => ({ ...prev, [chat.id]: !isExpanded }));
-                              }}
-                            >
-                              <Card.Title
-                                title={chat.shop_name || `Shop #${chat.shop_id}`}
-                                subtitle={isExpanded ? 'Tap to collapse' : 'Tap to view chat'}
-                              />
-                              {isExpanded && (
-                                <Card.Content>
-                                  {chatMessages.length === 0 ? (
-                                    <Text>No messages yet.</Text>
-                                  ) : (
-                                    chatMessages.map((msg) => (
-                                      <View key={msg.id} style={{ marginBottom: 8 }}>
-                                        <Text style={{ fontWeight: 'bold' }}>{msg.sender_email || 'Unknown'}</Text>
-                                        <Text>{msg.text}</Text>
-                                        <Text style={{ fontSize: 10, color: '#666' }}>{new Date(msg.created_at).toLocaleString()}</Text>
-                                      </View>
-                                    ))
-                                  )}
-                                  <TextInput
-                                    mode="outlined"
-                                    label="Your message"
-                                    value={newChatMessage}
-                                    onChangeText={setNewChatMessage}
-                                    style={{ marginTop: 10 }}
-                                  />
-                                  <Button
-                                    mode="contained"
-                                    onPress={handleSendChatMessage}
-                                    loading={sendingMessage}
-                                    disabled={sendingMessage || !newChatMessage.trim()}
-                                    style={{ marginTop: 10 }}
-                                  >
-                                    Send
-                                  </Button>
-                                </Card.Content>
-                              )}
-                            </Card>
-                          );
-                        })}
+                        {repairChats
+                          .filter((chat) => (chat.messages && chat.messages.length > 0))
+                          .map((chat) => {
+                            const isExpanded = expandedChats[chat.id];
+                            return (
+                              <Card
+                                key={chat.id}
+                                style={{ marginHorizontal: 10, marginBottom: 10 }}
+                                onPress={async () => {
+                                  if (!isExpanded) {
+                                    const token = await AsyncStorage.getItem('@access_token');
+                                    const messages = await getRepairChatMessages(token, chat.id);
+                                    setSelectedChatId(chat.id);
+                                    setChatMessages(messages);
+                                  }
+                                  setExpandedChats(prev => ({ ...prev, [chat.id]: !isExpanded }));
+                                }}
+                              >
+                                <Card.Title
+                                  title={chat.shop_name || `Shop #${chat.shop_id}`}
+                                  subtitle={isExpanded ? 'Tap to collapse' : 'Tap to view chat'}
+                                />
+                                {isExpanded && (
+                                  <Card.Content>
+                                    {chatMessages.length === 0 ? (
+                                      <Text>No messages yet.</Text>
+                                    ) : (
+                                      chatMessages.map((msg) => (
+                                        <View key={msg.id} style={{ marginBottom: 8 }}>
+                                          <Text style={{ fontWeight: 'bold' }}>{msg.sender_email || 'Unknown'}</Text>
+                                          <Text>{msg.text}</Text>
+                                          <Text style={{ fontSize: 10, color: '#666' }}>{new Date(msg.created_at).toLocaleString()}</Text>
+                                        </View>
+                                      ))
+                                    )}
+                                    <TextInput
+                                      mode="outlined"
+                                      label="Your message"
+                                      value={newChatMessage}
+                                      onChangeText={setNewChatMessage}
+                                      style={{ marginTop: 10 }}
+                                    />
+                                    <Button
+                                      mode="contained"
+                                      onPress={handleSendChatMessage}
+                                      loading={sendingMessage}
+                                      disabled={sendingMessage || !newChatMessage.trim()}
+                                      style={{ marginTop: 10 }}
+                                    >
+                                      Send
+                                    </Button>
+                                  </Card.Content>
+                                )}
+                              </Card>
+                            );
+                          })}
                         <Text style={{ marginLeft: 12, marginBottom: 8 }}>
-                          {repairChats.length} shop(s) have messaged you.
+                          {repairChats.filter((chat) => (chat.messages && chat.messages.length > 0)).length} shop(s) have messaged you.
                         </Text>
                       </>
                     )}
@@ -741,61 +801,67 @@ export default function RepairDetailScreen({ route, navigation }) {
         }
         contentContainerStyle={styles.listContent}
       />
-      {/* Floating buttons for shops: Send Offer and Test Notification */}
-      {isShop && (
-        <>
-          <Button
-            icon="plus"
-            mode="contained"
-            onPress={() =>
-              navigation.navigate('CreateOrUpdateOffer', {
-                repairId,
-                returnTo: 'RepairsList',
-              })
+      {/* Floating button for shops: Send Offer (only if repair is open) */}
+      {isShop && repair && repair.status === 'open' && (
+        <Button
+          icon="plus"
+          mode="contained"
+          onPress={() =>
+            navigation.navigate('CreateOrUpdateOffer', {
+              repairId,
+              returnTo: 'RepairsList',
+            })
+          }
+          style={{
+            position: 'absolute',
+            bottom: 80,
+            right: 20,
+            borderRadius: 30,
+            padding: 6,
+          }}
+        >
+          Send Offer
+        </Button>
+      )}
+      {/* Floating button for ongoing repair editing (Edit Parts) */}
+      {isShop && repair && repair.status === 'ongoing' && repair.shop_profile === shopProfileId && (
+        <Button
+          icon="wrench"
+          mode="contained"
+          onPress={() => {
+            if (repair.status === 'done') {
+              Alert.alert("This repair is completed and can no longer be edited.");
+              return;
             }
-            style={{
-              position: 'absolute',
-              bottom: 80,
-              right: 20,
-              borderRadius: 30,
-              padding: 6,
-            }}
-          >
-            Send Offer
-          </Button>
-
-          <Button
-            icon="bell"
-            mode="outlined"
-            onPress={async () => {
-              console.log('📣 Scheduling local notification...');
-              try {
-                const result = await Notifications.scheduleNotificationAsync({
-                  content: {
-                    title: '🔔 Local Test',
-                    body: 'This is a local scheduled notification',
-                    data: { dummy: true },
-                  },
-                  trigger: { seconds: 5 },
-                });
-                console.log('✅ Notification scheduled:', result);
-                Alert.alert('Scheduled', 'Test notification will fire in 5 seconds');
-              } catch (err) {
-                console.error('❌ Failed to schedule notification:', err);
-                Alert.alert('Error', 'Could not schedule notification.');
-              }
-            }}
-            style={{
-              position: 'absolute',
-              bottom: 20,
-              right: 20,
-              borderRadius: 30,
-              padding: 6,
-            }}
-          >
-            Test Notification
-          </Button>
-        </>
+            navigation.navigate('SelectRepairParts', {
+              currentParts: (selectedParts.length > 0 ? selectedParts : repairParts).map(p => ({
+                partsMasterId: p.partsMasterId || p.part_master || p.part_master_detail?.id || p.partsMaster?.id || p.shop_part?.part?.id,
+                shopPartId: p.shopPartId || p.shop_part_id || p.shop_part?.id,
+                quantity: p.quantity || 1,
+                price: p.price || p.price_per_item_at_use || '',
+                labor: p.labor || p.labor_cost || '',
+                note: p.note || '',
+                partsMaster: p.partsMaster || p.part_master_detail || p.parts_master_detail || p.shop_part_detail?.part || {},
+              })),
+              vehicleId: repair.vehicle?.toString() || '',
+              repairTypeId: repair.repair_type?.toString() || '',
+              description: editDescription || '',
+              kilometers: repair.kilometers?.toString() || '',
+              status: repair.status || 'open',
+              returnTo: 'RepairDetail',
+              repairId: repairId,
+            });
+          }}
+          style={{
+            position: 'absolute',
+            bottom: 140,
+            right: 20,
+            borderRadius: 30,
+            padding: 6,
+          }}
+        >
+          Edit Parts
+        </Button>
       )}
     </View>
   );

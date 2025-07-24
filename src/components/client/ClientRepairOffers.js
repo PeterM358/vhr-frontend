@@ -9,6 +9,7 @@ import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { API_BASE_URL } from '../../api/config';
 import { WebSocketContext } from '../../context/WebSocketManager';
 import { markNotificationRead } from '../../api/notifications';
+import { markOfferSeen } from '../../api/offers';
 import { FlatList } from 'react-native';
 import { Card, Text, ActivityIndicator, useTheme } from 'react-native-paper';
 
@@ -66,16 +67,16 @@ export default function ClientRepairOffers() {
         );
       }
 
-      navigation.navigate('RepairChat', { repairId: item.repair });
+      await markOfferSeen(token, item.id);
+
+      navigation.navigate('RepairDetail', { repairId: item.repair });
     } catch (err) {
       Alert.alert('Error', 'Could not open detail');
     }
   };
 
   const renderItem = ({ item }) => {
-  const isUnread = notifications.some(
-    n => !n.is_read && n.repair === item.repair
-  );
+  const isUnread = !item.is_seen_by_client;
   const isBooked = item.is_booked;
 
   let opacity = isUnread || isBooked ? 1 : 0.4;

@@ -52,9 +52,12 @@ export default function NotificationsList() {
         await fetchNotifications();
       }
 
-      if (item.repair) {
-        navigation.navigate('RepairChat', { repairId: item.repair });
+      // Use repairId from either item.repair or item.data?.repair
+      const repairId = item?.repair ?? item?.data?.repair_id;
+      if (repairId) {
+        navigation.navigate('RepairDetail', { repairId });
       } else {
+        console.warn('🔗 Notification missing repairId', item);
         Alert.alert('Info', 'No linked repair for this notification.');
       }
     } catch (err) {

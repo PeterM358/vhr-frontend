@@ -55,7 +55,7 @@ export default function ClientPromotions({ navigation }) {
       const token = await AsyncStorage.getItem('@access_token');
 
       const unreadNotifs = notifications.filter(
-        n => !n.is_read && n.offer === item.id
+        n => !n.is_read && n.offer === item.id && n.is_promotion
       );
 
       for (const notif of unreadNotifs) {
@@ -64,7 +64,7 @@ export default function ClientPromotions({ navigation }) {
 
       setNotifications(prev =>
         prev.map(n =>
-          n.offer === item.id ? { ...n, is_read: true } : n
+          n.offer === item.id && n.is_promotion ? { ...n, is_read: true } : n
         )
       );
 
@@ -76,9 +76,9 @@ export default function ClientPromotions({ navigation }) {
   };
 
   const renderItem = ({ item }) => {
-  const hasUnreadNotification = notifications.some(
-    n => !n.is_read && n.offer === item.id
-  );
+const hasUnreadNotification = notifications.some(
+  n => !n.is_read && n.offer === item.id && n.is_promotion === true
+);
 
   const isBooked = item.is_booked;
 

@@ -1,5 +1,3 @@
-// PATH: src/screens/CreatePromotionScreen.js
-
 import React, { useEffect, useState, useLayoutEffect } from 'react';
 import {
   StyleSheet,
@@ -102,6 +100,7 @@ export default function CreatePromotionScreen({ navigation }) {
   const savePromotion = async () => {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const shopProfileId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
       const response = await fetch(`${API_BASE_URL}/api/offers/`, {
         method: 'POST',
         headers: {
@@ -117,6 +116,7 @@ export default function CreatePromotionScreen({ navigation }) {
           valid_until: validUntil || null,
           max_bookings: maxBookings ? parseInt(maxBookings) : null,
           is_promotion: true,
+          shop_profile_id: parseInt(shopProfileId),
         }),
       });
 

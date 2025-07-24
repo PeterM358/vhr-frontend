@@ -98,7 +98,7 @@ export async function updateOffer(token, offerId, payload) {
 }
 
 export async function deleteOffer(token, offerId) {
-  const response = await fetch(`${API_BASE_URL}/api/offers/${offerId}/delete/`, {
+  const response = await fetch(`${API_BASE_URL}/api/offers/${offerId}/`, {
     method: 'DELETE',
     headers: {
       Authorization: `Bearer ${token}` },
@@ -184,4 +184,50 @@ export async function sendOfferMessage(token, offerId, payload) {
     throw new Error(err.detail || 'Failed to send message');
   }
   return await response.json();
+}
+
+// Mark an offer as seen
+export async function markOfferSeen(token, offerId) {
+  const response = await fetch(`${API_BASE_URL}/api/offers/${offerId}/mark_seen/`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to mark offer as seen');
+  }
+
+  return await response.json();
+}
+
+// Mark a promotion as seen by the current user
+export async function markPromotionSeen(token, offerId) {
+  const response = await fetch(`${API_BASE_URL}/api/offers/${offerId}/mark_promotion_seen/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to mark promotion as seen');
+  }
+
+  return await response.json();
+}
+
+export async function getSeenPromotions(token) {
+  const response = await fetch(`${API_BASE_URL}/api/offers/seen_promotions/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch seen promotions');
+  return await response.json(); // { seen_offer_ids: [1, 2, 3] }
 }

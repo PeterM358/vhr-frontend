@@ -27,6 +27,10 @@ export default function HomeScreen({ navigation }) {
 
   const { notifications } = useContext(WebSocketContext);
 
+  React.useEffect(() => {
+    console.log('🔄 Updated notifications state:', notifications);
+  }, [notifications]);
+
   useFocusEffect(
     React.useCallback(() => {
       const loadUser = async () => {
