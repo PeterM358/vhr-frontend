@@ -1,4 +1,7 @@
+import { useTheme, Text, Badge } from 'react-native-paper';
 import React, { useState, useEffect, useContext } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 import {
   View,
   Alert,
@@ -7,31 +10,33 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FlatList } from 'react-native';
-import { Card, Text, ActivityIndicator, useTheme } from 'react-native-paper';
+import { Card, ActivityIndicator } from 'react-native-paper';
 import { API_BASE_URL } from '../../api/config';
 import { WebSocketContext } from '../../context/WebSocketManager';
+import { AuthContext } from '../../context/AuthManager';
 import { markNotificationRead } from '../../api/notifications';
+import { getPromotions, markPromotionSeen, getSeenPromotions } from '../../api/promotions';
 
-export default function ClientPromotions({ navigation }) {
+export default function ClientPromotions({ navigation, onUpdateUnseenCount }) {
+  const theme = useTheme();
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { notifications, setNotifications } = useContext(WebSocketContext);
-  const theme = useTheme();
+  const { isClient } = useContext(AuthContext);
 
   const fetchPromotions = async () => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
-
-      const offersRes = await fetch(`${API_BASE_URL}/api/offers/?is_promotion=1`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!offersRes.ok) throw new Error('Failed to fetch promotions');
-      const offersData = await offersRes.json();
-
+      const offersData = await getPromotions(token);
+      console.log('📦 Promotions data from API:', offersData);
       setOffers(offersData);
+      if (onUpdateUnseenCount) {
+        const unseen = offersData.filter(p => !p.is_seen).length;
+        console.log('📤 Unseen promotions count sent to OffersScreen:', unseen);
+        onUpdateUnseenCount(unseen);
+      }
     } catch (err) {
       console.error('Failed to load promotions', err);
       Alert.alert('Error', 'Could not load promotions');
@@ -41,8 +46,17 @@ export default function ClientPromotions({ navigation }) {
   };
 
   useEffect(() => {
+    console.log('📡 Initial fetchPromotions called');
     fetchPromotions();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 Refetch promotions on focus');
+      fetchPromotions();
+    }, [])
+  );
+
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -53,22 +67,24 @@ export default function ClientPromotions({ navigation }) {
   const handlePressPromotion = async (item) => {
     try {
       const token = await AsyncStorage.getItem('@access_token');
+      if (!item.is_seen) {
+        await markPromotionSeen(token, item.id);
 
-      const unreadNotifs = notifications.filter(
-        n => !n.is_read && n.offer === item.id && n.is_promotion
-      );
-
-      for (const notif of unreadNotifs) {
-        await markNotificationRead(token, notif.id);
+        const matchingNotif = notifications.find(
+          (n) => n.promotion_id === item.id && !n.is_read
+        );
+        if (matchingNotif) {
+          await markNotificationRead(token, matchingNotif.id);
+          if (setNotifications) {
+            setNotifications((prev) =>
+              prev.map((n) =>
+                n.id === matchingNotif.id ? { ...n, is_read: true } : n
+              )
+            );
+          }
+        }
       }
-
-      setNotifications(prev =>
-        prev.map(n =>
-          n.offer === item.id && n.is_promotion ? { ...n, is_read: true } : n
-        )
-      );
-
-      navigation.navigate('PromotionDetail', { promotion: item });
+      navigation.navigate('PromotionDetail', { promotion: item }, { merge: true });
     } catch (err) {
       console.error('Error marking promotion notification', err);
       Alert.alert('Error', 'Failed to open promotion.');
@@ -76,42 +92,33 @@ export default function ClientPromotions({ navigation }) {
   };
 
   const renderItem = ({ item }) => {
-const hasUnreadNotification = notifications.some(
-  n => !n.is_read && n.offer === item.id && n.is_promotion === true
-);
-
-  const isBooked = item.is_booked;
-
-  let opacity = hasUnreadNotification || isBooked ? 1 : 0.4;
-
-  return (
-    <Card
-      style={{ marginVertical: 6, opacity }}
-      onPress={() => handlePressPromotion(item)}
-    >
-      <Card.Title
-        title={item.repair_type_name}
-        titleStyle={hasUnreadNotification ? { fontWeight: 'bold' } : {}}
-      />
-      <Card.Content>
-        <Text>{item.description}</Text>
-        <Text>Price: {item.price} BGN</Text>
-        <Text>Shop: {item.shop_name}</Text>
-        {isBooked && (
-          <Text style={{ color: theme.colors.primary, marginTop: 4 }}>
-            ✅ Already booked
-          </Text>
-        )}
-      </Card.Content>
-    </Card>
-  );
-};
+    const isSeen = item.is_seen;
+    const isBooked = item.is_booked;
+    const cardStyle = {
+      marginVertical: 6,
+      borderWidth: isSeen ? 0 : 2,
+      borderColor: isSeen ? 'transparent' : theme.colors.secondary,
+      backgroundColor: isSeen ? '#f0f0f0' : '#ffffff',
+    };
+    return (
+      <Card style={cardStyle} onPress={() => handlePressPromotion(item)}>
+        <Card.Title title={item.repair_type_name} titleStyle={isSeen ? {} : { fontWeight: 'bold' }} />
+        <Card.Content>
+          <Text>{item.description}</Text>
+          <Text>Price: {item.price} BGN</Text>
+          <Text>Shop: {item.shop_name}</Text>
+          {isBooked && (
+            <Text style={{ color: theme.colors.primary, marginTop: 4 }}>
+              ✅ Already booked
+            </Text>
+          )}
+        </Card.Content>
+      </Card>
+    );
+  };
 
   return (
     <View style={{ flex: 1, padding: 10, backgroundColor: theme.colors.background }}>
-      <Text variant="headlineSmall" style={{ textAlign: 'center', marginBottom: 10 }}>
-        Promotions
-      </Text>
       {loading ? (
         <ActivityIndicator size="large" />
       ) : (
@@ -132,3 +139,21 @@ const hasUnreadNotification = notifications.some(
     </View>
   );
 }
+
+const styles = (theme) => StyleSheet.create({
+  promotionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 10,
+    backgroundColor: theme.colors.primary,
+  },
+  promotionsTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+});

@@ -1,5 +1,3 @@
-// PATH: src/screens/PromotionDetailScreen.js
-
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -9,7 +7,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
-import { bookPromotion, unbookPromotion } from '../api/offers';
+import { bookPromotion, unbookPromotion, getPromotionBookings } from '../api/promotions';
 import { getVehicles } from '../api/vehicles';
 import { API_BASE_URL } from '../api/config';
 
@@ -25,42 +23,81 @@ export default function PromotionDetailScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchBookingStatus = async () => {
+      if (!promotion?.id) {
+        console.warn("⚠️ Missing promotion.id in fetchBookingStatus");
+        return;
+      }
+
       try {
         const token = await AsyncStorage.getItem('@access_token');
         const data = await getVehicles(token);
         setVehicles(data);
 
-        if (data.length > 0) {
-          const defaultId = data[0].id.toString();
-          setSelectedVehicleId(defaultId);
+        const defaultId = data[0]?.id?.toString();
+        setSelectedVehicleId(defaultId);
 
-          const response = await fetch(`${API_BASE_URL}/api/offers/${promotion.id}/`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const offerDetail = await response.json();
-
-          const already = offerDetail.bookings?.some(
-            (b) => b.vehicle === parseInt(defaultId)
-          );
-          setAlreadyBooked(already);
-        }
+        const bookingData = await getPromotionBookings(token, promotion.id);
+        const vehicleIds = (bookingData.booked_vehicle_ids || []).map((id) => String(id));
+        const selectedIdStr = String(defaultId);
+        console.log("✅ Final booked check (init):", { vehicleIds, selectedIdStr, isBooked: vehicleIds.includes(selectedIdStr) });
+        setAlreadyBooked(vehicleIds.includes(selectedIdStr));
       } catch (err) {
-        Alert.alert('Error', 'Failed to load vehicles or booking info');
+        console.error('Failed to load booking or vehicle data:', err);
+        Alert.alert('Error', 'Failed to load booking or vehicle data');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
-  }, []);
+    if (promotion?.id) {
+      fetchBookingStatus();
+    }
+  }, [promotion?.id]);
+
+  useEffect(() => {
+    const updateBookingStatus = async () => {
+      if (!promotion?.id) {
+        console.warn("⚠️ Missing promotion.id in updateBookingStatus");
+        return;
+      }
+
+      try {
+        console.log('📣 selectedVehicleId at updateBookingStatus:', selectedVehicleId);
+        const token = await AsyncStorage.getItem('@access_token');
+        const bookingData = await getPromotionBookings(token, promotion.id);
+        console.log('📣 raw bookingData from API:', bookingData);
+        const vehicleIds = (bookingData.booked_vehicle_ids || []).map((id) => String(id));
+        console.log('📣 parsed vehicleIds from bookingData:', vehicleIds);
+        const selectedIdStr = String(selectedVehicleId);
+        const isBooked = vehicleIds.includes(selectedIdStr);
+        console.log("✅ Final booked check (update):", { vehicleIds, selectedIdStr, isBooked });
+        setAlreadyBooked(isBooked);
+      } catch (err) {
+        console.error('Failed to refresh booking status:', err);
+      }
+    };
+
+    if (selectedVehicleId && promotion?.id) updateBookingStatus();
+  }, [selectedVehicleId, promotion?.id]);
+
+  const refreshBookingStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      const bookingData = await getPromotionBookings(token, promotion.id);
+      const vehicleIds = (bookingData.booked_vehicle_ids || []).map((id) => String(id));
+      setAlreadyBooked(vehicleIds.includes(String(selectedVehicleId)));
+    } catch (err) {
+      console.error('Failed to refresh booking status:', err);
+    }
+  };
 
   const handleBook = async () => {
     try {
       const token = await AsyncStorage.getItem('@access_token');
       await bookPromotion(token, promotion.id, parseInt(selectedVehicleId));
       Alert.alert('Success', 'Promotion booked!');
-      navigation.goBack();
+      await refreshBookingStatus();
     } catch (err) {
       Alert.alert('Error', err.message || 'Booking failed');
     }
@@ -69,9 +106,10 @@ export default function PromotionDetailScreen({ route, navigation }) {
   const handleUnbook = async () => {
     try {
       const token = await AsyncStorage.getItem('@access_token');
+      // Send vehicle_id in the request body as required by backend
       await unbookPromotion(token, promotion.id, parseInt(selectedVehicleId));
       Alert.alert('Cancelled', 'Booking has been removed.');
-      navigation.goBack();
+      await refreshBookingStatus();
     } catch (err) {
       Alert.alert('Error', err.message || 'Unbooking failed');
     }

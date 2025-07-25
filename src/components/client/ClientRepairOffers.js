@@ -13,7 +13,7 @@ import { markOfferSeen } from '../../api/offers';
 import { FlatList } from 'react-native';
 import { Card, Text, ActivityIndicator, useTheme } from 'react-native-paper';
 
-export default function ClientRepairOffers() {
+export default function ClientRepairOffers({ onUpdateUnseenOffersCount }) {
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -32,7 +32,12 @@ export default function ClientRepairOffers() {
       });
       const data = await res.json();
       setOffers(data);
-
+      const unseen = data.filter(o => !o.is_seen_by_client).length;
+      console.log('📤 Offers sent to parent:', data);
+      console.log('📤 Unseen offers count sent to OffersScreen:', unseen);
+      if (typeof onUpdateUnseenOffersCount === 'function') {
+        onUpdateUnseenOffersCount(unseen);
+      }
     } catch (err) {
       console.error('Failed to load repair offers', err);
       Alert.alert('Error', 'Could not load repair offers');
@@ -68,6 +73,12 @@ export default function ClientRepairOffers() {
       }
 
       await markOfferSeen(token, item.id);
+
+      setOffers(prev =>
+        prev.map(o =>
+          o.id === item.id ? { ...o, is_seen_by_client: true } : o
+        )
+      );
 
       navigation.navigate('RepairDetail', { repairId: item.repair });
     } catch (err) {

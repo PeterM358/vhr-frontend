@@ -7,7 +7,7 @@ import { View, FlatList, Alert, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { API_BASE_URL } from '../../api/config';
-import { deleteOffer } from '../../api/offers';
+import { deletePromotion, getPromotions } from '../../api/promotions'; // uses new API paths
 import { Card, Text, Button, ActivityIndicator, useTheme } from 'react-native-paper';
 import CommonButton from '../CommonButton';
 import BASE_STYLES from '../../styles/base';
@@ -29,10 +29,7 @@ export default function ShopPromotions() {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
-      const response = await fetch(`${API_BASE_URL}/api/offers/?is_promotion=1`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
+      const data = await getPromotions(token);
       setOffers(data);
     } catch (err) {
       console.error('❌ Failed to fetch promotions', err);
@@ -45,7 +42,7 @@ export default function ShopPromotions() {
   const handleDelete = async (offerId) => {
     try {
       const token = await AsyncStorage.getItem('@access_token');
-      await deleteOffer(token, offerId);
+      await deletePromotion(token, offerId);
       setOffers((prev) => prev.filter((o) => o.id !== offerId));
       Alert.alert('Deleted', 'Promotion deleted successfully');
     } catch (err) {

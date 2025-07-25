@@ -101,7 +101,7 @@ export default function CreatePromotionScreen({ navigation }) {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const shopProfileId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
-      const response = await fetch(`${API_BASE_URL}/api/offers/`, {
+      const response = await fetch(`${API_BASE_URL}/api/promotions/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

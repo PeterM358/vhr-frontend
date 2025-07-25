@@ -1,90 +1,85 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Badge, useTheme } from 'react-native-paper';
-import { WebSocketContext } from '../context/WebSocketManager';
+import { useTheme, Text, Badge } from 'react-native-paper';
 import ClientPromotions from '../components/client/ClientPromotions';
 import ClientRepairOffers from '../components/client/ClientRepairOffers';
-import { markNotificationAsRead } from '../api/notifications';
-import { markPromotionSeen, markOfferSeen } from '../api/offers';
 
 export default function OffersScreen({ navigation }) {
   const theme = useTheme();
   const [activeTab, setActiveTab] = useState('promotions');
-  const { notifications } = useContext(WebSocketContext);
-
-  const unseenPromotions = notifications.filter(n => !n.is_read && n.is_promotion === true).length;
-  const unseenOffers = notifications.filter(n => !n.is_read && n.is_promotion === false).length;
+  const [unseenCount, setUnseenCount] = useState(0);
+  const [unseenOffersCount, setUnseenOffersCount] = useState(0);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-
       <View style={styles.tabRow}>
         <TouchableOpacity
           style={[
             styles.tabButton,
             activeTab === 'promotions' && { backgroundColor: theme.colors.primary },
           ]}
-          onPress={async () => {
-            const unread = notifications.filter(n => !n.is_read && n.is_promotion === true);
-            for (const n of unread) {
-              await markNotificationAsRead(n.id);
-              if (n.offer_id) {
-                try {
-                  await markPromotionSeen(n.offer_id);
-                } catch (err) {
-                  console.warn('⚠️ Failed to mark promotion seen:', err.message);
-                }
-              }
-            }
-            setActiveTab('promotions');
-          }}
+          onPress={() => setActiveTab('promotions')}
         >
-          <Text style={[
-            styles.tabText,
-            activeTab === 'promotions' && { color: 'white', fontWeight: 'bold' },
-          ]}>
-            Promotions
-          </Text>
-          {unseenPromotions > 0 && (
-            <Badge style={styles.badge}>{unseenPromotions}</Badge>
-          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={[
+              styles.tabText,
+              activeTab === 'promotions' && { color: 'white', fontWeight: 'bold' },
+            ]}>
+              Promotions
+            </Text>
+            {/* Always show badge if unseenCount > 0 for testing */}
+            {unseenCount > 0 && (
+              <Badge style={[
+                styles.badge,
+                { backgroundColor: 'red' }
+              ]}>
+                {unseenCount}
+              </Badge>
+            )}
+          </View>
         </TouchableOpacity>
-
         <TouchableOpacity
           style={[
             styles.tabButton,
             activeTab === 'offers' && { backgroundColor: theme.colors.primary },
           ]}
-          onPress={async () => {
-            const unread = notifications.filter(n => !n.is_read && n.is_promotion === false);
-            for (const n of unread) {
-              await markNotificationAsRead(n.id);
-              if (n.offer_id) {
-                try {
-                  await markOfferSeen(n.offer_id);
-                } catch (err) {
-                  console.warn('⚠️ Failed to mark offer seen:', err.message);
-                }
-              }
-            }
-            setActiveTab('offers');
-          }}
+          onPress={() => setActiveTab('offers')}
         >
-          <Text style={[
-            styles.tabText,
-            activeTab === 'offers' && { color: 'white', fontWeight: 'bold' },
-          ]}>
-            Repair Offers
-          </Text>
-          {unseenOffers > 0 && (
-            <Badge style={styles.badge}>{unseenOffers}</Badge>
-          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={[
+              styles.tabText,
+              activeTab === 'offers' && { color: 'white', fontWeight: 'bold' },
+            ]}>
+              Repair Offers
+            </Text>
+            {unseenOffersCount > 0 && (
+              <Badge style={[styles.badge, { backgroundColor: 'red' }]}>
+                {unseenOffersCount}
+              </Badge>
+            )}
+          </View>
         </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
-        {activeTab === 'promotions' && <ClientPromotions navigation={navigation} />}
-        {activeTab === 'offers' && <ClientRepairOffers navigation={navigation} />}
+        <View style={[styles.tabContent, activeTab === 'promotions' ? styles.active : styles.inactive]}>
+          <ClientPromotions
+            navigation={navigation}
+            onUpdateUnseenCount={(unseenCount) => {
+              console.log('📤 Unseen promotions count sent to OffersScreen:', unseenCount);
+              setUnseenCount(unseenCount);
+            }}
+          />
+        </View>
+        <View style={[styles.tabContent, activeTab === 'offers' ? styles.active : styles.inactive]}>
+          <ClientRepairOffers
+            navigation={navigation}
+            onUpdateUnseenOffersCount={(unseenCount) => {
+              console.log('📤 Unseen offers count sent to OffersScreen:', unseenCount);
+              setUnseenOffersCount(unseenCount);
+            }}
+          />
+        </View>
       </View>
     </View>
   );
@@ -114,10 +109,18 @@ const styles = StyleSheet.create({
   },
   badge: {
     marginLeft: 8,
-    backgroundColor: 'red',
     color: 'white',
   },
   content: {
     flex: 1,
+  },
+  tabContent: {
+    flex: 1,
+  },
+  active: {
+    display: 'flex',
+  },
+  inactive: {
+    display: 'none',
   },
 });

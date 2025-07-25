@@ -84,11 +84,22 @@ export async function sendFirebaseTokenToBackend(fcmToken, userId = null, shopPr
   }
 }
 // Allows you to mark a notification as read without passing the token manually.
-export async function markNotificationAsRead(id) {
+export async function markNotificationAsRead(id, updateNotifications = null) {
   const token = await AsyncStorage.getItem('@access_token');
   if (!token) {
     console.warn('⚠️ No token found when trying to mark notification as read');
     return;
   }
-  return await markNotificationRead(token, id);
+
+  const response = await markNotificationRead(token, id);
+
+  if (updateNotifications) {
+    updateNotifications(prev =>
+      prev.map(n =>
+        n.id === id ? { ...n, is_read: true } : n
+      )
+    );
+  }
+
+  return response;
 }
