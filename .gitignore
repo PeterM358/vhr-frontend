@@ -34,10 +34,24 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
-android/
-!android/app/src/main/AndroidManifest.xml
-!android/scripts/decode_google_services.js
-!android/build.gradle
+# Ignore android except specific required files
+/android/*
+android/app/google-services.json
+android/app/debug.keystore
+!/android/gradlew
+!/android/gradlew.bat
+!/android/build.gradle
+!/android/app/
+!/android/app/build.gradle
+!/android/app/src/
+!/android/app/src/main/
+!/android/app/src/main/AndroidManifest.xml
+!/android/gradle/
+!/android/gradle/wrapper/
+!/android/gradle/wrapper/gradle-wrapper.properties
+!/android/gradle/wrapper/gradle-wrapper.jar
+!/android/scripts/
+!/android/scripts/decode_google_services.js
 
 src/firebase.js
 gitleaks-report.json
