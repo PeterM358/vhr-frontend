@@ -34,15 +34,16 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
-# Track entire android folder except secrets
+# Android - untrack secrets and build artifacts
 android/app/google-services.json
+android/app/src/main/res/values/secrets.xml
 android/app/debug.keystore
+android/.gradle/
+android/app/build/
+android/build/
+*.keystore
 
-# Firebase config
-android/app/google-services.json
-
+# Firebase config (deprecated)
 src/firebase.js
 gitleaks-report.json
-
-android/app/src/main/res/values/secrets.xml
 google-services.json.base64

@@ -8,10 +8,9 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "postinstall": "node ./scripts/decode_google_services.js",
-    "prebuild:android": "node ./scripts/decode_google_services.js && expo prebuild --platform android",
-    "start:android": "node ./scripts/decode_google_services.js && expo run:android",
-    "start:dev": "node ./scripts/decode_google_services.js && expo start --dev-client"
+    "prebuild:android": "expo prebuild --platform android",
+    "start:android": "expo run:android",
+    "start:dev": "expo start --dev-client"
   },
   "dependencies": {
     "@expo/metro-runtime": "^5.0.4",

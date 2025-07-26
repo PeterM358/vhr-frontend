@@ -56,7 +56,8 @@ export default {
     extra: {
       eas: {
         projectId: "cde03e84-e27d-4ec0-9712-519a847ceb2d"
-      }
+      },
+      googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY
     },
     owner: "mihailovv"
   }
