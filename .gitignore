@@ -35,5 +35,10 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 android/
+!android/app/src/main/AndroidManifest.xml
+!android/scripts/decode_google_services.js
+!android/build.gradle
 
 src/firebase.js
+gitleaks-report.json
+google-services.json.base64
