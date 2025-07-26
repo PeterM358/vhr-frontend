@@ -8,7 +8,12 @@ function decodeGoogleServicesFile() {
     return;
   }
 
-  const jsonPath = path.join(__dirname, '../android/app/google-services.json');
+  const jsonDir = path.join(__dirname, '../android/app');
+  const jsonPath = path.join(jsonDir, 'google-services.json');
+
+  // Ensure directory exists
+  fs.mkdirSync(jsonDir, { recursive: true });
+
   const decoded = Buffer.from(base64, 'base64').toString('utf-8');
   fs.writeFileSync(jsonPath, decoded);
   console.log("✅ google-services.json written to android/app/");
