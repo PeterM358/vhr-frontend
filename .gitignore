@@ -36,8 +36,6 @@ yarn-error.*
 *.tsbuildinfo
 # Ignore android except specific required files
 /android/*
-android/app/google-services.json
-android/app/debug.keystore
 !/android/gradlew
 !/android/gradlew.bat
 !/android/build.gradle
@@ -53,6 +51,11 @@ android/app/debug.keystore
 !/android/scripts/
 !/android/scripts/decode_google_services.js
 
+# Firebase config
+android/app/google-services.json
+
 src/firebase.js
 gitleaks-report.json
+
+android/app/src/main/res/values/secrets.xml
 google-services.json.base64
