@@ -42,7 +42,7 @@ export default {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
       },
-      googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? "./android/app/google-services.json"
+      googleServicesFile: "./android/app/google-services.json"
     },
     web: {
       favicon: "./assets/favicon.png",
