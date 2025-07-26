@@ -8,10 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "GOOGLE_SERVICES_JSON_BASE64": "$(GOOGLE_SERVICES_JSON_BASE64)"
-      },
-      "hooks": {
-        "prebuild": "node android/scripts/decode_google_services.js"
+        "GOOGLE_SERVICES_JSON_BASE64": "${GOOGLE_SERVICES_JSON_BASE64}"
       }
     },
     "preview": {
