@@ -34,22 +34,9 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
-# Ignore android except specific required files
-/android/*
-!/android/gradlew
-!/android/gradlew.bat
-!/android/build.gradle
-!/android/app/
-!/android/app/build.gradle
-!/android/app/src/
-!/android/app/src/main/
-!/android/app/src/main/AndroidManifest.xml
-!/android/gradle/
-!/android/gradle/wrapper/
-!/android/gradle/wrapper/gradle-wrapper.properties
-!/android/gradle/wrapper/gradle-wrapper.jar
-!/android/scripts/
-!/android/scripts/decode_google_services.js
+# Track entire android folder except secrets
+android/app/google-services.json
+android/app/debug.keystore
 
 # Firebase config
 android/app/google-services.json
