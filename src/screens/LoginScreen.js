@@ -72,6 +72,13 @@ export default function LoginScreen({ navigation }) {
 
   const goToRegister = () => navigation.navigate('Register');
 
+  const testPasswordReset = () => {
+    navigation.navigate('PasswordConfirmReset', {
+      uid: 'MQ',
+      token: 'ctlvi3-f5074152adbec6b5d26f0fa89331e7c1',
+    });
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.logoContainer}>
@@ -101,6 +108,13 @@ export default function LoginScreen({ navigation }) {
         onChangeText={setPassword}
         style={styles.input}
       />
+      <Button
+        mode="text"
+        onPress={() => navigation.navigate('PasswordRequestReset')}
+        labelStyle={{ color: theme.colors.primary }}
+      >
+        Forgot Password?
+      </Button>
 
       {loading ? (
         <ActivityIndicator size="large" style={styles.loading} color={theme.colors.primary} />
@@ -116,6 +130,7 @@ export default function LoginScreen({ navigation }) {
           Sign In
         </Button>
       )}
+
 
       <Text style={styles.subText}>Don't have an account?</Text>
       <Button

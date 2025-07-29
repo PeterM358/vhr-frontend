@@ -5,6 +5,7 @@ export default {
   expo: {
     name: "vhr-frontend",
     slug: "vhr-frontend",
+    scheme: "service1001", // 👈 ADD THIS
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",

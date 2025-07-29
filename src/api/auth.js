@@ -142,3 +142,31 @@ export const logout = async (
     routes: [{ name: 'Login' }],
   });
 };
+
+// ✅ Request Password Reset (send email)
+export const requestPasswordReset = async (email) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/api/users/password/reset/`, {
+      email,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('❌ Password reset request failed:', error.response?.data || error.message);
+    throw new Error('Failed to send password reset email.');
+  }
+};
+
+// ✅ Confirm Password Reset (set new password)
+export const confirmPasswordReset = async (uid, token, newPassword) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/api/users/password/confirm/`, {
+      uid,
+      token,
+      new_password: newPassword,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('❌ Password reset confirm failed:', error.response?.data || error.message);
+    throw new Error('Failed to reset password.');
+  }
+};

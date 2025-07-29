@@ -53,13 +53,28 @@ import OfferChatScreen from '../screens/OfferChatScreen';
 import CreateOrUpdateOfferScreen from '../screens/CreateOrUpdateOfferScreen';
 import SelectOfferPartsScreen from '../screens/SelectOfferPartsScreen';
 
+
+import PasswordRequestResetScreen from '../screens/PasswordRequestResetScreen';
+import PasswordConfirmResetScreen from '../screens/PasswordConfirmResetScreen';
+
+
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
   const theme = useTheme();
 
+  // Deep linking configuration
+  const linking = {
+    prefixes: ['service1001://'],
+    config: {
+      screens: {
+        PasswordConfirmReset: 'reset-password/:uid/:token',
+      },
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={linking}>
       <Stack.Navigator
         initialRouteName="AuthLoading"
         screenOptions={{
@@ -119,6 +134,9 @@ export default function AppNavigator() {
         <Stack.Screen name="ClientLogRepair" component={ClientLogRepairScreen} options={{ title: 'Log Repair' }}/>
         <Stack.Screen name="ClientRequestRepair" component={ClientRequestRepairScreen} options={{ title: 'Request Repair' }}/>
         
+        <Stack.Screen name="PasswordRequestReset" component={PasswordRequestResetScreen} options={{ title: 'Log Repair' }}/>
+        <Stack.Screen name="PasswordConfirmReset" component={PasswordConfirmResetScreen} options={{ title: 'Request Repair' }}/>
+
         <Stack.Screen
           name="CreateOrUpdateOffer"
           component={CreateOrUpdateOfferScreen}
