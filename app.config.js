@@ -26,6 +26,14 @@ export default {
             useFrameworks: "static"
           }
         }
+      ],
+      [
+        "expo-firebase-core",
+        {
+          "ios": {
+            "googleServicesFile": "./GoogleService-Info.plist"
+          }
+        }
       ]
     ],
     splash: {
@@ -35,7 +43,8 @@ export default {
     },
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.anonymous.vhr-frontend"
+      bundleIdentifier: "com.mihailovv.vhrfrontend",
+      googleServicesFile: "./GoogleService-Info.plist"
     },
     android: {
       package: "com.mihailovv.vhrfrontend",
@@ -43,7 +52,12 @@ export default {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
       },
-      googleServicesFile: "./android/app/google-services.json"
+      googleServicesFile: "./android/app/google-services.json",
+      config: {
+        googleMaps: {
+          apiKey: process.env.GOOGLE_MAPS_API_KEY
+        }
+      }
     },
     web: {
       favicon: "./assets/favicon.png",
@@ -58,7 +72,10 @@ export default {
       eas: {
         projectId: "cde03e84-e27d-4ec0-9712-519a847ceb2d"
       },
-      googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY
+      googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
+      googleClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
+      googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+      googleClientSecret: process.env.GOOGLE_CLIENT_SECRET
     },
     owner: "mihailovv"
   }

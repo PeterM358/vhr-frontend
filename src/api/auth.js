@@ -170,3 +170,12 @@ export const confirmPasswordReset = async (uid, token, newPassword) => {
     throw new Error('Failed to reset password.');
   }
 };
+
+export const googleLogin = async (idToken) => {
+  const response = await axios.post('/users/google-login/', {
+    id_token: idToken,
+  });
+
+  await storeLoginData(response.data, response.data.email);
+  return response.data;
+};

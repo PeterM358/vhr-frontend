@@ -35,6 +35,30 @@ import { getOffersForRepair, bookOffer, unbookOffer } from '../api/offers';
 import { RepairsList } from '../components/shop/RepairsList';
 
 export default function RepairDetailScreen({ route, navigation }) {
+  // Add repairDetails state at the top
+  const [repairDetails, setRepairDetails] = useState(null);
+  // Function to mark repair as done and refresh data (uses repairDetails object)
+  const handleMarkAsDone = async () => {
+    console.log("🟡 Confirm as Done button clicked");
+
+    if (!repairDetails || !repairDetails.id) {
+      console.error("❌ repairDetails or repairDetails.id is undefined");
+      return;
+    }
+
+    console.log("🔧 Attempting to mark repair as done. ID:", repairDetails.id);
+
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      await updateRepair(token, repairDetails.id, {
+        status: 'done',
+      });
+      console.log("✅ Repair marked as done.");
+      await refreshRepair(); // <-- Refresh UI after marking as done
+    } catch (error) {
+      console.error("❌ Error marking repair as done:", error);
+    }
+  };
   useLayoutEffect(() => {
     navigation.setOptions({
       headerBackTitleVisible: false,
@@ -156,6 +180,7 @@ export default function RepairDetailScreen({ route, navigation }) {
         }
 
         setRepair(repairData);
+        setRepairDetails(repairData); // <-- Store full repair data for mark as done
         setEditDescription(repairData.description || '');
         setShopDescription(repairData.shop_description || '');
         const offersData = await getOffersForRepair(token, repairId);
@@ -536,38 +561,6 @@ export default function RepairDetailScreen({ route, navigation }) {
                             onChangeText={setFinalKilometers}
                             style={styles.input}
                           />
-                          <Button
-                            mode="contained"
-                            buttonColor="green"
-                            onPress={() => {
-                              Alert.alert(
-                                'Confirm Completion',
-                                'Are you sure you want to mark this repair as done? You will not be able to update it afterwards.',
-                                [
-                                  {
-                                    text: 'Cancel',
-                                    style: 'cancel',
-                                  },
-                                  {
-                                    text: 'Yes, Mark as Done',
-                                    style: 'destructive',
-                                    onPress: async () => {
-                                      if (repair.status === 'done') {
-                                        Alert.alert("This repair is already completed.");
-                                        return;
-                                      }
-                                      const token = await AsyncStorage.getItem('@access_token');
-                                      await updateRepair(token, repairId, { status: 'done' });
-                                      Alert.alert('Success', 'Repair marked as done.');
-                                      await refreshRepair();
-                                    },
-                                  },
-                                ]
-                              );
-                            }}
-                          >
-                            Confirm as Done
-                          </Button>
                         </>
                       )}
                     </>
@@ -801,66 +794,10 @@ export default function RepairDetailScreen({ route, navigation }) {
         }
         contentContainerStyle={styles.listContent}
       />
-      {/* Floating button for shops: Send Offer (only if repair is open) */}
-      {isShop && repair && repair.status === 'open' && (
-        <Button
-          icon="plus"
-          mode="contained"
-          onPress={() =>
-            navigation.navigate('CreateOrUpdateOffer', {
-              repairId,
-              returnTo: 'RepairsList',
-            })
-          }
-          style={{
-            position: 'absolute',
-            bottom: 80,
-            right: 20,
-            borderRadius: 30,
-            padding: 6,
-          }}
-        >
-          Send Offer
-        </Button>
-      )}
-      {/* Floating button for ongoing repair editing (Edit Parts) */}
-      {isShop && repair && repair.status === 'ongoing' && repair.shop_profile === shopProfileId && (
-        <Button
-          icon="wrench"
-          mode="contained"
-          onPress={() => {
-            if (repair.status === 'done') {
-              Alert.alert("This repair is completed and can no longer be edited.");
-              return;
-            }
-            navigation.navigate('SelectRepairParts', {
-              currentParts: (selectedParts.length > 0 ? selectedParts : repairParts).map(p => ({
-                partsMasterId: p.partsMasterId || p.part_master || p.part_master_detail?.id || p.partsMaster?.id || p.shop_part?.part?.id,
-                shopPartId: p.shopPartId || p.shop_part_id || p.shop_part?.id,
-                quantity: p.quantity || 1,
-                price: p.price || p.price_per_item_at_use || '',
-                labor: p.labor || p.labor_cost || '',
-                note: p.note || '',
-                partsMaster: p.partsMaster || p.part_master_detail || p.parts_master_detail || p.shop_part_detail?.part || {},
-              })),
-              vehicleId: repair.vehicle?.toString() || '',
-              repairTypeId: repair.repair_type?.toString() || '',
-              description: editDescription || '',
-              kilometers: repair.kilometers?.toString() || '',
-              status: repair.status || 'open',
-              returnTo: 'RepairDetail',
-              repairId: repairId,
-            });
-          }}
-          style={{
-            position: 'absolute',
-            bottom: 140,
-            right: 20,
-            borderRadius: 30,
-            padding: 6,
-          }}
-        >
-          Edit Parts
+      {/* --- BOTTOM ACTION BUTTONS (Shop: Send Offer, Confirm as Done) --- */}
+      {isShop && repair && repair.status === 'ongoing' && (
+        <Button mode="contained" onPress={handleMarkAsDone} style={{ margin: 16 }}>
+          Confirm as Done
         </Button>
       )}
     </View>

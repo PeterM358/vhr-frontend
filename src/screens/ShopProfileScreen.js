@@ -122,6 +122,12 @@ export default function ShopProfileScreen({ navigation }) {
       city: profile.city,
       latitude: roundCoordinate(profile.latitude),
       longitude: roundCoordinate(profile.longitude),
+      languages: profile.languages,
+      email: profile.email,
+      website: profile.website,
+      offers_guarantee: profile.offers_guarantee,
+      brands: profile.brands,
+      working_hours: profile.working_hours,
     };
 
     setSaving(true);
@@ -307,6 +313,59 @@ export default function ShopProfileScreen({ navigation }) {
           {cities.map((c) => (
             <Picker.Item key={c.id} label={c.name} value={c.id} />
           ))}
+        </Picker>
+
+        <TextInput
+          label="Email"
+          mode="outlined"
+          value={profile.email || ''}
+          onChangeText={(text) => setProfile({ ...profile, email: text })}
+          style={styles.input}
+          keyboardType="email-address"
+        />
+
+        <TextInput
+          label="Website"
+          mode="outlined"
+          value={profile.website || ''}
+          onChangeText={(text) => setProfile({ ...profile, website: text })}
+          style={styles.input}
+        />
+
+        <TextInput
+          label="Languages (comma separated)"
+          mode="outlined"
+          value={profile.languages || ''}
+          onChangeText={(text) => setProfile({ ...profile, languages: text })}
+          style={styles.input}
+        />
+
+        <TextInput
+          label="Working Hours (JSON or text)"
+          mode="outlined"
+          multiline
+          numberOfLines={4}
+          value={profile.working_hours || ''}
+          onChangeText={(text) => setProfile({ ...profile, working_hours: text })}
+          style={styles.input}
+        />
+
+        <TextInput
+          label="Brands (comma separated)"
+          mode="outlined"
+          value={profile.brands || ''}
+          onChangeText={(text) => setProfile({ ...profile, brands: text })}
+          style={styles.input}
+        />
+
+        <Picker
+          selectedValue={profile.offers_guarantee}
+          onValueChange={(val) => setProfile({ ...profile, offers_guarantee: val })}
+          style={styles.picker}
+        >
+          <Picker.Item label="Offers Guarantee?" value={null} />
+          <Picker.Item label="Yes" value={true} />
+          <Picker.Item label="No" value={false} />
         </Picker>
 
         <Text variant="labelLarge" style={styles.label}>Photos</Text>

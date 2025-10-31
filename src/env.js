@@ -6,13 +6,13 @@ const ENV = __DEV__ ? 'dev' : 'prod';
 /**
  * IMPORTANT:
  * Replace 192.168.x.x with your actual computer's LAN IP for local network testing.
- * Example: '192.168.0.104'
+ * Example: '192.168.0.104' - Bansko, '192.168.1.8' - Home
  */
 const CONFIG = {
   dev: {
-    API_BASE_URL: 'http://192.168.0.103:8000',  // YOUR LOCAL LAN IP
-    WS_BASE_URL: 'ws://192.168.0.103:8001',
-  },
+    API_BASE_URL: 'http://192.168.1.8:8000',  // YOUR LOCAL LAN IP
+    WS_BASE_URL: 'ws://192.168.1.8:8001',
+  },    
   prod: {
     API_BASE_URL: 'https://your-production-api.com',
     WS_BASE_URL: 'wss://your-production-api.com',

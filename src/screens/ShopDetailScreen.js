@@ -1,5 +1,3 @@
-// PATH: src/screens/ShopDetailScreen.js
-
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -9,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  Linking,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -225,13 +224,50 @@ export default function ShopDetailScreen({ route, navigation }) {
     </View>
   );
 
+  const renderDetailsSection = () => (
+    <Card mode="outlined" style={styles.card}>
+      <Card.Content>
+        {shop.is_verified && <Text style={{ color: 'green' }}>✔ Verified Shop</Text>}
+        {shop.email && <Text>Email: {shop.email}</Text>}
+        {shop.website && (
+          <Text style={{ color: 'blue' }} onPress={() => Linking.openURL(shop.website)}>
+            Website: {shop.website}
+          </Text>
+        )}
+        {shop.languages?.length > 0 && <Text>Languages: {shop.languages.join(', ')}</Text>}
+        {shop.working_hours && (
+          <>
+            <Text>Working Hours:</Text>
+            {Object.entries(shop.working_hours).map(([day, hours]) => (
+              <Text key={day}>
+                {day.charAt(0).toUpperCase() + day.slice(1)}: {hours.start} – {hours.end}
+              </Text>
+            ))}
+          </>
+        )}
+        {shop.brands?.length > 0 && <Text>Brands: {shop.brands.join(', ')}</Text>}
+        {shop.available_repairs?.length > 0 && (
+          <Text>Services: {shop.available_repairs.map(r => r.name).join(', ')}</Text>
+        )}
+        {shop.offers_guarantee && <Text>🛡️ Offers Guarantees</Text>}
+        <Text>Rating: {shop.average_rating} ({shop.review_count} reviews)</Text>
+        <Text>Completed Repairs: {shop.completed_repairs_count}</Text>
+      </Card.Content>
+    </Card>
+  );
+
   return (
     <FlatList
       style={styles.container}
       data={isClientAccount ? vehicles : []}
       keyExtractor={(item) => item.id.toString()}
       renderItem={isClientAccount ? renderVehicle : null}
-      ListHeaderComponent={renderHeader}
+      ListHeaderComponent={() => (
+        <>
+          {renderHeader()}
+          {renderDetailsSection()}
+        </>
+      )}
       ListEmptyComponent={isClientAccount && !vehicles.length && <Text>No vehicles found.</Text>}
     />
   );
