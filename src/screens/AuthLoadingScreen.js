@@ -16,7 +16,7 @@ export default function AuthLoadingScreen({ navigation }) {
           navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
         }
       } else {
-        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+        navigation.reset({ index: 0, routes: [{ name: 'PublicHome' }] });
       }
     };
 

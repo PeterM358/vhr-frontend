@@ -9,6 +9,8 @@ import { useNavigation } from '@react-navigation/native';
 import { Text, Badge } from 'react-native-paper';
 import HomeScreen from '../screens/HomeScreen';
 import { WebSocketContext } from '../context/WebSocketManager';
+import { AuthContext } from '../context/AuthManager';
+import { logout } from '../api/auth';
 
 import MainText from '../../assets/main-text.png'; // ✅ Your bottom makeing image
 
@@ -17,10 +19,15 @@ const Drawer = createDrawerNavigator();
 function CustomDrawerContent(props) {
   const navigation = useNavigation();
   const { notifications } = useContext(WebSocketContext);
+  const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
 
   const unseenPromotions = notifications.filter(n => !n.is_read && n.repair == null).length;
   const unseenOffers = notifications.filter(n => !n.is_read && n.repair != null).length;
   const totalOffersBadge = unseenPromotions + unseenOffers;
+
+  const handleLogout = async () => {
+    await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
+  };
 
   return (
     <DrawerContentScrollView
@@ -69,9 +76,7 @@ function CustomDrawerContent(props) {
         />
         <DrawerItem
           label="Logout"
-          onPress={() =>
-            navigation.reset({ index: 0, routes: [{ name: 'Login' }] })
-          }
+          onPress={handleLogout}
           icon={() => <Text>🚪</Text>}
         />
       </View>

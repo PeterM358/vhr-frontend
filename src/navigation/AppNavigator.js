@@ -10,6 +10,7 @@ import { useTheme } from 'react-native-paper';
 // Screens
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
+import PublicHomeScreen from '../screens/PublicHomeScreen';
 import ClientVehiclesScreen from '../screens/ClientVehiclesScreen';
 import ShopMapScreen from '../screens/ShopMapScreen';
 import VehicleDetailScreen from '../screens/VehicleDetailScreen';
@@ -84,6 +85,7 @@ export default function AppNavigator() {
         }}
       >
         <Stack.Screen name="AuthLoading" component={AuthLoadingScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="PublicHome" component={PublicHomeScreen} options={{ title: 'Home' }} />
         <Stack.Screen name="Login" component={LoginScreen} options={{ title: '' }}/>
         <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Sign Up' }}/>
         <Stack.Screen name="Home" component={HomeDrawer} options={{ headerShown: false }} />

@@ -34,19 +34,32 @@ export default function ShopDetailScreen({ route, navigation }) {
   }, [shopId]);
 
   const loadData = async () => {
-    const token = await AsyncStorage.getItem('@access_token');
-    const storedUserId = await AsyncStorage.getItem('@user_id');
-    const storedIsShop = await AsyncStorage.getItem('@is_shop');
-
-    setUserId(storedUserId);
-    const isShopAccount = storedIsShop === 'true';
-    setIsClientAccount(!isShopAccount);
-
     try {
+      const token = await AsyncStorage.getItem('@access_token');
+      const storedUserId = await AsyncStorage.getItem('@user_id');
+      const storedIsShop = await AsyncStorage.getItem('@is_shop');
+
+      setUserId(storedUserId);
+
+      // If not logged in, load public shop detail only.
+      if (!token) {
+        const shopData = await getShopById(shopId, null);
+        setShop(shopData);
+        setIsOwner(false);
+        setIsClientAccount(false);
+        setVehicles([]);
+        return;
+      }
+
+      const isShopAccount = storedIsShop === 'true';
+      setIsClientAccount(!isShopAccount);
+
       const shopData = await getShopById(shopId, token);
       setShop(shopData);
 
-      const ownerCheck = shopData.users.includes(parseInt(storedUserId));
+      const ownerCheck = storedUserId
+        ? shopData.users.includes(parseInt(storedUserId, 10))
+        : false;
       setIsOwner(ownerCheck);
 
       if (!isShopAccount) {
@@ -57,7 +70,8 @@ export default function ShopDetailScreen({ route, navigation }) {
       }
 
     } catch (error) {
-      Alert.alert('Error', 'Failed to load shop or vehicles.');
+      console.error('Failed to load shop detail:', error);
+      Alert.alert('Error', 'Failed to load shop details.');
     } finally {
       setLoading(false);
     }

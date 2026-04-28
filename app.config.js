@@ -26,14 +26,6 @@ export default {
             useFrameworks: "static"
           }
         }
-      ],
-      [
-        "expo-firebase-core",
-        {
-          "ios": {
-            "googleServicesFile": "./GoogleService-Info.plist"
-          }
-        }
       ]
     ],
     splash: {

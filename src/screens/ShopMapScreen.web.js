@@ -47,7 +47,6 @@ export default function ShopMapScreen() {
   const [center, setCenter] = useState([42.6977, 23.3219]); // Sofia center
   const [zoom, setZoom] = useState(12);
   const [loading, setLoading] = useState(true);
-  const [selectedShop, setSelectedShop] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
 
   useEffect(() => {
@@ -73,17 +72,30 @@ export default function ShopMapScreen() {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const userIdStr = await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
-      const userId = parseInt(userIdStr, 10);
+      const userId = userIdStr ? parseInt(userIdStr, 10) : null;
+      const hasValidToken =
+        !!token && token !== 'null' && token !== 'undefined';
 
       const url = `${API_BASE_URL}/api/profiles/shops/${address ? `?address=${encodeURIComponent(address)}` : ''}`;
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
+      const headers = hasValidToken ? { Authorization: `Bearer ${token}` } : {};
+      let response = await fetch(url, { headers });
+      let data = await response.json();
 
-      const updatedShops = data.map(shop => ({
+      // If a stale token sneaks in, retry as true guest.
+      if (!response.ok && response.status === 401 && hasValidToken) {
+        response = await fetch(url, { headers: {} });
+        data = await response.json();
+      }
+
+      if (!response.ok) {
+        console.error('Shop fetch failed:', response.status, data);
+        throw new Error(data?.detail || 'Could not load shops');
+      }
+
+      const shopsArray = Array.isArray(data) ? data : [];
+      const updatedShops = shopsArray.map(shop => ({
         ...shop,
-        isMyShop: Array.isArray(shop.users) && shop.users.includes(userId),
+        isMyShop: Number.isInteger(userId) && Array.isArray(shop.users) && shop.users.includes(userId),
       }));
 
       setShops(updatedShops);
@@ -101,12 +113,6 @@ export default function ShopMapScreen() {
 
   const handleSearch = () => {
     fetchShops(addressQuery);
-  };
-
-  const handleViewDetails = () => {
-    if (selectedShop) {
-      navigation.navigate('ShopDetail', { shopId: selectedShop.id });
-    }
   };
 
   if (loading) {
@@ -172,9 +178,6 @@ export default function ShopMapScreen() {
             <Marker
               key={shop.id}
               position={[shop.latitude, shop.longitude]}
-              eventHandlers={{
-                click: () => setSelectedShop(shop),
-              }}
               icon={L.icon({
                 iconUrl: shop.isMyShop
                   ? 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png'
@@ -192,6 +195,13 @@ export default function ShopMapScreen() {
                   <Text style={{ marginBottom: 4 }}>{shop.address}</Text>
 
                   <Pressable
+                    style={[styles.popupButton, styles.detailsButton]}
+                    onPress={() => navigation.navigate('ShopDetail', { shopId: shop.id })}
+                  >
+                    <Text style={styles.popupButtonText}>View Details</Text>
+                  </Pressable>
+
+                  <Pressable
                     style={styles.popupButton}
                     onPress={() => {
                       const gmaps = `https://www.google.com/maps/search/?api=1&query=${shop.latitude},${shop.longitude}`;
@@ -205,17 +215,6 @@ export default function ShopMapScreen() {
             </Marker>
         ))}
       </MapContainer>
-
-      {selectedShop && (
-        <View style={styles.detailsBox}>
-          <Text style={styles.detailsText}>
-            Selected: {selectedShop.name} - {selectedShop.address}
-          </Text>
-          <Pressable style={styles.detailsButton} onPress={handleViewDetails}>
-            <Text style={styles.detailsButtonText}>View Details</Text>
-          </Pressable>
-        </View>
-      )}
     </View>
   );
 }
@@ -282,30 +281,12 @@ const styles = StyleSheet.create({
     marginTop: 6,
     alignItems: 'center',
   },
+  detailsButton: {
+    backgroundColor: '#007AFF',
+  },
   popupButtonText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 14,
-  },
-  detailsBox: {
-    padding: 12,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderColor: '#ddd',
-    alignItems: 'center',
-  },
-  detailsText: {
-    marginBottom: 8,
-    fontSize: 16,
-  },
-  detailsButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  detailsButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
   },
 });

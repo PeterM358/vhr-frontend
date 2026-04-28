@@ -18,10 +18,13 @@ export const getShops = async (token, address = '') => {
 
 // api/shops.js
 export async function getShopById(shopId, token) {
+  const headers =
+    token && token !== 'null' && token !== 'undefined'
+      ? { Authorization: `Bearer ${token}` }
+      : {};
+
   const response = await fetch(`${API_BASE_URL}/api/profiles/shops/${shopId}/`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers,
   });
 
   if (!response.ok) {

@@ -17,6 +17,8 @@ import ChooseShopScreen from '../screens/ChooseShopScreen';
 import ShopProfileScreen from '../screens/ShopProfileScreen';
 
 import { WebSocketContext } from '../context/WebSocketManager';
+import { AuthContext } from '../context/AuthManager';
+import { logout } from '../api/auth';
 import MainText from '../../assets/main-text.png'; // ✅ Makeing image at bottom
 
 const Drawer = createDrawerNavigator();
@@ -24,7 +26,12 @@ const Drawer = createDrawerNavigator();
 function CustomDrawerContent(props) {
   const navigation = useNavigation();
   const { notifications } = useContext(WebSocketContext);
+  const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
   const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  const handleLogout = async () => {
+    await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
+  };
 
   return (
     <DrawerContentScrollView
@@ -58,7 +65,7 @@ function CustomDrawerContent(props) {
         <DrawerItem label="Switch Shop" onPress={() => navigation.navigate('ChooseShop')} icon={() => <Text>🏪</Text>} />
         <DrawerItem
           label="Logout"
-          onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })}
+          onPress={handleLogout}
           icon={() => <Text>🚪</Text>}
         />
       </View>

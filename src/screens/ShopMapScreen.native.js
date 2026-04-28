@@ -31,19 +31,24 @@ export default function ShopMapScreen({ navigation }) {
     setLoading(true);
     const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     const userIdStr = await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
-    const userId = parseInt(userIdStr, 10);
+    const userId = userIdStr ? parseInt(userIdStr, 10) : null;
     console.log(`[${getNow()}] 👤 ShopMapScreen: User ID is ${userId}`);
 
     try {
       const url = `${API_BASE_URL}/api/profiles/shops/${address ? `?address=${encodeURIComponent(address)}` : ''}`;
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await fetch(url, { headers });
       const data = await response.json();
 
-      const updatedShops = data.map((shop) => ({
+      if (!response.ok) {
+        console.error('Shop fetch failed:', response.status, data);
+        throw new Error(data?.detail || 'Could not load shops');
+      }
+
+      const shopsArray = Array.isArray(data) ? data : [];
+      const updatedShops = shopsArray.map((shop) => ({
         ...shop,
-        isMyShop: Array.isArray(shop.users) && shop.users.includes(userId),
+        isMyShop: Number.isInteger(userId) && Array.isArray(shop.users) && shop.users.includes(userId),
       }));
 
       setShops(updatedShops);
@@ -53,8 +58,7 @@ export default function ShopMapScreen({ navigation }) {
     } finally {
       setLoading(false);
       const elapsed = Date.now() - fetchStart;
-      const totalElapsed = Date.now() - startTime;
-      console.log(`[${getNow()}] ✅ ShopMapScreen: Finished fetching shops. Elapsed: ${elapsed}ms, Total since open: ${totalElapsed}ms`);
+      console.log(`[${getNow()}] ✅ ShopMapScreen: Finished fetching shops. Elapsed: ${elapsed}ms`);
     }
   };
 
@@ -63,6 +67,7 @@ export default function ShopMapScreen({ navigation }) {
     console.log(`[${getNow()}] 🟡 ShopMapScreen: Starting fetchEverything...`);
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
+      setLoading(false);
       Alert.alert('Permission denied', 'Location access is required.');
       return;
     }

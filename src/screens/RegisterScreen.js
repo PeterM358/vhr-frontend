@@ -1,10 +1,9 @@
-// PATH: src/screens/RegisterScreen.js
-
 import React, { useState, useLayoutEffect } from 'react';
 import { StyleSheet, View, SafeAreaView, Pressable } from 'react-native';
 import { Text, TextInput, useTheme, Button, Portal, Dialog, ActivityIndicator } from 'react-native-paper';
 import { register } from '../api/auth';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import BaseStyles from '../styles/base';
 
 export default function RegisterScreen({ navigation }) {
   const theme = useTheme();
@@ -86,7 +85,7 @@ export default function RegisterScreen({ navigation }) {
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <View style={{ flex: 1 }}>
         <KeyboardAwareScrollView
-          contentContainerStyle={styles.container}
+          contentContainerStyle={BaseStyles.container}
           keyboardShouldPersistTaps="always"
           enableOnAndroid
           extraScrollHeight={20}
@@ -98,7 +97,7 @@ export default function RegisterScreen({ navigation }) {
             onChangeText={setEmailOrPhone}
             keyboardType="email-address"
             autoCapitalize="none"
-            style={styles.input}
+            style={BaseStyles.formInput}
           />
 
           <TextInput
@@ -107,7 +106,7 @@ export default function RegisterScreen({ navigation }) {
             secureTextEntry
             value={password}
             onChangeText={setPassword}
-            style={styles.input}
+            style={BaseStyles.formInput}
           />
 
           <Text style={styles.rolePrompt}>Select your role:</Text>
@@ -191,14 +190,6 @@ export default function RegisterScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  input: {
-    marginBottom: 16,
-  },
   rolePrompt: {
     fontSize: 16,
     marginBottom: 10,

@@ -28,7 +28,6 @@ import {
   getRepairChatMessages,
   sendRepairChatMessage,
   getRepairChatsByRepairId,
-  // getRepairChatById, // <-- No longer used
 } from '../api/repairs';
 import { getShopParts, prepareRepairPartsData } from '../api/parts';
 import { getOffersForRepair, bookOffer, unbookOffer } from '../api/offers';
@@ -189,12 +188,14 @@ export default function RepairDetailScreen({ route, navigation }) {
         // Check if a chat already exists for this shop
         if (shopFlag === 'true' && shopProfileIdStored) {
           const chatList = await getRepairChatsByRepairId(token, repairId);
-          const existingChat = chatList.find(chat => parseInt(chat.shop) === parseInt(shopProfileIdStored));
+          const existingChat = chatList.find(chat =>
+            parseInt(chat.shop_id ?? chat.shop) === parseInt(shopProfileIdStored)
+          );
           if (existingChat) {
             setChatId(existingChat.id);
-            const fullChat = await getRepairChatById(token, existingChat.id);
-            setActiveChat(fullChat);
-            setChatMessages(fullChat.messages || []);
+            setActiveChat(existingChat);
+            const messages = await getRepairChatMessages(token, existingChat.id);
+            setChatMessages(messages);
           }
         } else {
           const chatList = await getRepairChatsByRepairId(token, repairId);
@@ -275,9 +276,42 @@ export default function RepairDetailScreen({ route, navigation }) {
     const unsubscribe = navigation.addListener('focus', () => {
       refreshRepair();
       refreshOffers();
+      refreshChat();
     });
     return unsubscribe;
-  }, [navigation, repairId]);
+  }, [navigation, repairId, isShop, shopProfileId, chatId, selectedChatId]);
+
+  const refreshChat = async () => {
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      if (isShop) {
+        if (chatId) {
+          const messages = await getRepairChatMessages(token, chatId);
+          setChatMessages(messages);
+        } else if (shopProfileId) {
+          const chatList = await getRepairChatsByRepairId(token, repairId);
+          const existingChat = chatList.find(chat =>
+            parseInt(chat.shop_id ?? chat.shop) === parseInt(shopProfileId)
+          );
+          if (existingChat) {
+            setChatId(existingChat.id);
+            setActiveChat(existingChat);
+            const messages = await getRepairChatMessages(token, existingChat.id);
+            setChatMessages(messages);
+          }
+        }
+      } else {
+        const chatList = await getRepairChatsByRepairId(token, repairId);
+        setRepairChats(chatList);
+        if (selectedChatId) {
+          const messages = await getRepairChatMessages(token, selectedChatId);
+          setChatMessages(messages);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to refresh chat:', err);
+    }
+  };
 
   const refreshOffers = async () => {
     const token = await AsyncStorage.getItem('@access_token');
@@ -582,6 +616,20 @@ export default function RepairDetailScreen({ route, navigation }) {
               />
               {sectionExpanded.offers && (
                 <Card.Content>
+                  {isShop && shopProfileId !== null && repair.status !== 'done' && !offers.some(o => parseInt(o.shop) === shopProfileId) && (
+                    <Button
+                      mode="contained"
+                      onPress={() =>
+                        navigation.navigate('CreateOrUpdateOffer', {
+                          repairId,
+                          selectedOfferParts: [],
+                        })
+                      }
+                      style={{ marginBottom: 10 }}
+                    >
+                      Send Offer
+                    </Button>
+                  )}
                   {offers.length === 0 ? (
                     <Text style={{ textAlign: 'center', marginVertical: 10 }}>No offers yet.</Text>
                   ) : (

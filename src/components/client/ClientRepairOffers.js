@@ -27,7 +27,7 @@ export default function ClientRepairOffers({ onUpdateUnseenOffersCount }) {
     try {
       const token = await AsyncStorage.getItem('@access_token');
 
-      const res = await fetch(`${API_BASE_URL}/api/offers/?is_promotion=0`, {
+      const res = await fetch(`${API_BASE_URL}/api/offers/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();

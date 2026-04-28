@@ -10,11 +10,6 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
   const [repairId, setRepairId] = useState(route.params?.repairId || existingOffer?.repair || null);
   const theme = useTheme();
 
-  if (existingOffer) {
-    // This block was moved above useState declarations as per instructions.
-  }
-
-  const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [parts, setParts] = useState([]);
@@ -62,22 +57,19 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
       setParts(normalized);
     }
 
-    // Rehydrate fields only if not already set
-    if (!title && existingOffer?.title) setTitle(existingOffer.title);
     if (!description && existingOffer?.description) setDescription(existingOffer.description);
     if (!price && existingOffer?.price) setPrice(existingOffer.price?.toString());
   }, [route.params]);
 
   const handleSubmit = async () => {
-    if (!title || !repairId) {
-      Alert.alert('Missing Info', 'Please provide a title and make sure repair ID is present');
+    if (!description || !repairId) {
+      Alert.alert('Missing Info', 'Please provide a description and make sure repair ID is present');
       return;
     }
 
     try {
       const token = await AsyncStorage.getItem('@access_token');
       const payload = {
-        title,
         description,
         price: price ? parseFloat(price) : null,
         repair: repairId,
@@ -129,13 +121,6 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         <Card style={styles.formCard}>
           <Card.Title title={existingOffer ? 'Update Offer' : 'Create Offer'} />
           <Card.Content>
-            <TextInput
-              mode="outlined"
-              label="Title"
-              value={title}
-              onChangeText={setTitle}
-              style={styles.input}
-            />
             <TextInput
               mode="outlined"
               label="Description"
