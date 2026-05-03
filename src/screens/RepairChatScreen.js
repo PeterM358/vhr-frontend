@@ -324,24 +324,25 @@ export default function RepairChatScreen({ route, navigation }) {
       headerTitle: 'Details',
       headerBackTitleVisible: true,
       headerBackTitle: 'Back',
-      headerTintColor: theme.colors.onPrimary,
-      headerStyle: {
-        backgroundColor: theme.colors.primary,
-      },
-      headerBackImage: undefined, // Use default system arrow
+      headerTransparent: true,
+      headerShadowVisible: false,
+      headerStyle: { backgroundColor: 'transparent' },
+      headerTintColor: '#1e293b',
+      headerTitleStyle: { color: '#1e293b', fontWeight: '600' },
+      headerBackImage: undefined,
       headerRight: () =>
         isShop && repair && repair.status !== 'done' ? (
           <Button
             mode="text"
             compact
             onPress={handleSaveParts}
-            labelStyle={{ color: theme.colors.onPrimary, fontSize: 16 }}
+            labelStyle={{ color: '#1e293b', fontSize: 16 }}
           >
             Save
           </Button>
         ) : null,
     });
-  }, [navigation, selectedParts, isShop, repair, theme.colors.primary, theme.colors.onPrimary]);
+  }, [navigation, selectedParts, isShop, repair]);
 
   const handleSaveParts = async () => {
     try {

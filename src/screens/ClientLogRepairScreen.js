@@ -12,6 +12,9 @@ import { Picker } from '@react-native-picker/picker';
 import { createRepair } from '../api/repairs';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { API_BASE_URL } from '../api/config';
+import BASE_STYLES from '../styles/base';
+import { COLORS } from '../styles/colors';
+import ScreenBackground from '../components/ScreenBackground';
 
 export default function ClientLogRepairScreen({ navigation, route }) {
   const theme = useTheme();
@@ -138,7 +141,8 @@ export default function ClientLogRepairScreen({ navigation, route }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScreenBackground>
+    <ScrollView contentContainerStyle={BASE_STYLES.formScreen}>
       <Text variant="titleLarge" style={styles.title}>Log Personal Repair</Text>
 
       <TextInput
@@ -236,11 +240,11 @@ export default function ClientLogRepairScreen({ navigation, route }) {
         </Dialog>
       </Portal>
     </ScrollView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16 },
   title: { marginBottom: 16 },
   input: { marginVertical: 8 },
   label: {
@@ -284,5 +288,7 @@ const styles = StyleSheet.create({
   partCard: {
     marginVertical: 8,
     backgroundColor: '#f9f9f9',
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
   },
 });

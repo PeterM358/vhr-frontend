@@ -18,10 +18,12 @@ import {
   ZoomControl,
 } from 'react-leaflet';
 import L from 'leaflet';
+import { COLORS } from '../styles/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useNavigation } from '@react-navigation/native';
 import { API_BASE_URL } from '../api/config';
+import BASE_STYLES from '../styles/base';
 // import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet's default icon URLs
@@ -117,7 +119,7 @@ export default function ShopMapScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loader}>
+      <View style={BASE_STYLES.loadingCenter}>
         <ActivityIndicator size="large" />
       </View>
     );
@@ -125,17 +127,27 @@ export default function ShopMapScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Search box */}
-      <View style={styles.searchContainer}>
-        <TextInput
-          placeholder="Search by address..."
-          value={addressQuery}
-          onChangeText={setAddressQuery}
-          style={styles.searchInput}
-        />
-        <Pressable style={styles.searchButton} onPress={handleSearch}>
-          <Text style={styles.searchButtonText}>Search</Text>
+      <View style={styles.topChrome}>
+        <Pressable
+          style={({ hovered, pressed }) => [
+            styles.backPill,
+            (pressed || hovered) && styles.backPillPressed,
+          ]}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backPillIcon}>←</Text>
         </Pressable>
+        <View style={styles.searchContainer}>
+          <TextInput
+            placeholder="Search by address..."
+            value={addressQuery}
+            onChangeText={setAddressQuery}
+            style={styles.searchInput}
+          />
+          <Pressable style={styles.searchButton} onPress={handleSearch}>
+            <Text style={styles.searchButtonText}>Search</Text>
+          </Pressable>
+        </View>
       </View>
 
       <MapContainer center={center} zoom={zoom} style={styles.map} zoomControl={false}>
@@ -222,38 +234,47 @@ export default function ShopMapScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, position: 'relative' },
   map: { flex: 1, height: '100%', width: '100%' },
-  loader: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backButton: {
+  topChrome: {
     position: 'absolute',
-    top: 20,
-    left: 20,
+    top: 14,
+    left: 16,
+    right: 16,
     zIndex: 1100,
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'stretch',
   },
-  backButtonText: {
+  backPill: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(15,23,42,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.22)',
+    cursor: 'pointer',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
+  },
+  backPillPressed: {
+    opacity: 0.9,
+  },
+  backPillIcon: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '700',
+    lineHeight: 24,
   },
   searchContainer: {
-    position: 'absolute',
-    top: 5,
-    left: 20,
-    right: 20,
+    flex: 1,
     zIndex: 1000,
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 8,
-    boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.25)',
     gap: 10,
   },
   searchInput: {
@@ -265,7 +286,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   searchButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
@@ -282,7 +303,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   detailsButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: COLORS.primary,
   },
   popupButtonText: {
     color: '#fff',

@@ -5,7 +5,7 @@
 import React, { useContext } from 'react';
 import { View, StyleSheet, Image } from 'react-native';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
-import { useNavigation } from '@react-navigation/native';
+import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { Text, Badge } from 'react-native-paper';
 
 import ShopHomeScreen from '../screens/ShopHomeScreen';
@@ -19,7 +19,7 @@ import ShopProfileScreen from '../screens/ShopProfileScreen';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import { logout } from '../api/auth';
-import MainText from '../../assets/main-text.png'; // ✅ Makeing image at bottom
+import MainText from '../assets/images/main-text.png'; // ✅ Makeing image at bottom
 
 const Drawer = createDrawerNavigator();
 
@@ -47,7 +47,13 @@ function CustomDrawerContent(props) {
           onPress={() => navigation.navigate('ShopProfile')}
           icon={() => <Text>🏢</Text>}
         />
-        <DrawerItem label="Repairs" onPress={() => navigation.navigate('RepairsList')} icon={() => <Text>🛠️</Text>} />
+        <DrawerItem
+          label="Repairs"
+          onPress={() =>
+            props.navigation.dispatch(DrawerActions.jumpTo('RepairsList'))
+          }
+          icon={() => <Text>🛠️</Text>}
+        />
         <DrawerItem label="Clients" onPress={() => navigation.navigate('AuthorizedClients')} icon={() => <Text>👥</Text>} />
         <DrawerItem label="Promotions" onPress={() => navigation.navigate('ShopPromotions')} icon={() => <Text>🏷️</Text>} />
 

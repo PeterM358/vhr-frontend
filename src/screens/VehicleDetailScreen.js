@@ -2,22 +2,24 @@
  * PATH: src/screens/VehicleDetailScreen.js
  */
 
-import React, { useEffect, useState, useLayoutEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FlatList, ActivityIndicator, StyleSheet, View, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  Card,
   Text,
-  Button,
   useTheme,
-  Surface,
   FAB,
   SegmentedButtons,
-  IconButton
+  TouchableRipple,
 } from 'react-native-paper';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { API_BASE_URL } from '../api/config';
+import ScreenBackground from '../components/ScreenBackground';
+import { stackContentPaddingTop } from '../navigation/stackContentInset';
 
 export default function VehicleDetailScreen({ route, navigation }) {
+  const insets = useSafeAreaInsets();
   const { vehicleId } = route.params;
   const [vehicle, setVehicle] = useState(null);
   const [repairs, setRepairs] = useState([]);
@@ -27,17 +29,6 @@ export default function VehicleDetailScreen({ route, navigation }) {
 
   const theme = useTheme();
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerBackTitleVisible: false,
-      headerTintColor: theme.colors.onPrimary,
-      headerStyle: {
-        backgroundColor: theme.colors.primary,
-      },
-      headerLeft: undefined,
-    });
-  }, [navigation, isShop, theme.colors.primary, theme.colors.onPrimary]);
-  // ✅ Load isShop flag from storage
   useEffect(() => {
     const loadRole = async () => {
       const val = await AsyncStorage.getItem('@is_shop');
@@ -67,33 +58,82 @@ export default function VehicleDetailScreen({ route, navigation }) {
   }, [vehicleId]);
 
   if (loading) {
-    return <ActivityIndicator size="large" color={theme.colors.primary} style={styles.loading} />;
+    return (
+      <ScreenBackground safeArea={false}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#fff" />
+        </View>
+      </ScreenBackground>
+    );
   }
 
   if (!vehicle) {
-    return <Text style={[styles.emptyText, { color: theme.colors.onBackground }]}>Vehicle not found.</Text>;
+    return (
+      <ScreenBackground safeArea={false}>
+        <View style={styles.center}>
+          <Text style={styles.emptyText}>Vehicle not found.</Text>
+        </View>
+      </ScreenBackground>
+    );
   }
 
-  const filteredRepairs = repairs.filter(r => {
+  const filteredRepairs = repairs.filter((r) => {
     if (activeTab === 'repairs') return r.status === 'done';
     if (activeTab === 'offers') return r.status === 'offer';
     return false;
   });
 
+  const renderRepair = ({ item }) => (
+    <TouchableRipple
+      borderless
+      style={styles.repairCard}
+      onPress={() => navigation.navigate('RepairChat', { repairId: item.id })}
+    >
+      <View>
+        <Text style={styles.repairTitle} numberOfLines={1}>
+          {item.repair_type_name || 'Repair'}
+        </Text>
+        <Text style={styles.repairMeta}>Status: {item.status}</Text>
+        {item.description ? (
+          <Text style={styles.repairDesc} numberOfLines={2}>
+            {item.description}
+          </Text>
+        ) : null}
+      </View>
+    </TouchableRipple>
+  );
+
   return (
-    <View style={{ flex: 1 }}>
-      <Surface style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <Card mode="outlined" style={[styles.vehicleCard, { borderColor: theme.colors.primary }]}>
-          <Card.Title
-            title={`Plate: ${vehicle.license_plate}`}
-            titleStyle={{ color: theme.colors.onSurface }}
-          />
-          <Card.Content>
-            <Text style={{ color: theme.colors.onSurface }}>Make: {vehicle.make_name}</Text>
-            <Text style={{ color: theme.colors.onSurface }}>Model: {vehicle.model_name}</Text>
-            <Text style={{ color: theme.colors.onSurface }}>Year: {vehicle.year}</Text>
-          </Card.Content>
-        </Card>
+    <ScreenBackground safeArea={false}>
+      <View style={[styles.container, { paddingTop: stackContentPaddingTop(insets, 12) }]}>
+        {/* Hero card */}
+        <View style={styles.heroCard}>
+          <View style={styles.heroIconWrap}>
+            <MaterialCommunityIcons name="car-sports" size={36} color="#fff" />
+          </View>
+
+          <View style={styles.heroBody}>
+            <View style={styles.heroTopRow}>
+              <Text style={styles.heroPlate} numberOfLines={1}>
+                {vehicle.license_plate || '—'}
+              </Text>
+              {vehicle.year ? (
+                <View style={styles.heroBadge}>
+                  <Text style={styles.heroBadgeText}>{vehicle.year}</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={styles.heroMakeModel} numberOfLines={1}>
+              {[vehicle.make_name, vehicle.model_name].filter(Boolean).join(' ') ||
+                'Unknown vehicle'}
+            </Text>
+            {vehicle.kilometers != null && vehicle.kilometers !== '' ? (
+              <Text style={styles.heroKm}>
+                {Number(vehicle.kilometers).toLocaleString()} km
+              </Text>
+            ) : null}
+          </View>
+        </View>
 
         <SegmentedButtons
           value={activeTab}
@@ -106,22 +146,14 @@ export default function VehicleDetailScreen({ route, navigation }) {
               icon: 'car-wrench',
               style: {
                 backgroundColor:
-                  activeTab === 'repairs' ? theme.colors.primary : theme.colors.surface,
+                  activeTab === 'repairs' ? theme.colors.primary : 'rgba(255,255,255,0.92)',
                 borderColor: theme.colors.primary,
                 borderWidth: 1,
               },
               labelStyle: {
                 color:
-                  activeTab === 'repairs'
-                    ? theme.colors.onPrimary
-                    : theme.colors.primary,
+                  activeTab === 'repairs' ? theme.colors.onPrimary : theme.colors.primary,
                 fontWeight: 'bold',
-              },
-              icon: {
-                color:
-                  activeTab === 'repairs'
-                    ? theme.colors.onPrimary
-                    : theme.colors.primary,
               },
             },
             {
@@ -130,22 +162,14 @@ export default function VehicleDetailScreen({ route, navigation }) {
               icon: 'tag-outline',
               style: {
                 backgroundColor:
-                  activeTab === 'offers' ? theme.colors.primary : theme.colors.surface,
+                  activeTab === 'offers' ? theme.colors.primary : 'rgba(255,255,255,0.92)',
                 borderColor: theme.colors.primary,
                 borderWidth: 1,
               },
               labelStyle: {
                 color:
-                  activeTab === 'offers'
-                    ? theme.colors.onPrimary
-                    : theme.colors.primary,
+                  activeTab === 'offers' ? theme.colors.onPrimary : theme.colors.primary,
                 fontWeight: 'bold',
-              },
-              icon: {
-                color:
-                  activeTab === 'offers'
-                    ? theme.colors.onPrimary
-                    : theme.colors.primary,
               },
             },
           ]}
@@ -155,24 +179,12 @@ export default function VehicleDetailScreen({ route, navigation }) {
           data={filteredRepairs}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <Card
-              mode="outlined"
-              style={[styles.repairCard, { borderColor: theme.colors.primary }]}
-              onPress={() => navigation.navigate('RepairChat', { repairId: item.id })}
-            >
-              <Card.Content>
-                <Text style={[styles.repairTitle, { color: theme.colors.onSurface }]}>{item.repair_type_name}</Text>
-                <Text style={{ color: theme.colors.onSurface }}>Status: {item.status}</Text>
-                <Text style={{ color: theme.colors.onSurface }}>{item.description}</Text>
-              </Card.Content>
-            </Card>
-          )}
+          renderItem={renderRepair}
           ListEmptyComponent={
-            <Text style={[styles.emptyText, { color: theme.colors.onSurface }]}>No {activeTab} found.</Text>
+            <Text style={styles.emptyText}>No {activeTab} found.</Text>
           }
         />
-      </Surface>
+      </View>
 
       <FAB
         icon="plus"
@@ -212,45 +224,116 @@ export default function VehicleDetailScreen({ route, navigation }) {
           }
         }}
       />
-    </View>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 12,
+    paddingHorizontal: 16,
   },
-  vehicleCard: {
-    marginBottom: 12,
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(5,15,30,0.72)',
+    borderColor: 'rgba(255,255,255,0.16)',
     borderWidth: 1,
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 14,
   },
-  loading: {
-    marginTop: 50,
-  },
-  listContent: {
-    paddingBottom: 80,
-  },
-  repairCard: {
-    marginVertical: 6,
+  heroIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
   },
-  repairTitle: {
-    fontWeight: 'bold',
+  heroBody: {
+    flex: 1,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 4,
   },
-  emptyText: {
-    textAlign: 'center',
-    marginVertical: 20,
+  heroPlate: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.5,
   },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
+  heroBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    marginLeft: 8,
+  },
+  heroBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  heroMakeModel: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.92)',
+    marginBottom: 2,
+  },
+  heroKm: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
   },
   segmented: {
     marginVertical: 12,
     alignSelf: 'center',
     width: '90%',
+  },
+  listContent: {
+    paddingBottom: 100,
+  },
+  repairCard: {
+    backgroundColor: 'rgba(5,15,30,0.72)',
+    borderColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+  },
+  repairTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  repairMeta: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.78)',
+    marginBottom: 2,
+  },
+  repairDesc: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.65)',
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginVertical: 20,
+    color: 'rgba(255,255,255,0.85)',
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
   },
 });

@@ -2,21 +2,27 @@ import React, { useState, useEffect, useContext } from 'react';
 import { ScrollView, StyleSheet, View, Platform } from 'react-native';
 import { Text, TextInput, Button, ActivityIndicator, useTheme } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { login } from '../api/auth';
 import { sendFirebaseTokenToBackend } from '../api/notifications';
 
 import { getFirebaseToken } from '../notifications/firebaseMessaging';
 import { AuthContext } from '../context/AuthManager';
-import Logo from '../../assets/logo.svg';
-import { STORAGE_KEYS } from '../constants/storageKeys'; // ✅ Make sure you have these constants
+import Logo from '../assets/images/logo.svg';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 import * as Google from 'expo-auth-session/providers/google';
 import { googleLogin } from '../api/auth';
 import { makeRedirectUri } from 'expo-auth-session';
 import BaseStyles from '../styles/base';
+import ScreenBackground from '../components/ScreenBackground';
+import { COLORS } from '../constants/colors';
 
 export default function LoginScreen({ navigation }) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { setIsAuthenticated, setAuthToken, setUserEmailOrPhone } = useContext(AuthContext);
+
+  const headerReserve = insets.top + (Platform.OS === 'ios' ? 52 : 56);
 
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -44,19 +50,19 @@ export default function LoginScreen({ navigation }) {
   );
 
   useEffect(() => {
-    console.log("🟢 Google response changed:", googleResponse);
+    console.log('🟢 Google response changed:', googleResponse);
 
     const handleGoogleLogin = async () => {
-      console.log("🟢 Starting handleGoogleLogin with response:", googleResponse);
+      console.log('🟢 Starting handleGoogleLogin with response:', googleResponse);
 
       if (googleResponse?.type === 'success') {
         try {
           const { code } = googleResponse.params;
-          console.log("📡 Authorization Code:", code);
+          console.log('📡 Authorization Code:', code);
 
-          console.log("🔁 Using redirect URI for token exchange:", redirectUri);
+          console.log('🔁 Using redirect URI for token exchange:', redirectUri);
 
-          console.log("📤 Requesting token exchange with code:", code);
+          console.log('📤 Requesting token exchange with code:', code);
           const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -69,18 +75,18 @@ export default function LoginScreen({ navigation }) {
             }).toString(),
           });
 
-          console.log("⏳ Waiting for token response...");
+          console.log('⏳ Waiting for token response...');
           const tokenData = await tokenResponse.json();
-          console.log("🔐 Received tokenData from Google:", tokenData);
+          console.log('🔐 Received tokenData from Google:', tokenData);
 
           if (!tokenData.id_token) {
-            console.error("❌ No id_token received from token exchange");
-            setError("Google login failed: No ID token received.");
+            console.error('❌ No id_token received from token exchange');
+            setError('Google login failed: No ID token received.');
             return;
           }
 
           const id_token = tokenData.id_token;
-          console.log("📡 Sending id_token to Django:", id_token);
+          console.log('📡 Sending id_token to Django:', id_token);
 
           const data = await googleLogin(id_token);
           console.log('✅ Google Login Response from backend:', data);
@@ -101,7 +107,7 @@ export default function LoginScreen({ navigation }) {
           setError('Google login failed. Try again.');
         }
       } else {
-        console.warn("⚠️ Google login response type is not success:", googleResponse?.type);
+        console.warn('⚠️ Google login response type is not success:', googleResponse?.type);
       }
     };
 
@@ -109,28 +115,26 @@ export default function LoginScreen({ navigation }) {
   }, [googleResponse]);
 
   const handleLogin = async () => {
-    console.log("🟢 Starting handleLogin with:", emailOrPhone);
+    console.log('🟢 Starting handleLogin with:', emailOrPhone);
     setError('');
     setLoading(true);
     try {
       await AsyncStorage.setItem('@last_login_email', emailOrPhone.trim());
-      console.log("📤 Sending login request...");
+      console.log('📤 Sending login request...');
       const data = await login(emailOrPhone.trim(), password);
 
-      console.log("✅ Login success. Data:", data);
+      console.log('✅ Login success. Data:', data);
 
       setAuthToken(data.access);
       setIsAuthenticated(true);
       setUserEmailOrPhone(emailOrPhone.trim());
 
-      // Save tokens
       await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.access);
       await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refresh);
       await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, data.user_id.toString());
       await AsyncStorage.setItem(STORAGE_KEYS.IS_SHOP, data.is_shop ? 'true' : 'false');
       await AsyncStorage.setItem(STORAGE_KEYS.IS_CLIENT, data.is_client ? 'true' : 'false');
 
-      // Save shop profiles
       if (data.shop_profiles && data.shop_profiles.length > 0) {
         await AsyncStorage.setItem(STORAGE_KEYS.SHOP_PROFILES, JSON.stringify(data.shop_profiles));
         await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_SHOP_ID, data.shop_profiles[0].id.toString());
@@ -140,7 +144,6 @@ export default function LoginScreen({ navigation }) {
         await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SHOP_ID);
         console.log('⚠️ No shop profiles found');
       }
-
 
       const target = data.is_shop ? 'ShopHome' : 'Home';
 
@@ -156,80 +159,147 @@ export default function LoginScreen({ navigation }) {
   const goToRegister = () => navigation.navigate('Register');
 
   return (
-    <ScrollView contentContainerStyle={BaseStyles.container}>
-      <View style={BaseStyles.logoContainer}>
-        <Logo width={180} height={180} />
-      </View>
-      <Text style={BaseStyles.loginTitle}>Welcome Back!</Text>
-
-      {error ? (
-        <Text style={[BaseStyles.loginError, { color: theme.colors.error }]}>{error}</Text>
-      ) : null}
-
-      <TextInput
-        label="Email or Phone"
-        mode="outlined"
-        value={emailOrPhone}
-        onChangeText={setEmailOrPhone}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        style={BaseStyles.formInput}
-      />
-
-      <TextInput
-        label="Password"
-        mode="outlined"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        style={BaseStyles.formInput}
-      />
-      <Button
-        mode="text"
-        onPress={() => navigation.navigate('PasswordRequestReset')}
-        labelStyle={{ color: theme.colors.primary }}
+    <ScreenBackground safeArea={false}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[
+          styles.scroll,
+          {
+            paddingTop: headerReserve + 8,
+            paddingBottom: Math.max(insets.bottom, 24) + 24,
+          },
+        ]}
       >
-        Forgot Password?
-      </Button>
+        <View style={styles.card}>
+          <View style={BaseStyles.logoContainer}>
+            <Logo width={112} height={112} />
+          </View>
+          <Text style={styles.kicker}>Sign in</Text>
+          <Text style={styles.title}>Welcome back</Text>
+          <Text style={styles.subtitle}>
+            Use your email or phone and password to continue.
+          </Text>
 
-      {loading ? (
-        <ActivityIndicator size="large" style={BaseStyles.loginLoading} color={theme.colors.primary} />
-      ) : (
-        <>
+          {error ? (
+            <Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text>
+          ) : null}
+
+          <TextInput
+            label="Email or Phone"
+            mode="outlined"
+            value={emailOrPhone}
+            onChangeText={setEmailOrPhone}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            style={styles.input}
+          />
+
+          <TextInput
+            label="Password"
+            mode="outlined"
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+            style={styles.input}
+          />
+
           <Button
-            mode="contained"
-            icon="login"
-            onPress={handleLogin}
-            style={BaseStyles.loginButton}
-            contentStyle={BaseStyles.loginButtonContent}
-            labelStyle={BaseStyles.loginButtonLabel}
+            mode="text"
+            onPress={() => navigation.navigate('PasswordRequestReset')}
+            textColor={COLORS.PRIMARY}
+            compact
           >
-            Sign In
+            Forgot password?
           </Button>
-          {/*
-          <Button
-            mode="contained"
-            icon="google"
-            onPress={() => promptGoogleLogin()}
-            style={[BaseStyles.loginButton, { backgroundColor: '#DB4437' }]}
-            contentStyle={BaseStyles.loginButtonContent}
-            labelStyle={BaseStyles.loginButtonLabel}
-          >
-            Sign In with Google
+
+          {loading ? (
+            <ActivityIndicator size="large" style={BaseStyles.loginLoading} color={COLORS.PRIMARY} />
+          ) : (
+            <Button
+              mode="contained"
+              icon="login"
+              onPress={handleLogin}
+              style={[BaseStyles.loginButton, styles.fullBtn]}
+              contentStyle={BaseStyles.loginButtonContent}
+              labelStyle={BaseStyles.loginButtonLabel}
+              buttonColor={theme.colors.primary}
+            >
+              Sign In
+            </Button>
+          )}
+
+          <Text style={styles.subText}>{"Don't have an account?"}</Text>
+          <Button mode="text" onPress={goToRegister} textColor={COLORS.PRIMARY}>
+            Create account
           </Button>
-          */}
-        </>
-      )}
-
-
-      <Text style={BaseStyles.loginSubText}>Don't have an account?</Text>
-      <Button
-        mode="text"
-        onPress={goToRegister}
-        labelStyle={{ color: theme.colors.primary }}
-      >
-        Sign Up
-      </Button>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </ScreenBackground>
   );
 }
+
+const styles = StyleSheet.create({
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+    backgroundColor: COLORS.CARD_FLOATING,
+    borderRadius: 22,
+    paddingHorizontal: 22,
+    paddingVertical: 26,
+    alignItems: 'stretch',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+  },
+  kicker: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: COLORS.PRIMARY,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: COLORS.TEXT_DARK,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: COLORS.TEXT_MUTED,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  errorText: {
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  input: {
+    width: '100%',
+    marginBottom: 10,
+    backgroundColor: '#fff',
+  },
+  fullBtn: {
+    width: '100%',
+    alignSelf: 'center',
+    marginTop: 8,
+  },
+  subText: {
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 14,
+    color: COLORS.TEXT_MUTED,
+  },
+});

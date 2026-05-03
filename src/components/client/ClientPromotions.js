@@ -1,21 +1,21 @@
-import { useTheme, Text, Badge } from 'react-native-paper';
-import React, { useState, useEffect, useContext } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import {
   View,
   Alert,
   RefreshControl,
   StyleSheet,
+  FlatList,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FlatList } from 'react-native';
-import { Card, ActivityIndicator } from 'react-native-paper';
-import { API_BASE_URL } from '../../api/config';
+import { useFocusEffect } from '@react-navigation/native';
+import { useTheme, Text, ActivityIndicator } from 'react-native-paper';
+
 import { WebSocketContext } from '../../context/WebSocketManager';
-import { AuthContext } from '../../context/AuthManager';
 import { markNotificationRead } from '../../api/notifications';
-import { getPromotions, markPromotionSeen, getSeenPromotions } from '../../api/promotions';
+import { getPromotions, markPromotionSeen } from '../../api/promotions';
+import FloatingCard from '../ui/FloatingCard';
+import EmptyStateCard from '../ui/EmptyStateCard';
+import { COLORS } from '../../constants/colors';
 
 export default function ClientPromotions({ navigation, onUpdateUnseenCount }) {
   const theme = useTheme();
@@ -23,18 +23,15 @@ export default function ClientPromotions({ navigation, onUpdateUnseenCount }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { notifications, setNotifications } = useContext(WebSocketContext);
-  const { isClient } = useContext(AuthContext);
 
   const fetchPromotions = async () => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
       const offersData = await getPromotions(token);
-      console.log('📦 Promotions data from API:', offersData);
       setOffers(offersData);
       if (onUpdateUnseenCount) {
-        const unseen = offersData.filter(p => !p.is_seen).length;
-        console.log('📤 Unseen promotions count sent to OffersScreen:', unseen);
+        const unseen = offersData.filter((p) => !p.is_seen).length;
         onUpdateUnseenCount(unseen);
       }
     } catch (err) {
@@ -46,17 +43,14 @@ export default function ClientPromotions({ navigation, onUpdateUnseenCount }) {
   };
 
   useEffect(() => {
-    console.log('📡 Initial fetchPromotions called');
     fetchPromotions();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      console.log('🔄 Refetch promotions on focus');
       fetchPromotions();
     }, [])
   );
-
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -94,33 +88,42 @@ export default function ClientPromotions({ navigation, onUpdateUnseenCount }) {
   const renderItem = ({ item }) => {
     const isSeen = item.is_seen;
     const isBooked = item.is_booked;
-    const cardStyle = {
-      marginVertical: 6,
-      borderWidth: isSeen ? 0 : 2,
-      borderColor: isSeen ? 'transparent' : theme.colors.secondary,
-      backgroundColor: isSeen ? '#f0f0f0' : '#ffffff',
-    };
+
     return (
-      <Card style={cardStyle} onPress={() => handlePressPromotion(item)}>
-        <Card.Title title={item.repair_type_name} titleStyle={isSeen ? {} : { fontWeight: 'bold' }} />
-        <Card.Content>
-          <Text>{item.description}</Text>
-          <Text>Price: {item.price} BGN</Text>
-          <Text>Shop: {item.shop_name}</Text>
-          {isBooked && (
-            <Text style={{ color: theme.colors.primary, marginTop: 4 }}>
-              ✅ Already booked
-            </Text>
-          )}
-        </Card.Content>
-      </Card>
+      <FloatingCard
+        accent={!isSeen}
+        onPress={() => handlePressPromotion(item)}
+        style={{ opacity: isSeen ? 0.9 : 1 }}
+      >
+        <Text
+          style={[styles.typeTitle, !isSeen && styles.typeTitleBold]}
+          numberOfLines={2}
+        >
+          {item.repair_type_name}
+        </Text>
+        {!!item.description && (
+          <Text style={styles.desc} numberOfLines={3}>
+            {item.description}
+          </Text>
+        )}
+        <Text style={styles.priceLine}>
+          <Text style={styles.priceLabel}>Price: </Text>
+          <Text style={styles.priceValue}>{item.price} BGN</Text>
+        </Text>
+        <Text style={styles.shopLine}>Shop: {item.shop_name}</Text>
+        {isBooked && (
+          <Text style={[styles.booked, { color: theme.colors.primary }]}>
+            Already booked
+          </Text>
+        )}
+      </FloatingCard>
     );
   };
 
   return (
-    <View style={{ flex: 1, padding: 10, backgroundColor: theme.colors.background }}>
+    <View style={styles.root}>
       {loading ? (
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       ) : (
         <FlatList
           data={offers}
@@ -129,10 +132,13 @@ export default function ClientPromotions({ navigation, onUpdateUnseenCount }) {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
+          contentContainerStyle={styles.listContent}
           ListEmptyComponent={
-            <Text style={{ textAlign: 'center', marginVertical: 20 }}>
-              No promotions available.
-            </Text>
+            <EmptyStateCard
+              icon="tag-multiple-outline"
+              title="No promotions available"
+              subtitle="Pull down to refresh."
+            />
           }
         />
       )}
@@ -140,20 +146,49 @@ export default function ClientPromotions({ navigation, onUpdateUnseenCount }) {
   );
 }
 
-const styles = (theme) => StyleSheet.create({
-  promotionsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 10,
-    backgroundColor: theme.colors.primary,
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    paddingHorizontal: 4,
+    paddingBottom: 8,
+    backgroundColor: 'transparent',
   },
-  promotionsTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: 'white',
+  listContent: {
+    paddingBottom: 16,
+  },
+  typeTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: COLORS.PRIMARY_DARK,
+    marginBottom: 6,
+  },
+  typeTitleBold: {
+    fontWeight: '700',
+  },
+  desc: {
+    fontSize: 13,
+    color: COLORS.TEXT_MUTED,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  priceLine: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  priceLabel: {
+    color: COLORS.TEXT_MUTED,
+  },
+  priceValue: {
+    fontWeight: '800',
+    color: COLORS.PRIMARY,
+  },
+  shopLine: {
+    fontSize: 13,
+    color: COLORS.TEXT_DARK,
+  },
+  booked: {
+    marginTop: 8,
+    fontWeight: '600',
+    fontSize: 13,
   },
 });

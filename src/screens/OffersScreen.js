@@ -1,121 +1,220 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { useTheme, Text, Badge } from 'react-native-paper';
+import { View, StyleSheet, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { Text, Badge } from 'react-native-paper';
 import ClientPromotions from '../components/client/ClientPromotions';
 import ClientRepairOffers from '../components/client/ClientRepairOffers';
+import ScreenBackground from '../components/ScreenBackground';
 
 export default function OffersScreen({ navigation }) {
-  const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('promotions');
   const [unseenCount, setUnseenCount] = useState(0);
   const [unseenOffersCount, setUnseenOffersCount] = useState(0);
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.tabRow}>
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'promotions' && { backgroundColor: theme.colors.primary },
-          ]}
-          onPress={() => setActiveTab('promotions')}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={[
-              styles.tabText,
-              activeTab === 'promotions' && { color: 'white', fontWeight: 'bold' },
-            ]}>
-              Promotions
-            </Text>
-            {/* Always show badge if unseenCount > 0 for testing */}
-            {unseenCount > 0 && (
-              <Badge style={[
-                styles.badge,
-                { backgroundColor: 'red' }
-              ]}>
-                {unseenCount}
-              </Badge>
-            )}
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'offers' && { backgroundColor: theme.colors.primary },
-          ]}
-          onPress={() => setActiveTab('offers')}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={[
-              styles.tabText,
-              activeTab === 'offers' && { color: 'white', fontWeight: 'bold' },
-            ]}>
-              Repair Offers
-            </Text>
-            {unseenOffersCount > 0 && (
-              <Badge style={[styles.badge, { backgroundColor: 'red' }]}>
-                {unseenOffersCount}
-              </Badge>
-            )}
-          </View>
-        </TouchableOpacity>
-      </View>
+  const goBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Home');
+    }
+  };
 
-      <View style={styles.content}>
-        <View style={[styles.tabContent, activeTab === 'promotions' ? styles.active : styles.inactive]}>
-          <ClientPromotions
-            navigation={navigation}
-            onUpdateUnseenCount={(unseenCount) => {
-              console.log('📤 Unseen promotions count sent to OffersScreen:', unseenCount);
-              setUnseenCount(unseenCount);
-            }}
-          />
+  const topPad = Math.max(insets.top, 10);
+
+  return (
+    <ScreenBackground safeArea={false}>
+      <View style={[styles.root, { paddingTop: topPad }]}>
+        <View style={styles.headerRow}>
+          <Pressable
+            onPress={goBack}
+            style={({ pressed }) => [styles.iconPill, pressed && styles.pressed]}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
+          </Pressable>
+          <View pointerEvents="none" style={styles.titleAbsolute}>
+            <Text style={styles.screenTitle}>Offers</Text>
+          </View>
+          <View style={styles.headerSideSpacer} />
         </View>
-        <View style={[styles.tabContent, activeTab === 'offers' ? styles.active : styles.inactive]}>
-          <ClientRepairOffers
-            navigation={navigation}
-            onUpdateUnseenOffersCount={(unseenCount) => {
-              console.log('📤 Unseen offers count sent to OffersScreen:', unseenCount);
-              setUnseenOffersCount(unseenCount);
-            }}
-          />
+
+        <View style={styles.segmentOuter}>
+          <View style={styles.segmentTrack}>
+            <Pressable
+              onPress={() => setActiveTab('promotions')}
+              style={[
+                styles.segmentCell,
+                activeTab === 'promotions' && styles.segmentCellActive,
+              ]}
+            >
+              <View style={styles.segmentLabelRow}>
+                <Text
+                  style={[
+                    styles.segmentLabel,
+                    activeTab === 'promotions' && styles.segmentLabelActive,
+                  ]}
+                >
+                  Promotions
+                </Text>
+                {unseenCount > 0 && (
+                  <Badge style={[styles.badge, styles.badgeMargin]}>{String(unseenCount)}</Badge>
+                )}
+              </View>
+            </Pressable>
+            <Pressable
+              onPress={() => setActiveTab('offers')}
+              style={[
+                styles.segmentCell,
+                activeTab === 'offers' && styles.segmentCellActive,
+              ]}
+            >
+              <View style={styles.segmentLabelRow}>
+                <Text
+                  style={[
+                    styles.segmentLabel,
+                    activeTab === 'offers' && styles.segmentLabelActive,
+                  ]}
+                >
+                  Repair offers
+                </Text>
+                {unseenOffersCount > 0 && (
+                  <Badge style={[styles.badge, styles.badgeMargin]}>{String(unseenOffersCount)}</Badge>
+                )}
+              </View>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.content}>
+          <View style={[styles.tabContent, activeTab === 'promotions' ? styles.active : styles.inactive]}>
+            <ClientPromotions
+              navigation={navigation}
+              onUpdateUnseenCount={(count) => {
+                setUnseenCount(count);
+              }}
+            />
+          </View>
+          <View style={[styles.tabContent, activeTab === 'offers' ? styles.active : styles.inactive]}>
+            <ClientRepairOffers
+              navigation={navigation}
+              onUpdateUnseenOffersCount={(count) => {
+                setUnseenOffersCount(count);
+              }}
+            />
+          </View>
         </View>
       </View>
-    </View>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    backgroundColor: 'transparent',
   },
-  tabRow: {
+  headerRow: {
     flexDirection: 'row',
-    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    minHeight: 44,
   },
-  tabButton: {
+  iconPill: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(15,23,42,0.88)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.2)',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+  },
+  pressed: {
+    opacity: 0.88,
+  },
+  headerSideSpacer: {
+    width: 44,
+    height: 44,
+  },
+  titleAbsolute: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  screenTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  segmentOuter: {
+    marginBottom: 14,
+  },
+  segmentTrack: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 14,
+    padding: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  segmentCell: {
     flex: 1,
+    paddingVertical: 11,
+    paddingHorizontal: 8,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentCellActive: {
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+  },
+  segmentLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    marginHorizontal: 4,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
   },
-  tabText: {
-    fontSize: 16,
+  badgeMargin: {
+    marginLeft: 6,
+  },
+  segmentLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.92)',
+    textAlign: 'center',
+  },
+  segmentLabelActive: {
+    color: '#0f172a',
   },
   badge: {
-    marginLeft: 8,
-    color: 'white',
+    backgroundColor: '#dc2626',
   },
   content: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
   tabContent: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
   active: {
     display: 'flex',

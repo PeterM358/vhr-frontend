@@ -5,7 +5,6 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useTheme } from 'react-native-paper';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -61,9 +60,16 @@ import PasswordConfirmResetScreen from '../screens/PasswordConfirmResetScreen';
 
 const Stack = createNativeStackNavigator();
 
-export default function AppNavigator() {
-  const theme = useTheme();
+/** Floating header: back/title over ScreenBackground — no solid blue bar */
+const transparentStackHeader = {
+  headerTransparent: true,
+  headerStyle: { backgroundColor: 'transparent' },
+  headerTintColor: '#ffffff',
+  headerTitleStyle: { color: '#ffffff', fontWeight: '600' },
+  headerShadowVisible: false,
+};
 
+export default function AppNavigator() {
   // Deep linking configuration
   const linking = {
     prefixes: ['service1001://'],
@@ -79,22 +85,37 @@ export default function AppNavigator() {
       <Stack.Navigator
         initialRouteName="AuthLoading"
         screenOptions={{
-          headerStyle: { backgroundColor: theme.colors.primary },
-          headerTintColor: theme.colors.onPrimary,
-          headerTitleStyle: { color: theme.colors.onPrimary },
+          ...transparentStackHeader,
+          headerBackTitleVisible: false,
         }}
       >
         <Stack.Screen name="AuthLoading" component={AuthLoadingScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="PublicHome" component={PublicHomeScreen} options={{ title: 'Home' }} />
-        <Stack.Screen name="Login" component={LoginScreen} options={{ title: '' }}/>
-        <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Sign Up' }}/>
+        <Stack.Screen name="PublicHome" component={PublicHomeScreen} options={{ headerShown: false }} />
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{ ...transparentStackHeader, title: '' }}
+        />
+        <Stack.Screen
+          name="Register"
+          component={RegisterScreen}
+          options={{ ...transparentStackHeader, title: 'Sign Up' }}
+        />
         <Stack.Screen name="Home" component={HomeDrawer} options={{ headerShown: false }} />
         <Stack.Screen name="ShopHome" component={ShopDrawer} options={{ headerShown: false, title: 'Home' }} />
 
-        <Stack.Screen name="ShopMap" component={ShopMapScreen} options={{ title: 'Find Shops on Map' }} />
+        <Stack.Screen
+          name="ShopMap"
+          component={ShopMapScreen}
+          options={{ headerShown: false, title: 'Find Shops on Map' }}
+        />
         <Stack.Screen name="ClientVehicles" component={ClientVehiclesScreen} options={{ title: 'My Vehicles' }}/>
         <Stack.Screen name="VehicleDetail" component={VehicleDetailScreen} options={{ title: 'Vehicle Details' }}/> 
-        <Stack.Screen name="ShopDetail" component={ShopDetailScreen} options={{ title: 'Shop Details' }}/>
+        <Stack.Screen
+          name="ShopDetail"
+          component={ShopDetailScreen}
+          options={{ title: 'Shop Details' }}
+        />
         <Stack.Screen name="PromotionDetail" component={PromotionDetailScreen} options={{ title: 'Promotion Details' }}/>
         <Stack.Screen name="ClientRepairs" component={ClientRepairsList} options={{ title: 'Repairs' }}/>
         <Stack.Screen name="RepairDetail" component={RepairDetailScreen} options={{ title: 'Repair Details' }}/>
@@ -103,7 +124,11 @@ export default function AppNavigator() {
         <Stack.Screen name="CreatePromotion" component={CreatePromotionScreen} options={{ title: 'Create Promotion' }}/>
         <Stack.Screen name="ShopRegisterClient" component={ShopRegisterClientScreen} options={{ title: 'Register Client' }}/>
         <Stack.Screen name="ChooseShop" component={ChooseShopScreen} options={{ title: '' }}/>
-        <Stack.Screen name="OffersScreen" component={OffersScreen} options={{ title: 'Offers' }}/>
+        <Stack.Screen
+          name="OffersScreen"
+          component={OffersScreen}
+          options={{ headerShown: false, title: 'Offers' }}
+        />
         <Stack.Screen name="AuthorizedClients" component={AuthorizedClients} options={{ title: 'Authorized Clients' }}/>
         <Stack.Screen name="ShopPromotions" component={ShopPromotions} options={{ title: 'Promotions' }}/>
         <Stack.Screen name="RepairsList" component={RepairsList} options={{ title: 'Repairs' }}/>
@@ -112,8 +137,10 @@ export default function AppNavigator() {
           name="ShopNotificationsScreen"
           component={NotificationsWithAppbar}
           options={{
+            ...transparentStackHeader,
             title: 'Notifications',
             headerBackTitle: 'Back',
+            headerBackTitleVisible: true,
           }}
         />
         <Stack.Screen name="ShopProfile" component={ShopProfileScreen} options={{ title: 'Profile' }}/>
@@ -136,8 +163,16 @@ export default function AppNavigator() {
         <Stack.Screen name="ClientLogRepair" component={ClientLogRepairScreen} options={{ title: 'Log Repair' }}/>
         <Stack.Screen name="ClientRequestRepair" component={ClientRequestRepairScreen} options={{ title: 'Request Repair' }}/>
         
-        <Stack.Screen name="PasswordRequestReset" component={PasswordRequestResetScreen} options={{ title: 'Log Repair' }}/>
-        <Stack.Screen name="PasswordConfirmReset" component={PasswordConfirmResetScreen} options={{ title: 'Request Repair' }}/>
+        <Stack.Screen
+          name="PasswordRequestReset"
+          component={PasswordRequestResetScreen}
+          options={{ ...transparentStackHeader, title: 'Reset Password' }}
+        />
+        <Stack.Screen
+          name="PasswordConfirmReset"
+          component={PasswordConfirmResetScreen}
+          options={{ ...transparentStackHeader, title: 'New Password' }}
+        />
 
         <Stack.Screen
           name="CreateOrUpdateOffer"

@@ -8,7 +8,7 @@ export default {
     scheme: "service1001", // 👈 ADD THIS
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/icon.png",
+    icon: "./src/assets/icons/icon.png",
     userInterfaceStyle: "light",
     newArchEnabled: true,
     platforms: ["ios", "android", "web"],
@@ -29,7 +29,7 @@ export default {
       ]
     ],
     splash: {
-      image: "./assets/splash-icon.png",
+      image: "./src/assets/icons/splash-icon.png",
       resizeMode: "contain",
       backgroundColor: "#ffffff"
     },
@@ -41,7 +41,7 @@ export default {
     android: {
       package: "com.mihailovv.vhrfrontend",
       adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon.png",
+        foregroundImage: "./src/assets/icons/adaptive-icon.png",
         backgroundColor: "#ffffff"
       },
       googleServicesFile: "./android/app/google-services.json",
@@ -52,7 +52,7 @@ export default {
       }
     },
     web: {
-      favicon: "./assets/favicon.png",
+      favicon: "./src/assets/icons/favicon.png",
       meta: {
         viewport: "width=device-width, initial-scale=1"
       },

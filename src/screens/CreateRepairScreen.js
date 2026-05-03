@@ -6,9 +6,9 @@ import React, { useState, useEffect, useLayoutEffect } from 'react';
 import {
   StyleSheet,
   View,
-  SafeAreaView,
   Alert,
 } from 'react-native';
+import ScreenBackground from '../components/ScreenBackground';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import {
@@ -200,7 +200,7 @@ export default function CreateRepairScreen({ navigation, route }) {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <ScreenBackground>
       <KeyboardAwareScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="always"
@@ -350,7 +350,7 @@ export default function CreateRepairScreen({ navigation, route }) {
           </Dialog.Actions>
         </Dialog>
       </Portal>
-    </SafeAreaView>
+    </ScreenBackground>
   );
 }
 

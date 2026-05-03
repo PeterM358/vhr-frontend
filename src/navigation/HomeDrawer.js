@@ -12,7 +12,7 @@ import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import { logout } from '../api/auth';
 
-import MainText from '../../assets/main-text.png'; // ✅ Your bottom makeing image
+import MainText from '../assets/images/main-text.png'; // ✅ Your bottom makeing image
 
 const Drawer = createDrawerNavigator();
 

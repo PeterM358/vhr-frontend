@@ -7,6 +7,7 @@ import {
   Alert,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Text,
@@ -19,8 +20,12 @@ import {
 } from 'react-native-paper';
 
 import { getPartsCatalog } from '../api/parts';
+import ScreenBackground from '../components/ScreenBackground';
+import BASE_STYLES from '../styles/base';
+import { stackContentPaddingTop } from '../navigation/stackContentInset';
 
 export default function SelectOfferPartsScreen({ route, navigation }) {
+  const insets = useSafeAreaInsets();
   const theme = useTheme();
 
   useLayoutEffect(() => {
@@ -28,12 +33,8 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
       headerTitle: 'Manage Offer Parts',
       headerBackTitleVisible: true,
       headerBackTitle: 'Back',
-      headerTintColor: theme.colors.onPrimary,
-      headerStyle: {
-        backgroundColor: theme.colors.primary,
-      },
     });
-  }, [navigation, theme.colors.primary, theme.colors.onPrimary]);
+  }, [navigation]);
 
   const {
     currentParts = [],
@@ -167,11 +168,12 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
   };
 
   return (
+    <ScreenBackground safeArea={false}>
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: theme.colors.background }}
+      style={{ flex: 1, backgroundColor: 'transparent' }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={[BASE_STYLES.formScreenScroll, { paddingTop: stackContentPaddingTop(insets, 4) }]}>
         <Text variant="headlineSmall" style={styles.title}>
           Search & Select Offer Parts
         </Text>
@@ -319,11 +321,11 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
         </Button>
       </ScrollView>
     </KeyboardAvoidingView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, paddingBottom: 80 },
   title: { marginBottom: 12, textAlign: 'center' },
   input: { marginVertical: 8 },
   catalogCard: { marginVertical: 6 },

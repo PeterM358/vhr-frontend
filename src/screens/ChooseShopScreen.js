@@ -1,11 +1,12 @@
 // PATH: src/screens/ChooseShopScreen.js
 
 import React, { useEffect, useState } from 'react';
-import { FlatList, ActivityIndicator, StyleSheet } from 'react-native';
+import { FlatList, ActivityIndicator, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Card, Text, useTheme, Surface } from 'react-native-paper';
-import BASE_STYLES from '../styles/base';
+import { Card, Text, useTheme } from 'react-native-paper';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import ScreenBackground from '../components/ScreenBackground';
+import { COLORS } from '../styles/colors';
 
 export default function ChooseShopScreen({ navigation }) {
   const [shops, setShops] = useState([]);
@@ -28,8 +29,7 @@ export default function ChooseShopScreen({ navigation }) {
 
   const renderShop = ({ item }) => (
     <Card
-      mode="outlined"
-      style={[styles.card, { borderColor: theme.colors.primary }]}
+      style={styles.card}
       onPress={() => handleSelect(item.id)}
     >
       <Card.Content>
@@ -46,32 +46,41 @@ export default function ChooseShopScreen({ navigation }) {
   );
 
   return (
-    <Surface style={BASE_STYLES.overlay}>
-      <Text variant="titleLarge" style={styles.title}>
-        Choose a Profile
-      </Text>
+    <ScreenBackground>
+      <View style={styles.container}>
+        <Text variant="titleLarge" style={styles.title}>
+          Choose a Profile
+        </Text>
 
-      {loading ? (
-        <ActivityIndicator size="large" style={styles.loading} />
-      ) : (
-        <FlatList
-          data={shops}
-          keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
-          renderItem={renderShop}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>No shops found.</Text>
-          }
-        />
-      )}
-    </Surface>
+        {loading ? (
+          <ActivityIndicator size="large" color="#fff" style={styles.loading} />
+        ) : (
+          <FlatList
+            data={shops}
+            keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
+            renderItem={renderShop}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>No shops found.</Text>
+            }
+          />
+        )}
+      </View>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
   title: {
     marginBottom: 16,
     textAlign: 'center',
+    color: '#fff',
+    fontWeight: '700',
   },
   loading: {
     marginTop: 50,
@@ -81,17 +90,22 @@ const styles = StyleSheet.create({
   },
   card: {
     marginVertical: 8,
-    marginHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
   },
   shopName: {
     fontWeight: 'bold',
+    color: '#0f172a',
   },
   shopAddress: {
     marginTop: 4,
-    color: '#555',
+    color: '#475569',
   },
   emptyText: {
     textAlign: 'center',
     marginVertical: 20,
+    color: 'rgba(255,255,255,0.85)',
   },
 });

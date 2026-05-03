@@ -1,8 +1,12 @@
 /**
  * PATH: styles/theme.js
+ *
+ * Paper theme is wired to the centralized COLORS palette in styles/colors.js.
+ * Tweak colors there to retheme the entire app.
  */
 
 import { DefaultTheme } from 'react-native-paper';
+import { COLORS } from './colors';
 
 export const AppTheme = {
   ...DefaultTheme,
@@ -10,33 +14,36 @@ export const AppTheme = {
   colors: {
     ...DefaultTheme.colors,
 
-    // ✅ Make colors
-    primary: '#429bdb',         // Main make blue (buttons, Appbar, icons)
-    onPrimary: '#ffffff',       // Text/icons on primary
+    // ── Premium automotive blue ───────────────────────────────────────────
+    primary: COLORS.primary,            // Main accent (buttons, Appbar, icons)
+    onPrimary: COLORS.onPrimary,        // Text/icons on primary
 
-    secondary: '#007ACC',       // Stronger blue for accents like "Find Shops on Map"
-    onSecondary: '#ffffff',     // White text on blue buttons
+    // Use the deep blue as a strong "pressed/active" accent
+    secondary: COLORS.primaryDark,
+    onSecondary: COLORS.onPrimary,
 
-    background: '#ffffff',      // Screen background
-    surface: '#ffffff',         // Cards, sheets
-    onSurface: '#000000',       // Text/icons on surfaces
+    // Surface roles
+    background: COLORS.background,
+    surface: COLORS.surface,
+    onSurface: COLORS.text,
 
-    error: '#B00020',
+    error: COLORS.error,
     onError: '#ffffff',
 
-    text: '#000000',            // General text
+    text: COLORS.text,
     disabled: '#cccccc',
     placeholder: '#999999',
-    notification: '#FF3B30',
+    notification: COLORS.danger,
     backdrop: 'rgba(0,0,0,0.5)',
   },
 
   fonts: {
     ...DefaultTheme.fonts,
-    // You can customize weights/sizes here
   },
 
   animation: {
     scale: 1.0,
   },
 };
+
+export default AppTheme;

@@ -1,11 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Alert, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { TextInput, Button, Surface, useTheme, Text } from 'react-native-paper';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { API_BASE_URL } from '../api/config';
+import BASE_STYLES from '../styles/base';
 
 const getNow = () => new Date().toISOString();
 
@@ -18,6 +21,7 @@ function withTimeout(promise, ms = 5000) {
 
 export default function ShopMapScreen({ navigation }) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [location, setLocation] = useState(null);
   const [shops, setShops] = useState([]);
@@ -112,7 +116,7 @@ export default function ShopMapScreen({ navigation }) {
   if (!location || loading) return <ActivityIndicator size="large" style={styles.loader} />;
 
   return (
-    <View style={styles.container}>
+    <View style={BASE_STYLES.flexFill}>
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -148,47 +152,84 @@ export default function ShopMapScreen({ navigation }) {
         ))}
       </MapView>
 
-      <Surface style={styles.searchContainer}>
-        <TextInput
-          mode="outlined"
-          dense
-          placeholder="Search by address..."
-          value={addressQuery}
-          onChangeText={setAddressQuery}
-          style={styles.searchInput}
-        />
-        <Button
-          mode="contained"
-          icon="magnify"
-          onPress={handleSearch}
-          style={styles.searchButton}
-          compact
+      <View style={[styles.topChrome, { paddingTop: insets.top + 10 }]}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
-          Search
-        </Button>
-      </Surface>
+          <MaterialCommunityIcons name="chevron-left" size={28} color="#fff" />
+        </Pressable>
+
+        <Surface style={styles.searchSurface} elevation={4}>
+          <TextInput
+            mode="outlined"
+            dense
+            placeholder="Search by address..."
+            value={addressQuery}
+            onChangeText={setAddressQuery}
+            style={styles.searchInput}
+          />
+          <Button
+            mode="contained"
+            icon="magnify"
+            onPress={handleSearch}
+            style={styles.searchButton}
+            compact
+          >
+            Search
+          </Button>
+        </Surface>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
   map: { flex: 1 },
-  searchContainer: {
+  topChrome: {
     position: 'absolute',
-    top: 20,
-    left: 20,
-    right: 20,
-    padding: 10,
-    borderRadius: 12,
+    left: 12,
+    right: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    elevation: 5,
+    zIndex: 20,
+  },
+  backPill: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(15,23,42,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.22)',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+  },
+  backPillPressed: {
+    opacity: 0.9,
+  },
+  searchSurface: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 14,
     backgroundColor: '#fff',
   },
   searchInput: {
     flex: 1,
-    marginRight: 8,
+    marginRight: 6,
+    backgroundColor: 'transparent',
+    maxHeight: 48,
   },
   searchButton: {
     height: 40,

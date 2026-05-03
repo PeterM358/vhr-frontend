@@ -12,6 +12,46 @@ export default StyleSheet.create({
     paddingHorizontal: 24,
   },
 
+  background: {
+    flex: 1,
+    minHeight: '100vh',
+  },
+
+  flexFill: {
+    flex: 1,
+  },
+
+  loadingCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  formScreen: {
+    padding: 16,
+  },
+
+  formScreenScroll: {
+    padding: 16,
+    paddingBottom: 80,
+  },
+
+  centeredScreen: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'center',
+  },
+
+  centeredScreenScroll: {
+    flexGrow: 1,
+    padding: 20,
+    justifyContent: 'center',
+  },
+
+  formInputCompact: {
+    marginBottom: 12,
+  },
+
   overlay: {
     width: '100%',
     maxWidth: 1100,
@@ -123,6 +163,8 @@ export default StyleSheet.create({
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: AppTheme.colors.primary,
   },
 
   itemBox: {
@@ -135,6 +177,8 @@ export default StyleSheet.create({
     maxWidth: 820,
     width: '100%',
     alignSelf: 'center',
+    borderLeftWidth: 4,
+    borderLeftColor: AppTheme.colors.primary,
   },
 
   subText: {
@@ -178,6 +222,8 @@ export default StyleSheet.create({
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: AppTheme.colors.primary,
   },
 
   offerTitle: {
@@ -207,6 +253,8 @@ export default StyleSheet.create({
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 3 },
     shadowRadius: 6,
+    borderLeftWidth: 4,
+    borderLeftColor: AppTheme.colors.primary,
   },
 
   // LOGIN-SCREEN specific

@@ -1,22 +1,24 @@
 // PATH: src/screens/ShopRegisterClientScreen.js
 
 import React, { useState, useLayoutEffect } from 'react';
-import { StyleSheet, View, SafeAreaView } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ScreenBackground from '../components/ScreenBackground';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Text,
   TextInput,
   ActivityIndicator,
-  useTheme,
   Button,
   Portal,
   Dialog,
 } from 'react-native-paper';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { API_BASE_URL } from '../api/config';
+import { stackContentPaddingTop } from '../navigation/stackContentInset';
 
 export default function ShopRegisterClientScreen({ navigation }) {
-  const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -43,7 +45,7 @@ export default function ShopRegisterClientScreen({ navigation }) {
           compact
           onPress={handleHeaderSave}
           labelStyle={{
-            color: theme.colors.primary,
+            color: '#fff',
             fontSize: 16,
           }}
         >
@@ -104,11 +106,17 @@ export default function ShopRegisterClientScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <ScreenBackground safeArea={false}>
       <View style={{ flex: 1 }}>
         <KeyboardAwareScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={styles.container}
+          contentContainerStyle={[
+            styles.container,
+            {
+              paddingTop: stackContentPaddingTop(insets, 8),
+              paddingBottom: Math.max(insets.bottom, 16) + 100,
+            },
+          ]}
           keyboardShouldPersistTaps="always"
           enableOnAndroid
           extraScrollHeight={20}
@@ -171,18 +179,18 @@ export default function ShopRegisterClientScreen({ navigation }) {
           </Dialog>
         </Portal>
       </View>
-    </SafeAreaView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    paddingBottom: 100,
+    paddingHorizontal: 16,
   },
   label: {
     marginTop: 16,
     marginBottom: 4,
+    color: '#fff',
   },
   input: {
     marginBottom: 8,
@@ -190,7 +198,7 @@ const styles = StyleSheet.create({
   subText: {
     marginBottom: 16,
     textAlign: 'center',
-    color: 'gray',
+    color: 'rgba(255,255,255,0.7)',
   },
   loader: {
     marginTop: 20,

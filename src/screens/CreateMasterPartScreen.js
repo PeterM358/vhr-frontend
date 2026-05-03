@@ -17,6 +17,8 @@ import {
   useTheme,
 } from 'react-native-paper';
 import { createPartsMaster } from '../api/parts';
+import ScreenBackground from '../components/ScreenBackground';
+import BASE_STYLES from '../styles/base';
 
 const CATEGORY_OPTIONS = [
   'Liquids',
@@ -64,11 +66,12 @@ export default function CreateMasterPartScreen({ navigation, route }) {
   };
 
   return (
+    <ScreenBackground>
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: theme.colors.background }}
+      style={{ flex: 1, backgroundColor: 'transparent' }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={BASE_STYLES.formScreenScroll}>
         <Text variant="headlineSmall" style={styles.title}>
           Add New Part to Catalog
         </Text>
@@ -117,11 +120,11 @@ export default function CreateMasterPartScreen({ navigation, route }) {
         </Button>
       </ScrollView>
     </KeyboardAvoidingView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, paddingBottom: 80 },
   title: { marginBottom: 12, textAlign: 'center' },
   input: { marginVertical: 8 },
 });

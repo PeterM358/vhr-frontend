@@ -3,15 +3,22 @@
  */
 
 import React, { useContext } from 'react';
-import { View, Text, ImageBackground, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Appbar, Badge, Button, useTheme } from 'react-native-paper';
 import { logout } from '../api/auth';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
-import BASE_STYLES from '../styles/base';
-import Logo from '../../assets/logo.svg';
+import Logo from '../assets/images/logo.svg';
+import ScreenBackground from '../components/ScreenBackground';
+
+const WINDOW_H = Dimensions.get('window').height;
+/** Hero sits ~upper third of content below header — leaves room for future promos */
+const HERO_TOP_PADDING = Math.round(Math.min(Math.max(WINDOW_H * 0.22, 120), 200));
+
+/** Dark glass header (not saturated primary full-width slab) */
+const HOME_TOP_BAR = 'rgba(11,18,32,0.92)';
 
 export default function HomeScreen({ navigation }) {
   const theme = useTheme();
@@ -53,29 +60,23 @@ export default function HomeScreen({ navigation }) {
 
   if (isLoading) {
     return (
-      <ImageBackground
-        source={require('../../assets/background.jpg')}
-        style={BASE_STYLES.background}
-        blurRadius={5}
-      >
-        <View style={BASE_STYLES.overlay}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+      <ScreenBackground>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#fff" />
         </View>
-      </ImageBackground>
+      </ScreenBackground>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <ImageBackground
-        source={require('../../assets/background.jpg')}
-        style={BASE_STYLES.background}
-        blurRadius={5}
-      >
-        <View style={BASE_STYLES.overlay}>
-          <Text style={styles.welcomeText}>Welcome! Please Login or Register.</Text>
+      <ScreenBackground>
+        <View style={styles.center}>
+          <View style={styles.welcomeCard}>
+            <Text style={styles.welcomeTitle}>Welcome! Please Login or Register.</Text>
+          </View>
         </View>
-      </ImageBackground>
+      </ScreenBackground>
     );
   }
 
@@ -83,45 +84,43 @@ export default function HomeScreen({ navigation }) {
   if (username.includes('@')) username = username.split('@')[0];
 
   return (
-    <ImageBackground
-      source={require('../../assets/background.jpg')}
-      style={BASE_STYLES.background}
-      blurRadius={5}
-    >
-      <Appbar.Header style={{ backgroundColor: theme.colors.primary }}>
-        <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color={theme.colors.onPrimary} />
-        <Appbar.Content title={username} titleStyle={{ color: theme.colors.onPrimary }} />
+    <ScreenBackground safeArea={false}>
+      <Appbar.Header style={{ backgroundColor: HOME_TOP_BAR }}>
+        <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color="#fff" />
+        <Appbar.Content title={username} titleStyle={{ color: '#fff' }} />
         <View style={styles.iconWithBadge}>
           <Appbar.Action
             icon="bell-outline"
             onPress={() => navigation.navigate('OffersScreen')}
-            color={theme.colors.onPrimary}
+            color="#fff"
           />
           {totalOffersBadge > 0 && (
             <Badge style={styles.notificationBadge}>{totalOffersBadge}</Badge>
           )}
         </View>
-        <Appbar.Action icon="logout" onPress={handleLogout} color={theme.colors.onPrimary} />
+        <Appbar.Action icon="logout" onPress={handleLogout} color="#fff" />
       </Appbar.Header>
 
-      <View style={BASE_STYLES.overlay}>
-        <Logo width={120} height={120} style={styles.homeLogo} />
+      <View style={styles.heroWrap}>
+        <View style={styles.welcomeCard}>
+          <Logo width={96} height={96} style={styles.homeLogo} />
 
-        <Text style={styles.welcomeText}>Welcome to Vehicle Repair Hub</Text>
-        <Text style={styles.subText}>Use the menu or map below to navigate</Text>
+          <Text style={styles.welcomeTitle}>Welcome to Vehicle Repair Hub</Text>
+          <Text style={styles.welcomeSub}>Use the menu or map below to navigate</Text>
 
-        <Button
-          mode="contained"
-          icon="map"
-          onPress={() => navigation.navigate('ShopMap')}
-          style={[styles.mapButton, { backgroundColor: theme.colors.primary }]}
-          contentStyle={styles.mapButtonContent}
-          labelStyle={styles.mapButtonLabel}
-        >
-          Find Shops on Map
-        </Button>
+          <Button
+            mode="contained"
+            icon="map"
+            onPress={() => navigation.navigate('ShopMap')}
+            style={[styles.mapButton, { backgroundColor: theme.colors.primary }]}
+            contentStyle={styles.mapButtonContent}
+            labelStyle={styles.mapButtonLabel}
+          >
+            Find Shops on Map
+          </Button>
+        </View>
       </View>
-    </ImageBackground>
+    </ScreenBackground>
   );
 }
 
@@ -137,28 +136,49 @@ const styles = StyleSheet.create({
     backgroundColor: 'red',
     color: 'white',
   },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  heroWrap: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: HERO_TOP_PADDING,
+  },
+  welcomeCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: 'rgba(5,15,30,0.72)',
+    borderColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderRadius: 22,
+    padding: 22,
+    alignItems: 'center',
+  },
   homeLogo: {
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  welcomeText: {
+  welcomeTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 8,
-    color: '#333',
+    marginBottom: 6,
+    color: '#fff',
   },
-  subText: {
-    fontSize: 16,
+  welcomeSub: {
+    fontSize: 15,
     textAlign: 'center',
-    color: '#555',
-    marginBottom: 20,
+    color: 'rgba(255,255,255,0.78)',
+    marginBottom: 18,
   },
   mapButton: {
-    marginVertical: 16,
-    alignSelf: 'center',
-    width: '85%',
-    maxWidth: 400,
+    marginTop: 4,
+    alignSelf: 'stretch',
     borderRadius: 12,
     elevation: 2,
   },
@@ -167,8 +187,8 @@ const styles = StyleSheet.create({
     height: 50,
   },
   mapButtonLabel: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '700',
     color: '#fff',
   },
 });

@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { View, ScrollView, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, TextInput, Button, Card, Divider, IconButton, useTheme } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text, TextInput, Button, Card, Divider, IconButton } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createOffer, updateOffer } from '../api/offers';
+import ScreenBackground from '../components/ScreenBackground';
+import { stackContentPaddingTop } from '../navigation/stackContentInset';
 
 export default function CreateOrUpdateOfferScreen({ route, navigation }) {
+  const insets = useSafeAreaInsets();
   const { existingOffer, selectedOfferParts = [], offerId } = route.params || {};
   const [repairId, setRepairId] = useState(route.params?.repairId || existingOffer?.repair || null);
-  const theme = useTheme();
 
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -18,12 +21,8 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
     navigation.setOptions({
       headerTitle: existingOffer ? 'Update Offer' : 'Create Offer',
       headerBackTitleVisible: true,
-      headerTintColor: theme.colors.onPrimary,
-      headerStyle: {
-        backgroundColor: theme.colors.primary,
-      },
     });
-  }, [navigation, theme, existingOffer]);
+  }, [navigation, existingOffer]);
 
   useEffect(() => {
     console.log('🪵 DEBUG: existingOffer:', existingOffer);
@@ -113,11 +112,15 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
   };
 
   return (
+    <ScreenBackground safeArea={false}>
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: theme.colors.background }}
+      style={{ flex: 1, backgroundColor: 'transparent' }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={[
+        styles.container,
+        { paddingTop: stackContentPaddingTop(insets, 4), paddingBottom: Math.max(insets.bottom, 16) },
+      ]}>
         <Card style={styles.formCard}>
           <Card.Title title={existingOffer ? 'Update Offer' : 'Create Offer'} />
           <Card.Content>
@@ -180,6 +183,7 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         </Button>
       </ScrollView>
     </KeyboardAvoidingView>
+    </ScreenBackground>
   );
 }
 
@@ -202,6 +206,10 @@ const styles = StyleSheet.create({
   partCard: {
     marginVertical: 6,
     marginHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.98)',
   },
   submitButton: {
     marginVertical: 20,

@@ -8,7 +8,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   Linking,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -16,10 +18,16 @@ import { getShopById, uploadShopImage, deleteShopImage } from '../api/shops';
 import { getVehicles, updateVehicle } from '../api/vehicles';
 
 import { Card, Text, Button, ActivityIndicator, useTheme, Divider } from 'react-native-paper';
+import ScreenBackground from '../components/ScreenBackground';
+import { COLORS } from '../constants/colors';
 
 export default function ShopDetailScreen({ route, navigation }) {
   const { shopId } = route.params;
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  /** Space below transparent native header (approx. nav bar + status bar inset). */
+  const headerUnderlay =
+    insets.top + (Platform.OS === 'ios' ? 44 : 56);
 
   const [shop, setShop] = useState(null);
   const [vehicles, setVehicles] = useState([]);
@@ -156,7 +164,13 @@ export default function ShopDetailScreen({ route, navigation }) {
   };
 
   if (loading || !shop) {
-    return <ActivityIndicator animating={true} size="large" style={{ flex: 1 }} />;
+    return (
+      <ScreenBackground safeArea={false}>
+        <View style={styles.center}>
+          <ActivityIndicator animating={true} size="large" color="#fff" />
+        </View>
+      </ScreenBackground>
+    );
   }
 
   const renderVehicle = ({ item }) => {
@@ -271,26 +285,50 @@ export default function ShopDetailScreen({ route, navigation }) {
   );
 
   return (
-    <FlatList
-      style={styles.container}
-      data={isClientAccount ? vehicles : []}
-      keyExtractor={(item) => item.id.toString()}
-      renderItem={isClientAccount ? renderVehicle : null}
-      ListHeaderComponent={() => (
-        <>
-          {renderHeader()}
-          {renderDetailsSection()}
-        </>
-      )}
-      ListEmptyComponent={isClientAccount && !vehicles.length && <Text>No vehicles found.</Text>}
-    />
+    <ScreenBackground safeArea={false}>
+      <FlatList
+        style={styles.container}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingTop: headerUnderlay + 8 },
+        ]}
+        data={isClientAccount ? vehicles : []}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={isClientAccount ? renderVehicle : null}
+        ListHeaderComponent={() => (
+          <>
+            {renderHeader()}
+            {renderDetailsSection()}
+          </>
+        )}
+        ListEmptyComponent={isClientAccount && !vehicles.length && <Text style={{ color: '#fff', textAlign: 'center', marginTop: 16 }}>No vehicles found.</Text>}
+      />
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 12 },
-  card: { marginBottom: 16 },
-  sectionTitle: { marginVertical: 12 },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  container: { flex: 1, backgroundColor: 'transparent' },
+  listContent: {
+    paddingHorizontal: 12,
+    paddingBottom: 24,
+  },
+  card: {
+    marginBottom: 16,
+    borderRadius: 20,
+    backgroundColor: COLORS.CARD_FLOATING,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+  },
+  sectionTitle: { marginVertical: 12, color: '#fff' },
   imageScroll: {
     marginVertical: 12,
   },
@@ -321,6 +359,13 @@ const styles = StyleSheet.create({
   },
   vehicleCard: {
     marginBottom: 12,
+    borderRadius: 20,
+    backgroundColor: COLORS.CARD_FLOATING,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
   },
   authButton: {
     marginTop: 10,

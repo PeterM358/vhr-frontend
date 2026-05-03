@@ -23,6 +23,7 @@ import {
   createPartsMaster,
   createShopPart
 } from '../api/parts';
+import ScreenBackground from '../components/ScreenBackground';
 
 export default function AddShopPartScreen({ navigation, route }) {
   const theme = useTheme();
@@ -246,8 +247,9 @@ export default function AddShopPartScreen({ navigation, route }) {
   };
 
   return (
+    <ScreenBackground>
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: theme.colors.background }}
+      style={{ flex: 1, backgroundColor: 'transparent' }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.container}>
@@ -370,6 +372,7 @@ export default function AddShopPartScreen({ navigation, route }) {
         </Button>
       </ScrollView>
     </KeyboardAvoidingView>
+    </ScreenBackground>
   );
 }
 

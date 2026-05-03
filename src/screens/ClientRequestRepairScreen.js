@@ -9,6 +9,8 @@ import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { API_BASE_URL } from '../api/config';
+import BASE_STYLES from '../styles/base';
+import ScreenBackground from '../components/ScreenBackground';
 
 export default function ClientRequestRepairScreen({ route, navigation }) {
   const theme = useTheme();
@@ -90,7 +92,8 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScreenBackground>
+    <ScrollView contentContainerStyle={BASE_STYLES.formScreen}>
       <Text variant="titleLarge" style={styles.title}>Request Repair from Shop</Text>
       
       <TextInput
@@ -135,11 +138,11 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
         Submit Request
       </Button>
     </ScrollView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16 },
   title: { marginBottom: 16 },
   input: { marginVertical: 8 },
 });

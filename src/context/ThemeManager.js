@@ -2,6 +2,7 @@
 import React, { createContext, useState } from 'react';
 import { AppTheme } from '../styles/theme';
 import { DarkTheme as PaperDarkTheme } from 'react-native-paper';
+import { COLORS } from '../styles/colors';
 
 export const ThemeContext = createContext();
 
@@ -11,7 +12,7 @@ export function ThemeProvider({ children }) {
   const toggleTheme = () => setIsDark(prev => !prev);
 
   const theme = isDark
-    ? { ...PaperDarkTheme, colors: { ...PaperDarkTheme.colors, primary: '#007AFF' } }
+    ? { ...PaperDarkTheme, colors: { ...PaperDarkTheme.colors, primary: COLORS.primary } }
     : AppTheme;
 
   return (

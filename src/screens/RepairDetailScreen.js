@@ -4,8 +4,9 @@ import {
   Alert,
   ActivityIndicator,
   StyleSheet,
-  FlatList
+  FlatList,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Card,
@@ -16,7 +17,6 @@ import {
   useTheme,
 } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
-
 import {
   getRepairById,
   getRepairParts,
@@ -32,8 +32,11 @@ import {
 import { getShopParts, prepareRepairPartsData } from '../api/parts';
 import { getOffersForRepair, bookOffer, unbookOffer } from '../api/offers';
 import { RepairsList } from '../components/shop/RepairsList';
+import ScreenBackground from '../components/ScreenBackground';
+import { stackContentPaddingTop } from '../navigation/stackContentInset';
 
 export default function RepairDetailScreen({ route, navigation }) {
+  const insets = useSafeAreaInsets();
   // Add repairDetails state at the top
   const [repairDetails, setRepairDetails] = useState(null);
   // Function to mark repair as done and refresh data (uses repairDetails object)
@@ -441,7 +444,13 @@ export default function RepairDetailScreen({ route, navigation }) {
   );
 
   if (loading || !repair) {
-    return <ActivityIndicator size="large" style={{ flex: 1 }} />;
+    return (
+      <ScreenBackground safeArea={false}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#fff" />
+        </View>
+      </ScreenBackground>
+    );
   }
 
   // Debugging: Button/visibility debug logs for shops
@@ -465,7 +474,7 @@ export default function RepairDetailScreen({ route, navigation }) {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <ScreenBackground safeArea={false}>
       <FlatList
         ListHeaderComponent={
           <View>
@@ -840,7 +849,10 @@ export default function RepairDetailScreen({ route, navigation }) {
             )}
           </View>
         }
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingTop: stackContentPaddingTop(insets, 4) },
+        ]}
       />
       {/* --- BOTTOM ACTION BUTTONS (Shop: Send Offer, Confirm as Done) --- */}
       {isShop && repair && repair.status === 'ongoing' && (
@@ -848,21 +860,39 @@ export default function RepairDetailScreen({ route, navigation }) {
           Confirm as Done
         </Button>
       )}
-    </View>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   headerCard: {
-    margin: 10,
+    marginHorizontal: 10,
+    marginVertical: 8,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.08)',
   },
   addPartCard: {
     marginHorizontal: 10,
     marginVertical: 10,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.08)',
   },
   partCard: {
     marginHorizontal: 10,
     marginVertical: 6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.08)',
   },
   input: {
     marginVertical: 8,
@@ -871,7 +901,7 @@ const styles = StyleSheet.create({
     margin: 12,
     fontWeight: '600',
     fontSize: 18,
-    cursor: 'pointer',
+    color: '#fff',
   },
   pickerContainer: {
     borderWidth: 1,
@@ -881,10 +911,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
   offerCard: {
     marginHorizontal: 10,
-    marginVertical: 10,
+    marginVertical: 8,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.08)',
   },
 });

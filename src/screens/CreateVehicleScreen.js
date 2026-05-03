@@ -1,17 +1,16 @@
-import React, { useState, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
-  SafeAreaView,
-  ScrollView,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ScreenBackground from '../components/ScreenBackground';
 import {
   Text,
   TextInput,
   Button,
   ActivityIndicator,
-  useTheme,
   Portal,
   Dialog,
 } from 'react-native-paper';
@@ -19,9 +18,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { createVehicle, getMakes, getModelsForMake } from '../api/vehicles';
+import { stackContentPaddingTop } from '../navigation/stackContentInset';
 
 export default function CreateVehicleScreen({ navigation, route }) {
-  const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   const clientEmail = route?.params?.clientEmail || null;
   const clientPhone = route?.params?.clientPhone || null;
@@ -80,14 +80,6 @@ export default function CreateVehicleScreen({ navigation, route }) {
     fetchModels();
   }, [selectedMake]);
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerTitle: 'Add Vehicle',
-      headerStyle: { backgroundColor: theme.colors.primary },
-      headerTintColor: theme.colors.onPrimary,
-    });
-  }, [navigation, theme.colors.primary, theme.colors.onPrimary]);
-
   const handleSave = async () => {
     if (!selectedMake || !selectedModel || !year) {
       Alert.alert('Validation', 'Make, Model, and Year are required.');
@@ -130,11 +122,17 @@ export default function CreateVehicleScreen({ navigation, route }) {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <ScreenBackground safeArea={false}>
       <View style={{ flex: 1 }}>
         <KeyboardAwareScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={styles.container}
+          contentContainerStyle={[
+            styles.container,
+            {
+              paddingTop: stackContentPaddingTop(insets, 8),
+              paddingBottom: Math.max(insets.bottom, 16) + 80,
+            },
+          ]}
           keyboardShouldPersistTaps="always"
           enableOnAndroid
           extraScrollHeight={20}
@@ -223,14 +221,13 @@ export default function CreateVehicleScreen({ navigation, route }) {
           </Dialog>
         </Portal>
       </View>
-    </SafeAreaView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    paddingBottom: 100,
+    paddingHorizontal: 16,
   },
   label: {
     marginTop: 16,

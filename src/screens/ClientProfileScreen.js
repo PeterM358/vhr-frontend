@@ -2,9 +2,9 @@ import React, { useEffect, useState, useLayoutEffect } from 'react';
 import {
   View,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Text,
   TextInput,
@@ -12,7 +12,6 @@ import {
   Portal,
   Dialog,
   ActivityIndicator,
-  useTheme,
 } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
 
@@ -22,9 +21,11 @@ import {
   getCountries,
   getCitiesForCountry,
 } from '../api/profiles';
+import ScreenBackground from '../components/ScreenBackground';
+import { stackContentPaddingTop } from '../navigation/stackContentInset';
 
 export default function ClientProfileScreen({ navigation }) {
-  const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [profile, setProfile] = useState(null);
   const [countries, setCountries] = useState([]);
@@ -119,20 +120,29 @@ export default function ClientProfileScreen({ navigation }) {
   };
 
   if (loading) {
-    return <ActivityIndicator style={styles.loading} />;
+    return (
+      <ScreenBackground safeArea={false}>
+        <ActivityIndicator style={styles.loading} color="#fff" />
+      </ScreenBackground>
+    );
   }
 
   if (!profile) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text>No client profile found.</Text>
-      </View>
+      <ScreenBackground safeArea={false}>
+        <View style={styles.emptyContainer}>
+          <Text style={{ color: '#fff' }}>No client profile found.</Text>
+        </View>
+      </ScreenBackground>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <ScrollView contentContainerStyle={styles.container}>
+    <ScreenBackground safeArea={false}>
+      <ScrollView contentContainerStyle={[
+        styles.container,
+        { paddingTop: stackContentPaddingTop(insets, 8), paddingBottom: Math.max(insets.bottom, 16) },
+      ]}>
         <Text variant="labelLarge" style={styles.label}>Country</Text>
         <Picker
           selectedValue={profile.country}
@@ -192,7 +202,7 @@ export default function ClientProfileScreen({ navigation }) {
           </Dialog.Actions>
         </Dialog>
       </Portal>
-    </SafeAreaView>
+    </ScreenBackground>
   );
 }
 

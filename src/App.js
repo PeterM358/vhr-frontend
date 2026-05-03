@@ -1,12 +1,13 @@
 import React, { useEffect } from 'react';
-import { ImageBackground, StyleSheet, Alert, Platform, Linking } from 'react-native';
+import { StyleSheet, Alert, Platform, Linking, View, StatusBar as RNStatusBar } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import AppNavigator from './navigation/AppNavigator';
 import { WebSocketProvider } from './context/WebSocketManager';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { AppTheme } from './styles/theme';
 import { ThemeProvider } from './context/ThemeManager';
 import AuthManager from './context/AuthManager';
-import Constants from 'expo-constants';
 
 const handleDeepLink = ({ url }) => {
   if (url) {
@@ -37,26 +38,36 @@ export default function App() {
   }, []);
 
   return (
-    <ThemeProvider>
-      <PaperProvider theme={AppTheme}>
-        <AuthManager>
-          <WebSocketProvider>
-            <ImageBackground
-              source={require('../assets/background.jpg')}
-              style={styles.background}
-              resizeMode="cover"
-            >
-              <AppNavigator />
-            </ImageBackground>
-          </WebSocketProvider>
-        </AuthManager>
-      </PaperProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <View style={styles.root}>
+        {Platform.OS === 'android' && (
+          <RNStatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+        )}
+        <StatusBar style="light" />
+        <ThemeProvider>
+          <PaperProvider theme={AppTheme}>
+            <AuthManager>
+              <WebSocketProvider>
+                <AppNavigator />
+              </WebSocketProvider>
+            </AuthManager>
+          </PaperProvider>
+        </ThemeProvider>
+      </View>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
+  root: {
     flex: 1,
+    backgroundColor: '#0b1220',
+    ...(Platform.OS === 'web'
+      ? {
+          minHeight: '100vh',
+          width: '100%',
+          alignSelf: 'stretch',
+        }
+      : {}),
   },
 });

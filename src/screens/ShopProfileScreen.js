@@ -2,12 +2,13 @@ import React, { useEffect, useState, useLayoutEffect } from 'react';
 import {
   View,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Image,
   TouchableOpacity,
   Alert
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ScreenBackground from '../components/ScreenBackground';
 import {
   Text,
   TextInput,
@@ -34,8 +35,12 @@ import {
   deleteShopImage
 } from '../api/shops';
 
+import BASE_STYLES from '../styles/base';
+import { stackContentPaddingTop } from '../navigation/stackContentInset';
+
 export default function ShopProfileScreen({ navigation }) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [profile, setProfile] = useState(null);
   const [countries, setCountries] = useState([]);
@@ -224,20 +229,28 @@ export default function ShopProfileScreen({ navigation }) {
   };
 
   if (loading) {
-    return <ActivityIndicator style={styles.loading} />;
+    return (
+      <ScreenBackground safeArea={false}>
+        <View style={styles.loadingCenter}>
+          <ActivityIndicator color="#fff" />
+        </View>
+      </ScreenBackground>
+    );
   }
 
   if (!profile) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text>No shop profile found.</Text>
-      </View>
+      <ScreenBackground safeArea={false}>
+        <View style={styles.loadingCenter}>
+          <Text style={{ color: '#fff' }}>No shop profile found.</Text>
+        </View>
+      </ScreenBackground>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <ScrollView contentContainerStyle={styles.container}>
+    <ScreenBackground safeArea={false}>
+      <ScrollView contentContainerStyle={[BASE_STYLES.formScreen, { paddingTop: stackContentPaddingTop(insets, 8) }]}>
         <TextInput
           label="Name"
           mode="outlined"
@@ -412,18 +425,20 @@ export default function ShopProfileScreen({ navigation }) {
           </Dialog.Actions>
         </Dialog>
       </Portal>
-    </SafeAreaView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16 },
   input: { marginBottom: 12 },
   label: { marginTop: 12, marginBottom: 4, fontWeight: 'bold' },
   picker: { backgroundColor: '#f4f4f4', borderRadius: 8, marginBottom: 12 },
+  loadingCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   locateButton: { marginBottom: 12 },
-  loading: { flex: 1, justifyContent: 'center' },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   uploadButton: { marginVertical: 12 },
   deleteBtn: {
     position: 'absolute',
