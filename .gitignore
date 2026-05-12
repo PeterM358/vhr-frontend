@@ -7,6 +7,8 @@ node_modules/
 .expo/
 dist/
 web-build/
+# Ad-hoc web export output (bundles embed EXPO_PUBLIC_* / OAuth; do not commit)
+.expo-web-build-check/
 expo-env.d.ts
 
 # Native
@@ -47,3 +49,9 @@ android/build/
 src/firebase.js
 gitleaks-report.json
 google-services.json.base64
+
+# Expo/web verification build output
+.expo-web-build-check/
+web-build-verify*/
+dist/
+.expo-web-build-check/

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, Alert, Platform, Linking, View, StatusBar as RNStatusBar } from 'react-native';
+import { StyleSheet, Alert, Platform, Linking, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import AppNavigator from './navigation/AppNavigator';
@@ -22,28 +22,37 @@ const handleDeepLink = ({ url }) => {
 export default function App() {
 
   useEffect(() => {
+    let unsubscribeOnMessage = () => {};
     import('firebase/messaging').then(({ getMessaging, onMessage }) => {
       const messaging = getMessaging();
-      onMessage(messaging, payload => {
+      unsubscribeOnMessage = onMessage(messaging, payload => {
         console.log('📬 Foreground notification received:', payload);
         Alert.alert(payload.notification?.title || '🔔 Notification', payload.notification?.body || '');
       });
     });
 
-    Linking.addEventListener('url', handleDeepLink);
+    const subscription = Linking.addEventListener('url', handleDeepLink);
 
     return () => {
-      Linking.removeEventListener('url', handleDeepLink);
+      unsubscribeOnMessage();
+      subscription.remove();
     };
   }, []);
 
   return (
     <SafeAreaProvider>
       <View style={styles.root}>
-        {Platform.OS === 'android' && (
-          <RNStatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-        )}
-        <StatusBar style="light" />
+        {/*
+          Expo StatusBar defaults to translucent=true on Android, which draws under the
+          system bar and breaks native-stack header layout vs. clock / cutout (Pixel).
+          Force non-translucent on Android; iOS keeps default behavior.
+        */}
+        <StatusBar
+          style="light"
+          {...(Platform.OS === 'android'
+            ? { translucent: false, backgroundColor: '#0b1220' }
+            : {})}
+        />
         <ThemeProvider>
           <PaperProvider theme={AppTheme}>
             <AuthManager>

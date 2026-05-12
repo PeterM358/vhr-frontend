@@ -3,8 +3,10 @@
  */
 
 import React from 'react';
+import { Platform, Pressable, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -13,6 +15,7 @@ import PublicHomeScreen from '../screens/PublicHomeScreen';
 import ClientVehiclesScreen from '../screens/ClientVehiclesScreen';
 import ShopMapScreen from '../screens/ShopMapScreen';
 import VehicleDetailScreen from '../screens/VehicleDetailScreen';
+import EditVehicleDetailsScreen from '../screens/EditVehicleDetailsScreen';
 import ShopDetailScreen from '../screens/ShopDetailScreen';
 import AuthLoadingScreen from '../screens/AuthLoadingScreen';
 import PromotionDetailScreen from '../screens/PromotionDetailScreen';
@@ -67,7 +70,38 @@ const transparentStackHeader = {
   headerTintColor: '#ffffff',
   headerTitleStyle: { color: '#ffffff', fontWeight: '600' },
   headerShadowVisible: false,
+  /** Android/Web default is left-aligned title; iOS is always centered. */
+  headerTitleAlign: 'center',
 };
+
+/** Large hit target + label; avoids tiny default back control on Android with transparent headers. */
+function homeHeaderLeft(navigation) {
+  return () => (
+    <Pressable
+      onPress={() => {
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+          return;
+        }
+        navigation.navigate('Home');
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="Back"
+      hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        minHeight: Platform.OS === 'android' ? 52 : 44,
+        paddingVertical: 8,
+        paddingRight: 10,
+        paddingLeft: Platform.OS === 'android' ? 4 : 0,
+      }}
+    >
+      <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
+      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>Back</Text>
+    </Pressable>
+  );
+}
 
 export default function AppNavigator() {
   // Deep linking configuration
@@ -87,6 +121,7 @@ export default function AppNavigator() {
         screenOptions={{
           ...transparentStackHeader,
           headerBackTitleVisible: false,
+          ...(Platform.OS === 'android' ? { statusBarTranslucent: false } : {}),
         }}
       >
         <Stack.Screen name="AuthLoading" component={AuthLoadingScreen} options={{ headerShown: false }} />
@@ -109,17 +144,41 @@ export default function AppNavigator() {
           component={ShopMapScreen}
           options={{ headerShown: false, title: 'Find Shops on Map' }}
         />
-        <Stack.Screen name="ClientVehicles" component={ClientVehiclesScreen} options={{ title: 'My Vehicles' }}/>
+        <Stack.Screen
+          name="ClientVehicles"
+          component={ClientVehiclesScreen}
+          options={({ navigation }) => ({
+            ...transparentStackHeader,
+            title: 'My Vehicles',
+            headerLeft: homeHeaderLeft(navigation),
+          })}
+        />
         <Stack.Screen name="VehicleDetail" component={VehicleDetailScreen} options={{ title: 'Vehicle Details' }}/> 
+        <Stack.Screen
+          name="EditVehicleDetails"
+          component={EditVehicleDetailsScreen}
+          options={{ title: 'Technical details' }}
+        />
         <Stack.Screen
           name="ShopDetail"
           component={ShopDetailScreen}
-          options={{ title: 'Shop Details' }}
+          options={{ title: 'Service Details' }}
         />
         <Stack.Screen name="PromotionDetail" component={PromotionDetailScreen} options={{ title: 'Promotion Details' }}/>
-        <Stack.Screen name="ClientRepairs" component={ClientRepairsList} options={{ title: 'Repairs' }}/>
+        <Stack.Screen
+          name="ClientRepairs"
+          component={ClientRepairsList}
+          options={({ navigation, route }) => {
+            const fromVehicleDetail = !!route.params?.fromVehicleDetail;
+            return {
+              ...transparentStackHeader,
+              title: fromVehicleDetail ? 'Vehicle Repairs' : 'Repairs',
+              ...(fromVehicleDetail ? {} : { headerLeft: homeHeaderLeft(navigation) }),
+            };
+          }}
+        />
         <Stack.Screen name="RepairDetail" component={RepairDetailScreen} options={{ title: 'Repair Details' }}/>
-        <Stack.Screen name="CreateRepair" component={CreateRepairScreen} options={{ title: 'Create Repair' }}/>
+        <Stack.Screen name="CreateRepair" component={CreateRepairScreen} options={{ title: 'Request Service' }}/>
         <Stack.Screen name="CreateVehicle" component={CreateVehicleScreen} options={{ title: 'Create Vehicle' }}/>
         <Stack.Screen name="CreatePromotion" component={CreatePromotionScreen} options={{ title: 'Create Promotion' }}/>
         <Stack.Screen name="ShopRegisterClient" component={ShopRegisterClientScreen} options={{ title: 'Register Client' }}/>
@@ -161,7 +220,14 @@ export default function AppNavigator() {
         <Stack.Screen name="ManageRepairParts" component={ManageRepairPartsScreen} /> */}
 
         <Stack.Screen name="ClientLogRepair" component={ClientLogRepairScreen} options={{ title: 'Log Repair' }}/>
-        <Stack.Screen name="ClientRequestRepair" component={ClientRequestRepairScreen} options={{ title: 'Request Repair' }}/>
+        <Stack.Screen
+          name="ClientRequestRepair"
+          component={ClientRequestRepairScreen}
+          options={{
+            title: 'Request Service',
+            headerBackTitleVisible: false,
+          }}
+        />
         
         <Stack.Screen
           name="PasswordRequestReset"

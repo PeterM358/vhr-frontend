@@ -1,8 +1,7 @@
 // PATH: src/components/client/ClientRepairsList.js
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { View, FlatList, StyleSheet, Pressable } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRepairs } from '../../api/repairs';
 import { Text, ActivityIndicator } from 'react-native-paper';
@@ -12,7 +11,7 @@ import FloatingCard from '../ui/FloatingCard';
 import StatusBadge from '../ui/StatusBadge';
 import EmptyStateCard from '../ui/EmptyStateCard';
 import { COLORS } from '../../constants/colors';
-import { stackContentPaddingTop } from '../../navigation/stackContentInset';
+import { useStackBodyPaddingTop } from '../../navigation/stackContentInset';
 
 const TAB_OPTIONS = [
   { key: 'open', label: 'Open' },
@@ -20,11 +19,20 @@ const TAB_OPTIONS = [
   { key: 'done', label: 'Done' },
 ];
 
-export default function ClientRepairsList({ navigation }) {
-  const insets = useSafeAreaInsets();
+export default function ClientRepairsList({ navigation, route }) {
+  const bodyPadTop = useStackBodyPaddingTop(12);
   const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('open');
+  const scopedVehicleId = route.params?.vehicleId ? Number(route.params.vehicleId) : null;
+
+  useLayoutEffect(() => {
+    if (route.params?.fromVehicleDetail) {
+      navigation.setOptions({
+        title: 'Vehicle Repairs',
+      });
+    }
+  }, [navigation, route.params]);
 
   useEffect(() => {
     const fetchRepairs = async () => {
@@ -43,6 +51,11 @@ export default function ClientRepairsList({ navigation }) {
     fetchRepairs();
   }, [statusFilter]);
 
+  const visibleRepairs = useMemo(() => {
+    if (!scopedVehicleId) return repairs;
+    return repairs.filter((r) => Number(r.vehicle) === scopedVehicleId);
+  }, [repairs, scopedVehicleId]);
+
   const renderRepair = ({ item }) => {
     const title =
       `${item.vehicle_make ?? ''} ${item.vehicle_model ?? ''}`.trim() ||
@@ -52,7 +65,11 @@ export default function ClientRepairsList({ navigation }) {
     return (
       <FloatingCard
         onPress={() =>
-          navigation.navigate('RepairDetail', { repairId: item.id })
+          navigation.navigate('RepairDetail', {
+            repairId: item.id,
+            fromVehicleDetail: route.params?.fromVehicleDetail || false,
+            vehicleId: scopedVehicleId,
+          })
         }
       >
         <View style={styles.cardTopRow}>
@@ -86,7 +103,7 @@ export default function ClientRepairsList({ navigation }) {
 
   return (
     <ScreenBackground safeArea={false}>
-      <View style={[styles.container, { paddingTop: stackContentPaddingTop(insets, 12) }]}>
+      <View style={[styles.container, { paddingTop: bodyPadTop }]}>
         <View style={styles.tabRow}>
           {TAB_OPTIONS.map((tab) => {
             const active = tab.key === statusFilter;
@@ -121,14 +138,14 @@ export default function ClientRepairsList({ navigation }) {
           />
         ) : (
           <FlatList
-            data={repairs}
+            data={visibleRepairs}
             keyExtractor={(item) => item.id.toString()}
             renderItem={renderRepair}
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               <EmptyStateCard
                 icon="wrench-outline"
-                title="No repairs found"
+                title={scopedVehicleId ? 'No repairs for this vehicle' : 'No repairs found'}
                 subtitle={`Nothing in "${statusFilter}" right now.`}
               />
             }

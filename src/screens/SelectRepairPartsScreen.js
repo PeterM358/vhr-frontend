@@ -1,5 +1,8 @@
 /**
- * PATH: src/screens/SelectRepairPartsScreen.js
+ * Return target + parts payload:
+ * - RepairDetail: params.addedParts, repairId
+ * - CreateRepair / ClientLogRepair / RepairChat: params.addedParts (+ context)
+ * Offer flow uses SelectOfferPartsScreen → CreateOrUpdateOffer.
  */
 
 import React, { useState, useEffect, useLayoutEffect } from 'react';
@@ -34,7 +37,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTitle: 'Manage Parts',
+      headerTitle: 'Choose estimated parts',
       headerBackTitleVisible: true,
       headerBackTitle: 'Back',
       headerBackImage: undefined,
@@ -43,11 +46,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
 
   const {
     currentParts = [],
-    vehicleId,
-    repairTypeId,
-    description,
-    kilometers,
-    status,
+    returnTo = 'RepairDetail',
   } = route.params || {};
 
   const newCreatedPart = route.params?.newCreatedPart;
@@ -146,6 +145,11 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
   };
 
   const handleConfirmAndReturn = () => {
+    if (selected.length === 0) {
+      Alert.alert('No parts selected yet.');
+      return;
+    }
+
     for (let part of selected) {
       if (!part.quantity || isNaN(part.quantity) || !part.price || isNaN(part.price) || !part.labor || isNaN(part.labor)) {
         Alert.alert(
@@ -156,7 +160,6 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
       }
     }
 
-    // Map selected to send both part_master_id and shop_part_id if present
     const cleanedParts = selected.map(p => ({
       partsMasterId: parseInt(p.partsMasterId),
       partsMaster: p.partsMaster,
@@ -167,28 +170,74 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
       note: p.note,
     }));
 
-      console.log('Returning to:', route.params?.returnTo, 'with repairId:', route.params?.repairId);
+    const rp = route.params || {};
+    const target = returnTo;
 
-      navigation.reset({
-        index: 2,
-        routes: [
-          { name: 'Home' },
-          { name: 'RepairsList' },
-          {
-            name: 'RepairDetail',
-            params: {
-              addedParts: cleanedParts,
-              repairId: route.params?.repairId,
-              vehicleId,
-              repairTypeId,
-              description,
-              kilometers,
-              status,
-            },
-          },
-        ],
+    if (target === 'RepairDetail') {
+      const rid = rp.repairId;
+      if (rid == null) {
+        Alert.alert('Error', 'Missing repair reference. Open parts from a repair.');
+        return;
+      }
+      navigation.navigate({
+        name: 'RepairDetail',
+        merge: true,
+        params: {
+          repairId: rid,
+          addedParts: cleanedParts,
+        },
       });
-    };
+      return;
+    }
+
+    if (target === 'CreateRepair') {
+      navigation.navigate({
+        name: 'CreateRepair',
+        merge: true,
+        params: {
+          addedParts: cleanedParts,
+          vehicleId: rp.vehicleId,
+          repairTypeId: rp.repairTypeId,
+          serviceCategorySlug: rp.serviceCategorySlug,
+          description: rp.description,
+          symptoms: rp.symptoms,
+          kilometers: rp.kilometers,
+          status: rp.status,
+          targetingMode: rp.targetingMode,
+          selectedCenterIds: rp.selectedCenterIds,
+          requiresGuarantee: rp.requiresGuarantee,
+          preferredRadiusKm: rp.preferredRadiusKm,
+        },
+      });
+      return;
+    }
+
+    if (target === 'ClientLogRepair') {
+      navigation.navigate({
+        name: 'ClientLogRepair',
+        merge: true,
+        params: {
+          addedParts: cleanedParts,
+          vehicleId: rp.vehicleId,
+        },
+      });
+      return;
+    }
+
+    if (target === 'RepairChat') {
+      navigation.navigate({
+        name: 'RepairChat',
+        merge: true,
+        params: {
+          repairId: rp.repairId,
+          addedParts: cleanedParts,
+        },
+      });
+      return;
+    }
+
+    Alert.alert('Error', `Unknown return target: ${target}`);
+  };
 
   const navigateToAddNewPartScreen = () => {
     navigation.navigate('CreateMasterPart', {
@@ -216,12 +265,15 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
     >
       <ScrollView contentContainerStyle={[BASE_STYLES.formScreenScroll, { paddingTop: stackContentPaddingTop(insets, 4) }]}>
         <Text variant="headlineSmall" style={styles.title}>
-          Search & Select Parts
+          Choose estimated parts
+        </Text>
+        <Text style={styles.helperText}>
+          Custom parts entered by service centers may later help build the platform parts catalog.
         </Text>
 
         <TextInput
           mode="outlined"
-          label="Search Catalog"
+          label="Search parts catalog"
           value={query}
           onChangeText={setQuery}
           style={styles.input}
@@ -276,8 +328,11 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
         <Divider style={{ marginVertical: 20 }} />
 
         <Text variant="titleMedium" style={{ marginBottom: 8 }}>
-          Selected Parts
+          Selected estimated parts
         </Text>
+        {selected.length === 0 ? (
+          <Text style={styles.emptyStateText}>No parts selected yet.</Text>
+        ) : null}
         {selected.map((part, index) => {
           const expanded = expandedSelectedIndexes.includes(index);
 
@@ -354,15 +409,16 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
           onPress={navigateToAddNewPartScreen}
           style={{ marginBottom: 16 }}
         >
-          Can't find it? Add New Part to Catalog
+          Add custom part
         </Button>
+        {/* TODO(estimated-parts): future supplier invoice import, purchase/sell price, discounts, inventory quantity, margins, and supplier integrations. */}
 
         <Button
           mode="contained"
           onPress={handleConfirmAndReturn}
           style={{ marginBottom: 30 }}
         >
-          Confirm Selection
+          Confirm selection
         </Button>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -372,6 +428,12 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   title: { marginBottom: 12, textAlign: 'center' },
+  helperText: {
+    marginBottom: 8,
+    textAlign: 'center',
+    color: '#64748B',
+    fontSize: 13,
+  },
   input: { marginVertical: 8 },
   catalogCard: { marginVertical: 6 },
   selectedCard: {
@@ -381,5 +443,10 @@ const styles = StyleSheet.create({
   detailLabel: {
     marginBottom: 8,
     fontWeight: '600',
+  },
+  emptyStateText: {
+    color: '#64748B',
+    fontStyle: 'italic',
+    marginBottom: 6,
   },
 });

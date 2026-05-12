@@ -73,8 +73,9 @@ export default function ShopHomeScreen() {
       onPress={() => navigation.navigate('RepairDetail', { repairId: item.id })}
     >
       <Text style={styles.repairTitle} numberOfLines={2}>
-        {`${item.vehicle_make || ''} ${item.vehicle_model || ''} ${item.vehicle_license_plate ? `(${item.vehicle_license_plate})` : ''}`.trim()}
+        {`${item.vehicle_make || ''} ${item.vehicle_model || ''}`.trim() || 'Vehicle'}
       </Text>
+      <Text style={styles.repairMeta}>Plate hidden until booking</Text>
       {!!item.description && (
         <Text style={styles.repairDesc} numberOfLines={2}>
           {item.description}

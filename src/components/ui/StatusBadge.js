@@ -8,6 +8,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 const PALETTE = {
+  verified:  { bg: 'rgba(22,163,74,0.18)',  fg: '#15803D' }, // verified service center
   open:      { bg: 'rgba(37,99,235,0.16)',  fg: '#1D4ED8' }, // primary blue
   ongoing:   { bg: 'rgba(245,158,11,0.18)', fg: '#B45309' }, // amber
   done:      { bg: 'rgba(22,163,74,0.18)',  fg: '#15803D' }, // green

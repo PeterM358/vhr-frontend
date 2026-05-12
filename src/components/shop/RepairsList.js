@@ -4,14 +4,13 @@ import React, { useEffect, useState } from 'react';
 import { View, FlatList, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import {
   Text,
   ActivityIndicator,
 } from 'react-native-paper';
 
 import { getRepairs } from '../../api/repairs';
-import { getMyOffers } from '../../api/offers';
 import ScreenBackground from '../ScreenBackground';
 import FloatingCard from '../ui/FloatingCard';
 import StatusBadge from '../ui/StatusBadge';
@@ -24,16 +23,15 @@ import {
 import { stackContentPaddingTop } from '../../navigation/stackContentInset';
 
 const TAB_OPTIONS = [
-  { key: 'open',    label: 'Open' },
+  { key: 'open', label: 'Open' },
   { key: 'ongoing', label: 'Ongoing' },
-  { key: 'done',    label: 'Done' },
-  { key: 'offers',  label: 'Offers' },
+  { key: 'done', label: 'Done' },
+  { key: 'home', label: 'Home', isHome: true },
 ];
 
 export default function RepairsList() {
   const insets = useSafeAreaInsets();
   const [repairs, setRepairs] = useState([]);
-  const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState('open');
   const navigation = useNavigation();
@@ -43,13 +41,8 @@ export default function RepairsList() {
       setLoading(true);
       const token = await AsyncStorage.getItem('@access_token');
       try {
-        if (selectedTab === 'offers') {
-          const offersData = await getMyOffers(token);
-          setOffers(offersData);
-        } else {
-          const repairsData = await getRepairs(token, selectedTab);
-          setRepairs(repairsData);
-        }
+        const repairsData = await getRepairs(token, selectedTab);
+        setRepairs(repairsData);
       } catch (err) {
         console.error('Failed to load data', err);
       } finally {
@@ -63,6 +56,7 @@ export default function RepairsList() {
   const renderRepair = ({ item }) => {
     const title = `${item.vehicle_make ?? ''} ${item.vehicle_model ?? ''}`.trim() || 'Vehicle';
     const plate = item.vehicle_license_plate;
+    const showPlate = selectedTab !== 'open';
 
     return (
       <FloatingCard
@@ -75,9 +69,14 @@ export default function RepairsList() {
             <Text style={styles.cardTitle} numberOfLines={1}>
               {title}
             </Text>
-            {!!plate && (
+            {!!plate && showPlate && (
               <Text style={styles.cardPlate} numberOfLines={1}>
                 {plate}
+              </Text>
+            )}
+            {!!plate && !showPlate && (
+              <Text style={styles.cardPlate} numberOfLines={1}>
+                Plate hidden until booking
               </Text>
             )}
           </View>
@@ -99,51 +98,22 @@ export default function RepairsList() {
     );
   };
 
-  const renderOffer = ({ item }) => {
-    const title = `${item.vehicle_make ?? ''} ${item.vehicle_model ?? ''}`.trim() || 'Vehicle';
-    const plate = item.vehicle_license_plate;
-
-    return (
-      <FloatingCard
-        onPress={() =>
-          navigation.navigate('RepairDetail', { repairId: item.repair })
-        }
-      >
-        <View style={styles.cardTopRow}>
-          <View style={styles.cardTitleWrap}>
-            <Text style={styles.cardTitle} numberOfLines={1}>
-              {title}
-            </Text>
-            {!!plate && (
-              <Text style={styles.cardPlate} numberOfLines={1}>
-                {plate}
-              </Text>
-            )}
-          </View>
-          <View style={styles.priceTag}>
-            <Text style={styles.priceTagText}>{item.price} BGN</Text>
-          </View>
-        </View>
-
-        {!!item.description && (
-          <Text style={styles.cardDescription} numberOfLines={2}>
-            {item.description}
-          </Text>
-        )}
-      </FloatingCard>
-    );
-  };
-
   return (
     <ScreenBackground safeArea={false}>
       <View style={[styles.container, { paddingTop: stackContentPaddingTop(insets, 12) }]}>
         <View style={styles.tabRow}>
           {TAB_OPTIONS.map((tab) => {
-            const active = tab.key === selectedTab;
+            const active = !tab.isHome && tab.key === selectedTab;
             return (
               <Pressable
                 key={tab.key}
-                onPress={() => setSelectedTab(tab.key)}
+                onPress={() => {
+                  if (tab.isHome) {
+                    navigation.dispatch(DrawerActions.jumpTo('ShopDashboard'));
+                    return;
+                  }
+                  setSelectedTab(tab.key);
+                }}
                 style={({ pressed }) => [
                   styles.tab,
                   active ? styles.tabActive : styles.tabInactive,
@@ -168,20 +138,6 @@ export default function RepairsList() {
             size="large"
             color="#fff"
             style={styles.loading}
-          />
-        ) : selectedTab === 'offers' ? (
-          <FlatList
-            data={offers}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={renderOffer}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={
-              <EmptyStateCard
-                icon="tag-outline"
-                title="No offers sent yet"
-                subtitle="Offers you send to clients will appear here."
-              />
-            }
           />
         ) : (
           <FlatList
@@ -283,17 +239,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: TEXT_MUTED,
     marginTop: 6,
-  },
-  priceTag: {
-    backgroundColor: 'rgba(37,99,235,0.12)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  priceTagText: {
-    color: PRIMARY,
-    fontWeight: '700',
-    fontSize: 12,
-    letterSpacing: 0.3,
   },
 });

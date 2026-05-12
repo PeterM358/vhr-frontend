@@ -4,18 +4,34 @@ import { API_BASE_URL } from '../env';
 import { getFirebaseToken } from '../notifications/firebaseMessaging';
 import { sendFirebaseTokenToBackend } from './notifications';
 
+const normalizeLoginPhone = (value) => {
+  if (!value) return '';
+  const trimmed = value.trim().replace(/\s+/g, '').replace(/-/g, '');
+  if (trimmed.startsWith('00')) return `+${trimmed.slice(2)}`;
+  return trimmed;
+};
+
+const buildLoginIdentifierBody = (emailOrPhone, password) => {
+  const raw = (emailOrPhone || '').trim();
+  const hasAt = raw.includes('@');
+  if (hasAt) {
+    return { email: raw.toLowerCase(), password };
+  }
+  return { phone: normalizeLoginPhone(raw), password };
+};
+
 
 // ✅ Register
 export const register = async (emailOrPhone, password, isClient, isShop) => {
   try {
-    let registerData, loginData;
+    let registerData;
+    const raw = (emailOrPhone || '').trim();
+    const loginData = buildLoginIdentifierBody(raw, password);
 
-    if (emailOrPhone.trim().startsWith('+')) {
-      registerData = { phone: emailOrPhone.trim(), password, is_client: isClient, is_shop: isShop };
-      loginData = { phone: emailOrPhone.trim(), password };
+    if (raw.includes('@')) {
+      registerData = { email: raw.toLowerCase(), password, is_client: isClient, is_shop: isShop };
     } else {
-      registerData = { email: emailOrPhone.trim(), password, is_client: isClient, is_shop: isShop };
-      loginData = { email: emailOrPhone.trim(), password };
+      registerData = { phone: normalizeLoginPhone(raw), password, is_client: isClient, is_shop: isShop };
     }
 
     await axios.post(`${API_BASE_URL}/api/users/register/`, registerData);
@@ -34,12 +50,7 @@ export const register = async (emailOrPhone, password, isClient, isShop) => {
 // ✅ Login
 export const login = async (emailOrPhone, password) => {
   try {
-    let body;
-    if (emailOrPhone.trim().startsWith('+')) {
-      body = { phone: emailOrPhone.trim(), password };
-    } else {
-      body = { email: emailOrPhone.trim(), password };
-    }
+    const body = buildLoginIdentifierBody(emailOrPhone, password);
 
     console.log('🟢 Logging in with:', body);
 

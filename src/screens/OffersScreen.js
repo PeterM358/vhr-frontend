@@ -13,12 +13,12 @@ export default function OffersScreen({ navigation }) {
   const [unseenCount, setUnseenCount] = useState(0);
   const [unseenOffersCount, setUnseenOffersCount] = useState(0);
 
-  const goBack = () => {
+  const goHome = () => {
     if (navigation.canGoBack()) {
       navigation.goBack();
-    } else {
-      navigation.navigate('Home');
+      return;
     }
+    navigation.navigate('Home');
   };
 
   const topPad = Math.max(insets.top, 10);
@@ -28,16 +28,17 @@ export default function OffersScreen({ navigation }) {
       <View style={[styles.root, { paddingTop: topPad }]}>
         <View style={styles.headerRow}>
           <Pressable
-            onPress={goBack}
-            style={({ pressed }) => [styles.iconPill, pressed && styles.pressed]}
-            hitSlop={12}
+            onPress={goHome}
+            style={({ pressed }) => [styles.homeRow, pressed && styles.pressed]}
+            hitSlop={{ top: 16, bottom: 16, left: 8, right: 12 }}
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel="Home"
           >
             <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
+            <Text style={styles.homeLabel}>Home</Text>
           </Pressable>
           <View pointerEvents="none" style={styles.titleAbsolute}>
-            <Text style={styles.screenTitle}>Offers</Text>
+            <Text style={styles.screenTitle}>Activity</Text>
           </View>
           <View style={styles.headerSideSpacer} />
         </View>
@@ -79,7 +80,7 @@ export default function OffersScreen({ navigation }) {
                     activeTab === 'offers' && styles.segmentLabelActive,
                   ]}
                 >
-                  Repair offers
+                  Activity
                 </Text>
                 {unseenOffersCount > 0 && (
                   <Badge style={[styles.badge, styles.badgeMargin]}>{String(unseenOffersCount)}</Badge>
@@ -125,13 +126,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     minHeight: 44,
   },
-  iconPill: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(15,23,42,0.88)',
+  homeRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(15,23,42,0.88)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.2)',
     elevation: 4,
@@ -140,12 +142,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 6,
   },
+  homeLabel: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 2,
+  },
   pressed: {
     opacity: 0.88,
   },
   headerSideSpacer: {
-    width: 44,
-    height: 44,
+    minWidth: 96,
+    height: 48,
   },
   titleAbsolute: {
     ...StyleSheet.absoluteFillObject,

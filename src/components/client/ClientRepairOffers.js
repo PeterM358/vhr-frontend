@@ -6,30 +6,44 @@ import { API_BASE_URL } from '../../api/config';
 import { WebSocketContext } from '../../context/WebSocketManager';
 import { markNotificationRead } from '../../api/notifications';
 import { markOfferSeen } from '../../api/offers';
-import { Text, ActivityIndicator, useTheme } from 'react-native-paper';
+import { getRepairs } from '../../api/repairs';
+import { Text, ActivityIndicator } from 'react-native-paper';
 import FloatingCard from '../ui/FloatingCard';
 import EmptyStateCard from '../ui/EmptyStateCard';
 import { COLORS } from '../../constants/colors';
 
 export default function ClientRepairOffers({ onUpdateUnseenOffersCount }) {
   const [offers, setOffers] = useState([]);
+  const [repairStatusById, setRepairStatusById] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const { notifications, setNotifications } = useContext(WebSocketContext);
-  const theme = useTheme();
 
   const fetchRepairOffers = async () => {
+    // TODO(activity-filters): add client-side filters for offers/ongoing/completed/canceled states.
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
 
-      const res = await fetch(`${API_BASE_URL}/api/offers/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
+      const [offersRes, repairsData] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/offers/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        getRepairs(token).catch(() => []),
+      ]);
+      const data = await offersRes.json();
       setOffers(data);
+      const statusMap = {};
+      if (Array.isArray(repairsData)) {
+        repairsData.forEach((repair) => {
+          if (repair?.id != null && repair?.status) {
+            statusMap[String(repair.id)] = repair.status;
+          }
+        });
+      }
+      setRepairStatusById(statusMap);
       const unseen = data.filter((o) => !o.is_seen_by_client).length;
       if (typeof onUpdateUnseenOffersCount === 'function') {
         onUpdateUnseenOffersCount(unseen);
@@ -84,7 +98,53 @@ export default function ClientRepairOffers({ onUpdateUnseenOffersCount }) {
 
   const renderItem = ({ item }) => {
     const isUnread = !item.is_seen_by_client;
+    const statusFromRepairList = item?.repair != null ? repairStatusById[String(item.repair)] : null;
+    const rawRepairStatus =
+      item?.repair?.status ??
+      item?.repair_status ??
+      item?.repairStatus ??
+      statusFromRepairList ??
+      null;
+    const normalizedRepairStatus =
+      typeof rawRepairStatus === 'string' ? rawRepairStatus.trim().toLowerCase() : null;
+    const repairStatus =
+      normalizedRepairStatus === 'cancelled' ? 'canceled' : normalizedRepairStatus;
+    const hasRepairStatus = Boolean(repairStatus);
     const isBooked = item.is_booked;
+    const shopName = item.shop_name || 'Service center';
+    let activityTitle = 'Offer received';
+    let activityDescription = `${shopName} sent an offer`;
+    let activityLabel = 'NEW OFFER';
+    let activityStyle = styles.stateNew;
+    if (hasRepairStatus) {
+      if (repairStatus === 'done') {
+        activityTitle = 'Repair completed';
+        activityDescription = `${shopName} completed the repair`;
+        activityLabel = 'DONE';
+        activityStyle = styles.stateDone;
+      } else if (repairStatus === 'ongoing') {
+        activityTitle = 'Vehicle in service';
+        activityDescription = `Your vehicle is currently being serviced by ${shopName}`;
+        activityLabel = 'IN SERVICE';
+        activityStyle = styles.stateInService;
+      } else if (repairStatus === 'canceled') {
+        activityTitle = 'Repair canceled';
+        activityDescription = `${shopName} canceled the repair`;
+        activityLabel = 'CANCELED';
+        activityStyle = styles.stateCanceled;
+      } else if (repairStatus === 'open' && isBooked) {
+        activityTitle = 'Repair booked';
+        activityDescription = `You booked ${shopName}`;
+        activityLabel = 'BOOKED';
+        activityStyle = styles.stateBooked;
+      }
+    } else if (isBooked) {
+      // Fallback only when linked repair status is unavailable.
+      activityTitle = 'Repair booked';
+      activityDescription = `You booked ${shopName}`;
+      activityLabel = 'BOOKED';
+      activityStyle = styles.stateBooked;
+    }
 
     return (
       <FloatingCard
@@ -96,8 +156,9 @@ export default function ClientRepairOffers({ onUpdateUnseenOffersCount }) {
           style={[styles.typeTitle, isUnread && styles.typeTitleBold]}
           numberOfLines={2}
         >
-          {item.repair_type_name}
+          {activityTitle}
         </Text>
+        <Text style={styles.activityLine}>{activityDescription}</Text>
         {!!item.description && (
           <Text style={styles.desc} numberOfLines={3}>
             {item.description}
@@ -107,14 +168,10 @@ export default function ClientRepairOffers({ onUpdateUnseenOffersCount }) {
           <Text style={styles.priceLabel}>Price: </Text>
           <Text style={styles.priceValue}>{item.price} BGN</Text>
         </Text>
-        <Text style={styles.shopLine}>Shop: {item.shop_name}</Text>
-        {isBooked && (
-          <View style={styles.bookedPill}>
-            <Text style={[styles.bookedText, { color: theme.colors.primary }]}>
-              Already booked
-            </Text>
-          </View>
-        )}
+        <Text style={styles.shopLine}>Service center: {shopName}</Text>
+        <View style={[styles.statusPill, activityStyle]}>
+          <Text style={styles.statusText}>{activityLabel}</Text>
+        </View>
       </FloatingCard>
     );
   };
@@ -122,7 +179,7 @@ export default function ClientRepairOffers({ onUpdateUnseenOffersCount }) {
   return (
     <View style={styles.root}>
       {loading ? (
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <ActivityIndicator size="large" color={COLORS.PRIMARY} />
       ) : (
         <FlatList
           data={offers}
@@ -135,8 +192,8 @@ export default function ClientRepairOffers({ onUpdateUnseenOffersCount }) {
           ListEmptyComponent={
             <EmptyStateCard
               icon="handshake-outline"
-              title="No repair offers yet"
-              subtitle="When shops send offers, they will appear here."
+              title="No activity yet"
+              subtitle="Repair updates and offers will appear here."
             />
           }
         />
@@ -157,9 +214,15 @@ const styles = StyleSheet.create({
   },
   typeTitle: {
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.PRIMARY_DARK,
-    marginBottom: 6,
+    marginBottom: 4,
+  },
+  activityLine: {
+    color: COLORS.TEXT_DARK,
+    marginBottom: 8,
+    fontSize: 13,
+    fontWeight: '500',
   },
   typeTitleBold: {
     fontWeight: '700',
@@ -185,16 +248,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.TEXT_DARK,
   },
-  bookedPill: {
+  statusPill: {
     alignSelf: 'flex-start',
     marginTop: 10,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: 'rgba(245,158,11,0.14)',
   },
-  bookedText: {
+  statusText: {
     fontWeight: '700',
     fontSize: 12,
+    color: '#0f172a',
   },
+  stateNew: { backgroundColor: 'rgba(37,99,235,0.15)' },
+  stateBooked: { backgroundColor: 'rgba(245,158,11,0.2)' },
+  stateInService: { backgroundColor: 'rgba(59,130,246,0.2)' },
+  stateDone: { backgroundColor: 'rgba(16,185,129,0.22)' },
+  stateCanceled: { backgroundColor: 'rgba(239,68,68,0.2)' },
 });

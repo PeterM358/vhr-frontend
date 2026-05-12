@@ -1,16 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, ActivityIndicator, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getVehicles } from '../api/vehicles';
 import { Text, FAB, useTheme, TouchableRipple } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import ScreenBackground from '../components/ScreenBackground';
-import { stackContentPaddingTop } from '../navigation/stackContentInset';
+import { useStackBodyPaddingTop } from '../navigation/stackContentInset';
 
 export default function ClientVehiclesScreen({ navigation }) {
-  const insets = useSafeAreaInsets();
+  const bodyPadTop = useStackBodyPaddingTop(12);
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isShop, setIsShop] = useState(false);
@@ -92,7 +91,7 @@ export default function ClientVehiclesScreen({ navigation }) {
 
   return (
     <ScreenBackground safeArea={false}>
-      <View style={[styles.container, { paddingTop: stackContentPaddingTop(insets, 12) }]}>
+      <View style={[styles.container, { paddingTop: bodyPadTop }]}>
         <FlatList
           data={vehicles}
           keyExtractor={(item) => item.id.toString()}

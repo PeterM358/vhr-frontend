@@ -21,9 +21,22 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
   const [repairType, setRepairType] = useState('');
   const [repairTypes, setRepairTypes] = useState([]);
   const [loadingTypes, setLoadingTypes] = useState(false);
+  const [serviceCenterLabel, setServiceCenterLabel] = useState('Service Center');
+
+  const centerLabelForVehicleType = (vehicleTypeCode, vehicleTypeName) => {
+    const code = String(vehicleTypeCode || '').toLowerCase();
+    if (['car', 'van', 'truck'].includes(code)) return 'Auto Service Center';
+    if (['motorcycle', 'scooter'].includes(code)) return 'Motorcycle Service Center';
+    if (code === 'bicycle') return 'Bicycle Service Center';
+    if (code === 'ebike') return 'E-bike Service Center';
+    if (code === 'trailer') return 'Trailer Service Center';
+    const n = String(vehicleTypeName || '').trim();
+    if (n) return `${n} Service Center`;
+    return 'Service Center';
+  };
 
   useEffect(() => {
-    const loadRepairTypes = async () => {
+    const loadFormContext = async () => {
       setLoadingTypes(true);
       try {
         const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
@@ -35,16 +48,28 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
         } else {
           throw new Error('Failed to fetch repair types');
         }
+
+        if (vehicleId) {
+          const vehicleRes = await fetch(`${API_BASE_URL}/api/vehicles/${vehicleId}/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (vehicleRes.ok) {
+            const vehicle = await vehicleRes.json();
+            setServiceCenterLabel(
+              centerLabelForVehicleType(vehicle.vehicle_type_code, vehicle.vehicle_type_name)
+            );
+          }
+        }
       } catch (err) {
-        console.error('❌ Error loading repair types:', err);
-        Alert.alert('Error', 'Could not load repair types. Please try again.');
+        console.error('❌ Error loading request context:', err);
+        Alert.alert('Error', 'Could not load repair data. Please try again.');
       } finally {
         setLoadingTypes(false);
       }
     };
 
-    loadRepairTypes();
-  }, []);
+    loadFormContext();
+  }, [vehicleId]);
 
   const handleSubmit = async () => {
     if (!vehicleId) {
@@ -94,7 +119,9 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
   return (
     <ScreenBackground>
     <ScrollView contentContainerStyle={BASE_STYLES.formScreen}>
-      <Text variant="titleLarge" style={styles.title}>Request Repair from Shop</Text>
+      <Text variant="titleMedium" style={styles.contextTitle}>
+        Request from {serviceCenterLabel}
+      </Text>
       
       <TextInput
         mode="outlined"
@@ -113,21 +140,24 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
         style={styles.input}
       />
 
-      <Text variant="labelLarge" style={{ marginTop: 16 }}>Select Repair Type *</Text>
+      <Text variant="labelLarge" style={styles.pickerLabel}>Select Repair Type *</Text>
 
       {loadingTypes ? (
         <ActivityIndicator animating size="small" style={{ marginVertical: 8 }} />
       ) : (
-        <Picker
-          selectedValue={repairType}
-          onValueChange={(itemValue) => setRepairType(itemValue)}
-          style={styles.input}
-        >
-          <Picker.Item label="Select Repair Type" value="" />
-          {repairTypes.map((type) => (
-            <Picker.Item key={type.id} label={type.name} value={type.id} />
-          ))}
-        </Picker>
+        <View style={styles.pickerWrap}>
+          <Picker
+            selectedValue={repairType}
+            onValueChange={(itemValue) => setRepairType(itemValue)}
+            style={styles.picker}
+            dropdownIconColor="#0f172a"
+          >
+            <Picker.Item label="Select Repair Type" value="" />
+            {repairTypes.map((type) => (
+              <Picker.Item key={type.id} label={type.name} value={type.id} />
+            ))}
+          </Picker>
+        </View>
       )}
 
       <Button
@@ -143,6 +173,24 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  title: { marginBottom: 16 },
+  contextTitle: { marginBottom: 12, color: 'rgba(255,255,255,0.92)', fontWeight: '600' },
   input: { marginVertical: 8 },
+  pickerLabel: {
+    marginTop: 16,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  pickerWrap: {
+    marginTop: 8,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    overflow: 'hidden',
+  },
+  picker: {
+    color: '#0f172a',
+    backgroundColor: 'rgba(255,255,255,0.95)',
+  },
 });

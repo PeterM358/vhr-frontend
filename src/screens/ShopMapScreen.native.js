@@ -1,13 +1,23 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Alert, Pressable } from 'react-native';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import {
+  View,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { TextInput, Button, Surface, useTheme, Text } from 'react-native-paper';
+import { Picker } from '@react-native-picker/picker';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { getServiceCenters, VEHICLE_TYPE_FILTER_CHIPS } from '../api/serviceCenters';
 import { API_BASE_URL } from '../api/config';
+import ScreenBackground from '../components/ScreenBackground';
 import BASE_STYLES from '../styles/base';
 
 const getNow = () => new Date().toISOString();
@@ -29,27 +39,58 @@ export default function ShopMapScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const mapRef = useRef(null);
 
-  const fetchShops = async (address = '') => {
+  const [selectedVehicleType, setSelectedVehicleType] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedRepairType, setSelectedRepairType] = useState('');
+  const [repairTypes, setRepairTypes] = useState([]);
+  const addressRef = useRef(addressQuery);
+  addressRef.current = addressQuery;
+
+  const categoryOptions = useMemo(() => {
+    const map = {};
+    repairTypes.forEach((rt) => {
+      const slug = rt.category_slug;
+      const name = rt.category_name || slug;
+      if (slug && name && !map[slug]) map[slug] = name;
+    });
+    return Object.entries(map)
+      .map(([slug, name]) => ({ slug, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [repairTypes]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await fetch(`${API_BASE_URL}/api/repairs/types/`, { headers });
+        const data = await res.json();
+        if (res.ok && Array.isArray(data)) setRepairTypes(data);
+      } catch (e) {
+        console.warn('ShopMap: could not load repair types for filters', e);
+      }
+    })();
+  }, []);
+
+  const fetchShops = useCallback(async () => {
     const fetchStart = Date.now();
-    console.log(`[${getNow()}] 📡 ShopMapScreen: Sending request to fetch shops...`);
+    console.log(`[${getNow()}] 📡 ShopMapScreen: fetch service centers...`);
     setLoading(true);
     const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     const userIdStr = await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
     const userId = userIdStr ? parseInt(userIdStr, 10) : null;
-    console.log(`[${getNow()}] 👤 ShopMapScreen: User ID is ${userId}`);
 
     try {
-      const url = `${API_BASE_URL}/api/profiles/shops/${address ? `?address=${encodeURIComponent(address)}` : ''}`;
+      const filters = {};
+      const aq = addressRef.current.trim();
+      if (aq) filters.address = aq;
+      if (selectedVehicleType) filters.vehicle_type = selectedVehicleType;
+      if (selectedCategory) filters.category = selectedCategory;
+      if (selectedRepairType) filters.repair_type = selectedRepairType;
+
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await fetch(url, { headers });
-      const data = await response.json();
+      const shopsArray = await getServiceCenters(filters, { headers });
 
-      if (!response.ok) {
-        console.error('Shop fetch failed:', response.status, data);
-        throw new Error(data?.detail || 'Could not load shops');
-      }
-
-      const shopsArray = Array.isArray(data) ? data : [];
       const updatedShops = shopsArray.map((shop) => ({
         ...shop,
         isMyShop: Number.isInteger(userId) && Array.isArray(shop.users) && shop.users.includes(userId),
@@ -58,16 +99,15 @@ export default function ShopMapScreen({ navigation }) {
       setShops(updatedShops);
     } catch (error) {
       console.error('Error fetching shops:', error);
-      Alert.alert('Error', 'Could not load shops');
+      Alert.alert('Error', error.message || 'Could not load shops');
     } finally {
       setLoading(false);
       const elapsed = Date.now() - fetchStart;
-      console.log(`[${getNow()}] ✅ ShopMapScreen: Finished fetching shops. Elapsed: ${elapsed}ms`);
+      console.log(`[${getNow()}] ✅ ShopMapScreen: fetch done. Elapsed: ${elapsed}ms`);
     }
-  };
+  }, [selectedVehicleType, selectedCategory, selectedRepairType]);
 
   const fetchEverything = async () => {
-    const startTime = Date.now();
     console.log(`[${getNow()}] 🟡 ShopMapScreen: Starting fetchEverything...`);
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
@@ -84,16 +124,26 @@ export default function ShopMapScreen({ navigation }) {
       position = await Location.getLastKnownPositionAsync({});
     }
     setLocation(position.coords);
-    console.log(`[${getNow()}] 🟢 ShopMapScreen: Location fetched, now fetching shops...`);
-    await fetchShops();
+    console.log(`[${getNow()}] 🟢 ShopMapScreen: Location fetched`);
   };
 
   useEffect(() => {
     fetchEverything();
   }, []);
 
+  useEffect(() => {
+    if (!location) return;
+    fetchShops();
+  }, [
+    location,
+    selectedVehicleType,
+    selectedCategory,
+    selectedRepairType,
+    fetchShops,
+  ]);
+
   const handleSearch = () => {
-    fetchShops(addressQuery);
+    fetchShops();
   };
 
   useEffect(() => {
@@ -113,89 +163,181 @@ export default function ShopMapScreen({ navigation }) {
     mapRef.current?.animateToRegion(region, 1000);
   }, [location, shops]);
 
-  if (!location || loading) return <ActivityIndicator size="large" style={styles.loader} />;
+  if (!location || loading) {
+    return (
+      <ScreenBackground safeArea={false}>
+        <View style={[BASE_STYLES.flexFill, styles.loaderWrap]}>
+          <ActivityIndicator size="large" />
+        </View>
+      </ScreenBackground>
+    );
+  }
 
   return (
-    <View style={BASE_STYLES.flexFill}>
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        showsUserLocation={true}
-        initialRegion={{
-          latitude: location.latitude,
-          longitude: location.longitude,
-          latitudeDelta: 0.5,
-          longitudeDelta: 0.5,
-        }}
-      >
-        {shops
-          .map(s => ({
-            ...s,
-            latitude: s.latitude ? parseFloat(s.latitude) : null,
-            longitude: s.longitude ? parseFloat(s.longitude) : null,
-          }))
-          .filter(s => !isNaN(s.latitude) && !isNaN(s.longitude))
-          .map(shop => (
-            <Marker
-              key={shop.id}
-              coordinate={{ latitude: shop.latitude, longitude: shop.longitude }}
-              pinColor={shop.isMyShop ? 'green' : 'red'}
-            >
-              <Callout onPress={() => navigation.navigate('ShopDetail', { shopId: shop.id })}>
-                <View style={{ maxWidth: 200 }}>
-                  <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>{shop.name}</Text>
-                  <Text variant="bodySmall">{shop.address}</Text>
-                  <Text style={{ color: theme.colors.primary, marginTop: 5 }}>Tap for details</Text>
-                </View>
-              </Callout>
-            </Marker>
-        ))}
-      </MapView>
-
-      <View style={[styles.topChrome, { paddingTop: insets.top + 10 }]}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
+    <ScreenBackground safeArea={false}>
+      <View style={BASE_STYLES.flexFill}>
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          showsUserLocation={true}
+          initialRegion={{
+            latitude: location.latitude,
+            longitude: location.longitude,
+            latitudeDelta: 0.5,
+            longitudeDelta: 0.5,
+          }}
         >
-          <MaterialCommunityIcons name="chevron-left" size={28} color="#fff" />
-        </Pressable>
+          {shops
+            .map((s) => ({
+              ...s,
+              latitude: s.latitude ? parseFloat(s.latitude) : null,
+              longitude: s.longitude ? parseFloat(s.longitude) : null,
+            }))
+            .filter((s) => !isNaN(s.latitude) && !isNaN(s.longitude))
+            .map((shop) => (
+              <Marker
+                key={shop.id}
+                coordinate={{ latitude: shop.latitude, longitude: shop.longitude }}
+                pinColor={shop.isMyShop ? 'green' : 'red'}
+              >
+                <Callout onPress={() => navigation.navigate('ShopDetail', { shopId: shop.id })}>
+                  <View style={{ maxWidth: 200 }}>
+                    <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>{shop.name}</Text>
+                    <Text variant="bodySmall">{shop.address}</Text>
+                    <Text style={{ color: theme.colors.primary, marginTop: 5 }}>Tap for details</Text>
+                  </View>
+                </Callout>
+              </Marker>
+            ))}
+        </MapView>
 
-        <Surface style={styles.searchSurface} elevation={4}>
-          <TextInput
-            mode="outlined"
-            dense
-            placeholder="Search by address..."
-            value={addressQuery}
-            onChangeText={setAddressQuery}
-            style={styles.searchInput}
-          />
-          <Button
-            mode="contained"
-            icon="magnify"
-            onPress={handleSearch}
-            style={styles.searchButton}
-            compact
-          >
-            Search
-          </Button>
-        </Surface>
+        <View style={[styles.chromeColumn, { paddingTop: insets.top + 10 }]} pointerEvents="box-none">
+          <View style={styles.rowBackSearch}>
+            <Pressable
+              onPress={() => {
+                if (navigation.canGoBack()) {
+                  navigation.goBack();
+                  return;
+                }
+                navigation.navigate('Home');
+              }}
+              style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+            >
+              <MaterialCommunityIcons name="chevron-left" size={28} color="#fff" />
+            </Pressable>
+
+            <Surface style={styles.searchSurface} elevation={4}>
+              <TextInput
+                mode="outlined"
+                dense
+                placeholder="Search by address..."
+                value={addressQuery}
+                onChangeText={setAddressQuery}
+                style={styles.searchInput}
+              />
+              <Button
+                mode="contained"
+                icon="magnify"
+                onPress={handleSearch}
+                style={styles.searchButton}
+                compact
+              >
+                Search
+              </Button>
+            </Surface>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+            <Pressable
+              onPress={() => setSelectedVehicleType(null)}
+              style={[
+                styles.chip,
+                selectedVehicleType === null && styles.chipSelected,
+                selectedVehicleType === null && { borderColor: theme.colors.primary },
+              ]}
+            >
+              <Text style={styles.chipText}>Any vehicle</Text>
+            </Pressable>
+            {VEHICLE_TYPE_FILTER_CHIPS.map((vt) => {
+              const on = selectedVehicleType === vt.code;
+              return (
+                <Pressable
+                  key={vt.code}
+                  onPress={() => setSelectedVehicleType(on ? null : vt.code)}
+                  style={[styles.chip, on && styles.chipSelected, on && { borderColor: theme.colors.primary }]}
+                >
+                  <Text style={styles.chipText}>{vt.label}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+            <Pressable
+              onPress={() => setSelectedCategory(null)}
+              style={[
+                styles.chip,
+                selectedCategory === null && styles.chipSelected,
+                selectedCategory === null && { borderColor: theme.colors.primary },
+              ]}
+            >
+              <Text style={styles.chipText}>Any category</Text>
+            </Pressable>
+            {categoryOptions.map((c) => {
+              const on = selectedCategory === c.slug;
+              return (
+                <Pressable
+                  key={c.slug}
+                  onPress={() => setSelectedCategory(on ? null : c.slug)}
+                  style={[styles.chip, on && styles.chipSelected, on && { borderColor: theme.colors.primary }]}
+                >
+                  <Text style={styles.chipText}>{c.name}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <Surface style={styles.pickerSurface} elevation={2}>
+            <View style={styles.pickerClip}>
+              <Picker
+                selectedValue={selectedRepairType}
+                onValueChange={(v) => setSelectedRepairType(v || '')}
+                style={styles.picker}
+              >
+                <Picker.Item label="Service type (any)" value="" />
+                {repairTypes
+                  .filter((rt) => rt.slug)
+                  .map((rt) => (
+                    <Picker.Item key={rt.id} label={rt.name} value={rt.slug} />
+                  ))}
+              </Picker>
+            </View>
+          </Surface>
+        </View>
       </View>
-    </View>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  loaderWrap: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   map: { flex: 1 },
-  topChrome: {
+  chromeColumn: {
     position: 'absolute',
     left: 12,
     right: 12,
+    top: 0,
+    zIndex: 20,
+  },
+  rowBackSearch: {
     flexDirection: 'row',
     alignItems: 'center',
-    zIndex: 20,
   },
   backPill: {
     width: 46,
@@ -235,9 +377,38 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
   },
-  loader: {
-    flex: 1,
+  filterRow: {
+    marginTop: 8,
+    maxHeight: 40,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    marginRight: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(0,0,0,0.12)',
     justifyContent: 'center',
-    alignItems: 'center',
+  },
+  chipSelected: {
+    backgroundColor: 'rgba(226,237,255,0.98)',
+  },
+  chipText: {
+    fontSize: 13,
+    color: '#0f172a',
+    fontWeight: '500',
+  },
+  pickerSurface: {
+    marginTop: 8,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+  },
+  pickerClip: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  picker: {
+    width: '100%',
   },
 });

@@ -46,7 +46,13 @@ export async function updateRepair(token, repairId, data) {
     },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Failed to update repair');
+  if (!res.ok) {
+    const errorText = await res.text();
+    const error = new Error('Failed to update repair');
+    error.status = res.status;
+    error.responseText = errorText;
+    throw error;
+  }
   return res.json();
 }
 
@@ -173,4 +179,55 @@ export async function getRepairChatById(token, chatId) {
   });
   if (!response.ok) throw new Error('Failed to fetch repair chat');
   return await response.json();
+}
+
+/**
+ * Upload a photo or video for a repair (multipart).
+ * @param {{ uri: string, mediaType: 'image' | 'video', fileName: string, mimeType: string }} mediaItem
+ */
+export async function uploadRepairMedia(token, repairId, mediaItem) {
+  const formData = new FormData();
+  formData.append('media_type', mediaItem.mediaType);
+  formData.append('file', {
+    uri: mediaItem.uri,
+    name: mediaItem.fileName,
+    type: mediaItem.mimeType,
+  });
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair/${repairId}/media/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.warn('Media upload failed', {
+      repairId,
+      mediaType: mediaItem.mediaType,
+      fileName: mediaItem.fileName,
+      status: response.status,
+      errorBody,
+    });
+    throw new Error('Failed to upload media');
+  }
+  return response.json();
+}
+
+export async function deleteRepairMedia(token, repairId, mediaId) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair/${repairId}/media/${mediaId}/`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.warn('Media delete failed', {
+      repairId,
+      mediaId,
+      status: response.status,
+      errorBody,
+    });
+    throw new Error('Failed to remove media');
+  }
+  return true;
 }

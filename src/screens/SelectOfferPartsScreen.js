@@ -30,7 +30,7 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTitle: 'Manage Offer Parts',
+      headerTitle: 'Select parts',
       headerBackTitleVisible: true,
       headerBackTitle: 'Back',
     });
@@ -40,6 +40,7 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
     currentParts = [],
     offerId,
     existingOffer,
+    repairId,
   } = route.params || {};
 
   const newCreatedPart = route.params?.newCreatedPart;
@@ -136,6 +137,11 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
   };
 
   const handleConfirmAndReturn = () => {
+    if (selected.length === 0) {
+      Alert.alert('No parts selected yet.');
+      return;
+    }
+
     for (let part of selected) {
       if (!part.quantity || isNaN(part.quantity) || !part.price || isNaN(part.price) || !part.labor || isNaN(part.labor)) {
         Alert.alert(
@@ -163,6 +169,7 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
         selectedOfferParts: cleanedParts,
         offerId,
         existingOffer,
+        repairId,
       },
     });
   };
@@ -175,12 +182,12 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
     >
       <ScrollView contentContainerStyle={[BASE_STYLES.formScreenScroll, { paddingTop: stackContentPaddingTop(insets, 4) }]}>
         <Text variant="headlineSmall" style={styles.title}>
-          Search & Select Offer Parts
+          Search parts catalog
         </Text>
 
         <TextInput
           mode="outlined"
-          label="Search Catalog"
+          label="Search parts catalog"
           value={query}
           onChangeText={setQuery}
           style={styles.input}
@@ -235,8 +242,11 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
         <Divider style={{ marginVertical: 20 }} />
 
         <Text variant="titleMedium" style={{ marginBottom: 8 }}>
-          Selected Parts
+          Selected parts
         </Text>
+        {selected.length === 0 ? (
+          <Text style={styles.emptyText}>No parts selected yet.</Text>
+        ) : null}
         {selected.map((part, index) => {
           const expanded = expandedSelectedIndexes.includes(index);
           return (
@@ -309,7 +319,7 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
           }}
           style={{ marginBottom: 16 }}
         >
-          Can't find it? Add New Part to Catalog
+          Add custom part
         </Button>
 
         <Button
@@ -329,6 +339,11 @@ const styles = StyleSheet.create({
   title: { marginBottom: 12, textAlign: 'center' },
   input: { marginVertical: 8 },
   catalogCard: { marginVertical: 6 },
+  emptyText: {
+    color: '#64748B',
+    fontStyle: 'italic',
+    marginBottom: 8,
+  },
   selectedCard: {
     marginVertical: 8,
     backgroundColor: '#f9f9f9',

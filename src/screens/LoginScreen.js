@@ -24,7 +24,10 @@ export default function LoginScreen({ navigation }) {
 
   const headerReserve = insets.top + (Platform.OS === 'ios' ? 52 : 56);
 
-  const [emailOrPhone, setEmailOrPhone] = useState('');
+  const [loginMethod, setLoginMethod] = useState('email');
+  const [email, setEmail] = useState('');
+  const [phonePrefix, setPhonePrefix] = useState('+359');
+  const [phoneNational, setPhoneNational] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,7 +35,21 @@ export default function LoginScreen({ navigation }) {
   useEffect(() => {
     const loadLastLogin = async () => {
       const last = await AsyncStorage.getItem('@last_login_email');
-      if (last) setEmailOrPhone(last);
+      if (!last) return;
+      if (last.startsWith('+')) {
+        setLoginMethod('phone');
+        const digits = last.slice(1);
+        if (digits.startsWith('359')) {
+          setPhonePrefix('+359');
+          setPhoneNational(digits.slice(3));
+        } else {
+          setPhonePrefix('+');
+          setPhoneNational(digits);
+        }
+      } else {
+        setLoginMethod('email');
+        setEmail(last);
+      }
     };
     loadLastLogin();
   }, []);
@@ -115,19 +132,23 @@ export default function LoginScreen({ navigation }) {
   }, [googleResponse]);
 
   const handleLogin = async () => {
-    console.log('🟢 Starting handleLogin with:', emailOrPhone);
+    const identifier =
+      loginMethod === 'phone'
+        ? `${(phonePrefix || '').trim()}${(phoneNational || '').trim()}`
+        : (email || '').trim();
+    console.log('🟢 Starting handleLogin with:', identifier);
     setError('');
     setLoading(true);
     try {
-      await AsyncStorage.setItem('@last_login_email', emailOrPhone.trim());
+      await AsyncStorage.setItem('@last_login_email', identifier);
       console.log('📤 Sending login request...');
-      const data = await login(emailOrPhone.trim(), password);
+      const data = await login(identifier, password);
 
       console.log('✅ Login success. Data:', data);
 
       setAuthToken(data.access);
       setIsAuthenticated(true);
-      setUserEmailOrPhone(emailOrPhone.trim());
+      setUserEmailOrPhone(identifier);
 
       await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.access);
       await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refresh);
@@ -177,22 +198,65 @@ export default function LoginScreen({ navigation }) {
           <Text style={styles.kicker}>Sign in</Text>
           <Text style={styles.title}>Welcome back</Text>
           <Text style={styles.subtitle}>
-            Use your email or phone and password to continue.
+            Choose your login method and enter your password.
           </Text>
 
           {error ? (
             <Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text>
           ) : null}
 
-          <TextInput
-            label="Email or Phone"
-            mode="outlined"
-            value={emailOrPhone}
-            onChangeText={setEmailOrPhone}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            style={styles.input}
-          />
+          <View style={styles.methodSwitchRow}>
+            <Button
+              mode={loginMethod === 'email' ? 'contained' : 'outlined'}
+              compact
+              onPress={() => setLoginMethod('email')}
+              style={styles.methodBtn}
+            >
+              Email
+            </Button>
+            <Button
+              mode={loginMethod === 'phone' ? 'contained' : 'outlined'}
+              compact
+              onPress={() => setLoginMethod('phone')}
+              style={styles.methodBtn}
+            >
+              Phone
+            </Button>
+          </View>
+
+          {loginMethod === 'email' ? (
+            <TextInput
+              label="Email"
+              mode="outlined"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              style={styles.input}
+            />
+          ) : (
+            <>
+              <View style={styles.phoneRow}>
+                <TextInput
+                  label="Prefix"
+                  mode="outlined"
+                  value={phonePrefix}
+                  onChangeText={setPhonePrefix}
+                  keyboardType="phone-pad"
+                  style={[styles.input, styles.prefixInput]}
+                />
+                <TextInput
+                  label="Phone number"
+                  mode="outlined"
+                  value={phoneNational}
+                  onChangeText={setPhoneNational}
+                  keyboardType="phone-pad"
+                  style={[styles.input, styles.phoneInput]}
+                />
+              </View>
+              <Text style={styles.helperText}>Use the phone number linked to your account.</Text>
+            </>
+          )}
 
           <TextInput
             label="Password"
@@ -290,6 +354,30 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 10,
     backgroundColor: '#fff',
+  },
+  methodSwitchRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  methodBtn: {
+    flex: 1,
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  prefixInput: {
+    flex: 0.7,
+  },
+  phoneInput: {
+    flex: 1.3,
+  },
+  helperText: {
+    fontSize: 12,
+    color: COLORS.TEXT_MUTED,
+    marginBottom: 8,
+    marginTop: -2,
   },
   fullBtn: {
     width: '100%',
