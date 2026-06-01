@@ -29,7 +29,7 @@ function withTimeout(promise, ms = 5000) {
   ]);
 }
 
-export default function ShopMapScreen({ navigation }) {
+export default function ShopMapScreen({ navigation, route }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -200,7 +200,15 @@ export default function ShopMapScreen({ navigation }) {
                 coordinate={{ latitude: shop.latitude, longitude: shop.longitude }}
                 pinColor={shop.isMyShop ? 'green' : 'red'}
               >
-                <Callout onPress={() => navigation.navigate('ShopDetail', { shopId: shop.id })}>
+                <Callout
+                  onPress={() =>
+                    navigation.navigate('ShopDetail', {
+                      shopId: shop.id,
+                      returnTo: route.params?.returnTo,
+                      vehicleId: route.params?.vehicleId,
+                    })
+                  }
+                >
                   <View style={{ maxWidth: 200 }}>
                     <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>{shop.name}</Text>
                     <Text variant="bodySmall">{shop.address}</Text>

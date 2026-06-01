@@ -1,6 +1,6 @@
 /**
  * Optional vehicle field groups for progressive create/edit UI.
- * Basic fields (type, make, model, year, plate, VIN, km) are handled by parent screens.
+ * Basic fields (type, make, model, plate, VIN, km, registration) are handled by parent screens.
  */
 
 export const ODOMETER_SOURCE_OPTIONS = [
@@ -27,8 +27,6 @@ export const VEHICLE_OPTIONAL_GROUPS = [
       { key: 'body_type', label: 'Body type', kind: 'choice' },
       { key: 'trim_version', label: 'Trim / version', kind: 'text' },
       { key: 'generation', label: 'Generation', kind: 'text' },
-      { key: 'first_registration_date', label: 'First registration', kind: 'date', placeholder: 'YYYY-MM-DD' },
-      { key: 'registration_country', label: 'Registration country', kind: 'text' },
     ],
   },
   {
@@ -94,9 +92,9 @@ export const VEHICLE_OPTIONAL_GROUPS = [
       { key: 'fleet_id', label: 'Fleet ID', kind: 'text' },
       { key: 'driver_name', label: 'Driver name', kind: 'text' },
       { key: 'department', label: 'Department', kind: 'text' },
-      { key: 'lease_expiration_date', label: 'Lease expiration', kind: 'date', placeholder: 'YYYY-MM-DD' },
+      { key: 'lease_expiration_date', label: 'Lease expiration', kind: 'date' },
       { key: 'insurance_company', label: 'Insurance company', kind: 'text' },
-      { key: 'warranty_expiration_date', label: 'Warranty expiration', kind: 'date', placeholder: 'YYYY-MM-DD' },
+      { key: 'warranty_expiration_date', label: 'Warranty expiration', kind: 'date' },
     ],
   },
   {
@@ -326,6 +324,11 @@ export function vehicleToFormStrings(vehicle) {
       out[k] = 'owner';
       return;
     }
+    if (k === 'first_registration_date' || k === 'lease_expiration_date' || k === 'warranty_expiration_date') {
+      const raw = v == null || v === '' ? '' : String(v);
+      out[k] = raw.length >= 10 ? raw.slice(0, 10) : raw;
+      return;
+    }
     if (v == null || v === '') {
       out[k] = '';
     } else {
@@ -333,6 +336,40 @@ export function vehicleToFormStrings(vehicle) {
     }
   });
   return out;
+}
+
+/** Picker options from GET /api/profiles/countries/ or GET /api/vehicles/countries/ (code+name). */
+export function profileCountriesToPickerOptions(countryRows) {
+  const rows = Array.isArray(countryRows) ? countryRows : [];
+  return rows
+    .map((c) => {
+      const code = String(c.iso2 ?? c.code ?? '').trim().toUpperCase();
+      const label = String(c.name || '').trim() || code;
+      return { value: code, label };
+    })
+    .filter((o) => o.value.length === 2);
+}
+
+/** ISO2 from a profiles country row or minimal { code, name } row. */
+function countryRowIso2(c) {
+  if (!c) return '';
+  const v = c.iso2 ?? c.code;
+  return String(v || '').trim().toUpperCase();
+}
+
+/** Map stored registration_country (ISO2 or legacy name) to picker ISO2. */
+export function registrationCountryToFormCode(stored, countryRows) {
+  const s = String(stored || '').trim();
+  if (!s) return '';
+  const rows = Array.isArray(countryRows) ? countryRows : [];
+  const upper = s.toUpperCase();
+  if (upper.length === 2) {
+    const byCode = rows.find((c) => countryRowIso2(c) === upper);
+    if (byCode) return countryRowIso2(byCode);
+    return upper;
+  }
+  const byName = rows.find((c) => String(c.name).trim().toLowerCase() === s.toLowerCase());
+  return byName ? countryRowIso2(byName) : '';
 }
 
 export function vehicleToFormBools(vehicle) {

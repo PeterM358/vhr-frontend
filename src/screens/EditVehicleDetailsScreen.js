@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, Button, Dialog, Portal, Switch, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Dialog, Portal, Switch, Text, TextInput } from 'react-native-paper';
 
 import { API_BASE_URL } from '../api/config';
+import { getCountries } from '../api/profiles';
 import {
   getCatalogEbikeSystems,
   getCatalogTrailerTypes,
@@ -18,6 +20,7 @@ import FloatingCard from '../components/ui/FloatingCard';
 import { COLORS } from '../constants/colors';
 import { stackContentPaddingTop } from '../navigation/stackContentInset';
 import VehicleCatalogEbikeTrailerSection from '../components/vehicle/VehicleCatalogEbikeTrailerSection';
+import VehicleRegistrationIdentityBlock from '../components/vehicle/VehicleRegistrationIdentityBlock';
 import VehicleCollapsibleFormSections from '../components/vehicle/VehicleCollapsibleFormSections';
 import {
   buildOptionalVehiclePayload,
@@ -26,13 +29,21 @@ import {
   VEHICLE_OPTIONAL_GROUPS,
   vehicleToFormBools,
   vehicleToFormStrings,
+  registrationCountryToFormCode,
+  profileCountriesToPickerOptions,
 } from '../components/vehicle/vehicleFormConfig';
+import { isoToDisplayDate } from '../components/vehicle/dateFieldUtils';
 
 export default function EditVehicleDetailsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { vehicleId } = route.params || {};
 
   const [vehicleChoices, setVehicleChoices] = useState({});
+  const [countriesState, setCountriesState] = useState({
+    status: 'loading',
+    rows: [],
+    error: '',
+  });
   const [backendFieldGroups, setBackendFieldGroups] = useState([]);
   const [catalogEbikeSystems, setCatalogEbikeSystems] = useState([]);
   const [catalogTrailerTypes, setCatalogTrailerTypes] = useState([]);
@@ -41,8 +52,11 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
   const [identityPlate, setIdentityPlate] = useState('');
   const [identityTypeName, setIdentityTypeName] = useState('');
   const [identityBrandModel, setIdentityBrandModel] = useState('');
-  const [identityYear, setIdentityYear] = useState('');
   const [identityVin, setIdentityVin] = useState('');
+  const [vinEditable, setVinEditable] = useState('');
+  const [vinLocked, setVinLocked] = useState(true);
+  const [regFirstIso, setRegFirstIso] = useState('');
+  const [regCountryIso, setRegCountryIso] = useState('');
 
   const [editCatalogEbike, setEditCatalogEbike] = useState('');
   const [editCatalogTrailer, setEditCatalogTrailer] = useState('');
@@ -56,6 +70,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
     return init;
   });
   const [expandedEbikeTrailer, setExpandedEbikeTrailer] = useState(false);
+  const [registrationExpanded, setRegistrationExpanded] = useState(false);
   const [poweredEquipmentEnabled, setPoweredEquipmentEnabled] = useState(false);
 
   const [loading, setLoading] = useState(true);
@@ -88,6 +103,40 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
     return resolved.filter((group) => group.key !== 'odometer');
   }, [vehicleTypeCode, optionalStrings, optionalBools, poweredEquipmentEnabled, backendFieldGroups]);
 
+  const reloadCountries = useCallback(async () => {
+    setCountriesState((prev) => ({ ...prev, status: 'loading', error: '' }));
+    try {
+      const raw = await getCountries();
+      const list = Array.isArray(raw) ? raw : [];
+      setCountriesState({ status: 'success', rows: list, error: '' });
+    } catch (e) {
+      const msg = e && typeof e.message === 'string' ? e.message : '';
+      if (__DEV__) console.warn('[EditVehicleDetails] getCountries failed', msg);
+      setCountriesState({ status: 'error', rows: [], error: 'Could not load countries.' });
+    }
+  }, []);
+
+  const mergedVehicleChoices = useMemo(() => {
+    return vehicleChoices && typeof vehicleChoices === 'object' ? { ...vehicleChoices } : {};
+  }, [vehicleChoices]);
+
+  const countryPickerOptions = useMemo(
+    () => profileCountriesToPickerOptions(countriesState.rows || []),
+    [countriesState.rows]
+  );
+
+  const registrationDateLabel = useMemo(() => {
+    const iso = String(regFirstIso || '').trim();
+    return iso ? isoToDisplayDate(iso) || iso : 'Not set';
+  }, [regFirstIso]);
+
+  const registrationCountryLabel = useMemo(() => {
+    const code = String(regCountryIso || '').trim().toUpperCase();
+    if (!code) return 'Not set';
+    const hit = countryPickerOptions.find((o) => o.value === code);
+    return hit?.label || code;
+  }, [regCountryIso, countryPickerOptions]);
+
   const showTrailerPoweredEquipmentToggle = useMemo(
     () =>
       String(vehicleTypeCode || '').toLowerCase() === 'trailer' &&
@@ -113,12 +162,27 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
       if (!vehicleId) return;
       try {
         const token = await AsyncStorage.getItem('@access_token');
+        setCountriesState({ status: 'loading', rows: [], error: '' });
         const [choices, ebikeRows, trailerRows, vehicleRes] = await Promise.all([
           getVehicleChoices(),
           getCatalogEbikeSystems(),
           getCatalogTrailerTypes(),
           fetch(`${API_BASE_URL}/api/vehicles/${vehicleId}/`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
+        let countryList = [];
+        try {
+          const rawCountries = await getCountries();
+          countryList = Array.isArray(rawCountries) ? rawCountries : [];
+          if (!cancelled) {
+            setCountriesState({ status: 'success', rows: countryList, error: '' });
+          }
+        } catch (ce) {
+          const msg = ce && typeof ce.message === 'string' ? ce.message : '';
+          if (__DEV__) console.warn('[EditVehicleDetails] getCountries failed', msg);
+          if (!cancelled) {
+            setCountriesState({ status: 'error', rows: [], error: 'Could not load countries.' });
+          }
+        }
         const vehicle = await vehicleRes.json();
         if (cancelled) return;
 
@@ -136,8 +200,16 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
           [vehicle.make_name, vehicle.model_name].filter(Boolean).join(' ') ||
           'Unknown vehicle';
         setIdentityBrandModel(line);
-        setIdentityYear(vehicle.year != null ? String(vehicle.year) : '—');
-        setIdentityVin(String(vehicle.vin || '').trim() ? String(vehicle.vin) : '—');
+        const existingVin = String(vehicle.vin || '').trim();
+        setIdentityVin(existingVin || '—');
+        setVinEditable(existingVin);
+        setVinLocked(!!existingVin);
+
+        const frd = vehicle.first_registration_date;
+        const frdIso = frd ? String(frd).slice(0, 10) : '';
+        setRegFirstIso(frdIso);
+        setRegCountryIso(registrationCountryToFormCode(vehicle.registration_country, countryList));
+        setRegistrationExpanded(!frdIso && !registrationCountryToFormCode(vehicle.registration_country, countryList));
 
         setEditCatalogEbike(vehicle.catalog_ebike_system != null ? String(vehicle.catalog_ebike_system) : '');
         setEditCatalogTrailer(vehicle.catalog_trailer_type != null ? String(vehicle.catalog_trailer_type) : '');
@@ -190,6 +262,14 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
         catalog_trailer_type: editCatalogTrailer ? parseInt(editCatalogTrailer, 10) : null,
         ...built.payload,
       };
+      const fr = String(regFirstIso ?? '').trim();
+      payload.first_registration_date = fr || null;
+      const rc = String(regCountryIso ?? '').trim().toUpperCase();
+      payload.registration_country = rc || null;
+      if (!vinLocked) {
+        const v = String(vinEditable ?? '').trim();
+        payload.vin = v || null;
+      }
       delete payload.odometer_verified;
       delete payload.odometer_source;
       await updateVehicle(vehicleId, payload, token);
@@ -243,20 +323,72 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
               <Text style={styles.identityLabel}>Brand / model</Text>
               <Text style={styles.identityValue}>{identityBrandModel}</Text>
             </View>
+            {vinLocked ? (
+              <View style={styles.identityRow}>
+                <Text style={styles.identityLabel}>VIN</Text>
+                <Text style={styles.identityValue} selectable>
+                  {identityVin}
+                </Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.identityLabel}>VIN (optional)</Text>
+                <TextInput
+                  mode="outlined"
+                  value={vinEditable}
+                  onChangeText={setVinEditable}
+                  placeholder="17-character VIN"
+                  autoCapitalize="characters"
+                  style={{ marginBottom: 8 }}
+                />
+              </>
+            )}
             <View style={styles.identityRow}>
-              <Text style={styles.identityLabel}>Year</Text>
-              <Text style={styles.identityValue}>{identityYear}</Text>
+              <Text style={styles.identityLabel}>First registration</Text>
+              <Text style={styles.identityValue}>{registrationDateLabel}</Text>
             </View>
             <View style={styles.identityRow}>
-              <Text style={styles.identityLabel}>VIN</Text>
-              <Text style={styles.identityValue} selectable>
-                {identityVin}
+              <Text style={styles.identityLabel}>Reg. country</Text>
+              <Text style={styles.identityValue}>{registrationCountryLabel}</Text>
+            </View>
+            <Pressable
+              onPress={() => setRegistrationExpanded((v) => !v)}
+              style={styles.registrationToggle}
+              accessibilityRole="button"
+            >
+              <Text style={styles.registrationToggleText}>
+                {registrationExpanded
+                  ? 'Hide registration editor'
+                  : regFirstIso || regCountryIso
+                    ? 'Edit registration'
+                    : 'Add registration (optional)'}
               </Text>
-            </View>
+              <MaterialCommunityIcons
+                name={registrationExpanded ? 'chevron-up' : 'chevron-down'}
+                size={20}
+                color={COLORS.PRIMARY}
+              />
+            </Pressable>
             <Text style={styles.hintMuted}>
-              Core identity and VIN are locked to protect vehicle history. Update kilometers on the vehicle screen. Contact support or use a correction flow if identity or VIN are wrong.
+              {vinLocked
+                ? 'Plate, make/model, and VIN are locked after creation. Registration: add date once if you skipped it at create; country can change later. Kilometers are on the vehicle screen.'
+                : 'Add your VIN once, then save. Registration is optional and edited below when expanded.'}
             </Text>
           </FloatingCard>
+
+          {registrationExpanded ? (
+            <FloatingCard style={{ marginTop: 10 }}>
+              <VehicleRegistrationIdentityBlock
+                firstRegistrationIso={regFirstIso}
+                onChangeFirstRegistrationIso={setRegFirstIso}
+                registrationCountryIso={regCountryIso}
+                onChangeRegistrationCountryIso={setRegCountryIso}
+                countriesState={countriesState}
+                onRetryCountries={reloadCountries}
+                lockFirstRegistrationDate={!!String(regFirstIso || '').trim()}
+              />
+            </FloatingCard>
+          ) : null}
 
           <Text style={styles.sectionLead}>
             Edit engine, trailer, e-bike, and other technical fields below. Service reminders are edited from each reminder row on the vehicle screen.
@@ -296,7 +428,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
             onChangeString={changeOptionalString}
             bools={optionalBools}
             onChangeBool={changeOptionalBool}
-            choicesMap={vehicleChoices}
+            choicesMap={mergedVehicleChoices}
             groups={relevantOptionalGroups}
           />
 
@@ -382,6 +514,18 @@ const styles = StyleSheet.create({
   },
   identityLabel: { color: COLORS.TEXT_MUTED, fontSize: 13 },
   identityValue: { color: COLORS.TEXT_DARK, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
+  registrationToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingVertical: 6,
+  },
+  registrationToggleText: {
+    color: COLORS.PRIMARY,
+    fontWeight: '600',
+    fontSize: 14,
+  },
   mileageEvidenceCard: {
     marginTop: 2,
   },

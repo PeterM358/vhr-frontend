@@ -120,9 +120,11 @@ export default function AuthorizedClients({ navigation }) {
                   {vehicle.make_name} {vehicle.model_name}
                 </Text>
                 <View style={styles.vehicleMetaRow}>
-                  {!!vehicle.year && (
-                    <Text style={styles.vehicleMeta}>Year: {vehicle.year}</Text>
-                  )}
+                  {(vehicle.registration_year != null && vehicle.registration_year !== '') || vehicle.year ? (
+                    <Text style={styles.vehicleMeta}>
+                      Year: {vehicle.registration_year ?? vehicle.year}
+                    </Text>
+                  ) : null}
                   {vehicle.kilometers != null && (
                     <Text style={styles.vehicleMeta}>
                       {Number(vehicle.kilometers).toLocaleString()} km

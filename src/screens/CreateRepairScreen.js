@@ -363,6 +363,8 @@ export default function CreateRepairScreen({ navigation, route }) {
       };
       if (!isEditMode) {
         body.vehicle = parseInt(vehicleId, 10);
+        body.source = 'marketplace_request';
+        body.status = 'open';
       }
 
       const isShop = await AsyncStorage.getItem('@is_shop');

@@ -1,18 +1,36 @@
 // PATH: src/env.js
 
-// Automatically choose dev or prod based on React Native __DEV__ global
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
 const ENV = __DEV__ ? 'dev' : 'prod';
 
 /**
- * IMPORTANT:
- * Replace 192.168.x.x with your actual computer's LAN IP for local network testing.
- * Example: '192.168.0.104' - Bansko, '192.168.1.8' - Home
+ * LAN IP of this Mac (Wi‑Fi). Update when you change networks:
+ *   ipconfig getifaddr en1
  */
+const DEV_LAN_HOST = '192.168.0.105';
+
+function resolveDevHost() {
+  if (Platform.OS === 'web') {
+    return '127.0.0.1';
+  }
+  if (Platform.OS === 'android' && !Constants.isDevice) {
+    return '10.0.2.2';
+  }
+  if (Platform.OS === 'ios' && !Constants.isDevice) {
+    return '127.0.0.1';
+  }
+  return DEV_LAN_HOST;
+}
+
+const DEV_HOST = resolveDevHost();
+
 const CONFIG = {
   dev: {
-    API_BASE_URL: 'http://192.168.1.8:8000',  // YOUR LOCAL LAN IP
-    WS_BASE_URL: 'ws://192.168.1.8:8001',
-  },    
+    API_BASE_URL: `http://${DEV_HOST}:8000`,
+    WS_BASE_URL: `ws://${DEV_HOST}:8001`,
+  },
   prod: {
     API_BASE_URL: 'https://your-production-api.com',
     WS_BASE_URL: 'wss://your-production-api.com',
@@ -21,3 +39,9 @@ const CONFIG = {
 
 export const API_BASE_URL = CONFIG[ENV].API_BASE_URL;
 export const WS_BASE_URL = CONFIG[ENV].WS_BASE_URL;
+
+if (__DEV__) {
+  console.log(
+    `[VHR] API → ${API_BASE_URL} (platform=${Platform.OS}, device=${Constants.isDevice})`
+  );
+}

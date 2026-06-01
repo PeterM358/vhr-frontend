@@ -4,9 +4,6 @@ import { Text, TextInput, Button, ActivityIndicator, useTheme } from 'react-nati
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { login } from '../api/auth';
-import { sendFirebaseTokenToBackend } from '../api/notifications';
-
-import { getFirebaseToken } from '../notifications/firebaseMessaging';
 import { AuthContext } from '../context/AuthManager';
 import Logo from '../assets/images/logo.svg';
 import { STORAGE_KEYS } from '../constants/storageKeys';

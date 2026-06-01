@@ -2,12 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import { View, FlatList, StyleSheet, Pressable } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import {
   Text,
   ActivityIndicator,
+  Appbar,
 } from 'react-native-paper';
 
 import { getRepairs } from '../../api/repairs';
@@ -20,7 +20,8 @@ import {
   TEXT_DARK,
   TEXT_MUTED,
 } from '../../constants/colors';
-import { stackContentPaddingTop } from '../../navigation/stackContentInset';
+
+const SHOP_TOP_BAR = 'rgba(11,18,32,0.92)';
 
 const TAB_OPTIONS = [
   { key: 'open', label: 'Open' },
@@ -30,7 +31,6 @@ const TAB_OPTIONS = [
 ];
 
 export default function RepairsList() {
-  const insets = useSafeAreaInsets();
   const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState('open');
@@ -55,8 +55,8 @@ export default function RepairsList() {
 
   const renderRepair = ({ item }) => {
     const title = `${item.vehicle_make ?? ''} ${item.vehicle_model ?? ''}`.trim() || 'Vehicle';
-    const plate = item.vehicle_license_plate;
-    const showPlate = selectedTab !== 'open';
+    const plate = String(item.vehicle_license_plate || '').trim();
+    const showPlate = Boolean(plate);
 
     return (
       <FloatingCard
@@ -74,11 +74,11 @@ export default function RepairsList() {
                 {plate}
               </Text>
             )}
-            {!!plate && !showPlate && (
+            {!showPlate ? (
               <Text style={styles.cardPlate} numberOfLines={1}>
                 Plate hidden until booking
               </Text>
-            )}
+            ) : null}
           </View>
           <StatusBadge status={item.status} />
         </View>
@@ -100,7 +100,19 @@ export default function RepairsList() {
 
   return (
     <ScreenBackground safeArea={false}>
-      <View style={[styles.container, { paddingTop: stackContentPaddingTop(insets, 12) }]}>
+      <Appbar.Header style={{ backgroundColor: SHOP_TOP_BAR }}>
+        <Appbar.BackAction
+          color="#fff"
+          onPress={() => navigation.dispatch(DrawerActions.jumpTo('ShopDashboard'))}
+        />
+        <Appbar.Content title="Repairs" titleStyle={{ color: '#fff' }} />
+        <Appbar.Action
+          icon="menu"
+          color="#fff"
+          onPress={() => navigation.openDrawer()}
+        />
+      </Appbar.Header>
+      <View style={[styles.container, { paddingTop: 12 }]}>
         <View style={styles.tabRow}>
           {TAB_OPTIONS.map((tab) => {
             const active = !tab.isHome && tab.key === selectedTab;

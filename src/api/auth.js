@@ -1,8 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../env';
-import { getFirebaseToken } from '../notifications/firebaseMessaging';
-import { sendFirebaseTokenToBackend } from './notifications';
+import { syncPushDeviceToken, deactivatePushDeviceToken } from '../notifications/pushDeviceSync';
 
 const normalizeLoginPhone = (value) => {
   if (!value) return '';
@@ -39,6 +38,7 @@ export const register = async (emailOrPhone, password, isClient, isShop) => {
     const loginResponse = await axios.post(`${API_BASE_URL}/api/token/`, loginData);
 
     await storeLoginData(loginResponse.data, emailOrPhone.trim());
+    await syncPushDeviceToken(loginResponse.data.access);
 
     return true;
   } catch (error) {
@@ -58,21 +58,7 @@ export const login = async (emailOrPhone, password) => {
     console.log('🟢 Login response received:', response.data);
 
     await storeLoginData(response.data, emailOrPhone.trim());
-
-    // Retrieve token from AsyncStorage after it's saved
-    const access = await AsyncStorage.getItem('@access_token');
-    const userId = response.data.user_id;
-    const isShop = response.data.is_shop;
-    const shopProfiles = response.data.shop_profiles;
-
-    const fcmToken = await getFirebaseToken();
-    console.log('📲 FCM Token:', fcmToken);
-    console.log('🔐 Retrieved access token:', access);
-
-    if (fcmToken && access) {
-      const shopProfileId = isShop && Array.isArray(shopProfiles) && shopProfiles.length > 0 ? shopProfiles[0].id : null;
-      await sendFirebaseTokenToBackend(fcmToken, userId, shopProfileId, access);
-    }
+    await syncPushDeviceToken(response.data.access);
 
     return response.data;
   } catch (error) {
@@ -141,7 +127,11 @@ export const logout = async (
   setIsAuthenticated,
   setUserEmailOrPhone
 ) => {
-  console.log('🟠 Logging out, clearing AsyncStorage...');
+  const accessToken = await AsyncStorage.getItem('@access_token');
+  if (accessToken) {
+    await deactivatePushDeviceToken(accessToken);
+  }
+
   await AsyncStorage.clear();
 
   if (setAuthToken) setAuthToken(null);
@@ -188,5 +178,6 @@ export const googleLogin = async (idToken) => {
   });
 
   await storeLoginData(response.data, response.data.email);
+  await syncPushDeviceToken(response.data.access);
   return response.data;
 };

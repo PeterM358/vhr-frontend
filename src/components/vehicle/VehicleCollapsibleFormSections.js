@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, Pressable, StyleSheet } from 'react-native';
-import { Text, TextInput, Switch } from 'react-native-paper';
+import { View, Pressable, StyleSheet, Platform, Text as RNText } from 'react-native';
+import { Text, TextInput, Switch, Button, ActivityIndicator } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import FloatingCard from '../ui/FloatingCard';
 import { COLORS } from '../../constants/colors';
 import { VEHICLE_OPTIONAL_GROUPS, ODOMETER_SOURCE_OPTIONS } from './vehicleFormConfig';
+import ServiceRecordDatePicker from './ServiceRecordDatePicker';
 
 export default function VehicleCollapsibleFormSections({
   expanded,
@@ -15,8 +16,21 @@ export default function VehicleCollapsibleFormSections({
   bools,
   onChangeBool,
   choicesMap = {},
+  /** Per choice field: loading / error / retry (e.g. registration_country). */
+  choiceExtras = {},
   groups = VEHICLE_OPTIONAL_GROUPS,
 }) {
+  const renderDateField = (field) => (
+    <View key={field.key} style={styles.fieldBlock}>
+      <ServiceRecordDatePicker
+        label={field.label}
+        valueIso={strings[field.key] || ''}
+        onChangeIso={(v) => onChangeString(field.key, v)}
+        optional
+      />
+    </View>
+  );
+
   return (
     <>
       {groups.map((group) => {
@@ -62,28 +76,59 @@ export default function VehicleCollapsibleFormSections({
                       </View>
                     );
                   }
+                  if (field.kind === 'date') {
+                    return renderDateField(field);
+                  }
                   if (field.kind === 'choice') {
-                    const options = choicesMap[field.key];
-                    const val = strings[field.key] ?? '';
-                    if (Array.isArray(options) && options.length > 0) {
+                    const extra = choiceExtras[field.key];
+                    if (extra?.loading) {
                       return (
                         <View key={field.key} style={styles.fieldBlock}>
                           <Text style={styles.label}>{field.label}</Text>
-                          <View style={styles.pickerBox}>
-                            <Picker
-                              selectedValue={val}
-                              onValueChange={(v) => onChangeString(field.key, v)}
-                              style={styles.picker}
-                            >
-                              <Picker.Item label="—" value="" />
-                              {options.map((o) => (
-                                <Picker.Item key={o.value} label={o.label} value={o.value} />
-                              ))}
-                            </Picker>
-                          </View>
+                          <ActivityIndicator animating style={styles.choiceSpinner} />
                         </View>
                       );
                     }
+                    if (extra?.error) {
+                      return (
+                        <View key={field.key} style={styles.fieldBlock}>
+                          <Text style={styles.label}>{field.label}</Text>
+                          <Text style={styles.helperText}>{extra.error}</Text>
+                          {extra.onRetry ? (
+                            <Button mode="outlined" compact onPress={extra.onRetry} style={styles.retryBtn}>
+                              Retry
+                            </Button>
+                          ) : null}
+                        </View>
+                      );
+                    }
+                    const options = choicesMap[field.key];
+                    if (!Array.isArray(options) || options.length === 0) {
+                      return (
+                        <View key={field.key} style={styles.fieldBlock}>
+                          <Text style={styles.label}>{field.label}</Text>
+                          <Text style={styles.helperText}>No options available.</Text>
+                        </View>
+                      );
+                    }
+                    const val = strings[field.key] ?? '';
+                    return (
+                      <View key={field.key} style={styles.fieldBlock}>
+                        <Text style={styles.label}>{field.label}</Text>
+                        <View style={styles.pickerBox}>
+                          <Picker
+                            selectedValue={val}
+                            onValueChange={(v) => onChangeString(field.key, v)}
+                            style={styles.picker}
+                          >
+                            <Picker.Item label="—" value="" />
+                            {options.map((o) => (
+                              <Picker.Item key={o.value} label={o.label} value={o.value} />
+                            ))}
+                          </Picker>
+                        </View>
+                      </View>
+                    );
                   }
                   const keyboardType =
                     field.kind === 'int' || field.kind === 'decimal' ? 'decimal-pad' : 'default';
@@ -173,5 +218,28 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_MUTED,
     lineHeight: 17,
     marginBottom: 8,
+  },
+  iosDatePicker: {
+    alignSelf: 'stretch',
+  },
+  datePressable: {
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.12)',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  datePressableText: {
+    fontSize: 15,
+    color: COLORS.TEXT_DARK,
+  },
+  choiceSpinner: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  retryBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
   },
 });

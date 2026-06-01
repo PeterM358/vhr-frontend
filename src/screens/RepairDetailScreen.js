@@ -42,6 +42,29 @@ import StatusBadge from '../components/ui/StatusBadge';
 import { COLORS } from '../constants/colors';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import * as ImagePicker from 'expo-image-picker';
+import {
+  formatOwnerLoggedTrustLabel,
+  formatServiceRecordProvider,
+} from '../utils/serviceRecordProvider';
+
+function formatEvidenceLevel(level) {
+  if (!level) return null;
+  const k = String(level).toLowerCase();
+  const map = {
+    owner_entered: 'Owner entered',
+    owner_with_photos: 'Owner with photos',
+    receipt_attached: 'Receipt attached',
+    service_center_confirmed: 'Service center confirmed',
+    platform_invoice_linked: 'Platform invoice linked',
+    inventory_stock_linked: 'Inventory stock linked',
+    later_inspection_confirmed: 'Later inspection confirmed',
+    disputed: 'Disputed',
+    admin_verified: 'Admin verified',
+    imported_document: 'Imported document',
+    external_import: 'External import',
+  };
+  return map[k] || String(level).replace(/_/g, ' ');
+}
 
 function formatPaymentStatus(status) {
   if (!status) return '—';
@@ -124,15 +147,17 @@ export default function RepairDetailScreen({ route, navigation }) {
 
   useLayoutEffect(() => {
     const st = String(repair?.status || '').toLowerCase();
+    const src = String(repair?.source || '').toLowerCase();
     let title = 'Repair';
     if (st === 'open') title = 'Service Request';
+    else if (st === 'done' && src === 'owner_logged') title = 'Service record';
     else if (st === 'done') title = 'Service record';
     else if (st === 'ongoing') title = 'Repair';
     navigation.setOptions({
       headerBackTitleVisible: false,
       title,
     });
-  }, [navigation, repair?.status]);
+  }, [navigation, repair?.status, repair?.source]);
 
   const handleUpdateRepair = async ({ finalize = false, showSuccessAlert = true } = {}) => {
     if (repair.status === 'done') {
@@ -353,22 +378,12 @@ export default function RepairDetailScreen({ route, navigation }) {
     return offers.some((o) => o.is_booked && Number(o.shop) === shopProfileIdNum);
   }, [isShop, shopProfileIdNum, offers]);
 
-  /** Shop may see license plate: assigned on repair, or has booked offer on this request. */
-  const isShopAuthorizedForVehiclePlate = useMemo(() => {
-    if (!isShop || !repair || shopProfileIdNum == null || Number.isNaN(shopProfileIdNum)) return false;
-    if (repair.shop_profile != null && Number(repair.shop_profile) === shopProfileIdNum) return true;
-    return shopHasBookedOfferForRepair;
-  }, [isShop, repair, shopProfileIdNum, shopHasBookedOfferForRepair]);
-
+  /** Shop may see plate when API exposes it (booked job or vehicle authorized for shop). */
   const canViewerSeeVehiclePlate = useMemo(() => {
     if (!repair) return false;
     if (!isShop) return true;
-    const st = String(repair.status || '').toLowerCase();
-    if (st === 'open') {
-      return isShopAuthorizedForVehiclePlate;
-    }
-    return isShopAuthorizedForVehiclePlate || st === 'booked' || st === 'ongoing' || st === 'done';
-  }, [repair, isShop, isShopAuthorizedForVehiclePlate]);
+    return Boolean(String(repair.vehicle_license_plate || '').trim());
+  }, [repair, isShop]);
 
   const handleAddPart = async () => {
     if (!newPart.shopPartId) {
@@ -555,9 +570,11 @@ export default function RepairDetailScreen({ route, navigation }) {
     ? repair.preferred_service_center_names
     : [];
   const statusLower = String(repair.status || '').toLowerCase();
+  const sourceLower = String(repair.source || '').toLowerCase();
   const isDone = statusLower === 'done';
   const isOpenStatus = statusLower === 'open';
   const isOngoingStatus = statusLower === 'ongoing';
+  const isOwnerLoggedServiceRecord = sourceLower === 'owner_logged' && isDone;
   const shouldShowTargetingCardForClient =
     !isDone &&
     !isShop &&
@@ -602,11 +619,13 @@ export default function RepairDetailScreen({ route, navigation }) {
     );
   const canEditClientRequest = isOpenRequest && isClientOwner;
 
-  const heroReferenceLine = isOpenStatus
-    ? `Request #${repair.id}`
-    : isOngoingStatus
-      ? `Repair #${repair.id}`
-      : `Reference #${repair.id}`;
+  const heroReferenceLine = isOwnerLoggedServiceRecord
+    ? `Service record #${repair.id}`
+    : isOpenStatus
+      ? `Request #${repair.id}`
+      : isOngoingStatus
+        ? `Repair #${repair.id}`
+        : `Reference #${repair.id}`;
 
   const handleEditRequest = () => {
     if (!canEditClientRequest) return;
@@ -820,9 +839,13 @@ export default function RepairDetailScreen({ route, navigation }) {
 
             {isDone ? (
             <FloatingCard style={styles.historyRecordCard}>
-              <Text style={styles.cardTitle}>Completed service record</Text>
+              <Text style={styles.cardTitle}>
+                {isOwnerLoggedServiceRecord ? 'Service record' : 'Completed service record'}
+              </Text>
               <Text style={styles.historyHelperText}>
-                This repair is now part of the vehicle service history.
+                {isOwnerLoggedServiceRecord
+                  ? 'You logged this service. It is saved as part of your vehicle history.'
+                  : 'This repair is now part of the vehicle service history.'}
               </Text>
               <View style={styles.completedPillRow}>
                 <View style={styles.completedPill}>
@@ -835,10 +858,51 @@ export default function RepairDetailScreen({ route, navigation }) {
                 <Text style={styles.summaryLabel}>Service type</Text>
                 <Text style={styles.summaryValue}>{completedServiceTypeName}</Text>
               </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Service center</Text>
-                <Text style={styles.summaryValue}>{repair.shop_profile_name || '—'}</Text>
-              </View>
+              {isOwnerLoggedServiceRecord ? (
+                <>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Service provider</Text>
+                    <Text style={styles.summaryValue}>{formatServiceRecordProvider(repair)}</Text>
+                  </View>
+                  {formatOwnerLoggedTrustLabel(repair) ? (
+                    <Text style={styles.trustHint}>{formatOwnerLoggedTrustLabel(repair)}</Text>
+                  ) : null}
+                  {!repair.self_repair && String(repair.manual_service_center_phone || '').trim() ? (
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Phone</Text>
+                      <Text style={styles.summaryValue}>{repair.manual_service_center_phone}</Text>
+                    </View>
+                  ) : null}
+                  {!repair.self_repair && String(repair.manual_service_center_email || '').trim() ? (
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Email</Text>
+                      <Text style={styles.summaryValue}>{repair.manual_service_center_email}</Text>
+                    </View>
+                  ) : null}
+                  {!repair.self_repair && String(repair.manual_service_center_address || '').trim() ? (
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Address</Text>
+                      <Text style={styles.summaryValue}>{repair.manual_service_center_address}</Text>
+                    </View>
+                  ) : null}
+                  {!repair.self_repair &&
+                  repair.manual_service_center_latitude != null &&
+                  repair.manual_service_center_longitude != null ? (
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Location</Text>
+                      <Text style={styles.summaryValue}>
+                        {String(repair.manual_service_center_latitude)},{' '}
+                        {String(repair.manual_service_center_longitude)}
+                      </Text>
+                    </View>
+                  ) : null}
+                </>
+              ) : (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Service center</Text>
+                  <Text style={styles.summaryValue}>{repair.shop_profile_name || '—'}</Text>
+                </View>
+              )}
               {completionRecordedAt ? (
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Completed on</Text>
@@ -855,16 +919,28 @@ export default function RepairDetailScreen({ route, navigation }) {
                       : '—'}
                 </Text>
               </View>
+              {isOwnerLoggedServiceRecord && repair.evidence_level ? (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Evidence</Text>
+                  <Text style={styles.summaryValue}>{formatEvidenceLevel(repair.evidence_level)}</Text>
+                </View>
+              ) : null}
 
               <Text style={styles.summarySectionTitle}>Notes</Text>
               {repair.shop_description ? (
                 <Text style={styles.detailLine}>Workshop notes: {repair.shop_description}</Text>
               ) : null}
               {repair.description ? (
-                <Text style={styles.detailLine}>Original request: {repair.description}</Text>
+                <Text style={styles.detailLine}>
+                  {isOwnerLoggedServiceRecord ? 'Notes: ' : 'Original request: '}
+                  {repair.description}
+                </Text>
               ) : null}
               {repair.symptoms ? (
-                <Text style={styles.mutedText}>Symptoms: {repair.symptoms}</Text>
+                <Text style={styles.mutedText}>
+                  {isOwnerLoggedServiceRecord ? 'Details: ' : 'Symptoms: '}
+                  {repair.symptoms}
+                </Text>
               ) : null}
               {!repair.shop_description && !repair.description && !repair.symptoms ? (
                 <Text style={styles.mutedText}>No notes captured for this record.</Text>
@@ -1162,7 +1238,9 @@ export default function RepairDetailScreen({ route, navigation }) {
               <Text style={styles.cardTitle}>Photos & videos</Text>
               <Text style={styles.mutedText}>
                 {isDone
-                  ? 'Part of the permanent service record as visual proof and history evidence.'
+                  ? isOwnerLoggedServiceRecord
+                    ? 'Add photos or receipts from this screen to strengthen this logged record (when uploads are enabled).'
+                    : 'Part of the permanent service record as visual proof and history evidence.'
                   : isOpenStatus
                     ? canEditClientRequest
                       ? 'Add or remove photos and videos while this request is open. After a shop is booked, media here becomes read-only.'
@@ -1825,6 +1903,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 10,
+  },
+  trustHint: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 10,
+    fontStyle: 'italic',
   },
   completedPillRow: {
     marginBottom: 12,

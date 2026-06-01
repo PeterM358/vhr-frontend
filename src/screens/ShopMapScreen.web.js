@@ -22,7 +22,7 @@ import L from 'leaflet';
 import { COLORS } from '../styles/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 import { getServiceCenters, VEHICLE_TYPE_FILTER_CHIPS } from '../api/serviceCenters';
 import { API_BASE_URL } from '../api/config';
@@ -46,6 +46,7 @@ function ChangeView({ center, zoom }) {
 
 export default function ShopMapScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
   const [shops, setShops] = useState([]);
   const [addressQuery, setAddressQuery] = useState('');
   const addressRef = useRef(addressQuery);
@@ -326,7 +327,13 @@ export default function ShopMapScreen() {
 
                     <Pressable
                       style={[styles.popupButton, styles.detailsButton]}
-                      onPress={() => navigation.navigate('ShopDetail', { shopId: shop.id })}
+                      onPress={() =>
+                        navigation.navigate('ShopDetail', {
+                          shopId: shop.id,
+                          returnTo: route.params?.returnTo,
+                          vehicleId: route.params?.vehicleId,
+                        })
+                      }
                     >
                       <Text style={styles.popupButtonText}>View Details</Text>
                     </Pressable>

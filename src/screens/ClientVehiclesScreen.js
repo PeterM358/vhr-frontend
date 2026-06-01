@@ -40,7 +40,9 @@ export default function ClientVehiclesScreen({ navigation }) {
     return unsubscribe;
   }, [navigation]);
 
-  const renderVehicle = ({ item }) => (
+  const renderVehicle = ({ item }) => {
+    const displayYear = item.registration_year ?? item.year;
+    return (
     <TouchableRipple
       style={styles.card}
       borderless
@@ -56,9 +58,9 @@ export default function ClientVehiclesScreen({ navigation }) {
             <Text style={styles.plate} numberOfLines={1}>
               {item.license_plate || '—'}
             </Text>
-            {item.year ? (
+            {displayYear != null && displayYear !== '' ? (
               <View style={styles.yearBadge}>
-                <Text style={styles.yearBadgeText}>{item.year}</Text>
+                <Text style={styles.yearBadgeText}>{displayYear}</Text>
               </View>
             ) : null}
           </View>
@@ -77,7 +79,8 @@ export default function ClientVehiclesScreen({ navigation }) {
         <MaterialCommunityIcons name="chevron-right" size={24} color="#94a3b8" />
       </View>
     </TouchableRipple>
-  );
+    );
+  };
 
   if (loading) {
     return (

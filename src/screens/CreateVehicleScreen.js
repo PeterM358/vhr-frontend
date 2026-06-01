@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -18,6 +18,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { getCountries } from '../api/profiles';
 import {
   createVehicle,
   getMakes,
@@ -33,6 +34,7 @@ import { COLORS } from '../constants/colors';
 import VehicleCollapsibleFormSections from '../components/vehicle/VehicleCollapsibleFormSections';
 import VehicleCatalogIdentityBlock from '../components/vehicle/VehicleCatalogIdentityBlock';
 import VehicleCatalogEbikeTrailerSection from '../components/vehicle/VehicleCatalogEbikeTrailerSection';
+import VehicleRegistrationIdentityBlock from '../components/vehicle/VehicleRegistrationIdentityBlock';
 import { useVehicleCatalogLists } from '../components/vehicle/useVehicleCatalogLists';
 import { applyVehicleCatalogFieldsToPayload } from '../components/vehicle/vehicleIdentityPayload';
 import {
@@ -73,9 +75,15 @@ export default function CreateVehicleScreen({ navigation, route }) {
   const [poweredEquipmentEnabled, setPoweredEquipmentEnabled] = useState(false);
 
   const [vehicleChoices, setVehicleChoices] = useState({});
+  const [countriesState, setCountriesState] = useState({
+    status: 'loading',
+    rows: [],
+    error: '',
+  });
   const [backendFieldGroups, setBackendFieldGroups] = useState([]);
 
-  const [year, setYear] = useState('');
+  const [firstRegIso, setFirstRegIso] = useState('');
+  const [regCountryIso, setRegCountryIso] = useState('');
   const [kilometers, setKilometers] = useState('');
   const [licensePlate, setLicensePlate] = useState('');
   const [vin, setVin] = useState('');
@@ -153,9 +161,23 @@ export default function CreateVehicleScreen({ navigation, route }) {
     setSelectedModelLegacy('');
   };
 
+  const reloadCountries = useCallback(async () => {
+    setCountriesState((prev) => ({ ...prev, status: 'loading', error: '' }));
+    try {
+      const raw = await getCountries();
+      const list = Array.isArray(raw) ? raw : [];
+      setCountriesState({ status: 'success', rows: list, error: '' });
+    } catch (e) {
+      const msg = e && typeof e.message === 'string' ? e.message : '';
+      if (__DEV__) console.warn('[CreateVehicle] getCountries failed', msg);
+      setCountriesState({ status: 'error', rows: [], error: 'Could not load countries.' });
+    }
+  }, []);
+
   useEffect(() => {
     const load = async () => {
       try {
+        setCountriesState({ status: 'loading', rows: [], error: '' });
         const [makesData, typesData, choices, ebike, trailers] = await Promise.all([
           getMakes(),
           getVehicleTypes(),
@@ -163,6 +185,15 @@ export default function CreateVehicleScreen({ navigation, route }) {
           getCatalogEbikeSystems(),
           getCatalogTrailerTypes(),
         ]);
+        try {
+          const rawCountries = await getCountries();
+          const list = Array.isArray(rawCountries) ? rawCountries : [];
+          setCountriesState({ status: 'success', rows: list, error: '' });
+        } catch (ce) {
+          const msg = ce && typeof ce.message === 'string' ? ce.message : '';
+          if (__DEV__) console.warn('[CreateVehicle] getCountries failed', msg);
+          setCountriesState({ status: 'error', rows: [], error: 'Could not load countries.' });
+        }
         setMakes(makesData);
         setVehicleTypes(typesData);
         setVehicleChoices(choices && typeof choices === 'object' ? choices : {});
@@ -195,12 +226,6 @@ export default function CreateVehicleScreen({ navigation, route }) {
   };
 
   const handleSave = async () => {
-    const y = parseInt(String(year).trim(), 10);
-    if (!Number.isFinite(y) || y < 1900 || y > 2100) {
-      Alert.alert('Validation', 'Enter a valid year.');
-      return;
-    }
-
     if (manualMode) {
       if (!selectedMake || !selectedModelLegacy) {
         Alert.alert('Validation', 'Choose make and model, or switch to catalog selection.');
@@ -232,10 +257,14 @@ export default function CreateVehicleScreen({ navigation, route }) {
     try {
       const token = await AsyncStorage.getItem('@access_token');
       const payload = {
-        year: y,
         kilometers: km,
         ...built.payload,
       };
+
+      const fr = String(firstRegIso ?? '').trim();
+      if (fr) payload.first_registration_date = fr;
+      const rc = String(regCountryIso ?? '').trim().toUpperCase();
+      if (rc) payload.registration_country = rc;
 
       const plate = String(licensePlate ?? '').trim();
       if (plate) payload.license_plate = plate;
@@ -321,6 +350,10 @@ export default function CreateVehicleScreen({ navigation, route }) {
     poweredEquipmentEnabled,
     backendFieldGroups,
   ]);
+
+  const mergedVehicleChoices = useMemo(() => {
+    return vehicleChoices && typeof vehicleChoices === 'object' ? { ...vehicleChoices } : {};
+  }, [vehicleChoices]);
 
   const showTrailerPoweredEquipmentToggle = useMemo(
     () =>
@@ -410,14 +443,13 @@ export default function CreateVehicleScreen({ navigation, route }) {
             />
             <Text style={styles.microHint}>{vinHint}</Text>
 
-            <Text style={[styles.label, { marginTop: 16 }]}>Year *</Text>
-            <TextInput
-              mode="outlined"
-              value={year}
-              onChangeText={setYear}
-              placeholder="e.g. 2016"
-              keyboardType="number-pad"
-              style={styles.input}
+            <VehicleRegistrationIdentityBlock
+              firstRegistrationIso={firstRegIso}
+              onChangeFirstRegistrationIso={setFirstRegIso}
+              registrationCountryIso={regCountryIso}
+              onChangeRegistrationCountryIso={setRegCountryIso}
+              countriesState={countriesState}
+              onRetryCountries={reloadCountries}
             />
 
             <Text style={styles.label}>Kilometers</Text>
@@ -499,7 +531,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
             onChangeString={changeOptionalString}
             bools={optionalBools}
             onChangeBool={changeOptionalBool}
-            choicesMap={vehicleChoices}
+            choicesMap={mergedVehicleChoices}
             groups={relevantOptionalGroups}
           />
 

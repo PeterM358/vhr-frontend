@@ -35,6 +35,11 @@ export default function OptionalVehicleGroupsReadonly({ vehicle }) {
           let display = String(v);
           if (f.kind === 'odometer_picker' || f.key === 'odometer_source') {
             display = labelForOdometerSource(v);
+          } else if (f.key === 'registration_country') {
+            display =
+              vehicle.registration_country_name && String(vehicle.registration_country_name).trim()
+                ? String(vehicle.registration_country_name)
+                : String(v);
           }
           rows.push({ key: f.key, label: f.label, value: display });
         });

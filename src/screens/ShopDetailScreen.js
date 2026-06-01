@@ -251,6 +251,22 @@ export default function ShopDetailScreen({ route, navigation }) {
             : v
         )
       );
+
+      const returnTo = route.params?.returnTo;
+      const returnVehicleId = route.params?.vehicleId;
+      if (returnTo === 'VehicleDetail' && returnVehicleId != null) {
+        navigation.navigate({
+          name: 'VehicleDetail',
+          params: { vehicleId: returnVehicleId, expandAuthorizedCenters: true },
+          merge: true,
+        });
+      } else if (returnTo === 'ManageVehicleServiceCenters' && returnVehicleId != null) {
+        navigation.navigate({
+          name: 'ManageVehicleServiceCenters',
+          params: { vehicleId: returnVehicleId },
+          merge: true,
+        });
+      }
     } catch (_error) {
       Alert.alert('Error', 'Failed to update authorization.');
     }

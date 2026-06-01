@@ -45,6 +45,25 @@ export async function patchVehicleReminder(vehicleId, reminderId, payload, token
   return response.json();
 }
 
+/** POST /api/vehicles/:id/expenses/ — amounts are minor units (see VehicleExpense.amount_minor). */
+export async function createVehicleExpense(vehicleId, payload, token) {
+  const response = await fetch(`${API_BASE_URL}/api/vehicles/${vehicleId}/expenses/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    const err = new Error('Failed to create expense');
+    err.responseText = errText;
+    throw err;
+  }
+  return response.json();
+}
+
 export async function getVehicleTypes() {
   const token = await AsyncStorage.getItem('@access_token');
   const res = await fetch(`${API_BASE_URL}/api/vehicles/types/`, {

@@ -15,6 +15,7 @@ import PublicHomeScreen from '../screens/PublicHomeScreen';
 import ClientVehiclesScreen from '../screens/ClientVehiclesScreen';
 import ShopMapScreen from '../screens/ShopMapScreen';
 import VehicleDetailScreen from '../screens/VehicleDetailScreen';
+import VehicleSpecsScreen from '../screens/VehicleSpecsScreen';
 import EditVehicleDetailsScreen from '../screens/EditVehicleDetailsScreen';
 import ShopDetailScreen from '../screens/ShopDetailScreen';
 import AuthLoadingScreen from '../screens/AuthLoadingScreen';
@@ -22,6 +23,9 @@ import PromotionDetailScreen from '../screens/PromotionDetailScreen';
 import ClientRepairsList from '../components/client/ClientRepairsList';
 import RepairDetailScreen from '../screens/RepairDetailScreen';
 import CreateRepairScreen from '../screens/CreateRepairScreen';
+import LogServiceRecordScreen from '../screens/LogServiceRecordScreen';
+import ManageVehicleServiceCentersScreen from '../screens/ManageVehicleServiceCentersScreen';
+import AddObligationPaymentScreen from '../screens/AddObligationPaymentScreen';
 import CreateVehicleScreen from '../screens/CreateVehicleScreen';
 import CreatePromotionScreen from '../screens/CreatePromotionScreen';
 import ShopRegisterClientScreen from '../screens/ShopRegisterClientScreen';
@@ -155,6 +159,11 @@ export default function AppNavigator() {
         />
         <Stack.Screen name="VehicleDetail" component={VehicleDetailScreen} options={{ title: 'Vehicle Details' }}/> 
         <Stack.Screen
+          name="VehicleSpecs"
+          component={VehicleSpecsScreen}
+          options={{ title: 'Vehicle specs' }}
+        />
+        <Stack.Screen
           name="EditVehicleDetails"
           component={EditVehicleDetailsScreen}
           options={{ title: 'Technical details' }}
@@ -179,6 +188,21 @@ export default function AppNavigator() {
         />
         <Stack.Screen name="RepairDetail" component={RepairDetailScreen} options={{ title: 'Repair Details' }}/>
         <Stack.Screen name="CreateRepair" component={CreateRepairScreen} options={{ title: 'Request Service' }}/>
+        <Stack.Screen
+          name="LogServiceRecord"
+          component={LogServiceRecordScreen}
+          options={{ title: 'Add Service Record' }}
+        />
+        <Stack.Screen
+          name="ManageVehicleServiceCenters"
+          component={ManageVehicleServiceCentersScreen}
+          options={{ title: 'Service center access' }}
+        />
+        <Stack.Screen
+          name="AddObligationPayment"
+          component={AddObligationPaymentScreen}
+          options={{ title: 'Add Obligation / Payment' }}
+        />
         <Stack.Screen name="CreateVehicle" component={CreateVehicleScreen} options={{ title: 'Create Vehicle' }}/>
         <Stack.Screen name="CreatePromotion" component={CreatePromotionScreen} options={{ title: 'Create Promotion' }}/>
         <Stack.Screen name="ShopRegisterClient" component={ShopRegisterClientScreen} options={{ title: 'Register Client' }}/>

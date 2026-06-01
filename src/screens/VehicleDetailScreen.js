@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { ActivityIndicator, StyleSheet, View, Alert, ScrollView, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import { ActivityIndicator, StyleSheet, View, Alert, ScrollView, Pressable, KeyboardAvoidingView, Platform, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,6 +21,7 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { API_BASE_URL } from '../api/config';
 import { updateVehicle, patchVehicleReminder } from '../api/vehicles';
+import { listVehicleDocuments } from '../api/documents';
 import ScreenBackground from '../components/ScreenBackground';
 import { stackContentPaddingTop } from '../navigation/stackContentInset';
 import AppCard from '../components/ui/AppCard';
@@ -28,6 +29,15 @@ import FloatingCard from '../components/ui/FloatingCard';
 import StatusBadge from '../components/ui/StatusBadge';
 import { COLORS } from '../constants/colors';
 import OptionalVehicleGroupsReadonly from '../components/vehicle/OptionalVehicleGroupsReadonly';
+import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePicker';
+import { isoToDisplayDate } from '../components/vehicle/dateFieldUtils';
+import { remindersByTypeMap } from '../utils/vehicleReminderUtils';
+import {
+  groupVehicleDocuments,
+  documentTypeLabel,
+  formatDocumentRowSubtitle,
+} from '../utils/vehicleDocumentTypes';
+import { formatServiceRecordProvider } from '../utils/serviceRecordProvider';
 
 const BASE_VEHICLE_REMINDER_SECTION_ROWS = [
   { reminder_type: 'insurance', label: 'Insurance', icon: 'shield-check-outline' },
@@ -48,7 +58,10 @@ const SUSPENSION_REMINDER_ROW = {
 function formatVehicleReminderDueLine(reminder) {
   if (!reminder) return null;
   const parts = [];
-  if (reminder.due_date) parts.push(`Due ${reminder.due_date}`);
+  if (reminder.due_date) {
+    const label = isoToDisplayDate(String(reminder.due_date).slice(0, 10)) || reminder.due_date;
+    parts.push(`Due ${label}`);
+  }
   if (reminder.due_kilometers != null && reminder.due_kilometers !== '') {
     const n = Number(reminder.due_kilometers);
     if (Number.isFinite(n)) parts.push(`Due at ${n.toLocaleString()} km`);
@@ -59,7 +72,8 @@ function formatVehicleReminderDueLine(reminder) {
   }
   if (reminder.predicted_due_date && !reminder.due_date) {
     const conf = reminder.prediction_confidence ? ` · ${reminder.prediction_confidence} confidence` : '';
-    parts.push(`Est. calendar ${reminder.predicted_due_date}${conf}`);
+    const est = isoToDisplayDate(String(reminder.predicted_due_date).slice(0, 10)) || reminder.predicted_due_date;
+    parts.push(`Est. calendar ${est}${conf}`);
   }
   return parts.length ? parts.join(' · ') : null;
 }
@@ -72,30 +86,6 @@ function reminderUiTone(uiStatus) {
   if (k === 'active_until') return { bg: 'rgba(22,163,74,0.15)', fg: '#15803D' };
   if (k === 'completed') return { bg: 'rgba(22,163,74,0.15)', fg: '#15803D' };
   return { bg: 'rgba(100,116,139,0.12)', fg: '#475569' };
-}
-
-function isoToDisplayDate(isoDate) {
-  const raw = String(isoDate || '').trim();
-  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return raw;
-  return `${m[3]}.${m[2]}.${m[1]}`;
-}
-
-function displayDateToIso(displayDate) {
-  const raw = String(displayDate || '').trim();
-  if (!raw) return null;
-  const m = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-  if (!m) return undefined;
-  const day = Number(m[1]);
-  const month = Number(m[2]);
-  const year = Number(m[3]);
-  const dt = new Date(Date.UTC(year, month - 1, day));
-  const valid =
-    dt.getUTCFullYear() === year &&
-    dt.getUTCMonth() + 1 === month &&
-    dt.getUTCDate() === day;
-  if (!valid) return undefined;
-  return `${m[3]}-${m[2]}-${m[1]}`;
 }
 
 function reminderDueDateHelper(reminderType) {
@@ -115,14 +105,15 @@ export default function VehicleDetailScreen({ route, navigation }) {
   const { vehicleId } = route.params;
   const [vehicle, setVehicle] = useState(null);
   const [repairs, setRepairs] = useState([]);
+  const [vehicleDocuments, setVehicleDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [isShop, setIsShop] = useState(false);
   const [sectionsExpanded, setSectionsExpanded] = useState({
     remindersObligations: false,
     serviceHistory: true,
     authorizedCenters: false,
     documents: false,
-    quickActions: false,
   });
 
   const [kmModalVisible, setKmModalVisible] = useState(false);
@@ -154,31 +145,67 @@ export default function VehicleDetailScreen({ route, navigation }) {
     loadRole();
   }, []);
 
-  const loadVehicleDetails = useCallback(async () => {
+  const loadVehicleDetails = useCallback(async ({ silent = false } = {}) => {
     const token = await AsyncStorage.getItem('@access_token');
+    const shopFlag = await AsyncStorage.getItem('@is_shop');
+    if (!silent) {
+      setLoading(true);
+    }
     try {
       const res = await fetch(`${API_BASE_URL}/api/vehicles/${vehicleId}/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (!res.ok) {
+        throw new Error('Failed to load vehicle');
+      }
       const data = await res.json();
       setVehicle(data);
       setRepairs(data.repairs || []);
+      if (shopFlag !== 'true') {
+        try {
+          const docs = await listVehicleDocuments(token, vehicleId);
+          setVehicleDocuments(docs);
+        } catch (docErr) {
+          console.warn('Could not load vehicle documents', docErr);
+          setVehicleDocuments([]);
+        }
+      } else {
+        setVehicleDocuments([]);
+      }
     } catch (err) {
       console.error('Error fetching vehicle details:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [vehicleId]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadVehicleDetails({ silent: true });
+  }, [loadVehicleDetails]);
 
   useFocusEffect(
     useCallback(() => {
       loadVehicleDetails();
-    }, [loadVehicleDetails])
+      if (route.params?.expandReminders) {
+        setSectionsExpanded((prev) => ({ ...prev, remindersObligations: true }));
+        navigation.setParams({ expandReminders: undefined });
+      }
+      if (route.params?.expandAuthorizedCenters) {
+        setSectionsExpanded((prev) => ({ ...prev, authorizedCenters: true }));
+        navigation.setParams({ expandAuthorizedCenters: undefined });
+      }
+    }, [loadVehicleDetails, navigation, route.params?.expandReminders, route.params?.expandAuthorizedCenters])
   );
 
   const openTechnicalDetails = () => {
     if (!vehicle) return;
     navigation.navigate('EditVehicleDetails', { vehicleId });
+  };
+
+  const openVehicleSpecs = () => {
+    navigation.navigate('VehicleSpecs', { vehicleId });
   };
 
   const openKmModal = () => {
@@ -229,7 +256,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
       id: r.id,
       reminder_type: rowTemplate.reminder_type,
       label: rowTemplate.label,
-      due_date: r.due_date != null ? isoToDisplayDate(String(r.due_date)) : '',
+      due_date: r.due_date != null ? String(r.due_date).slice(0, 10) : '',
       due_kilometers: r.due_kilometers != null && r.due_kilometers !== '' ? String(r.due_kilometers) : '',
       advance_notice_days:
         r.advance_notice_days != null && r.advance_notice_days !== '' ? String(r.advance_notice_days) : '',
@@ -253,9 +280,14 @@ export default function VehicleDetailScreen({ route, navigation }) {
   const saveReminderPatch = async () => {
     const id = reminderDraft.id;
     if (!id) return;
-    const dueDate = displayDateToIso(reminderDraft.due_date);
+    const dueDateRaw = String(reminderDraft.due_date || '').trim();
+    const dueDate = dueDateRaw
+      ? /^\d{4}-\d{2}-\d{2}$/.test(dueDateRaw)
+        ? dueDateRaw
+        : undefined
+      : null;
     if (dueDate === undefined) {
-      Alert.alert('Validation', 'Enter a valid date as DD.MM.YYYY.');
+      Alert.alert('Validation', 'Choose a valid due date.');
       return;
     }
 
@@ -315,6 +347,11 @@ export default function VehicleDetailScreen({ route, navigation }) {
     });
   }, [repairs]);
 
+  const documentGroups = useMemo(
+    () => groupVehicleDocuments(vehicleDocuments),
+    [vehicleDocuments]
+  );
+
   const scrollToY = useCallback((y) => {
     if (y == null || scrollRef.current == null) return;
     scrollRef.current.scrollTo({ y: Math.max(0, y - 10), animated: true });
@@ -373,13 +410,17 @@ export default function VehicleDetailScreen({ route, navigation }) {
     }));
   }, [vehicle]);
 
-  const serviceCenterLine = (r) =>
-    r.shop_profile_name || r.shop_name || r.shop_email || '—';
-  const repairTypeLine = (r) =>
-    r.final_repair_type_name ||
-    r.effective_repair_type_name ||
-    r.repair_type_name ||
-    'Needs classification';
+  const repairTypeLine = (r) => {
+    const name =
+      r.final_repair_type_name ||
+      r.effective_repair_type_name ||
+      r.repair_type_name ||
+      null;
+    if (name) return name;
+    const desc = String(r.description || '').trim();
+    if (desc) return desc.length > 56 ? `${desc.slice(0, 53)}…` : desc;
+    return 'Needs classification';
+  };
   const mediaIndicatorLabel = (r) => {
     const mediaItems = Array.isArray(r.repair_media)
       ? r.repair_media
@@ -532,14 +573,32 @@ export default function VehicleDetailScreen({ route, navigation }) {
     return raw;
   }, [vehicle?.vehicle_type_name]);
 
-  const remindersByType = useMemo(() => {
-    const list = Array.isArray(vehicle?.reminders) ? vehicle.reminders : [];
-    const m = {};
-    list.forEach((row) => {
-      if (row?.reminder_type) m[row.reminder_type] = row;
-    });
-    return m;
-  }, [vehicle?.reminders]);
+  /** ISO2 • Registered DD.MM.YYYY (legacy year-only → ~YYYY). */
+  const heroRegistrationSubtitle = useMemo(() => {
+    if (!vehicle) return null;
+    const iso = String(vehicle.registration_country || '').trim().toUpperCase();
+    const dateRaw = vehicle.first_registration_date;
+    const dateDisp = dateRaw ? isoToDisplayDate(dateRaw) : null;
+    const yr =
+      vehicle.registration_year != null && vehicle.registration_year !== ''
+        ? Number(vehicle.registration_year)
+        : vehicle.year != null && vehicle.year !== ''
+          ? Number(vehicle.year)
+          : null;
+    const parts = [];
+    if (iso.length === 2) parts.push(iso);
+    if (dateDisp) {
+      parts.push(`Registered ${dateDisp}`);
+    } else if (yr != null && Number.isFinite(yr) && !dateRaw) {
+      parts.push(`Registered ~${yr}`);
+    }
+    return parts.length ? parts.join(' • ') : null;
+  }, [vehicle]);
+
+  const remindersByType = useMemo(
+    () => remindersByTypeMap(vehicle?.reminders),
+    [vehicle?.reminders]
+  );
 
   const reminderSectionRows = useMemo(() => {
     const code = String(vehicle?.vehicle_type_code || '').toLowerCase();
@@ -561,7 +620,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
           <StatusBadge status={item.status} />
         </View>
         <Text style={styles.repairMeta} numberOfLines={2}>
-          Service center: {serviceCenterLine(item)}
+          Service provider: {formatServiceRecordProvider(item)}
         </Text>
         {item.final_kilometers != null || (item.kilometers != null && item.kilometers !== '') ? (
           <Text style={styles.repairMeta}>
@@ -600,7 +659,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
             </View>
           </View>
           <Text style={styles.repairMeta} numberOfLines={2}>
-            Service center: {serviceCenterLine(item)}
+            Service provider: {formatServiceRecordProvider(item)}
           </Text>
           {mediaIndicatorLabel(item) ? (
             <Chip compact style={styles.mediaChip}>
@@ -644,41 +703,42 @@ export default function VehicleDetailScreen({ route, navigation }) {
     );
   }
 
-  const completedCount = repairs.filter((r) => r.status === 'done').length;
-  const upcomingCount = repairs.filter((r) => ['booked', 'ongoing', 'waiting_parts'].includes(r.status)).length;
-
   const handleAddActivity = () => {
-    Alert.alert(
-      'Add activity',
-      'Choose what you want to add for this vehicle.',
-      [
-        {
-          text: 'Request service',
-          onPress: () =>
-            navigation.navigate('CreateRepair', {
-              vehicleId,
-              mode: 'request_repair',
-              preselectedStatus: 'open',
-              returnTo: 'VehicleDetail',
-              origin: 'VehicleDetail',
-            }),
-        },
-        {
-          text: 'Add service record',
-          onPress: () =>
-            navigation.navigate('CreateRepair', {
-              vehicleId,
-              mode: 'service_record',
-              preselectedStatus: 'done',
-              returnTo: 'VehicleDetail',
-              origin: 'VehicleDetail',
-            }),
-        },
-        // TODO(service-history): Introduce a separate "Log service record" flow/screen distinct from service-request intake.
-        { text: 'Upload receipt/document (coming soon)', onPress: () => Alert.alert('Coming soon') },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    if (isShop) {
+      Alert.alert('Add activity', 'Owners log activity from the client app.');
+      return;
+    }
+    Alert.alert('Add activity', 'Choose what you want to add for this vehicle.', [
+      {
+        text: 'Request service',
+        onPress: () =>
+          navigation.navigate('CreateRepair', {
+            vehicleId,
+            mode: 'request',
+            returnTo: 'VehicleDetail',
+            origin: 'VehicleDetail',
+          }),
+      },
+      {
+        text: 'Add service record',
+        onPress: () =>
+          navigation.navigate('LogServiceRecord', {
+            vehicleId,
+            returnTo: 'VehicleDetail',
+            origin: 'VehicleDetail',
+          }),
+      },
+      {
+        text: 'Add obligation / payment',
+        onPress: () =>
+          navigation.navigate('AddObligationPayment', {
+            vehicleId,
+            returnTo: 'VehicleDetail',
+            origin: 'VehicleDetail',
+          }),
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const toggleSection = (key) => {
@@ -687,17 +747,61 @@ export default function VehicleDetailScreen({ route, navigation }) {
 
   const handleFindServiceCenters = () => {
     if (navigation?.navigate) {
-      navigation.navigate('ShopMap', { vehicleId });
+      navigation.navigate('ShopMap', { vehicleId, returnTo: 'VehicleDetail' });
       return;
     }
     Alert.alert('Notice', 'Service center discovery will open here.');
   };
 
-  const handleManageAuthorizedCenter = (center) => {
+  const setCenterAuthorized = async (center, shouldAuthorize) => {
+    const vid = vehicle?.id ?? route.params?.vehicleId;
+    if (vid == null || !vehicle) return;
+    const currentIds = authorizedServiceCenters
+      .map((c) => Number(c.id))
+      .filter(Number.isFinite);
+    const sid = Number(center.id);
+    const nextIds = shouldAuthorize
+      ? currentIds.includes(sid)
+        ? currentIds
+        : [...currentIds, sid]
+      : currentIds.filter((id) => id !== sid);
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      const updated = await updateVehicle(vid, { shared_with_shops_ids: nextIds }, token);
+      setVehicle(updated);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Could not update authorization.');
+    }
+  };
+
+  const handleRevokeAuthorizedCenter = (center) => {
     Alert.alert(
-      'Manage access',
-      `Remove access / Manage for ${center?.name || 'this service center'} is coming soon.`
+      'Remove access?',
+      `${center?.name || 'This service center'} will no longer see your full vehicle history.\n\nRepairs they already performed stay visible to them in their shop records.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove access',
+          style: 'destructive',
+          onPress: () => setCenterAuthorized(center, false),
+        },
+      ]
     );
+  };
+
+  const handleOpenAuthorizedCenter = (center) => {
+    navigation.navigate('ShopDetail', {
+      shopId: center.id,
+      vehicleId: vehicle?.id ?? route.params?.vehicleId,
+      returnTo: 'VehicleDetail',
+    });
+  };
+
+  const handleManageServiceCenters = () => {
+    navigation.navigate('ManageVehicleServiceCenters', {
+      vehicleId: vehicle?.id ?? route.params?.vehicleId,
+    });
   };
 
   const SectionHeader = ({ title, sectionKey }) => (
@@ -710,6 +814,27 @@ export default function VehicleDetailScreen({ route, navigation }) {
       />
     </Pressable>
   );
+
+  const renderDocumentGroup = (title, items) => {
+    if (!items?.length) return null;
+    return (
+      <View style={styles.documentGroup}>
+        <Text style={styles.documentGroupTitle}>
+          {title} ({items.length})
+        </Text>
+        {items.map((doc) => (
+          <View key={doc.id} style={styles.documentRow}>
+            <Text style={styles.documentRowTitle} numberOfLines={1}>
+              {doc.title || doc.original_filename || documentTypeLabel(doc.document_type)}
+            </Text>
+            <Text style={styles.documentRowMeta} numberOfLines={2}>
+              {formatDocumentRowSubtitle(doc)}
+            </Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
 
   const infoTile = (label, value, { onPress, showChevron = false } = {}) => {
     const row = (
@@ -753,9 +878,20 @@ export default function VehicleDetailScreen({ route, navigation }) {
             styles.scrollContent,
             { paddingTop: stackContentPaddingTop(insets, 12) },
           ]}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
+          }
         >
           <AppCard variant="dark" contentStyle={styles.heroInner} style={styles.heroCardWrap}>
-            <View style={styles.heroCard}>
+            <Pressable
+              onPress={openVehicleSpecs}
+              accessibilityRole="button"
+              accessibilityLabel="View vehicle specs"
+              style={({ pressed }) => [
+                styles.heroCard,
+                pressed ? styles.heroIdentityPressed : null,
+              ]}
+            >
               <View style={styles.heroIconWrap}>
                 <MaterialCommunityIcons name="car-sports" size={36} color="#fff" />
               </View>
@@ -764,15 +900,15 @@ export default function VehicleDetailScreen({ route, navigation }) {
                   <Text style={styles.heroPlate} numberOfLines={1}>
                     {vehicle.license_plate || '—'}
                   </Text>
-                  {vehicle.year ? (
-                    <View style={styles.heroBadge}>
-                      <Text style={styles.heroBadgeText}>{vehicle.year}</Text>
-                    </View>
-                  ) : null}
                 </View>
                 <Text style={styles.heroMakeModel} numberOfLines={2}>
                   {heroIdentity.line1}
                 </Text>
+                {heroRegistrationSubtitle ? (
+                  <Text style={styles.heroFirstReg} numberOfLines={2}>
+                    {heroRegistrationSubtitle}
+                  </Text>
+                ) : null}
                 {heroIdentity.line2 ? (
                   <Text style={styles.heroVariant} numberOfLines={1}>
                     {heroIdentity.line2}
@@ -785,7 +921,17 @@ export default function VehicleDetailScreen({ route, navigation }) {
                     : 'Kilometers not set'}
                 </Text>
               </View>
-            </View>
+            </Pressable>
+            <Pressable
+              onPress={openVehicleSpecs}
+              accessibilityRole="button"
+              accessibilityLabel="View specs"
+              hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
+              style={({ pressed }) => [styles.heroViewSpecsRow, pressed ? styles.heroViewSpecsPressed : null]}
+            >
+              <Text style={styles.heroViewSpecsText}>View specs</Text>
+              <MaterialCommunityIcons name="chevron-right" size={18} color="rgba(255,255,255,0.85)" />
+            </Pressable>
             {!isShop ? (
               <View style={styles.heroActionsRow}>
                 <Button
@@ -874,7 +1020,17 @@ export default function VehicleDetailScreen({ route, navigation }) {
                   return (
                     <Pressable
                       key={row.reminder_type}
-                      onPress={() => openReminderEditor(row, r)}
+                      onPress={() => {
+                        if (isObligationReminderType(row.reminder_type)) {
+                          navigation.navigate('AddObligationPayment', {
+                            vehicleId,
+                            initialReminderType: row.reminder_type,
+                            returnTo: 'VehicleDetail',
+                          });
+                          return;
+                        }
+                        openReminderEditor(row, r);
+                      }}
                       disabled={isShop}
                       style={({ pressed }) => [
                         styles.reminderUnifiedRow,
@@ -965,6 +1121,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
             </FloatingCard>
           </View>
 
+          {!isShop ? (
           <FloatingCard>
             <SectionHeader title="Authorized service centers" sectionKey="authorizedCenters" />
             {sectionsExpanded.authorizedCenters ? (
@@ -975,17 +1132,32 @@ export default function VehicleDetailScreen({ route, navigation }) {
                 {authorizedServiceCenters.length ? (
                   <View style={styles.authorizedList}>
                     {authorizedServiceCenters.map((center) => (
-                      <View key={center.id} style={styles.authorizedCard}>
+                      <Pressable
+                        key={center.id}
+                        style={({ pressed }) => [
+                          styles.authorizedCard,
+                          pressed && styles.authorizedCardPressed,
+                        ]}
+                        onPress={() => handleOpenAuthorizedCenter(center)}
+                      >
                         <View style={styles.authorizedCardMain}>
                           <Text style={styles.authorizedName}>{center.name}</Text>
                           <Text style={styles.authorizedLocation}>
                             {center.location || 'Location not specified'}
                           </Text>
+                          <Text style={styles.authorizedTapHint}>Tap for shop profile</Text>
                         </View>
-                        <Button mode="outlined" compact onPress={() => handleManageAuthorizedCenter(center)}>
-                          Remove access / Manage
+                        <Button
+                          mode="outlined"
+                          compact
+                          onPress={(e) => {
+                            e?.stopPropagation?.();
+                            handleRevokeAuthorizedCenter(center);
+                          }}
+                        >
+                          Remove access
                         </Button>
-                      </View>
+                      </Pressable>
                     ))}
                   </View>
                 ) : (
@@ -995,86 +1167,56 @@ export default function VehicleDetailScreen({ route, navigation }) {
                   <Button mode="contained" icon="map-search" onPress={handleFindServiceCenters}>
                     Find service centers
                   </Button>
-                  <Button
-                    mode="text"
-                    icon="plus-circle-outline"
-                    onPress={() => Alert.alert('Coming soon', 'Add service center manually (coming soon)')}
-                  >
-                    Add service center manually (coming soon)
+                  <Button mode="outlined" icon="store-cog" onPress={handleManageServiceCenters}>
+                    Manage service center access
                   </Button>
                 </View>
               </>
             ) : null}
           </FloatingCard>
+          ) : null}
 
-          <FloatingCard>
-            <SectionHeader title="Documents & photos" sectionKey="documents" />
-            {sectionsExpanded.documents ? (
-              <>
+          {vehicleDocuments.length > 0 ? (
+            <FloatingCard>
+              <SectionHeader
+                title={`Documents & photos (${vehicleDocuments.length})`}
+                sectionKey="documents"
+              />
+              {sectionsExpanded.documents ? (
+                <>
+                  {renderDocumentGroup('Invoices / receipts', documentGroups.invoices)}
+                  {renderDocumentGroup(
+                    'Insurance / inspection / vignette',
+                    documentGroups.obligations
+                  )}
+                  {renderDocumentGroup('Vehicle photos', documentGroups.photos)}
+                  {renderDocumentGroup('Other', documentGroups.other)}
+                  {isShop ? (
+                    <Text style={styles.sectionHint}>
+                      Document archive is visible to the vehicle owner.
+                    </Text>
+                  ) : null}
+                </>
+              ) : (
                 <Text style={styles.sectionHint}>
-                  Vehicle documents such as insurance, inspection papers, invoices and receipts will appear here.
+                  {vehicleDocuments.length} file{vehicleDocuments.length === 1 ? '' : 's'} on record. Expand to
+                  browse.
                 </Text>
-                <View style={styles.chipsWrap}>
-                  <Chip compact style={styles.placeholderChip}>Invoices</Chip>
-                  <Chip compact style={styles.placeholderChip}>Inspection docs</Chip>
-                  <Chip compact style={styles.placeholderChip}>Insurance papers</Chip>
-                  <Chip compact style={styles.placeholderChip}>Vehicle photos</Chip>
-                </View>
-              </>
-            ) : null}
-          </FloatingCard>
-
-          <FloatingCard>
-            <SectionHeader title="Quick actions" sectionKey="quickActions" />
-            {sectionsExpanded.quickActions ? (
-              <>
-                <View style={styles.quickActions}>
-                  <Button mode="contained" icon="plus" onPress={handleAddActivity}>
-                    Add activity
-                  </Button>
-                  <Button
-                    mode="outlined"
-                    icon="history"
-                    onPress={() =>
-                      navigation.navigate('ClientRepairs', {
-                        vehicleId,
-                        fromVehicleDetail: true,
-                      })
-                    }
-                  >
-                    Vehicle history
-                  </Button>
-                  <Button
-                    mode="text"
-                    icon="calendar-clock"
-                    onPress={() =>
-                      Alert.alert(
-                        'Coming soon',
-                        'Scheduling and reminder management will be added in future iterations.'
-                      )
-                    }
-                  >
-                    Reminders center (soon)
-                  </Button>
-                </View>
-                <View style={styles.kpiRow}>
-                  <Chip compact style={styles.kpiChip}>Repairs: {repairs.length}</Chip>
-                  <Chip compact style={styles.kpiChip}>Upcoming: {upcomingCount}</Chip>
-                  <Chip compact style={styles.kpiChip}>Done: {completedCount}</Chip>
-                </View>
-              </>
-            ) : null}
-          </FloatingCard>
+              )}
+            </FloatingCard>
+          ) : null}
         </ScrollView>
       </View>
 
-      <FAB
-        icon="plus"
-        label="Add activity"
-        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-        color={theme.colors.onPrimary}
-        onPress={handleAddActivity}
-      />
+      {!isShop ? (
+        <FAB
+          icon="plus"
+          label="Add activity"
+          style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+          color={theme.colors.onPrimary}
+          onPress={handleAddActivity}
+        />
+      ) : null}
 
       <Portal>
         <Modal
@@ -1118,14 +1260,11 @@ export default function VehicleDetailScreen({ route, navigation }) {
             <Text style={styles.modalTitle}>
               {reminderDueDateHelper(reminderDraft.reminder_type)}
             </Text>
-            <Text style={styles.modalMuted}>Date format: DD.MM.YYYY</Text>
-            <TextInput
-              mode="outlined"
+            <ServiceRecordDatePicker
               label="Due date"
-              value={reminderDraft.due_date}
-              onChangeText={(t) => setReminderDraft((d) => ({ ...d, due_date: t }))}
-              placeholder="DD.MM.YYYY"
-              style={styles.modalInput}
+              valueIso={reminderDraft.due_date}
+              onChangeIso={(iso) => setReminderDraft((d) => ({ ...d, due_date: iso }))}
+              optional={isObligationReminderType(reminderDraft.reminder_type)}
             />
             {!isObligationReminderType(reminderDraft.reminder_type) ? (
               <TextInput
@@ -1241,6 +1380,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  heroIdentityPressed: {
+    opacity: 0.92,
+  },
+  heroViewSpecsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    alignSelf: 'flex-end',
+    marginTop: 4,
+    gap: 2,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  heroViewSpecsPressed: {
+    opacity: 0.85,
+  },
+  heroViewSpecsText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.92)',
+    textDecorationLine: 'underline',
+  },
   heroInner: {
     paddingVertical: 4,
   },
@@ -1273,21 +1434,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     letterSpacing: 0.5,
   },
-  heroBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    marginLeft: 8,
-  },
-  heroBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#fff',
-  },
   heroMakeModel: {
     fontSize: 15,
     color: 'rgba(255,255,255,0.92)',
+    marginBottom: 2,
+  },
+  heroFirstReg: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.82)',
     marginBottom: 2,
   },
   heroVariant: {
@@ -1315,6 +1469,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 10,
+  },
+  documentGroup: {
+    marginBottom: 12,
+  },
+  documentGroupTitle: {
+    color: COLORS.TEXT_DARK,
+    fontWeight: '700',
+    fontSize: 14,
+    marginBottom: 6,
+  },
+  documentRow: {
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.08)',
+    borderRadius: 10,
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 6,
+  },
+  documentRowTitle: {
+    color: COLORS.TEXT_DARK,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  documentRowMeta: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 12,
+    marginTop: 4,
+    lineHeight: 16,
   },
   infoGrid: {
     flexDirection: 'row',
@@ -1519,9 +1702,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 10,
     gap: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  authorizedCardPressed: {
+    backgroundColor: 'rgba(59,130,246,0.06)',
   },
   authorizedCardMain: {
+    flex: 1,
     gap: 2,
+  },
+  authorizedTapHint: {
+    color: COLORS.PRIMARY,
+    fontSize: 12,
+    marginTop: 2,
   },
   authorizedName: {
     color: COLORS.TEXT_DARK,
@@ -1531,18 +1725,6 @@ const styles = StyleSheet.create({
   authorizedLocation: {
     color: COLORS.TEXT_MUTED,
     fontSize: 12,
-  },
-  quickActions: {
-    gap: 10,
-    marginBottom: 12,
-  },
-  kpiRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  kpiChip: {
-    backgroundColor: 'rgba(15,23,42,0.08)',
   },
   fab: {
     position: 'absolute',

@@ -1,8 +1,10 @@
 import { registerRootComponent } from 'expo';
 
+import { registerBackgroundMessageHandler } from './src/notifications/firebaseMessaging';
+
+// Must run before React mounts (native FCM background delivery).
+registerBackgroundMessageHandler();
+
 import App from './src/App.js';
 
-// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
-// It also ensures that whether you load the app in Expo Go or in a native build,
-// the environment is set up appropriately
 registerRootComponent(App);
