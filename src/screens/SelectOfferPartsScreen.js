@@ -19,7 +19,7 @@ import {
   IconButton,
 } from 'react-native-paper';
 
-import { getPartsCatalog } from '../api/parts';
+import { getPartsCatalog, getSuggestedPartsForRepairType } from '../api/parts';
 import ScreenBackground from '../components/ScreenBackground';
 import BASE_STYLES from '../styles/base';
 import { stackContentPaddingTop } from '../navigation/stackContentInset';
@@ -41,17 +41,48 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
     offerId,
     existingOffer,
     repairId,
+    repairTypeId: repairTypeIdParam = '',
   } = route.params || {};
+
+  const repairTypeId = repairTypeIdParam || existingOffer?.repair_type || '';
 
   const newCreatedPart = route.params?.newCreatedPart;
 
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingSuggested, setLoadingSuggested] = useState(false);
+  const [suggestedParts, setSuggestedParts] = useState([]);
   const [results, setResults] = useState([]);
   const [selected, setSelected] = useState([...currentParts]);
 
   const [expandedCatalogIndexes, setExpandedCatalogIndexes] = useState([]);
   const [expandedSelectedIndexes, setExpandedSelectedIndexes] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    const loadSuggested = async () => {
+      if (!repairTypeId) return;
+      setLoadingSuggested(true);
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        const shopProfileId = await AsyncStorage.getItem('@current_shop_id');
+        const data = await getSuggestedPartsForRepairType(
+          token,
+          repairTypeId,
+          shopProfileId || undefined,
+        );
+        if (active) setSuggestedParts(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.warn('Suggested parts load failed', err);
+      } finally {
+        if (active) setLoadingSuggested(false);
+      }
+    };
+    loadSuggested();
+    return () => {
+      active = false;
+    };
+  }, [repairTypeId]);
 
   useEffect(() => {
     if (newCreatedPart && !selected.some(p => p.partsMasterId === newCreatedPart.id)) {
@@ -106,7 +137,7 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
     );
   };
 
-  const handleSelectFromCatalog = (item) => {
+  const addCatalogItem = (item) => {
     if (selected.some((p) => p.partsMasterId === item.id)) return;
 
     setSelected(prev => [
@@ -116,11 +147,15 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
         shopPartId: item.shop_part?.id ?? null,
         quantity: 1,
         price: item.shop_part?.price || '',
-        labor: item.shop_part?.labor_cost || '',
+        labor: item.shop_part?.default_labor_cost ?? item.shop_part?.labor_cost ?? '',
         note: '',
         partsMaster: item,
       },
     ]);
+  };
+
+  const handleSelectFromCatalog = (item) => {
+    addCatalogItem(item);
   };
 
   const handleRemoveSelected = (index) => {
@@ -182,8 +217,36 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
     >
       <ScrollView contentContainerStyle={[BASE_STYLES.formScreenScroll, { paddingTop: stackContentPaddingTop(insets, 4) }]}>
         <Text variant="headlineSmall" style={styles.title}>
-          Search parts catalog
+          Choose estimated parts
         </Text>
+        <Text style={styles.helperText}>
+          Global catalog — your shop price applies when you sell. Tap typical parts or search.
+        </Text>
+
+        {loadingSuggested ? (
+          <Text style={styles.helperText}>Loading typical parts…</Text>
+        ) : suggestedParts.length > 0 ? (
+          <View style={styles.suggestedBlock}>
+            <Text style={styles.suggestedTitle}>Typical for this service</Text>
+            <View style={styles.chipRow}>
+              {suggestedParts.map((item) => {
+                const picked = selected.some((p) => p.partsMasterId === item.id);
+                return (
+                  <Button
+                    key={item.id}
+                    mode={picked ? 'contained-tonal' : 'outlined'}
+                    compact
+                    style={styles.suggestChip}
+                    onPress={() => (picked ? null : addCatalogItem(item))}
+                    disabled={picked}
+                  >
+                    {item.name}
+                  </Button>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
 
         <TextInput
           mode="outlined"
@@ -337,6 +400,16 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   title: { marginBottom: 12, textAlign: 'center' },
+  helperText: {
+    marginBottom: 8,
+    textAlign: 'center',
+    color: '#64748B',
+    fontSize: 13,
+  },
+  suggestedBlock: { marginBottom: 12 },
+  suggestedTitle: { fontWeight: '600', marginBottom: 8, color: '#334155' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  suggestChip: { marginBottom: 4 },
   input: { marginVertical: 8 },
   catalogCard: { marginVertical: 6 },
   emptyText: {

@@ -13,9 +13,9 @@ import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { TextInput, Button, Surface, useTheme, Text } from 'react-native-paper';
-import { Picker } from '@react-native-picker/picker';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { getServiceCenters, VEHICLE_TYPE_FILTER_CHIPS } from '../api/serviceCenters';
+import { spreadShopMarkersForMap, regionForMapPoints } from '../utils/mapMarkerSpread';
 import { API_BASE_URL } from '../api/config';
 import ScreenBackground from '../components/ScreenBackground';
 import BASE_STYLES from '../styles/base';
@@ -57,6 +57,18 @@ export default function ShopMapScreen({ navigation, route }) {
       .map(([slug, name]) => ({ slug, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [repairTypes]);
+
+  const repairTypeChipOptions = useMemo(() => {
+    const rows = repairTypes.filter((rt) => rt.slug);
+    if (!selectedCategory) return rows;
+    return rows.filter((rt) => rt.category_slug === selectedCategory);
+  }, [repairTypes, selectedCategory]);
+
+  useEffect(() => {
+    if (!selectedRepairType) return;
+    const stillValid = repairTypeChipOptions.some((rt) => rt.slug === selectedRepairType);
+    if (!stillValid) setSelectedRepairType('');
+  }, [repairTypeChipOptions, selectedRepairType]);
 
   useEffect(() => {
     (async () => {
@@ -146,22 +158,22 @@ export default function ShopMapScreen({ navigation, route }) {
     fetchShops();
   };
 
+  const displayShops = useMemo(() => {
+    const normalized = shops
+      .map((s) => ({
+        ...s,
+        latitude: s.latitude ? parseFloat(s.latitude) : null,
+        longitude: s.longitude ? parseFloat(s.longitude) : null,
+      }))
+      .filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude));
+    return spreadShopMarkersForMap(normalized, location);
+  }, [shops, location]);
+
   useEffect(() => {
-    if (!location || shops.length === 0) return;
-
-    const allPoints = [...shops, location];
-    const latitudes = allPoints.map((p) => p.latitude);
-    const longitudes = allPoints.map((p) => p.longitude);
-
-    const region = {
-      latitude: (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
-      longitude: (Math.min(...longitudes) + Math.max(...longitudes)) / 2,
-      latitudeDelta: Math.max(0.5, Math.max(...latitudes) - Math.min(...latitudes) + 0.2),
-      longitudeDelta: Math.max(0.5, Math.max(...longitudes) - Math.min(...longitudes) + 0.2),
-    };
-
-    mapRef.current?.animateToRegion(region, 1000);
-  }, [location, shops]);
+    if (!location || displayShops.length === 0) return;
+    const region = regionForMapPoints(displayShops);
+    if (region) mapRef.current?.animateToRegion(region, 1000);
+  }, [location, displayShops]);
 
   if (!location || loading) {
     return (
@@ -187,18 +199,22 @@ export default function ShopMapScreen({ navigation, route }) {
             longitudeDelta: 0.5,
           }}
         >
-          {shops
-            .map((s) => ({
-              ...s,
-              latitude: s.latitude ? parseFloat(s.latitude) : null,
-              longitude: s.longitude ? parseFloat(s.longitude) : null,
-            }))
-            .filter((s) => !isNaN(s.latitude) && !isNaN(s.longitude))
-            .map((shop) => (
+          {displayShops.map((shop) => {
+              const isReported = shop.source === 'owner_reported';
+              const markerKey = shop.list_id || `${shop.source || 'shop'}-${shop.id}`;
+              const lat = shop.displayLatitude ?? shop.latitude;
+              const lon = shop.displayLongitude ?? shop.longitude;
+              const capabilityLine = [
+                (shop.supported_vehicle_type_names || []).join(', '),
+                (shop.observed_repair_type_names || shop.available_repair_names || []).join(', '),
+              ]
+                .filter(Boolean)
+                .join(' · ');
+              return (
               <Marker
-                key={shop.id}
-                coordinate={{ latitude: shop.latitude, longitude: shop.longitude }}
-                pinColor={shop.isMyShop ? 'green' : 'red'}
+                key={markerKey}
+                coordinate={{ latitude: lat, longitude: lon }}
+                pinColor={shop.isMyShop ? 'green' : isReported ? 'orange' : 'red'}
               >
                 <Callout
                   onPress={() =>
@@ -209,26 +225,31 @@ export default function ShopMapScreen({ navigation, route }) {
                     })
                   }
                 >
-                  <View style={{ maxWidth: 200 }}>
+                  <View style={{ maxWidth: 220 }}>
                     <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>{shop.name}</Text>
+                    {isReported ? (
+                      <Text variant="bodySmall" style={{ marginTop: 2 }}>
+                        Reported by owners · not verified
+                      </Text>
+                    ) : null}
                     <Text variant="bodySmall">{shop.address}</Text>
+                    {capabilityLine ? (
+                      <Text variant="bodySmall" style={{ marginTop: 4, color: '#64748b' }}>
+                        {capabilityLine}
+                      </Text>
+                    ) : null}
                     <Text style={{ color: theme.colors.primary, marginTop: 5 }}>Tap for details</Text>
                   </View>
                 </Callout>
               </Marker>
-            ))}
+            );
+            })}
         </MapView>
 
         <View style={[styles.chromeColumn, { paddingTop: insets.top + 10 }]} pointerEvents="box-none">
           <View style={styles.rowBackSearch}>
             <Pressable
-              onPress={() => {
-                if (navigation.canGoBack()) {
-                  navigation.goBack();
-                  return;
-                }
-                navigation.navigate('Home');
-              }}
+              onPress={() => navigation.navigate('Home')}
               style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
               hitSlop={10}
               accessibilityRole="button"
@@ -308,22 +329,30 @@ export default function ShopMapScreen({ navigation, route }) {
             })}
           </ScrollView>
 
-          <Surface style={styles.pickerSurface} elevation={2}>
-            <View style={styles.pickerClip}>
-              <Picker
-                selectedValue={selectedRepairType}
-                onValueChange={(v) => setSelectedRepairType(v || '')}
-                style={styles.picker}
-              >
-                <Picker.Item label="Service type (any)" value="" />
-                {repairTypes
-                  .filter((rt) => rt.slug)
-                  .map((rt) => (
-                    <Picker.Item key={rt.id} label={rt.name} value={rt.slug} />
-                  ))}
-              </Picker>
-            </View>
-          </Surface>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+            <Pressable
+              onPress={() => setSelectedRepairType('')}
+              style={[
+                styles.chip,
+                !selectedRepairType && styles.chipSelected,
+                !selectedRepairType && { borderColor: theme.colors.primary },
+              ]}
+            >
+              <Text style={styles.chipText}>Any service</Text>
+            </Pressable>
+            {repairTypeChipOptions.map((rt) => {
+              const on = selectedRepairType === rt.slug;
+              return (
+                <Pressable
+                  key={rt.id}
+                  onPress={() => setSelectedRepairType(on ? '' : rt.slug)}
+                  style={[styles.chip, on && styles.chipSelected, on && { borderColor: theme.colors.primary }]}
+                >
+                  <Text style={styles.chipText}>{rt.name}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </View>
       </View>
     </ScreenBackground>
@@ -406,17 +435,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#0f172a',
     fontWeight: '500',
-  },
-  pickerSurface: {
-    marginTop: 8,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-  },
-  pickerClip: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  picker: {
-    width: '100%',
   },
 });

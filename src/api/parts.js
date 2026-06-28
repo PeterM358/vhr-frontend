@@ -2,6 +2,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from './config';
 
 // ✅ Get global PartsMaster catalog with query params object
+export async function getSuggestedPartsForRepairType(token, repairTypeId, shopProfileId) {
+  const qs = new URLSearchParams();
+  if (shopProfileId) qs.set('shop_profile_id', String(shopProfileId));
+  const url = `${API_BASE_URL}/api/repairs/types/${repairTypeId}/suggested-parts/${qs.toString() ? `?${qs}` : ''}`;
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) throw new Error('Failed to load suggested parts');
+  return response.json();
+}
+
 export async function getPartsCatalog(token, queryParams = {}) {
   const params = new URLSearchParams(queryParams).toString();
   const url = `${API_BASE_URL}/api/parts/parts/${params ? '?' + params : ''}`;

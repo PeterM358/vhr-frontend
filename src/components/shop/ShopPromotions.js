@@ -26,6 +26,7 @@ import {
   TEXT_MUTED,
 } from '../../constants/colors';
 import { stackContentPaddingTop } from '../../navigation/stackContentInset';
+import { formatMoneyAmount } from '../../constants/currency';
 
 export default function ShopPromotions() {
   const insets = useSafeAreaInsets();
@@ -86,7 +87,7 @@ export default function ShopPromotions() {
           {item.title}
         </Text>
         <View style={styles.priceTag}>
-          <Text style={styles.priceTagText}>{item.price} BGN</Text>
+          <Text style={styles.priceTagText}>{formatMoneyAmount(item.price)}</Text>
         </View>
       </View>
 

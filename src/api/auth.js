@@ -40,7 +40,7 @@ export const register = async (emailOrPhone, password, isClient, isShop) => {
     await storeLoginData(loginResponse.data, emailOrPhone.trim());
     await syncPushDeviceToken(loginResponse.data.access);
 
-    return true;
+    return loginResponse.data;
   } catch (error) {
     console.error('❌ Registration/Login error:', error.response?.data || error.message);
     throw new Error('Registration or login failed.');
@@ -94,6 +94,8 @@ const storeLoginData = async (data, fallbackDisplay) => {
     ['@is_shop', JSON.stringify(is_shop)],
     ['@user_id', user_id?.toString() || ''],
     ['@user_email_or_phone', userDisplay],
+    ['@login_email', email && String(email).trim() ? String(email).trim() : ''],
+    ['@login_phone', phone && String(phone).trim() ? String(phone).trim() : ''],
   ];
 
   // Only for shops with valid shop_profiles

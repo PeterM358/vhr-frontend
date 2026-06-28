@@ -13,8 +13,11 @@ import {
   getCatalogTrailerTypes,
   getVehicleChoices,
   getVehicleFieldGroups,
+  getVehicleTypes,
   updateVehicle,
 } from '../api/vehicles';
+import { Picker } from '@react-native-picker/picker';
+import { confirmMessage } from '../utils/crossPlatformAlert';
 import ScreenBackground from '../components/ScreenBackground';
 import FloatingCard from '../components/ui/FloatingCard';
 import { COLORS } from '../constants/colors';
@@ -33,6 +36,9 @@ import {
   profileCountriesToPickerOptions,
 } from '../components/vehicle/vehicleFormConfig';
 import { isoToDisplayDate } from '../components/vehicle/dateFieldUtils';
+import MileageEvidenceCard from '../components/vehicle/MileageEvidenceCard';
+import MileageConfidenceSheet from '../components/vehicle/MileageConfidenceSheet';
+import { resolveMileageFactorAction } from '../utils/mileageConfidence';
 
 export default function EditVehicleDetailsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
@@ -48,6 +54,9 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
   const [catalogEbikeSystems, setCatalogEbikeSystems] = useState([]);
   const [catalogTrailerTypes, setCatalogTrailerTypes] = useState([]);
 
+  const [vehicleTypes, setVehicleTypes] = useState([]);
+  const [selectedVehicleTypeId, setSelectedVehicleTypeId] = useState('');
+  const [initialVehicleTypeId, setInitialVehicleTypeId] = useState('');
   const [vehicleTypeCode, setVehicleTypeCode] = useState('');
   const [identityPlate, setIdentityPlate] = useState('');
   const [identityTypeName, setIdentityTypeName] = useState('');
@@ -71,12 +80,68 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
   });
   const [expandedEbikeTrailer, setExpandedEbikeTrailer] = useState(false);
   const [registrationExpanded, setRegistrationExpanded] = useState(false);
+  const [mileageConfidence, setMileageConfidence] = useState(null);
+  const [mileageSheetVisible, setMileageSheetVisible] = useState(false);
   const [poweredEquipmentEnabled, setPoweredEquipmentEnabled] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
+
+  const goBackToVehicleDetail = useCallback(() => {
+    if (!vehicleId) {
+      navigation.goBack();
+      return;
+    }
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('VehicleDetail', { vehicleId });
+  }, [navigation, vehicleId]);
+
+  const openFromMileageIntent = useCallback(
+    (factor) => {
+      const intent = resolveMileageFactorAction(factor);
+      if (!intent) return;
+      const action = intent.action;
+      if (action === 'repair_detail' && intent.repairId) {
+        navigation.navigate('RepairDetail', { repairId: intent.repairId });
+        return;
+      }
+      if (action === 'log_service' || action === 'log_service_receipt' || action === 'log_service_odometer') {
+        navigation.navigate('LogServiceRecord', {
+          vehicleId,
+          returnTo: 'EditVehicleDetails',
+          origin: 'EditVehicleDetails',
+        });
+        return;
+      }
+      if (action === 'add_obligation_inspection') {
+        navigation.navigate('AddObligationPayment', {
+          vehicleId,
+          initialReminderType: 'technical_inspection',
+          returnTo: 'EditVehicleDetails',
+          origin: 'EditVehicleDetails',
+        });
+        return;
+      }
+      if (action === 'manage_authorized_centers') {
+        navigation.navigate('ManageVehicleServiceCenters', { vehicleId });
+        return;
+      }
+      if (action === 'vehicle_specs') {
+        navigation.navigate('VehicleSpecs', { vehicleId });
+        return;
+      }
+      navigation.navigate('VehicleDetail', {
+        vehicleId,
+        mileageIntent: { action, repairId: intent.repairId },
+      });
+    },
+    [navigation, vehicleId]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -156,6 +221,60 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
     return Boolean(editCatalogTrailer || optionalStrings.trailer_type || optionalBools.braked_trailer);
   }, [vehicleTypeCode, editCatalogTrailer, optionalStrings, optionalBools]);
 
+  const hasVehicleTypePicker = vehicleTypes.length > 0;
+
+  const vehicleTypeLabel = useCallback(
+    (typeId) => {
+      if (!typeId) return 'Not set';
+      const row = vehicleTypes.find((vt) => String(vt.id) === String(typeId));
+      return row?.name || identityTypeName || 'Not set';
+    },
+    [vehicleTypes, identityTypeName]
+  );
+
+  const applyVehicleTypeChange = useCallback(
+    async (nextId) => {
+      const prevId = selectedVehicleTypeId;
+      const next = nextId ? String(nextId) : '';
+      if (next === String(prevId || '')) return;
+
+      const fromLabel = vehicleTypeLabel(prevId);
+      const toLabel = vehicleTypeLabel(next);
+
+      if (prevId && next) {
+        const ok = await confirmMessage(
+          'Change vehicle type?',
+          `Are you sure you want to change from ${fromLabel} to ${toLabel}? This affects reminders, service matching, and what your workshop sees.`,
+          { confirmLabel: 'Change type' }
+        );
+        if (!ok) return;
+      } else if (prevId && !next) {
+        const ok = await confirmMessage(
+          'Clear vehicle type?',
+          `Remove ${fromLabel} as the vehicle type?`,
+          { confirmLabel: 'Clear type' }
+        );
+        if (!ok) return;
+      }
+
+      setSelectedVehicleTypeId(next);
+      const row = vehicleTypes.find((vt) => String(vt.id) === next);
+      setVehicleTypeCode(row?.code || '');
+      setIdentityTypeName(row?.name || 'Not set');
+    },
+    [selectedVehicleTypeId, vehicleTypeLabel, vehicleTypes]
+  );
+
+  const reloadVehicleTypes = useCallback(async () => {
+    try {
+      const rows = await getVehicleTypes();
+      setVehicleTypes(Array.isArray(rows) ? rows : []);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Could not load vehicle types.');
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -169,6 +288,12 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
           getCatalogTrailerTypes(),
           fetch(`${API_BASE_URL}/api/vehicles/${vehicleId}/`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
+        let typeRows = [];
+        try {
+          typeRows = await getVehicleTypes();
+        } catch (typeErr) {
+          if (__DEV__) console.warn('[EditVehicleDetails] getVehicleTypes failed', typeErr);
+        }
         let countryList = [];
         try {
           const rawCountries = await getCountries();
@@ -189,10 +314,22 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
         setVehicleChoices(choices && typeof choices === 'object' ? choices : {});
         setCatalogEbikeSystems(ebikeRows);
         setCatalogTrailerTypes(trailerRows);
+        setVehicleTypes(Array.isArray(typeRows) ? typeRows : []);
 
+        setMileageConfidence(vehicle.mileage_confidence || null);
+        let resolvedTypeId =
+          vehicle.vehicle_type != null && vehicle.vehicle_type !== ''
+            ? String(vehicle.vehicle_type)
+            : '';
+        if (!resolvedTypeId && vehicle.vehicle_type_code && Array.isArray(typeRows)) {
+          const hit = typeRows.find((vt) => vt.code === vehicle.vehicle_type_code);
+          if (hit?.id != null) resolvedTypeId = String(hit.id);
+        }
+        setSelectedVehicleTypeId(resolvedTypeId);
+        setInitialVehicleTypeId(resolvedTypeId);
         setVehicleTypeCode(vehicle.vehicle_type_code || '');
         setIdentityPlate(vehicle.license_plate || '—');
-        setIdentityTypeName(vehicle.vehicle_type_name || 'Vehicle');
+        setIdentityTypeName(vehicle.vehicle_type_name || 'Not set');
         const line =
           [vehicle.catalog_brand_name, vehicle.catalog_model_name, vehicle.catalog_generation_name]
             .filter(Boolean)
@@ -270,11 +407,14 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
         const v = String(vinEditable ?? '').trim();
         payload.vin = v || null;
       }
+      if (String(selectedVehicleTypeId || '') !== String(initialVehicleTypeId || '')) {
+        payload.vehicle_type = selectedVehicleTypeId ? parseInt(selectedVehicleTypeId, 10) : null;
+      }
       delete payload.odometer_verified;
       delete payload.odometer_source;
       await updateVehicle(vehicleId, payload, token);
       Alert.alert('Saved', 'Vehicle details updated.');
-      navigation.goBack();
+      goBackToVehicleDetail();
     } catch (e) {
       console.error(e);
       Alert.alert('Error', e.message || 'Could not save vehicle.');
@@ -309,72 +449,151 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
           enableOnAndroid
           extraScrollHeight={20}
         >
-          <FloatingCard>
-            <Text style={styles.cardTitle}>Vehicle identity (locked)</Text>
-            <View style={styles.identityRow}>
-              <Text style={styles.identityLabel}>Plate</Text>
-              <Text style={styles.identityValue}>{identityPlate}</Text>
-            </View>
-            <View style={styles.identityRow}>
-              <Text style={styles.identityLabel}>Vehicle type</Text>
-              <Text style={styles.identityValue}>{identityTypeName}</Text>
-            </View>
-            <View style={styles.identityRow}>
-              <Text style={styles.identityLabel}>Brand / model</Text>
-              <Text style={styles.identityValue}>{identityBrandModel}</Text>
-            </View>
-            {vinLocked ? (
-              <View style={styles.identityRow}>
-                <Text style={styles.identityLabel}>VIN</Text>
-                <Text style={styles.identityValue} selectable>
-                  {identityVin}
-                </Text>
-              </View>
-            ) : (
-              <>
-                <Text style={styles.identityLabel}>VIN (optional)</Text>
-                <TextInput
-                  mode="outlined"
-                  value={vinEditable}
-                  onChangeText={setVinEditable}
-                  placeholder="17-character VIN"
-                  autoCapitalize="characters"
-                  style={{ marginBottom: 8 }}
-                />
-              </>
-            )}
-            <View style={styles.identityRow}>
-              <Text style={styles.identityLabel}>First registration</Text>
-              <Text style={styles.identityValue}>{registrationDateLabel}</Text>
-            </View>
-            <View style={styles.identityRow}>
-              <Text style={styles.identityLabel}>Reg. country</Text>
-              <Text style={styles.identityValue}>{registrationCountryLabel}</Text>
-            </View>
-            <Pressable
-              onPress={() => setRegistrationExpanded((v) => !v)}
-              style={styles.registrationToggle}
-              accessibilityRole="button"
-            >
-              <Text style={styles.registrationToggleText}>
-                {registrationExpanded
-                  ? 'Hide registration editor'
-                  : regFirstIso || regCountryIso
-                    ? 'Edit registration'
-                    : 'Add registration (optional)'}
+          {hasVehicleTypePicker ? (
+            <FloatingCard style={{ marginBottom: 10 }}>
+              <Text style={styles.cardTitle}>Vehicle identity</Text>
+              <Text style={styles.fieldLabel}>Vehicle type</Text>
+              <Text style={styles.hintMuted}>
+                Car, truck, motorcycle, bicycle, trailer, etc. Workshops and service matching use this on bookings.
               </Text>
-              <MaterialCommunityIcons
-                name={registrationExpanded ? 'chevron-up' : 'chevron-down'}
-                size={20}
-                color={COLORS.PRIMARY}
-              />
-            </Pressable>
-            <Text style={styles.hintMuted}>
-              {vinLocked
-                ? 'Plate, make/model, and VIN are locked after creation. Registration: add date once if you skipped it at create; country can change later. Kilometers are on the vehicle screen.'
-                : 'Add your VIN once, then save. Registration is optional and edited below when expanded.'}
-            </Text>
-          </FloatingCard>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={selectedVehicleTypeId}
+                  onValueChange={applyVehicleTypeChange}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Not set" value="" />
+                  {vehicleTypes.map((vt) => (
+                    <Picker.Item key={vt.id} label={vt.name} value={String(vt.id)} />
+                  ))}
+                </Picker>
+              </View>
+              <View style={styles.identityRow}>
+                <Text style={styles.identityLabel}>Plate</Text>
+                <Text style={styles.identityValue}>{identityPlate}</Text>
+              </View>
+              <View style={styles.identityRow}>
+                <Text style={styles.identityLabel}>Brand / model</Text>
+                <Text style={styles.identityValue}>{identityBrandModel}</Text>
+              </View>
+              {vinLocked ? (
+                <View style={styles.identityRow}>
+                  <Text style={styles.identityLabel}>VIN</Text>
+                  <Text style={styles.identityValue} selectable>
+                    {identityVin}
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.identityLabel}>VIN (optional)</Text>
+                  <TextInput
+                    mode="outlined"
+                    value={vinEditable}
+                    onChangeText={setVinEditable}
+                    placeholder="17-character VIN"
+                    autoCapitalize="characters"
+                    style={{ marginBottom: 8 }}
+                  />
+                </>
+              )}
+              <View style={styles.identityRow}>
+                <Text style={styles.identityLabel}>First registration</Text>
+                <Text style={styles.identityValue}>{registrationDateLabel}</Text>
+              </View>
+              <View style={styles.identityRow}>
+                <Text style={styles.identityLabel}>Reg. country</Text>
+                <Text style={styles.identityValue}>{registrationCountryLabel}</Text>
+              </View>
+              <Pressable
+                onPress={() => setRegistrationExpanded((v) => !v)}
+                style={styles.registrationToggle}
+                accessibilityRole="button"
+              >
+                <Text style={styles.registrationToggleText}>
+                  {registrationExpanded
+                    ? 'Hide registration editor'
+                    : regFirstIso || regCountryIso
+                      ? 'Edit registration'
+                      : 'Add registration (optional)'}
+                </Text>
+                <MaterialCommunityIcons
+                  name={registrationExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={20}
+                  color={COLORS.PRIMARY}
+                />
+              </Pressable>
+              <Text style={styles.hintMuted}>
+                {vinLocked
+                  ? 'Plate, make/model, and VIN are locked after creation. Changing vehicle type asks for confirmation. Registration: add date once if you skipped it at create; country can change later. Kilometers are on the vehicle screen.'
+                  : 'Add your VIN once, then save. Registration is optional and edited below when expanded.'}
+              </Text>
+            </FloatingCard>
+          ) : (
+            <FloatingCard style={{ marginBottom: 10 }}>
+              <Text style={styles.cardTitle}>Vehicle identity</Text>
+              <Text style={styles.helperMuted}>
+                Vehicle types could not be loaded. Pull to refresh or tap retry — Car, Truck, Motorcycle, etc. should
+                appear here.
+              </Text>
+              <Button mode="outlined" compact onPress={reloadVehicleTypes} style={{ alignSelf: 'flex-start', marginTop: 8 }}>
+                Retry vehicle types
+              </Button>
+              <View style={styles.identityRow}>
+                <Text style={styles.identityLabel}>Plate</Text>
+                <Text style={styles.identityValue}>{identityPlate}</Text>
+              </View>
+              <View style={styles.identityRow}>
+                <Text style={styles.identityLabel}>Brand / model</Text>
+                <Text style={styles.identityValue}>{identityBrandModel}</Text>
+              </View>
+              {vinLocked ? (
+                <View style={styles.identityRow}>
+                  <Text style={styles.identityLabel}>VIN</Text>
+                  <Text style={styles.identityValue} selectable>
+                    {identityVin}
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.identityLabel}>VIN (optional)</Text>
+                  <TextInput
+                    mode="outlined"
+                    value={vinEditable}
+                    onChangeText={setVinEditable}
+                    placeholder="17-character VIN"
+                    autoCapitalize="characters"
+                    style={{ marginBottom: 8 }}
+                  />
+                </>
+              )}
+              <View style={styles.identityRow}>
+                <Text style={styles.identityLabel}>First registration</Text>
+                <Text style={styles.identityValue}>{registrationDateLabel}</Text>
+              </View>
+              <View style={styles.identityRow}>
+                <Text style={styles.identityLabel}>Reg. country</Text>
+                <Text style={styles.identityValue}>{registrationCountryLabel}</Text>
+              </View>
+              <Pressable
+                onPress={() => setRegistrationExpanded((v) => !v)}
+                style={styles.registrationToggle}
+                accessibilityRole="button"
+              >
+                <Text style={styles.registrationToggleText}>
+                  {registrationExpanded
+                    ? 'Hide registration editor'
+                    : regFirstIso || regCountryIso
+                      ? 'Edit registration'
+                      : 'Add registration (optional)'}
+                </Text>
+                <MaterialCommunityIcons
+                  name={registrationExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={20}
+                  color={COLORS.PRIMARY}
+                />
+              </Pressable>
+            </FloatingCard>
+          )}
 
           {registrationExpanded ? (
             <FloatingCard style={{ marginTop: 10 }}>
@@ -433,23 +652,28 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
           />
 
           <FloatingCard style={styles.mileageEvidenceCard}>
-            <Text style={styles.cardTitle}>Mileage evidence</Text>
-            <Text style={styles.mileageEvidenceText}>
-              Mileage confidence is calculated automatically from service history, invoices, receipts, inspections, and chronological consistency.
-            </Text>
-            <Text style={styles.mileageEvidenceStatus}>Confidence: Not enough evidence yet</Text>
-            <View style={styles.mileageEvidenceBullets}>
-              <Text style={styles.mileageEvidenceBullet}>- No verified service-center records yet</Text>
-              <Text style={styles.mileageEvidenceBullet}>- No receipts/invoices attached yet</Text>
-              <Text style={styles.mileageEvidenceBullet}>- No inspection/imported records yet</Text>
-            </View>
+            <Pressable
+              onPress={() => setMileageSheetVisible(true)}
+              accessibilityRole="button"
+              style={styles.mileageEvidenceHeader}
+            >
+              <Text style={styles.cardTitle}>Mileage evidence</Text>
+              <MaterialCommunityIcons name="chevron-right" size={22} color={COLORS.PRIMARY} />
+            </Pressable>
+            <MileageEvidenceCard
+              mileageConfidence={mileageConfidence}
+              compact
+              helperText="Tap a row below or the title for actions. Lower mileage on old records is allowed."
+              interactive
+              onFactorPress={openFromMileageIntent}
+            />
           </FloatingCard>
         </KeyboardAwareScrollView>
         <View style={[styles.bottomActionBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
           <View style={styles.bottomActionRow}>
             <Button
               mode="outlined"
-              onPress={() => navigation.goBack()}
+              onPress={goBackToVehicleDetail}
               disabled={saving}
               style={styles.cancelButton}
               labelStyle={styles.cancelButtonLabel}
@@ -468,6 +692,17 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
             </Button>
           </View>
         </View>
+
+        <MileageConfidenceSheet
+          visible={mileageSheetVisible}
+          onDismiss={() => setMileageSheetVisible(false)}
+          mileageConfidence={mileageConfidence}
+          onFactorPress={(factor) => {
+            setMileageSheetVisible(false);
+            openFromMileageIntent(factor);
+          }}
+          bottomInset={insets.bottom}
+        />
 
         <Portal>
           <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)}>
@@ -513,7 +748,28 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   identityLabel: { color: COLORS.TEXT_MUTED, fontSize: 13 },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.TEXT_MUTED,
+    marginBottom: 4,
+  },
+  helperMuted: {
+    fontSize: 13,
+    color: COLORS.TEXT_MUTED,
+    lineHeight: 18,
+  },
   identityValue: { color: COLORS.TEXT_DARK, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.12)',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+  },
+  picker: {
+    width: '100%',
+  },
   registrationToggle: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -529,25 +785,11 @@ const styles = StyleSheet.create({
   mileageEvidenceCard: {
     marginTop: 2,
   },
-  mileageEvidenceText: {
-    fontSize: 13,
-    color: COLORS.TEXT_MUTED,
-    lineHeight: 18,
-  },
-  mileageEvidenceStatus: {
-    marginTop: 10,
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.TEXT_DARK,
-  },
-  mileageEvidenceBullets: {
-    marginTop: 8,
-    gap: 4,
-  },
-  mileageEvidenceBullet: {
-    fontSize: 13,
-    color: COLORS.TEXT_MUTED,
-    lineHeight: 18,
+  mileageEvidenceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
   bottomActionBar: {
     position: 'absolute',

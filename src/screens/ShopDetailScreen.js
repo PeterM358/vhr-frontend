@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { getShopById, deleteShopImage } from '../api/shops';
+import { formatDayHoursWithLunch, parseLunchBreak } from '../utils/shopWorkingHours';
 import { getVehicles, updateVehicle } from '../api/vehicles';
 
 import { Text, Button, ActivityIndicator, useTheme, Chip, Divider } from 'react-native-paper';
@@ -24,6 +24,13 @@ import FloatingCard from '../components/ui/FloatingCard';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
 import StatusBadge from '../components/ui/StatusBadge';
 import { COLORS } from '../constants/colors';
+import { formatAuthorizeConfirmMessage, formatRevokeConfirmMessage } from '../utils/shopDataAccess';
+import { formatShopDisplayName } from '../utils/shopDisplayName';
+import { formatMoneyAmount } from '../constants/currency';
+import { resolveRepairTypeIcon } from '../utils/repairTypeIcons';
+import { buildShopGeneratedPublicProfile } from '../utils/shopPublicProfileText';
+import { openShopInMaps, resolveShopMapsUrl } from '../utils/shopMapsLink';
+import ShopQuickRequestSheet from '../components/shop/ShopQuickRequestSheet';
 
 const GENERIC_TERM = 'Service Center';
 
@@ -73,24 +80,12 @@ function normalizeUrl(url) {
   return /^https?:\/\//i.test(t) ? t : `https://${t}`;
 }
 
-function formatHoursLine(dayValue) {
-  if (dayValue == null || dayValue === '') return 'Closed';
-  if (typeof dayValue === 'string') return dayValue;
-  if (typeof dayValue === 'object') {
-    if ('closed' in dayValue && dayValue.closed) return 'Closed';
-    const start = dayValue.start != null ? String(dayValue.start) : '';
-    const end = dayValue.end != null ? String(dayValue.end) : '';
-    if (!start && !end) return 'Closed';
-    if (!start || !end) return start || end;
-    return `${start} – ${end}`;
-  }
-  return String(dayValue);
-}
 
 /** Python weekday convention: Monday = 0 … Sunday = 6 (when keys are numeric). */
 function workingHoursEntries(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
 
+  const lunch = parseLunchBreak(raw);
   const keyed = [];
 
   const pushParsed = (dayIndex, hoursValue) => {
@@ -105,11 +100,12 @@ function workingHoursEntries(raw) {
     keyed.push({
       order: dayIndex,
       label: WEEKDAYS_MON_FIRST[dayIndex],
-      text: formatHoursLine(hoursValue),
+      text: formatDayHoursWithLunch(hoursValue, lunch),
     });
   };
 
   for (const [key, hoursValue] of Object.entries(raw)) {
+    if (String(key).trim().toLowerCase() === 'lunch_break') continue;
     let dayIndex = null;
     const k = String(key).trim().toLowerCase();
     if (DAY_ALIAS[k] !== undefined) {
@@ -179,6 +175,9 @@ export default function ShopDetailScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
   const [isClientAccount, setIsClientAccount] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isShopAccount, setIsShopAccount] = useState(false);
+  const [requestSheetOpen, setRequestSheetOpen] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -195,12 +194,16 @@ export default function ShopDetailScreen({ route, navigation }) {
         setShop(shopData);
         setIsOwner(false);
         setIsClientAccount(false);
+        setIsLoggedIn(false);
+        setIsShopAccount(false);
         setVehicles([]);
         return;
       }
 
-      const isShopAccount = storedIsShop === 'true';
-      setIsClientAccount(!isShopAccount);
+      const shopUser = storedIsShop === 'true';
+      setIsLoggedIn(true);
+      setIsShopAccount(shopUser);
+      setIsClientAccount(!shopUser);
 
       const shopData = await getShopById(shopId, token);
       setShop(shopData);
@@ -225,9 +228,8 @@ export default function ShopDetailScreen({ route, navigation }) {
     }
   };
 
-  const toggleAuthorization = async (vehicle) => {
+  const applyAuthorizationChange = async (vehicle, isAuthorized) => {
     const token = await AsyncStorage.getItem('@access_token');
-    const isAuthorized = vehicle.shared_with_shops.some((s) => Number(s.id) === Number(shopId));
 
     const updatedIds = isAuthorized
       ? vehicle.shared_with_shops
@@ -272,6 +274,28 @@ export default function ShopDetailScreen({ route, navigation }) {
     }
   };
 
+  const toggleAuthorization = (vehicle) => {
+    const isAuthorized = vehicle.shared_with_shops.some((s) => Number(s.id) === Number(shopId));
+    const shopName = shop?.name ?? GENERIC_TERM;
+
+    if (isAuthorized) {
+      Alert.alert('Remove access?', formatRevokeConfirmMessage(shopName), [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove access',
+          style: 'destructive',
+          onPress: () => applyAuthorizationChange(vehicle, true),
+        },
+      ]);
+      return;
+    }
+
+    Alert.alert('Authorize service center?', formatAuthorizeConfirmMessage(shopName), [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Authorize', onPress: () => applyAuthorizationChange(vehicle, false) },
+    ]);
+  };
+
   const handleDeleteImage = async (imageId) => {
     try {
       const token = await AsyncStorage.getItem('@access_token');
@@ -310,29 +334,62 @@ export default function ShopDetailScreen({ route, navigation }) {
     );
   }
 
-  const serviceName = (shop.name && String(shop.name).trim()) || GENERIC_TERM;
-  const subtitleType =
-    presentationServiceCenterType(shop.service_center_type) ?? GENERIC_TERM;
-  const shortDesc =
-    typeof shop.short_description === 'string' ? shop.short_description.trim() : '';
+  const serviceName = formatShopDisplayName(shop.name || GENERIC_TERM);
+  const vehicleNamesForSubtitle = collectVehicleTypeNames(shop);
+  const subtitleType = vehicleNamesForSubtitle.length
+    ? vehicleNamesForSubtitle.join(' · ')
+    : presentationServiceCenterType(shop.service_center_type) ?? GENERIC_TERM;
   const addr = typeof shop.address === 'string' ? shop.address.trim() : '';
   const phone =
     (typeof shop.display_phone === 'string' && shop.display_phone.trim()) ||
     (typeof shop.phone_e164 === 'string' && shop.phone_e164.trim()) ||
     (typeof shop.phone === 'string' && shop.phone.trim()) ||
     '';
-  const seoPlace =
-    (typeof shop.seo_city === 'string' && shop.seo_city.trim()) ||
+  const cityName =
     (typeof shop.city_name === 'string' && shop.city_name.trim()) ||
+    (typeof shop.seo_city === 'string' && shop.seo_city.trim()) ||
+    '';
+  const countryName =
+    (typeof shop.country_name === 'string' && shop.country_name.trim()) ||
+    (typeof shop.seo_country === 'string' && shop.seo_country.trim()) ||
     '';
 
-  const locationForAbout =
-    addr || seoPlace ? (addr || seoPlace) : '';
+  const locationLine = [addr, cityName, countryName].filter(Boolean).join(', ');
+  const mapsUrl = resolveShopMapsUrl({
+    googleMapsUrl: shop.google_maps_url,
+    latitude: shop.latitude,
+    longitude: shop.longitude,
+    address: addr,
+    cityName,
+    countryName,
+  });
+
+  const generatedSummary =
+    typeof shop.generated_public_summary === 'string'
+      ? shop.generated_public_summary.trim()
+      : '';
+
+  const repairNames = collectRepairNames(shop);
+  const liveAboutSummary = buildShopGeneratedPublicProfile({
+    shopName: serviceName,
+    vehicleTypeNames: vehicleNamesForSubtitle,
+    repairTypeNames: repairNames,
+    publishedMenuItems: Array.isArray(shop.service_menu) ? shop.service_menu : [],
+    cityName,
+    countryName,
+    address: addr,
+    workingHours: shop.working_hours,
+    offersGuarantee: shop.offers_guarantee === true,
+    brands: Array.isArray(shop.brand_names) ? shop.brand_names : [],
+    allBrandsServiced: shop.all_brands_serviced === true,
+  }).summary;
 
   const aboutLead =
-    locationForAbout
-      ? `${serviceName} is a ${subtitleType} located in ${locationForAbout}.`
-      : `${serviceName} is a ${subtitleType}.`;
+    liveAboutSummary ||
+    generatedSummary ||
+    (locationLine
+      ? `${serviceName} is a ${subtitleType} located in ${locationLine}.`
+      : `${serviceName} is a ${subtitleType}.`);
 
   const longDescription =
     typeof shop.description === 'string' ? shop.description.trim() : '';
@@ -343,11 +400,12 @@ export default function ShopDetailScreen({ route, navigation }) {
       ? Number(shop.completed_repairs_count)
       : null;
 
-  const repairNames = collectRepairNames(shop);
-  const vehicleNames = collectVehicleTypeNames(shop);
+  const vehicleNames = vehicleNamesForSubtitle;
   const hoursRows = workingHoursEntries(shop.working_hours).filter((r) => r?.label && r?.text != null);
 
   const imagesList = Array.isArray(shop.images) ? shop.images : [];
+
+  const showClientRequest = !isOwner && !isShopAccount;
 
   const linkRow = [
     { key: 'website', icon: 'web', url: shop.website },
@@ -408,7 +466,10 @@ export default function ShopDetailScreen({ route, navigation }) {
         style={styles.container}
         contentContainerStyle={[
           styles.listContent,
-          { paddingTop: headerUnderlay + 8 },
+          {
+            paddingTop: headerUnderlay + 8,
+            paddingBottom: showClientRequest ? insets.bottom + 96 : insets.bottom + 32,
+          },
         ]}
         keyboardShouldPersistTaps="handled"
       >
@@ -418,7 +479,6 @@ export default function ShopDetailScreen({ route, navigation }) {
             {shop.is_verified ? <StatusBadge status="verified" /> : null}
           </View>
           <Text style={styles.heroSubtitle}>{subtitleType}</Text>
-          {!!shortDesc && <Text style={styles.heroShortDesc}>{shortDesc}</Text>}
           {shop.offers_guarantee ? (
             <View style={styles.guaranteeRow}>
               <MaterialCommunityIcons name="shield-check" size={18} color="rgba(255,255,255,0.88)" />
@@ -428,18 +488,25 @@ export default function ShopDetailScreen({ route, navigation }) {
 
           <Divider style={styles.heroDivider} />
 
-          {addr ? (
-            <View style={styles.heroIconRow}>
+          {locationLine ? (
+            <Pressable
+              onPress={() =>
+                openShopInMaps({
+                  googleMapsUrl: shop.google_maps_url,
+                  latitude: shop.latitude,
+                  longitude: shop.longitude,
+                  address: addr,
+                  cityName,
+                  countryName,
+                })
+              }
+              disabled={!mapsUrl}
+              hitSlop={8}
+              style={({ pressed }) => [styles.heroIconRow, pressed && mapsUrl && styles.heroIconRowPressed]}
+            >
               <MaterialCommunityIcons name="map-marker-outline" size={22} color="rgba(255,255,255,0.92)" />
-              <View style={styles.heroCol}>
-                <Text style={styles.heroRowText}>{addr}</Text>
-                {normalizeUrl(shop.google_maps_url) ? (
-                  <Pressable onPress={() => openExternal('Maps', shop.google_maps_url)} hitSlop={6}>
-                    <Text style={styles.mapsLink}>Open in Maps</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            </View>
+              <Text style={[styles.heroRowText, mapsUrl && styles.heroRowLink]}>{locationLine}</Text>
+            </Pressable>
           ) : null}
 
           {phone ? (
@@ -461,31 +528,15 @@ export default function ShopDetailScreen({ route, navigation }) {
           </HeroIconRow>
         </AppCard>
 
-        <SectionHeading title="About" />
-        <FloatingCard>
-          <Text style={styles.aboutLead}>{aboutLead}</Text>
-          {longDescription ? (
-            <Text style={styles.aboutBody}>{longDescription}</Text>
-          ) : null}
-        </FloatingCard>
-
-        <SectionHeading title="Services" />
-        <FloatingCard>
-          {repairNames.length ? (
-            <ChipWrap labels={repairNames} />
-          ) : (
-            <Text style={styles.placeholderMuted}>Services not added yet</Text>
-          )}
-        </FloatingCard>
-
-        <SectionHeading title="Vehicle types" />
-        <FloatingCard>
-          {vehicleNames.length ? (
-            <ChipWrap labels={vehicleNames} />
-          ) : (
-            <Text style={styles.placeholderMuted}>Vehicle types not added yet</Text>
-          )}
-        </FloatingCard>
+        {shop.is_claimed === false || shop.registration_origin === 'owner_reported' ? (
+          <FloatingCard style={styles.unclaimedBanner}>
+            <Text style={styles.unclaimedTitle}>Owner-reported · not claimed yet</Text>
+            <Text style={styles.unclaimedBody}>
+              This service center was added from a customer service record. The business can claim this profile
+              later to manage bookings and confirm records.
+            </Text>
+          </FloatingCard>
+        ) : null}
 
         <SectionHeading title="Photos" />
         {imagesList.length > 0 ? (
@@ -513,13 +564,87 @@ export default function ShopDetailScreen({ route, navigation }) {
           />
         )}
 
+        <SectionHeading title="About" />
+        <FloatingCard>
+          <Text style={styles.aboutLead}>{aboutLead}</Text>
+          {longDescription ? (
+            <Text style={styles.aboutBody}>{longDescription}</Text>
+          ) : null}
+        </FloatingCard>
+
+        <SectionHeading title="Services" />
+        <FloatingCard>
+          {repairNames.length ? (
+            <ChipWrap labels={repairNames} />
+          ) : (
+            <Text style={styles.placeholderMuted}>Services not added yet</Text>
+          )}
+        </FloatingCard>
+
+        {Array.isArray(shop.service_menu) && shop.service_menu.length > 0 ? (
+          <>
+            <SectionHeading title="Published pricing" />
+            <FloatingCard>
+              {shop.service_menu.map((item) => {
+                const label = item.repair_type_name || 'Service';
+                const from = item.price_from;
+                const to = item.price_to;
+                let priceLine = 'Price on request';
+                if (from != null && to != null && String(from) !== String(to)) {
+                  priceLine = `${formatMoneyAmount(from)} – ${formatMoneyAmount(to)}`;
+                } else if (from != null) {
+                  priceLine = `from ${formatMoneyAmount(from)}`;
+                } else if (to != null) {
+                  priceLine = `from ${formatMoneyAmount(to)}`;
+                }
+                return (
+                  <View key={`${item.repair_type_id}-${label}`} style={styles.menuRow}>
+                    <View style={styles.menuIconCircle}>
+                      <MaterialCommunityIcons
+                        name={resolveRepairTypeIcon(item)}
+                        size={20}
+                        color={COLORS.PRIMARY}
+                      />
+                    </View>
+                    <View style={styles.menuTextCol}>
+                      <Text style={styles.menuServiceName}>{label}</Text>
+                      <Text style={styles.menuPriceLine}>{priceLine}</Text>
+                      {item.disclaimer ? (
+                        <Text style={styles.menuDisclaimer}>{item.disclaimer}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })}
+            </FloatingCard>
+          </>
+        ) : null}
+
+        <SectionHeading title="Vehicle types" />
+        <FloatingCard>
+          {vehicleNames.length ? (
+            <ChipWrap labels={vehicleNames} />
+          ) : (
+            <Text style={styles.placeholderMuted}>Vehicle types not added yet</Text>
+          )}
+        </FloatingCard>
+
+        {Array.isArray(shop.brand_names) && shop.brand_names.length > 0 ? (
+          <>
+            <SectionHeading title="Brands" />
+            <FloatingCard>
+              <ChipWrap labels={shop.brand_names} />
+            </FloatingCard>
+          </>
+        ) : null}
+
         {isOwner ? (
           <Button
             mode="contained-tonal"
             onPress={() => navigation.navigate('ShopProfile')}
             style={styles.manageProfileBtn}
           >
-            Edit service profile
+            Edit center details
           </Button>
         ) : null}
 
@@ -559,8 +684,12 @@ export default function ShopDetailScreen({ route, navigation }) {
         {isClientAccount ? (
           <>
             <Divider style={{ marginVertical: 12, opacity: 0.35 }} />
-            <SectionHeading title="Authorize this Service Center" />
+            <SectionHeading title="Authorize this service center" />
             <FloatingCard>
+              <Text style={styles.authExplainer}>
+                Authorization shares full mechanical service history for the vehicles you select. Booking a repair
+                without authorizing only grants access to that job and related prior work in the same category.
+              </Text>
               {vehicles.length === 0 ? (
                 <Text style={styles.placeholderOnCard}>You have no vehicles registered.</Text>
               ) : (
@@ -590,6 +719,32 @@ export default function ShopDetailScreen({ route, navigation }) {
           </>
         ) : null}
       </ScrollView>
+
+      {showClientRequest ? (
+        <Pressable
+          onPress={() => setRequestSheetOpen(true)}
+          style={({ pressed }) => [
+            styles.requestFab,
+            { bottom: insets.bottom + 16 },
+            pressed && styles.requestFabPressed,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Request service at this shop"
+        >
+          <MaterialCommunityIcons name="calendar-clock" size={22} color="#fff" />
+          <Text style={styles.requestFabLabel}>Request service</Text>
+        </Pressable>
+      ) : null}
+
+      <ShopQuickRequestSheet
+        visible={requestSheetOpen}
+        onClose={() => setRequestSheetOpen(false)}
+        shop={shop}
+        shopId={shopId}
+        vehicles={vehicles}
+        navigation={navigation}
+        isLoggedIn={isLoggedIn}
+      />
     </ScreenBackground>
   );
 }
@@ -603,7 +758,34 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   listContent: {
     paddingHorizontal: 12,
-    paddingBottom: 32,
+  },
+  requestFab: {
+    position: 'absolute',
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 999,
+    backgroundColor: COLORS.PRIMARY,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.35)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  requestFabPressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.98 }],
+  },
+  requestFabLabel: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.15,
   },
   sectionHeading: {
     marginTop: 14,
@@ -671,17 +853,18 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  mapsLink: {
-    marginTop: 4,
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#93c5fd',
-    textDecorationLine: 'underline',
+  heroIconRowPressed: {
+    opacity: 0.85,
   },
   heroRowText: {
+    flex: 1,
     fontSize: 14,
     lineHeight: 20,
     color: 'rgba(255,255,255,0.95)',
+  },
+  heroRowLink: {
+    color: '#93c5fd',
+    textDecorationLine: 'underline',
   },
   aboutLead: {
     fontSize: 14,
@@ -710,6 +893,41 @@ const styles = StyleSheet.create({
   placeholderMuted: {
     color: COLORS.TEXT_MUTED,
     fontSize: 14,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(15,23,42,0.12)',
+  },
+  menuIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(37,99,235,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuTextCol: {
+    flex: 1,
+  },
+  menuServiceName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.TEXT_DARK,
+  },
+  menuPriceLine: {
+    marginTop: 4,
+    fontSize: 14,
+    color: COLORS.TEXT_DARK,
+  },
+  menuDisclaimer: {
+    marginTop: 4,
+    fontSize: 12,
+    color: COLORS.TEXT_MUTED,
+    lineHeight: 16,
   },
   placeholderOnCard: {
     color: COLORS.TEXT_MUTED,
@@ -788,10 +1006,31 @@ const styles = StyleSheet.create({
   linkIconBtnPressed: {
     opacity: 0.75,
   },
+  authExplainer: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
   vehicleRow: {
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(15,23,42,0.08)',
+  },
+  unclaimedBanner: {
+    marginBottom: 8,
+    borderColor: 'rgba(180,83,9,0.25)',
+    backgroundColor: 'rgba(254,243,199,0.5)',
+  },
+  unclaimedTitle: {
+    fontWeight: '700',
+    color: '#92400e',
+    marginBottom: 4,
+  },
+  unclaimedBody: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 13,
+    lineHeight: 18,
   },
   vehicleMeta: {
     fontSize: 14,

@@ -1,5 +1,7 @@
 /** Vehicle document types and grouping (matches backend VehicleDocument). */
 
+import { DEFAULT_CURRENCY } from '../constants/currency';
+
 export const DOCUMENT_TYPE_INSURANCE_POLICY = 'insurance_policy';
 export const DOCUMENT_TYPE_TECHNICAL_INSPECTION = 'technical_inspection';
 export const DOCUMENT_TYPE_VIGNETTE = 'vignette';
@@ -75,7 +77,7 @@ export function formatDocumentRowSubtitle(doc) {
   if (doc.total_amount_minor != null && doc.total_amount_minor !== '') {
     const major = Number(doc.total_amount_minor) / 100;
     if (Number.isFinite(major)) {
-      parts.push(`${major.toFixed(2)} ${doc.currency || 'BGN'}`);
+      parts.push(`${major.toFixed(2)} ${doc.currency || DEFAULT_CURRENCY}`);
     }
   }
   if (doc.created_at) {

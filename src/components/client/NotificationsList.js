@@ -1,14 +1,17 @@
 // PATH: src/components/client/NotificationsList.js
 
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useState, useContext, useCallback } from 'react';
 import { View, FlatList, Alert, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Text, ActivityIndicator } from 'react-native-paper';
 
-import { getNotifications, markNotificationRead } from '../../api/notifications';
+import {
+  getNotifications,
+  markNotificationRead,
+  patchNotificationReadInList,
+} from '../../api/notifications';
 import { WebSocketContext } from '../../context/WebSocketManager';
-import ScreenBackground from '../ScreenBackground';
 import FloatingCard from '../ui/FloatingCard';
 import EmptyStateCard from '../ui/EmptyStateCard';
 import {
@@ -16,17 +19,30 @@ import {
   TEXT_DARK,
   TEXT_MUTED,
 } from '../../constants/colors';
+import {
+  navigateForClientNotification,
+  notificationActionHint,
+} from '../../utils/clientNotificationRouting';
 
-export default function NotificationsList() {
+export default function NotificationsList({ activityReturnTo = 'ClientActivity' }) {
   const [loading, setLoading] = useState(true);
   const [remoteNotifications, setRemoteNotifications] = useState([]);
   const { notifications: liveNotifications = [], setNotifications } =
     useContext(WebSocketContext);
   const navigation = useNavigation();
 
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchNotifications();
+    }, [])
+  );
+
+  const markReadLocally = (id) => {
+    setRemoteNotifications((prev) => patchNotificationReadInList(prev, id));
+    if (typeof setNotifications === 'function') {
+      setNotifications((prev) => patchNotificationReadInList(prev, id));
+    }
+  };
 
   const fetchNotifications = async () => {
     setLoading(true);
@@ -47,16 +63,13 @@ export default function NotificationsList() {
       const token = await AsyncStorage.getItem('@access_token');
       if (!item.is_read) {
         await markNotificationRead(token, item.id);
-        if (typeof setNotifications === 'function') {
-          setNotifications((prev) => prev.filter((n) => n.id !== item.id));
-        }
+        markReadLocally(item.id);
       }
 
-      if (item.repair) {
-        navigation.navigate('RepairChat', { repairId: item.repair });
-      } else {
-        Alert.alert('Info', 'No linked detail for this notification.');
+      if (navigateForClientNotification(navigation, item, { returnTo: activityReturnTo })) {
+        return;
       }
+      Alert.alert('Info', 'No linked detail for this notification.');
     } catch (err) {
       console.error('Error handling notification press', err);
       Alert.alert('Error', 'Failed to open notification.');
@@ -73,6 +86,7 @@ export default function NotificationsList() {
 
   const renderItem = ({ item }) => {
     const unread = !item.is_read;
+    const hint = notificationActionHint(item);
     return (
       <FloatingCard
         onPress={() => handlePress(item)}
@@ -95,6 +109,8 @@ export default function NotificationsList() {
           </Text>
         )}
 
+        {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+
         <Text style={styles.timestamp}>
           {new Date(item.created_at).toLocaleString()}
         </Text>
@@ -104,24 +120,19 @@ export default function NotificationsList() {
 
   if (loading) {
     return (
-      <ScreenBackground>
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#fff" />
-        </View>
-      </ScreenBackground>
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
     );
   }
 
   return (
-    <ScreenBackground safeArea={false}>
-      <View style={styles.container}>
-        <Text style={styles.heading}>Notifications</Text>
-
+    <View style={styles.container}>
         {mergedNotifications.length === 0 ? (
           <EmptyStateCard
             icon="bell-outline"
             title="No notifications yet"
-            subtitle="Updates about your repairs will appear here."
+            subtitle="Offers, promotions, bookings, and reschedule updates appear here."
           />
         ) : (
           <FlatList
@@ -134,7 +145,6 @@ export default function NotificationsList() {
           />
         )}
       </View>
-    </ScreenBackground>
   );
 }
 
@@ -192,6 +202,12 @@ const styles = StyleSheet.create({
     color: TEXT_MUTED,
     lineHeight: 18,
     marginBottom: 6,
+  },
+  hint: {
+    fontSize: 12,
+    color: PRIMARY,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   timestamp: {
     fontSize: 11,

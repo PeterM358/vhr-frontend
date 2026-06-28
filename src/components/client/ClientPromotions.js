@@ -16,6 +16,7 @@ import { getPromotions, markPromotionSeen } from '../../api/promotions';
 import FloatingCard from '../ui/FloatingCard';
 import EmptyStateCard from '../ui/EmptyStateCard';
 import { COLORS } from '../../constants/colors';
+import { formatMoneyAmount } from '../../constants/currency';
 
 export default function ClientPromotions({ navigation, onUpdateUnseenCount }) {
   const theme = useTheme();
@@ -108,7 +109,7 @@ export default function ClientPromotions({ navigation, onUpdateUnseenCount }) {
         )}
         <Text style={styles.priceLine}>
           <Text style={styles.priceLabel}>Price: </Text>
-          <Text style={styles.priceValue}>{item.price} BGN</Text>
+          <Text style={styles.priceValue}>{formatMoneyAmount(item.price)}</Text>
         </Text>
         <Text style={styles.shopLine}>Shop: {item.shop_name}</Text>
         {isBooked && (

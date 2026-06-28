@@ -25,7 +25,7 @@ export default function DocumentAttachmentList({
           />
           <View style={styles.rowText}>
             <Text style={styles.rowTitle} numberOfLines={1}>
-              {item.fileName || documentTypeLabel(item.documentType)}
+              {item.title || item.fileName || documentTypeLabel(item.documentType)}
             </Text>
             <Text style={styles.rowMeta}>{documentTypeLabel(item.documentType)}</Text>
           </View>
@@ -36,7 +36,12 @@ export default function DocumentAttachmentList({
   );
 }
 
-export function DocumentAttachmentActions({ onAddReceipt, onAddPhoto, disabled }) {
+export function DocumentAttachmentActions({
+  onAddReceipt,
+  onAddPhoto,
+  onAddOdometerPhoto,
+  disabled,
+}) {
   return (
     <View style={styles.actions}>
       <Button
@@ -48,6 +53,17 @@ export function DocumentAttachmentActions({ onAddReceipt, onAddPhoto, disabled }
       >
         Add receipt / invoice
       </Button>
+      {onAddOdometerPhoto ? (
+        <Button
+          mode="outlined"
+          icon="speedometer"
+          onPress={onAddOdometerPhoto}
+          disabled={disabled}
+          style={styles.actionBtn}
+        >
+          Add odometer photo (optional)
+        </Button>
+      ) : null}
       <Button
         mode="outlined"
         icon="camera-plus-outline"

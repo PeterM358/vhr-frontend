@@ -34,6 +34,7 @@ export default function ServiceRecordDatePicker({
   minIso = null,
 }) {
   const [androidOpen, setAndroidOpen] = useState(false);
+  const [iosOptionalOpen, setIosOptionalOpen] = useState(false);
 
   const displayText = useMemo(() => {
     if (!valueIso) return optional ? '— Optional —' : '—';
@@ -86,6 +87,41 @@ export default function ServiceRecordDatePicker({
   }
 
   if (Platform.OS === 'ios') {
+    if (optional && !valueIso) {
+      return (
+        <View style={styles.wrap}>
+          {label ? (
+            <Text variant="labelLarge" style={styles.label}>
+              {label}
+              {optional ? ' (optional)' : ''}
+            </Text>
+          ) : null}
+          <Pressable
+            onPress={() => setIosOptionalOpen(true)}
+            style={styles.datePressable}
+            accessibilityRole="button"
+          >
+            <RNText style={styles.datePressableText}>{displayText}</RNText>
+          </Pressable>
+          {iosOptionalOpen ? (
+            <DateTimePicker
+              value={pickerValue}
+              mode="date"
+              display="spinner"
+              minimumDate={minimumDate}
+              maximumDate={maximumDate}
+              onChange={(_e, d) => {
+                if (d) {
+                  applyDate(d);
+                  setIosOptionalOpen(false);
+                }
+              }}
+              style={styles.iosPicker}
+            />
+          ) : null}
+        </View>
+      );
+    }
     return (
       <View style={styles.wrap}>
         {label ? (
@@ -105,7 +141,7 @@ export default function ServiceRecordDatePicker({
           }}
           style={optional ? undefined : styles.iosPicker}
         />
-        {optional ? (
+        {optional && valueIso ? (
           <Pressable onPress={clearIfOptional} style={styles.clearBtn}>
             <RNText style={styles.clearText}>Clear date</RNText>
           </Pressable>

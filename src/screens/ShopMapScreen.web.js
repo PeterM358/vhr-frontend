@@ -23,8 +23,8 @@ import { COLORS } from '../styles/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { Picker } from '@react-native-picker/picker';
 import { getServiceCenters, VEHICLE_TYPE_FILTER_CHIPS } from '../api/serviceCenters';
+import { spreadShopMarkersForMap } from '../utils/mapMarkerSpread';
 import { API_BASE_URL } from '../api/config';
 import ScreenBackground from '../components/ScreenBackground';
 import BASE_STYLES from '../styles/base';
@@ -75,6 +75,18 @@ export default function ShopMapScreen() {
       .map(([slug, name]) => ({ slug, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [repairTypes]);
+
+  const repairTypeChipOptions = useMemo(() => {
+    const rows = repairTypes.filter((rt) => rt.slug);
+    if (!selectedCategory) return rows;
+    return rows.filter((rt) => rt.category_slug === selectedCategory);
+  }, [repairTypes, selectedCategory]);
+
+  useEffect(() => {
+    if (!selectedRepairType) return;
+    const stillValid = repairTypeChipOptions.some((rt) => rt.slug === selectedRepairType);
+    if (!stillValid) setSelectedRepairType('');
+  }, [repairTypeChipOptions, selectedRepairType]);
 
   useEffect(() => {
     (async () => {
@@ -184,13 +196,7 @@ export default function ShopMapScreen() {
                 styles.backPill,
                 (pressed || hovered) && styles.backPillPressed,
               ]}
-              onPress={() => {
-                if (navigation.canGoBack()) {
-                  navigation.goBack();
-                  return;
-                }
-                navigation.navigate('Home');
-              }}
+              onPress={() => navigation.navigate('Home')}
             >
               <Text style={styles.backPillIcon}>←</Text>
             </Pressable>
@@ -255,20 +261,26 @@ export default function ShopMapScreen() {
             })}
           </ScrollView>
 
-          <View style={styles.pickerWrap}>
-            <Picker
-              selectedValue={selectedRepairType}
-              onValueChange={(v) => setSelectedRepairType(v || '')}
-              style={styles.picker}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+            <Pressable
+              onPress={() => setSelectedRepairType('')}
+              style={[styles.chip, !selectedRepairType && styles.chipSelected]}
             >
-              <Picker.Item label="Service type (any)" value="" />
-              {repairTypes
-                .filter((rt) => rt.slug)
-                .map((rt) => (
-                  <Picker.Item key={rt.id} label={rt.name} value={rt.slug} />
-                ))}
-            </Picker>
-          </View>
+              <Text style={styles.chipText}>Any service</Text>
+            </Pressable>
+            {repairTypeChipOptions.map((rt) => {
+              const on = selectedRepairType === rt.slug;
+              return (
+                <Pressable
+                  key={rt.id}
+                  onPress={() => setSelectedRepairType(on ? '' : rt.slug)}
+                  style={[styles.chip, on && styles.chipSelected]}
+                >
+                  <Text style={styles.chipText}>{rt.name}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </View>
 
         <MapContainer center={center} zoom={zoom} style={styles.map} zoomControl={false}>
@@ -298,21 +310,35 @@ export default function ShopMapScreen() {
             </Marker>
           )}
 
-          {shops
-            .map((shop) => ({
-              ...shop,
-              latitude: shop.latitude ? parseFloat(shop.latitude) : null,
-              longitude: shop.longitude ? parseFloat(shop.longitude) : null,
-            }))
-            .filter((s) => !isNaN(s.latitude) && !isNaN(s.longitude))
-            .map((shop) => (
+          {spreadShopMarkersForMap(
+            shops
+              .map((shop) => ({
+                ...shop,
+                latitude: shop.latitude ? parseFloat(shop.latitude) : null,
+                longitude: shop.longitude ? parseFloat(shop.longitude) : null,
+              }))
+              .filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude)),
+            userLocation
+              ? { latitude: userLocation[0], longitude: userLocation[1] }
+              : null
+          ).map((shop) => {
+              const isReported = shop.source === 'owner_reported';
+              const markerKey = shop.list_id || `${shop.source || 'shop'}-${shop.id}`;
+              const lat = shop.displayLatitude ?? shop.latitude;
+              const lon = shop.displayLongitude ?? shop.longitude;
+              const capabilityLine = [
+                (shop.supported_vehicle_type_names || []).join(', '),
+                (shop.observed_repair_type_names || shop.available_repair_names || []).join(', '),
+              ]
+                .filter(Boolean)
+                .join(' · ');
+              const markerColor = shop.isMyShop ? 'green' : isReported ? 'orange' : 'red';
+              return (
               <Marker
-                key={shop.id}
-                position={[shop.latitude, shop.longitude]}
+                key={markerKey}
+                position={[lat, lon]}
                 icon={L.icon({
-                  iconUrl: shop.isMyShop
-                    ? 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png'
-                    : 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                  iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${markerColor}.png`,
                   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
                   iconSize: [25, 41],
                   iconAnchor: [12, 41],
@@ -321,9 +347,17 @@ export default function ShopMapScreen() {
                 })}
               >
                 <Popup>
-                  <View style={{ maxWidth: 200 }}>
+                  <View style={{ maxWidth: 220 }}>
                     <Text style={{ fontWeight: 'bold', marginBottom: 4 }}>{shop.name}</Text>
+                    {isReported ? (
+                      <Text style={{ marginBottom: 4, color: '#b45309' }}>
+                        Reported by owners · not verified
+                      </Text>
+                    ) : null}
                     <Text style={{ marginBottom: 4 }}>{shop.address}</Text>
+                    {capabilityLine ? (
+                      <Text style={{ marginBottom: 4, color: '#64748b' }}>{capabilityLine}</Text>
+                    ) : null}
 
                     <Pressable
                       style={[styles.popupButton, styles.detailsButton]}
@@ -341,7 +375,7 @@ export default function ShopMapScreen() {
                     <Pressable
                       style={styles.popupButton}
                       onPress={() => {
-                        const gmaps = `https://www.google.com/maps/search/?api=1&query=${shop.latitude},${shop.longitude}`;
+                        const gmaps = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
                         window.open(gmaps, '_blank');
                       }}
                     >
@@ -350,7 +384,8 @@ export default function ShopMapScreen() {
                   </View>
                 </Popup>
               </Marker>
-            ))}
+            );
+            })}
         </MapContainer>
       </View>
     </ScreenBackground>

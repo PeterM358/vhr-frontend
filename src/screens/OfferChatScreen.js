@@ -23,6 +23,7 @@ import {
 import { getOfferMessages, sendOfferMessage } from '../api/offers';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { WebSocketContext } from '../context/WebSocketManager';
+import { formatMoneyAmount } from '../constants/currency';
 
 
 export default function OfferChatScreen({ route, navigation }) {
@@ -133,7 +134,7 @@ export default function OfferChatScreen({ route, navigation }) {
         <Text style={styles.sender}>{isMine ? 'You' : item.sender_email}</Text>
         {item.text && <Text style={styles.text}>{item.text}</Text>}
         {item.price_offer && (
-          <Text style={styles.offer}>💰 Offer: {item.price_offer} BGN</Text>
+          <Text style={styles.offer}>💰 Offer: {formatMoneyAmount(item.price_offer)}</Text>
         )}
         <Text style={styles.timestamp}>
           {new Date(item.created_at).toLocaleString()}

@@ -26,10 +26,11 @@ import {
   IconButton,
 } from 'react-native-paper';
 
-import { getPartsCatalog } from '../api/parts';
+import { getPartsCatalog, getSuggestedPartsForRepairType } from '../api/parts';
 import ScreenBackground from '../components/ScreenBackground';
 import BASE_STYLES from '../styles/base';
 import { stackContentPaddingTop } from '../navigation/stackContentInset';
+import { partCatalogSubtitle } from '../utils/repairPartsTotals';
 
 export default function SelectRepairPartsScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
@@ -47,33 +48,68 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
   const {
     currentParts = [],
     returnTo = 'RepairDetail',
+    repairTypeId = '',
   } = route.params || {};
 
   const newCreatedPart = route.params?.newCreatedPart;
 
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingSuggested, setLoadingSuggested] = useState(false);
+  const [suggestedParts, setSuggestedParts] = useState([]);
   const [results, setResults] = useState([]);
   const [selected, setSelected] = useState([...currentParts]);
 
   const [expandedCatalogIndexes, setExpandedCatalogIndexes] = useState([]);
-  const [expandedSelectedIndexes, setExpandedSelectedIndexes] = useState([]);
+  const [expandedSelectedIndexes, setExpandedSelectedIndexes] = useState(
+    () => currentParts.map((_, index) => index),
+  );
 
   useEffect(() => {
     if (newCreatedPart && !selected.some(p => p.partsMasterId === newCreatedPart.id)) {
-      setSelected(prev => [
-        ...prev,
-        {
-          partsMasterId: newCreatedPart.id,
-          quantity: 1,
-          price: '',
-          labor: '',
-          note: '',
-          partsMaster: newCreatedPart,
-        },
-      ]);
+      setSelected(prev => {
+        const nextIndex = prev.length;
+        setExpandedSelectedIndexes(exp => (exp.includes(nextIndex) ? exp : [...exp, nextIndex]));
+        return [
+          ...prev,
+          {
+            partsMasterId: newCreatedPart.id,
+            quantity: 1,
+            price: '',
+            labor: '',
+            note: '',
+            partsMaster: newCreatedPart,
+          },
+        ];
+      });
     }
   }, [newCreatedPart]);
+
+  useEffect(() => {
+    let active = true;
+    const loadSuggested = async () => {
+      if (!repairTypeId) return;
+      setLoadingSuggested(true);
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        const shopProfileId = await AsyncStorage.getItem('@current_shop_id');
+        const data = await getSuggestedPartsForRepairType(
+          token,
+          repairTypeId,
+          shopProfileId || undefined,
+        );
+        if (active) setSuggestedParts(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.warn('Suggested parts load failed', err);
+      } finally {
+        if (active) setLoadingSuggested(false);
+      }
+    };
+    loadSuggested();
+    return () => {
+      active = false;
+    };
+  }, [repairTypeId]);
 
   const handleSearch = async () => {
     if (!query.trim()) {
@@ -114,21 +150,29 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
     );
   };
 
-  const handleSelectFromCatalog = (item) => {
+  const addCatalogItem = (item) => {
     if (selected.some((p) => p.partsMasterId === item.id)) return;
 
-    setSelected(prev => [
-      ...prev,
-      {
-        partsMasterId: item.id,
-        shopPartId: item.shop_part?.id ?? null,
-        quantity: 1,
-        price: item.shop_part?.price || '',
-        labor: item.shop_part?.labor_cost || '',
-        note: '',
-        partsMaster: item,
-      },
-    ]);
+    setSelected((prev) => {
+      const nextIndex = prev.length;
+      setExpandedSelectedIndexes((exp) => (exp.includes(nextIndex) ? exp : [...exp, nextIndex]));
+      return [
+        ...prev,
+        {
+          partsMasterId: item.id,
+          shopPartId: item.shop_part?.id ?? null,
+          quantity: 1,
+          price: item.shop_part?.price || '',
+          labor: item.shop_part?.default_labor_cost ?? item.shop_part?.labor_cost ?? '',
+          note: '',
+          partsMaster: item,
+        },
+      ];
+    });
+  };
+
+  const handleSelectFromCatalog = (item) => {
+    addCatalogItem(item);
   };
 
   const handleRemoveSelected = (index) => {
@@ -264,12 +308,34 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={[BASE_STYLES.formScreenScroll, { paddingTop: stackContentPaddingTop(insets, 4) }]}>
-        <Text variant="headlineSmall" style={styles.title}>
-          Choose estimated parts
-        </Text>
         <Text style={styles.helperText}>
-          Custom parts entered by service centers may later help build the platform parts catalog.
+          One global catalog — your shop sets its own sell price. Pick typical parts below or search.
         </Text>
+
+        {loadingSuggested ? (
+          <Text style={styles.helperText}>Loading typical parts for this service…</Text>
+        ) : suggestedParts.length > 0 ? (
+          <View style={styles.suggestedBlock}>
+            <Text style={styles.suggestedTitle}>Typical for this service</Text>
+            <View style={styles.chipRow}>
+              {suggestedParts.map((item) => {
+                const picked = selected.some((p) => p.partsMasterId === item.id);
+                return (
+                  <Button
+                    key={item.id}
+                    mode={picked ? 'contained-tonal' : 'outlined'}
+                    compact
+                    style={styles.suggestChip}
+                    onPress={() => (picked ? null : addCatalogItem(item))}
+                    disabled={picked}
+                  >
+                    {item.name}
+                  </Button>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
 
         <TextInput
           mode="outlined"
@@ -288,7 +354,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
             <Card key={idx} style={styles.catalogCard}>
               <Card.Title
                 title={item.name}
-                subtitle={item.brand}
+                subtitle={partCatalogSubtitle(item)}
                 left={(props) => (
                   <IconButton
                     {...props}
@@ -342,8 +408,8 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
               style={[styles.selectedCard, getBorderStyle(part)]}
             >
               <Card.Title
-                title={part.partsMaster?.name || ''}
-                subtitle={part.partsMaster?.brand || ''}
+                title={part.partsMaster?.name || 'Part'}
+                subtitle={partCatalogSubtitle(part.partsMaster)}
                 left={(props) => (
                   <IconButton
                     {...props}
@@ -418,7 +484,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
           onPress={handleConfirmAndReturn}
           style={{ marginBottom: 30 }}
         >
-          Confirm selection
+          {returnTo === 'RepairDetail' ? 'Save parts to repair' : 'Confirm selection'}
         </Button>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -449,4 +515,8 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginBottom: 6,
   },
+  suggestedBlock: { marginBottom: 12 },
+  suggestedTitle: { fontWeight: '600', marginBottom: 8, color: '#334155' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  suggestChip: { marginBottom: 4 },
 });

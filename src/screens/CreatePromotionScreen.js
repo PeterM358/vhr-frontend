@@ -192,7 +192,7 @@ export default function CreatePromotionScreen({ navigation }) {
             </View>
           )}
 
-          <Text variant="labelLarge" style={styles.label}>Price (BGN) *</Text>
+          <Text variant="labelLarge" style={styles.label}>Price (EUR) *</Text>
           <TextInput
             mode="outlined"
             value={price}

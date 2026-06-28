@@ -5,6 +5,7 @@ import { FlatList, ActivityIndicator, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Card, Text, useTheme } from 'react-native-paper';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { getMyShopProfiles } from '../api/profiles';
 import ScreenBackground from '../components/ScreenBackground';
 import { COLORS } from '../styles/colors';
 
@@ -15,16 +16,26 @@ export default function ChooseShopScreen({ navigation }) {
 
   useEffect(() => {
     const loadShops = async () => {
-      const data = await AsyncStorage.getItem(STORAGE_KEYS.SHOP_PROFILES);
-      setShops(data ? JSON.parse(data) : []);
-      setLoading(false);
+      try {
+        const rows = await getMyShopProfiles();
+        const list = Array.isArray(rows) ? rows : [];
+        setShops(list);
+        if (list.length) {
+          await AsyncStorage.setItem(STORAGE_KEYS.SHOP_PROFILES, JSON.stringify(list));
+        }
+      } catch {
+        const data = await AsyncStorage.getItem(STORAGE_KEYS.SHOP_PROFILES);
+        setShops(data ? JSON.parse(data) : []);
+      } finally {
+        setLoading(false);
+      }
     };
     loadShops();
   }, []);
 
   const handleSelect = async (shopId) => {
     await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_SHOP_ID, shopId.toString());
-    navigation.reset({ index: 0, routes: [{ name: 'ShopHome' }] });
+    navigation.reset({ index: 0, routes: [{ name: 'ShopDashboard' }] });
   };
 
   const renderShop = ({ item }) => (
@@ -49,7 +60,7 @@ export default function ChooseShopScreen({ navigation }) {
     <ScreenBackground>
       <View style={styles.container}>
         <Text variant="titleLarge" style={styles.title}>
-          Choose a Profile
+          Switch service center
         </Text>
 
         {loading ? (

@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,6 +16,9 @@ import {
   groupHasDisplayData,
   ODOMETER_SOURCE_OPTIONS,
 } from '../components/vehicle/vehicleFormConfig';
+import MileageEvidenceCard from '../components/vehicle/MileageEvidenceCard';
+import MileageConfidenceSheet from '../components/vehicle/MileageConfidenceSheet';
+import { mileageConfidenceCategoryPill, resolveMileageFactorAction } from '../utils/mileageConfidence';
 
 function isoToDisplayDate(isoDate) {
   const raw = String(isoDate || '').trim();
@@ -56,6 +60,48 @@ export default function VehicleSpecsScreen({ navigation, route }) {
   const [choices, setChoices] = useState({});
   const [loading, setLoading] = useState(true);
   const [isShop, setIsShop] = useState(false);
+  const [mileageSheetVisible, setMileageSheetVisible] = useState(false);
+
+  const openFromMileageIntent = useCallback(
+    (factor) => {
+      const intent = resolveMileageFactorAction(factor);
+      if (!intent) return;
+      const action = intent.action;
+      if (action === 'repair_detail' && intent.repairId) {
+        navigation.navigate('RepairDetail', { repairId: intent.repairId });
+        return;
+      }
+      if (action === 'log_service' || action === 'log_service_receipt' || action === 'log_service_odometer') {
+        navigation.navigate('LogServiceRecord', {
+          vehicleId,
+          returnTo: 'VehicleSpecs',
+          origin: 'VehicleSpecs',
+        });
+        return;
+      }
+      if (action === 'add_obligation_inspection') {
+        navigation.navigate('AddObligationPayment', {
+          vehicleId,
+          initialReminderType: 'technical_inspection',
+          returnTo: 'VehicleSpecs',
+          origin: 'VehicleSpecs',
+        });
+        return;
+      }
+      if (action === 'manage_authorized_centers') {
+        navigation.navigate('ManageVehicleServiceCenters', { vehicleId });
+        return;
+      }
+      if (action === 'vehicle_specs') {
+        return;
+      }
+      navigation.navigate('VehicleDetail', {
+        vehicleId,
+        mileageIntent: { action, repairId: intent.repairId },
+      });
+    },
+    [navigation, vehicleId]
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -118,8 +164,13 @@ export default function VehicleSpecsScreen({ navigation, route }) {
     return getRelevantVehicleFieldGroups(code, {
       ...vehicle,
       powered_equipment_enabled: poweredEquipmentEnabled,
-    });
+    }).filter((g) => g.key !== 'odometer');
   }, [vehicle, poweredEquipmentEnabled]);
+
+  const confidencePill = useMemo(
+    () => mileageConfidenceCategoryPill(vehicle?.mileage_confidence?.category),
+    [vehicle?.mileage_confidence?.category]
+  );
 
   const identityRows = useMemo(() => {
     if (!vehicle) return [];
@@ -244,8 +295,48 @@ export default function VehicleSpecsScreen({ navigation, route }) {
           </FloatingCard>
         ) : null}
 
+        <FloatingCard style={styles.card}>
+          <Pressable
+            onPress={() => setMileageSheetVisible(true)}
+            style={styles.mileageHeaderRow}
+            accessibilityRole="button"
+          >
+            <Text style={styles.cardTitle}>Mileage evidence</Text>
+            <View
+              style={[
+                styles.confidenceMiniPill,
+                { backgroundColor: confidencePill.bg, borderColor: confidencePill.border },
+              ]}
+            >
+              <Text style={styles.confidenceMiniPillText}>
+                {vehicle.mileage_confidence?.category_label || 'Low confidence'}
+              </Text>
+              <MaterialCommunityIcons name="chevron-down" size={18} color={COLORS.PRIMARY} />
+            </View>
+          </Pressable>
+          <MileageEvidenceCard
+            mileageConfidence={vehicle.mileage_confidence}
+            compact
+            showCategoryTitle={false}
+            helperText="Tap for details and shortcuts."
+            interactive
+            onFactorPress={openFromMileageIntent}
+          />
+        </FloatingCard>
+
         {relevantGroups.map((g) => renderOptionalGroup(g))}
       </ScrollView>
+
+      <MileageConfidenceSheet
+        visible={mileageSheetVisible}
+        onDismiss={() => setMileageSheetVisible(false)}
+        mileageConfidence={vehicle.mileage_confidence}
+        onFactorPress={(factor) => {
+          setMileageSheetVisible(false);
+          openFromMileageIntent(factor);
+        }}
+        bottomInset={insets.bottom}
+      />
 
       {!isShop ? (
         <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
@@ -279,7 +370,30 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: COLORS.TEXT_DARK,
+    marginBottom: 0,
+  },
+  mileageHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 10,
+    gap: 8,
+  },
+  confidenceMiniPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexShrink: 1,
+  },
+  confidenceMiniPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.TEXT_DARK,
+    flexShrink: 1,
   },
   cardHint: {
     fontSize: 12,

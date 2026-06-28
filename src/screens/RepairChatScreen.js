@@ -36,6 +36,7 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 import { WebSocketContext } from '../context/WebSocketManager';
 
 import { API_BASE_URL } from '../api/config';
+import { formatMoneyAmount } from '../constants/currency';
 
 export default function RepairChatScreen({ route, navigation }) {
   const { repairId } = route.params;
@@ -289,7 +290,7 @@ export default function RepairChatScreen({ route, navigation }) {
           <Text style={styles.text}>{item.text}</Text>
         ) : null}
         {item.price_offer ? (
-          <Text style={styles.offer}>💰 Offer: {item.price_offer} BGN</Text>
+          <Text style={styles.offer}>💰 Offer: {formatMoneyAmount(item.price_offer)}</Text>
         ) : null}
         <Text style={styles.timestamp}>
           {new Date(item.created_at).toLocaleString()}
@@ -453,7 +454,7 @@ export default function RepairChatScreen({ route, navigation }) {
                             style={{ backgroundColor: theme.colors.primary, marginRight: 4 }}
                             onPress={handleBookOffer}
                           >
-                            Book {latestOffer.price_offer} BGN
+                            Book {formatMoneyAmount(latestOffer.price_offer)}
                           </Button>
                         )}
                         {!isShop && repair.status === 'ongoing' && latestOffer && latestOffer.price_offer && (

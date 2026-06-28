@@ -24,6 +24,12 @@ import { updateVehicle } from '../api/vehicles';
 import ScreenBackground from '../components/ScreenBackground';
 import FloatingCard from '../components/ui/FloatingCard';
 import { COLORS } from '../constants/colors';
+import {
+  ACCESS_AUTHORIZED_MECHANICAL,
+  ACCESS_JOB_SCOPED,
+  formatRevokeConfirmMessage,
+  getAccessLevel,
+} from '../utils/shopDataAccess';
 
 async function fetchVehicle(vehicleId, token) {
   const res = await fetch(`${API_BASE_URL}/api/vehicles/${vehicleId}/`, {
@@ -122,10 +128,7 @@ export default function ManageVehicleServiceCentersScreen({ navigation, route })
   };
 
   const confirmRevoke = (center) => {
-    Alert.alert(
-      'Remove access?',
-      `${center.name} will no longer see your full vehicle history or reminders.\n\nRepairs they already performed or quoted on this vehicle stay visible to them in their shop records.`,
-      [
+    Alert.alert('Remove access?', formatRevokeConfirmMessage(center.name), [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Remove access',
@@ -173,14 +176,41 @@ export default function ManageVehicleServiceCentersScreen({ navigation, route })
           </Text>
           <Text style={styles.subtitle}>{vehicleTitle}</Text>
           <Text style={styles.hint}>
-            Authorized centers can view this vehicle&apos;s history and help with future service. This is separate
-            from logging a past service record.
+            Choose who can see more than a single booked job. Booking a repair always grants job-only access for that
+            repair; authorizing a center below shares full mechanical history.
           </Text>
+          {[ACCESS_JOB_SCOPED, ACCESS_AUTHORIZED_MECHANICAL].map((scope) => {
+            const level = getAccessLevel(scope);
+            if (!level) return null;
+            const isAuthorized = scope === ACCESS_AUTHORIZED_MECHANICAL;
+            return (
+              <View
+                key={scope}
+                style={[styles.tierCard, isAuthorized ? styles.tierCardAuthorized : styles.tierCardJob]}
+              >
+                <View style={styles.tierHeader}>
+                  <MaterialCommunityIcons
+                    name={isAuthorized ? 'shield-check' : 'briefcase-outline'}
+                    size={18}
+                    color={isAuthorized ? '#166534' : COLORS.PRIMARY}
+                  />
+                  <Text style={styles.tierTitle}>{level.title}</Text>
+                </View>
+                <Text style={styles.tierSummary}>{level.summary}</Text>
+                <Text style={styles.tierListLabel}>Can see</Text>
+                {level.canSee.slice(0, 3).map((line) => (
+                  <Text key={line} style={styles.tierListItem}>
+                    • {line}
+                  </Text>
+                ))}
+              </View>
+            );
+          })}
           <View style={styles.infoBox}>
             <MaterialCommunityIcons name="information-outline" size={18} color={COLORS.PRIMARY} />
             <Text style={styles.infoText}>
-              If you remove access, shops still keep repairs and jobs they already had on file—they only lose ongoing
-              access to your vehicle profile.
+              Removing authorization does not delete past shop records. Future bookings still use job-only access for
+              that repair.
             </Text>
           </View>
         </FloatingCard>
@@ -208,9 +238,10 @@ export default function ManageVehicleServiceCentersScreen({ navigation, route })
                         {center.location || 'Location not specified'}
                       </Text>
                       <Text style={styles.rowTap}>Tap for shop profile</Text>
+                      <Text style={styles.authorizedBadge}>Full mechanical history</Text>
                     </View>
                     <View style={styles.rowActions}>
-                      <Text style={styles.accessLabel}>Access</Text>
+                      <Text style={styles.accessLabel}>Authorized</Text>
                       <Switch
                         value
                         disabled={busy}
@@ -281,6 +312,61 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_MUTED,
     fontSize: 12,
     lineHeight: 17,
+  },
+  tierCard: {
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  tierCardJob: {
+    borderColor: 'rgba(59,130,246,0.25)',
+    backgroundColor: 'rgba(59,130,246,0.05)',
+  },
+  tierCardAuthorized: {
+    borderColor: 'rgba(34,197,94,0.25)',
+    backgroundColor: 'rgba(34,197,94,0.05)',
+  },
+  tierHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  tierTitle: {
+    fontWeight: '700',
+    color: COLORS.TEXT_DARK,
+    fontSize: 14,
+  },
+  tierSummary: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 6,
+  },
+  tierListLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.TEXT_MUTED,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  tierListItem: {
+    fontSize: 12,
+    color: COLORS.TEXT_DARK,
+    lineHeight: 17,
+  },
+  authorizedBadge: {
+    marginTop: 6,
+    alignSelf: 'flex-start',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#166534',
+    backgroundColor: 'rgba(34,197,94,0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    overflow: 'hidden',
   },
   sectionTitle: {
     fontWeight: '700',

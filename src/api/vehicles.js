@@ -27,6 +27,21 @@ export async function updateVehicle(vehicleId, payload, token) {
   return response.json();
 }
 
+/** GET /api/vehicles/:id/forecast/ — anonymized cohort + own usage/spend estimates. */
+export async function getVehicleForecast(vehicleId, token, { horizonMonths = 12 } = {}) {
+  const params = new URLSearchParams();
+  if (horizonMonths != null) params.set('horizon_months', String(horizonMonths));
+  const qs = params.toString();
+  const response = await fetch(
+    `${API_BASE_URL}/api/vehicles/${vehicleId}/forecast/${qs ? `?${qs}` : ''}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!response.ok) {
+    throw new Error('Failed to fetch vehicle forecast');
+  }
+  return response.json();
+}
+
 export async function patchVehicleReminder(vehicleId, reminderId, payload, token) {
   const response = await fetch(
     `${API_BASE_URL}/api/vehicles/${vehicleId}/reminders/${reminderId}/`,
@@ -69,7 +84,7 @@ export async function getVehicleTypes() {
   const res = await fetch(`${API_BASE_URL}/api/vehicles/types/`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) return [];
+  if (!res.ok) throw new Error('Failed to load vehicle types');
   const rows = await res.json();
   return Array.isArray(rows) ? rows : [];
 }

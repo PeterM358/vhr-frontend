@@ -6,5 +6,6 @@ export const STORAGE_KEYS = {
   IS_SHOP: '@is_shop',
   IS_CLIENT: '@is_client',
   SHOP_PROFILES: '@shop_profiles',
-  CURRENT_SHOP_ID: '@current_shop_id'
+  CURRENT_SHOP_ID: '@current_shop_id',
+  logServiceRecordDraftKey: (vehicleId) => `@log_service_record_draft_${vehicleId}`,
 };

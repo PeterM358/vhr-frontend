@@ -3,12 +3,27 @@
  */
 
 import React, { useContext, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, FlatList, Pressable } from 'react-native';
 import { DrawerActions, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Appbar, Badge, Button, useTheme } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logout } from '../api/auth';
-import { getRepairs } from '../api/repairs';
+import { getRepairs, getShopCalendar } from '../api/repairs';
+import {
+  cacheUnscheduledCount,
+  readCachedUnscheduledCount,
+  shouldRefreshUnscheduledCount,
+} from '../utils/shopCalendarBadge';
+import {
+  fetchShopProfileCompleteness,
+  gateRepairNavigation,
+} from '../utils/shopProfileGate';
+import {
+  setCachedShopRepairs,
+} from '../utils/shopRepairsPrefetch';
+import ShopProfileSetupBanner from '../components/shop/ShopProfileSetupBanner';
+import { getMyShopProfiles } from '../api/profiles';
+import { formatShopDisplayName } from '../utils/shopDisplayName';
 
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
@@ -30,39 +45,107 @@ export default function ShopHomeScreen() {
   const [shopDisplayName, setShopDisplayName] = useState('Shop');
   const [openRepairs, setOpenRepairs] = useState([]);
   const [repairsLoading, setRepairsLoading] = useState(true);
-
+  const [unscheduledCount, setUnscheduledCount] = useState(0);
+  const [profileComplete, setProfileComplete] = useState(true);
+  const [missingProfileFields, setMissingProfileFields] = useState([]);
   const unreadCount = notifications.filter(n => !n.is_read).length;
+  const lastRepairNotifIdRef = React.useRef(null);
+
+  const loadOpenRepairs = React.useCallback(async ({ background = false } = {}) => {
+    if (!background) setRepairsLoading(true);
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      const data = await getRepairs(token, 'open');
+      const rows = Array.isArray(data) ? data : [];
+      setOpenRepairs(rows);
+      setCachedShopRepairs('open', rows);
+    } catch (err) {
+      console.error('Failed to load open repairs', err);
+      setOpenRepairs([]);
+    } finally {
+      if (!background) setRepairsLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!notifications.length) return;
+    const latest = notifications[0];
+    if (!latest?.id || latest.id === lastRepairNotifIdRef.current) return;
+    const eventType = String(
+      latest.data?.event_type || latest.event_type || latest.notification_type || ''
+    ).toLowerCase();
+    if (!eventType.includes('repair_request')) return;
+    lastRepairNotifIdRef.current = latest.id;
+    loadOpenRepairs({ background: true });
+  }, [notifications, loadOpenRepairs]);
+
+  const refreshProfileGate = React.useCallback(async () => {
+    try {
+      const { isComplete, missingFields } = await fetchShopProfileCompleteness();
+      setProfileComplete(isComplete);
+      setMissingProfileFields(missingFields);
+    } catch (err) {
+      console.warn('Shop profile gate check failed', err);
+    }
+  }, []);
 
   useFocusEffect(
     React.useCallback(() => {
       const loadShopUser = async () => {
-        const stored = await AsyncStorage.getItem('@user_email_or_phone');
-        let display = 'Shop';
-        if (stored?.trim()) {
-          display = stored.includes('@') ? stored.split('@')[0] : stored;
+        try {
+          const profiles = await getMyShopProfiles();
+          const shopName = profiles?.[0]?.name?.trim();
+          if (shopName) {
+            setShopDisplayName(formatShopDisplayName(shopName));
+          } else {
+            const stored = await AsyncStorage.getItem('@user_email_or_phone');
+            let display = 'Service center';
+            if (stored?.trim()) {
+              display = stored.includes('@') ? stored.split('@')[0] : stored;
+            }
+            setShopDisplayName(display);
+          }
+        } catch {
+          setShopDisplayName('Service center');
+        } finally {
+          setLoading(false);
         }
-        setShopDisplayName(display);
-        setLoading(false);
       };
 
-      const loadOpenRepairs = async () => {
-        setRepairsLoading(true);
+      const loadUnscheduledBadge = async () => {
+        const cached = await readCachedUnscheduledCount();
+        setUnscheduledCount(cached);
+        const stale = await shouldRefreshUnscheduledCount();
+        if (!stale) return;
         try {
           const token = await AsyncStorage.getItem('@access_token');
-          const data = await getRepairs(token, 'open');
-          setOpenRepairs(Array.isArray(data) ? data : []);
-        } catch (err) {
-          console.error('Failed to load open repairs', err);
-          setOpenRepairs([]);
-        } finally {
-          setRepairsLoading(false);
+          const data = await getShopCalendar(token, { badge_only: true });
+          const count = data.unscheduled_count ?? 0;
+          setUnscheduledCount(count);
+          await cacheUnscheduledCount(count);
+        } catch {
+          /* keep cached */
         }
       };
 
+      refreshProfileGate();
       loadShopUser();
       loadOpenRepairs();
-    }, [])
+      loadUnscheduledBadge();
+    }, [refreshProfileGate, loadOpenRepairs])
   );
+
+  const handleRepairPress = (repairId) => {
+    if (
+      !gateRepairNavigation(navigation, {
+        isComplete: profileComplete,
+        missingFields: missingProfileFields,
+      })
+    ) {
+      return;
+    }
+    navigation.navigate('RepairDetail', { repairId });
+  };
 
   const handleLogout = async () => {
     await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
@@ -72,9 +155,7 @@ export default function ShopHomeScreen() {
     const plate = String(item.vehicle_license_plate || '').trim();
     const showPlate = Boolean(plate);
     return (
-    <FloatingCard
-      onPress={() => navigation.navigate('RepairDetail', { repairId: item.id })}
-    >
+    <FloatingCard onPress={() => handleRepairPress(item.id)}>
       <Text style={styles.repairTitle} numberOfLines={2}>
         {`${item.vehicle_make || ''} ${item.vehicle_model || ''}`.trim() || 'Vehicle'}
       </Text>
@@ -115,10 +196,33 @@ export default function ShopHomeScreen() {
           onPress={() => navigation.openDrawer()}
           color="#fff"
         />
-        <Appbar.Content
-          title={shopDisplayName}
-          titleStyle={{ color: '#fff' }}
-        />
+        <Pressable
+          onPress={() =>
+            navigation.navigate('ShopProfile', {
+              requireSetup: !profileComplete,
+            })
+          }
+          style={styles.titlePressable}
+          accessibilityRole="button"
+          accessibilityLabel="Open center details"
+        >
+          <Appbar.Content title={shopDisplayName} titleStyle={{ color: '#fff' }} />
+        </Pressable>
+        <View style={styles.iconWithBadge}>
+          <Appbar.Action
+            icon="calendar-month-outline"
+            onPress={() =>
+              navigation.navigate('ShopCalendar', {
+                returnTo: 'ShopDashboard',
+                backLabel: 'Home',
+              })
+            }
+            color="#fff"
+          />
+          {unscheduledCount > 0 ? (
+            <Badge style={styles.notificationBadge}>{unscheduledCount}</Badge>
+          ) : null}
+        </View>
         <View style={styles.iconWithBadge}>
           <Appbar.Action
             icon="bell-outline"
@@ -137,6 +241,15 @@ export default function ShopHomeScreen() {
       </Appbar.Header>
 
       <View style={styles.content}>
+        {!profileComplete ? (
+          <ShopProfileSetupBanner
+            missingFields={missingProfileFields}
+            onCompletePress={() =>
+              navigation.navigate('ShopProfile', { requireSetup: true })
+            }
+          />
+        ) : null}
+
         <View style={styles.headerCard}>
           <Logo width={72} height={72} style={styles.shopLogo} />
           <Text style={styles.welcomeText}>
@@ -195,6 +308,10 @@ export default function ShopHomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  titlePressable: {
+    flex: 1,
+    justifyContent: 'center',
+  },
   iconWithBadge: {
     position: 'relative',
     marginRight: 8,

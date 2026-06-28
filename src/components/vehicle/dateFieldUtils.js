@@ -28,6 +28,21 @@ export function localDateToIso(d) {
   return `${y}-${m}-${day}`;
 }
 
+/** Add calendar years to an ISO date (YYYY-MM-DD). */
+export function addYearsToIso(iso, years = 1) {
+  const d = parseIsoToLocalDate(iso);
+  if (!d) return '';
+  d.setFullYear(d.getFullYear() + years);
+  return localDateToIso(d);
+}
+
+/** Reject epoch / garbage dates from pickers. */
+export function isSaneServiceIso(iso) {
+  const raw = String(iso || '').trim();
+  if (!ISO_DATE.test(raw)) return false;
+  return raw >= '1980-01-01';
+}
+
 /** Display as DD.MM.YYYY for labels and Android date rows. */
 export function isoToDisplayDate(iso) {
   const raw = String(iso || '').trim();

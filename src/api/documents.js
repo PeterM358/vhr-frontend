@@ -108,7 +108,7 @@ export async function uploadRepairDocuments(token, vehicleId, repairId, attachme
       uploadRepairDocument(token, vehicleId, repairId, item, {
         ...meta,
         document_type: item.documentType,
-        title: item.title || meta.title,
+        title: item.title || meta.title || '',
         notes: meta.notes,
         total_amount_minor:
           item.documentType === 'receipt' || item.documentType === 'repair_invoice'

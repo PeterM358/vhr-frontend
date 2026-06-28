@@ -23,6 +23,7 @@ import { API_BASE_URL } from '../api/config';
 import { patchVehicleReminder, createVehicleExpense } from '../api/vehicles';
 import { uploadVehicleDocument } from '../api/documents';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { DEFAULT_CURRENCY } from '../constants/currency';
 import FloatingCard from '../components/ui/FloatingCard';
 import { COLORS } from '../constants/colors';
 import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePicker';
@@ -42,7 +43,7 @@ const OBLIGATION_CHOICES = [
   { reminder_type: 'road_tax', label: 'Road tax / annual fees', expense_type: 'road_tax' },
 ];
 
-/** BGN major → minor (2 decimals). */
+/** EUR major → minor (2 decimals). */
 function bgnToAmountMinor(raw) {
   const s = String(raw ?? '').trim();
   if (!s) return 0;
@@ -201,7 +202,7 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
             {
               expense_type: expenseType,
               amount_minor: amountMinor,
-              currency: 'BGN',
+              currency: DEFAULT_CURRENCY,
               valid_until: dueIso,
               paid_date: paidIso || null,
               notes: note,
@@ -226,7 +227,7 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
             document_type: docType,
             valid_until: dueIso,
             total_amount_minor: amountRaw !== '' ? amountMinor : undefined,
-            currency: 'BGN',
+            currency: DEFAULT_CURRENCY,
             paid_date: paidIso || undefined,
             notes: note || undefined,
           });
@@ -309,7 +310,7 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
             />
 
             <Text variant="labelLarge" style={styles.label}>
-              Amount paid (BGN)
+              Amount paid (EUR)
             </Text>
             <TextInput
               mode="outlined"

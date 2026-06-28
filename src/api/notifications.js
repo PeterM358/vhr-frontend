@@ -125,6 +125,35 @@ export async function sendFirebaseTokenToBackend(fcmToken, userId = null, shopPr
   });
 }
 
+export async function markRepairNotificationsRead(repairId, { setNotifications } = {}) {
+  const token = await AsyncStorage.getItem('@access_token');
+  if (!token || repairId == null) return 0;
+
+  const data = await getNotifications(token);
+  const rows = Array.isArray(data) ? data : data?.results ?? [];
+  const unread = rows.filter(
+    (n) => !n.is_read && Number(n.repair) === Number(repairId)
+  );
+
+  await Promise.all(
+    unread.map((n) => markNotificationRead(token, n.id).catch(() => null))
+  );
+
+  if (typeof setNotifications === 'function') {
+    setNotifications((prev) =>
+      prev.map((n) =>
+        Number(n.repair) === Number(repairId) ? { ...n, is_read: true } : n
+      )
+    );
+  }
+
+  return unread.length;
+}
+
+export function patchNotificationReadInList(list, id) {
+  return (list || []).map((n) => (n.id === id ? { ...n, is_read: true } : n));
+}
+
 export async function markNotificationAsRead(id, updateNotifications = null) {
   const token = await AsyncStorage.getItem('@access_token');
   if (!token) {

@@ -1,28 +1,136 @@
-import React, { useEffect, useState, useContext } from 'react';
-import { View, Alert, RefreshControl, StyleSheet, FlatList } from 'react-native';
+import React, { useEffect, useState, useContext, useMemo } from 'react';
+import { View, Alert, RefreshControl, StyleSheet, FlatList, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { API_BASE_URL } from '../../api/config';
 import { WebSocketContext } from '../../context/WebSocketManager';
 import { markNotificationRead } from '../../api/notifications';
 import { markOfferSeen } from '../../api/offers';
-import { getRepairs } from '../../api/repairs';
-import { Text, ActivityIndicator } from 'react-native-paper';
+import { clientReportVehicleArrival, getRepairs } from '../../api/repairs';
+import { Text, ActivityIndicator, Button } from 'react-native-paper';
 import FloatingCard from '../ui/FloatingCard';
 import EmptyStateCard from '../ui/EmptyStateCard';
 import { COLORS } from '../../constants/colors';
+import { formatOfferPricingLines, formatOfferPrimaryPrice } from '../../utils/offerPricing';
 
-export default function ClientRepairOffers({ onUpdateUnseenOffersCount }) {
+import ClientActionNeeded from './ClientActionNeeded';
+import {
+  isTerminalRepairStatus,
+  isUpcomingAppointment,
+  isVehicleAtShop,
+  clientReportedArrival,
+  normalizeRepairStatus,
+} from '../../utils/repairArrival';
+
+function isTerminalStatus(status) {
+  return isTerminalRepairStatus(status);
+}
+
+function ActivitySection({ title, hint, children }) {
+  if (!children) return null;
+  return (
+    <View style={styles.sectionWrap}>
+      <Text style={styles.sectionHeading}>{title}</Text>
+      {hint ? <Text style={styles.sectionHint}>{hint}</Text> : null}
+      {children}
+    </View>
+  );
+}
+
+function RepairSummaryCard({
+  repair,
+  onPress,
+  badge,
+  badgeStyle,
+  sublabel,
+  showCheckIn,
+  onCheckIn,
+  checkingIn,
+}) {
+  const plate = repair.vehicle_license_plate || 'Your vehicle';
+  const shop = repair.shop_profile_name || 'Service center';
+  const serviceType =
+    repair.final_repair_type_name ||
+    repair.repair_type_name ||
+    repair.repair_type?.name ||
+    null;
+  const checkedIn = clientReportedArrival(repair);
+
+  return (
+    <FloatingCard style={styles.summaryCard} accent={badge === 'IN SERVICE'}>
+      <Pressable onPress={onPress} style={({ pressed }) => [pressed && { opacity: 0.92 }]}>
+        <Text style={styles.summaryTitle}>{plate}</Text>
+        {serviceType ? <Text style={styles.summaryMeta}>{serviceType}</Text> : null}
+        {repair.scheduled_start ? (
+          <Text style={styles.summaryHighlight}>
+            {new Date(repair.scheduled_start).toLocaleString()}
+          </Text>
+        ) : null}
+        <Text style={styles.summaryShop}>{shop}</Text>
+        {sublabel ? <Text style={styles.summarySublabel}>{sublabel}</Text> : null}
+        {badge ? (
+          <View style={[styles.statusPill, badgeStyle]}>
+            <Text style={styles.statusText}>{badge}</Text>
+          </View>
+        ) : null}
+      </Pressable>
+      {showCheckIn && !checkedIn ? (
+        <Button
+          mode="contained"
+          compact
+          onPress={() => onCheckIn(repair)}
+          loading={checkingIn === repair.id}
+          disabled={checkingIn === repair.id}
+          style={styles.checkInBtn}
+        >
+          I&apos;m here for my appointment
+        </Button>
+      ) : null}
+    </FloatingCard>
+  );
+}
+
+export default function ClientRepairOffers({
+  onUpdateUnseenOffersCount,
+  onUpdateActionNeededCount,
+  activityReturnTo = 'ClientActivity',
+}) {
   const [offers, setOffers] = useState([]);
+  const [repairs, setRepairs] = useState([]);
   const [repairStatusById, setRepairStatusById] = useState({});
+  const [actionNeededCount, setActionNeededCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [checkingInId, setCheckingInId] = useState(null);
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const { notifications, setNotifications } = useContext(WebSocketContext);
 
+  const openRepairDetail = (repairId) => {
+    navigation.navigate('RepairDetail', {
+      repairId,
+      returnTo: activityReturnTo,
+    });
+  };
+
+  const handleClientCheckIn = async (repair) => {
+    setCheckingInId(repair.id);
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      await clientReportVehicleArrival(token, repair.id);
+      await fetchRepairOffers();
+      Alert.alert(
+        'Checked in',
+        'The service center has been notified. They will confirm when your vehicle is on site.'
+      );
+    } catch (err) {
+      Alert.alert('Could not check in', err?.message || 'Please try again.');
+    } finally {
+      setCheckingInId(null);
+    }
+  };
+
   const fetchRepairOffers = async () => {
-    // TODO(activity-filters): add client-side filters for offers/ongoing/completed/canceled states.
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
@@ -34,20 +142,17 @@ export default function ClientRepairOffers({ onUpdateUnseenOffersCount }) {
         getRepairs(token).catch(() => []),
       ]);
       const data = await offersRes.json();
-      setOffers(data);
+      const repairRows = Array.isArray(repairsData) ? repairsData : [];
       const statusMap = {};
-      if (Array.isArray(repairsData)) {
-        repairsData.forEach((repair) => {
-          if (repair?.id != null && repair?.status) {
-            statusMap[String(repair.id)] = repair.status;
-          }
-        });
-      }
+      repairRows.forEach((repair) => {
+        if (repair?.id != null && repair?.status) {
+          statusMap[String(repair.id)] = repair.status;
+        }
+      });
+
+      setOffers(Array.isArray(data) ? data : []);
+      setRepairs(repairRows);
       setRepairStatusById(statusMap);
-      const unseen = data.filter((o) => !o.is_seen_by_client).length;
-      if (typeof onUpdateUnseenOffersCount === 'function') {
-        onUpdateUnseenOffersCount(unseen);
-      }
     } catch (err) {
       console.error('Failed to load repair offers', err);
       Alert.alert('Error', 'Could not load repair offers');
@@ -90,91 +195,181 @@ export default function ClientRepairOffers({ onUpdateUnseenOffersCount }) {
         )
       );
 
-      navigation.navigate('RepairDetail', { repairId: item.repair });
+      openRepairDetail(item.repair);
     } catch (err) {
       Alert.alert('Error', 'Could not open detail');
     }
   };
 
-  const renderItem = ({ item }) => {
-    const isUnread = !item.is_seen_by_client;
-    const statusFromRepairList = item?.repair != null ? repairStatusById[String(item.repair)] : null;
-    const rawRepairStatus =
-      item?.repair?.status ??
-      item?.repair_status ??
-      item?.repairStatus ??
-      statusFromRepairList ??
-      null;
-    const normalizedRepairStatus =
-      typeof rawRepairStatus === 'string' ? rawRepairStatus.trim().toLowerCase() : null;
-    const repairStatus =
-      normalizedRepairStatus === 'cancelled' ? 'canceled' : normalizedRepairStatus;
-    const hasRepairStatus = Boolean(repairStatus);
-    const isBooked = item.is_booked;
-    const shopName = item.shop_name || 'Service center';
-    let activityTitle = 'Offer received';
-    let activityDescription = `${shopName} sent an offer`;
-    let activityLabel = 'NEW OFFER';
-    let activityStyle = styles.stateNew;
-    if (hasRepairStatus) {
-      if (repairStatus === 'done') {
-        activityTitle = 'Repair completed';
-        activityDescription = `${shopName} completed the repair`;
-        activityLabel = 'DONE';
-        activityStyle = styles.stateDone;
-      } else if (repairStatus === 'ongoing') {
-        activityTitle = 'Vehicle in service';
-        activityDescription = `Your vehicle is currently being serviced by ${shopName}`;
-        activityLabel = 'IN SERVICE';
-        activityStyle = styles.stateInService;
-      } else if (repairStatus === 'canceled') {
-        activityTitle = 'Repair canceled';
-        activityDescription = `${shopName} canceled the repair`;
-        activityLabel = 'CANCELED';
-        activityStyle = styles.stateCanceled;
-      } else if (repairStatus === 'open' && isBooked) {
-        activityTitle = 'Repair booked';
-        activityDescription = `You booked ${shopName}`;
-        activityLabel = 'BOOKED';
-        activityStyle = styles.stateBooked;
-      }
-    } else if (isBooked) {
-      // Fallback only when linked repair status is unavailable.
-      activityTitle = 'Repair booked';
-      activityDescription = `You booked ${shopName}`;
-      activityLabel = 'BOOKED';
-      activityStyle = styles.stateBooked;
+  const { upcomingAppointments, inServiceRepairs, offersToReview } = useMemo(() => {
+    const activeRepairs = repairs.filter(
+      (r) => !isTerminalStatus(normalizeRepairStatus(r.status))
+    );
+
+    const upcoming = activeRepairs.filter((r) => isUpcomingAppointment(r));
+
+    const inService = activeRepairs.filter((r) => isVehicleAtShop(r));
+
+    const upcomingIds = new Set(upcoming.map((r) => r.id));
+    const inServiceIds = new Set(inService.map((r) => r.id));
+
+    const pendingOffers = offers.filter((o) => {
+      const repairRow = activeRepairs.find((r) => r.id === o.repair);
+      const status = normalizeRepairStatus(
+        repairRow?.status || repairStatusById[String(o.repair)]
+      );
+      if (!status || isTerminalStatus(status)) return false;
+      if (repairRow && isVehicleAtShop(repairRow)) return false;
+      if (inServiceIds.has(o.repair)) return false;
+      if (upcomingIds.has(o.repair) && o.is_booked) return false;
+      return status === 'open' || status === 'ongoing';
+    });
+
+    return {
+      upcomingAppointments: upcoming,
+      inServiceRepairs: inService,
+      offersToReview: pendingOffers,
+    };
+  }, [repairs, offers, repairStatusById]);
+
+  useEffect(() => {
+    if (typeof onUpdateUnseenOffersCount === 'function') {
+      const unseen = offersToReview.filter((o) => !o.is_seen_by_client).length;
+      onUpdateUnseenOffersCount(unseen);
     }
+  }, [offersToReview, onUpdateUnseenOffersCount]);
+
+  const handleActionNeededChange = (count) => {
+    setActionNeededCount(count);
+    if (typeof onUpdateActionNeededCount === 'function') {
+      onUpdateActionNeededCount(count);
+    }
+  };
+
+  const showEmptyState =
+    actionNeededCount === 0 &&
+    upcomingAppointments.length === 0 &&
+    inServiceRepairs.length === 0 &&
+    offersToReview.length === 0;
+
+  const renderOfferItem = ({ item }) => {
+    const isUnread = !item.is_seen_by_client;
+    const shopName = item.shop_name || 'Service center';
+    const isBooked = item.is_booked;
+
+    const pricing = formatOfferPricingLines(item);
 
     return (
       <FloatingCard
         accent={isUnread}
         onPress={() => handlePressOffer(item)}
-        style={{ opacity: isUnread || isBooked ? 1 : 0.88 }}
+        style={styles.offerCard}
       >
-        <Text
-          style={[styles.typeTitle, isUnread && styles.typeTitleBold]}
-          numberOfLines={2}
-        >
-          {activityTitle}
+        <Text style={[styles.typeTitle, isUnread && styles.typeTitleBold]} numberOfLines={2}>
+          {isBooked ? 'Repair booked' : 'New offer'}
         </Text>
-        <Text style={styles.activityLine}>{activityDescription}</Text>
+        <Text style={styles.activityLine}>
+          {isBooked
+            ? `You booked ${shopName} — open the repair for details`
+            : `${shopName} sent a quote — tap to review and book`}
+        </Text>
         {!!item.description && (
           <Text style={styles.desc} numberOfLines={3}>
             {item.description}
           </Text>
         )}
-        <Text style={styles.priceLine}>
-          <Text style={styles.priceLabel}>Price: </Text>
-          <Text style={styles.priceValue}>{item.price} BGN</Text>
-        </Text>
-        <Text style={styles.shopLine}>Service center: {shopName}</Text>
-        <View style={[styles.statusPill, activityStyle]}>
-          <Text style={styles.statusText}>{activityLabel}</Text>
+        {pricing.estimateLine ? (
+          <Text style={styles.priceLine}>
+            <Text style={styles.priceLabel}>Estimate: </Text>
+            <Text style={styles.priceValue}>
+              {pricing.estimateLine.replace(/^Estimate\s+/, '')}
+            </Text>
+          </Text>
+        ) : null}
+        {pricing.quotedLine ? (
+          <Text style={styles.priceLine}>
+            <Text style={styles.priceLabel}>Quoted: </Text>
+            <Text style={styles.priceValue}>
+              {formatOfferPrimaryPrice(item)}
+            </Text>
+          </Text>
+        ) : !pricing.estimateLine ? (
+          <Text style={styles.priceLine}>
+            <Text style={styles.priceLabel}>Price: </Text>
+            <Text style={styles.priceValue}>{formatOfferPrimaryPrice(item)}</Text>
+          </Text>
+        ) : null}
+        <View style={[styles.statusPill, isBooked ? styles.stateBooked : styles.stateNew]}>
+          <Text style={styles.statusText}>{isBooked ? 'BOOKED' : 'NEW OFFER'}</Text>
         </View>
       </FloatingCard>
     );
   };
+
+  const renderListHeader = () => (
+    <>
+      <ClientActionNeeded onChanged={handleActionNeededChange} />
+
+      {upcomingAppointments.length > 0 ? (
+        <ActivitySection
+          title="Upcoming appointments"
+          hint="Your next scheduled visit"
+        >
+          {upcomingAppointments.map((repair) => (
+            <RepairSummaryCard
+              key={`appt-${repair.id}`}
+              repair={repair}
+              onPress={() => openRepairDetail(repair.id)}
+              showCheckIn
+              onCheckIn={handleClientCheckIn}
+              checkingIn={checkingInId}
+              badge={clientReportedArrival(repair) ? 'CHECKED IN' : 'SCHEDULED'}
+              badgeStyle={clientReportedArrival(repair) ? styles.stateInService : styles.stateBooked}
+              sublabel={
+                clientReportedArrival(repair)
+                  ? 'You checked in — waiting for the shop to confirm arrival'
+                  : 'Tap check in when you arrive at the service center'
+              }
+            />
+          ))}
+        </ActivitySection>
+      ) : null}
+
+      {inServiceRepairs.length > 0 ? (
+        <ActivitySection
+          title="In service now"
+          hint="Your vehicle is at the shop — tap to follow progress"
+        >
+          {inServiceRepairs.map((repair) => (
+            <RepairSummaryCard
+              key={`ongoing-${repair.id}`}
+              repair={repair}
+              onPress={() => openRepairDetail(repair.id)}
+              badge="IN SERVICE"
+              badgeStyle={styles.stateInService}
+            />
+          ))}
+        </ActivitySection>
+      ) : null}
+
+      {offersToReview.length > 0 ? (
+        <View style={styles.sectionWrap}>
+          <Text style={styles.sectionHeading}>Offers to review</Text>
+          <Text style={styles.sectionHint}>
+            Compare quotes and book a time on the repair request
+          </Text>
+        </View>
+      ) : null}
+
+      {showEmptyState ? (
+        <EmptyStateCard
+          icon="check-circle-outline"
+          title="Nothing needs attention"
+          subtitle="Upcoming visits and in-progress work will show here. Completed repairs are in the menu under Repairs."
+        />
+      ) : null}
+    </>
+  );
 
   return (
     <View style={styles.root}>
@@ -182,20 +377,15 @@ export default function ClientRepairOffers({ onUpdateUnseenOffersCount }) {
         <ActivityIndicator size="large" color={COLORS.PRIMARY} />
       ) : (
         <FlatList
-          data={offers}
+          data={offersToReview}
           keyExtractor={(item) => item.id.toString()}
-          renderItem={renderItem}
+          renderItem={renderOfferItem}
+          ListHeaderComponent={renderListHeader}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
           contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
-            <EmptyStateCard
-              icon="handshake-outline"
-              title="No activity yet"
-              subtitle="Repair updates and offers will appear here."
-            />
-          }
+          ListEmptyComponent={null}
         />
       )}
     </View>
@@ -212,20 +402,73 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 16,
   },
+  sectionWrap: {
+    marginBottom: 12,
+  },
+  sectionHeading: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+    marginLeft: 4,
+  },
+  sectionHint: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 12,
+    marginBottom: 8,
+    marginLeft: 4,
+    lineHeight: 17,
+  },
+  summaryCard: {
+    marginBottom: 8,
+  },
+  checkInBtn: {
+    marginTop: 10,
+  },
+  offerCard: {
+    marginBottom: 8,
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.TEXT_DARK,
+  },
+  summaryMeta: {
+    fontSize: 13,
+    color: COLORS.TEXT_MUTED,
+    marginTop: 2,
+  },
+  summaryHighlight: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.PRIMARY,
+    marginTop: 4,
+  },
+  summaryShop: {
+    fontSize: 13,
+    color: COLORS.TEXT_MUTED,
+    marginTop: 2,
+  },
+  summarySublabel: {
+    fontSize: 12,
+    color: COLORS.TEXT_MUTED,
+    marginTop: 6,
+    lineHeight: 17,
+  },
   typeTitle: {
     fontSize: 17,
     fontWeight: '700',
     color: COLORS.PRIMARY_DARK,
     marginBottom: 4,
   },
+  typeTitleBold: {
+    fontWeight: '700',
+  },
   activityLine: {
     color: COLORS.TEXT_DARK,
     marginBottom: 8,
     fontSize: 13,
     fontWeight: '500',
-  },
-  typeTitleBold: {
-    fontWeight: '700',
   },
   desc: {
     fontSize: 13,
@@ -244,10 +487,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.PRIMARY,
   },
-  shopLine: {
-    fontSize: 13,
-    color: COLORS.TEXT_DARK,
-  },
   statusPill: {
     alignSelf: 'flex-start',
     marginTop: 10,
@@ -263,6 +502,4 @@ const styles = StyleSheet.create({
   stateNew: { backgroundColor: 'rgba(37,99,235,0.15)' },
   stateBooked: { backgroundColor: 'rgba(245,158,11,0.2)' },
   stateInService: { backgroundColor: 'rgba(59,130,246,0.2)' },
-  stateDone: { backgroundColor: 'rgba(16,185,129,0.22)' },
-  stateCanceled: { backgroundColor: 'rgba(239,68,68,0.2)' },
 });

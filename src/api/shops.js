@@ -1,4 +1,5 @@
 // src/api/shops.js
+import { Platform } from 'react-native';
 import { API_BASE_URL } from './config';
 
 export const getShops = async (token, address = '') => {
@@ -35,29 +36,55 @@ export async function getShopById(shopId, token) {
 }
 
 
-export async function uploadShopImage(shopProfileId, token, imageUri) {
-  const formData = new FormData();
+async function appendImageToFormData(formData, imageUri, file = null) {
+  if (Platform.OS === 'web') {
+    if (file instanceof File || file instanceof Blob) {
+      formData.append('image', file, file.name || 'shop_photo.jpg');
+      return;
+    }
+    if (imageUri) {
+      const res = await fetch(imageUri);
+      const blob = await res.blob();
+      formData.append('image', blob, 'shop_photo.jpg');
+      return;
+    }
+    throw new Error('No image file selected');
+  }
+
   formData.append('image', {
     uri: imageUri,
     name: 'shop_photo.jpg',
     type: 'image/jpeg',
   });
+}
+
+export async function uploadShopImage(shopProfileId, token, imageUri, file = null) {
+  const formData = new FormData();
+  await appendImageToFormData(formData, imageUri, file);
+
+  const headers = { Authorization: `Bearer ${token}` };
+  if (Platform.OS !== 'web') {
+    headers['Content-Type'] = 'multipart/form-data';
+  }
 
   const response = await fetch(
     `${API_BASE_URL}/api/profiles/shop_profiles/${shopProfileId}/images/`,
     {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data',
-      },
+      headers,
       body: formData,
     }
   );
 
   if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.detail || 'Upload failed');
+    let detail = 'Upload failed';
+    try {
+      const err = await response.json();
+      detail = err.detail || detail;
+    } catch (_e) {
+      /* ignore */
+    }
+    throw new Error(detail);
   }
 
   return await response.json();

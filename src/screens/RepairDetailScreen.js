@@ -1,14 +1,15 @@
-import React, { useEffect, useState, useMemo, useLayoutEffect } from 'react';
+import React, { useEffect, useState, useMemo, useLayoutEffect, useRef, useCallback, useContext } from 'react';
 import {
   View,
   Alert,
   ActivityIndicator,
   StyleSheet,
-  FlatList,
   Linking,
   Modal,
   Pressable,
   Image,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,6 +29,15 @@ import {
   deleteRepairPart,
   updateRepairPart,
   updateRepair,
+  getRelatedServiceHistory,
+  requestOwnerLoggedRepairConfirmation,
+  respondOwnerLoggedRepairConfirmation,
+  respondRepairReschedule,
+  counterRepairReschedule,
+  shopRespondRepairReschedule,
+  shopConfirmVehicleArrival,
+  clientReportVehicleArrival,
+  cancelScheduledAppointment,
   uploadRepairMedia,
   deleteRepairMedia,
 } from '../api/repairs';
@@ -35,9 +45,26 @@ import { getShopParts, prepareRepairPartsData } from '../api/parts';
 import { getOffersForRepair, bookOffer, unbookOffer, deleteOffer } from '../api/offers';
 import { RepairsList } from '../components/shop/RepairsList';
 import ScreenBackground from '../components/ScreenBackground';
-import { stackContentPaddingTop } from '../navigation/stackContentInset';
+import { useStackBodyPaddingTop } from '../navigation/stackContentInset';
+import { markRepairNotificationsRead } from '../api/notifications';
+import { WebSocketContext } from '../context/WebSocketManager';
+import {
+  SCHEDULE_DAY_OFFSETS,
+  SCHEDULE_TIME_SLOTS,
+  applyDayOffset,
+  applyTimeSlotToDate,
+  formatSchedulePreview,
+} from '../utils/scheduleSlotPicker';
+import {
+  isVehicleAtShop,
+  isUpcomingAppointment,
+  clientReportedArrival,
+  getVisitDisplayText,
+  canCancelAppointment,
+} from '../utils/repairArrival';
 import AppCard from '../components/ui/AppCard';
 import FloatingCard from '../components/ui/FloatingCard';
+import RelatedServiceHistoryCard from '../components/repair/RelatedServiceHistoryCard';
 import StatusBadge from '../components/ui/StatusBadge';
 import { COLORS } from '../constants/colors';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -45,7 +72,40 @@ import * as ImagePicker from 'expo-image-picker';
 import {
   formatOwnerLoggedTrustLabel,
   formatServiceRecordProvider,
+  ownerLoggedConfirmationStatus,
 } from '../utils/serviceRecordProvider';
+import { DEFAULT_CURRENCY, formatMoneyAmount } from '../constants/currency';
+import { formatOfferPrimaryPrice, formatOfferPricingLines } from '../utils/offerPricing';
+import {
+  analyzeFinalizeKilometers,
+  hasOdometerPhotoAttachment,
+  repairHasOdometerEvidence,
+  parseOdometerKm,
+  resolveEffectiveFinalizeKm,
+  suggestFinalizeKm,
+  initialFinalKilometersInput,
+} from '../utils/finalizeMileageValidation';
+import { pickOdometerPhotoAttachment } from '../utils/pickDocumentFile';
+import { uploadRepairDocument } from '../api/documents';
+import { showMessage } from '../utils/crossPlatformAlert';
+import { messageFromApiError } from '../utils/apiErrorMessage';
+import { getPartsExport } from '../api/serviceMenu';
+import { presentPartsExportShareSheet } from '../utils/partsExportShare';
+import { computePartsTotals } from '../utils/repairPartsTotals';
+import FinalizeOdometerEvidenceSheet from '../components/repair/FinalizeOdometerEvidenceSheet';
+import RepairInvoicingCard from '../components/shop/RepairInvoicingCard';
+
+function resolveEffectiveServiceTypeId(finalRepairTypeId, repair) {
+  const fromForm = String(finalRepairTypeId || '').trim();
+  if (fromForm) return fromForm;
+  if (repair?.final_repair_type != null && repair.final_repair_type !== '') {
+    return String(repair.final_repair_type);
+  }
+  if (repair?.repair_type != null && repair.repair_type !== '') {
+    return String(repair.repair_type);
+  }
+  return '';
+}
 
 function formatEvidenceLevel(level) {
   if (!level) return null;
@@ -66,6 +126,14 @@ function formatEvidenceLevel(level) {
   return map[k] || String(level).replace(/_/g, ' ');
 }
 
+function hasOdometerEvidenceAvailable(repair, pendingPhoto) {
+  return Boolean(
+    pendingPhoto ||
+      hasOdometerPhotoAttachment(repair?.documents) ||
+      repairHasOdometerEvidence(repair)
+  );
+}
+
 function formatPaymentStatus(status) {
   if (!status) return '—';
   const map = {
@@ -76,6 +144,17 @@ function formatPaymentStatus(status) {
   };
   return map[String(status)] || String(status).replace(/_/g, ' ');
 }
+
+const PAYMENT_STATUS_OPTIONS = [
+  { value: 'paid', label: 'Paid on pickup', hint: 'Customer paid when collecting the vehicle' },
+  { value: 'unpaid', label: 'Unpaid', hint: 'Bill later — common for fleet accounts' },
+  {
+    value: 'included_in_invoice',
+    label: 'Monthly invoice',
+    hint: 'Company / fleet — settle on periodic invoice',
+  },
+  { value: 'partially_paid', label: 'Partial deposit', hint: 'Deposit received, balance outstanding' },
+];
 
 function formatHistoryDate(raw) {
   if (raw == null || raw === '') return null;
@@ -110,9 +189,15 @@ function normalizeMediaType(item) {
   return '';
 }
 
+function parseApiErrorMessage(error, fallback = 'Request failed.') {
+  return messageFromApiError(error, fallback);
+}
+
 export default function RepairDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
-  const { repairId } = route.params;
+  const bodyPaddingTop = useStackBodyPaddingTop(12);
+  const { repairId, returnTo } = route.params;
+  const { setNotifications } = useContext(WebSocketContext);
   const theme = useTheme();
 
   const [repair, setRepair] = useState(null);
@@ -136,14 +221,37 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [laborPrice, setLaborPrice] = useState('');
   const [partsPrice, setPartsPrice] = useState('');
   const [totalPrice, setTotalPrice] = useState('');
-  const [currency, setCurrency] = useState('BGN');
+  const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
+  const [pendingOdometerPhoto, setPendingOdometerPhoto] = useState(null);
+  const [finalizeKmError, setFinalizeKmError] = useState('');
+  const [finalizeTypeError, setFinalizeTypeError] = useState('');
+  const [odometerEvidenceSheet, setOdometerEvidenceSheet] = useState(null);
+  const [odometerDiscrepancyNote, setOdometerDiscrepancyNote] = useState('');
+  const [odometerSheetFinalizing, setOdometerSheetFinalizing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('unpaid');
+  const [paymentStatusSaving, setPaymentStatusSaving] = useState(false);
   const [warrantyMonths, setWarrantyMonths] = useState('');
+  const totalManuallyEditedRef = useRef(false);
   const [offers, setOffers] = useState([]);
   const [repairTypes, setRepairTypes] = useState([]);
   const [finalRepairTypeId, setFinalRepairTypeId] = useState('');
   const [selectedImageUri, setSelectedImageUri] = useState(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [requestingConfirmation, setRequestingConfirmation] = useState(false);
+  const [respondingConfirmation, setRespondingConfirmation] = useState(false);
+  const [respondingReschedule, setRespondingReschedule] = useState(false);
+  const [partsExportExtra, setPartsExportExtra] = useState('');
+  const [exportingParts, setExportingParts] = useState(false);
+  const [counterModalVisible, setCounterModalVisible] = useState(false);
+  const [counterDate, setCounterDate] = useState(() => applyDayOffset(new Date(), 1, new Date()));
+  const [counterTimeSlot, setCounterTimeSlot] = useState('09:00');
+  const [counterDayOffset, setCounterDayOffset] = useState(1);
+  const [counterNote, setCounterNote] = useState('');
+  const [submittingCounter, setSubmittingCounter] = useState(false);
+  const [respondingArrival, setRespondingArrival] = useState(false);
+  const [cancelingAppointment, setCancelingAppointment] = useState(false);
+  const [relatedServiceHistory, setRelatedServiceHistory] = useState(null);
+  const [relatedHistoryLoading, setRelatedHistoryLoading] = useState(false);
 
   useLayoutEffect(() => {
     const st = String(repair?.status || '').toLowerCase();
@@ -159,14 +267,136 @@ export default function RepairDetailScreen({ route, navigation }) {
     });
   }, [navigation, repair?.status, repair?.source]);
 
-  const handleUpdateRepair = async ({ finalize = false, showSuccessAlert = true } = {}) => {
+  const formatSumTotal = (labor, parts) => {
+    const sum = (labor ?? 0) + (parts ?? 0);
+    return Number.isInteger(sum) ? String(sum) : sum.toFixed(2);
+  };
+
+  const syncTotalFromLaborParts = useCallback((nextLabor, nextParts) => {
+    if (totalManuallyEditedRef.current) return;
+    const lStr = String(nextLabor ?? '').trim();
+    const pStr = String(nextParts ?? '').trim();
+    if (!lStr && !pStr) {
+      setTotalPrice('');
+      return;
+    }
+    const labor = lStr ? parseFloat(lStr) : 0;
+    const parts = pStr ? parseFloat(pStr) : 0;
+    if (!Number.isFinite(labor) || !Number.isFinite(parts)) return;
+    setTotalPrice(formatSumTotal(labor, parts));
+  }, []);
+
+  const handleLaborChange = useCallback(
+    (text) => {
+      setLaborPrice(text);
+      syncTotalFromLaborParts(text, partsPrice);
+    },
+    [partsPrice, syncTotalFromLaborParts]
+  );
+
+  const handlePartsChange = useCallback(
+    (text) => {
+      setPartsPrice(text);
+      syncTotalFromLaborParts(laborPrice, text);
+    },
+    [laborPrice, syncTotalFromLaborParts]
+  );
+
+  const handleTotalChange = useCallback((text) => {
+    totalManuallyEditedRef.current = true;
+    setTotalPrice(text);
+  }, []);
+
+  const runFinalizeMileageGate = useCallback(
+    async (parsedFinalKilometers) => {
+      const priorMax = repair?.prior_max_odometer_km;
+      const analysis = analyzeFinalizeKilometers(parsedFinalKilometers, priorMax);
+      if (analysis.ok) {
+        setFinalizeKmError('');
+        return { proceed: true, jumpAcknowledged: false };
+      }
+      if (hasOdometerEvidenceAvailable(repair, pendingOdometerPhoto)) {
+        setFinalizeKmError('');
+        return { proceed: true, jumpAcknowledged: true };
+      }
+      setFinalizeKmError(analysis.message);
+      return {
+        proceed: false,
+        needsEvidenceSheet: true,
+        analysis,
+        km: parsedFinalKilometers,
+      };
+    },
+    [repair, pendingOdometerPhoto]
+  );
+
+  const handlePickDashboardPhoto = useCallback(async () => {
+    try {
+      const attachment = await pickOdometerPhotoAttachment();
+      if (attachment) {
+        setPendingOdometerPhoto(attachment);
+        setFinalizeKmError('');
+      }
+    } catch (err) {
+      showMessage('Error', err.message || 'Could not pick dashboard photo.');
+    }
+  }, []);
+
+  const handleUpdateRepair = async ({
+    finalize = false,
+    showSuccessAlert = true,
+    mileageLargeJumpAcknowledged = false,
+    skipMileageGate = false,
+    odometerNote = '',
+    partsOverride = null,
+  } = {}) => {
     if (repair.status === 'done') {
       Alert.alert("This repair is completed and can no longer be edited.");
       return false;
     }
     console.log("💾 Save button clicked");
-    const partsToSend = selectedParts.length > 0 ? selectedParts : repairParts;
+    const partsToSend = partsOverride ?? (selectedParts.length > 0 ? selectedParts : repairParts);
+    const partsTotals = computePartsTotals(partsToSend);
     try {
+      if (finalize) {
+        const effectiveTypeId = resolveEffectiveServiceTypeId(finalRepairTypeId, repair);
+        if (!effectiveTypeId) {
+          const msg = 'Select the final service type before completing this repair.';
+          setFinalizeTypeError(msg);
+          showMessage('Service type required', msg);
+          return false;
+        }
+        setFinalizeTypeError('');
+      }
+
+      if (finalize && !skipMileageGate) {
+        const effectiveKm = resolveEffectiveFinalizeKm(finalKilometers, repair);
+        if (effectiveKm == null) {
+          const msg = 'Enter the final vehicle kilometers before completing this repair.';
+          setFinalizeKmError(msg);
+          setOdometerEvidenceSheet({
+            visible: true,
+            analysis: { blocked: false, message: msg, requiresOdometerEvidence: false },
+            km: null,
+          });
+          return false;
+        }
+        const gate = await runFinalizeMileageGate(effectiveKm);
+        if (!gate.proceed) {
+          if (gate.needsEvidenceSheet) {
+            setOdometerEvidenceSheet({
+              visible: true,
+              analysis: gate.analysis,
+              km: gate.km,
+            });
+          }
+          return false;
+        }
+        if (gate.jumpAcknowledged) {
+          mileageLargeJumpAcknowledged = true;
+        }
+      }
+
       const token = await AsyncStorage.getItem('@access_token');
       const shopProfileId = await AsyncStorage.getItem('@current_shop_id');
       const { repairPartsData, newShopParts } = await prepareRepairPartsData(
@@ -182,19 +412,49 @@ export default function RepairDetailScreen({ route, navigation }) {
         shop_description: shopDescription,
         repair_parts_data: repairPartsData,
       };
+      const noteText = String(odometerNote || odometerDiscrepancyNote || '').trim();
+      if (noteText) {
+        const noteLine = `Odometer note: ${noteText}`;
+        body.shop_description = [String(shopDescription || '').trim(), noteLine].filter(Boolean).join('\n');
+      }
       const parsedFinalRepairTypeId = String(finalRepairTypeId || '').trim()
         ? parseInt(finalRepairTypeId, 10)
         : null;
-      if (parsedFinalRepairTypeId === null || !Number.isNaN(parsedFinalRepairTypeId)) {
+      const effectiveTypeIdForSave = resolveEffectiveServiceTypeId(finalRepairTypeId, repair);
+      if (parsedFinalRepairTypeId != null && !Number.isNaN(parsedFinalRepairTypeId)) {
         body.final_repair_type = parsedFinalRepairTypeId;
+      } else if (effectiveTypeIdForSave) {
+        const parsedEffective = parseInt(effectiveTypeIdForSave, 10);
+        if (!Number.isNaN(parsedEffective)) {
+          body.final_repair_type = parsedEffective;
+        }
+      } else if (parsedFinalRepairTypeId === null) {
+        body.final_repair_type = null;
       }
-      const parsedLaborPrice = String(laborPrice || '').trim() ? parseFloat(laborPrice) : null;
-      const parsedPartsPrice = String(partsPrice || '').trim() ? parseFloat(partsPrice) : null;
-      const parsedTotalPrice = String(totalPrice || '').trim() ? parseFloat(totalPrice) : null;
-      const parsedFinalKilometers = String(finalKilometers || '').trim()
-        ? parseInt(finalKilometers, 10)
-        : null;
-      if (!Number.isNaN(parsedFinalKilometers)) {
+      const parsedLaborPrice = partsToSend.length
+        ? partsTotals.laborSum
+        : String(laborPrice || '').trim()
+          ? parseFloat(laborPrice)
+          : null;
+      const parsedPartsPrice = partsToSend.length
+        ? partsTotals.partsSum
+        : String(partsPrice || '').trim()
+          ? parseFloat(partsPrice)
+          : null;
+      let parsedTotalPrice = String(totalPrice || '').trim() ? parseFloat(totalPrice) : null;
+      if (partsToSend.length > 0) {
+        parsedTotalPrice = partsTotals.total;
+      } else if (
+        (parsedTotalPrice === null || Number.isNaN(parsedTotalPrice)) &&
+        (parsedLaborPrice != null || parsedPartsPrice != null)
+      ) {
+        const labor = Number.isFinite(parsedLaborPrice) ? parsedLaborPrice : 0;
+        const parts = Number.isFinite(parsedPartsPrice) ? parsedPartsPrice : 0;
+        parsedTotalPrice = labor + parts;
+      }
+      const parsedFinalKilometers =
+        parseOdometerKm(finalKilometers) ?? suggestFinalizeKm(repair);
+      if (parsedFinalKilometers != null) {
         body.final_kilometers = parsedFinalKilometers;
       }
       if (parsedLaborPrice === null || !Number.isNaN(parsedLaborPrice)) {
@@ -206,7 +466,7 @@ export default function RepairDetailScreen({ route, navigation }) {
       if (parsedTotalPrice === null || !Number.isNaN(parsedTotalPrice)) {
         body.total_price = parsedTotalPrice;
       }
-      body.currency = (currency || 'BGN').trim() || 'BGN';
+      body.currency = DEFAULT_CURRENCY;
       body.payment_status = paymentStatus || 'unpaid';
       const parsedWarrantyMonths = String(warrantyMonths || '').trim()
         ? parseInt(warrantyMonths, 10)
@@ -216,19 +476,63 @@ export default function RepairDetailScreen({ route, navigation }) {
       }
       if (finalize) {
         body.status = 'done';
+        if (mileageLargeJumpAcknowledged) {
+          body.mileage_large_jump_acknowledged = true;
+        }
       }
       console.log('📦 Body to send:', JSON.stringify(body, null, 2));
+
+      if (pendingOdometerPhoto && repair?.vehicle) {
+        await uploadRepairDocument(token, repair.vehicle, repairId, pendingOdometerPhoto, {
+          document_type: pendingOdometerPhoto.documentType,
+          title: pendingOdometerPhoto.title || 'Odometer photo',
+          notes: noteText || undefined,
+          currency: DEFAULT_CURRENCY,
+        });
+        setPendingOdometerPhoto(null);
+      }
 
       await updateRepair(token, repairId, body);
       await refreshRepair();
       await refreshParts();
       if (showSuccessAlert) {
-        Alert.alert('Saved', finalize ? 'Repair finalized successfully.' : 'Repair progress saved successfully.');
+        if (finalize) {
+          showMessage(
+            'Repair completed',
+            'The client was notified that the vehicle is ready for pickup.',
+            { variant: 'success' }
+          );
+        } else {
+          showMessage('Saved', 'Repair progress saved successfully.');
+        }
       }
+      setFinalizeKmError('');
+      setFinalizeTypeError('');
+      setOdometerEvidenceSheet(null);
+      setOdometerDiscrepancyNote('');
       return true;
     } catch (err) {
       console.error('❌ Update Error:', err);
-      Alert.alert('Error', err.message || 'Failed to update repair');
+      const message = parseApiErrorMessage(err, 'Failed to update repair');
+      if (/odometer|kilometer|\bkm\b/i.test(message)) {
+        setFinalizeKmError(message);
+        const effectiveKm = resolveEffectiveFinalizeKm(finalKilometers, repair);
+        const analysis = analyzeFinalizeKilometers(effectiveKm, repair?.prior_max_odometer_km);
+        setOdometerEvidenceSheet({
+          visible: true,
+          analysis: analysis.ok
+            ? { blocked: true, message, requiresOdometerEvidence: true }
+            : analysis,
+          km: effectiveKm,
+        });
+        setOdometerSheetFinalizing(false);
+        return false;
+      }
+      if (/service type|final_repair_type|repair_type/i.test(message)) {
+        setFinalizeTypeError(message);
+      }
+      showMessage('Error', message);
+      setOdometerSheetFinalizing(false);
       return false;
     }
   };
@@ -275,13 +579,12 @@ export default function RepairDetailScreen({ route, navigation }) {
         setRepair(repairData);
         setEditDescription(repairData.description || '');
         setShopDescription(repairData.shop_description || '');
-        setFinalKilometers(
-          repairData.final_kilometers != null ? String(repairData.final_kilometers) : ''
-        );
+        setFinalKilometers(initialFinalKilometersInput(repairData));
         setLaborPrice(repairData.labor_price != null ? String(repairData.labor_price) : '');
         setPartsPrice(repairData.parts_price != null ? String(repairData.parts_price) : '');
         setTotalPrice(repairData.total_price != null ? String(repairData.total_price) : '');
-        setCurrency(repairData.currency || 'BGN');
+        totalManuallyEditedRef.current = repairData.total_price != null;
+        setCurrency(repairData.currency || DEFAULT_CURRENCY);
         setPaymentStatus(repairData.payment_status || 'unpaid');
         setWarrantyMonths(repairData.warranty_months != null ? String(repairData.warranty_months) : '');
         setFinalRepairTypeId(
@@ -306,12 +609,69 @@ export default function RepairDetailScreen({ route, navigation }) {
     loadData();
   }, [repairId]);
 
-  // Handle route.params updates (e.g., after selecting parts)
   useEffect(() => {
-    if (route.params?.addedParts) {
-      setSelectedParts(route.params.addedParts);
-    }
-  }, [route.params]);
+    let cancelled = false;
+
+    const loadRelatedHistory = async () => {
+      if (!isShop || !repair?.id) {
+        setRelatedServiceHistory(null);
+        return;
+      }
+      const hasAccess =
+        repair.shop_data_access_scope ||
+        Boolean(String(repair.vehicle_license_plate || '').trim());
+      if (!hasAccess) {
+        setRelatedServiceHistory(null);
+        return;
+      }
+
+      setRelatedHistoryLoading(true);
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        const data = await getRelatedServiceHistory(token, repair.id);
+        if (!cancelled) setRelatedServiceHistory(data);
+      } catch (error) {
+        console.warn('Related service history unavailable', error);
+        if (!cancelled) setRelatedServiceHistory(null);
+      } finally {
+        if (!cancelled) setRelatedHistoryLoading(false);
+      }
+    };
+
+    loadRelatedHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [isShop, repair?.id, repair?.shop_data_access_scope, repair?.vehicle_license_plate]);
+
+  // Handle route.params updates (e.g., after selecting parts) — save immediately once.
+  useEffect(() => {
+    const added = route.params?.addedParts;
+    if (!added?.length || !repair || repair.status === 'done' || loading) return;
+
+    let cancelled = false;
+    (async () => {
+      setSelectedParts(added);
+      const totals = computePartsTotals(added);
+      setLaborPrice(String(totals.laborSum));
+      setPartsPrice(String(totals.partsSum));
+      setTotalPrice(String(totals.total));
+      totalManuallyEditedRef.current = false;
+
+      const ok = await handleUpdateRepair({
+        partsOverride: added,
+        showSuccessAlert: true,
+      });
+      if (!cancelled && ok) {
+        navigation.setParams({ addedParts: undefined });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params?.addedParts, repair?.id, loading]);
 
   // If using useLayoutEffect to set navigation options, ensure selectedParts is in the dependency array.
   // (Not present in this file, but if you add one, include selectedParts as a dependency.)
@@ -337,13 +697,12 @@ export default function RepairDetailScreen({ route, navigation }) {
     setRepair(repairData);
     setEditDescription(repairData.description || '');
     setShopDescription(repairData.shop_description || '');
-    setFinalKilometers(
-      repairData.final_kilometers != null ? String(repairData.final_kilometers) : ''
-    );
+    setFinalKilometers(initialFinalKilometersInput(repairData));
     setLaborPrice(repairData.labor_price != null ? String(repairData.labor_price) : '');
     setPartsPrice(repairData.parts_price != null ? String(repairData.parts_price) : '');
     setTotalPrice(repairData.total_price != null ? String(repairData.total_price) : '');
-    setCurrency(repairData.currency || 'BGN');
+    totalManuallyEditedRef.current = repairData.total_price != null;
+    setCurrency(repairData.currency || DEFAULT_CURRENCY);
     setPaymentStatus(repairData.payment_status || 'unpaid');
     setWarrantyMonths(repairData.warranty_months != null ? String(repairData.warranty_months) : '');
     setFinalRepairTypeId(
@@ -356,8 +715,35 @@ export default function RepairDetailScreen({ route, navigation }) {
   };
 
   const handleFinalizeRepair = async () => {
-    if (repair.status !== 'ongoing') return;
+    if (String(repair?.status || '').toLowerCase() !== 'ongoing') {
+      showMessage('Cannot finalize', 'Only ongoing repairs can be finalized.');
+      return;
+    }
     await handleUpdateRepair({ finalize: true, showSuccessAlert: true });
+  };
+
+  const handleOdometerSheetFinalize = async () => {
+    if (!pendingOdometerPhoto) return;
+    setOdometerSheetFinalizing(true);
+    await handleUpdateRepair({
+      finalize: true,
+      showSuccessAlert: true,
+      skipMileageGate: true,
+      odometerNote: odometerDiscrepancyNote,
+    });
+    setOdometerSheetFinalizing(false);
+  };
+
+  const handleOdometerSheetConfirmWithoutPhoto = async () => {
+    setOdometerSheetFinalizing(true);
+    await handleUpdateRepair({
+      finalize: true,
+      showSuccessAlert: true,
+      skipMileageGate: true,
+      mileageLargeJumpAcknowledged: true,
+      odometerNote: odometerDiscrepancyNote,
+    });
+    setOdometerSheetFinalizing(false);
   };
 
   const refreshParts = async () => {
@@ -367,8 +753,28 @@ export default function RepairDetailScreen({ route, navigation }) {
   };
 
   const isMyShopRepair = useMemo(() => {
-    return isShop && repair && repair.shop_profile === shopProfileId;
+    if (!isShop || !repair || shopProfileId == null) return false;
+    return Number(repair.shop_profile) === Number(shopProfileId);
   }, [isShop, repair, shopProfileId]);
+
+  const handleSavePaymentStatus = async (nextStatus) => {
+    const statusToSave = nextStatus ?? paymentStatus;
+    if (!isShop || !isMyShopRepair || paymentStatusSaving) return false;
+    setPaymentStatusSaving(true);
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      await updateRepair(token, repairId, { payment_status: statusToSave || 'unpaid' });
+      setPaymentStatus(statusToSave);
+      await refreshRepair();
+      showMessage('Payment status updated', '', { variant: 'success' });
+      return true;
+    } catch (err) {
+      showMessage('Error', parseApiErrorMessage(err, 'Could not update payment status.'));
+      return false;
+    } finally {
+      setPaymentStatusSaving(false);
+    }
+  };
 
   const shopProfileIdNum = shopProfileId != null ? Number(shopProfileId) : null;
 
@@ -384,6 +790,36 @@ export default function RepairDetailScreen({ route, navigation }) {
     if (!isShop) return true;
     return Boolean(String(repair.vehicle_license_plate || '').trim());
   }, [repair, isShop]);
+
+  const canOpenVehicleProfile = useMemo(
+    () => isShop && Boolean(repair?.can_open_vehicle_profile && repair?.vehicle),
+    [isShop, repair?.can_open_vehicle_profile, repair?.vehicle]
+  );
+
+  const displayPartsList = selectedParts.length > 0 ? selectedParts : repairParts;
+  const displayPartsTotals = useMemo(
+    () => computePartsTotals(displayPartsList),
+    [selectedParts, repairParts]
+  );
+  const hasPartsLines = displayPartsList.length > 0;
+
+  const openVehicleProfile = useCallback(() => {
+    if (!canOpenVehicleProfile) return;
+    navigation.navigate('VehicleDetail', {
+      vehicleId: String(repair.vehicle),
+      backLabel: 'Repair',
+      returnTo: 'RepairDetail',
+      repairId,
+    });
+  }, [canOpenVehicleProfile, navigation, repair?.vehicle, repairId]);
+
+  const openHistoryRepair = useCallback(
+    (historyRepairId) => {
+      if (!historyRepairId) return;
+      navigation.push('RepairDetail', { repairId: historyRepairId });
+    },
+    [navigation]
+  );
 
   const handleAddPart = async () => {
     if (!newPart.shopPartId) {
@@ -534,20 +970,6 @@ export default function RepairDetailScreen({ route, navigation }) {
     );
   }
 
-  // Debugging: Button/visibility debug logs for shops
-  console.log("🔍 isShop:", isShop);
-  console.log("🔍 repair.status:", repair?.status);
-  console.log("🔍 repair.shop_profile:", repair?.shop_profile);
-  console.log("🔍 shopProfileId:", shopProfileId);
-  if (repair && isShop) {
-    console.log("🧠 DEBUG MATCH:", {
-      status: repair.status,
-      repairShop: repair.shop_profile,
-      myShop: shopProfileId,
-      isOwner: repair.shop_profile === shopProfileId,
-    });
-  }
-
   // Show minimal view only when identity/request fields are missing (not when plate is intentionally hidden).
   const hasMainRepairFields =
     Object.prototype.hasOwnProperty.call(repair, 'vehicle_make') ||
@@ -574,7 +996,44 @@ export default function RepairDetailScreen({ route, navigation }) {
   const isDone = statusLower === 'done';
   const isOpenStatus = statusLower === 'open';
   const isOngoingStatus = statusLower === 'ongoing';
+  const vehicleAtShop = isVehicleAtShop(repair);
+  const upcomingAppointment = isUpcomingAppointment(repair);
+  const visitDisplayText = getVisitDisplayText(repair);
+  const ownerCheckedIn = clientReportedArrival(repair);
   const isOwnerLoggedServiceRecord = sourceLower === 'owner_logged' && isDone;
+  const ownerLoggedConfirmation = ownerLoggedConfirmationStatus(repair);
+  const hasSelectedShopProvider = Boolean(repair?.shop_profile || repair?.shop_profile_id);
+  const hasManualProvider = Boolean(
+    String(repair?.manual_service_center_name || '').trim() ||
+      String(repair?.manual_service_center_address || '').trim() ||
+      String(repair?.manual_service_center_city || '').trim() ||
+      String(repair?.manual_service_center_country || '').trim() ||
+      String(repair?.manual_service_center_phone || '').trim() ||
+      String(repair?.manual_service_center_email || '').trim() ||
+      repair?.manual_service_center_latitude != null ||
+      repair?.manual_service_center_longitude != null
+  );
+  const isClientOwner =
+    !isShop &&
+    (
+      currentUserId == null ||
+      repair?.client == null ||
+      Number(repair.client) === Number(currentUserId)
+    );
+  const showCancelAppointment =
+    canCancelAppointment(repair) && (isClientOwner || (isShop && isMyShopRepair));
+  const canRequestServiceCenterConfirmation =
+    isOwnerLoggedServiceRecord &&
+    isClientOwner &&
+    hasSelectedShopProvider &&
+    ownerLoggedConfirmation !== 'pending' &&
+    ownerLoggedConfirmation !== 'confirmed';
+  const canShopRespondToConfirmation =
+    isOwnerLoggedServiceRecord &&
+    isShop &&
+    repair?.shop_profile != null &&
+    Number(repair.shop_profile) === Number(shopProfileId) &&
+    ownerLoggedConfirmation === 'pending';
   const shouldShowTargetingCardForClient =
     !isDone &&
     !isShop &&
@@ -596,8 +1055,7 @@ export default function RepairDetailScreen({ route, navigation }) {
     repair.calculated_total_price != null;
   const vehicleDisplay = `${repair.vehicle_make || ''} ${repair.vehicle_model || ''}`.trim() || 'Vehicle';
   const completionRecordedAt = formatHistoryDate(repair.completed_at || repair.updated_at);
-  const summaryCurrency = repair.currency || 'BGN';
-  const displayPartsList = selectedParts.length > 0 ? selectedParts : repairParts;
+  const summaryCurrency = repair.currency || DEFAULT_CURRENCY;
   const completedServiceTypeName =
     repair.final_repair_type_name ||
     repair.effective_repair_type_name ||
@@ -606,17 +1064,10 @@ export default function RepairDetailScreen({ route, navigation }) {
   const qualityWarnings = Array.isArray(repair.quality_warnings) ? repair.quality_warnings : [];
   const showMissingTypeWarning =
     isShop &&
-    qualityWarnings.includes('missing_repair_type') &&
     repair.status === 'ongoing' &&
-    repair.shop_profile === shopProfileId;
+    Number(repair.shop_profile) === Number(shopProfileId) &&
+    !resolveEffectiveServiceTypeId(finalRepairTypeId, repair);
   const isOpenRequest = isOpenStatus;
-  const isClientOwner =
-    !isShop &&
-    (
-      currentUserId == null ||
-      repair?.client == null ||
-      Number(repair.client) === Number(currentUserId)
-    );
   const canEditClientRequest = isOpenRequest && isClientOwner;
 
   const heroReferenceLine = isOwnerLoggedServiceRecord
@@ -753,40 +1204,915 @@ export default function RepairDetailScreen({ route, navigation }) {
     ]);
   };
 
+  const handleRequestServiceCenterConfirmation = async () => {
+    if (!canRequestServiceCenterConfirmation || requestingConfirmation) return;
+    try {
+      setRequestingConfirmation(true);
+      const token = await AsyncStorage.getItem('@access_token');
+      await requestOwnerLoggedRepairConfirmation(token, repairId);
+      await refreshRepair();
+      Alert.alert('Confirmation requested', 'The selected service center was notified.');
+    } catch (err) {
+      Alert.alert(
+        'Could not request confirmation',
+        parseApiErrorMessage(err, 'Please try again.')
+      );
+    } finally {
+      setRequestingConfirmation(false);
+    }
+  };
+
+  const pendingReschedule = repair?.pending_reschedule_proposal;
+  const rescheduleInitiator = pendingReschedule?.initiated_by || 'shop';
+  const pendingFromShop = rescheduleInitiator === 'shop';
+  const pendingFromOwner = rescheduleInitiator === 'owner';
+
+  const handleShopArrival = async () => {
+    try {
+      setRespondingArrival(true);
+      const token = await AsyncStorage.getItem('@access_token');
+      await shopConfirmVehicleArrival(token, repairId);
+      await refreshRepair();
+      Alert.alert('Vehicle arrived', 'The repair is now in service.');
+    } catch (err) {
+      Alert.alert('Could not confirm', parseApiErrorMessage(err, 'Please try again.'));
+    } finally {
+      setRespondingArrival(false);
+    }
+  };
+
+  const handleClientArrival = async () => {
+    try {
+      setRespondingArrival(true);
+      const token = await AsyncStorage.getItem('@access_token');
+      await clientReportVehicleArrival(token, repairId);
+      await refreshRepair();
+      Alert.alert(
+        'Checked in',
+        'The service center has been notified. They will confirm when your vehicle is on site.'
+      );
+    } catch (err) {
+      Alert.alert('Could not check in', parseApiErrorMessage(err, 'Please try again.'));
+    } finally {
+      setRespondingArrival(false);
+    }
+  };
+
+  const handleCancelAppointment = () => {
+    Alert.alert(
+      'Cancel appointment?',
+      isShop
+        ? 'The owner will be notified. The visit will be removed from your calendar.'
+        : 'The service center will be notified. You can request a new time later.',
+      [
+        { text: 'Keep appointment', style: 'cancel' },
+        {
+          text: 'Cancel appointment',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setCancelingAppointment(true);
+              const token = await AsyncStorage.getItem('@access_token');
+              await cancelScheduledAppointment(token, repairId);
+              await markRepairNotificationsRead(repairId, { setNotifications });
+              await refreshRepair();
+              Alert.alert('Appointment canceled', 'Both sides have been notified.');
+            } catch (err) {
+              Alert.alert('Could not cancel', parseApiErrorMessage(err, 'Please try again.'));
+            } finally {
+              setCancelingAppointment(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const afterRescheduleAction = async (action) => {
+    await markRepairNotificationsRead(repairId, { setNotifications });
+    await refreshRepair();
+    if (returnTo === 'ClientActivity' || returnTo === 'ClientNotifications') {
+      navigation.goBack();
+      return;
+    }
+    Alert.alert(
+      action === 'accept' ? 'New time confirmed' : 'Reschedule declined',
+      action === 'accept'
+        ? 'Your appointment was updated.'
+        : 'The shop will keep the previous time unless they contact you.'
+    );
+  };
+
+  const handleRescheduleResponse = async (action) => {
+    if (!pendingReschedule || respondingReschedule || isShop || !pendingFromShop) return;
+    try {
+      setRespondingReschedule(true);
+      const token = await AsyncStorage.getItem('@access_token');
+      await respondRepairReschedule(token, repairId, {
+        proposalId: pendingReschedule.id,
+        action,
+      });
+      await afterRescheduleAction(action);
+    } catch (err) {
+      Alert.alert('Could not respond', parseApiErrorMessage(err, 'Please try again.'));
+    } finally {
+      setRespondingReschedule(false);
+    }
+  };
+
+  const handleShopRescheduleResponse = async (action) => {
+    if (!pendingReschedule || respondingReschedule || !isShop || !pendingFromOwner) return;
+    try {
+      setRespondingReschedule(true);
+      const token = await AsyncStorage.getItem('@access_token');
+      await shopRespondRepairReschedule(token, repairId, {
+        proposalId: pendingReschedule.id,
+        action,
+      });
+      await refreshRepair();
+      Alert.alert(
+        action === 'accept' ? 'Time confirmed' : 'Suggestion declined',
+        action === 'accept'
+          ? 'The appointment was updated.'
+          : 'The previous time stays on the calendar.'
+      );
+    } catch (err) {
+      Alert.alert('Could not respond', parseApiErrorMessage(err, 'Please try again.'));
+    } finally {
+      setRespondingReschedule(false);
+    }
+  };
+
+  const openCounterModal = () => {
+    const base = pendingReschedule?.proposed_start
+      ? new Date(pendingReschedule.proposed_start)
+      : applyDayOffset(new Date(), 1, new Date());
+    setCounterDate(base);
+    setCounterTimeSlot(
+      `${base.getHours().toString().padStart(2, '0')}:${base.getMinutes().toString().padStart(2, '0')}`
+    );
+    setCounterDayOffset(1);
+    setCounterNote('');
+    setCounterModalVisible(true);
+  };
+
+  const submitCounter = async () => {
+    const start = applyTimeSlotToDate(counterDate, counterTimeSlot);
+    const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+    try {
+      setSubmittingCounter(true);
+      const token = await AsyncStorage.getItem('@access_token');
+      await counterRepairReschedule(token, repairId, {
+        scheduledStart: start.toISOString(),
+        scheduledEnd: end.toISOString(),
+        note: counterNote,
+      });
+      setCounterModalVisible(false);
+      await markRepairNotificationsRead(repairId, { setNotifications });
+      await refreshRepair();
+      Alert.alert(
+        'Suggestion sent',
+        'The service center will accept or decline your preferred time.'
+      );
+      if (returnTo === 'ClientActivity' || returnTo === 'ClientNotifications') {
+        navigation.goBack();
+      }
+    } catch (err) {
+      Alert.alert('Could not send', parseApiErrorMessage(err, 'Please try again.'));
+    } finally {
+      setSubmittingCounter(false);
+    }
+  };
+
+  const handleShopConfirmationResponse = async (action) => {
+    if (!canShopRespondToConfirmation || respondingConfirmation) return;
+    const run = async (note) => {
+      try {
+        setRespondingConfirmation(true);
+        const token = await AsyncStorage.getItem('@access_token');
+        await respondOwnerLoggedRepairConfirmation(token, repairId, {
+          action,
+          note: note || undefined,
+        });
+        await refreshRepair();
+        Alert.alert(
+          action === 'confirm' ? 'Record confirmed' : 'Record rejected',
+          action === 'confirm'
+            ? 'This service record is now confirmed by your service center.'
+            : 'The owner will see your rejection note.'
+        );
+      } catch (err) {
+        Alert.alert(
+          'Could not submit response',
+          parseApiErrorMessage(err, 'Please try again.')
+        );
+      } finally {
+        setRespondingConfirmation(false);
+      }
+    };
+
+    if (action === 'confirm') {
+      await run('');
+      return;
+    }
+    Alert.alert(
+      'Reject confirmation',
+      'The owner will see that this record was not confirmed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: () => run('Service center could not verify this record.'),
+        },
+      ]
+    );
+  };
+
+  const handleExportPartsRequest = async () => {
+    if (!isShop || !repair?.id || !shopProfileId || exportingParts) return;
+    const extra = String(partsExportExtra || '').trim();
+    try {
+      setExportingParts(true);
+      const token = await AsyncStorage.getItem('@access_token');
+      const payload = await getPartsExport(token, repair.id, shopProfileId, extra || undefined);
+      await presentPartsExportShareSheet(payload.share_text, { title: 'Parts request' });
+    } catch (err) {
+      Alert.alert('Export failed', parseApiErrorMessage(err, 'Could not build parts export.'));
+    } finally {
+      setExportingParts(false);
+    }
+  };
+
+  const displayPartsForExport = selectedParts.length > 0 ? selectedParts : repairParts;
+  const shopCanManagePartsOnRepair =
+    isShop &&
+    shopProfileId != null &&
+    !isDone &&
+    (parseInt(repair?.shop_profile, 10) === shopProfileId ||
+      offers.some((o) => parseInt(o.shop, 10) === shopProfileId));
+
+  const shopCanFinalizeOngoing =
+    isShop &&
+    repair?.status === 'ongoing' &&
+    shopProfileId != null &&
+    Number(repair.shop_profile) === Number(shopProfileId);
+
+  const showOffersPhase = isOpenStatus && !isDone;
+
+  const navigateToManageParts = () => {
+    if (repair.status === 'done') {
+      Alert.alert('This repair is completed and can no longer be edited.');
+      return;
+    }
+    navigation.navigate('SelectRepairParts', {
+      currentParts: displayPartsForExport.map((p) => ({
+        partsMasterId:
+          p.partsMasterId ||
+          p.part_master ||
+          p.part_master_detail?.id ||
+          p.partsMaster?.id ||
+          p.shop_part?.part?.id,
+        shopPartId: p.shopPartId || p.shop_part_id || p.shop_part?.id,
+        quantity: p.quantity || 1,
+        price: p.price || p.price_per_item_at_use || '',
+        labor: p.labor || p.labor_cost || '',
+        note: p.note || '',
+        partsMaster:
+          p.partsMaster || p.part_master_detail || p.parts_master_detail || p.shop_part_detail?.part || {},
+      })),
+      vehicleId: repair.vehicle?.toString() || '',
+      repairTypeId:
+        repair.final_repair_type?.toString() ||
+        repair.repair_type?.toString() ||
+        '',
+      description: editDescription || '',
+      kilometers: repair.kilometers?.toString() || '',
+      status: repair.status || 'open',
+      returnTo: 'RepairDetail',
+      repairId,
+    });
+  };
+
+  const renderShopFinalizeServiceTypeCard = () => {
+    if (!shopCanFinalizeOngoing) return null;
+    return (
+      <FloatingCard
+        style={[
+          styles.lightActionCard,
+          finalizeTypeError ? styles.lightActionCardError : null,
+        ]}
+      >
+        <Text style={styles.cardSectionTitle}>Final service type *</Text>
+        <Text style={styles.cardBodyText}>
+          Required before you can finalize. Used for service history, reminders, and statistics.
+        </Text>
+        <View
+          style={[styles.pickerContainer, finalizeTypeError ? styles.pickerContainerError : null]}
+        >
+          <Picker
+            selectedValue={finalRepairTypeId}
+            onValueChange={(value) => {
+              setFinalRepairTypeId(value);
+              if (finalizeTypeError) setFinalizeTypeError('');
+            }}
+            style={styles.pickerLight}
+            itemStyle={styles.pickerItemLight}
+          >
+            <Picker.Item label="Select service type…" value="" color={COLORS.TEXT_DARK} />
+            {repairTypes.map((type) => (
+              <Picker.Item
+                key={type.id}
+                label={type.name}
+                value={String(type.id)}
+                color={COLORS.TEXT_DARK}
+              />
+            ))}
+          </Picker>
+        </View>
+        {finalizeTypeError ? (
+          <Text style={styles.errorText}>{finalizeTypeError}</Text>
+        ) : showMissingTypeWarning ? (
+          <Text style={styles.warningTextOnLight}>
+            Service type missing — choose one above before tapping Finalize repair.
+          </Text>
+        ) : null}
+      </FloatingCard>
+    );
+  };
+
+  const renderPaymentStatusSelector = ({ saveOnSelect = false } = {}) => {
+    const selectedHint =
+      PAYMENT_STATUS_OPTIONS.find((opt) => opt.value === paymentStatus)?.hint || '';
+    return (
+      <View style={styles.completionSection}>
+        <Text style={styles.cardSectionTitle}>Payment status</Text>
+        <Text style={styles.cardBodyText}>
+          {saveOnSelect
+            ? 'Update when the customer pays — e.g. mark Paid on pickup, or Monthly invoice for fleet accounts.'
+            : 'Finalize when the work is finished — payment does not block completion. Mark how money was handled: paid on pickup for retail, or unpaid / monthly invoice for fleet and company accounts.'}
+        </Text>
+        <View style={styles.paymentChipRow}>
+          {PAYMENT_STATUS_OPTIONS.map((opt) => {
+            const selected = paymentStatus === opt.value;
+            return (
+              <Pressable
+                key={opt.value}
+                onPress={() => {
+                  setPaymentStatus(opt.value);
+                  if (saveOnSelect) {
+                    handleSavePaymentStatus(opt.value);
+                  }
+                }}
+                disabled={saveOnSelect && paymentStatusSaving}
+                style={[
+                  styles.paymentChip,
+                  selected ? styles.paymentChipSelected : null,
+                  saveOnSelect && paymentStatusSaving ? styles.paymentChipDisabled : null,
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+              >
+                <Text
+                  style={[styles.paymentChipText, selected ? styles.paymentChipTextSelected : null]}
+                >
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        {selectedHint ? <Text style={styles.cardBodyText}>{selectedHint}</Text> : null}
+        {saveOnSelect ? (
+          <Button
+            mode="outlined"
+            loading={paymentStatusSaving}
+            disabled={paymentStatusSaving}
+            onPress={() => handleSavePaymentStatus()}
+            style={styles.progressButton}
+          >
+            Save payment status
+          </Button>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderPartsSupplierSection = () => {
+    if (!isShop || !repair?.id || !shopCanManagePartsOnRepair) return null;
+    return (
+      <View style={styles.partsSupplierSection}>
+        <Text style={styles.partsSectionLabel}>Parts supplier request</Text>
+        <Text style={styles.mutedText}>
+          Export VIN, year, engine, and parts on this repair to your supplier via email or Viber.
+        </Text>
+        {displayPartsForExport.length > 0 ? (
+          <View style={{ marginBottom: 8 }}>
+            {displayPartsForExport.map((p, idx) => (
+              <Text key={idx} style={styles.detailLine}>
+                •{' '}
+                {p.partsMaster?.name ||
+                  p.part_master_detail?.name ||
+                  p.parts_master_detail?.name ||
+                  p.shop_part_detail?.part?.name ||
+                  'Part'}{' '}
+                ×{p.quantity || 1}
+              </Text>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.mutedText}>
+            No parts yet — add parts above or typical parts will be suggested from the service type.
+          </Text>
+        )}
+        <TextInput
+          mode="outlined"
+          label="Extra parts (comma-separated)"
+          value={partsExportExtra}
+          onChangeText={setPartsExportExtra}
+          style={styles.input}
+        />
+        <Button
+          mode="contained-tonal"
+          icon="share-variant"
+          loading={exportingParts}
+          disabled={exportingParts}
+          onPress={handleExportPartsRequest}
+        >
+          Export parts request
+        </Button>
+      </View>
+    );
+  };
+
+  const renderOffersSection = () => {
+    if (isDone || !showOffersPhase) return null;
+    return (
+      <Card
+        mode="outlined"
+        style={[styles.headerCard, !isShop && styles.offersProminentCard]}
+      >
+        <Card.Title
+          title={!isShop && offers.length > 0 ? `Offers (${offers.length})` : 'Offers'}
+          subtitle={
+            !isShop && offers.length > 0
+              ? 'Compare and book a proposal below'
+              : undefined
+          }
+        />
+        <Card.Content>
+          {isShop && shopProfileId !== null && !offers.some((o) => parseInt(o.shop) === shopProfileId) && (
+            <Button
+              mode="contained"
+              onPress={() =>
+                navigation.navigate('CreateOrUpdateOffer', {
+                  repairId,
+                  shopId: shopProfileId,
+                  selectedOfferParts: [],
+                })
+              }
+              style={{ marginBottom: 10 }}
+            >
+              Send offer
+            </Button>
+          )}
+          {offers.length === 0 ? (
+            <>
+              <Text style={styles.offerEmptyText}>
+                {isShop ? 'Be the first to send an offer.' : 'Service centers have not sent offers yet.'}
+              </Text>
+              <Text style={styles.offerEmptyHint}>
+                {isShop
+                  ? 'Send an offer to start the conversation.'
+                  : 'Chat becomes available after a service center sends an offer.'}
+              </Text>
+            </>
+          ) : (
+            (() => {
+              const hasBooked = offers.some((o) => o.is_booked);
+              const sortedOffers = [...offers].sort((a, b) => (b.is_booked ? 1 : 0) - (a.is_booked ? 1 : 0));
+              return sortedOffers.map((offer) => (
+                <FloatingCard key={offer.id} style={styles.offerCard}>
+                  <View style={styles.offerTopRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.offerShopName}>
+                        {offer.shop_name || offer.shop_profile_name || 'Service Center'}
+                      </Text>
+                      <View style={styles.offerBadgesRow}>
+                        {offer.is_booked ? (
+                          <View style={styles.offerBadgeBooked}>
+                            <Text style={styles.offerBadgeBookedText}>Booked</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.offerBadgeSoft}>
+                            <Text style={styles.offerBadgeSoftText}>Best match</Text>
+                          </View>
+                        )}
+                        <View style={styles.offerBadgeSoft}>
+                          <Text style={styles.offerBadgeSoftText}>Fast response</Text>
+                        </View>
+                      </View>
+                    </View>
+                    <Text style={styles.offerPrice}>{formatOfferPrimaryPrice(offer)}</Text>
+                    {(() => {
+                      const pricing = formatOfferPricingLines(offer);
+                      if (pricing.estimateLine && pricing.quotedLine) {
+                        return (
+                          <Text style={styles.offerMetaText}>
+                            {pricing.estimateLine.replace(/^Estimate\s+/, 'Est. ')}
+                          </Text>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </View>
+
+                  <Text style={styles.offerDescription}>
+                    {offer.description || 'Service proposal available.'}
+                  </Text>
+                  {offer.availability_note ? (
+                    <Text style={styles.offerMetaText}>Availability: {offer.availability_note}</Text>
+                  ) : offer.available_from ? (
+                    <Text style={styles.offerMetaText}>
+                      Available from: {new Date(offer.available_from).toLocaleString()}
+                    </Text>
+                  ) : null}
+                  {offer.is_guaranteed ? (
+                    <View style={styles.offerBadgeSoft}>
+                      <Text style={styles.offerBadgeSoftText}>Guarantee included</Text>
+                    </View>
+                  ) : null}
+                  {offer.parts?.length ? (
+                    <Text style={styles.offerMetaText}>Included parts: {offer.parts.length}</Text>
+                  ) : null}
+                  {offer.estimated_duration_minutes ? (
+                    <Text style={styles.offerMetaText}>
+                      Estimated duration: {offer.estimated_duration_minutes} min
+                    </Text>
+                  ) : null}
+
+                  <View style={styles.offerActionsRow}>
+                    {isShop && shopProfileId !== null && parseInt(offer.shop) === shopProfileId && (
+                      <>
+                        <Button
+                          mode="outlined"
+                          onPress={() =>
+                            navigation.navigate('CreateOrUpdateOffer', {
+                              repairId,
+                              shopId: shopProfileId,
+                              offerId: offer.id,
+                              existingOffer: offer,
+                              selectedOfferParts: offer.parts || [],
+                            })
+                          }
+                        >
+                          Edit offer
+                        </Button>
+                        <Button mode="text" textColor="#dc2626" onPress={() => handleDeleteOffer(offer.id)}>
+                          Delete offer
+                        </Button>
+                        <Button mode="outlined" onPress={handleOpenOfferChat}>
+                          Open chat
+                        </Button>
+                        {offer.phone_call_allowed && (offer.shop_phone_e164 || offer.shop_phone) ? (
+                          <Button
+                            mode="text"
+                            onPress={() => handleCallShop(offer.shop_phone_e164 || offer.shop_phone)}
+                          >
+                            Call
+                          </Button>
+                        ) : null}
+                      </>
+                    )}
+                    {!isShop && (
+                      <>
+                        {!hasBooked && !offer.is_booked ? (
+                          <Button mode="contained" onPress={() => handleBookOffer(offer.id)}>
+                            {offer.is_promotion ? 'Book promotion' : 'Book offer'}
+                          </Button>
+                        ) : null}
+                        <Button mode="outlined" onPress={handleOpenOfferChat}>
+                          Open chat
+                        </Button>
+                        {offer.phone_call_allowed && (offer.shop_phone_e164 || offer.shop_phone) ? (
+                          <Button
+                            mode="text"
+                            onPress={() => handleCallShop(offer.shop_phone_e164 || offer.shop_phone)}
+                          >
+                            Call
+                          </Button>
+                        ) : null}
+                        {offer.is_booked ? (
+                          <Button mode="text" onPress={() => handleUnbookOffer(offer.id)}>
+                            Cancel booking
+                          </Button>
+                        ) : null}
+                      </>
+                    )}
+                  </View>
+                </FloatingCard>
+              ));
+            })()
+          )}
+        </Card.Content>
+      </Card>
+    );
+  };
+
   return (
     <>
     <ScreenBackground safeArea={false}>
-      <FlatList
-        ListHeaderComponent={
+      <ScrollView
+        key={`repair-${repair.id}-${repair.status}`}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingTop: bodyPaddingTop },
+        ]}
+      >
           <View>
             <AppCard variant="dark" style={styles.heroWrap} contentStyle={styles.heroInner}>
-              <View style={styles.heroTop}>
-                <View style={styles.heroTextCol}>
-                  <Text style={styles.heroTitle}>{vehicleDisplay}</Text>
-                  <Text
-                    style={canViewerSeeVehiclePlate ? styles.heroPlate : styles.heroPlateHidden}
-                  >
-                    {canViewerSeeVehiclePlate
-                      ? (String(repair.vehicle_license_plate || '').trim() || '—')
-                      : 'Plate hidden until booking'}
-                  </Text>
-                  {repair.vehicle_vin ? (
-                    <Text style={styles.heroMeta}>VIN: {repair.vehicle_vin}</Text>
-                  ) : null}
-                  <Text style={styles.heroReference}>{heroReferenceLine}</Text>
-                  <Text style={styles.heroMeta}>Service type: {completedServiceTypeName}</Text>
-                  <Text style={styles.heroMeta}>
-                    {isDone ? 'Final kilometers: ' : 'Request kilometers: '}
-                    {isDone && repair.final_kilometers != null
-                      ? repair.final_kilometers
-                      : repair.kilometers != null
-                        ? repair.kilometers
-                        : '—'}
-                  </Text>
+              <Pressable
+                disabled={!canOpenVehicleProfile}
+                onPress={openVehicleProfile}
+                style={({ pressed }) => [pressed && canOpenVehicleProfile ? { opacity: 0.9 } : null]}
+              >
+                <View style={styles.heroTop}>
+                  <View style={styles.heroTextCol}>
+                    <Text style={styles.heroTitle}>{vehicleDisplay}</Text>
+                    <Text
+                      style={canViewerSeeVehiclePlate ? styles.heroPlate : styles.heroPlateHidden}
+                    >
+                      {canViewerSeeVehiclePlate
+                        ? (String(repair.vehicle_license_plate || '').trim() || '—')
+                        : 'Plate hidden until booking'}
+                    </Text>
+                    {canOpenVehicleProfile ? (
+                      <Text style={styles.heroVehicleLink}>Tap to open vehicle profile</Text>
+                    ) : null}
+                    {repair.vehicle_vin ? (
+                      <Text style={styles.heroMeta}>VIN: {repair.vehicle_vin}</Text>
+                    ) : null}
+                    <Text style={styles.heroReference}>{heroReferenceLine}</Text>
+                    {repair.scheduled_start ? (
+                      <Text style={styles.heroMeta}>
+                        Scheduled:{' '}
+                        {new Date(repair.scheduled_start).toLocaleString()}
+                        {repair.scheduled_end
+                          ? ` – ${new Date(repair.scheduled_end).toLocaleTimeString(undefined, {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}`
+                          : ''}
+                      </Text>
+                    ) : null}
+                    <Text style={styles.heroMeta}>Service type: {completedServiceTypeName}</Text>
+                    {isDone ? (
+                      <Text style={styles.heroMeta}>
+                        Payment: {formatPaymentStatus(repair.payment_status)}
+                      </Text>
+                    ) : null}
+                    <Text style={styles.heroMeta}>
+                      {isDone ? 'Final kilometers: ' : 'Request kilometers: '}
+                      {isDone && repair.final_kilometers != null
+                        ? repair.final_kilometers
+                        : repair.kilometers != null
+                          ? repair.kilometers
+                          : '—'}
+                    </Text>
+                  </View>
+                  <StatusBadge status={repair.status} />
                 </View>
-                <StatusBadge status={repair.status} />
-              </View>
+              </Pressable>
             </AppCard>
+
+            {renderShopFinalizeServiceTypeCard()}
+
+            {isDone && isMyShopRepair ? (
+              <FloatingCard style={styles.lightActionCard}>
+                <Text style={styles.cardTitle}>Repair completed</Text>
+                <Text style={styles.mutedText}>
+                  The client is notified in the app when you finalize. If they have no app but an email on
+                  file, a pickup email can be sent once mail is enabled. Update payment status below when
+                  they pay.
+                </Text>
+              </FloatingCard>
+            ) : null}
+
+            {isDone && isMyShopRepair ? (
+              <FloatingCard style={styles.lightActionCard}>
+                {renderPaymentStatusSelector({ saveOnSelect: true })}
+              </FloatingCard>
+            ) : null}
+
+            {isDone && isMyShopRepair ? (
+              <RepairInvoicingCard
+                repair={repair}
+                onRepairUpdated={setRepair}
+                onOpenInvoice={(invoiceId) =>
+                  navigation.navigate('ShopInvoiceDetail', { invoiceId })
+                }
+                onOpenInvoicingHome={() => navigation.navigate('ShopInvoicing')}
+              />
+            ) : null}
+
+            {!isShop && isDone && repair.shop_profile_name ? (
+              <FloatingCard style={styles.readyPickupClientCard}>
+                <Text style={styles.cardTitle}>Ready for pickup</Text>
+                <Text style={styles.mutedText}>
+                  {repair.shop_profile_name} has finished your service. You can collect {vehicleDisplay}{' '}
+                  when convenient.
+                </Text>
+              </FloatingCard>
+            ) : null}
+
+            {!isShop && isOngoingStatus ? (
+              <FloatingCard style={styles.ongoingClientCard}>
+                <Text style={styles.cardTitle}>Repair in progress</Text>
+                <Text style={styles.mutedText}>
+                  {repair.shop_profile_name
+                    ? `Your vehicle is being serviced at ${repair.shop_profile_name}.`
+                    : 'This repair is in progress.'}{' '}
+                  New offers are not available on this request — send a new service request if you need
+                  other quotes.
+                </Text>
+              </FloatingCard>
+            ) : null}
+
+            {!isShop && pendingReschedule?.status === 'pending' && pendingFromShop ? (
+              <FloatingCard style={styles.rescheduleCard}>
+                <Text style={styles.cardTitle}>Reschedule request</Text>
+                <Text style={styles.detailLine}>
+                  {pendingReschedule.shop_profile_name || 'Service center'} proposed a new time:
+                </Text>
+                <Text style={styles.detailLine}>
+                  {pendingReschedule.proposed_start
+                    ? new Date(pendingReschedule.proposed_start).toLocaleString()
+                    : '—'}
+                </Text>
+                {pendingReschedule.note ? (
+                  <Text style={styles.mutedText}>Note: {pendingReschedule.note}</Text>
+                ) : null}
+                <View style={styles.rescheduleActions}>
+                  <Button
+                    mode="contained"
+                    onPress={() => handleRescheduleResponse('accept')}
+                    loading={respondingReschedule}
+                    disabled={respondingReschedule}
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    mode="outlined"
+                    onPress={() => handleRescheduleResponse('decline')}
+                    disabled={respondingReschedule}
+                  >
+                    Decline
+                  </Button>
+                  <Button
+                    mode="text"
+                    onPress={openCounterModal}
+                    disabled={respondingReschedule}
+                  >
+                    Suggest different time
+                  </Button>
+                </View>
+              </FloatingCard>
+            ) : null}
+
+            {!isShop && pendingReschedule?.status === 'pending' && pendingFromOwner ? (
+              <FloatingCard style={styles.rescheduleCard}>
+                <Text style={styles.cardTitle}>Waiting for shop</Text>
+                <Text style={styles.detailLine}>
+                  You suggested{' '}
+                  {pendingReschedule.proposed_start
+                    ? new Date(pendingReschedule.proposed_start).toLocaleString()
+                    : 'a new time'}
+                  . {pendingReschedule.shop_profile_name || 'The service center'} will confirm or
+                  decline.
+                </Text>
+              </FloatingCard>
+            ) : null}
+
+            {isShop && pendingReschedule?.status === 'pending' && pendingFromOwner ? (
+              <FloatingCard style={styles.rescheduleCard}>
+                <Text style={styles.cardTitle}>Client suggested new time</Text>
+                <Text style={styles.detailLine}>
+                  Proposed:{' '}
+                  {pendingReschedule.proposed_start
+                    ? new Date(pendingReschedule.proposed_start).toLocaleString()
+                    : '—'}
+                </Text>
+                {pendingReschedule.note ? (
+                  <Text style={styles.mutedText}>Note: {pendingReschedule.note}</Text>
+                ) : null}
+                <View style={styles.rescheduleActions}>
+                  <Button
+                    mode="contained"
+                    onPress={() => handleShopRescheduleResponse('accept')}
+                    loading={respondingReschedule}
+                    disabled={respondingReschedule}
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    mode="outlined"
+                    onPress={() => handleShopRescheduleResponse('decline')}
+                    disabled={respondingReschedule}
+                  >
+                    Decline
+                  </Button>
+                </View>
+              </FloatingCard>
+            ) : null}
+
+            {!isDone && upcomingAppointment && !isShop && isClientOwner ? (
+              <FloatingCard style={styles.rescheduleCard}>
+                <Text style={styles.cardTitle}>Upcoming appointment</Text>
+                <Text style={styles.detailLine}>
+                  Scheduled:{' '}
+                  {repair.scheduled_start
+                    ? new Date(repair.scheduled_start).toLocaleString()
+                    : '—'}
+                </Text>
+                <Text style={styles.mutedText}>
+                  {ownerCheckedIn
+                    ? 'You checked in. The service center will confirm when your vehicle is on site.'
+                    : 'Your visit has not started yet. Check in when you arrive at the service center.'}
+                </Text>
+                {!ownerCheckedIn ? (
+                  <Button
+                    mode="contained"
+                    onPress={handleClientArrival}
+                    loading={respondingArrival}
+                    disabled={respondingArrival || cancelingAppointment}
+                    style={styles.arrivalButton}
+                  >
+                    I&apos;m here for my appointment
+                  </Button>
+                ) : null}
+                {showCancelAppointment ? (
+                  <Button
+                    mode="outlined"
+                    onPress={handleCancelAppointment}
+                    loading={cancelingAppointment}
+                    disabled={cancelingAppointment || respondingArrival}
+                    style={styles.cancelAppointmentButton}
+                    textColor="#B91C1C"
+                  >
+                    Cancel appointment
+                  </Button>
+                ) : null}
+              </FloatingCard>
+            ) : null}
+
+            {!isDone &&
+            isShop &&
+            isMyShopRepair &&
+            !vehicleAtShop &&
+            repair.scheduled_start ? (
+              <FloatingCard style={styles.rescheduleCard}>
+                <Text style={styles.cardTitle}>Awaiting arrival</Text>
+                <Text style={styles.detailLine}>
+                  Appointment:{' '}
+                  {new Date(repair.scheduled_start).toLocaleString()}
+                </Text>
+                {repair.client_arrival_reported_at ? (
+                  <Text style={styles.mutedText}>
+                    Client checked in at{' '}
+                    {new Date(repair.client_arrival_reported_at).toLocaleString()}.
+                    Confirm when the vehicle is on site.
+                  </Text>
+                ) : (
+                  <Text style={styles.mutedText}>
+                    Mark arrived once the vehicle is physically at your center.
+                  </Text>
+                )}
+                <Button
+                  mode="contained"
+                  onPress={handleShopArrival}
+                  loading={respondingArrival}
+                  disabled={respondingArrival || cancelingAppointment}
+                  style={styles.arrivalButton}
+                >
+                  Vehicle arrived
+                </Button>
+                {showCancelAppointment ? (
+                  <Button
+                    mode="outlined"
+                    onPress={handleCancelAppointment}
+                    loading={cancelingAppointment}
+                    disabled={cancelingAppointment || respondingArrival}
+                    style={styles.cancelAppointmentButton}
+                    textColor="#B91C1C"
+                  >
+                    Cancel appointment
+                  </Button>
+                ) : null}
+              </FloatingCard>
+            ) : null}
+
+            {!isShop ? renderOffersSection() : null}
 
             {!isDone ? (
             <FloatingCard>
@@ -798,6 +2124,9 @@ export default function RepairDetailScreen({ route, navigation }) {
               ) : null}
               {repair.symptoms ? <Text style={styles.detailLine}>Symptoms: {repair.symptoms}</Text> : null}
               {repair.description ? <Text style={styles.detailLine}>Description: {repair.description}</Text> : null}
+              {visitDisplayText ? (
+                <Text style={styles.detailLine}>{visitDisplayText}</Text>
+              ) : null}
               <Text style={styles.detailLine}>Guarantee requested: {repair.requires_guarantee ? 'Yes' : 'No'}</Text>
               {repair.preferred_radius_km ? (
                 <Text style={styles.detailLine}>Preferred radius: {repair.preferred_radius_km} km</Text>
@@ -806,34 +2135,6 @@ export default function RepairDetailScreen({ route, navigation }) {
               {isShop && repair.request_targeting_mode !== 'all_qualified' ? (
                 <Text style={styles.mutedText}>Matching details are available for non-default targeting modes.</Text>
               ) : null}
-            </FloatingCard>
-            ) : null}
-
-            {shouldShowTargetingCardForClient ? (
-            <FloatingCard>
-              <Text style={styles.cardTitle}>
-                Request targeting
-              </Text>
-              {preferredCenterNames.length > 0 ? (
-                <View style={styles.chipsWrap}>
-                  {preferredCenterNames.map((name, idx) => (
-                    <View key={`${name}-${idx}`} style={styles.chip}>
-                      <Text style={styles.chipText}>{name}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <Text style={styles.mutedText}>
-                  {repair.request_targeting_mode === 'all_qualified' &&
-                    'Sent to qualified service centers matching this vehicle and service.'}
-                  {repair.request_targeting_mode === 'verified_only' &&
-                    'Sent only to verified/guaranteed service centers.'}
-                  {repair.request_targeting_mode === 'operator_assisted' &&
-                    'Platform-assisted matching requested.'}
-                  {repair.request_targeting_mode === 'selected_centers' &&
-                    'No specific centers selected for this request.'}
-                </Text>
-              )}
             </FloatingCard>
             ) : null}
 
@@ -867,6 +2168,104 @@ export default function RepairDetailScreen({ route, navigation }) {
                   {formatOwnerLoggedTrustLabel(repair) ? (
                     <Text style={styles.trustHint}>{formatOwnerLoggedTrustLabel(repair)}</Text>
                   ) : null}
+                  {hasSelectedShopProvider ? (
+                    <View style={styles.confirmationCard}>
+                      {ownerLoggedConfirmation === 'confirmed' ? (
+                        <>
+                          <Text style={styles.confirmationTitle}>Confirmed by service center</Text>
+                          <Text style={styles.confirmationBody}>
+                            {repair.shop_profile_name || 'Selected service center'} confirmed this record.
+                          </Text>
+                        </>
+                      ) : ownerLoggedConfirmation === 'pending' ? (
+                        <>
+                          <Text style={styles.confirmationTitle}>Confirmation requested</Text>
+                          <Text style={styles.confirmationBody}>
+                            Waiting for {repair.shop_profile_name || 'the selected service center'} to confirm this
+                            service record.
+                          </Text>
+                        </>
+                      ) : ownerLoggedConfirmation === 'rejected' ? (
+                        <>
+                          <Text style={styles.confirmationTitle}>Service center did not confirm</Text>
+                          <Text style={styles.confirmationBody}>
+                            {repair.confirmation_note ||
+                              'The center declined confirmation for this owner-logged record.'}
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={styles.confirmationTitle}>Workshop attributed</Text>
+                          <Text style={styles.confirmationBody}>
+                            You selected {repair.shop_profile_name || 'a service center'} for this record. It is not
+                            confirmed until the center approves it.
+                          </Text>
+                        </>
+                      )}
+                      {canRequestServiceCenterConfirmation ? (
+                        <Button
+                          mode="outlined"
+                          loading={requestingConfirmation}
+                          disabled={requestingConfirmation}
+                          onPress={handleRequestServiceCenterConfirmation}
+                          style={styles.confirmationActionBtn}
+                        >
+                          Request confirmation
+                        </Button>
+                      ) : null}
+                      {canShopRespondToConfirmation ? (
+                        <View style={styles.confirmationShopActions}>
+                          <Button
+                            mode="contained"
+                            compact
+                            loading={respondingConfirmation}
+                            disabled={respondingConfirmation}
+                            onPress={() => handleShopConfirmationResponse('confirm')}
+                          >
+                            Confirm
+                          </Button>
+                          <Button
+                            mode="outlined"
+                            compact
+                            loading={respondingConfirmation}
+                            disabled={respondingConfirmation}
+                            onPress={() => handleShopConfirmationResponse('reject')}
+                          >
+                            Reject
+                          </Button>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : null}
+                  {hasManualProvider ? (
+                    <View style={styles.confirmationCard}>
+                      <Text style={styles.confirmationTitle}>Unlisted service center</Text>
+                      <Text style={styles.confirmationBody}>
+                        No platform confirmation available yet for manual/unlisted centers.
+                      </Text>
+                    </View>
+                  ) : null}
+                  {isOwnerLoggedServiceRecord ? (
+                    <View style={styles.evidenceChips}>
+                      {(repair.evidence_level === 'owner_with_photos' ||
+                        repair.evidence_level === 'service_center_confirmed') && (
+                        <View style={styles.evidenceChip}>
+                          <Text style={styles.evidenceChipText}>Photos attached</Text>
+                        </View>
+                      )}
+                      {(repair.evidence_level === 'receipt_attached' ||
+                        repair.evidence_level === 'service_center_confirmed') && (
+                        <View style={styles.evidenceChip}>
+                          <Text style={styles.evidenceChipText}>Receipt attached</Text>
+                        </View>
+                      )}
+                      {String(repair.evidence_level || '').toLowerCase() === 'owner_with_photos' ? (
+                        <View style={styles.evidenceChip}>
+                          <Text style={styles.evidenceChipText}>Odometer photo attached (if tagged)</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : null}
                   {!repair.self_repair && String(repair.manual_service_center_phone || '').trim() ? (
                     <View style={styles.summaryRow}>
                       <Text style={styles.summaryLabel}>Phone</Text>
@@ -883,6 +2282,18 @@ export default function RepairDetailScreen({ route, navigation }) {
                     <View style={styles.summaryRow}>
                       <Text style={styles.summaryLabel}>Address</Text>
                       <Text style={styles.summaryValue}>{repair.manual_service_center_address}</Text>
+                    </View>
+                  ) : null}
+                  {!repair.self_repair &&
+                  (String(repair.manual_service_center_city || '').trim() ||
+                    String(repair.manual_service_center_country || '').trim()) ? (
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>City / country</Text>
+                      <Text style={styles.summaryValue}>
+                        {[repair.manual_service_center_city, repair.manual_service_center_country]
+                          .filter((x) => String(x || '').trim())
+                          .join(', ')}
+                      </Text>
                     </View>
                   ) : null}
                   {!repair.self_repair &&
@@ -903,6 +2314,12 @@ export default function RepairDetailScreen({ route, navigation }) {
                   <Text style={styles.summaryValue}>{repair.shop_profile_name || '—'}</Text>
                 </View>
               )}
+              {sourceLower === 'service_center_direct' ? (
+                <View style={styles.confirmationCard}>
+                  <Text style={styles.confirmationTitle}>Created by service center</Text>
+                  <Text style={styles.confirmationBody}>High confidence record.</Text>
+                </View>
+              ) : null}
               {completionRecordedAt ? (
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Completed on</Text>
@@ -1002,22 +2419,34 @@ export default function RepairDetailScreen({ route, navigation }) {
                         : '—'}
                     </Text>
                   </View>
+                </>
+              ) : (
+                <Text style={styles.mutedText}>No amounts recorded on this repair.</Text>
+              )}
+              {!(isDone && isMyShopRepair) ? (
+                isMyShopRepair ? (
+                  renderPaymentStatusSelector({ saveOnSelect: true })
+                ) : (
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Payment status</Text>
                     <Text style={styles.summaryValue}>{formatPaymentStatus(repair.payment_status)}</Text>
                   </View>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Warranty</Text>
-                    <Text style={styles.summaryValue}>
-                      {repair.warranty_months != null ? `${repair.warranty_months} months` : '—'}
-                    </Text>
-                  </View>
-                </>
-              ) : (
-                <Text style={styles.mutedText}>Financial summary not added yet.</Text>
-              )}
+                )
+              ) : null}
+              {hasFinancialSummary ? (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Warranty</Text>
+                  <Text style={styles.summaryValue}>
+                    {repair.warranty_months != null ? `${repair.warranty_months} months` : '—'}
+                  </Text>
+                </View>
+              ) : null}
               <Text style={[styles.mutedText, { marginTop: 8 }]}>
-                Invoice generation will be added later.
+                {isMyShopRepair && isDone
+                  ? 'Payment can be updated in the card above when the customer pays.'
+                  : isMyShopRepair
+                    ? 'After finalize, create a platform invoice or attach an external PDF.'
+                    : null}
               </Text>
             </FloatingCard>
             ) : isOpenStatus && isShop ? (
@@ -1034,44 +2463,18 @@ export default function RepairDetailScreen({ route, navigation }) {
               />
               <Card.Content>
                   <Text style={styles.mutedText}>Track parts, notes, and final repair details.</Text>
-                  {repair.status === 'ongoing' ? (
+                  {vehicleAtShop ? (
                     <View style={styles.serviceStateChip}>
-                      <Text style={styles.serviceStateChipText}>Vehicle currently in service</Text>
+                      <Text style={styles.serviceStateChipText}>Vehicle at service center</Text>
                     </View>
                   ) : null}
-                  {isShop && repair && repair.status === 'ongoing' && repair.shop_profile === shopProfileId && (
+                  {shopCanManagePartsOnRepair ? (
                     <View style={{ alignItems: 'flex-start', marginBottom: 8 }}>
-                      <Button
-                        mode="outlined"
-                        onPress={() => {
-                          if (repair.status === 'done') {
-                            Alert.alert("This repair is completed and can no longer be edited.");
-                            return;
-                          }
-                          navigation.navigate('SelectRepairParts', {
-                            currentParts: (selectedParts.length > 0 ? selectedParts : repairParts).map(p => ({
-                              partsMasterId: p.partsMasterId || p.part_master || p.part_master_detail?.id || p.partsMaster?.id || p.shop_part?.part?.id,
-                              shopPartId: p.shopPartId || p.shop_part_id || p.shop_part?.id,
-                              quantity: p.quantity || 1,
-                              price: p.price || p.price_per_item_at_use || '',
-                              labor: p.labor || p.labor_cost || '',
-                              note: p.note || '',
-                              partsMaster: p.partsMaster || p.part_master_detail || p.parts_master_detail || p.shop_part_detail?.part || {},
-                            })),
-                            vehicleId: repair.vehicle?.toString() || '',
-                            repairTypeId: repair.repair_type?.toString() || '',
-                            description: editDescription || '',
-                            kilometers: repair.kilometers?.toString() || '',
-                            status: repair.status || 'open',
-                            returnTo: 'RepairDetail',
-                            repairId: repairId,
-                          });
-                        }}
-                      >
+                      <Button mode="outlined" onPress={navigateToManageParts}>
                         Manage Parts
                       </Button>
                     </View>
-                  )}
+                  ) : null}
                   <Text style={styles.partsSectionLabel}>Parts used</Text>
                   {(selectedParts.length > 0 ? selectedParts : repairParts).length === 0 ? (
                     <Text style={{ fontStyle: 'italic', color: 'gray' }}>No parts recorded yet.</Text>
@@ -1084,29 +2487,20 @@ export default function RepairDetailScreen({ route, navigation }) {
                         <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>Price</Text>
                         <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>Labor</Text>
                       </View>
-                      {(selectedParts.length > 0 ? selectedParts : repairParts).map((item, index) => (
+                      {displayPartsList.map((item, index) => (
                         <View key={item.id || index}>
                           {renderRepairPartItem({ item })}
                         </View>
                       ))}
-                      {/* Total row */}
-                      {(selectedParts.length > 0 ? selectedParts : repairParts).length > 0 && (
-                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10 }}>
-                          <Text style={{ fontWeight: 'bold', marginRight: 10 }}>Total:</Text>
-                          <Text>
-                            {(
-                              (selectedParts.length > 0 ? selectedParts : repairParts).reduce((acc, part) => {
-                                const price = parseFloat(part.price) || parseFloat(part.price_per_item_at_use) || 0;
-                                const labor = parseFloat(part.labor) || parseFloat(part.labor_cost) || 0;
-                                const qty = parseInt(part.quantity) || 1;
-                                return acc + (price + labor) * qty;
-                              }, 0)
-                            ).toFixed(2)} BGN
-                          </Text>
-                        </View>
-                      )}
+                      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10 }}>
+                        <Text style={{ fontWeight: 'bold', marginRight: 10 }}>Total:</Text>
+                        <Text>
+                          {formatMoneyAmount(displayPartsTotals.total, DEFAULT_CURRENCY)}
+                        </Text>
+                      </View>
                     </>
                   )}
+                  {renderPartsSupplierSection()}
                   {(isMyShopRepair || (isShop && repair.status === 'ongoing' && repair.shop_profile === shopProfileId)) && (
                     <>
                       {repair.status === 'ongoing' && isShop && repair.shop_profile === shopProfileId && (
@@ -1124,70 +2518,91 @@ export default function RepairDetailScreen({ route, navigation }) {
                             label="Final vehicle kilometers"
                             keyboardType="numeric"
                             value={finalKilometers}
-                            onChangeText={setFinalKilometers}
+                            onChangeText={(text) => {
+                              setFinalKilometers(text);
+                              if (finalizeKmError) setFinalizeKmError('');
+                            }}
                             style={styles.input}
+                            error={Boolean(finalizeKmError)}
                           />
-                          <Text style={styles.mutedText}>
-                            Used for vehicle history and future service reminders.
-                          </Text>
-                          <Text style={styles.labelSmall}>Final service type</Text>
-                          <View style={styles.pickerContainer}>
-                            <Picker selectedValue={finalRepairTypeId} onValueChange={setFinalRepairTypeId}>
-                              <Picker.Item label="Not specified" value="" />
-                              {repairTypes.map((type) => (
-                                <Picker.Item key={type.id} label={type.name} value={String(type.id)} />
-                              ))}
-                            </Picker>
-                          </View>
-                          <Text style={styles.mutedText}>
-                            Used for service history, reminders, and statistics.
-                          </Text>
-                          {showMissingTypeWarning ? (
-                            <Text style={styles.warningText}>
-                              Service type missing. Add it before finalizing for better history.
-                            </Text>
+                          {finalizeKmError ? (
+                            <Text style={styles.errorText}>{finalizeKmError}</Text>
                           ) : null}
+                          <Button
+                            mode="outlined"
+                            icon="camera"
+                            onPress={handlePickDashboardPhoto}
+                            style={styles.dashboardPhotoBtn}
+                          >
+                            {pendingOdometerPhoto ? 'Change dashboard photo' : 'Upload dashboard photo'}
+                          </Button>
+                          {pendingOdometerPhoto ? (
+                            <Text style={styles.mutedText}>Dashboard photo ready — will upload when you save or finalize.</Text>
+                          ) : null}
+                          <Text style={styles.mutedText}>
+                            Used for vehicle history and future service reminders. Defaults to the vehicle
+                            odometer ({repair?.vehicle_kilometers != null
+                              ? `${Number(repair.vehicle_kilometers).toLocaleString()} km`
+                              : 'from profile'}).
+                            {repair?.prior_max_odometer_km != null
+                              ? ` Previous service record: ${Number(repair.prior_max_odometer_km).toLocaleString()} km.`
+                              : ''}
+                          </Text>
                           <Text style={styles.partsSectionLabel}>Repair financial summary</Text>
-                          <TextInput
-                            mode="outlined"
-                            label="Labor price"
-                            keyboardType="numeric"
-                            value={laborPrice}
-                            onChangeText={setLaborPrice}
-                            style={styles.input}
-                          />
-                          <TextInput
-                            mode="outlined"
-                            label="Parts price"
-                            keyboardType="numeric"
-                            value={partsPrice}
-                            onChangeText={setPartsPrice}
-                            style={styles.input}
-                          />
-                          <TextInput
-                            mode="outlined"
-                            label="Total price"
-                            keyboardType="numeric"
-                            value={totalPrice}
-                            onChangeText={setTotalPrice}
-                            style={styles.input}
-                          />
-                          <TextInput
-                            mode="outlined"
-                            label="Currency"
-                            value={currency}
-                            onChangeText={setCurrency}
-                            style={styles.input}
-                          />
-                          <Text style={styles.labelSmall}>Payment status</Text>
-                          <View style={styles.pickerContainer}>
-                            <Picker selectedValue={paymentStatus} onValueChange={setPaymentStatus}>
-                              <Picker.Item label="Unpaid" value="unpaid" />
-                              <Picker.Item label="Partially paid" value="partially_paid" />
-                              <Picker.Item label="Paid" value="paid" />
-                              <Picker.Item label="Included in invoice" value="included_in_invoice" />
-                            </Picker>
+                          {hasPartsLines ? (
+                            <>
+                              <Text style={styles.detailLine}>
+                                Parts (from list): {formatMoneyAmount(displayPartsTotals.partsSum, DEFAULT_CURRENCY)}
+                              </Text>
+                              <Text style={styles.detailLine}>
+                                Labor (from list): {formatMoneyAmount(displayPartsTotals.laborSum, DEFAULT_CURRENCY)}
+                              </Text>
+                              <Text style={[styles.detailLine, { fontWeight: '600' }]}>
+                                Total: {formatMoneyAmount(displayPartsTotals.total, DEFAULT_CURRENCY)}
+                              </Text>
+                              <Text style={styles.mutedText}>
+                                Amounts come from your parts list. Edit line items via Manage parts.
+                              </Text>
+                            </>
+                          ) : (
+                            <>
+                              <TextInput
+                                mode="outlined"
+                                label="Labor price"
+                                keyboardType="numeric"
+                                value={laborPrice}
+                                onChangeText={handleLaborChange}
+                                style={styles.input}
+                              />
+                              <TextInput
+                                mode="outlined"
+                                label="Parts price"
+                                keyboardType="numeric"
+                                value={partsPrice}
+                                onChangeText={handlePartsChange}
+                                style={styles.input}
+                              />
+                              <TextInput
+                                mode="outlined"
+                                label="Total price"
+                                keyboardType="numeric"
+                                value={totalPrice}
+                                onChangeText={handleTotalChange}
+                                style={styles.input}
+                              />
+                              <Text style={styles.mutedText}>
+                                Total updates from labor + parts unless you edit it directly.
+                              </Text>
+                            </>
+                          )}
+                          <Text style={styles.mutedText}>All amounts are in {DEFAULT_CURRENCY}.</Text>
+                          <View style={styles.completionSection}>
+                            <Text style={styles.cardSectionTitle}>Payment & completion</Text>
+                            <Text style={styles.cardBodyText}>
+                              Finalize when the work is finished — payment does not block completion.
+                            </Text>
                           </View>
+                          {renderPaymentStatusSelector()}
                           <TextInput
                             mode="outlined"
                             label="Warranty months"
@@ -1196,15 +2611,26 @@ export default function RepairDetailScreen({ route, navigation }) {
                             onChangeText={setWarrantyMonths}
                             style={styles.input}
                           />
-                          <Button mode="contained" onPress={handleUpdateRepair} style={styles.progressButton}>
+                          <Button
+                            mode="contained"
+                            onPress={() => handleUpdateRepair()}
+                            style={styles.progressButton}
+                          >
                             Save repair progress
                           </Button>
-                          {repair.status === 'ongoing' ? (
-                            <Button mode="outlined" onPress={handleFinalizeRepair} style={styles.progressButton}>
+                          {String(repair.status || '').toLowerCase() === 'ongoing' ? (
+                            <Button
+                              mode="contained"
+                              onPress={() => handleFinalizeRepair()}
+                              style={styles.progressButton}
+                            >
                               Finalize repair
                             </Button>
                           ) : null}
-                          <Text style={styles.mutedText}>Invoice generation coming later.</Text>
+                          <Text style={styles.mutedText}>
+                            You can finalize before payment is collected — update payment status later
+                            from the completed record when needed.
+                          </Text>
                         </>
                       )}
                     </>
@@ -1214,10 +2640,10 @@ export default function RepairDetailScreen({ route, navigation }) {
                       <Text style={styles.partsSectionLabel}>Repair financial summary</Text>
                       {hasFinancialSummary ? (
                         <>
-                          <Text style={styles.detailLine}>Labor: {repair.labor_price ?? '—'} {repair.currency || 'BGN'}</Text>
-                          <Text style={styles.detailLine}>Parts: {repair.parts_price ?? '—'} {repair.currency || 'BGN'}</Text>
+                          <Text style={styles.detailLine}>Labor: {formatMoneyAmount(repair.labor_price, repair.currency)}</Text>
+                          <Text style={styles.detailLine}>Parts: {formatMoneyAmount(repair.parts_price, repair.currency)}</Text>
                           <Text style={styles.detailLine}>
-                            Total: {repair.total_price ?? repair.calculated_total_price ?? '—'} {repair.currency || 'BGN'}
+                            Total: {formatMoneyAmount(repair.total_price ?? repair.calculated_total_price, repair.currency)}
                           </Text>
                           <Text style={styles.detailLine}>Payment status: {formatPaymentStatus(repair.payment_status)}</Text>
                           <Text style={styles.detailLine}>
@@ -1227,12 +2653,50 @@ export default function RepairDetailScreen({ route, navigation }) {
                       ) : (
                         <Text style={styles.mutedText}>Financial summary not added yet.</Text>
                       )}
-                      <Text style={styles.mutedText}>Invoice generation will be added later.</Text>
+                      <Text style={styles.mutedText}>
+                        {isMyShopRepair
+                          ? 'After finalize, create a platform invoice or attach an external PDF.'
+                          : null}
+                      </Text>
                     </>
                   )}
                 </Card.Content>
             </Card>
             )}
+
+            {isShop && (repair.shop_data_access_scope || canViewerSeeVehiclePlate) ? (
+              <RelatedServiceHistoryCard
+                payload={relatedServiceHistory}
+                loading={relatedHistoryLoading}
+                onOpenFullRecord={openHistoryRepair}
+              />
+            ) : null}
+
+            {shouldShowTargetingCardForClient ? (
+            <FloatingCard>
+              <Text style={styles.cardTitle}>Request targeting</Text>
+              {preferredCenterNames.length > 0 ? (
+                <View style={styles.chipsWrap}>
+                  {preferredCenterNames.map((name, idx) => (
+                    <View key={`${name}-${idx}`} style={styles.chip}>
+                      <Text style={styles.chipText}>{name}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.mutedText}>
+                  {repair.request_targeting_mode === 'all_qualified' &&
+                    'Sent to qualified service centers matching this vehicle and service.'}
+                  {repair.request_targeting_mode === 'verified_only' &&
+                    'Sent only to verified/guaranteed service centers.'}
+                  {repair.request_targeting_mode === 'operator_assisted' &&
+                    'Platform-assisted matching requested.'}
+                  {repair.request_targeting_mode === 'selected_centers' &&
+                    'No specific centers selected for this request.'}
+                </Text>
+              )}
+            </FloatingCard>
+            ) : null}
 
             <FloatingCard style={styles.mediaCardCompact}>
               <Text style={styles.cardTitle}>Photos & videos</Text>
@@ -1339,155 +2803,10 @@ export default function RepairDetailScreen({ route, navigation }) {
               )}
             </FloatingCard>
 
-            {!isDone ? (
-            <Card mode="outlined" style={styles.headerCard}>
-              <Card.Title
-                title="Offers"
-              />
-              <Card.Content>
-                  {isShop && shopProfileId !== null && !offers.some(o => parseInt(o.shop) === shopProfileId) && (
-                    <Button
-                      mode="contained"
-                      onPress={() =>
-                        navigation.navigate('CreateOrUpdateOffer', {
-                          repairId,
-                          selectedOfferParts: [],
-                        })
-                      }
-                      style={{ marginBottom: 10 }}
-                    >
-                      Send offer
-                    </Button>
-                  )}
-                  {offers.length === 0 ? (
-                    <>
-                      <Text style={styles.offerEmptyText}>
-                        {isShop ? 'Be the first to send an offer.' : 'Service centers have not sent offers yet.'}
-                      </Text>
-                      <Text style={styles.offerEmptyHint}>
-                        {isShop
-                          ? 'Send an offer to start the conversation.'
-                          : 'Chat becomes available after a service center sends an offer.'}
-                      </Text>
-                    </>
-                  ) : (
-                    (() => {
-                      const hasBooked = offers.some((o) => o.is_booked);
-                      const sortedOffers = [...offers].sort((a, b) => (b.is_booked ? 1 : 0) - (a.is_booked ? 1 : 0));
-                      return sortedOffers.map((offer) => (
-                        <FloatingCard key={offer.id} style={styles.offerCard}>
-                          <View style={styles.offerTopRow}>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.offerShopName}>
-                                {offer.shop_name || offer.shop_profile_name || 'Service Center'}
-                              </Text>
-                              <View style={styles.offerBadgesRow}>
-                                {offer.is_booked ? (
-                                  <View style={styles.offerBadgeBooked}>
-                                    <Text style={styles.offerBadgeBookedText}>Booked</Text>
-                                  </View>
-                                ) : (
-                                  <View style={styles.offerBadgeSoft}>
-                                    <Text style={styles.offerBadgeSoftText}>Best match</Text>
-                                  </View>
-                                )}
-                                <View style={styles.offerBadgeSoft}>
-                                  <Text style={styles.offerBadgeSoftText}>Fast response</Text>
-                                </View>
-                              </View>
-                            </View>
-                            <Text style={styles.offerPrice}>{offer.price != null ? `${offer.price} BGN` : 'Quote pending'}</Text>
-                          </View>
-
-                          <Text style={styles.offerDescription}>{offer.description || 'Service proposal available.'}</Text>
-                          {offer.availability_note ? (
-                            <Text style={styles.offerMetaText}>Availability: {offer.availability_note}</Text>
-                          ) : offer.available_from ? (
-                            <Text style={styles.offerMetaText}>
-                              Available from: {new Date(offer.available_from).toLocaleString()}
-                            </Text>
-                          ) : null}
-                          {offer.is_guaranteed ? (
-                            <View style={styles.offerBadgeSoft}>
-                              <Text style={styles.offerBadgeSoftText}>Guarantee included</Text>
-                            </View>
-                          ) : null}
-                          {offer.parts?.length ? (
-                            <Text style={styles.offerMetaText}>Included parts: {offer.parts.length}</Text>
-                          ) : null}
-                          {offer.estimated_duration_minutes ? (
-                            <Text style={styles.offerMetaText}>
-                              Estimated duration: {offer.estimated_duration_minutes} min
-                            </Text>
-                          ) : null}
-
-                          <View style={styles.offerActionsRow}>
-                            {isShop && shopProfileId !== null && parseInt(offer.shop) === shopProfileId && (
-                              <>
-                                <Button
-                                  mode="outlined"
-                                  onPress={() =>
-                                    navigation.navigate('CreateOrUpdateOffer', {
-                                      repairId,
-                                      offerId: offer.id,
-                                      existingOffer: offer,
-                                      selectedOfferParts: offer.parts || [],
-                                    })
-                                  }
-                                >
-                                  Edit offer
-                                </Button>
-                                <Button mode="text" textColor="#dc2626" onPress={() => handleDeleteOffer(offer.id)}>
-                                  Delete offer
-                                </Button>
-                                <Button mode="outlined" onPress={handleOpenOfferChat}>
-                                  Open chat
-                                </Button>
-                                {offer.phone_call_allowed && (offer.shop_phone_e164 || offer.shop_phone) ? (
-                                  <Button mode="text" onPress={() => handleCallShop(offer.shop_phone_e164 || offer.shop_phone)}>
-                                    Call
-                                  </Button>
-                                ) : null}
-                              </>
-                            )}
-                            {!isShop && (
-                              <>
-                                {!hasBooked && !offer.is_booked ? (
-                                  <Button mode="contained" onPress={() => handleBookOffer(offer.id)}>
-                                    {offer.is_promotion ? 'Book promotion' : 'Book offer'}
-                                  </Button>
-                                ) : null}
-                                <Button mode="outlined" onPress={handleOpenOfferChat}>
-                                  Open chat
-                                </Button>
-                                {offer.phone_call_allowed && (offer.shop_phone_e164 || offer.shop_phone) ? (
-                                  <Button mode="text" onPress={() => handleCallShop(offer.shop_phone_e164 || offer.shop_phone)}>
-                                    Call
-                                  </Button>
-                                ) : null}
-                                {offer.is_booked ? (
-                                  <Button mode="text" onPress={() => handleUnbookOffer(offer.id)}>
-                                    Cancel booking
-                                  </Button>
-                                ) : null}
-                              </>
-                            )}
-                          </View>
-                        </FloatingCard>
-                      ));
-                    })()
-                  )}
-                </Card.Content>
-            </Card>
-            ) : null}
+            {isShop ? renderOffersSection() : null}
 
           </View>
-        }
-        contentContainerStyle={[
-          styles.listContent,
-          { paddingTop: stackContentPaddingTop(insets, 4) },
-        ]}
-      />
+      </ScrollView>
     </ScreenBackground>
     <Modal
       visible={Boolean(selectedImageUri)}
@@ -1504,6 +2823,106 @@ export default function RepairDetailScreen({ route, navigation }) {
         ) : null}
       </View>
     </Modal>
+    <Modal
+      visible={counterModalVisible}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setCounterModalVisible(false)}
+    >
+      <View style={styles.counterModalBackdrop}>
+        <View style={styles.counterModalCard}>
+          <Text style={styles.counterModalTitle}>Suggest a different time</Text>
+          <Text style={styles.counterModalPreview}>{formatSchedulePreview(counterDate)}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.counterDayRow}>
+            {SCHEDULE_DAY_OFFSETS.map((opt) => (
+              <Pressable
+                key={opt.label}
+                onPress={() => {
+                  setCounterDayOffset(opt.days);
+                  const next = applyDayOffset(
+                    new Date(),
+                    opt.days,
+                    applyTimeSlotToDate(counterDate, counterTimeSlot)
+                  );
+                  setCounterDate(next);
+                }}
+                style={[
+                  styles.counterChip,
+                  counterDayOffset === opt.days && styles.counterChipActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.counterChipText,
+                    counterDayOffset === opt.days && styles.counterChipTextActive,
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.counterDayRow}>
+            {SCHEDULE_TIME_SLOTS.map((slot) => (
+              <Pressable
+                key={slot}
+                onPress={() => {
+                  setCounterTimeSlot(slot);
+                  setCounterDate(applyTimeSlotToDate(counterDate, slot));
+                }}
+                style={[
+                  styles.counterChip,
+                  counterTimeSlot === slot && styles.counterChipActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.counterChipText,
+                    counterTimeSlot === slot && styles.counterChipTextActive,
+                  ]}
+                >
+                  {slot}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          <TextInput
+            label="Note (optional)"
+            value={counterNote}
+            onChangeText={setCounterNote}
+            mode="outlined"
+            style={styles.counterNoteInput}
+          />
+          <View style={styles.counterModalActions}>
+            <Button mode="outlined" onPress={() => setCounterModalVisible(false)}>
+              Cancel
+            </Button>
+            <Button mode="contained" loading={submittingCounter} onPress={submitCounter}>
+              Send to shop
+            </Button>
+          </View>
+        </View>
+      </View>
+    </Modal>
+    <FinalizeOdometerEvidenceSheet
+      visible={Boolean(odometerEvidenceSheet?.visible)}
+      onDismiss={() => setOdometerEvidenceSheet(null)}
+      analysis={odometerEvidenceSheet?.analysis}
+      enteredKm={odometerEvidenceSheet?.km}
+      priorMaxKm={repair?.prior_max_odometer_km}
+      pendingPhoto={pendingOdometerPhoto}
+      discrepancyNote={odometerDiscrepancyNote}
+      onChangeDiscrepancyNote={setOdometerDiscrepancyNote}
+      onPickPhoto={handlePickDashboardPhoto}
+      onFinalizeWithPhoto={handleOdometerSheetFinalize}
+      onConfirmWithoutPhoto={handleOdometerSheetConfirmWithoutPhoto}
+      allowConfirmWithoutPhoto={Boolean(
+        odometerEvidenceSheet?.analysis?.requiresPhotoOrConfirm &&
+          !odometerEvidenceSheet?.analysis?.blocked
+      )}
+      finalizing={odometerSheetFinalizing}
+      bottomInset={insets.bottom}
+    />
     </>
   );
 }
@@ -1543,6 +2962,12 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 4,
   },
+  heroVehicleLink: {
+    color: 'rgba(147,197,253,0.95)',
+    fontSize: 12,
+    marginTop: 6,
+    fontWeight: '600',
+  },
   heroReference: {
     color: 'rgba(255,255,255,0.72)',
     fontSize: 13,
@@ -1564,6 +2989,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 8,
   },
+  partsExportCard: {
+    marginBottom: 12,
+    gap: 8,
+  },
   detailLine: {
     color: COLORS.TEXT_DARK,
     fontSize: 14,
@@ -1579,11 +3008,92 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  arrivalButton: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+  },
+  cancelAppointmentButton: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  rescheduleCard: {
+    marginBottom: 12,
+    borderColor: 'rgba(245,158,11,0.35)',
+    borderWidth: 1,
+  },
+  rescheduleActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  counterModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  counterModalCard: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 16,
+  },
+  counterModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+    color: '#0f172a',
+  },
+  counterModalPreview: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#334155',
+    marginBottom: 12,
+  },
+  counterDayRow: {
+    marginBottom: 10,
+  },
+  counterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#f1f5f9',
+    marginRight: 8,
+  },
+  counterChipActive: {
+    backgroundColor: '#2563eb',
+  },
+  counterChipText: {
+    color: '#334155',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  counterChipTextActive: {
+    color: '#fff',
+  },
+  counterNoteInput: {
+    marginBottom: 12,
+    backgroundColor: '#fff',
+  },
+  counterModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
   warningText: {
     color: '#b45309',
     fontSize: 12,
     lineHeight: 17,
     marginTop: 6,
+  },
+  errorText: {
+    color: '#b91c1c',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+    marginBottom: 4,
   },
   chipsWrap: {
     flexDirection: 'row',
@@ -1734,6 +3244,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(15,23,42,0.08)',
   },
+  offersProminentCard: {
+    borderColor: COLORS.PRIMARY,
+    borderWidth: 2,
+    marginBottom: 12,
+  },
   addPartCard: {
     marginHorizontal: 0,
     marginVertical: 10,
@@ -1759,6 +3274,117 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
     backgroundColor: '#fff',
+  },
+  pickerContainerError: {
+    borderColor: '#b91c1c',
+    borderWidth: 2,
+  },
+  finalizeRequiredCard: {
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(37,99,235,0.22)',
+  },
+  lightActionCard: {
+    backgroundColor: '#ffffff',
+    borderWidth: 2,
+    borderColor: 'rgba(37,99,235,0.4)',
+  },
+  lightActionCardError: {
+    borderColor: '#b91c1c',
+  },
+  cardSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.TEXT_DARK,
+    marginBottom: 6,
+  },
+  cardBodyText: {
+    fontSize: 14,
+    color: COLORS.TEXT_MUTED,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  labelSmallDark: {
+    color: COLORS.TEXT_DARK,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  warningTextOnLight: {
+    color: '#b45309',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 8,
+    fontWeight: '600',
+  },
+  paymentChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
+  },
+  paymentChip: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(15,23,42,0.18)',
+    backgroundColor: '#f8fafc',
+  },
+  paymentChipSelected: {
+    borderColor: COLORS.PRIMARY,
+    backgroundColor: 'rgba(37,99,235,0.12)',
+  },
+  paymentChipDisabled: {
+    opacity: 0.55,
+  },
+  paymentChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.TEXT_DARK,
+  },
+  paymentChipTextSelected: {
+    color: COLORS.PRIMARY,
+  },
+  completionSection: {
+    marginTop: 12,
+    marginBottom: 4,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(15,23,42,0.12)',
+  },
+  pickerLight: {
+    width: '100%',
+    color: COLORS.TEXT_DARK,
+  },
+  pickerItemLight: {
+    color: COLORS.TEXT_DARK,
+    fontSize: 16,
+  },
+  finalizeRequiredCardTop: {
+    marginTop: 4,
+  },
+  finalizeRequiredCardError: {
+    backgroundColor: '#fff5f5',
+    borderColor: '#b91c1c',
+  },
+  ongoingClientCard: {
+    marginBottom: 10,
+  },
+  readyPickupClientCard: {
+    marginBottom: 10,
+    backgroundColor: '#f0fdf4',
+    borderColor: '#86efac',
+  },
+  partsSupplierSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(15,23,42,0.12)',
   },
   labelSmall: {
     color: COLORS.TEXT_MUTED,
@@ -1862,6 +3488,10 @@ const styles = StyleSheet.create({
   progressButton: {
     marginTop: 8,
   },
+  dashboardPhotoBtn: {
+    marginTop: 4,
+    marginBottom: 4,
+  },
   serviceStateChip: {
     alignSelf: 'flex-start',
     marginTop: 8,
@@ -1910,6 +3540,51 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginBottom: 10,
     fontStyle: 'italic',
+  },
+  confirmationCard: {
+    marginBottom: 10,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(37,99,235,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(37,99,235,0.2)',
+    gap: 6,
+  },
+  confirmationTitle: {
+    color: COLORS.TEXT_DARK,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  confirmationBody: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  confirmationActionBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  confirmationShopActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  evidenceChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  evidenceChip: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: 'rgba(15,23,42,0.08)',
+  },
+  evidenceChipText: {
+    color: COLORS.TEXT_DARK,
+    fontSize: 12,
+    fontWeight: '600',
   },
   completedPillRow: {
     marginBottom: 12,

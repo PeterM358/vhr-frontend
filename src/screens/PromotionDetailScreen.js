@@ -13,6 +13,7 @@ import { bookPromotion, unbookPromotion, getPromotionBookings } from '../api/pro
 import { getVehicles } from '../api/vehicles';
 
 import { Card, Text, Button, useTheme, Divider } from 'react-native-paper';
+import { formatMoneyAmount } from '../constants/currency';
 import ScreenBackground from '../components/ScreenBackground';
 import { stackContentPaddingTop } from '../navigation/stackContentInset';
 
@@ -147,7 +148,7 @@ export default function PromotionDetailScreen({ route, navigation }) {
           <Card.Content>
             <Divider style={{ marginVertical: 8 }} />
             <Text variant="bodyMedium">{promotion.description}</Text>
-            <Text variant="titleMedium" style={{ marginTop: 8 }}>Price: {promotion.price} BGN</Text>
+            <Text variant="titleMedium" style={{ marginTop: 8 }}>Price: {formatMoneyAmount(promotion.price)}</Text>
           </Card.Content>
         </Card>
 

@@ -20,7 +20,7 @@ import {
 } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { API_BASE_URL } from '../api/config';
-import { updateVehicle, patchVehicleReminder } from '../api/vehicles';
+import { updateVehicle, patchVehicleReminder, getVehicleForecast } from '../api/vehicles';
 import { listVehicleDocuments } from '../api/documents';
 import ScreenBackground from '../components/ScreenBackground';
 import { stackContentPaddingTop } from '../navigation/stackContentInset';
@@ -28,6 +28,7 @@ import AppCard from '../components/ui/AppCard';
 import FloatingCard from '../components/ui/FloatingCard';
 import StatusBadge from '../components/ui/StatusBadge';
 import { COLORS } from '../constants/colors';
+import { DEFAULT_CURRENCY } from '../constants/currency';
 import OptionalVehicleGroupsReadonly from '../components/vehicle/OptionalVehicleGroupsReadonly';
 import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePicker';
 import { isoToDisplayDate } from '../components/vehicle/dateFieldUtils';
@@ -38,6 +39,14 @@ import {
   formatDocumentRowSubtitle,
 } from '../utils/vehicleDocumentTypes';
 import { formatServiceRecordProvider } from '../utils/serviceRecordProvider';
+import MileageConfidenceSheet from '../components/vehicle/MileageConfidenceSheet';
+import VehicleForecastCard from '../components/vehicle/VehicleForecastCard';
+import {
+  heroConfidenceSubtitle,
+  mileageConfidenceCategoryPill,
+  resolveMileageFactorAction,
+} from '../utils/mileageConfidence';
+import { formatBookingAccessHint, formatRevokeConfirmMessage } from '../utils/shopDataAccess';
 
 const BASE_VEHICLE_REMINDER_SECTION_ROWS = [
   { reminder_type: 'insurance', label: 'Insurance', icon: 'shield-check-outline' },
@@ -102,7 +111,7 @@ function isObligationReminderType(reminderType) {
 
 export default function VehicleDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
-  const { vehicleId } = route.params;
+  const { vehicleId, mileageIntent: mileageIntentParam } = route.params || {};
   const [vehicle, setVehicle] = useState(null);
   const [repairs, setRepairs] = useState([]);
   const [vehicleDocuments, setVehicleDocuments] = useState([]);
@@ -115,7 +124,12 @@ export default function VehicleDetailScreen({ route, navigation }) {
     authorizedCenters: false,
     documents: false,
   });
+  const [forecast, setForecast] = useState(null);
+  const [forecastLoading, setForecastLoading] = useState(false);
+  const [forecastExpanded, setForecastExpanded] = useState(true);
+  const [pendingServiceHistoryScroll, setPendingServiceHistoryScroll] = useState(false);
 
+  const [mileageSheetVisible, setMileageSheetVisible] = useState(false);
   const [kmModalVisible, setKmModalVisible] = useState(false);
   const [kmDraft, setKmDraft] = useState('');
   const [kmSaving, setKmSaving] = useState(false);
@@ -135,7 +149,11 @@ export default function VehicleDetailScreen({ route, navigation }) {
 
   const theme = useTheme();
   const scrollRef = useRef(null);
-  const sectionScrollYs = useRef({ activeRepairs: null, serviceHistory: null });
+  const sectionScrollYs = useRef({
+    activeRepairs: null,
+    serviceHistory: null,
+    authorizedCenters: null,
+  });
 
   useEffect(() => {
     const loadRole = async () => {
@@ -169,8 +187,20 @@ export default function VehicleDetailScreen({ route, navigation }) {
           console.warn('Could not load vehicle documents', docErr);
           setVehicleDocuments([]);
         }
+        setForecastLoading(true);
+        try {
+          const forecastData = await getVehicleForecast(vehicleId, token);
+          setForecast(forecastData);
+        } catch (forecastErr) {
+          console.warn('Could not load vehicle forecast', forecastErr);
+          setForecast(null);
+        } finally {
+          setForecastLoading(false);
+        }
       } else {
         setVehicleDocuments([]);
+        setForecast(null);
+        setForecastLoading(false);
       }
     } catch (err) {
       console.error('Error fetching vehicle details:', err);
@@ -188,16 +218,29 @@ export default function VehicleDetailScreen({ route, navigation }) {
   useFocusEffect(
     useCallback(() => {
       loadVehicleDetails();
-      if (route.params?.expandReminders) {
-        setSectionsExpanded((prev) => ({ ...prev, remindersObligations: true }));
-        navigation.setParams({ expandReminders: undefined });
-      }
-      if (route.params?.expandAuthorizedCenters) {
-        setSectionsExpanded((prev) => ({ ...prev, authorizedCenters: true }));
-        navigation.setParams({ expandAuthorizedCenters: undefined });
-      }
-    }, [loadVehicleDetails, navigation, route.params?.expandReminders, route.params?.expandAuthorizedCenters])
+    }, [loadVehicleDetails])
   );
+
+  useEffect(() => {
+    if (route.params?.expandReminders) {
+      setSectionsExpanded((prev) => ({ ...prev, remindersObligations: true }));
+      navigation.setParams({ expandReminders: undefined });
+    }
+    if (route.params?.expandAuthorizedCenters) {
+      setSectionsExpanded((prev) => ({ ...prev, authorizedCenters: true }));
+      navigation.setParams({ expandAuthorizedCenters: undefined });
+    }
+    if (route.params?.scrollToServiceHistory) {
+      setPendingServiceHistoryScroll(true);
+      setSectionsExpanded((prev) => ({ ...prev, serviceHistory: true }));
+      navigation.setParams({ scrollToServiceHistory: undefined });
+    }
+  }, [
+    route.params?.expandReminders,
+    route.params?.expandAuthorizedCenters,
+    route.params?.scrollToServiceHistory,
+    navigation,
+  ]);
 
   const openTechnicalDetails = () => {
     if (!vehicle) return;
@@ -368,6 +411,15 @@ export default function VehicleDetailScreen({ route, navigation }) {
     });
   }, [serviceHistorySorted.length, scrollToY]);
 
+  useEffect(() => {
+    if (!pendingServiceHistoryScroll || loading) return;
+    const t = setTimeout(() => {
+      scrollToServiceHistorySection();
+      setPendingServiceHistoryScroll(false);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [pendingServiceHistoryScroll, loading, scrollToServiceHistorySection]);
+
   const scrollToActiveRepairsSection = useCallback(() => {
     if (!repairs.length) {
       Alert.alert('No repairs', 'There are no repair records on this vehicle yet.');
@@ -385,12 +437,105 @@ export default function VehicleDetailScreen({ route, navigation }) {
     navigation.navigate('RepairDetail', { repairId: latest.id });
   }, [navigation, serviceHistorySorted]);
 
+  const openRepairById = useCallback(
+    (repairId) => {
+      if (!repairId) {
+        openLatestCompletedRepair();
+        return;
+      }
+      navigation.navigate('RepairDetail', { repairId });
+    },
+    [navigation, openLatestCompletedRepair]
+  );
+
+  const scrollToAuthorizedCenters = useCallback(() => {
+    setSectionsExpanded((prev) => ({ ...prev, authorizedCenters: true }));
+    requestAnimationFrame(() => {
+      setTimeout(() => scrollToY(sectionScrollYs.current.authorizedCenters), 80);
+    });
+  }, [scrollToY]);
+
+  const navigateLogServiceRecord = useCallback(() => {
+    navigation.navigate('LogServiceRecord', {
+      vehicleId,
+      returnTo: 'VehicleDetail',
+      origin: 'VehicleDetail',
+    });
+  }, [navigation, vehicleId]);
+
+  const handleMileageFactorPress = useCallback(
+    (factor) => {
+      const intent = resolveMileageFactorAction(factor);
+      if (!intent) return;
+      setMileageSheetVisible(false);
+
+      switch (intent.action) {
+        case 'service_history':
+          scrollToServiceHistorySection();
+          break;
+        case 'repair_detail':
+          openRepairById(intent.repairId);
+          break;
+        case 'log_service':
+        case 'log_service_receipt':
+        case 'log_service_odometer':
+          navigateLogServiceRecord();
+          break;
+        case 'add_obligation_inspection':
+          navigation.navigate('AddObligationPayment', {
+            vehicleId,
+            initialReminderType: 'technical_inspection',
+            returnTo: 'VehicleDetail',
+            origin: 'VehicleDetail',
+          });
+          break;
+        case 'manage_authorized_centers':
+          if (navigation.navigate) {
+            navigation.navigate('ManageVehicleServiceCenters', { vehicleId });
+          } else {
+            scrollToAuthorizedCenters();
+          }
+          break;
+        case 'vehicle_specs':
+          navigation.navigate('VehicleSpecs', { vehicleId });
+          break;
+        default:
+          scrollToServiceHistorySection();
+      }
+    },
+    [
+      navigation,
+      vehicleId,
+      scrollToServiceHistorySection,
+      openRepairById,
+      navigateLogServiceRecord,
+      scrollToAuthorizedCenters,
+    ]
+  );
+
+  const mileageConfidence = vehicle?.mileage_confidence;
+  const confidencePillStyle = useMemo(
+    () => mileageConfidenceCategoryPill(mileageConfidence?.category),
+    [mileageConfidence?.category]
+  );
+
   useEffect(() => {
     setSectionsExpanded((prev) => ({
       ...prev,
       serviceHistory: serviceHistorySorted.length <= 3,
     }));
   }, [serviceHistorySorted.length]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!mileageIntentParam?.action || !vehicle) return;
+      navigation.setParams({ mileageIntent: undefined });
+      handleMileageFactorPress({
+        action: mileageIntentParam.action,
+        repair_id: mileageIntentParam.repairId,
+      });
+    }, [mileageIntentParam, vehicle, navigation, handleMileageFactorPress])
+  );
 
   const authorizedServiceCenters = useMemo(() => {
     const raw =
@@ -510,22 +655,22 @@ export default function VehicleDetailScreen({ route, navigation }) {
       totalSpentMinor: readMinor(backend.total_spent_minor),
       totalLaborMinor: readMinor(backend.total_labor_minor),
       totalPartsMinor: readMinor(backend.total_parts_minor),
-      currency: backend.currency || 'BGN',
+      currency: backend.currency || DEFAULT_CURRENCY,
       lastCompletedDate: backend.last_completed_at || localLifetimeSummary.lastCompletedDate || null,
       usesBackend: true,
     };
   }, [vehicle, localLifetimeSummary]);
 
-  const formatMinorCurrency = (minorValue, currencyCode = 'BGN') => {
+  const formatMinorCurrency = (minorValue, currencyCode = DEFAULT_CURRENCY) => {
     if (minorValue == null) return '—';
     const n = Number(minorValue);
     if (!Number.isFinite(n)) return '—';
-    return `${(n / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currencyCode || 'BGN'}`;
+    return `${(n / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currencyCode || DEFAULT_CURRENCY}`;
   };
 
   const formattedLifetimeMoney = useMemo(() => {
     if (lifetimeSummary.usesBackend) {
-      const cc = lifetimeSummary.currency || 'BGN';
+      const cc = lifetimeSummary.currency || DEFAULT_CURRENCY;
       return {
         totalSpent: formatMinorCurrency(lifetimeSummary.totalSpentMinor, cc),
         totalLabor: formatMinorCurrency(lifetimeSummary.totalLaborMinor, cc),
@@ -535,15 +680,15 @@ export default function VehicleDetailScreen({ route, navigation }) {
     return {
       totalSpent:
         lifetimeSummary.totalSpent != null
-          ? `${Number(lifetimeSummary.totalSpent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BGN`
+          ? `${Number(lifetimeSummary.totalSpent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${DEFAULT_CURRENCY}`
           : '—',
       totalLabor:
         lifetimeSummary.totalLabor != null
-          ? `${Number(lifetimeSummary.totalLabor).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BGN`
+          ? `${Number(lifetimeSummary.totalLabor).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${DEFAULT_CURRENCY}`
           : '—',
       totalParts:
         lifetimeSummary.totalParts != null
-          ? `${Number(lifetimeSummary.totalParts).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BGN`
+          ? `${Number(lifetimeSummary.totalParts).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${DEFAULT_CURRENCY}`
           : '—',
     };
   }, [lifetimeSummary]);
@@ -635,7 +780,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
   );
 
   const renderCompletedHistoryCard = (item) => {
-    const currency = item.currency || 'BGN';
+    const currency = item.currency || DEFAULT_CURRENCY;
     const km =
       item.final_kilometers != null
         ? item.final_kilometers
@@ -778,7 +923,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
   const handleRevokeAuthorizedCenter = (center) => {
     Alert.alert(
       'Remove access?',
-      `${center?.name || 'This service center'} will no longer see your full vehicle history.\n\nRepairs they already performed stay visible to them in their shop records.`,
+      formatRevokeConfirmMessage(center?.name || 'This service center'),
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -920,6 +1065,40 @@ export default function VehicleDetailScreen({ route, navigation }) {
                     ? `${Number(vehicle.kilometers).toLocaleString()} km`
                     : 'Kilometers not set'}
                 </Text>
+                {!isShop ? (
+                  <Pressable
+                    onPress={() => setMileageSheetVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Mileage confidence details"
+                    style={({ pressed }) => [
+                      styles.heroConfidenceRow,
+                      pressed && styles.heroConfidencePressed,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.heroConfidencePill,
+                        {
+                          backgroundColor: confidencePillStyle.bg,
+                          borderColor: confidencePillStyle.border,
+                        },
+                      ]}
+                    >
+                      <MaterialCommunityIcons
+                        name="shield-check-outline"
+                        size={14}
+                        color={confidencePillStyle.fg}
+                      />
+                      <Text style={[styles.heroConfidencePillText, { color: confidencePillStyle.fg }]}>
+                        {mileageConfidence?.category_label || 'Mileage confidence'}
+                      </Text>
+                      <MaterialCommunityIcons name="chevron-down" size={16} color={confidencePillStyle.fg} />
+                    </View>
+                    <Text style={styles.heroConfidenceSub} numberOfLines={2}>
+                      {heroConfidenceSubtitle(mileageConfidence)}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
             </Pressable>
             <Pressable
@@ -959,6 +1138,17 @@ export default function VehicleDetailScreen({ route, navigation }) {
           <FloatingCard>
             <Text style={styles.sectionTitle}>Vehicle info</Text>
             <View style={styles.infoGrid}>
+              {!isShop
+                ? heroTypeLabel
+                  ? infoTile('Vehicle type', heroTypeLabel, {
+                      onPress: openTechnicalDetails,
+                      showChevron: true,
+                    })
+                  : infoTile('Vehicle type', 'Not set — tap to choose', {
+                      onPress: openTechnicalDetails,
+                      showChevron: true,
+                    })
+                : null}
               {String(vehicle.vin || '').trim()
                 ? infoTile('VIN', vehicle.vin, {})
                 : infoTile('VIN', 'Add VIN for better parts and service matching.', {})}
@@ -997,6 +1187,17 @@ export default function VehicleDetailScreen({ route, navigation }) {
               </View>
             </View>
           </FloatingCard>
+
+          {!isShop ? (
+            <FloatingCard>
+              <VehicleForecastCard
+                forecast={forecast}
+                loading={forecastLoading}
+                expanded={forecastExpanded}
+                onToggleExpanded={() => setForecastExpanded((v) => !v)}
+              />
+            </FloatingCard>
+          ) : null}
 
           <OptionalVehicleGroupsReadonly vehicle={vehicle} />
 
@@ -1122,12 +1323,19 @@ export default function VehicleDetailScreen({ route, navigation }) {
           </View>
 
           {!isShop ? (
+          <View
+            collapsable={false}
+            onLayout={(e) => {
+              sectionScrollYs.current.authorizedCenters = e.nativeEvent.layout.y;
+            }}
+          >
           <FloatingCard>
             <SectionHeader title="Authorized service centers" sectionKey="authorizedCenters" />
             {sectionsExpanded.authorizedCenters ? (
               <>
                 <Text style={styles.sectionHint}>
-                  Authorized service centers can view this vehicle history and help maintain future service records.
+                  Authorizing a center shares full mechanical service history, reminders, and specs. Booking a repair
+                  without authorizing only grants job access: {formatBookingAccessHint()}
                 </Text>
                 {authorizedServiceCenters.length ? (
                   <View style={styles.authorizedList}>
@@ -1145,6 +1353,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
                           <Text style={styles.authorizedLocation}>
                             {center.location || 'Location not specified'}
                           </Text>
+                          <Text style={styles.authorizedAccessBadge}>Full mechanical history</Text>
                           <Text style={styles.authorizedTapHint}>Tap for shop profile</Text>
                         </View>
                         <Button
@@ -1172,8 +1381,14 @@ export default function VehicleDetailScreen({ route, navigation }) {
                   </Button>
                 </View>
               </>
-            ) : null}
+            ) : (
+              <Text style={styles.sectionHint}>
+                {authorizedServiceCenters.length} authorized center
+                {authorizedServiceCenters.length === 1 ? '' : 's'}. Expand to manage access.
+              </Text>
+            )}
           </FloatingCard>
+          </View>
           ) : null}
 
           {vehicleDocuments.length > 0 ? (
@@ -1215,6 +1430,16 @@ export default function VehicleDetailScreen({ route, navigation }) {
           style={[styles.fab, { backgroundColor: theme.colors.primary }]}
           color={theme.colors.onPrimary}
           onPress={handleAddActivity}
+        />
+      ) : null}
+
+      {!isShop ? (
+        <MileageConfidenceSheet
+          visible={mileageSheetVisible}
+          onDismiss={() => setMileageSheetVisible(false)}
+          mileageConfidence={mileageConfidence}
+          onFactorPress={handleMileageFactorPress}
+          bottomInset={insets.bottom}
         />
       ) : null}
 
@@ -1457,6 +1682,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,255,255,0.7)',
     marginTop: 2,
+  },
+  heroConfidenceRow: {
+    marginTop: 10,
+    alignSelf: 'stretch',
+  },
+  heroConfidencePressed: {
+    opacity: 0.9,
+  },
+  heroConfidencePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    maxWidth: '100%',
+  },
+  heroConfidencePillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  heroConfidenceSub: {
+    marginTop: 6,
+    fontSize: 11,
+    lineHeight: 15,
+    color: 'rgba(255,255,255,0.72)',
   },
   sectionTitle: {
     color: COLORS.TEXT_DARK,
@@ -1711,6 +1965,18 @@ const styles = StyleSheet.create({
   authorizedCardMain: {
     flex: 1,
     gap: 2,
+  },
+  authorizedAccessBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#166534',
+    backgroundColor: 'rgba(34,197,94,0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    overflow: 'hidden',
   },
   authorizedTapHint: {
     color: COLORS.PRIMARY,

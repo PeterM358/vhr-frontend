@@ -11,6 +11,7 @@ import HomeScreen from '../screens/HomeScreen';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import { logout } from '../api/auth';
+import { resetFromClientDrawer } from './drawerNavigation';
 
 import MainText from '../assets/images/main-text.png'; // ✅ Your bottom makeing image
 
@@ -21,9 +22,7 @@ function CustomDrawerContent(props) {
   const { notifications } = useContext(WebSocketContext);
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
 
-  const unseenPromotions = notifications.filter(n => !n.is_read && n.repair == null).length;
-  const unseenOffers = notifications.filter(n => !n.is_read && n.repair != null).length;
-  const totalOffersBadge = unseenPromotions + unseenOffers;
+  const unreadNotifications = notifications.filter((n) => !n.is_read).length;
 
   const handleLogout = async () => {
     await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
@@ -45,33 +44,39 @@ function CustomDrawerContent(props) {
 
         <DrawerItem
           label="Profile"
-          onPress={() => navigation.navigate('ClientProfile')}
+          onPress={() => resetFromClientDrawer(navigation, 'ClientProfile')}
           icon={() => <Text>👤</Text>}
         />
 
         <DrawerItem
           label="Repairs"
-          onPress={() => navigation.navigate('ClientRepairs')}
+          onPress={() => resetFromClientDrawer(navigation, 'ClientRepairs')}
           icon={() => <Text>🛠️</Text>}
         />
         <DrawerItem
           label="Vehicles"
-          onPress={() => navigation.navigate('ClientVehicles')}
+          onPress={() => resetFromClientDrawer(navigation, 'ClientVehicles')}
           icon={() => <Text>🚗</Text>}
         />
         <DrawerItem
-          label="Offers"
-          onPress={() => navigation.navigate('OffersScreen')}
-          icon={({ color }) => (
+          label="Activity"
+          onPress={() =>
+            resetFromClientDrawer(navigation, 'ClientActivity', {
+              returnTo: 'Home',
+              backLabel: 'Home',
+              initialTab: unreadNotifications > 0 ? 'inbox' : 'repairs',
+            })
+          }
+          icon={() => (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={{ color }}>🏷️</Text>
-              {totalOffersBadge > 0 && <Badge>{totalOffersBadge}</Badge>}
+              <Text>🔔</Text>
+              {unreadNotifications > 0 ? <Badge>{unreadNotifications}</Badge> : null}
             </View>
           )}
         />
         <DrawerItem
           label="Find Shops on Map"
-          onPress={() => navigation.navigate('ShopMap')}
+          onPress={() => resetFromClientDrawer(navigation, 'ShopMap')}
           icon={() => <Text>🗺️</Text>}
         />
         <DrawerItem

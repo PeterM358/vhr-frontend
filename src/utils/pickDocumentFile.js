@@ -76,6 +76,17 @@ export async function pickReceiptOrInvoiceAttachment() {
   return assetToAttachment(asset, inferReceiptDocumentType(asset.mimeType, asset.fileName));
 }
 
+/** Optional odometer reading photo (evidence only; no OCR). */
+export async function pickOdometerPhotoAttachment() {
+  const item = await pickVehiclePhotoAttachment();
+  if (!item) return null;
+  return {
+    ...item,
+    title: 'Odometer photo',
+    documentType: DOCUMENT_TYPE_VEHICLE_PHOTO,
+  };
+}
+
 /** Service record or vehicle photo. */
 export async function pickVehiclePhotoAttachment() {
   if (Platform.OS === 'web') {
@@ -95,4 +106,21 @@ export async function pickVehiclePhotoAttachment() {
 /** Obligation policy / proof (PDF or image). */
 export async function pickObligationDocumentAttachment() {
   return pickReceiptOrInvoiceAttachment();
+}
+
+/** Shop invoice logo — PNG, JPG, WebP, or SVG (web). */
+export async function pickInvoiceLogoAttachment() {
+  if (Platform.OS === 'web') {
+    return pickWebFile('image/png,image/jpeg,image/webp,image/svg+xml,.svg');
+  }
+  const allowed = await requestLibraryPermission();
+  if (!allowed) return null;
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: true,
+    aspect: [3, 1],
+    quality: 0.92,
+  });
+  if (result.canceled || !result.assets?.length) return null;
+  return assetToAttachment(result.assets[0], DOCUMENT_TYPE_VEHICLE_PHOTO);
 }

@@ -3,8 +3,9 @@
  * Completed maintenance/repair work only — not obligations (see AddObligationPaymentScreen).
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View, Alert } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { StyleSheet, View, Alert, Pressable } from 'react-native';
 import ScreenBackground from '../components/ScreenBackground';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
@@ -22,26 +23,66 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { API_BASE_URL } from '../api/config';
-import { createRepair } from '../api/repairs';
+import { createRepair, requestOwnerLoggedRepairConfirmation } from '../api/repairs';
 import { uploadRepairDocuments } from '../api/documents';
 import { patchVehicleReminder } from '../api/vehicles';
+import {
+  buildManualServiceCenterDraft,
+  manualDraftHasData,
+  workshopSummaryLines,
+} from '../utils/manualServiceCenterDraft';
+import {
+  validateManualServiceCenterInput,
+  parseOptionalCoordinate,
+  roundCoordinateForApi,
+} from '../utils/manualServiceCenter';
+import {
+  buildLogServiceRecordFormDraft,
+  applyLogServiceRecordFormDraft,
+} from '../utils/logServiceRecordFormDraft';
+import {
+  knownWorkshopsFromVehicleRepairs,
+  parseProviderPickerValue,
+} from '../utils/knownVehicleWorkshops';
+import * as Location from 'expo-location';
+import {
+  PROVIDER_PICKER_FILTER_THRESHOLD,
+  buildProviderPickerOptions,
+  distinctProviderCities,
+  filterProviderPickerOptions,
+  formatProviderOptionLabel,
+  providerOptionsHaveCoordinates,
+} from '../utils/serviceProviderPicker';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import FloatingCard from '../components/ui/FloatingCard';
 import { COLORS } from '../constants/colors';
 import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePicker';
-import { localDateToIso } from '../components/vehicle/dateFieldUtils';
+import { localDateToIso, isSaneServiceIso } from '../components/vehicle/dateFieldUtils';
+import {
+  OIL_INTERVAL_KM_OPTIONS,
+  DEFAULT_OIL_INTERVAL_KM,
+  computeNextOilDueKm,
+  computeNextOilDueDateIso,
+} from '../utils/oilServiceDefaults';
 import {
   filterServiceRecordRepairTypes,
   classifyServiceRecordFormVariant,
   resolveOwnerLoggedRepairMoney,
 } from '../utils/serviceRecordRepairTypes';
 import {
+  pickOdometerPhotoAttachment,
   pickReceiptOrInvoiceAttachment,
   pickVehiclePhotoAttachment,
 } from '../utils/pickDocumentFile';
 import DocumentAttachmentList, {
   DocumentAttachmentActions,
 } from '../components/documents/DocumentAttachmentList';
+import { DEFAULT_CURRENCY } from '../constants/currency';
+import {
+  analyzeFinalizeKilometers,
+  hasOdometerPhotoAttachment,
+  parseOdometerKm,
+} from '../utils/finalizeMileageValidation';
 
 async function applyPostCreateReminderPatches({
   token,
@@ -94,12 +135,22 @@ export default function LogServiceRecordScreen({ navigation, route }) {
   const [manualPhone, setManualPhone] = useState('');
   const [manualEmail, setManualEmail] = useState('');
   const [manualAddress, setManualAddress] = useState('');
+  const [manualCountryId, setManualCountryId] = useState(null);
+  const [manualCityId, setManualCityId] = useState(null);
+  const [manualCountryIso, setManualCountryIso] = useState('');
+  const [manualCityName, setManualCityName] = useState('');
+  const [manualLatitude, setManualLatitude] = useState('');
+  const [manualLongitude, setManualLongitude] = useState('');
   const [laborPrice, setLaborPrice] = useState('');
   const [partsPrice, setPartsPrice] = useState('');
   const [totalPrice, setTotalPrice] = useState('');
+  const totalManuallyEditedRef = useRef(false);
 
   const [nextDueKm, setNextDueKm] = useState('');
   const [nextOilDueIso, setNextOilDueIso] = useState('');
+  const [oilIntervalKm, setOilIntervalKm] = useState(DEFAULT_OIL_INTERVAL_KM);
+  const [oilNextDueKmEdited, setOilNextDueKmEdited] = useState(false);
+  const [oilNextDueDateEdited, setOilNextDueDateEdited] = useState(false);
 
   const [technicalValidIso, setTechnicalValidIso] = useState('');
 
@@ -110,6 +161,12 @@ export default function LogServiceRecordScreen({ navigation, route }) {
   const [pendingAttachments, setPendingAttachments] = useState([]);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
+  const [providerSearchQuery, setProviderSearchQuery] = useState('');
+  const [providerCityFilter, setProviderCityFilter] = useState('');
+  const [providerNearMe, setProviderNearMe] = useState(false);
+  const [providerUserLocation, setProviderUserLocation] = useState(null);
+  const [providerLocationLoading, setProviderLocationLoading] = useState(false);
+  const lastFormDraftKeyRef = useRef('');
 
   const filteredTypes = useMemo(() => filterServiceRecordRepairTypes(allRepairTypes), [allRepairTypes]);
 
@@ -124,24 +181,332 @@ export default function LogServiceRecordScreen({ navigation, route }) {
     return Array.isArray(list) ? list : [];
   }, [vehicle]);
 
+  const knownWorkshops = useMemo(
+    () => knownWorkshopsFromVehicleRepairs(vehicle?.repairs),
+    [vehicle?.repairs]
+  );
+
+  const allProviderOptions = useMemo(
+    () => buildProviderPickerOptions(authorizedCenters, knownWorkshops),
+    [authorizedCenters, knownWorkshops]
+  );
+
+  const hasProviderPickerOptions = allProviderOptions.length > 0;
+
+  const showProviderFilters = allProviderOptions.length > PROVIDER_PICKER_FILTER_THRESHOLD;
+
+  const providerCities = useMemo(
+    () => distinctProviderCities(allProviderOptions),
+    [allProviderOptions]
+  );
+
+  const providerPickerValue = useMemo(() => {
+    if (providerMode === 'authorized' && selectedShopProfileId) {
+      return `shop:${selectedShopProfileId}`;
+    }
+    return '';
+  }, [providerMode, selectedShopProfileId]);
+
+  const filteredProviderOptions = useMemo(
+    () =>
+      filterProviderPickerOptions({
+        options: allProviderOptions,
+        searchQuery: showProviderFilters ? providerSearchQuery : '',
+        cityFilter: showProviderFilters ? providerCityFilter : '',
+        nearMeEnabled: showProviderFilters && providerNearMe,
+        userLocation: providerUserLocation,
+        selectedPickerValue: providerPickerValue,
+      }),
+    [
+      allProviderOptions,
+      showProviderFilters,
+      providerSearchQuery,
+      providerCityFilter,
+      providerNearMe,
+      providerUserLocation,
+      providerPickerValue,
+    ]
+  );
+
+  const canFilterByNearMe = useMemo(
+    () => providerOptionsHaveCoordinates(allProviderOptions),
+    [allProviderOptions]
+  );
+
+  const toggleProviderNearMe = async () => {
+    if (providerNearMe) {
+      setProviderNearMe(false);
+      return;
+    }
+    setProviderLocationLoading(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Location', 'Allow location to filter workshops near you.');
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({});
+      setProviderUserLocation({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      });
+      setProviderNearMe(true);
+    } catch (e) {
+      console.warn('Provider near-me location failed', e);
+      Alert.alert('Location', 'Could not get your location. Try again.');
+    } finally {
+      setProviderLocationLoading(false);
+    }
+  };
+
   const clearManualProviderFields = () => {
     setManualName('');
     setManualPhone('');
     setManualEmail('');
     setManualAddress('');
+    setManualCountryId(null);
+    setManualCityId(null);
+    setManualCountryIso('');
+    setManualCityName('');
+    setManualLatitude('');
+    setManualLongitude('');
   };
+
+  const applyManualDraft = useCallback((draft) => {
+    if (!draft) return;
+    setProviderMode('manual');
+    setSelectedShopProfileId('');
+    setManualName(draft.name || '');
+    setManualPhone(draft.phone || '');
+    setManualEmail(draft.email || '');
+    setManualAddress(draft.address || '');
+    setManualCountryId(draft.countryId ?? null);
+    setManualCityId(draft.cityId ?? null);
+    setManualCountryIso(draft.countryIso || '');
+    setManualCityName(draft.cityName || '');
+    setManualLatitude(draft.latitude || '');
+    setManualLongitude(draft.longitude || '');
+  }, []);
+
+  const currentManualDraft = useMemo(
+    () =>
+      buildManualServiceCenterDraft({
+        name: manualName,
+        phone: manualPhone,
+        email: manualEmail,
+        address: manualAddress,
+        countryId: manualCountryId,
+        cityId: manualCityId,
+        countryIso: manualCountryIso,
+        cityName: manualCityName,
+        latitude: manualLatitude,
+        longitude: manualLongitude,
+      }),
+    [
+      manualName,
+      manualPhone,
+      manualEmail,
+      manualAddress,
+      manualCountryId,
+      manualCityId,
+      manualCountryIso,
+      manualCityName,
+      manualLatitude,
+      manualLongitude,
+    ]
+  );
+
+  const hasManualCenter = providerMode === 'manual' && manualDraftHasData(currentManualDraft);
+  const workshopSummary = useMemo(
+    () => workshopSummaryLines(currentManualDraft),
+    [currentManualDraft]
+  );
 
   useEffect(() => {
     navigation.setOptions({ title: 'Add Service Record' });
   }, [navigation]);
 
+  const buildCurrentFormDraft = useCallback(
+    () =>
+      buildLogServiceRecordFormDraft({
+        repairTypeId,
+        completedAtIso,
+        finalKilometers,
+        notes,
+        providerMode,
+        selectedShopProfileId,
+        laborPrice,
+        partsPrice,
+        totalPrice,
+        totalManuallyEdited: totalManuallyEditedRef.current,
+        nextDueKm,
+        nextOilDueIso,
+        oilIntervalKm,
+        oilNextDueKmEdited,
+        oilNextDueDateEdited,
+        technicalValidIso,
+        brakeNextCheckKm,
+      }),
+    [
+      repairTypeId,
+      completedAtIso,
+      finalKilometers,
+      notes,
+      providerMode,
+      selectedShopProfileId,
+      laborPrice,
+      partsPrice,
+      totalPrice,
+      nextDueKm,
+      nextOilDueIso,
+      oilIntervalKm,
+      oilNextDueKmEdited,
+      oilNextDueDateEdited,
+      technicalValidIso,
+      brakeNextCheckKm,
+    ]
+  );
+
+  const persistFormDraftToStorage = useCallback(
+    async (draft) => {
+      if (!vehicleId || !draft) return;
+      try {
+        await AsyncStorage.setItem(
+          STORAGE_KEYS.logServiceRecordDraftKey(vehicleId),
+          JSON.stringify(draft)
+        );
+      } catch (e) {
+        console.warn('Could not persist service record draft', e);
+      }
+    },
+    [vehicleId]
+  );
+
+  const restoreFormDraft = useCallback((draft) => {
+    if (!draft) return;
+    const key = JSON.stringify(draft);
+    if (lastFormDraftKeyRef.current === key) return;
+    lastFormDraftKeyRef.current = key;
+    applyLogServiceRecordFormDraft(draft, {
+      setRepairTypeId,
+      setCompletedAtIso,
+      setFinalKilometers,
+      setNotes,
+      setProviderMode,
+      setSelectedShopProfileId,
+      setLaborPrice,
+      setPartsPrice,
+      setTotalPrice,
+      setTotalManuallyEdited: (v) => {
+        totalManuallyEditedRef.current = v;
+      },
+      setNextDueKm,
+      setNextOilDueIso,
+      setOilIntervalKm,
+      setOilNextDueKmEdited,
+      setOilNextDueDateEdited,
+      setTechnicalValidIso,
+      setBrakeNextCheckKm,
+    });
+  }, []);
+
+  const openAddWorkshop = useCallback(
+    (extraParams = {}) => {
+      const formDraft = buildCurrentFormDraft();
+      persistFormDraftToStorage(formDraft);
+      navigation.setParams({ logServiceRecordDraft: formDraft });
+      navigation.navigate('AddManualServiceCenter', {
+        vehicleId,
+        repairTypeLabel: selectedType?.name || '',
+        logServiceRecordDraft: formDraft,
+        ...extraParams,
+      });
+    },
+    [buildCurrentFormDraft, navigation, vehicleId, selectedType?.name, persistFormDraftToStorage]
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const paramDraft = route.params?.logServiceRecordDraft;
+        if (paramDraft) {
+          lastFormDraftKeyRef.current = '';
+          restoreFormDraft(paramDraft);
+          return;
+        }
+        if (!vehicleId) return;
+        try {
+          const raw = await AsyncStorage.getItem(STORAGE_KEYS.logServiceRecordDraftKey(vehicleId));
+          if (cancelled || !raw) return;
+          lastFormDraftKeyRef.current = '';
+          restoreFormDraft(JSON.parse(raw));
+        } catch (e) {
+          console.warn('Could not restore service record draft', e);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [route.params?.logServiceRecordDraft, restoreFormDraft, vehicleId])
+  );
+
   useEffect(() => {
-    if (route.params?.providerMode === 'manual') {
-      setProviderMode('manual');
-      setSelectedShopProfileId('');
-      clearManualProviderFields();
+    const draft = route.params?.manualServiceCenterDraft;
+    if (!draft) return;
+    const formDraft = route.params?.logServiceRecordDraft;
+    lastFormDraftKeyRef.current = '';
+    if (formDraft) {
+      restoreFormDraft(formDraft);
+    } else if (vehicleId) {
+      AsyncStorage.getItem(STORAGE_KEYS.logServiceRecordDraftKey(vehicleId))
+        .then((raw) => {
+          if (raw) {
+            lastFormDraftKeyRef.current = '';
+            restoreFormDraft(JSON.parse(raw));
+          }
+        })
+        .catch(() => {});
     }
-  }, [route.params?.providerMode]);
+    applyManualDraft(draft);
+    navigation.setParams({
+      manualServiceCenterDraft: undefined,
+      logServiceRecordDraft: undefined,
+    });
+  }, [
+    route.params?.manualServiceCenterDraft,
+    route.params?.logServiceRecordDraft,
+    applyManualDraft,
+    restoreFormDraft,
+    navigation,
+    vehicleId,
+  ]);
+
+  useEffect(() => {
+    if (variant !== 'oil') return;
+    if (!oilNextDueDateEdited && completedAtIso) {
+      const autoDate = computeNextOilDueDateIso(completedAtIso);
+      if (autoDate) setNextOilDueIso(autoDate);
+    }
+    if (!oilNextDueKmEdited && String(finalKilometers || '').trim()) {
+      const autoKm = computeNextOilDueKm(finalKilometers, oilIntervalKm);
+      if (autoKm) setNextDueKm(autoKm);
+    }
+  }, [
+    variant,
+    completedAtIso,
+    finalKilometers,
+    oilIntervalKm,
+    oilNextDueDateEdited,
+    oilNextDueKmEdited,
+  ]);
+
+  useEffect(() => {
+    if (nextOilDueIso && !isSaneServiceIso(nextOilDueIso)) {
+      setNextOilDueIso('');
+      setOilNextDueDateEdited(false);
+    }
+  }, [nextOilDueIso]);
 
   useEffect(() => {
     const load = async () => {
@@ -212,6 +577,15 @@ export default function LogServiceRecordScreen({ navigation, route }) {
     }
   };
 
+  const handlePickOdometerPhoto = async () => {
+    try {
+      addAttachment(await pickOdometerPhotoAttachment());
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Could not pick odometer photo.');
+    }
+  };
+
   const resolvedCompletedIso = () => {
     const s = String(completedAtIso || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return undefined;
@@ -221,7 +595,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
   const resolvedNextOilDueIso = () => {
     const s = String(nextOilDueIso || '').trim();
     if (!s) return null;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return undefined;
+    if (!isSaneServiceIso(s)) return undefined;
     return s;
   };
 
@@ -247,6 +621,46 @@ export default function LogServiceRecordScreen({ navigation, route }) {
     if (!Number.isFinite(n)) return undefined;
     return n;
   };
+
+  const formatSumTotal = (labor, parts) => {
+    const sum = (labor ?? 0) + (parts ?? 0);
+    return Number.isInteger(sum) ? String(sum) : sum.toFixed(2);
+  };
+
+  const syncTotalFromLaborParts = useCallback((nextLabor, nextParts) => {
+    if (totalManuallyEditedRef.current) return;
+    const lStr = String(nextLabor ?? '').trim();
+    const pStr = String(nextParts ?? '').trim();
+    if (!lStr && !pStr) {
+      setTotalPrice('');
+      return;
+    }
+    const labor = lStr ? parseFloat(lStr) : 0;
+    const parts = pStr ? parseFloat(pStr) : 0;
+    if (!Number.isFinite(labor) || !Number.isFinite(parts)) return;
+    setTotalPrice(formatSumTotal(labor, parts));
+  }, []);
+
+  const handleLaborChange = useCallback(
+    (text) => {
+      setLaborPrice(text);
+      syncTotalFromLaborParts(text, partsPrice);
+    },
+    [partsPrice, syncTotalFromLaborParts]
+  );
+
+  const handlePartsChange = useCallback(
+    (text) => {
+      setPartsPrice(text);
+      syncTotalFromLaborParts(laborPrice, text);
+    },
+    [laborPrice, syncTotalFromLaborParts]
+  );
+
+  const handleTotalChange = useCallback((text) => {
+    totalManuallyEditedRef.current = true;
+    setTotalPrice(text);
+  }, []);
 
   const handleSubmit = async () => {
     const vid = parseInt(vehicleId, 10);
@@ -277,7 +691,8 @@ export default function LogServiceRecordScreen({ navigation, route }) {
       return;
     }
 
-    const fk = parseOptionalInt(finalKilometers);
+    const fkRaw = parseOdometerKm(finalKilometers);
+    const fk = fkRaw == null && String(finalKilometers ?? '').trim() ? undefined : fkRaw;
     if (fk === undefined) {
       setDialogMessage('Kilometers at service must be a whole number or empty.');
       setDialogVisible(true);
@@ -293,6 +708,57 @@ export default function LogServiceRecordScreen({ navigation, route }) {
       setDialogMessage('Kilometers at service are required for a brake service record.');
       setDialogVisible(true);
       return;
+    }
+
+    let mileageJumpAcknowledged = false;
+    if (fk != null) {
+      const priorMax = vehicle?.prior_max_odometer_km;
+      const analysis = analyzeFinalizeKilometers(fk, priorMax);
+      if (!analysis.ok) {
+        if (analysis.blocked) {
+          setDialogMessage(analysis.message);
+          setDialogVisible(true);
+          return;
+        }
+        const hasPhoto = hasOdometerPhotoAttachment(pendingAttachments);
+        if (hasPhoto) {
+          mileageJumpAcknowledged = true;
+        } else {
+          const confirmed = await new Promise((resolve) => {
+            Alert.alert(
+              'Large odometer increase',
+              analysis.message,
+              [
+                { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                {
+                  text: 'Add odometer photo',
+                  onPress: async () => {
+                    try {
+                      const attachment = await pickOdometerPhotoAttachment();
+                      if (attachment) {
+                        setPendingAttachments((prev) => [...prev, attachment]);
+                        Alert.alert(
+                          'Photo added',
+                          'Odometer photo attached. Tap save again to continue.'
+                        );
+                      }
+                    } catch (err) {
+                      Alert.alert('Error', err.message || 'Could not pick odometer photo.');
+                    }
+                    resolve(false);
+                  },
+                },
+                { text: 'Confirm reading', onPress: () => resolve(true) },
+              ],
+              { cancelable: true, onDismiss: () => resolve(false) }
+            );
+          });
+          if (!confirmed) {
+            return;
+          }
+          mileageJumpAcknowledged = true;
+        }
+      }
     }
 
     const nextOilIso = resolvedNextOilDueIso();
@@ -342,12 +808,17 @@ export default function LogServiceRecordScreen({ navigation, route }) {
     total = money.total_price;
 
     if (providerMode === 'manual') {
-      const anyContact = [manualName, manualPhone, manualEmail].some((s) => String(s || '').trim());
-      const hasAddr = String(manualAddress || '').trim();
-      if (anyContact && !hasAddr) {
-        setDialogMessage(
-          'Add an address when entering name, phone, or email for a manual service center.'
-        );
+      const manualErr = validateManualServiceCenterInput({
+        phone: manualPhone,
+        email: manualEmail,
+        address: manualAddress,
+        city: manualCityName,
+        countryIso: manualCountryIso,
+        latitude: manualLatitude,
+        longitude: manualLongitude,
+      });
+      if (manualErr) {
+        setDialogMessage(manualErr);
         setDialogVisible(true);
         return;
       }
@@ -392,16 +863,25 @@ export default function LogServiceRecordScreen({ navigation, route }) {
           providerMode === 'manual' ? String(manualEmail || '').trim() || null : null,
         manual_service_center_address:
           providerMode === 'manual' ? String(manualAddress || '').trim() || null : null,
-        manual_service_center_latitude: null,
-        manual_service_center_longitude: null,
+        manual_service_center_city:
+          providerMode === 'manual' ? manualCityName || null : null,
+        manual_service_center_country:
+          providerMode === 'manual' ? manualCountryIso || null : null,
+        manual_service_center_latitude:
+          providerMode === 'manual' ? roundCoordinateForApi(manualLatitude) : null,
+        manual_service_center_longitude:
+          providerMode === 'manual' ? roundCoordinateForApi(manualLongitude) : null,
         evidence_level: 'owner_entered',
         labor_price: labor,
         parts_price: parts,
         total_price: total,
-        currency: 'BGN',
+        currency: DEFAULT_CURRENCY,
         repair_parts_data: [],
         symptoms: '',
       };
+      if (mileageJumpAcknowledged) {
+        body.mileage_large_jump_acknowledged = true;
+      }
 
       const created = await createRepair(token, body);
       const newId = created?.id;
@@ -433,7 +913,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
         const amountMinor =
           total != null && Number.isFinite(Number(total)) ? Math.round(Number(total) * 100) : undefined;
         const { failed } = await uploadRepairDocuments(token, vid, newId, pendingAttachments, {
-          currency: 'BGN',
+          currency: DEFAULT_CURRENCY,
           total_amount_minor: amountMinor,
           notes: String(notes || '').trim() || undefined,
         });
@@ -446,12 +926,45 @@ export default function LogServiceRecordScreen({ navigation, route }) {
           'Service record saved, but some documents failed to upload.'
         );
       }
+      const linkedShopSelected =
+        providerMode === 'authorized' &&
+        selectedShopProfileId &&
+        Number.isFinite(parseInt(selectedShopProfileId, 10));
+      const returnToVehicleHistory = () => {
+        AsyncStorage.removeItem(STORAGE_KEYS.logServiceRecordDraftKey(String(vid))).catch(() => {});
+        navigation.navigate({
+          name: 'VehicleDetail',
+          params: {
+            vehicleId: vid,
+            scrollToServiceHistory: true,
+          },
+          merge: true,
+        });
+      };
 
-      navigation.replace('RepairDetail', {
-        repairId: newId,
-        vehicleId: vid,
-        origin: 'LogServiceRecord',
-      });
+      if (linkedShopSelected) {
+        Alert.alert('Service record saved', 'Ask the selected service center to confirm this record?', [
+          {
+            text: 'Later',
+            style: 'cancel',
+            onPress: returnToVehicleHistory,
+          },
+          {
+            text: 'Ask now',
+            onPress: async () => {
+              try {
+                await requestOwnerLoggedRepairConfirmation(token, newId);
+              } catch (_e) {
+                // Non-blocking: owner can request later from detail.
+              }
+              returnToVehicleHistory();
+            },
+          },
+        ]);
+        return;
+      }
+
+      returnToVehicleHistory();
     } catch (err) {
       console.error(err);
       setDialogMessage(err.message || 'Could not save service record.');
@@ -482,7 +995,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
           <TextInput
             mode="outlined"
             value={laborPrice}
-            onChangeText={setLaborPrice}
+            onChangeText={handleLaborChange}
             keyboardType="decimal-pad"
             style={styles.input}
           />
@@ -492,7 +1005,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
           <TextInput
             mode="outlined"
             value={partsPrice}
-            onChangeText={setPartsPrice}
+            onChangeText={handlePartsChange}
             keyboardType="decimal-pad"
             style={styles.input}
           />
@@ -504,12 +1017,13 @@ export default function LogServiceRecordScreen({ navigation, route }) {
       <TextInput
         mode="outlined"
         value={totalPrice}
-        onChangeText={setTotalPrice}
+        onChangeText={handleTotalChange}
         keyboardType="decimal-pad"
         style={styles.input}
       />
       <Text style={styles.sectionHint}>
-        Amounts use major units (e.g. BGN). If only total is filled, labor is stored as 0 and parts as the total.
+        Amounts use major units (EUR). Total updates when labor or parts change; you can still edit it.
+        If only total is filled, labor is stored as 0 and parts as the total.
       </Text>
     </>
   );
@@ -527,6 +1041,9 @@ export default function LogServiceRecordScreen({ navigation, route }) {
             { paddingBottom: 110 + Math.max(insets.bottom, 10) },
           ]}
           keyboardShouldPersistTaps="handled"
+          enableResetScrollToCoords={false}
+          enableAutomaticScroll
+          extraScrollHeight={24}
         >
           <FloatingCard>
             <Text variant="titleMedium" style={styles.sectionTitle}>
@@ -593,7 +1110,9 @@ export default function LogServiceRecordScreen({ navigation, route }) {
                   style={styles.input}
                 />
                 <Text style={styles.kmHelper}>
-                  Old records are allowed. Vehicle current kilometers will only increase when this value is higher.
+                  Old records are allowed — including lower mileage (dashboard replacement, correction, or historical
+                  entry). Vehicle current km only increases when this value is higher. Possible rollback warnings lower
+                  confidence only; they never block save.
                 </Text>
               </>
             )}
@@ -616,22 +1135,55 @@ export default function LogServiceRecordScreen({ navigation, route }) {
             {variant === 'oil' ? (
               <>
                 <Text variant="labelLarge" style={styles.label}>
-                  Next due km (optional)
+                  Oil change interval
+                </Text>
+                <View style={styles.oilIntervalRow}>
+                  {OIL_INTERVAL_KM_OPTIONS.map((opt) => {
+                    const on = oilIntervalKm === opt.km;
+                    return (
+                      <Pressable
+                        key={opt.km}
+                        onPress={() => {
+                          setOilIntervalKm(opt.km);
+                          setOilNextDueKmEdited(false);
+                        }}
+                        style={[styles.oilIntervalChip, on && styles.oilIntervalChipOn]}
+                      >
+                        <Text style={[styles.oilIntervalChipText, on && styles.oilIntervalChipTextOn]}>
+                          {opt.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text variant="labelLarge" style={styles.label}>
+                  Next due km
                 </Text>
                 <TextInput
                   mode="outlined"
                   value={nextDueKm}
-                  onChangeText={setNextDueKm}
-                  placeholder="Overrides auto interval after save if set"
+                  onChangeText={(text) => {
+                    setOilNextDueKmEdited(true);
+                    setNextDueKm(text);
+                  }}
+                  placeholder="Auto: current km + interval"
                   keyboardType="numeric"
                   style={styles.input}
                 />
                 <ServiceRecordDatePicker
                   label="Next due date"
                   valueIso={nextOilDueIso}
-                  onChangeIso={setNextOilDueIso}
+                  onChangeIso={(iso) => {
+                    setOilNextDueDateEdited(true);
+                    setNextOilDueIso(iso);
+                  }}
                   optional
+                  minIso={completedAtIso || todayIso}
                 />
+                <Text style={styles.sectionHint}>
+                  Defaults to +{oilIntervalKm.toLocaleString()} km and +1 year from the service date. Edit either
+                  field to override.
+                </Text>
               </>
             ) : null}
 
@@ -664,7 +1216,8 @@ export default function LogServiceRecordScreen({ navigation, route }) {
               Service provider
             </Text>
             <Text style={styles.sectionHint}>
-              Optional. Selecting an authorized center does not mean they have confirmed this record yet.
+              Optional. Authorized centers have access to this vehicle. Previously used workshops appear as
+              unconfirmed until they join the platform.
             </Text>
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>Self repair</Text>
@@ -683,60 +1236,173 @@ export default function LogServiceRecordScreen({ navigation, route }) {
             </View>
             {providerMode !== 'self' ? (
               <>
-                {providerMode !== 'manual' ? (
+                {!hasManualCenter ? (
                   <>
                     <Text variant="labelLarge" style={styles.label}>
-                      Authorized service center
+                      Service center
                     </Text>
-                    {authorizedCenters.length ? (
-                      <View style={styles.pickerContainer}>
-                        <Picker
-                          selectedValue={selectedShopProfileId}
-                          onValueChange={(value) => {
-                            setSelectedShopProfileId(value);
-                            setProviderMode(value ? 'authorized' : null);
-                            if (value) {
-                              clearManualProviderFields();
-                            }
-                          }}
-                          style={styles.picker}
-                        >
-                          <Picker.Item label="— None —" value="" />
-                          {authorizedCenters.map((center) => (
-                            <Picker.Item
-                              key={String(center.id)}
-                              label={center.name || `Shop #${center.id}`}
-                              value={String(center.id)}
+                    {hasProviderPickerOptions ? (
+                      <>
+                        {showProviderFilters ? (
+                          <>
+                            <TextInput
+                              mode="outlined"
+                              value={providerSearchQuery}
+                              onChangeText={setProviderSearchQuery}
+                              placeholder="Search by name, city, phone…"
+                              style={styles.input}
+                              dense
                             />
-                          ))}
-                        </Picker>
-                      </View>
+                            {providerCities.length > 1 ? (
+                              <>
+                                <Text variant="labelLarge" style={styles.label}>
+                                  City
+                                </Text>
+                                <View style={styles.pickerContainer}>
+                                  <Picker
+                                    selectedValue={providerCityFilter}
+                                    onValueChange={setProviderCityFilter}
+                                    style={styles.picker}
+                                  >
+                                    <Picker.Item label="— All cities —" value="" />
+                                    {providerCities.map((city) => (
+                                      <Picker.Item key={city} label={city} value={city} />
+                                    ))}
+                                  </Picker>
+                                </View>
+                              </>
+                            ) : null}
+                            {canFilterByNearMe ? (
+                              <View style={styles.providerFilterRow}>
+                                <Button
+                                  mode={providerNearMe ? 'contained' : 'outlined'}
+                                  compact
+                                  loading={providerLocationLoading}
+                                  disabled={providerLocationLoading}
+                                  onPress={toggleProviderNearMe}
+                                  icon={() => (
+                                    <MaterialCommunityIcons
+                                      name="crosshairs-gps"
+                                      size={18}
+                                      color={providerNearMe ? '#fff' : COLORS.PRIMARY}
+                                    />
+                                  )}
+                                >
+                                  Near me
+                                </Button>
+                                {providerNearMe ? (
+                                  <Text style={styles.providerFilterHint}>
+                                    Within 40 km · workshops with map pin only
+                                  </Text>
+                                ) : null}
+                              </View>
+                            ) : null}
+                            <Text style={styles.providerFilterCount}>
+                              Showing {filteredProviderOptions.length} of {allProviderOptions.length}
+                            </Text>
+                          </>
+                        ) : null}
+                        {filteredProviderOptions.length ? (
+                          <View style={styles.pickerContainer}>
+                            <Picker
+                              selectedValue={providerPickerValue}
+                              onValueChange={(value) => {
+                                const parsed = parseProviderPickerValue(value);
+                                if (parsed.type === 'none') {
+                                  setProviderMode(null);
+                                  setSelectedShopProfileId('');
+                                  clearManualProviderFields();
+                                  return;
+                                }
+                                if (parsed.type === 'shop') {
+                                  setSelectedShopProfileId(parsed.shopId);
+                                  setProviderMode('authorized');
+                                  clearManualProviderFields();
+                                  return;
+                                }
+                                if (parsed.type === 'workshop') {
+                                  const entry = allProviderOptions.find(
+                                    (opt) => opt.workshopKey === parsed.workshopKey
+                                  );
+                                  if (entry?.workshopDraft) applyManualDraft(entry.workshopDraft);
+                                }
+                              }}
+                              style={styles.picker}
+                            >
+                              <Picker.Item label="— None —" value="" />
+                              {filteredProviderOptions.map((option) => (
+                                <Picker.Item
+                                  key={option.pickerValue}
+                                  label={formatProviderOptionLabel(option)}
+                                  value={option.pickerValue}
+                                />
+                              ))}
+                            </Picker>
+                          </View>
+                        ) : (
+                          <Text style={styles.sectionHint}>
+                            No centers match your filters. Clear search, city, or Near me — or add a new workshop
+                            below.
+                          </Text>
+                        )}
+                      </>
                     ) : (
                       <Text style={styles.sectionHint}>
-                        No authorized service centers yet. Use Find service centers on the vehicle to grant access,
-                        or add a center manually below.
+                        No service centers yet. Grant access via Find service centers on the vehicle, or add a
+                        workshop below.
                       </Text>
                     )}
+                    {authorizedCenters.length ? (
+                      <Text style={styles.sectionHint}>
+                        Authorized centers can see this vehicle on the platform. Linking a record still needs their
+                        confirmation.
+                      </Text>
+                    ) : null}
+                    {knownWorkshops.length ? (
+                      <Text style={styles.sectionHint}>
+                        Unconfirmed workshops were logged on past records — they are not on the platform yet.
+                      </Text>
+                    ) : null}
                     <Button
                       mode="outlined"
                       icon={() => (
                         <MaterialCommunityIcons name="store-plus-outline" size={20} color={COLORS.PRIMARY} />
                       )}
-                      onPress={() => {
-                        setProviderMode('manual');
-                        setSelectedShopProfileId('');
-                      }}
+                      onPress={() => openAddWorkshop()}
                       style={styles.unlistedToggleBtn}
                     >
-                      Add service center manually
+                      Add workshop (map + phone)
                     </Button>
                   </>
                 ) : (
-                  <View style={styles.unlistedBody}>
-                    <View style={styles.unlistedHeaderRow}>
-                      <Text variant="titleSmall" style={styles.unlistedTitle}>
-                        Add service center manually
+                  <View style={styles.manualSummaryCard}>
+                    <Text variant="titleSmall" style={styles.unlistedTitle}>
+                      Workshop
+                    </Text>
+                    <Text style={styles.manualSummaryName}>{workshopSummary.title}</Text>
+                    {workshopSummary.lines.map((line) => (
+                      <Text key={line} style={styles.manualSummaryMeta}>
+                        {line}
                       </Text>
+                    ))}
+                    {String(manualPhone || '').trim() ? (
+                      <Text style={styles.manualSummaryMeta}>{manualPhone}</Text>
+                    ) : null}
+                    {String(manualEmail || '').trim() ? (
+                      <Text style={styles.manualSummaryMeta}>{manualEmail}</Text>
+                    ) : null}
+                    <Text style={styles.manualSummaryHint}>
+                      Saved in our workshop directory and linked to this record — not authorized on your vehicle
+                      until they join the platform.
+                    </Text>
+                    <View style={styles.manualSummaryActions}>
+                      <Button
+                        mode="outlined"
+                        compact
+                        onPress={() => openAddWorkshop({ draft: currentManualDraft })}
+                      >
+                        Edit
+                      </Button>
                       <Button
                         mode="text"
                         compact
@@ -745,46 +1411,9 @@ export default function LogServiceRecordScreen({ navigation, route }) {
                           clearManualProviderFields();
                         }}
                       >
-                        Cancel
+                        Remove
                       </Button>
                     </View>
-                    <Text style={styles.disclaimer}>
-                      Saved for this record only. Does not create a shop profile or authorize access on your vehicle.
-                    </Text>
-                    <TextInput
-                      mode="outlined"
-                      label="Name (optional)"
-                      value={manualName}
-                      onChangeText={setManualName}
-                      style={styles.input}
-                    />
-                    <TextInput
-                      mode="outlined"
-                      label="Phone (optional)"
-                      value={manualPhone}
-                      onChangeText={setManualPhone}
-                      style={styles.input}
-                      keyboardType="phone-pad"
-                    />
-                    <TextInput
-                      mode="outlined"
-                      label="Email (optional)"
-                      value={manualEmail}
-                      onChangeText={setManualEmail}
-                      style={styles.input}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                    />
-                    <TextInput
-                      mode="outlined"
-                      label="Address"
-                      value={manualAddress}
-                      onChangeText={setManualAddress}
-                      style={styles.input}
-                    />
-                    <Button mode="text" disabled compact style={styles.mapSoonBtn}>
-                      Pick location on map (coming soon)
-                    </Button>
                   </View>
                 )}
               </>
@@ -813,8 +1442,12 @@ export default function LogServiceRecordScreen({ navigation, route }) {
             <Text variant="labelLarge" style={[styles.label, styles.attachmentsLabel]}>
               Attachments (optional)
             </Text>
+            <Text style={styles.sectionHint}>
+              Odometer photos are optional evidence — no automatic mileage reading.
+            </Text>
             <DocumentAttachmentActions
               onAddReceipt={handlePickReceipt}
+              onAddOdometerPhoto={handlePickOdometerPhoto}
               onAddPhoto={handlePickPhoto}
               disabled={saving}
             />
@@ -906,6 +1539,50 @@ const styles = StyleSheet.create({
   picker: {
     width: '100%',
   },
+  providerFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  providerFilterHint: {
+    flex: 1,
+    color: COLORS.TEXT_MUTED,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  providerFilterCount: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  oilIntervalRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  oilIntervalChip: {
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.15)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+  },
+  oilIntervalChipOn: {
+    borderColor: COLORS.PRIMARY,
+    backgroundColor: 'rgba(37,99,235,0.08)',
+  },
+  oilIntervalChipText: {
+    color: COLORS.TEXT_DARK,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  oilIntervalChipTextOn: {
+    color: COLORS.PRIMARY,
+  },
   vehicleSummaryCard: {
     borderWidth: 1,
     borderColor: 'rgba(15,23,42,0.1)',
@@ -942,28 +1619,39 @@ const styles = StyleSheet.create({
     marginTop: 4,
     alignSelf: 'stretch',
   },
-  unlistedBody: {
-    marginTop: 4,
-  },
-  unlistedHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
   unlistedTitle: {
     color: COLORS.TEXT_DARK,
     fontWeight: '700',
   },
-  disclaimer: {
+  manualSummaryCard: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.1)',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    padding: 12,
+  },
+  manualSummaryName: {
+    color: COLORS.TEXT_DARK,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  manualSummaryMeta: {
     color: COLORS.TEXT_MUTED,
     fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 10,
+    marginTop: 2,
   },
-  mapSoonBtn: {
-    alignSelf: 'flex-start',
-    marginTop: -4,
+  manualSummaryHint: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 8,
+  },
+  manualSummaryActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
   },
   attachmentsLabel: {
     marginTop: 12,

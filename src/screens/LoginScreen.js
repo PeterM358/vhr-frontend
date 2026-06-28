@@ -4,6 +4,7 @@ import { Text, TextInput, Button, ActivityIndicator, useTheme } from 'react-nati
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { login } from '../api/auth';
+import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import { AuthContext } from '../context/AuthManager';
 import Logo from '../assets/images/logo.svg';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -114,8 +115,12 @@ export default function LoginScreen({ navigation }) {
           await AsyncStorage.setItem(STORAGE_KEYS.IS_SHOP, data.is_shop ? 'true' : 'false');
           await AsyncStorage.setItem(STORAGE_KEYS.IS_CLIENT, data.is_client ? 'true' : 'false');
 
-          const target = data.is_shop ? 'ShopHome' : 'Home';
-          navigation.reset({ index: 0, routes: [{ name: target }] });
+          if (data.is_shop) {
+            const route = await resolveShopEntryRoute();
+            navigation.reset(buildShopAuthReset(route));
+          } else {
+            navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+          }
         } catch (error) {
           console.error('❌ Google login error', error);
           setError('Google login failed. Try again.');
@@ -163,9 +168,12 @@ export default function LoginScreen({ navigation }) {
         console.log('⚠️ No shop profiles found');
       }
 
-      const target = data.is_shop ? 'ShopHome' : 'Home';
-
-      navigation.reset({ index: 0, routes: [{ name: target }] });
+          if (data.is_shop) {
+            const route = await resolveShopEntryRoute();
+            navigation.reset(buildShopAuthReset(route));
+          } else {
+            navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+          }
     } catch (err) {
       console.error('❌ Login error', err);
       setError('Login failed. Please check your credentials.');

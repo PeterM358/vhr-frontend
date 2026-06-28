@@ -33,6 +33,12 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 import FloatingCard from '../components/ui/FloatingCard';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
 import { COLORS } from '../constants/colors';
+import { parseOdometerKm } from '../utils/finalizeMileageValidation';
+import {
+  buildVisitSlotOptions,
+  buildPreferredVisitTimes,
+  formatPreferredVisitNote,
+} from '../utils/shopVisitSlots';
 
 
 
@@ -42,7 +48,9 @@ export default function CreateRepairScreen({ navigation, route }) {
   const isEditMode = route.params?.mode === 'edit_request';
   const editRepairId = route.params?.repairId ? Number(route.params.repairId) : null;
   const preselectedVehicleId = route.params?.vehicleId?.toString() || '';
+  const preselectedShopId = route.params?.shopId ? Number(route.params.shopId) : null;
   const fromVehicleDetail = route.params?.origin === 'VehicleDetail' || route.params?.returnTo === 'VehicleDetail';
+  const fromShopDetail = route.params?.origin === 'ShopDetail' || route.params?.returnTo === 'ShopDetail';
   const [vehicles, setVehicles] = useState([]);
   const [repairTypes, setRepairTypes] = useState([]);
 
@@ -51,11 +59,25 @@ export default function CreateRepairScreen({ navigation, route }) {
   const [serviceCategorySlug, setServiceCategorySlug] = useState('');
   const [description, setDescription] = useState('');
   const [symptoms, setSymptoms] = useState('');
+  const [visitDayOffset, setVisitDayOffset] = useState(1);
+  const [visitTimeSlot, setVisitTimeSlot] = useState('09:00');
+  const [visitExtraNotes, setVisitExtraNotes] = useState('');
+  const [availabilityNotes, setAvailabilityNotes] = useState(
+    route.params?.availabilityNotes || ''
+  );
   const [kilometers, setKilometers] = useState('');
   const [status] = useState('open');
-  const [targetingMode, setTargetingMode] = useState('all_qualified');
+  const [targetingMode, setTargetingMode] = useState(
+    route.params?.targetingMode || 'all_qualified'
+  );
   const [serviceCenters, setServiceCenters] = useState([]);
-  const [selectedCenterIds, setSelectedCenterIds] = useState([]);
+  const [selectedCenterIds, setSelectedCenterIds] = useState(() => {
+    if (route.params?.selectedCenterIds?.length) {
+      return route.params.selectedCenterIds.map((id) => Number(id)).filter((id) => !Number.isNaN(id));
+    }
+    if (preselectedShopId) return [preselectedShopId];
+    return [];
+  });
   const [requiresGuarantee, setRequiresGuarantee] = useState(false);
   const [preferredRadiusKm, setPreferredRadiusKm] = useState('');
   const [loadingCenters, setLoadingCenters] = useState(false);
@@ -67,7 +89,6 @@ export default function CreateRepairScreen({ navigation, route }) {
   const [selectedMedia, setSelectedMedia] = useState([]);
   const [existingMedia, setExistingMedia] = useState([]);
   const [showVehiclePicker, setShowVehiclePicker] = useState(!preselectedVehicleId);
-  const [serviceTypeExpanded, setServiceTypeExpanded] = useState(false);
 
   // Restore state when returning from related flows
   useEffect(() => {
@@ -77,6 +98,16 @@ export default function CreateRepairScreen({ navigation, route }) {
       if (route.params.serviceCategorySlug !== undefined) setServiceCategorySlug(route.params.serviceCategorySlug);
       if (route.params.description !== undefined) setDescription(route.params.description);
       if (route.params.symptoms !== undefined) setSymptoms(route.params.symptoms);
+      if (route.params.availabilityNotes !== undefined) {
+        setAvailabilityNotes(route.params.availabilityNotes);
+      }
+      if (
+        route.params.targetingMode === 'selected_centers' &&
+        preselectedShopId &&
+        !route.params.selectedCenterIds?.length
+      ) {
+        setSelectedCenterIds([preselectedShopId]);
+      }
       if (route.params.kilometers !== undefined) setKilometers(route.params.kilometers);
       if (route.params.targetingMode) setTargetingMode(route.params.targetingMode);
       if (route.params.selectedCenterIds) setSelectedCenterIds(route.params.selectedCenterIds);
@@ -103,16 +134,13 @@ export default function CreateRepairScreen({ navigation, route }) {
     }
   }, [selectedVehicle]);
 
-  // Prefill odometer from vehicle when opening request from vehicle detail (editable).
   useEffect(() => {
-    if (isEditMode || !fromVehicleDetail || !selectedVehicle) return;
-    setKilometers((prev) => {
-      if (prev !== undefined && String(prev).trim() !== '') return prev;
-      const vk = selectedVehicle.kilometers;
-      if (vk != null && vk !== '') return String(vk);
-      return prev;
-    });
-  }, [fromVehicleDetail, selectedVehicle, isEditMode]);
+    if (isEditMode || !selectedVehicle) return;
+    const vk = selectedVehicle.kilometers;
+    if (vk != null && vk !== '') {
+      setKilometers(String(vk));
+    }
+  }, [selectedVehicle, isEditMode]);
 
   useEffect(() => {
     navigation.setOptions({
@@ -134,9 +162,31 @@ export default function CreateRepairScreen({ navigation, route }) {
   }, [repairTypes]);
 
   const filteredRepairTypes = useMemo(() => {
-    if (!serviceCategorySlug) return repairTypes;
-    return repairTypes.filter((t) => t.category_slug === serviceCategorySlug);
+    const rows = serviceCategorySlug
+      ? repairTypes.filter((t) => t.category_slug === serviceCategorySlug)
+      : repairTypes;
+    return [...rows].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
   }, [repairTypes, serviceCategorySlug]);
+
+  const visitDays = useMemo(() => buildVisitSlotOptions(null, { maxDays: 14 }), []);
+  const selectedVisitDay = useMemo(
+    () => visitDays.find((row) => row.offset === visitDayOffset) || visitDays[0] || null,
+    [visitDays, visitDayOffset]
+  );
+  const visitTimeSlots = selectedVisitDay?.slots?.length ? selectedVisitDay.slots : ['09:00'];
+
+  useEffect(() => {
+    if (!visitDays.length) return;
+    if (!visitDays.some((row) => row.offset === visitDayOffset)) {
+      setVisitDayOffset(visitDays[0].offset);
+    }
+  }, [visitDays, visitDayOffset]);
+
+  useEffect(() => {
+    if (!visitTimeSlots.includes(visitTimeSlot)) {
+      setVisitTimeSlot(visitTimeSlots[0]);
+    }
+  }, [visitTimeSlots, visitTimeSlot]);
 
   // Initial data load
   useEffect(() => {
@@ -179,6 +229,22 @@ export default function CreateRepairScreen({ navigation, route }) {
           setPreferredRadiusKm(
             editRepair.preferred_radius_km != null ? String(editRepair.preferred_radius_km) : ''
           );
+          setAvailabilityNotes(editRepair.availability_notes || '');
+          setVisitExtraNotes(editRepair.availability_notes || '');
+          if (editRepair.client_preferred_start) {
+            const preferred = new Date(editRepair.client_preferred_start);
+            if (!Number.isNaN(preferred.getTime())) {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const preferredDay = new Date(preferred);
+              preferredDay.setHours(0, 0, 0, 0);
+              const offset = Math.round((preferredDay - today) / (24 * 60 * 60 * 1000));
+              setVisitDayOffset(offset);
+              setVisitTimeSlot(
+                `${preferred.getHours().toString().padStart(2, '0')}:${preferred.getMinutes().toString().padStart(2, '0')}`
+              );
+            }
+          }
           const existing = Array.isArray(editRepair.repair_media)
             ? editRepair.repair_media
             : Array.isArray(editRepair.media)
@@ -192,7 +258,7 @@ export default function CreateRepairScreen({ navigation, route }) {
           setVehicleId(vehicleData[0].id.toString());
         }
       } catch (err) {
-        console.error('❌ Error:', err);
+        console.error('? Error:', err);
         setDialogMessage('Error loading form data');
         setDialogVisible(true);
       } finally {
@@ -304,14 +370,37 @@ export default function CreateRepairScreen({ navigation, route }) {
     setSelectedMedia((prev) => prev.filter((m) => m.localId !== localId));
   };
 
+  const selectServiceCategory = (slug) => {
+    setServiceCategorySlug(slug);
+  };
+
+  const selectRepairType = (type) => {
+    setRepairTypeId(String(type.id));
+    if (type.category_slug) {
+      setServiceCategorySlug(type.category_slug);
+    }
+  };
+
+  const resolvedRepairTypeId = useMemo(() => {
+    if (repairTypeId) return repairTypeId;
+    return '';
+  }, [repairTypeId]);
+
   const handleSubmitRequest = () => {
     if (!vehicleId) {
       setDialogMessage('Vehicle is required.');
       setDialogVisible(true);
       return;
     }
-    if (!String(description || '').trim() && !String(symptoms || '').trim()) {
-      setDialogMessage('Describe the problem or add photos/videos so service centers can understand the request.');
+    const typeId = resolvedRepairTypeId || selectedRepairType?.id;
+    const hasRepairType = Boolean(typeId);
+    const hasWrittenDetails =
+      Boolean(String(description || '').trim()) || Boolean(String(symptoms || '').trim());
+    const hasMedia = selectedMedia.length > 0;
+    if (!hasRepairType && !hasWrittenDetails && !hasMedia) {
+      setDialogMessage(
+        'Select a service type (e.g. Oil change), or add symptoms or photos so shops understand the request.'
+      );
       setDialogVisible(true);
       return;
     }
@@ -324,20 +413,10 @@ export default function CreateRepairScreen({ navigation, route }) {
   };
 
   const resolveKilometersForApi = () => {
-    const raw = String(kilometers ?? '').trim();
-    const fromInput = raw === '' ? NaN : parseInt(raw, 10);
-    if (Number.isFinite(fromInput) && fromInput >= 0) {
-      return fromInput;
-    }
-    if (
-      !isEditMode &&
-      selectedVehicle?.kilometers != null &&
-      selectedVehicle.kilometers !== ''
-    ) {
-      const vk = parseInt(String(selectedVehicle.kilometers), 10);
-      if (Number.isFinite(vk) && vk >= 0) return vk;
-    }
-    return 0;
+    const vk = parseOdometerKm(selectedVehicle?.kilometers);
+    if (vk != null) return vk;
+    const fromInput = parseOdometerKm(kilometers);
+    return fromInput != null ? fromInput : 0;
   };
 
   // Save service request intake
@@ -347,11 +426,23 @@ export default function CreateRepairScreen({ navigation, route }) {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const shopProfileId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
       const kmForApi = resolveKilometersForApi();
+      const preferredTimes = buildPreferredVisitTimes(selectedVisitDay, visitTimeSlot);
+      const preferredNote = formatPreferredVisitNote(selectedVisitDay, visitTimeSlot);
+      const extraNotes = String(visitExtraNotes || availabilityNotes || '').trim();
+      const availabilityText = [preferredNote, extraNotes && extraNotes !== preferredNote ? extraNotes : '']
+        .filter(Boolean)
+        .join('. ');
+
+      const typeIdForApi = resolvedRepairTypeId || selectedRepairType?.id;
+      const parsedVehicleId = parseInt(vehicleId, 10);
+      if (!Number.isFinite(parsedVehicleId)) {
+        throw new Error('Vehicle is required.');
+      }
 
       const body = {
-        repair_type: repairTypeId ? parseInt(repairTypeId, 10) : null,
-        description,
-        symptoms,
+        repair_type: typeIdForApi ? parseInt(String(typeIdForApi), 10) : null,
+        description: String(description || '').trim(),
+        symptoms: String(symptoms || '').trim(),
         kilometers: kmForApi,
         status,
         request_targeting_mode: targetingMode,
@@ -359,10 +450,13 @@ export default function CreateRepairScreen({ navigation, route }) {
           targetingMode === 'selected_centers' ? selectedCenterIds : [],
         requires_guarantee: requiresGuarantee,
         preferred_radius_km: preferredRadiusKm ? parseInt(preferredRadiusKm, 10) : null,
+        availability_notes: availabilityText || null,
+        client_preferred_start: preferredTimes.start,
+        client_preferred_end: preferredTimes.end,
         repair_parts_data: [],
       };
       if (!isEditMode) {
-        body.vehicle = parseInt(vehicleId, 10);
+        body.vehicle = parsedVehicleId;
         body.source = 'marketplace_request';
         body.status = 'open';
       }
@@ -440,6 +534,11 @@ export default function CreateRepairScreen({ navigation, route }) {
           return;
         }
 
+        if ((returnTo === 'ShopDetail' || origin === 'ShopDetail') && route.params?.shopId) {
+          navigation.navigate('ShopDetail', { shopId: route.params.shopId });
+          return;
+        }
+
         if (savedRepairId) {
           navigation.navigate('RepairDetail', {
             repairId: savedRepairId,
@@ -456,7 +555,15 @@ export default function CreateRepairScreen({ navigation, route }) {
         navigation.navigate('Home');
       }, 1500);
     } catch (err) {
-      console.error('❌ Save Error:', err);
+      console.error('Save Error:', err);
+      if (__DEV__) {
+        console.warn('Repair request payload debug:', {
+          vehicleId,
+          repairTypeId: resolvedRepairTypeId,
+          selectedRepairTypeId: selectedRepairType?.id,
+          responseText: err?.responseText,
+        });
+      }
       setDialogMessage(err.message || 'Submission failed');
       setDialogVisible(true);
     } finally {
@@ -483,10 +590,61 @@ export default function CreateRepairScreen({ navigation, route }) {
             <Text style={styles.sectionHint}>
               Share symptoms and details so service centers understand the issue quickly.
             </Text>
+            <Text variant="labelLarge" style={styles.label}>Repair category</Text>
+            <View style={styles.centerChipsWrap}>
+              <Pressable
+                onPress={() => selectServiceCategory('')}
+                style={[styles.centerChip, !serviceCategorySlug && styles.centerChipSelected]}
+              >
+                <Text style={[styles.centerChipText, !serviceCategorySlug && styles.centerChipTextSelected]}>
+                  All
+                </Text>
+              </Pressable>
+              {categoryOptions.map((c) => {
+                const selected = serviceCategorySlug === c.slug;
+                return (
+                  <Pressable
+                    key={c.slug}
+                    onPress={() => selectServiceCategory(c.slug)}
+                    style={[styles.centerChip, selected && styles.centerChipSelected]}
+                  >
+                    <Text style={[styles.centerChipText, selected && styles.centerChipTextSelected]}>
+                      {c.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text variant="labelLarge" style={[styles.label, { marginTop: 8 }]}>Repair type</Text>
+            <View style={styles.centerChipsWrap}>
+              {filteredRepairTypes.length === 0 ? (
+                <Text style={styles.sectionHint}>No service types in this category.</Text>
+              ) : (
+                filteredRepairTypes.map((t) => {
+                  const selected = String(t.id) === String(repairTypeId);
+                  return (
+                    <Pressable
+                      key={t.id}
+                      onPress={() => selectRepairType(t)}
+                      style={[styles.centerChip, selected && styles.centerChipSelected]}
+                    >
+                      <Text style={[styles.centerChipText, selected && styles.centerChipTextSelected]}>
+                        {t.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })
+              )}
+            </View>
+            <Text style={styles.sectionHint}>
+              {repairTypeId
+                ? `${selectedRepairType?.name || 'Service'} selected — description is optional.`
+                : 'Pick a service type (recommended) or describe the problem below.'}
+            </Text>
             {selectedVehicle ? (
               <View style={styles.vehicleSummaryCard}>
                 <View style={styles.vehicleSummaryMain}>
-                  <Text style={styles.vehicleSummaryPlate}>{selectedVehicle.license_plate || '—'}</Text>
+                  <Text style={styles.vehicleSummaryPlate}>{selectedVehicle.license_plate || '�'}</Text>
                   <Text style={styles.vehicleSummaryName}>
                     {[selectedVehicle.make_name, selectedVehicle.model_name].filter(Boolean).join(' ') || 'Vehicle'}
                   </Text>
@@ -535,9 +693,16 @@ export default function CreateRepairScreen({ navigation, route }) {
                   style={styles.input}
                 />
                 <Text style={styles.sectionHint}>
-                  Pre-filled from your vehicle when available. Change it if the odometer has moved; the app keeps the higher reading on your vehicle profile.
+                  Service requests use the odometer on your vehicle profile (shown above). Update it on
+                  the vehicle screen if it has changed since your last service.
                 </Text>
               </View>
+            ) : null}
+            {fromShopDetail ? (
+              <Text style={styles.shopRequestNotice}>
+                Your preferred visit time is a suggestion only. Wait for the shop to confirm before you
+                bring your vehicle.
+              </Text>
             ) : null}
             <Text variant="labelLarge" style={styles.label}>Symptoms</Text>
             <TextInput
@@ -548,12 +713,67 @@ export default function CreateRepairScreen({ navigation, route }) {
               style={styles.input}
               multiline
             />
-            <Text variant="labelLarge" style={styles.label}>Description</Text>
+            <Text variant="labelLarge" style={styles.label}>Preferred visit time</Text>
+            <Text style={styles.sectionHint}>
+              Pick a day and time. The shop must confirm before it counts as booked.
+            </Text>
+            <View style={styles.centerChipsWrap}>
+              {visitDays.map((day) => {
+                const selected = day.offset === visitDayOffset;
+                return (
+                  <Pressable
+                    key={day.offset}
+                    onPress={() => setVisitDayOffset(day.offset)}
+                    style={[styles.centerChip, selected && styles.centerChipSelected]}
+                  >
+                    <Text style={[styles.centerChipText, selected && styles.centerChipTextSelected]}>
+                      {day.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={[styles.centerChipsWrap, { marginTop: 4 }]}>
+              {visitTimeSlots.map((slot) => {
+                const selected = slot === visitTimeSlot;
+                return (
+                  <Pressable
+                    key={slot}
+                    onPress={() => setVisitTimeSlot(slot)}
+                    style={[styles.centerChip, selected && styles.centerChipSelected]}
+                  >
+                    <Text style={[styles.centerChipText, selected && styles.centerChipTextSelected]}>
+                      {slot}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {selectedVisitDay ? (
+              <Text style={styles.sectionHint}>
+                {formatPreferredVisitNote(selectedVisitDay, visitTimeSlot)}
+              </Text>
+            ) : null}
+            <TextInput
+              mode="outlined"
+              value={visitExtraNotes}
+              onChangeText={setVisitExtraNotes}
+              placeholder="Extra timing notes (optional)"
+              style={styles.input}
+              multiline
+            />
+            <Text variant="labelLarge" style={styles.label}>
+              {repairTypeId ? 'Extra notes (optional)' : 'Description'}
+            </Text>
             <TextInput
               mode="outlined"
               value={description}
               onChangeText={setDescription}
-              placeholder="Additional details for service center"
+              placeholder={
+                repairTypeId
+                  ? 'Anything else the shop should know (optional)'
+                  : 'What should the shop look at?'
+              }
               style={styles.input}
               multiline
             />
@@ -610,38 +830,6 @@ export default function CreateRepairScreen({ navigation, route }) {
                 ))}
               </View>
             ) : null}
-          </FloatingCard>
-
-          <FloatingCard>
-            <Pressable onPress={() => setServiceTypeExpanded((prev) => !prev)} style={styles.expandHeader}>
-              <Text variant="titleMedium" style={styles.sectionTitle}>Add service type (optional)</Text>
-              <Text style={styles.expandHeaderAction}>{serviceTypeExpanded ? 'Hide' : 'Expand'}</Text>
-            </Pressable>
-            {serviceTypeExpanded ? (
-              <>
-                <Text variant="labelLarge" style={styles.label}>Service category</Text>
-                <View style={styles.pickerContainer}>
-                  <Picker selectedValue={serviceCategorySlug} onValueChange={setServiceCategorySlug} style={styles.picker}>
-                    <Picker.Item label="Any category" value="" />
-                    {categoryOptions.map((c) => (
-                      <Picker.Item key={c.slug} label={c.name} value={c.slug} />
-                    ))}
-                  </Picker>
-                </View>
-                <Text variant="labelLarge" style={styles.label}>Service type (optional)</Text>
-                <View style={styles.pickerContainer}>
-                  <Picker selectedValue={repairTypeId} onValueChange={setRepairTypeId} style={styles.picker}>
-                    <Picker.Item label="Select service type..." value="" />
-                    {filteredRepairTypes.map((t) => (
-                      <Picker.Item key={t.id} label={t.name} value={t.id.toString()} />
-                    ))}
-                  </Picker>
-                </View>
-              </>
-            ) : null}
-            <Text style={styles.sectionHint}>
-              Not sure? Describe the issue and we’ll help classify it.
-            </Text>
           </FloatingCard>
 
           <FloatingCard>
@@ -823,15 +1011,17 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_MUTED,
     marginBottom: 10,
   },
-  expandHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  expandHeaderAction: {
-    color: COLORS.PRIMARY,
-    fontWeight: '700',
-    marginLeft: 8,
+  shopRequestNotice: {
+    marginBottom: 10,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    color: '#9a3412',
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '600',
   },
   label: {
     marginTop: 10,

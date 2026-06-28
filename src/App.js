@@ -8,6 +8,7 @@ import { Provider as PaperProvider } from 'react-native-paper';
 import { AppTheme } from './styles/theme';
 import { ThemeProvider } from './context/ThemeManager';
 import AuthManager from './context/AuthManager';
+import MessageDialogHost from './components/ui/MessageDialog';
 
 const handleDeepLink = ({ url }) => {
   if (url) {
@@ -58,6 +59,7 @@ export default function App() {
             <AuthManager>
               <WebSocketProvider>
                 <AppNavigator />
+                <MessageDialogHost />
               </WebSocketProvider>
             </AuthManager>
           </PaperProvider>

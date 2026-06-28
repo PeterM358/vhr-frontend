@@ -17,6 +17,7 @@ export async function getServiceCenters(filters = {}, init = {}) {
   if (filters.vehicle_type) params.append('vehicle_type', filters.vehicle_type);
   if (filters.category) params.append('category', filters.category);
   if (filters.repair_type) params.append('repair_type', filters.repair_type);
+  if (filters.include_reported !== false) params.append('include_reported', 'true');
 
   const qs = params.toString();
   const url = `${API_BASE_URL}/api/service-centers/${qs ? `?${qs}` : ''}`;

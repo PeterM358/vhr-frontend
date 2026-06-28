@@ -24,13 +24,15 @@ import ClientRepairsList from '../components/client/ClientRepairsList';
 import RepairDetailScreen from '../screens/RepairDetailScreen';
 import CreateRepairScreen from '../screens/CreateRepairScreen';
 import LogServiceRecordScreen from '../screens/LogServiceRecordScreen';
+import MapLocationPickerScreen from '../screens/MapLocationPickerScreen';
+import AddManualServiceCenterScreen from '../screens/AddManualServiceCenterScreen';
 import ManageVehicleServiceCentersScreen from '../screens/ManageVehicleServiceCentersScreen';
 import AddObligationPaymentScreen from '../screens/AddObligationPaymentScreen';
 import CreateVehicleScreen from '../screens/CreateVehicleScreen';
 import CreatePromotionScreen from '../screens/CreatePromotionScreen';
 import ShopRegisterClientScreen from '../screens/ShopRegisterClientScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
-import OffersScreen from '../screens/OffersScreen';
+import ClientActivityScreen from '../screens/ClientActivityScreen';
 
 import AuthorizedClients from '../components/shop/AuthorizedClients';
 import ShopPromotions from '../components/shop/ShopPromotions';
@@ -42,6 +44,10 @@ import HomeDrawer from './HomeDrawer';
 import NotificationsWithAppbar from '../components/shop/NotificationsWithAppbar';
 
 import ShopProfileScreen from '../screens/ShopProfileScreen';
+import ShopServiceMenuScreen from '../screens/ShopServiceMenuScreen';
+import ShopInvoicingScreen from '../screens/ShopInvoicingScreen';
+import ShopWarehouseReceiveScreen from '../screens/ShopWarehouseReceiveScreen';
+import ShopInvoiceDetailScreen from '../screens/ShopInvoiceDetailScreen';
 import ClientProfileScreen from '../screens/ClientProfileScreen';
 import AddShopPartScreen from '../screens/AddShopPartScreen';
 
@@ -78,17 +84,11 @@ const transparentStackHeader = {
   headerTitleAlign: 'center',
 };
 
-/** Large hit target + label; avoids tiny default back control on Android with transparent headers. */
-function homeHeaderLeft(navigation) {
+/** Pop one screen — use when returning to the screen below (avoids duplicate stack entries). */
+function stackBackHeaderLeft(navigation, label = 'Back') {
   return () => (
     <Pressable
-      onPress={() => {
-        if (navigation.canGoBack()) {
-          navigation.goBack();
-          return;
-        }
-        navigation.navigate('Home');
-      }}
+      onPress={() => navigation.goBack()}
       accessibilityRole="button"
       accessibilityLabel="Back"
       hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
@@ -102,7 +102,60 @@ function homeHeaderLeft(navigation) {
       }}
     >
       <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
-      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>Back</Text>
+      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** Large hit target + label; avoids tiny default back control on Android with transparent headers. */
+function drawerHeaderLeft(navigation, homeRoute, label = 'Home') {
+  return () => (
+    <Pressable
+      onPress={() => navigation.navigate(homeRoute)}
+      accessibilityRole="button"
+      accessibilityLabel="Back"
+      hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        minHeight: Platform.OS === 'android' ? 52 : 44,
+        paddingVertical: 8,
+        paddingRight: 10,
+        paddingLeft: Platform.OS === 'android' ? 4 : 0,
+      }}
+    >
+      <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
+      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function homeHeaderLeft(navigation) {
+  return drawerHeaderLeft(navigation, 'Home', 'Home');
+}
+
+function shopHomeHeaderLeft(navigation) {
+  return drawerHeaderLeft(navigation, 'ShopHome', 'Home');
+}
+
+function vehicleDetailsHeaderLeft(navigation) {
+  return () => (
+    <Pressable
+      onPress={() => navigation.navigate('ClientVehicles')}
+      accessibilityRole="button"
+      accessibilityLabel="Back to vehicles"
+      hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        minHeight: Platform.OS === 'android' ? 52 : 44,
+        paddingVertical: 8,
+        paddingRight: 10,
+        paddingLeft: Platform.OS === 'android' ? 4 : 0,
+      }}
+    >
+      <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
+      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>My Vehicles</Text>
     </Pressable>
   );
 }
@@ -138,7 +191,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Register"
           component={RegisterScreen}
-          options={{ ...transparentStackHeader, title: 'Sign Up' }}
+          options={{ ...transparentStackHeader, title: 'Create account' }}
         />
         <Stack.Screen name="Home" component={HomeDrawer} options={{ headerShown: false }} />
         <Stack.Screen name="ShopHome" component={ShopDrawer} options={{ headerShown: false, title: 'Home' }} />
@@ -155,9 +208,27 @@ export default function AppNavigator() {
             ...transparentStackHeader,
             title: 'My Vehicles',
             headerLeft: homeHeaderLeft(navigation),
+            headerBackVisible: false,
           })}
         />
-        <Stack.Screen name="VehicleDetail" component={VehicleDetailScreen} options={{ title: 'Vehicle Details' }}/> 
+        <Stack.Screen
+          name="VehicleDetail"
+          component={VehicleDetailScreen}
+          options={({ navigation, route }) => {
+            const backLabel = route.params?.backLabel;
+            if (backLabel) {
+              return {
+                title: 'Vehicle Details',
+                headerLeft: stackBackHeaderLeft(navigation, backLabel),
+                headerBackVisible: false,
+              };
+            }
+            return {
+              title: 'Vehicle Details',
+              headerLeft: vehicleDetailsHeaderLeft(navigation),
+            };
+          }}
+        />
         <Stack.Screen
           name="VehicleSpecs"
           component={VehicleSpecsScreen}
@@ -182,16 +253,50 @@ export default function AppNavigator() {
             return {
               ...transparentStackHeader,
               title: fromVehicleDetail ? 'Vehicle Repairs' : 'Repairs',
-              ...(fromVehicleDetail ? {} : { headerLeft: homeHeaderLeft(navigation) }),
+              ...(fromVehicleDetail
+                ? {}
+                : { headerLeft: homeHeaderLeft(navigation), headerBackVisible: false }),
             };
           }}
         />
-        <Stack.Screen name="RepairDetail" component={RepairDetailScreen} options={{ title: 'Repair Details' }}/>
+        <Stack.Screen
+          name="RepairDetail"
+          component={RepairDetailScreen}
+          options={({ navigation, route }) => {
+            const returnTo = route.params?.returnTo;
+            const backLabel = route.params?.backLabel;
+            if (returnTo === 'ClientActivity' || returnTo === 'ClientNotifications') {
+              return {
+                title: 'Repair',
+                headerLeft: stackBackHeaderLeft(navigation, backLabel || 'Activity'),
+                headerBackVisible: false,
+              };
+            }
+            if (returnTo === 'ShopCalendar') {
+              return {
+                title: 'Repair',
+                headerLeft: stackBackHeaderLeft(navigation, backLabel || 'Calendar'),
+                headerBackVisible: false,
+              };
+            }
+            return { title: 'Repair Details' };
+          }}
+        />
         <Stack.Screen name="CreateRepair" component={CreateRepairScreen} options={{ title: 'Request Service' }}/>
         <Stack.Screen
           name="LogServiceRecord"
           component={LogServiceRecordScreen}
           options={{ title: 'Add Service Record' }}
+        />
+        <Stack.Screen
+          name="AddManualServiceCenter"
+          component={AddManualServiceCenterScreen}
+          options={{ title: 'Add service center' }}
+        />
+        <Stack.Screen
+          name="MapLocationPicker"
+          component={MapLocationPickerScreen}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="ManageVehicleServiceCenters"
@@ -206,16 +311,58 @@ export default function AppNavigator() {
         <Stack.Screen name="CreateVehicle" component={CreateVehicleScreen} options={{ title: 'Create Vehicle' }}/>
         <Stack.Screen name="CreatePromotion" component={CreatePromotionScreen} options={{ title: 'Create Promotion' }}/>
         <Stack.Screen name="ShopRegisterClient" component={ShopRegisterClientScreen} options={{ title: 'Register Client' }}/>
-        <Stack.Screen name="ChooseShop" component={ChooseShopScreen} options={{ title: '' }}/>
+        <Stack.Screen
+          name="ChooseShop"
+          component={ChooseShopScreen}
+          options={({ navigation }) => ({
+            title: '',
+            headerLeft: shopHomeHeaderLeft(navigation),
+            headerBackVisible: false,
+          })}
+        />
+        <Stack.Screen
+          name="ClientActivity"
+          component={ClientActivityScreen}
+          options={{ headerShown: false, title: 'Activity' }}
+        />
         <Stack.Screen
           name="OffersScreen"
-          component={OffersScreen}
-          options={{ headerShown: false, title: 'Offers' }}
+          component={ClientActivityScreen}
+          options={{ headerShown: false, title: 'Activity' }}
         />
-        <Stack.Screen name="AuthorizedClients" component={AuthorizedClients} options={{ title: 'Authorized Clients' }}/>
-        <Stack.Screen name="ShopPromotions" component={ShopPromotions} options={{ title: 'Promotions' }}/>
+        <Stack.Screen
+          name="ClientNotifications"
+          component={ClientActivityScreen}
+          options={{ headerShown: false, title: 'Activity' }}
+        />
+        <Stack.Screen
+          name="AuthorizedClients"
+          component={AuthorizedClients}
+          options={({ navigation }) => ({
+            title: 'Authorized Clients',
+            headerLeft: shopHomeHeaderLeft(navigation),
+            headerBackVisible: false,
+          })}
+        />
+        <Stack.Screen
+          name="ShopPromotions"
+          component={ShopPromotions}
+          options={({ navigation }) => ({
+            title: 'Promotions',
+            headerLeft: shopHomeHeaderLeft(navigation),
+            headerBackVisible: false,
+          })}
+        />
         <Stack.Screen name="RepairsList" component={RepairsList} options={{ title: 'Repairs' }}/>
-        <Stack.Screen name="NotificationsList" component={NotificationsList} options={{ title: 'Notifications' }}/>
+        <Stack.Screen
+          name="NotificationsList"
+          component={NotificationsList}
+          options={({ navigation }) => ({
+            title: 'Notifications',
+            headerLeft: shopHomeHeaderLeft(navigation),
+            headerBackVisible: false,
+          })}
+        />
         <Stack.Screen
           name="ShopNotificationsScreen"
           component={NotificationsWithAppbar}
@@ -226,7 +373,51 @@ export default function AppNavigator() {
             headerBackTitleVisible: true,
           }}
         />
-        <Stack.Screen name="ShopProfile" component={ShopProfileScreen} options={{ title: 'Profile' }}/>
+        <Stack.Screen
+          name="ShopProfile"
+          component={ShopProfileScreen}
+          options={({ navigation }) => ({
+            title: 'Profile',
+            headerLeft: shopHomeHeaderLeft(navigation),
+            headerBackVisible: false,
+          })}
+        />
+        <Stack.Screen
+          name="ShopServiceMenu"
+          component={ShopServiceMenuScreen}
+          options={({ navigation }) => ({
+            title: 'Price list',
+            headerLeft: shopHomeHeaderLeft(navigation),
+            headerBackVisible: false,
+          })}
+        />
+        <Stack.Screen
+          name="ShopInvoicing"
+          component={ShopInvoicingScreen}
+          options={({ navigation }) => ({
+            title: 'Invoicing',
+            headerLeft: shopHomeHeaderLeft(navigation),
+            headerBackVisible: false,
+          })}
+        />
+        <Stack.Screen
+          name="ShopWarehouse"
+          component={ShopWarehouseReceiveScreen}
+          options={({ navigation }) => ({
+            title: 'Warehouse',
+            headerLeft: shopHomeHeaderLeft(navigation),
+            headerBackVisible: false,
+          })}
+        />
+        <Stack.Screen
+          name="ShopInvoiceDetail"
+          component={ShopInvoiceDetailScreen}
+          options={{
+            title: 'Invoice',
+            headerBackTitle: 'Back',
+            headerBackTitleVisible: true,
+          }}
+        />
         
         <Stack.Screen name="AddShopPartScreen" component={AddShopPartScreen} options={{ title: 'Add Parts to Inventory' }}/>
         <Stack.Screen name="SelectRepairParts" component={SelectRepairPartsScreen} options={{ title: 'Select / Add Parts' }}/>
@@ -234,9 +425,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ClientProfile"
           component={ClientProfileScreen}
-          options={{
+          options={({ navigation }) => ({
             title: 'Profile',
-          }}
+            headerLeft: homeHeaderLeft(navigation),
+            headerBackVisible: false,
+          })}
         />
          <Stack.Screen name="OfferChat" component={OfferChatScreen} options={{ title: 'Details' }}/>
         <Stack.Screen name="RepairChat" component={RepairChatScreen} options={{ title: 'Details' }}/>

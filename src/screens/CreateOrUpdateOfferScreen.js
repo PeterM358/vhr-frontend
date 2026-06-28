@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   ScrollView,
@@ -14,10 +14,30 @@ import { Text, TextInput, Button, Switch } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { createOffer, updateOffer } from '../api/offers';
+import { getOfferDraft } from '../api/serviceMenu';
+import { getMyShopProfiles } from '../api/profiles';
+import { DEFAULT_CURRENCY, formatMoneyAmount } from '../constants/currency';
+import { computeFromSum, computeToSum } from '../utils/offerPricing';
+import { fetchShopCalendarCached } from '../utils/shopCalendarCache';
+import {
+  buildDailyLoadMap,
+  getDayLoadRow,
+  buildScheduledByDayMap,
+  dateKeyLocal,
+  DAY_LOAD_CHIP_STYLES,
+  DAY_LOAD_TEXT_STYLES,
+  formatDayLoadChipHint,
+  formatDayLoadHeroLine,
+  formatDayLoadLabel,
+  formatDayLoadPeekLine,
+  getBookingsForDate,
+  getBookedTimeSet,
+  getDayLoadLevel,
+} from '../utils/shopDayLoad';
 import ScreenBackground from '../components/ScreenBackground';
 import { stackContentPaddingTop } from '../navigation/stackContentInset';
-import AppCard from '../components/ui/AppCard';
 import FloatingCard from '../components/ui/FloatingCard';
+import DayBookingsPopup from '../components/shop/DayBookingsPopup';
 import { COLORS } from '../constants/colors';
 
 const TIME_SLOTS = [
@@ -42,23 +62,13 @@ const BRING_QUICK_OFFSETS = [
   { label: '+2 weeks', days: 14 },
 ];
 
-const PICKUP_SHORTCUTS = [
-  { key: 'plus2h', label: 'Same day +2h' },
-  { key: 'plus4h', label: 'Same day +4h' },
-  { key: 'nextMorning', label: 'Next day morning' },
-  { key: 'nextAfternoon', label: 'Next day afternoon' },
-  { key: 'plus2days', label: '+2 days' },
-  { key: 'plus1week', label: '+1 week' },
-  { key: 'custom', label: 'Custom ready time' },
-];
-
-/** Day offsets from bring calendar date (pickup custom UI). */
-const PICKUP_CUSTOM_DAY_OFFSETS = [
+const PICKUP_DAY_OFFSETS_FROM_BRING = [
   { label: 'Same day', days: 0 },
-  { label: 'Next day', days: 1 },
+  { label: '+1 day', days: 1 },
   { label: '+2 days', days: 2 },
   { label: '+3 days', days: 3 },
   { label: '+1 week', days: 7 },
+  { label: '+2 weeks', days: 14 },
 ];
 
 /** Local UI only — not submitted to API. */
@@ -69,16 +79,36 @@ function parseEstimateNumber(raw) {
   return Number.isFinite(n) ? n : 0;
 }
 
-function formatTotalFromLaborParts(laborStr, partsStr) {
-  const lt = String(laborStr ?? '').trim();
-  const pt = String(partsStr ?? '').trim();
-  if (lt === '' && pt === '') return null;
+function computeQuotedTotal(laborFrom, partsFrom) {
+  return computeFromSum(laborFrom, partsFrom);
+}
 
-  const sum = parseEstimateNumber(laborStr) + parseEstimateNumber(partsStr);
-  if (Math.abs(sum % 1) < 1e-9 || Number.isInteger(sum)) {
-    return String(Math.round(sum));
+function formatEstimateAmount(n) {
+  if (!Number.isFinite(n)) return '0';
+  if (Math.abs(n % 1) < 1e-9 || Number.isInteger(n)) return String(Math.round(n));
+  return String(Math.round(n * 100) / 100);
+}
+
+function validatePricingInputs(laborFrom, laborTo, partsFrom, partsTo, total) {
+  const lf = String(laborFrom ?? '').trim();
+  const pf = String(partsFrom ?? '').trim();
+  const totalStr = String(total ?? '').trim();
+  if (!lf) return 'Enter labor from/exact amount.';
+  if (!pf) return 'Enter parts from/exact amount.';
+  if (!totalStr) return 'Enter quoted total.';
+  if (parseEstimateNumber(lf) < 0 || parseEstimateNumber(pf) < 0) {
+    return 'Amounts cannot be negative.';
   }
-  return String(Math.round(sum * 100) / 100);
+  const lt = String(laborTo ?? '').trim();
+  const pt = String(partsTo ?? '').trim();
+  if (lt && parseEstimateNumber(lt) < parseEstimateNumber(lf)) {
+    return 'Labor To must be at least Labor from/exact.';
+  }
+  if (pt && parseEstimateNumber(pt) < parseEstimateNumber(pf)) {
+    return 'Parts To must be at least Parts from/exact.';
+  }
+  if (!Number.isFinite(parseFloat(totalStr))) return 'Enter a valid quoted total.';
+  return null;
 }
 
 function dayStart(d) {
@@ -169,14 +199,44 @@ function formatPayloadDateTime(d) {
   return `${dd}.${mm}.${yyyy} ${hm}`;
 }
 
-/** Card row: 12.05.2026, 08:00 */
+/** Card row: Mon 12.05.2026, 08:00 */
 function formatDisplayDateTimeComma(d) {
   if (!d || Number.isNaN(d.getTime())) return 'Tap to set';
   const dd = d.getDate().toString().padStart(2, '0');
   const mm = (d.getMonth() + 1).toString().padStart(2, '0');
   const yyyy = d.getFullYear();
   const hm = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-  return `${dd}.${mm}.${yyyy}, ${hm}`;
+  const weekday = d.toLocaleDateString(undefined, { weekday: 'short' });
+  return `${weekday} ${dd}.${mm}.${yyyy}, ${hm}`;
+}
+
+function formatBigDatePreview(d) {
+  if (!d || Number.isNaN(d.getTime())) {
+    return { dayName: '—', dateLine: 'Pick a date', timeLine: '—' };
+  }
+  return {
+    dayName: d.toLocaleDateString(undefined, { weekday: 'long' }),
+    dateLine: d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }),
+    timeLine: `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`,
+  };
+}
+
+function dayOffsetFromToday(d) {
+  const today = dayStart(new Date());
+  const target = dayStart(d);
+  return Math.round((target.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+function dayOffsetFromAnchor(anchor, target) {
+  if (!anchor || !target) return null;
+  const a = dayStart(anchor);
+  const t = dayStart(target);
+  return Math.round((t.getTime() - a.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+function workingTimeSlotString(d) {
+  if (!d || Number.isNaN(d.getTime())) return '';
+  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
 }
 
 function buildScheduleAvailabilityNote(bringAt, pickupAt, optionalNote) {
@@ -248,14 +308,6 @@ function pickupFromBringShortcut(bring, key) {
       return new Date(b.getTime() + 2 * 3600000);
     case 'plus4h':
       return new Date(b.getTime() + 4 * 3600000);
-    case 'nextMorning':
-      return new Date(b.getFullYear(), b.getMonth(), b.getDate() + 1, 9, 0, 0, 0);
-    case 'nextAfternoon':
-      return new Date(b.getFullYear(), b.getMonth(), b.getDate() + 1, 14, 0, 0, 0);
-    case 'plus2days':
-      return new Date(b.getFullYear(), b.getMonth(), b.getDate() + 2, b.getHours(), b.getMinutes(), 0, 0);
-    case 'plus1week':
-      return new Date(b.getFullYear(), b.getMonth(), b.getDate() + 7, b.getHours(), b.getMinutes(), 0, 0);
     default:
       return null;
   }
@@ -263,50 +315,162 @@ function pickupFromBringShortcut(bring, key) {
 
 export default function CreateOrUpdateOfferScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
-  const { existingOffer, selectedOfferParts = [] } = route.params || {};
+  const { existingOffer, selectedOfferParts = [], shopId: routeShopId } = route.params || {};
   const [repairId, setRepairId] = useState(route.params?.repairId || existingOffer?.repair || null);
+  const [shopId, setShopId] = useState(routeShopId ?? existingOffer?.shop ?? null);
 
   const [description, setDescription] = useState('');
-  const [laborEstimate, setLaborEstimate] = useState('');
-  const [partsEstimate, setPartsEstimate] = useState('');
+  const [laborFrom, setLaborFrom] = useState('');
+  const [laborTo, setLaborTo] = useState('');
+  const [partsFrom, setPartsFrom] = useState('');
+  const [partsTo, setPartsTo] = useState('');
   const [price, setPrice] = useState('');
+  const priceManuallyEditedRef = useRef(false);
   const [availableFrom, setAvailableFrom] = useState('');
   const [bringAt, setBringAt] = useState(null);
   const [pickupAt, setPickupAt] = useState(null);
   const [optionalAvailabilityNote, setOptionalAvailabilityNote] = useState('');
   const [phoneCallAllowed, setPhoneCallAllowed] = useState(true);
   const [parts, setParts] = useState([]);
+  const [offerDraft, setOfferDraft] = useState(null);
+  const [draftDismissed, setDraftDismissed] = useState(false);
   const hydratedAvailabilityOfferIdRef = useRef(null);
 
   const [pickerModalVisible, setPickerModalVisible] = useState(false);
   const [pickerTarget, setPickerTarget] = useState(null);
-  const [pickupSubPhase, setPickupSubPhase] = useState('shortcuts');
   const [bringCustomDateActive, setBringCustomDateActive] = useState(false);
+  const [pickupCustomDateActive, setPickupCustomDateActive] = useState(false);
   const [webCustomBringDateStr, setWebCustomBringDateStr] = useState('');
   const [workingDate, setWorkingDate] = useState(new Date());
   const [androidPhase, setAndroidPhase] = useState('date');
   const [androidPickerVisible, setAndroidPickerVisible] = useState(false);
   const [androidPickerContext, setAndroidPickerContext] = useState(null);
+  const [dailyLoadMap, setDailyLoadMap] = useState(() => new Map());
+  const [scheduledByDay, setScheduledByDay] = useState(() => new Map());
+  const [dailyVehicleCapacity, setDailyVehicleCapacity] = useState(null);
+  const [dayBookingsPopupDate, setDayBookingsPopupDate] = useState(null);
 
   const isWeb = Platform.OS === 'web';
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTitle: existingOffer ? 'Update Offer' : 'Create Offer',
+      headerTitle: existingOffer ? 'Update proposal' : 'Send proposal',
       headerBackTitleVisible: true,
     });
   }, [navigation, existingOffer]);
 
-  const syncTotalFromLaborParts = useCallback((laborStr, partsStr) => {
-    const next = formatTotalFromLaborParts(laborStr, partsStr);
-    if (next !== null) setPrice(next);
+  const syncTotalFromEstimates = useCallback((nextLaborFrom, nextPartsFrom) => {
+    if (priceManuallyEditedRef.current) return;
+    const lf = String(nextLaborFrom ?? '').trim();
+    const pf = String(nextPartsFrom ?? '').trim();
+    if (!lf && !pf) {
+      setPrice('');
+      return;
+    }
+    setPrice(formatEstimateAmount(computeQuotedTotal(nextLaborFrom, nextPartsFrom)));
   }, []);
+
+  const loadDayLoadForPicker = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      if (!token) return;
+      let resolvedShopId = shopId;
+      if (!resolvedShopId) {
+        const shops = await getMyShopProfiles();
+        resolvedShopId = shops?.[0]?.id ?? null;
+        if (resolvedShopId) setShopId(resolvedShopId);
+      }
+      const from = dayStart(new Date());
+      const to = new Date(from);
+      to.setDate(to.getDate() + 21);
+      to.setHours(23, 59, 59, 999);
+      const data = await fetchShopCalendarCached(token, {
+        from: from.toISOString(),
+        to: to.toISOString(),
+        shopId: resolvedShopId,
+      });
+      setDailyLoadMap(buildDailyLoadMap(data.daily_load));
+      setScheduledByDay(buildScheduledByDayMap(data.scheduled));
+      setDailyVehicleCapacity(
+        data.daily_vehicle_capacity != null ? Number(data.daily_vehicle_capacity) : null
+      );
+    } catch (err) {
+      console.warn('Could not load shop day load', err);
+    }
+  }, [shopId]);
+
+  const getBookedCountForDate = useCallback(
+    (date) => {
+      const row = getDayLoadRow(dailyLoadMap, date);
+      return row?.bookedCount ?? 0;
+    },
+    [dailyLoadMap]
+  );
+
+  const getLaborRowForDate = useCallback(
+    (date) => getDayLoadRow(dailyLoadMap, date),
+    [dailyLoadMap]
+  );
+
+  const getBookingsOnDate = useCallback(
+    (date) => getBookingsForDate(scheduledByDay, date),
+    [scheduledByDay]
+  );
+
+  const selectedDayBookings = useMemo(
+    () => getBookingsOnDate(workingDate),
+    [workingDate, getBookingsOnDate]
+  );
+
+  const selectedDayLoad = useMemo(() => {
+    const booked = getBookedCountForDate(workingDate);
+    const laborRow = getLaborRowForDate(workingDate);
+    return {
+      booked,
+      laborRow,
+      level: getDayLoadLevel(booked, dailyVehicleCapacity, laborRow),
+      label: formatDayLoadLabel(booked, dailyVehicleCapacity, laborRow),
+      chipHint: formatDayLoadChipHint(booked, selectedDayBookings, laborRow),
+      peekLine: formatDayLoadPeekLine(booked, selectedDayBookings, laborRow),
+      heroLine: formatDayLoadHeroLine(booked, dailyVehicleCapacity, laborRow),
+      bookings: selectedDayBookings,
+    };
+  }, [
+    workingDate,
+    dailyVehicleCapacity,
+    getBookedCountForDate,
+    getLaborRowForDate,
+    selectedDayBookings,
+  ]);
+
+  const dayBookingsPopupBookings = useMemo(() => {
+    if (!dayBookingsPopupDate) return [];
+    return getBookingsOnDate(dayBookingsPopupDate);
+  }, [dayBookingsPopupDate, getBookingsOnDate]);
+
+  const dayBookingsPopupLabel = useMemo(() => {
+    if (!dayBookingsPopupDate || Number.isNaN(dayBookingsPopupDate.getTime())) return '';
+    return dayBookingsPopupDate.toLocaleDateString(undefined, {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  }, [dayBookingsPopupDate]);
+
+  const openDayBookingsPopup = (date) => {
+    if (!date || Number.isNaN(date.getTime())) return;
+    if (getBookedCountForDate(date) <= 0) return;
+    setDayBookingsPopupDate(new Date(date.getTime()));
+  };
+
+  const closeDayBookingsPopup = () => setDayBookingsPopupDate(null);
 
   const resetPickerUi = () => {
     setPickerModalVisible(false);
     setPickerTarget(null);
-    setPickupSubPhase('shortcuts');
     setBringCustomDateActive(false);
+    setPickupCustomDateActive(false);
     setWebCustomBringDateStr('');
     setAndroidPickerVisible(false);
     setAndroidPickerContext(null);
@@ -316,10 +480,12 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
   const openBringPicker = () => {
     const initial = bringAt || defaultDateAtHour(10, 0);
     setWorkingDate(new Date(initial.getTime()));
-    setBringCustomDateActive(false);
+    const offset = dayOffsetFromToday(initial);
+    const matchesQuick = BRING_QUICK_OFFSETS.some((opt) => opt.days === offset);
+    setBringCustomDateActive(Boolean(bringAt) && !matchesQuick);
     setWebCustomBringDateStr('');
     setPickerTarget('bring');
-    setPickupSubPhase('shortcuts');
+    loadDayLoadForPicker();
     if (Platform.OS === 'android') {
       setPickerModalVisible(true);
       return;
@@ -332,14 +498,17 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
       Alert.alert('Bring time required', 'Set bring vehicle date and time first.');
       return;
     }
-    const initial = pickupAt || new Date(bringAt.getTime() + 4 * 3600000);
+    const initial =
+      pickupAt && pickupAt.getTime() > bringAt.getTime()
+        ? pickupAt
+        : pickupFromBringShortcut(bringAt, 'plus4h') || new Date(bringAt.getTime() + 4 * 3600000);
     setWorkingDate(new Date(initial.getTime()));
-    setPickupSubPhase('shortcuts');
+    const offset = dayOffsetFromAnchor(bringAt, initial);
+    const matchesQuick = PICKUP_DAY_OFFSETS_FROM_BRING.some((opt) => opt.days === offset);
+    setPickupCustomDateActive(Boolean(pickupAt) && !matchesQuick);
+    setBringCustomDateActive(false);
+    setWebCustomBringDateStr('');
     setPickerTarget('pickup');
-    if (Platform.OS === 'android') {
-      setPickerModalVisible(true);
-      return;
-    }
     setPickerModalVisible(true);
   };
 
@@ -385,6 +554,12 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
     if (!date) return;
     const ctx = androidPickerContext;
     if (ctx === 'bringCustomDate') {
+      setWorkingDate(mergeDateWithTimeOf(date, workingDate));
+      setAndroidPickerVisible(false);
+      setAndroidPickerContext(null);
+      return;
+    }
+    if (ctx === 'pickupCustomDate') {
       setWorkingDate(mergeDateWithTimeOf(date, workingDate));
       setAndroidPickerVisible(false);
       setAndroidPickerContext(null);
@@ -443,12 +618,22 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
     setAndroidPickerVisible(true);
   };
 
-  const startAndroidPickupCustom = () => {
-    setPickupSubPhase('shortcuts');
-    setPickerModalVisible(false);
+  const startAndroidPickupCustomDate = () => {
+    setPickupCustomDateActive(false);
+    setAndroidPickerContext('pickupCustomDate');
+    setAndroidPhase('date');
+    setAndroidPickerVisible(true);
+  };
+
+  const startAndroidPickupFullPicker = () => {
+    resetPickerUi();
     setAndroidPickerContext('pickupCustom');
     setAndroidPhase('date');
-    setWorkingDate(pickupAt ? new Date(pickupAt) : new Date(bringAt.getTime() + 4 * 3600000));
+    setWorkingDate(
+      pickupAt && pickupAt.getTime() > bringAt.getTime()
+        ? new Date(pickupAt)
+        : new Date(bringAt.getTime() + 4 * 3600000)
+    );
     setAndroidPickerVisible(true);
   };
 
@@ -463,7 +648,7 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
     return true;
   };
 
-  const applyPickupDayFromBring = (daysAfterBring) => {
+  const applyPickupOffsetDays = (daysAfterBring) => {
     if (!bringAt) return;
     const base = new Date(
       bringAt.getFullYear(),
@@ -471,35 +656,25 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
       bringAt.getDate() + daysAfterBring
     );
     setWorkingDate(mergeDateWithTimeOf(base, workingDate));
+    setPickupCustomDateActive(false);
   };
 
-  const onPickupShortcutPress = (key) => {
-    if (key === 'custom') {
-      if (Platform.OS === 'android') {
-        startAndroidPickupCustom();
+  const confirmPickupModalDone = () => {
+    let next = workingDate;
+    if (isWeb && pickupCustomDateActive) {
+      const parsed = parseDdMmYyyy(webCustomBringDateStr);
+      if (!parsed) {
+        Alert.alert('Invalid date', 'Use DD.MM.YYYY (example: 12.05.2026).');
         return;
       }
-      setPickupSubPhase('custom');
-      setWorkingDate(
-        pickupAt ? new Date(pickupAt) : new Date(bringAt.getTime() + 4 * 3600000)
-      );
-      return;
+      next = mergeDateWithTimeOf(parsed, workingDate);
+      setPickupCustomDateActive(false);
     }
-    const next = pickupFromBringShortcut(bringAt, key);
-    if (!next || next.getTime() <= bringAt.getTime()) {
+    if (next.getTime() <= bringAt.getTime()) {
       Alert.alert('Invalid times', 'Pickup/ready time must be after bring time.');
       return;
     }
-    setPickupAt(next);
-    resetPickerUi();
-  };
-
-  const confirmPickupCustom = () => {
-    if (workingDate.getTime() <= bringAt.getTime()) {
-      Alert.alert('Invalid times', 'Pickup/ready time must be after bring time.');
-      return;
-    }
-    commitPickup(workingDate);
+    commitPickup(next);
   };
 
   const confirmBringModalDone = () => {
@@ -548,7 +723,11 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
     }
 
     if (!description && existingOffer?.description) setDescription(existingOffer.description);
-    if (!price && existingOffer?.price) setPrice(existingOffer.price?.toString());
+    if (existingOffer?.labor_from != null) setLaborFrom(String(existingOffer.labor_from));
+    if (existingOffer?.labor_to != null) setLaborTo(String(existingOffer.labor_to));
+    if (existingOffer?.parts_from != null) setPartsFrom(String(existingOffer.parts_from));
+    if (existingOffer?.parts_to != null) setPartsTo(String(existingOffer.parts_to));
+    if (!price && existingOffer?.price != null) setPrice(String(existingOffer.price));
     if (!availableFrom && existingOffer?.available_from) setAvailableFrom(existingOffer.available_from);
 
     const offerIdForHydrate = existingOffer?.id ?? null;
@@ -570,9 +749,68 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
     if (existingOffer?.phone_call_allowed != null) setPhoneCallAllowed(Boolean(existingOffer.phone_call_allowed));
   }, [route.params]);
 
+  useEffect(() => {
+    let active = true;
+    const loadDraft = async () => {
+      if (existingOffer?.id || draftDismissed) return;
+      const rid = repairId ?? route.params?.repairId ?? null;
+      if (!rid) return;
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        const shopProfileId = await AsyncStorage.getItem('@current_shop_id');
+        if (!token || !shopProfileId) return;
+        const draft = await getOfferDraft(token, rid, shopProfileId);
+        if (active) setOfferDraft(draft);
+      } catch (err) {
+        console.warn('offer draft load failed', err);
+      }
+    };
+    loadDraft();
+    return () => {
+      active = false;
+    };
+  }, [repairId, route.params?.repairId, existingOffer?.id, draftDismissed]);
+
+  const applyOfferDraft = () => {
+    if (!offerDraft) return;
+    const labor = offerDraft.labor_estimate != null ? String(offerDraft.labor_estimate) : '';
+    const partsVal = offerDraft.parts_estimate != null ? String(offerDraft.parts_estimate) : '';
+    if (labor) setLaborFrom(labor);
+    if (partsVal) setPartsFrom(partsVal);
+    if (labor || partsVal) syncTotalFromEstimates(labor, partsVal);
+    if (offerDraft.suggested_price != null) {
+      setPrice(String(offerDraft.suggested_price));
+    }
+    if (Array.isArray(offerDraft.parts) && offerDraft.parts.length > 0) {
+      setParts(
+        offerDraft.parts.map((p) => ({
+          partsMasterId: p.parts_master_id,
+          quantity: p.quantity || 1,
+          price: p.price_per_item || '0',
+          labor: p.labor_cost || '0',
+          note: p.note || '',
+          partsMaster: p.parts_master_name ? { name: p.parts_master_name } : null,
+        }))
+      );
+    }
+    setDraftDismissed(true);
+    setOfferDraft(null);
+  };
+
+  const draftSourceLabel =
+    offerDraft?.source === 'history'
+      ? 'Prior job on this vehicle'
+      : offerDraft?.source === 'offer'
+        ? 'Your last offer for this service'
+      : offerDraft?.source === 'menu'
+        ? 'Published price list'
+        : offerDraft?.source === 'manual'
+          ? 'No automatic suggestion'
+          : null;
+
   const handleSubmit = async () => {
-    if (!description || !repairId) {
-      Alert.alert('Missing Info', 'Please provide a description and make sure repair ID is present');
+    if (!repairId) {
+      Alert.alert('Missing Info', 'Repair ID is missing. Please reopen this offer from repair details.');
       return;
     }
 
@@ -580,6 +818,14 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
       Alert.alert('Invalid times', 'Pickup/ready time must be after bring time.');
       return;
     }
+
+    const pricingError = validatePricingInputs(laborFrom, laborTo, partsFrom, partsTo, price);
+    if (pricingError) {
+      Alert.alert('Pricing required', pricingError);
+      return;
+    }
+
+    const quotedTotal = parseFloat(String(price).trim());
 
     try {
       const token = await AsyncStorage.getItem('@access_token');
@@ -591,8 +837,12 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
       const computedDuration = computeDurationMinutes(bringAt, pickupAt);
 
       const payload = {
-        description,
-        price: price ? parseFloat(price) : null,
+        description: String(description || '').trim(),
+        labor_from: parseFloat(String(laborFrom).trim()),
+        labor_to: String(laborTo || '').trim() ? parseFloat(String(laborTo).trim()) : null,
+        parts_from: parseFloat(String(partsFrom).trim()),
+        parts_to: String(partsTo || '').trim() ? parseFloat(String(partsTo).trim()) : null,
+        price: quotedTotal,
         available_from: availableFrom || null,
         estimated_duration_minutes: computedDuration != null ? computedDuration : null,
         availability_note,
@@ -640,19 +890,138 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
     });
   };
 
+  const renderDateTimeHero = (showLoad = false) => {
+    const preview = formatBigDatePreview(workingDate);
+    const canPeek = showLoad && selectedDayLoad.booked > 0;
+    return (
+      <View style={styles.dateHero}>
+        <Text style={styles.dateHeroDay}>{preview.dayName}</Text>
+        <Text style={styles.dateHeroDate}>{preview.dateLine}</Text>
+        <Text style={styles.dateHeroTime}>{preview.timeLine}</Text>
+        {showLoad && selectedDayLoad.heroLine && !canPeek ? (
+          <Text
+            style={[
+              styles.dayLoadHeroLine,
+              selectedDayLoad.level === 'full' && styles.dayLoadHeroFull,
+              selectedDayLoad.level === 'busy' && styles.dayLoadHeroBusy,
+            ]}
+          >
+            {selectedDayLoad.heroLine}
+          </Text>
+        ) : null}
+        {canPeek ? (
+          <Pressable
+            onPress={() => openDayBookingsPopup(workingDate)}
+            style={({ pressed }) => [styles.dayLoadPeekBtn, pressed && { opacity: 0.85 }]}
+          >
+            <Text
+              style={[
+                styles.dayLoadPeekText,
+                selectedDayLoad.level === 'full' && styles.dayLoadHeroFull,
+                selectedDayLoad.level === 'busy' && styles.dayLoadHeroBusy,
+              ]}
+            >
+              {selectedDayLoad.peekLine || `${selectedDayLoad.booked} booked`}
+            </Text>
+            <Text style={styles.dayLoadPeekHint}>Tap to see bookings</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderBringDayChip = (opt) => {
+    const chipDate = dayStart(new Date());
+    chipDate.setDate(chipDate.getDate() + opt.days);
+    const bookings = getBookingsOnDate(chipDate);
+    const booked = bookings.length || getBookedCountForDate(chipDate);
+    const laborRow = getLaborRowForDate(chipDate);
+    const level = getDayLoadLevel(booked, dailyVehicleCapacity, laborRow);
+    const chipHint = formatDayLoadChipHint(booked, bookings, laborRow);
+    const selected = !bringCustomDateActive && dayOffsetFromToday(workingDate) === opt.days;
+    return (
+      <View
+        key={opt.label}
+        style={[
+          styles.timeChip,
+          styles.dayLoadChip,
+          DAY_LOAD_CHIP_STYLES[level],
+          selected && styles.timeChipSelected,
+          selected && level === 'full' && styles.timeChipSelectedFull,
+        ]}
+      >
+        <Pressable onPress={() => applyBringOffsetDays(opt.days)} style={styles.dayLoadChipMain}>
+          <Text style={[styles.timeChipText, selected && styles.timeChipTextSelected]}>
+            {opt.label}
+          </Text>
+        </Pressable>
+        {chipHint ? (
+          <Pressable
+            onPress={() => openDayBookingsPopup(chipDate)}
+            hitSlop={6}
+            style={styles.dayLoadChipPeek}
+          >
+            <Text
+              style={[
+                styles.dayLoadChipSub,
+                DAY_LOAD_TEXT_STYLES[level],
+                selected && styles.dayLoadChipSubSelected,
+              ]}
+            >
+              {chipHint}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderTimeSlotChips = (showBookedHints = false) => {
+    const activeSlot = workingTimeSlotString(workingDate);
+    const bookedTimes = showBookedHints
+      ? getBookedTimeSet(getBookingsOnDate(workingDate))
+      : new Set();
+    return (
+      <View style={styles.chipRowWrap}>
+        {TIME_SLOTS.map((slot) => {
+          const selected = activeSlot === slot;
+          const isBooked = bookedTimes.has(slot);
+          return (
+            <Pressable
+              key={slot}
+              onPress={() => applyWorkingTimeSlot(slot)}
+              style={[
+                styles.timeChip,
+                isBooked && !selected && styles.timeChipBooked,
+                selected && styles.timeChipSelected,
+              ]}
+            >
+              <Text style={[styles.timeChipText, selected && styles.timeChipTextSelected]}>
+                {slot}
+              </Text>
+              {isBooked ? (
+                <Text
+                  style={[
+                    styles.timeChipBookedSub,
+                    selected && styles.timeChipBookedSubSelected,
+                  ]}
+                >
+                  booked
+                </Text>
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  };
+
   const renderBringModalBody = () => (
     <>
+      {renderDateTimeHero(true)}
       <Text style={styles.modalSubtitle}>Date</Text>
       <View style={styles.chipRowWrap}>
-        {BRING_QUICK_OFFSETS.map((opt) => (
-          <Pressable
-            key={opt.label}
-            onPress={() => applyBringOffsetDays(opt.days)}
-            style={styles.timeChip}
-          >
-            <Text style={styles.timeChipText}>{opt.label}</Text>
-          </Pressable>
-        ))}
+        {BRING_QUICK_OFFSETS.map((opt) => renderBringDayChip(opt))}
         <Pressable
           onPress={() => {
             if (Platform.OS === 'ios') {
@@ -670,7 +1039,9 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
           }}
           style={[styles.timeChip, bringCustomDateActive && styles.timeChipSelected]}
         >
-          <Text style={styles.timeChipText}>Custom date</Text>
+          <Text style={[styles.timeChipText, bringCustomDateActive && styles.timeChipTextSelected]}>
+            Custom date
+          </Text>
         </Pressable>
       </View>
       {Platform.OS === 'ios' && bringCustomDateActive ? (
@@ -698,89 +1069,92 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         </View>
       ) : null}
       <Text style={styles.modalSubtitle}>Time</Text>
-      <View style={styles.chipRowWrap}>
-        {TIME_SLOTS.map((slot) => (
-          <Pressable key={slot} onPress={() => applyWorkingTimeSlot(slot)} style={styles.timeChip}>
-            <Text style={styles.timeChipText}>{slot}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <Text style={styles.webPreview}>Selected: {formatPayloadDateTime(workingDate)}</Text>
+      {renderTimeSlotChips(true)}
     </>
   );
 
-  const renderPickupModalBody = () => {
-    if (pickupSubPhase === 'custom') {
-      return (
-        <>
-          <Text style={styles.modalSubtitle}>Custom ready time</Text>
-          {Platform.OS === 'ios' ? (
-            <DateTimePicker
-              value={workingDate}
-              mode="datetime"
-              display="spinner"
-              onChange={onIosDateTimeChange}
-            />
-          ) : null}
-          {isWeb ? (
-            <>
-              <Text style={styles.modalSubtitle}>Date (from bring day)</Text>
-              <View style={styles.chipRowWrap}>
-                {PICKUP_CUSTOM_DAY_OFFSETS.map((opt) => (
-                  <Pressable
-                    key={`p-${opt.label}`}
-                    onPress={() => applyPickupDayFromBring(opt.days)}
-                    style={styles.timeChip}
-                  >
-                    <Text style={styles.timeChipText}>{opt.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Text style={styles.modalSubtitle}>Time</Text>
-              <View style={styles.chipRowWrap}>
-                {TIME_SLOTS.map((slot) => (
-                  <Pressable
-                    key={`pt-${slot}`}
-                    onPress={() => applyWorkingTimeSlot(slot)}
-                    style={styles.timeChip}
-                  >
-                    <Text style={styles.timeChipText}>{slot}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Text style={styles.webPreview}>Selected: {formatPayloadDateTime(workingDate)}</Text>
-            </>
-          ) : null}
-          <View style={styles.modalActions}>
-            <Button onPress={() => setPickupSubPhase('shortcuts')}>Back</Button>
-            <Button mode="contained" style={styles.modalDoneButton} onPress={confirmPickupCustom}>
-              Done
-            </Button>
-          </View>
-        </>
-      );
-    }
-    return (
-      <>
-        <Text style={styles.modalSubtitle}>Pickup duration</Text>
-        <View style={styles.shortcutCol}>
-          {PICKUP_SHORTCUTS.map((s) => (
+  const renderPickupModalBody = () => (
+    <>
+      {renderDateTimeHero()}
+      <Text style={styles.modalSubtitle}>Ready date (after bring day)</Text>
+      <View style={styles.chipRowWrap}>
+        {PICKUP_DAY_OFFSETS_FROM_BRING.map((opt) => {
+          const selected =
+            !pickupCustomDateActive && dayOffsetFromAnchor(bringAt, workingDate) === opt.days;
+          return (
             <Pressable
-              key={s.key}
-              onPress={() => onPickupShortcutPress(s.key)}
-              style={styles.shortcutRow}
+              key={opt.label}
+              onPress={() => applyPickupOffsetDays(opt.days)}
+              style={[styles.timeChip, selected && styles.timeChipSelected]}
             >
-              <Text style={styles.shortcutRowText}>{s.label}</Text>
-              <Text style={styles.selectorChevron}>›</Text>
+              <Text style={[styles.timeChipText, selected && styles.timeChipTextSelected]}>
+                {opt.label}
+              </Text>
             </Pressable>
-          ))}
+          );
+        })}
+        <Pressable
+          onPress={() => {
+            if (Platform.OS === 'ios') {
+              setPickupCustomDateActive(true);
+              return;
+            }
+            if (isWeb) {
+              setPickupCustomDateActive(true);
+              setWebCustomBringDateStr(
+                `${workingDate.getDate().toString().padStart(2, '0')}.${(workingDate.getMonth() + 1).toString().padStart(2, '0')}.${workingDate.getFullYear()}`
+              );
+              return;
+            }
+            startAndroidPickupCustomDate();
+          }}
+          style={[styles.timeChip, pickupCustomDateActive && styles.timeChipSelected]}
+        >
+          <Text style={[styles.timeChipText, pickupCustomDateActive && styles.timeChipTextSelected]}>
+            Custom date
+          </Text>
+        </Pressable>
+      </View>
+      {Platform.OS === 'ios' && pickupCustomDateActive ? (
+        <DateTimePicker
+          value={workingDate}
+          mode="date"
+          display="spinner"
+          minimumDate={bringAt || undefined}
+          onChange={onIosBringDateOnlyChange}
+        />
+      ) : null}
+      {isWeb && pickupCustomDateActive ? (
+        <View style={styles.webCustomDateBlock}>
+          <Text style={styles.helperMuted}>Custom date (DD.MM.YYYY)</Text>
+          <TextInput
+            mode="outlined"
+            dense
+            value={webCustomBringDateStr}
+            onChangeText={setWebCustomBringDateStr}
+            placeholder="12.05.2026"
+            style={styles.webCustomInput}
+          />
+          <Button mode="outlined" compact onPress={applyWebCustomBringDate}>
+            Apply custom date
+          </Button>
         </View>
-      </>
-    );
-  };
+      ) : null}
+      <Text style={styles.modalSubtitle}>Time</Text>
+      {renderTimeSlotChips()}
+    </>
+  );
 
   const modalTitle =
     pickerTarget === 'bring' ? 'Bring vehicle' : 'Pickup / ready';
+
+  const fromSumAmount = computeFromSum(laborFrom, partsFrom);
+  const toSumAmount = computeToSum(laborFrom, laborTo, partsFrom, partsTo);
+  const showFromSum = String(laborFrom || '').trim() && String(partsFrom || '').trim();
+  const showToSum =
+    showFromSum &&
+    (String(laborTo || '').trim() || String(partsTo || '').trim()) &&
+    toSumAmount !== fromSumAmount;
 
   return (
     <ScreenBackground safeArea={false}>
@@ -792,10 +1166,30 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         styles.container,
         { paddingTop: stackContentPaddingTop(insets, 4), paddingBottom: Math.max(insets.bottom, 16) },
       ]}>
-        <AppCard style={styles.heroCard}>
-          <Text style={styles.heroTitle}>{existingOffer ? 'Update proposal' : 'Create proposal'}</Text>
-          <Text style={styles.heroSubtitle}>Send a service proposal to the client.</Text>
-        </AppCard>
+        <Text style={styles.pageIntro}>Send a service proposal to the client.</Text>
+
+        {offerDraft && !draftDismissed && !existingOffer ? (
+          <FloatingCard style={styles.formCard}>
+            <Text style={styles.sectionTitle}>Suggested pricing</Text>
+            <Text style={styles.helperText}>
+              Source: {draftSourceLabel}
+              {offerDraft.notes ? ` — ${offerDraft.notes}` : ''}
+            </Text>
+            {offerDraft.suggested_price != null ? (
+              <Text style={styles.helperText}>
+                Suggested total: {formatMoneyAmount(offerDraft.suggested_price)}
+              </Text>
+            ) : null}
+            <View style={styles.draftActions}>
+              <Button mode="contained" onPress={applyOfferDraft} style={styles.draftBtn}>
+                Use suggestion
+              </Button>
+              <Button mode="text" onPress={() => setDraftDismissed(true)}>
+                Dismiss
+              </Button>
+            </View>
+          </FloatingCard>
+        ) : null}
 
         <FloatingCard style={styles.formCard}>
           <Text style={styles.sectionTitle}>Repair notes</Text>
@@ -810,49 +1204,95 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         </FloatingCard>
 
         <FloatingCard style={styles.formCard}>
-          <Text style={styles.sectionTitle}>Estimated pricing</Text>
+          <Text style={styles.sectionTitle}>Estimated pricing ({DEFAULT_CURRENCY})</Text>
           <Text style={styles.helperText}>
-            Send an estimated repair price. Final pricing can be updated after inspection.
+            From/exact is required. To is optional for a range. Total is saved separately from the from sum.
           </Text>
+          <Text style={styles.fieldGroupLabel}>Labor</Text>
+          <View style={styles.rangeRow}>
+            <TextInput
+              mode="outlined"
+              label="From/exact"
+              value={laborFrom}
+              onChangeText={(t) => {
+                setLaborFrom(t);
+                syncTotalFromEstimates(t, partsFrom);
+              }}
+              keyboardType="decimal-pad"
+              placeholder="10"
+              right={<TextInput.Affix text="€" />}
+              style={styles.rangeInput}
+            />
+            <TextInput
+              mode="outlined"
+              label="To (optional)"
+              value={laborTo}
+              onChangeText={setLaborTo}
+              keyboardType="decimal-pad"
+              placeholder="50"
+              right={<TextInput.Affix text="€" />}
+              style={styles.rangeInput}
+            />
+          </View>
+          <Text style={styles.fieldGroupLabel}>Parts</Text>
+          <View style={styles.rangeRow}>
+            <TextInput
+              mode="outlined"
+              label="From/exact"
+              value={partsFrom}
+              onChangeText={(t) => {
+                setPartsFrom(t);
+                syncTotalFromEstimates(laborFrom, t);
+              }}
+              keyboardType="decimal-pad"
+              placeholder="50"
+              right={<TextInput.Affix text="€" />}
+              style={styles.rangeInput}
+            />
+            <TextInput
+              mode="outlined"
+              label="To (optional)"
+              value={partsTo}
+              onChangeText={setPartsTo}
+              keyboardType="decimal-pad"
+              placeholder="150"
+              right={<TextInput.Affix text="€" />}
+              style={styles.rangeInput}
+            />
+          </View>
+          {showFromSum ? (
+            <Text style={styles.pricingSumLine}>
+              From sum: {formatMoneyAmount(fromSumAmount, DEFAULT_CURRENCY)}
+            </Text>
+          ) : null}
+          {showToSum ? (
+            <Text style={styles.pricingSumLine}>
+              To sum: {formatMoneyAmount(toSumAmount, DEFAULT_CURRENCY)}
+            </Text>
+          ) : null}
           <TextInput
             mode="outlined"
-            label="Labor estimate"
-            value={laborEstimate}
-            onChangeText={(t) => {
-              setLaborEstimate(t);
-              syncTotalFromLaborParts(t, partsEstimate);
-            }}
-            keyboardType="decimal-pad"
-            style={styles.input}
-          />
-          <TextInput
-            mode="outlined"
-            label="Parts estimate"
-            value={partsEstimate}
-            onChangeText={(t) => {
-              setPartsEstimate(t);
-              syncTotalFromLaborParts(laborEstimate, t);
-            }}
-            keyboardType="decimal-pad"
-            style={styles.input}
-          />
-          <TextInput
-            mode="outlined"
-            label="Total estimate"
+            label="Quoted total"
             value={price}
-            onChangeText={setPrice}
+            onChangeText={(t) => {
+              priceManuallyEditedRef.current = true;
+              setPrice(t);
+            }}
             keyboardType="decimal-pad"
+            placeholder="e.g. 115"
+            right={<TextInput.Affix text="€" />}
             style={styles.input}
           />
           <Text style={styles.helperText}>
-            Total updates automatically from labor plus parts—you can adjust the total anytime.
+            From sum and to sum are saved on the offer. Quoted total is what the client books against.
           </Text>
         </FloatingCard>
 
         <FloatingCard style={styles.formCard}>
           <Text style={styles.sectionTitle}>Availability</Text>
           <Text style={[styles.helperText, { marginBottom: 12 }]}>
-            Tell the client when to bring the vehicle and when it may be ready.
+            Tell the client when to bring the vehicle and when it may be ready. Day chips show bookings
+            and times already taken from your calendar.
           </Text>
 
           <Pressable
@@ -924,7 +1364,9 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
                   <Text style={styles.partMeta}>Part number: {part.partsMaster.part_number}</Text>
                 )}
                   <Text style={styles.partMeta}>Qty: {part.quantity}</Text>
-                  <Text style={styles.partMeta}>Estimated price: {part.price}</Text>
+                  <Text style={styles.partMeta}>
+                    Estimated price: {formatMoneyAmount(part.price, DEFAULT_CURRENCY)}
+                  </Text>
                   {part.note && <Text>Note: {part.note}</Text>}
               </FloatingCard>
             ))}
@@ -937,7 +1379,7 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
           onPress={handleSubmit}
           style={styles.submitButton}
         >
-          {existingOffer ? 'Update Offer' : 'Send Offer'}
+          {existingOffer ? 'Update proposal' : 'Send proposal'}
         </Button>
       </ScrollView>
 
@@ -959,18 +1401,21 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
                 Custom date & time (system picker)
               </Button>
             ) : null}
-            {pickerTarget === 'bring' ? (
-              <View style={styles.modalActions}>
-                <Button onPress={resetPickerUi}>Cancel</Button>
-                <Button mode="contained" style={styles.modalDoneButton} onPress={confirmBringModalDone}>
-                  Done
-                </Button>
-              </View>
-            ) : pickupSubPhase === 'shortcuts' ? (
-              <View style={styles.modalActions}>
-                <Button onPress={resetPickerUi}>Close</Button>
-              </View>
+            {pickerTarget === 'pickup' && Platform.OS === 'android' ? (
+              <Button mode="outlined" onPress={startAndroidPickupFullPicker} style={{ marginTop: 8 }}>
+                Custom date & time (system picker)
+              </Button>
             ) : null}
+            <View style={styles.modalActions}>
+              <Button onPress={resetPickerUi}>Cancel</Button>
+              <Button
+                mode="contained"
+                style={styles.modalDoneButton}
+                onPress={pickerTarget === 'bring' ? confirmBringModalDone : confirmPickupModalDone}
+              >
+                Done
+              </Button>
+            </View>
           </View>
         </View>
       </Modal>
@@ -979,11 +1424,18 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         <DateTimePicker
           key={`${androidPickerContext}-${androidPhase}`}
           value={workingDate}
-          mode={androidPickerContext === 'bringCustomDate' ? 'date' : androidPhase}
+          mode={androidPickerContext === 'bringCustomDate' || androidPickerContext === 'pickupCustomDate' ? 'date' : androidPhase}
           display="default"
           onChange={onAndroidDateTimeChange}
         />
       ) : null}
+
+      <DayBookingsPopup
+        visible={Boolean(dayBookingsPopupDate)}
+        dateLabel={dayBookingsPopupLabel}
+        bookings={dayBookingsPopupBookings}
+        onClose={closeDayBookingsPopup}
+      />
     </KeyboardAvoidingView>
     </ScreenBackground>
   );
@@ -993,18 +1445,33 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
   },
-  heroCard: {
+  pageIntro: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: 15,
     marginBottom: 14,
-    backgroundColor: COLORS.CARD_DARK,
+    lineHeight: 21,
   },
-  heroTitle: {
-    color: '#fff',
-    fontSize: 22,
+  fieldGroupLabel: {
     fontWeight: '700',
+    color: COLORS.TEXT_DARK,
+    marginBottom: 6,
+    marginTop: 4,
   },
-  heroSubtitle: {
-    marginTop: 6,
-    color: 'rgba(255,255,255,0.85)',
+  rangeRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 8,
+  },
+  rangeInput: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  pricingSumLine: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.PRIMARY,
+    marginBottom: 10,
+    marginTop: 4,
   },
   input: {
     marginBottom: 12,
@@ -1015,6 +1482,15 @@ const styles = StyleSheet.create({
   helperText: {
     color: COLORS.TEXT_MUTED,
     marginTop: 2,
+  },
+  draftActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  draftBtn: {
+    flexGrow: 0,
   },
   helperMuted: {
     fontSize: 12,
@@ -1101,12 +1577,117 @@ const styles = StyleSheet.create({
   },
   timeChipSelected: {
     borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(33, 150, 243, 0.08)',
+    backgroundColor: COLORS.PRIMARY,
+  },
+  timeChipSelectedFull: {
+    borderColor: '#dc2626',
+    backgroundColor: '#dc2626',
+  },
+  timeChipBooked: {
+    borderColor: 'rgba(100,116,139,0.55)',
+    backgroundColor: 'rgba(241,245,249,0.95)',
+  },
+  timeChipBookedSub: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748b',
+    marginTop: 2,
+  },
+  timeChipBookedSubSelected: {
+    color: 'rgba(255,255,255,0.9)',
+  },
+  dayLoadChip: {
+    minWidth: 88,
+    alignItems: 'center',
+  },
+  dayLoadChipSub: {
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  dayLoadChipSubSelected: {
+    color: 'rgba(255,255,255,0.92)',
+  },
+  dayLoadHeroLine: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+    color: COLORS.TEXT_MUTED,
+    paddingHorizontal: 8,
+  },
+  dayLoadHeroBusy: {
+    color: '#b45309',
+  },
+  dayLoadHeroFull: {
+    color: '#b91c1c',
+    fontWeight: '600',
+  },
+  dayLoadPeekBtn: {
+    marginTop: 8,
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  dayLoadPeekText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.PRIMARY,
+    textAlign: 'center',
+  },
+  dayLoadPeekHint: {
+    marginTop: 2,
+    fontSize: 11,
+    color: COLORS.TEXT_MUTED,
+    textAlign: 'center',
+  },
+  dayLoadChipMain: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  dayLoadChipPeek: {
+    marginTop: 2,
+    paddingHorizontal: 4,
+    paddingBottom: 2,
   },
   timeChipText: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
     color: COLORS.TEXT_DARK,
+  },
+  timeChipTextSelected: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  dateHero: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(37, 99, 235, 0.2)',
+  },
+  dateHeroDay: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.PRIMARY,
+    textTransform: 'capitalize',
+  },
+  dateHeroDate: {
+    marginTop: 4,
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.TEXT_DARK,
+    textAlign: 'center',
+  },
+  dateHeroTime: {
+    marginTop: 8,
+    fontSize: 36,
+    fontWeight: '800',
+    color: COLORS.TEXT_DARK,
+    letterSpacing: 1,
   },
   webPreview: {
     marginTop: 12,

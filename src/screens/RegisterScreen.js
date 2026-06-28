@@ -1,6 +1,6 @@
-import React, { useState, useLayoutEffect } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View, Pressable, Platform } from 'react-native';
-import { Text, TextInput, Button, Portal, Dialog, ActivityIndicator } from 'react-native-paper';
+import { Text, TextInput, Button, Portal, Dialog, ActivityIndicator, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { register } from '../api/auth';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -8,8 +8,10 @@ import BaseStyles from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
 import Logo from '../assets/images/logo.svg';
 import { COLORS } from '../constants/colors';
+import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 
 export default function RegisterScreen({ navigation }) {
+  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const headerReserve = insets.top + (Platform.OS === 'ios' ? 52 : 56);
 
@@ -20,31 +22,13 @@ export default function RegisterScreen({ navigation }) {
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
 
-  useLayoutEffect(() => {
-    const handleHeaderSave = () => {
-      if (!emailOrPhone.trim()) {
-        setDialogMessage('Email or Phone is required.');
-        setDialogVisible(true);
-        return;
-      }
-      saveRegistration();
-    };
-
-    navigation.setOptions({
-      headerRight: () => (
-        <Button
-          mode="text"
-          compact
-          onPress={handleHeaderSave}
-          labelStyle={{ color: '#fff', fontSize: 16 }}
-        >
-          Save
-        </Button>
-      ),
-    });
-  }, [navigation, emailOrPhone, password, role]);
-
   const saveRegistration = async () => {
+    if (!emailOrPhone.trim()) {
+      setDialogMessage('Email or phone is required.');
+      setDialogVisible(true);
+      return;
+    }
+
     setSaving(true);
     try {
       const result = await register(
@@ -57,20 +41,17 @@ export default function RegisterScreen({ navigation }) {
       setDialogMessage('Registration successful!');
       setDialogVisible(true);
 
-      setTimeout(() => {
+      setTimeout(async () => {
         setDialogVisible(false);
         if (result.is_shop) {
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'ShopHome' }],
-          });
+          const route = await resolveShopEntryRoute();
+          navigation.reset(buildShopAuthReset(route));
         } else if (result.is_client) {
           navigation.reset({
             index: 0,
             routes: [{ name: 'Home' }],
           });
         } else {
-          // fallback
           navigation.reset({
             index: 0,
             routes: [{ name: 'Login' }],
@@ -106,10 +87,9 @@ export default function RegisterScreen({ navigation }) {
               <Logo width={88} height={88} />
             </View>
 
-            <Text style={styles.kicker}>Join</Text>
             <Text style={styles.title}>Create your account</Text>
             <Text style={styles.subtitle}>
-              Add your credentials and pick how you will use Vehicle Repair Hub.
+              Choose client or repair shop, then add your sign-in details.
             </Text>
 
             <TextInput
@@ -167,8 +147,19 @@ export default function RegisterScreen({ navigation }) {
               </Pressable>
             </View>
 
-            {saving && (
+            {saving ? (
               <ActivityIndicator animating size="small" color={COLORS.PRIMARY} style={{ marginTop: 8 }} />
+            ) : (
+              <Button
+                mode="contained"
+                onPress={saveRegistration}
+                style={styles.createButton}
+                contentStyle={styles.createButtonContent}
+                labelStyle={styles.createButtonLabel}
+                buttonColor={theme.colors.primary}
+              >
+                Create account
+              </Button>
             )}
           </View>
         </KeyboardAwareScrollView>
@@ -215,15 +206,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.14,
     shadowRadius: 14,
   },
-  kicker: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    color: COLORS.PRIMARY,
-    textTransform: 'uppercase',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
   title: {
     fontSize: 26,
     fontWeight: '700',
@@ -255,7 +237,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 20,
   },
   roleButton: {
     flex: 1,
@@ -290,5 +272,18 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
     lineHeight: 16,
+  },
+  createButton: {
+    marginTop: 4,
+    borderRadius: 12,
+    alignSelf: 'stretch',
+  },
+  createButtonContent: {
+    height: 48,
+  },
+  createButtonLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

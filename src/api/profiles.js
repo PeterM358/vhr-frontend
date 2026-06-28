@@ -72,3 +72,39 @@ export async function updateClientProfile(payload) {
   if (!res.ok) throw new Error('Failed to update client profile');
   return res.json();
 }
+
+export async function uploadShopInvoiceLogo(profileId, token, attachment) {
+  const formData = new FormData();
+  if (attachment?.file) {
+    formData.append('logo', attachment.file, attachment.fileName || 'invoice-logo');
+  } else if (attachment?.uri) {
+    formData.append('logo', {
+      uri: attachment.uri,
+      name: attachment.fileName || 'invoice-logo.png',
+      type: attachment.mimeType || 'image/png',
+    });
+  } else {
+    throw new Error('No logo file selected');
+  }
+
+  const res = await fetch(`${API_BASE_URL}/api/profiles/shop_profiles/${profileId}/invoice-logo/`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || 'Failed to upload invoice logo');
+  }
+  return res.json();
+}
+
+export async function deleteShopInvoiceLogo(profileId, token) {
+  const res = await fetch(`${API_BASE_URL}/api/profiles/shop_profiles/${profileId}/invoice-logo/`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok && res.status !== 204) {
+    throw new Error('Failed to remove invoice logo');
+  }
+}

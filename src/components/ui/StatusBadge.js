@@ -10,6 +10,7 @@ import { View, Text, StyleSheet } from 'react-native';
 const PALETTE = {
   verified:  { bg: 'rgba(22,163,74,0.18)',  fg: '#15803D' }, // verified service center
   open:      { bg: 'rgba(37,99,235,0.16)',  fg: '#1D4ED8' }, // primary blue
+  requested: { bg: 'rgba(124,58,237,0.18)', fg: '#6D28D9' }, // direct client request
   ongoing:   { bg: 'rgba(245,158,11,0.18)', fg: '#B45309' }, // amber
   done:      { bg: 'rgba(22,163,74,0.18)',  fg: '#15803D' }, // green
   completed: { bg: 'rgba(22,163,74,0.18)',  fg: '#15803D' },
@@ -17,6 +18,9 @@ const PALETTE = {
   cancelled: { bg: 'rgba(220,38,38,0.18)',  fg: '#B91C1C' }, // red
   rejected:  { bg: 'rgba(220,38,38,0.18)',  fg: '#B91C1C' },
   pending:   { bg: 'rgba(2,132,199,0.18)',  fg: '#075985' },
+  draft:     { bg: 'rgba(2,132,199,0.18)',  fg: '#075985' },
+  issued:    { bg: 'rgba(22,163,74,0.18)',  fg: '#15803D' },
+  void:      { bg: 'rgba(100,116,139,0.18)', fg: '#334155' },
 };
 
 const FALLBACK = { bg: 'rgba(100,116,139,0.18)', fg: '#334155' };

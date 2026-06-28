@@ -50,9 +50,7 @@ export default function HomeScreen({ navigation }) {
     }, [setUserEmailOrPhone])
   );
 
-  const unseenPromotions = notifications.filter(n => !n.is_read && n.repair == null).length;
-  const unseenOffers = notifications.filter(n => !n.is_read && n.repair != null).length;
-  const totalOffersBadge = unseenPromotions + unseenOffers;
+  const unreadNotifications = notifications.filter((n) => !n.is_read).length;
 
   const handleLogout = async () => {
     await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
@@ -91,11 +89,17 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.iconWithBadge}>
           <Appbar.Action
             icon="bell-outline"
-            onPress={() => navigation.navigate('OffersScreen')}
+            onPress={() =>
+              navigation.navigate('ClientActivity', {
+                returnTo: 'Home',
+                backLabel: 'Home',
+                initialTab: unreadNotifications > 0 ? 'inbox' : 'repairs',
+              })
+            }
             color="#fff"
           />
-          {totalOffersBadge > 0 && (
-            <Badge style={styles.notificationBadge}>{totalOffersBadge}</Badge>
+          {unreadNotifications > 0 && (
+            <Badge style={styles.notificationBadge}>{unreadNotifications}</Badge>
           )}
         </View>
         <Appbar.Action icon="logout" onPress={handleLogout} color="#fff" />
