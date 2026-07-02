@@ -71,6 +71,7 @@ import PasswordRequestResetScreen from '../screens/PasswordRequestResetScreen';
 import PasswordConfirmResetScreen from '../screens/PasswordConfirmResetScreen';
 
 import { buildAppLinking, redirectLegacyWebUrl } from './webLinking';
+import NavigationFallback from './NavigationFallback';
 
 const Stack = createNativeStackNavigator();
 
@@ -177,7 +178,7 @@ export default function AppNavigator() {
   }, []);
 
   return (
-    <NavigationContainer linking={linking}>
+    <NavigationContainer linking={linking} fallback={<NavigationFallback />}>
       <Stack.Navigator
         initialRouteName="AuthLoading"
         screenOptions={{

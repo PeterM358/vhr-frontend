@@ -3,6 +3,7 @@ import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ScreenBackground from '../components/ScreenBackground';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
+import { resetToClientDashboard, resetToPublicHome } from '../navigation/authNavigation';
 
 export default function AuthLoadingScreen({ navigation }) {
   useEffect(() => {
@@ -15,10 +16,10 @@ export default function AuthLoadingScreen({ navigation }) {
           const route = await resolveShopEntryRoute();
           navigation.reset(buildShopAuthReset(route));
         } else {
-          navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+          resetToClientDashboard(navigation);
         }
       } else {
-        navigation.reset({ index: 0, routes: [{ name: 'PublicHome' }] });
+        resetToPublicHome(navigation);
       }
     };
 

@@ -34,6 +34,7 @@ import { NOTIFICATION_CENTER_PLACEHOLDERS } from '../constants/clientDashboardPl
 import { COLORS } from '../constants/colors';
 import { resetFromClientDrawer } from '../navigation/drawerNavigation';
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
+import { resetToPublicHome } from '../navigation/authNavigation';
 import { showMessage } from '../utils/crossPlatformAlert';
 
 const HOME_TOP_BAR = 'rgba(11,18,32,0.92)';
@@ -78,6 +79,7 @@ export default function HomeScreen({ navigation }) {
   const [recentRepairs, setRecentRepairs] = useState([]);
   const [openRequestsCount, setOpenRequestsCount] = useState(0);
   const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -87,18 +89,20 @@ export default function HomeScreen({ navigation }) {
       };
 
       const ensureAuthOrPublicHome = async () => {
-        if (isLoading) return;
-        const token = await AsyncStorage.getItem('@access_token');
-        const hasToken = !!(token && token !== 'null' && token !== 'undefined');
-        if (hasToken) {
-          if (!isAuthenticated) {
-            setAuthToken?.(token);
-            setIsAuthenticated?.(true);
+        try {
+          if (isLoading) return;
+          const token = await AsyncStorage.getItem('@access_token');
+          const hasToken = !!(token && token !== 'null' && token !== 'undefined');
+          if (hasToken) {
+            if (!isAuthenticated) {
+              setAuthToken?.(token);
+              setIsAuthenticated?.(true);
+            }
+            return;
           }
-          return;
-        }
-        if (!isAuthenticated) {
-          navigation.replace('PublicHome');
+          resetToPublicHome(navigation);
+        } finally {
+          setSessionChecked(true);
         }
       };
 
@@ -216,7 +220,7 @@ export default function HomeScreen({ navigation }) {
     ? { label: 'Request Service', onPress: goRequestService }
     : { label: 'Add Vehicle', onPress: goAddVehicle };
 
-  if (isLoading) {
+  if (isLoading || !sessionChecked) {
     return (
       <ScreenBackground>
         <View style={styles.center}>

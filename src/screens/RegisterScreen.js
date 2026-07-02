@@ -12,6 +12,7 @@ import ScreenBackground from '../components/ScreenBackground';
 import Logo from '../assets/images/logo.svg';
 import { COLORS } from '../constants/colors';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
+import { resetToClientDashboard } from '../navigation/authNavigation';
 
 export default function RegisterScreen({ navigation }) {
   const theme = useTheme();
@@ -72,10 +73,7 @@ export default function RegisterScreen({ navigation }) {
         const route = await resolveShopEntryRoute();
         navigation.reset(buildShopAuthReset(route));
       } else if (result.is_client) {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Home' }],
-        });
+        resetToClientDashboard(navigation);
       } else {
         navigation.reset({
           index: 0,

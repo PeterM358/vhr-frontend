@@ -9,6 +9,7 @@ import Logo from '../assets/images/logo.svg';
 import ScreenBackground from '../components/ScreenBackground';
 
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
+import { resetToClientDashboard } from '../navigation/authNavigation';
 
 export default function PublicHomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -21,7 +22,7 @@ export default function PublicHomeScreen({ navigation }) {
         const token = await AsyncStorage.getItem('@access_token');
         if (cancelled) return;
         if (token && token !== 'null' && token !== 'undefined') {
-          navigation.replace('Home', { screen: 'HomeMain' });
+          resetToClientDashboard(navigation);
         }
       })();
       return () => {

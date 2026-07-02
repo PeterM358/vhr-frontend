@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { login } from '../api/auth';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
+import { resetToClientDashboard } from '../navigation/authNavigation';
 import { AuthContext } from '../context/AuthManager';
 import Logo from '../assets/images/logo.svg';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -119,7 +120,7 @@ export default function LoginScreen({ navigation }) {
             const route = await resolveShopEntryRoute();
             navigation.reset(buildShopAuthReset(route));
           } else {
-            navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+            resetToClientDashboard(navigation);
           }
         } catch (error) {
           console.error('❌ Google login error', error);
@@ -172,7 +173,7 @@ export default function LoginScreen({ navigation }) {
             const route = await resolveShopEntryRoute();
             navigation.reset(buildShopAuthReset(route));
           } else {
-            navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+            resetToClientDashboard(navigation);
           }
     } catch (err) {
       console.error('❌ Login error', err);

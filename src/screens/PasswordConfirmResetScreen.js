@@ -22,6 +22,7 @@ import {
   resolvePasswordResetParams,
 } from '../utils/authSession';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
+import { resetToClientDashboard } from '../navigation/authNavigation';
 
 export default function PasswordConfirmResetScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
@@ -73,7 +74,7 @@ export default function PasswordConfirmResetScreen({ route, navigation }) {
         const shopRoute = await resolveShopEntryRoute();
         navigation.reset(buildShopAuthReset(shopRoute));
       } else {
-        navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+        resetToClientDashboard(navigation);
       }
     } catch (err) {
       console.error('Password reset confirm failed:', err);

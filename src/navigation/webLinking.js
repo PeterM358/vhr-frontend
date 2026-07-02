@@ -67,6 +67,11 @@ export async function redirectLegacyWebUrl() {
     target = authed
       ? pathname.replace(/^\/Home\/HomeMain/, '/dashboard')
       : '/';
+  } else if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) {
+    const authed = await hasStoredAuthToken();
+    if (!authed) {
+      target = '/';
+    }
   }
 
   if (target && target !== pathname) {

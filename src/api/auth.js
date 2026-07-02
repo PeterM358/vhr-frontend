@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../env';
 import { syncPushDeviceToken, deactivatePushDeviceToken } from '../notifications/pushDeviceSync';
 import { messageFromApiError } from '../utils/apiErrorMessage';
+import { resetToPublicHome } from '../navigation/authNavigation';
 
 const normalizeLoginPhone = (value) => {
   if (!value) return '';
@@ -141,10 +142,7 @@ export const logout = async (
   if (setIsAuthenticated) setIsAuthenticated(false);
   if (setUserEmailOrPhone) setUserEmailOrPhone('');
 
-  navigation.reset({
-    index: 0,
-    routes: [{ name: 'PublicHome' }],
-  });
+  resetToPublicHome(navigation);
 };
 
 // ✅ Request Password Reset (send email)
