@@ -1,15 +1,16 @@
 // PATH: src/env.js
+//
+// API URLs are set via EXPO_PUBLIC_* at build/dev time (see .env.*.example).
+// When unset in development, falls back to platform-appropriate localhost/LAN hosts.
 
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-const ENV = __DEV__ ? 'dev' : 'prod';
+const DEV_LAN_HOST = process.env.EXPO_PUBLIC_DEV_LAN_HOST || '192.168.0.105';
 
-/**
- * LAN IP of this Mac (Wi‑Fi). Update when you change networks:
- *   ipconfig getifaddr en1
- */
-const DEV_LAN_HOST = '192.168.0.105';
+function trimUrl(url) {
+  return typeof url === 'string' ? url.trim().replace(/\/$/, '') : '';
+}
 
 function resolveDevHost() {
   if (Platform.OS === 'web') {
@@ -24,24 +25,40 @@ function resolveDevHost() {
   return DEV_LAN_HOST;
 }
 
-const DEV_HOST = resolveDevHost();
+function httpToWs(url) {
+  if (url.startsWith('https://')) {
+    return `wss://${url.slice('https://'.length)}`;
+  }
+  if (url.startsWith('http://')) {
+    return `ws://${url.slice('http://'.length)}`;
+  }
+  return url;
+}
 
-const CONFIG = {
-  dev: {
-    API_BASE_URL: `http://${DEV_HOST}:8000`,
-    WS_BASE_URL: `ws://${DEV_HOST}:8001`,
-  },
-  prod: {
-    API_BASE_URL: 'https://your-production-api.com',
-    WS_BASE_URL: 'wss://your-production-api.com',
-  },
-};
+function resolveApiBaseUrl() {
+  const fromEnv = trimUrl(process.env.EXPO_PUBLIC_API_BASE_URL);
+  if (fromEnv) {
+    return fromEnv;
+  }
 
-export const API_BASE_URL = CONFIG[ENV].API_BASE_URL;
-export const WS_BASE_URL = CONFIG[ENV].WS_BASE_URL;
+  const host = resolveDevHost();
+  return `http://${host}:8000`;
+}
+
+function resolveWsBaseUrl(apiBaseUrl) {
+  const fromEnv = trimUrl(process.env.EXPO_PUBLIC_WS_BASE_URL);
+  if (fromEnv) {
+    return fromEnv;
+  }
+  return httpToWs(apiBaseUrl);
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
+export const WS_BASE_URL = resolveWsBaseUrl(API_BASE_URL);
 
 if (__DEV__) {
   console.log(
-    `[VHR] API → ${API_BASE_URL} (platform=${Platform.OS}, device=${Constants.isDevice})`
+    `[Veversal] API → ${API_BASE_URL} (platform=${Platform.OS}, device=${Constants.isDevice})`
   );
+  console.log(`[Veversal] WS  → ${WS_BASE_URL}`);
 }

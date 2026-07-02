@@ -8,6 +8,11 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "web:local": "node scripts/with-env.js .env.local npx expo start --web",
+    "build:web": "npx expo export --platform web",
+    "build:web:local": "node scripts/with-env.js .env.local npx expo export --platform web",
+    "build:web:staging": "node scripts/with-env.js .env.staging npx expo export --platform web",
+    "build:web:production": "node scripts/with-env.js .env.production npx expo export --platform web",
     "prebuild:android": "expo prebuild --platform android",
     "start:android": "expo run:android",
     "start:dev": "expo start --dev-client"

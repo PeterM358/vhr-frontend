@@ -53,6 +53,8 @@ export default {
     },
     web: {
       favicon: "./src/assets/icons/favicon.png",
+      bundler: "metro",
+      output: "single",
       meta: {
         viewport: "width=device-width, initial-scale=1"
       },
@@ -67,7 +69,9 @@ export default {
       googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
       googleClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
       googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-      googleClientSecret: process.env.GOOGLE_CLIENT_SECRET
+      googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL,
+      wsBaseUrl: process.env.EXPO_PUBLIC_WS_BASE_URL
     },
     owner: "mihailovv"
   }
