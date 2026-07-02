@@ -9,6 +9,7 @@ import { AppTheme } from './styles/theme';
 import { ThemeProvider } from './context/ThemeManager';
 import AuthManager from './context/AuthManager';
 import MessageDialogHost from './components/ui/MessageDialog';
+import { devLog } from './utils/logger';
 
 const handleDeepLink = ({ url }) => {
   if (!url) return;
@@ -27,7 +28,7 @@ export default function App() {
     import('firebase/messaging').then(({ getMessaging, onMessage }) => {
       const messaging = getMessaging();
       unsubscribeOnMessage = onMessage(messaging, payload => {
-        console.log('📬 Foreground notification received:', payload);
+        devLog('Foreground notification received', payload?.messageId || 'unknown');
         Alert.alert(payload.notification?.title || '🔔 Notification', payload.notification?.body || '');
       });
     });

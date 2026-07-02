@@ -692,9 +692,6 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
   };
 
   useEffect(() => {
-    console.log('🪵 DEBUG: existingOffer:', existingOffer);
-    console.log('🪵 DEBUG: selectedOfferParts:', selectedOfferParts);
-
     if (route.params?.repairId && !repairId) {
       setRepairId(route.params.repairId);
     }
@@ -709,7 +706,6 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         partsMaster: p.parts_master_detail || p.partsMaster,
       }));
       setParts(normalized);
-      console.log('🪵 DEBUG: initializing from selectedOfferParts');
     } else if (existingOffer?.parts?.length > 0) {
       const normalized = existingOffer.parts.map((p) => ({
         partsMasterId: p.parts_master || p.partsMasterId,

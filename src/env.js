@@ -5,6 +5,7 @@
 
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { devLog } from './utils/logger';
 
 const DEV_LAN_HOST = process.env.EXPO_PUBLIC_DEV_LAN_HOST || '192.168.0.105';
 
@@ -57,8 +58,8 @@ export const API_BASE_URL = resolveApiBaseUrl();
 export const WS_BASE_URL = resolveWsBaseUrl(API_BASE_URL);
 
 if (__DEV__) {
-  console.log(
+  devLog(
     `[Veversal] API → ${API_BASE_URL} (platform=${Platform.OS}, device=${Constants.isDevice})`
   );
-  console.log(`[Veversal] WS  → ${WS_BASE_URL}`);
+  devLog(`[Veversal] WS  → ${WS_BASE_URL}`);
 }

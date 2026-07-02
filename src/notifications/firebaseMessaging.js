@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { devLog, safeWarn } from '../utils/logger';
 
 /** Native FCM via @react-native-firebase/messaging (not available on web / many simulators). */
 let messagingModule = null;
@@ -14,7 +15,7 @@ function loadMessaging() {
     messagingModule = require('@react-native-firebase/messaging').default;
     return messagingModule;
   } catch (err) {
-    console.warn('Firebase messaging module unavailable:', err?.message || err);
+    safeWarn('Firebase messaging module unavailable', err);
     messagingModule = false;
     return null;
   }
@@ -32,10 +33,10 @@ export function registerBackgroundMessageHandler() {
   }
   try {
     messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-      console.log('📩 Background push:', remoteMessage?.messageId || remoteMessage);
+      devLog('Background push received', remoteMessage?.messageId || 'unknown');
     });
   } catch (err) {
-    console.warn('Background message handler not registered:', err?.message || err);
+    safeWarn('Background message handler not registered', err);
   }
 }
 
@@ -51,7 +52,7 @@ export async function requestFirebasePermission() {
       authStatus === messaging.AuthorizationStatus.PROVISIONAL
     );
   } catch (err) {
-    console.warn('Firebase permission request failed:', err?.message || err);
+    safeWarn('Firebase permission request failed', err);
     return false;
   }
 }
@@ -67,14 +68,14 @@ export function registerFirebaseListeners() {
 
   try {
     messaging().onMessage(async (remoteMessage) => {
-      console.log('📩 Foreground push:', remoteMessage);
+      devLog('Foreground push received', remoteMessage?.messageId || 'unknown');
       const { Alert } = require('react-native');
       if (remoteMessage?.notification) {
         Alert.alert(remoteMessage.notification.title, remoteMessage.notification.body);
       }
     });
   } catch (err) {
-    console.warn('Foreground message listener failed:', err?.message || err);
+    safeWarn('Foreground message listener failed', err);
   }
 }
 
@@ -86,11 +87,11 @@ export async function getFirebaseToken() {
   try {
     const token = await messaging().getToken();
     if (token) {
-      console.log('📱 FCM token obtained');
+      devLog('FCM token obtained');
     }
     return token || null;
   } catch (err) {
-    console.warn('Failed to get FCM token:', err?.message || err);
+    safeWarn('Failed to get FCM token', err);
     return null;
   }
 }
@@ -107,7 +108,7 @@ export function subscribeToTokenRefresh(onRefresh) {
   try {
     return messaging().onTokenRefresh(onRefresh);
   } catch (err) {
-    console.warn('Token refresh listener failed:', err?.message || err);
+    safeWarn('Token refresh listener failed', err);
     return null;
   }
 }

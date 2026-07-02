@@ -23,6 +23,7 @@ import {
 } from '../utils/authSession';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import { resetToClientDashboard } from '../navigation/authNavigation';
+import { safeError } from '../utils/logger';
 
 export default function PasswordConfirmResetScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
@@ -77,7 +78,7 @@ export default function PasswordConfirmResetScreen({ route, navigation }) {
         resetToClientDashboard(navigation);
       }
     } catch (err) {
-      console.error('Password reset confirm failed:', err);
+      safeError('Password reset confirm failed', err);
       const message = err.message || 'Failed to reset password.';
       setError(message);
       showMessage('Error', message, { variant: 'error' });

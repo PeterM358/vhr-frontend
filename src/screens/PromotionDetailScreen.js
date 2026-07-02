@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { bookPromotion, unbookPromotion, getPromotionBookings } from '../api/promotions';
 import { getVehicles } from '../api/vehicles';
+import { safeError } from '../utils/logger';
 
 import { Card, Text, Button, useTheme, Divider } from 'react-native-paper';
 import { formatMoneyAmount } from '../constants/currency';
@@ -46,10 +47,9 @@ export default function PromotionDetailScreen({ route, navigation }) {
         const bookingData = await getPromotionBookings(token, promotion.id);
         const vehicleIds = (bookingData.booked_vehicle_ids || []).map((id) => String(id));
         const selectedIdStr = String(defaultId);
-        console.log("✅ Final booked check (init):", { vehicleIds, selectedIdStr, isBooked: vehicleIds.includes(selectedIdStr) });
         setAlreadyBooked(vehicleIds.includes(selectedIdStr));
       } catch (err) {
-        console.error('Failed to load booking or vehicle data:', err);
+        safeError('Failed to load booking or vehicle data', err);
         Alert.alert('Error', 'Failed to load booking or vehicle data');
       } finally {
         setLoading(false);
@@ -69,18 +69,14 @@ export default function PromotionDetailScreen({ route, navigation }) {
       }
 
       try {
-        console.log('📣 selectedVehicleId at updateBookingStatus:', selectedVehicleId);
         const token = await AsyncStorage.getItem('@access_token');
         const bookingData = await getPromotionBookings(token, promotion.id);
-        console.log('📣 raw bookingData from API:', bookingData);
         const vehicleIds = (bookingData.booked_vehicle_ids || []).map((id) => String(id));
-        console.log('📣 parsed vehicleIds from bookingData:', vehicleIds);
         const selectedIdStr = String(selectedVehicleId);
         const isBooked = vehicleIds.includes(selectedIdStr);
-        console.log("✅ Final booked check (update):", { vehicleIds, selectedIdStr, isBooked });
         setAlreadyBooked(isBooked);
       } catch (err) {
-        console.error('Failed to refresh booking status:', err);
+        safeError('Failed to refresh booking status', err);
       }
     };
 
@@ -94,7 +90,7 @@ export default function PromotionDetailScreen({ route, navigation }) {
       const vehicleIds = (bookingData.booked_vehicle_ids || []).map((id) => String(id));
       setAlreadyBooked(vehicleIds.includes(String(selectedVehicleId)));
     } catch (err) {
-      console.error('Failed to refresh booking status:', err);
+      safeError('Failed to refresh booking status', err);
     }
   };
 

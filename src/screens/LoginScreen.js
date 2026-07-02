@@ -13,6 +13,7 @@ import BaseStyles from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
 import { COLORS } from '../constants/colors';
 import { shouldEnableGoogleOAuth } from '../components/auth/googleOAuthConfig';
+import { safeError, safeWarn } from '../utils/logger';
 
 export default function LoginScreen({ navigation, route }) {
   const theme = useTheme();
@@ -47,7 +48,7 @@ export default function LoginScreen({ navigation, route }) {
         }
       })
       .catch((err) => {
-        console.warn('Google OAuth module unavailable:', err?.message || err);
+        safeWarn('Google OAuth module unavailable', err);
       });
 
     return () => {
@@ -130,7 +131,7 @@ export default function LoginScreen({ navigation, route }) {
           resetToClientDashboard(navigation);
         }
       } catch (oauthError) {
-        console.error('Google login error', oauthError);
+        safeError('Google login failed', oauthError);
         setError('Google login failed. Try again.');
       }
     },
@@ -173,7 +174,7 @@ export default function LoginScreen({ navigation, route }) {
         resetToClientDashboard(navigation);
       }
     } catch (err) {
-      console.error('Login error', err);
+      safeError('Login failed', err);
       setError('Login failed. Please check your credentials.');
     } finally {
       setLoading(false);

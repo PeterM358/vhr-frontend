@@ -14,13 +14,11 @@ export async function getSuggestedPartsForRepairType(token, repairTypeId, shopPr
 export async function getPartsCatalog(token, queryParams = {}) {
   const params = new URLSearchParams(queryParams).toString();
   const url = `${API_BASE_URL}/api/parts/parts/${params ? '?' + params : ''}`;
-  console.log('🔍 Fetching Parts Catalog:', url);
 
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const text = await response.text();
-  console.log('📥 Parts Catalog Response:', text);
 
   if (!response.ok) throw new Error('Failed to fetch parts catalog');
   return JSON.parse(text);
@@ -28,8 +26,6 @@ export async function getPartsCatalog(token, queryParams = {}) {
 
 // ✅ Create new PartsMaster entry (global)
 export async function createPartsMaster(token, data) {
-  console.log('📤 Creating PartsMaster with:', data);
-
   const response = await fetch(`${API_BASE_URL}/api/parts/parts/`, {
     method: 'POST',
     headers: {
@@ -40,7 +36,6 @@ export async function createPartsMaster(token, data) {
   });
 
   const text = await response.text();
-  console.log('📥 Created PartsMaster Response:', text);
 
   if (!response.ok) throw new Error('Failed to create new part in catalog');
   return JSON.parse(text);
@@ -48,14 +43,11 @@ export async function createPartsMaster(token, data) {
 
 // ✅ Get shop's own ShopParts listings
 export async function getShopParts(token) {
-  console.log('🔍 Fetching ShopParts...');
-
   const response = await fetch(`${API_BASE_URL}/api/parts/shop-parts/`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
   const text = await response.text();
-  console.log('📥 ShopParts Response:', text);
 
   if (!response.ok) throw new Error('Failed to fetch shop parts');
   return JSON.parse(text);
@@ -63,8 +55,6 @@ export async function getShopParts(token) {
 
 // ✅ Create new ShopPart listing
 export async function createShopPart(token, data) {
-  console.log('📤 Creating ShopPart with:', data);
-
   const response = await fetch(`${API_BASE_URL}/api/parts/shop-parts/`, {
     method: 'POST',
     headers: {
@@ -75,7 +65,6 @@ export async function createShopPart(token, data) {
   });
 
   const text = await response.text();
-  console.log('📥 Created ShopPart Response:', text);
 
   if (!response.ok) throw new Error('Failed to create shop part');
   return JSON.parse(text);
@@ -83,8 +72,6 @@ export async function createShopPart(token, data) {
 
 // ✅ Update existing ShopPart listing
 export async function updateShopPart(token, shopPartId, data) {
-  console.log('📤 Updating ShopPart:', shopPartId, data);
-
   const response = await fetch(`${API_BASE_URL}/api/parts/shop-parts/${shopPartId}/`, {
     method: 'PATCH',
     headers: {
@@ -95,7 +82,6 @@ export async function updateShopPart(token, shopPartId, data) {
   });
 
   const text = await response.text();
-  console.log('📥 Updated ShopPart Response:', text);
 
   if (!response.ok) throw new Error('Failed to update shop part');
   return JSON.parse(text);
@@ -103,8 +89,6 @@ export async function updateShopPart(token, shopPartId, data) {
 
 // ✅ Delete ShopPart listing
 export async function deleteShopPart(token, shopPartId) {
-  console.log('🗑️ Deleting ShopPart:', shopPartId);
-
   const response = await fetch(`${API_BASE_URL}/api/parts/shop-parts/${shopPartId}/`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },

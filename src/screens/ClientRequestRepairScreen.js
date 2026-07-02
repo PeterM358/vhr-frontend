@@ -11,6 +11,7 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 import { API_BASE_URL } from '../api/config';
 import BASE_STYLES from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
+import { safeError } from '../utils/logger';
 
 export default function ClientRequestRepairScreen({ route, navigation }) {
   const theme = useTheme();
@@ -91,8 +92,6 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
         status: 'open',
       };
 
-      console.log('📤 Creating Repair Request with:', payload);
-
       const response = await fetch(`${API_BASE_URL}/api/repairs/repair/`, {
         method: 'POST',
         headers: {
@@ -106,12 +105,11 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
         Alert.alert('Success', 'Repair request created as OPEN.');
         navigation.goBack();
       } else {
-        const errorText = await response.text();
-        console.error('❌ Error creating repair:', errorText);
+        await response.text();
         Alert.alert('Error', 'Failed to create repair request.');
       }
     } catch (err) {
-      console.error('❌ Exception:', err);
+      safeError('Create repair request failed', err);
       Alert.alert('Error', 'An unexpected error occurred.');
     }
   };

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, Button, StyleSheet, Text, View } from 'react-native';
 import ScreenBackground from '../ScreenBackground';
+import { safeError } from '../../utils/logger';
 
 export default class LoginErrorBoundary extends React.Component {
   constructor(props) {
@@ -13,7 +14,7 @@ export default class LoginErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error) {
-    console.error('LoginScreen render error:', error);
+    safeError('LoginScreen render error', error);
   }
 
   render() {

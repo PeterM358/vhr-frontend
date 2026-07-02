@@ -126,8 +126,6 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
       params.search = query;
       if (shopProfileId) params.shop_profile = shopProfileId;
 
-      console.log('🔍 Fetching Parts Catalog with:', params);
-
       const data = await getPartsCatalog(token, params);
       setResults(data);
     } catch (err) {

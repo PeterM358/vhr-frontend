@@ -12,6 +12,7 @@ import { AuthContext } from './AuthManager';
 import { WS_BASE_URL } from '../env';
 import { getNotifications } from '../api/notifications';
 import { normalizeNotification } from '../utils/normalizeNotification';
+import { devLog, safeError, safeWarn } from '../utils/logger';
 
 export const WebSocketContext = createContext();
 
@@ -40,7 +41,7 @@ export const WebSocketProvider = ({ children }) => {
       const rows = (Array.isArray(data) ? data : data?.results ?? []).map(normalizeNotification);
       setNotifications((prev) => mergeNotificationLists(prev, rows));
     } catch (error) {
-      console.warn('Failed to refresh notifications', error?.message || error);
+      safeWarn('Failed to refresh notifications', error);
     }
   }, [authToken]);
 
@@ -63,24 +64,24 @@ export const WebSocketProvider = ({ children }) => {
         const rows = (Array.isArray(data) ? data : data?.results ?? []).map(normalizeNotification);
         if (!cancelled) setNotifications(rows);
       } catch (error) {
-        console.warn('Failed to load notifications', error?.message || error);
+        safeWarn('Failed to load notifications', error);
       }
     })();
 
     const url = `${WS_BASE_URL}/ws/notifications/?token=${authToken}`;
     ws.current = new WebSocket(url);
 
-    ws.current.onopen = () => console.log('✅ WebSocket connected');
+    ws.current.onopen = () => devLog('WebSocket connected');
     ws.current.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
         setNotifications((prev) => mergeNotificationLists(prev, [normalizeNotification(data)]));
       } catch (error) {
-        console.error('❌ WS parse error:', error);
+        safeError('WebSocket message parse failed', error);
       }
     };
-    ws.current.onerror = (e) => console.error('❌ WS error:', e.message);
-    ws.current.onclose = (e) => console.log('❌ WS closed:', e.code, e.reason);
+    ws.current.onerror = () => safeWarn('WebSocket error', 'connection failed');
+    ws.current.onclose = (e) => devLog('WebSocket closed', e.code);
 
     return () => {
       cancelled = true;

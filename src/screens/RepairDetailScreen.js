@@ -89,6 +89,7 @@ import { pickOdometerPhotoAttachment } from '../utils/pickDocumentFile';
 import { uploadRepairDocument } from '../api/documents';
 import { showMessage } from '../utils/crossPlatformAlert';
 import { messageFromApiError } from '../utils/apiErrorMessage';
+import { safeError } from '../utils/logger';
 import { getPartsExport } from '../api/serviceMenu';
 import { presentPartsExportShareSheet } from '../utils/partsExportShare';
 import { computePartsTotals } from '../utils/repairPartsTotals';
@@ -354,7 +355,6 @@ export default function RepairDetailScreen({ route, navigation }) {
       Alert.alert("This repair is completed and can no longer be edited.");
       return false;
     }
-    console.log("💾 Save button clicked");
     const partsToSend = partsOverride ?? (selectedParts.length > 0 ? selectedParts : repairParts);
     const partsTotals = computePartsTotals(partsToSend);
     try {
@@ -480,7 +480,6 @@ export default function RepairDetailScreen({ route, navigation }) {
           body.mileage_large_jump_acknowledged = true;
         }
       }
-      console.log('📦 Body to send:', JSON.stringify(body, null, 2));
 
       if (pendingOdometerPhoto && repair?.vehicle) {
         await uploadRepairDocument(token, repair.vehicle, repairId, pendingOdometerPhoto, {
@@ -862,11 +861,6 @@ export default function RepairDetailScreen({ route, navigation }) {
   };
 
   const handleBookOffer = async (selectedOfferId) => {
-    console.log("💥 handleBookOffer called");
-    console.log("📌 FULL repair object:", JSON.stringify(repair, null, 2));
-    console.log("📌 repair.offer:", repair?.offer);
-    console.log("📌 repair.vehicle:", repair?.vehicle);
-
     if (!selectedOfferId || !repair?.vehicle) {
       Alert.alert('Error', 'Missing offer or vehicle information.');
       return;
@@ -875,21 +869,16 @@ export default function RepairDetailScreen({ route, navigation }) {
     try {
       const token = await AsyncStorage.getItem('@access_token');
       await bookOffer(token, selectedOfferId, repair.vehicle);
-      console.log("✅ Booking request sent:", selectedOfferId, repair.vehicle);
       Alert.alert('Success', 'Offer booked!');
       await refreshRepair();
       await refreshOffers();
     } catch (err) {
-      console.error("❌ Booking failed:", err);
+      safeError('Booking failed', err);
       Alert.alert('Error', err.message || 'Failed to book offer');
     }
   };
 
   const handleUnbookOffer = async (selectedOfferId) => {
-    console.log("💥 handleUnbookOffer called");
-    console.log("📌 selectedOfferId:", selectedOfferId);
-    console.log("📌 repair.vehicle:", repair?.vehicle);
-
     if (!selectedOfferId || !repair?.vehicle) {
       Alert.alert('Error', 'Missing offer or vehicle information.');
       return;
@@ -902,7 +891,7 @@ export default function RepairDetailScreen({ route, navigation }) {
       await refreshRepair();
       await refreshOffers();
     } catch (err) {
-      console.error("❌ Cancel failed:", err);
+      safeError('Cancel booking failed', err);
       Alert.alert('Error', err.message || 'Failed to cancel booking');
     }
   };

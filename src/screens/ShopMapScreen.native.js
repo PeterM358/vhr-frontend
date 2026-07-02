@@ -19,6 +19,7 @@ import { spreadShopMarkersForMap, regionForMapPoints } from '../utils/mapMarkerS
 import { API_BASE_URL } from '../api/config';
 import ScreenBackground from '../components/ScreenBackground';
 import BASE_STYLES from '../styles/base';
+import { devLog } from '../utils/logger';
 
 const getNow = () => new Date().toISOString();
 
@@ -86,7 +87,7 @@ export default function ShopMapScreen({ navigation, route }) {
 
   const fetchShops = useCallback(async () => {
     const fetchStart = Date.now();
-    console.log(`[${getNow()}] 📡 ShopMapScreen: fetch service centers...`);
+    devLog(`[${getNow()}] ShopMapScreen: fetch service centers`);
     setLoading(true);
     const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     const userIdStr = await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
@@ -115,12 +116,12 @@ export default function ShopMapScreen({ navigation, route }) {
     } finally {
       setLoading(false);
       const elapsed = Date.now() - fetchStart;
-      console.log(`[${getNow()}] ✅ ShopMapScreen: fetch done. Elapsed: ${elapsed}ms`);
+      devLog(`[${getNow()}] ShopMapScreen: fetch done (${elapsed}ms)`);
     }
   }, [selectedVehicleType, selectedCategory, selectedRepairType]);
 
   const fetchEverything = async () => {
-    console.log(`[${getNow()}] 🟡 ShopMapScreen: Starting fetchEverything...`);
+    devLog(`[${getNow()}] ShopMapScreen: starting fetchEverything`);
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       setLoading(false);
@@ -136,7 +137,7 @@ export default function ShopMapScreen({ navigation, route }) {
       position = await Location.getLastKnownPositionAsync({});
     }
     setLocation(position.coords);
-    console.log(`[${getNow()}] 🟢 ShopMapScreen: Location fetched`);
+    devLog(`[${getNow()}] ShopMapScreen: location fetched`);
   };
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 import { API_BASE_URL } from './config';
 import { formatDrfErrorMessage, messageFromApiResponseText } from '../utils/apiErrorMessage';
+import { safeWarn } from '../utils/logger';
 
 async function throwApiError(response, fallback) {
   const errorText = await response.text();
@@ -284,14 +285,7 @@ export async function uploadRepairMedia(token, repairId, mediaItem) {
     body: formData,
   });
   if (!response.ok) {
-    const errorBody = await response.text();
-    console.warn('Media upload failed', {
-      repairId,
-      mediaType: mediaItem.mediaType,
-      fileName: mediaItem.fileName,
-      status: response.status,
-      errorBody,
-    });
+    safeWarn('Media upload failed', `repair ${repairId}, HTTP ${response.status}`);
     throw new Error('Failed to upload media');
   }
   return response.json();
@@ -474,14 +468,8 @@ export async function deleteRepairMedia(token, repairId, mediaId) {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
-    const errorBody = await response.text();
-    console.warn('Media delete failed', {
-      repairId,
-      mediaId,
-      status: response.status,
-      errorBody,
-    });
-    throw new Error('Failed to remove media');
+    safeWarn('Media delete failed', `repair ${repairId}, HTTP ${response.status}`);
+    throw new Error('Failed to delete media');
   }
   return true;
 }

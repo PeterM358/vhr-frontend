@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../env';
 import { syncPushDeviceToken, deactivatePushDeviceToken } from '../notifications/pushDeviceSync';
 import { messageFromApiError } from '../utils/apiErrorMessage';
 import { resetToPublicHome } from '../navigation/authNavigation';
+import { safeError } from '../utils/logger';
 
 const normalizeLoginPhone = (value) => {
   if (!value) return '';
@@ -44,7 +45,7 @@ export const register = async (emailOrPhone, password, isClient, isShop) => {
 
     return loginResponse.data;
   } catch (error) {
-    console.error('❌ Registration/Login error:', error.response?.data || error.message);
+    safeError('Registration or login failed', error);
     throw new Error(messageFromApiError(error, 'Registration or login failed.'));
   }
 };
@@ -54,17 +55,14 @@ export const login = async (emailOrPhone, password) => {
   try {
     const body = buildLoginIdentifierBody(emailOrPhone, password);
 
-    console.log('🟢 Logging in with:', body);
-
     const response = await axios.post(`${API_BASE_URL}/api/token/`, body);
-    console.log('🟢 Login response received:', response.data);
 
     await storeLoginData(response.data, emailOrPhone.trim());
     await syncPushDeviceToken(response.data.access);
 
     return response.data;
   } catch (error) {
-    console.error('❌ Login error:', error.response?.data || error.message);
+    safeError('Login failed', error);
     throw new Error('Login failed. Please check your credentials.');
   }
 };
@@ -87,8 +85,6 @@ const storeLoginData = async (data, fallbackDisplay) => {
   else if (phone && phone.trim()) userDisplay = phone.trim();
   else userDisplay = fallbackDisplay;
 
-  console.log('✅ Storing user_display:', userDisplay);
-
   const itemsToStore = [
     ['@access_token', access],
     ['@refresh_token', refresh],
@@ -106,7 +102,6 @@ const storeLoginData = async (data, fallbackDisplay) => {
   }
 
   await AsyncStorage.multiSet(itemsToStore);
-  console.log('✅ Tokens saved to AsyncStorage');
 };
 
 // ✅ Example of an authenticated API call
@@ -153,7 +148,7 @@ export const requestPasswordReset = async (email) => {
     });
     return response.data;
   } catch (error) {
-    console.error('❌ Password reset request failed:', error.response?.data || error.message);
+    safeError('Password reset request failed', error);
     throw new Error('Failed to send password reset email.');
   }
 };
@@ -174,7 +169,7 @@ export const confirmPasswordReset = async (uid, token, newPassword) => {
     }
     return data;
   } catch (error) {
-    console.error('❌ Password reset confirm failed:', error.response?.data || error.message);
+    safeError('Password reset confirm failed', error);
     throw new Error(messageFromApiError(error, 'Failed to reset password.'));
   }
 };

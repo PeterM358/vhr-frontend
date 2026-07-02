@@ -33,6 +33,7 @@ import { getRepairById, getRepairMessages, sendRepairMessage, confirmRepair, upd
 import { prepareRepairPartsData, getShopParts, updateShopPart, createShopPart } from '../api/parts';
 import { bookPromotion, unbookPromotion } from '../api/offers';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { safeError } from '../utils/logger';
 import { WebSocketContext } from '../context/WebSocketManager';
 
 import { API_BASE_URL } from '../api/config';
@@ -215,18 +216,10 @@ export default function RepairChatScreen({ route, navigation }) {
   const handleBookOffer = async () => {
     const latestOffer = getLatestOffer();
 
-    console.log("💥 handleBookOffer called!");
-    console.log("🟢 User isShop:", isShop);
-    console.log("🟢 Latest offer:", latestOffer);
-    console.log("🟢 Repair object:", JSON.stringify(repair, null, 2));
-
     if (!latestOffer) {
       Alert.alert('Error', 'No latest offer found.');
       return;
     }
-
-    console.log("📌 offerId:", latestoffer.id);
-    console.log("📌 price_offer:", latestOffer.price_offer);
 
     if (!latestoffer.id && latestoffer.id !== 0) {
       Alert.alert('Error', 'This offer cannot be booked (missing offer ID).');
@@ -238,16 +231,13 @@ export default function RepairChatScreen({ route, navigation }) {
       return;
     }
 
-    console.log("✅ Booking with offerId:", latestoffer.id, "vehicleId:", repair.vehicle);
-
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       await bookPromotion(token, latestoffer.id, repair.vehicle);
-      console.log("✅ Booking API call completed!");
       Alert.alert('Success', 'Offer booked!');
       navigation.goBack();
     } catch (err) {
-      console.error("❌ Booking failed error object:", err);
+      safeError('Booking failed', err);
       Alert.alert('Error', err.message || 'Failed to book offer');
     }
   };
@@ -315,7 +305,7 @@ export default function RepairChatScreen({ route, navigation }) {
       Alert.alert('Success', 'Repair confirmed as done!');
       await loadRepair();
     } catch (err) {
-      console.error("❌ Confirm repair failed:", err);
+      safeError('Confirm repair failed', err);
       Alert.alert('Error', err.message || 'Failed to confirm repair');
     }
   };
@@ -349,11 +339,8 @@ export default function RepairChatScreen({ route, navigation }) {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const shopProfileId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
-      console.log('🧭 Starting handleSaveParts...');
-      console.log('🧭 Current selectedParts:', selectedParts);
 
       let freshShopParts = await getShopParts(token);
-      console.log('🧭 Fresh ShopParts:', freshShopParts);
 
       const repairPartsData = [];
 
@@ -366,13 +353,11 @@ export default function RepairChatScreen({ route, navigation }) {
           let shopPart = freshShopParts.find(sp => sp.part?.id === parseInt(part.partsMasterId));
 
           if (shopPart) {
-            console.log(`🧭 Found existing ShopPart for partId=${part.partsMasterId}: shopPartId=${shopPart.id}`);
             await updateShopPart(token, shopPart.id, {
               price: part.price,
               default_labor_cost: part.labor,
             });
           } else {
-            console.log(`🟢 No ShopPart found for partId=${part.partsMasterId}, creating...`);
             shopPart = await createShopPart(token, {
               shop_profile: parseInt(shopProfileId),
               part_id: parseInt(part.partsMasterId),
@@ -396,8 +381,6 @@ export default function RepairChatScreen({ route, navigation }) {
         if (shopPartId) partData.shop_part_id = shopPartId;
               }
 
-      console.log('🧭 Final repairPartsData to PATCH:', repairPartsData);
-
       await updateRepair(token, repairId, {
         description: repair.description,
         kilometers: repair.kilometers ? parseInt(repair.kilometers) : null,
@@ -415,7 +398,7 @@ export default function RepairChatScreen({ route, navigation }) {
         ],
       });
     } catch (err) {
-      console.error("❌ Save Parts Error:", err);
+      safeError('Save parts failed', err);
       Alert.alert('Error', err.message || 'Failed to save parts');
     }
   };

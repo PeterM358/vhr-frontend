@@ -1,11 +1,10 @@
 // src/api/offers.js
 import { API_BASE_URL } from './config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { safeError } from '../utils/logger';
 
 export async function bookOffer(token, offerId, vehicleId) {
-  console.log("📣 bookOffer called with:", { offerId, vehicleId });
   const url = `${API_BASE_URL}/api/offers/${offerId}/book/`;
-  console.log("📣 URL:", url);
 
   const response = await fetch(url, {
     method: 'POST',
@@ -21,7 +20,7 @@ export async function bookOffer(token, offerId, vehicleId) {
     try {
       err = await response.json();
     } catch (e) {
-      console.error("❌ Failed to parse error JSON:", e);
+      safeError('Failed to parse booking error response', e);
       throw new Error('Booking failed');
     }
     throw new Error(err.detail || 'Booking failed');
@@ -32,7 +31,6 @@ export async function bookOffer(token, offerId, vehicleId) {
 
 export async function unbookOffer(token, offerId) {
   const url = `${API_BASE_URL}/api/offers/${offerId}/unbook/`;
-  console.log("📣 unbookOffer URL:", url);
 
   const response = await fetch(url, {
     method: 'POST',
@@ -46,7 +44,7 @@ export async function unbookOffer(token, offerId) {
     try {
       err = await response.json();
     } catch (e) {
-      console.error("❌ Failed to parse error JSON:", e);
+      safeError('Failed to parse unbooking error response', e);
       throw new Error('Unbooking failed');
     }
     throw new Error(err.detail || 'Unbooking failed');
@@ -106,7 +104,7 @@ export async function getMyOffers(token) {
   const shopId = await AsyncStorage.getItem('@current_shop_id');
 
   if (!shopId) {
-    console.error('No current shop selected in AsyncStorage');
+    safeError('getMyOffers', 'No current shop selected');
     throw new Error('No current shop selected. Please choose a shop.');
   }
 
@@ -115,15 +113,8 @@ export async function getMyOffers(token) {
   });
 
   if (!response.ok) {
-    let errorDetail = '';
-    try {
-      const err = await response.json();
-      errorDetail = JSON.stringify(err);
-    } catch (e) {
-      errorDetail = await response.text();
-    }
-    console.error(`getMyOffers error: ${response.status} - ${errorDetail}`);
-    throw new Error(errorDetail || 'Failed to fetch offers');
+    safeError('getMyOffers failed', `HTTP ${response.status}`);
+    throw new Error('Failed to fetch offers');
   }
 
   return await response.json();

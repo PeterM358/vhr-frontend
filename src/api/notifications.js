@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { API_BASE_URL } from './config';
+import { safeWarn } from '../utils/logger';
 
 export async function getNotifications(token) {
   const response = await fetch(`${API_BASE_URL}/api/notifications/`, {
@@ -60,13 +61,12 @@ export async function registerDeviceToken(authToken, payload) {
       }),
     });
     if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      console.warn('Device token register failed', response.status, errorText);
+      safeWarn('Device token register failed', `HTTP ${response.status}`);
       return null;
     }
     return response.json();
   } catch (err) {
-    console.warn('Device token register error:', err?.message || err);
+    safeWarn('Device token register error', err);
     return null;
   }
 }
@@ -88,12 +88,12 @@ export async function deactivateDeviceToken(authToken, token) {
       body: JSON.stringify({ token }),
     });
     if (!response.ok) {
-      console.warn('Device token deactivate failed', response.status);
+      safeWarn('Device token deactivate failed', `HTTP ${response.status}`);
       return false;
     }
     return true;
   } catch (err) {
-    console.warn('Device token deactivate error:', err?.message || err);
+    safeWarn('Device token deactivate error', err);
     return false;
   }
 }

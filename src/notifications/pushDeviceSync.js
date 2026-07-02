@@ -10,6 +10,7 @@ import {
   requestFirebasePermission,
   subscribeToTokenRefresh,
 } from './firebaseMessaging';
+import { devLog, safeWarn } from '../utils/logger';
 
 export const FCM_TOKEN_STORAGE_KEY = '@fcm_device_token';
 
@@ -65,7 +66,7 @@ export async function syncPushDeviceToken(authToken) {
     await AsyncStorage.setItem(FCM_TOKEN_STORAGE_KEY, token);
     attachPushTokenRefreshListener(async () => AsyncStorage.getItem('@access_token'));
   } catch (err) {
-    console.warn('Push device token sync skipped:', err?.message || err);
+    safeWarn('Push device token sync skipped', err);
   }
 }
 
@@ -81,7 +82,7 @@ export async function deactivatePushDeviceToken(authToken) {
     }
     await deactivateDeviceToken(authToken, token);
   } catch (err) {
-    console.warn('Push device token deactivate skipped:', err?.message || err);
+    safeWarn('Push device token deactivate skipped', err);
   }
 }
 
@@ -112,9 +113,9 @@ export function attachPushTokenRefreshListener(getAuthToken) {
         app_build,
       });
       await AsyncStorage.setItem(FCM_TOKEN_STORAGE_KEY, newToken);
-      console.log('📱 FCM token refresh registered with backend');
+      devLog('FCM token refresh registered with backend');
     } catch (err) {
-      console.warn('FCM token refresh sync failed:', err?.message || err);
+      safeWarn('FCM token refresh sync failed', err);
     }
   });
   if (typeof unsub === 'function') {

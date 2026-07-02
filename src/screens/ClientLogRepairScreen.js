@@ -13,6 +13,7 @@ import { createRepair } from '../api/repairs';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { API_BASE_URL } from '../api/config';
 import BASE_STYLES from '../styles/base';
+import { safeError } from '../utils/logger';
 import { COLORS } from '../styles/colors';
 import ScreenBackground from '../components/ScreenBackground';
 
@@ -114,8 +115,6 @@ export default function ClientLogRepairScreen({ navigation, route }) {
         repair_parts_data: repairPartsData,
       };
 
-      console.log('✅ Submitting client repair:', body);
-
       await createRepair(token, body);
 
       setDialogMessage('Repair saved as done.');
@@ -132,7 +131,7 @@ export default function ClientLogRepairScreen({ navigation, route }) {
       }, 1500);
 
     } catch (err) {
-      console.error('❌ Save Error:', err);
+      safeError('Save repair failed', err);
       setDialogMessage(err.message || 'Failed to save repair.');
       setDialogVisible(true);
     } finally {

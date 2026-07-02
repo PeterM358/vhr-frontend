@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from './config';
+import { safeError } from '../utils/logger';
 
 // 🔹 Load *my* shop profiles (those user is linked to)
 export async function getMyShopProfiles() {
@@ -24,7 +25,7 @@ export async function updateShopProfile(profileId, payload) {
   });
   if (!res.ok) {
     const errorData = await res.json();
-    console.error('Backend Validation Error:', errorData);
+    safeError('Shop profile update failed', errorData?.detail || 'validation error');
     throw new Error(JSON.stringify(errorData));
   }
   return res.json();

@@ -13,6 +13,7 @@ import Logo from '../assets/images/logo.svg';
 import { COLORS } from '../constants/colors';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import { resetToClientDashboard } from '../navigation/authNavigation';
+import { safeError } from '../utils/logger';
 
 export default function RegisterScreen({ navigation }) {
   const theme = useTheme();
@@ -81,7 +82,7 @@ export default function RegisterScreen({ navigation }) {
         });
       }
     } catch (err) {
-      console.error('Registration error:', err);
+      safeError('Registration failed', err);
       setDialogMessage(err.message || 'Failed to register');
       setDialogVisible(true);
     } finally {
