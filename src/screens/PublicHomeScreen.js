@@ -1,14 +1,34 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { ScrollView, View, StyleSheet } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Text } from 'react-native-paper';
 import BaseStyles from '../styles/base';
 import Logo from '../assets/images/logo.svg';
 import ScreenBackground from '../components/ScreenBackground';
 
+import { openServiceCenters } from '../navigation/serviceCentersNavigation';
+
 export default function PublicHomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const topPad = insets.top + 16;
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const token = await AsyncStorage.getItem('@access_token');
+        if (cancelled) return;
+        if (token && token !== 'null' && token !== 'undefined') {
+          navigation.replace('Home', { screen: 'HomeMain' });
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [navigation])
+  );
 
   return (
     <ScreenBackground safeArea={false}>
@@ -32,7 +52,7 @@ export default function PublicHomeScreen({ navigation }) {
 
           <Button
             mode="contained"
-            onPress={() => navigation.navigate('ShopMap')}
+            onPress={() => openServiceCenters(navigation)}
             style={BaseStyles.loginButton}
             contentStyle={BaseStyles.loginButtonContent}
             labelStyle={BaseStyles.loginButtonLabel}

@@ -12,6 +12,7 @@ import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import { logout } from '../api/auth';
 import { resetFromClientDrawer } from './drawerNavigation';
+import { openServiceCenters } from './serviceCentersNavigation';
 
 import MainText from '../assets/images/main-text.png'; // ✅ Your bottom makeing image
 
@@ -76,7 +77,7 @@ function CustomDrawerContent(props) {
         />
         <DrawerItem
           label="Find Service Centers"
-          onPress={() => resetFromClientDrawer(navigation, 'ShopMap')}
+          onPress={() => openServiceCenters(navigation)}
           icon={() => <Text>🗺️</Text>}
         />
         <DrawerItem

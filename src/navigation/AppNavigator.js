@@ -2,7 +2,7 @@
  * PATH: src/navigation/AppNavigator.js
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Platform, Pressable, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -70,6 +70,7 @@ import SelectOfferPartsScreen from '../screens/SelectOfferPartsScreen';
 import PasswordRequestResetScreen from '../screens/PasswordRequestResetScreen';
 import PasswordConfirmResetScreen from '../screens/PasswordConfirmResetScreen';
 
+import { buildAppLinking, redirectLegacyWebUrl } from './webLinking';
 
 const Stack = createNativeStackNavigator();
 
@@ -169,15 +170,11 @@ function getLinkingPrefixes() {
 }
 
 export default function AppNavigator() {
-  // Deep linking: native scheme + https web URLs from transactional emails
-  const linking = {
-    prefixes: getLinkingPrefixes(),
-    config: {
-      screens: {
-        PasswordConfirmReset: 'reset-password/:uid/:token',
-      },
-    },
-  };
+  const linking = buildAppLinking(getLinkingPrefixes());
+
+  useEffect(() => {
+    redirectLegacyWebUrl();
+  }, []);
 
   return (
     <NavigationContainer linking={linking}>

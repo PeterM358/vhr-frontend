@@ -33,6 +33,7 @@ import FloatingCard from '../components/ui/FloatingCard';
 import { NOTIFICATION_CENTER_PLACEHOLDERS } from '../constants/clientDashboardPlaceholders';
 import { COLORS } from '../constants/colors';
 import { resetFromClientDrawer } from '../navigation/drawerNavigation';
+import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import { showMessage } from '../utils/crossPlatformAlert';
 
 const HOME_TOP_BAR = 'rgba(11,18,32,0.92)';
@@ -85,6 +86,22 @@ export default function HomeScreen({ navigation }) {
         if (setUserEmailOrPhone) setUserEmailOrPhone(last || '');
       };
 
+      const ensureAuthOrPublicHome = async () => {
+        if (isLoading) return;
+        const token = await AsyncStorage.getItem('@access_token');
+        const hasToken = !!(token && token !== 'null' && token !== 'undefined');
+        if (hasToken) {
+          if (!isAuthenticated) {
+            setAuthToken?.(token);
+            setIsAuthenticated?.(true);
+          }
+          return;
+        }
+        if (!isAuthenticated) {
+          navigation.replace('PublicHome');
+        }
+      };
+
       const loadDashboard = async () => {
         if (!isAuthenticated) return;
         setDashboardLoading(true);
@@ -105,8 +122,16 @@ export default function HomeScreen({ navigation }) {
       };
 
       loadUser();
+      ensureAuthOrPublicHome();
       loadDashboard();
-    }, [isAuthenticated, setUserEmailOrPhone])
+    }, [
+      isAuthenticated,
+      isLoading,
+      navigation,
+      setAuthToken,
+      setIsAuthenticated,
+      setUserEmailOrPhone,
+    ])
   );
 
   const unreadNotifications = notifications.filter((n) => !n.is_read).length;
@@ -118,7 +143,7 @@ export default function HomeScreen({ navigation }) {
 
   const goRequestService = () => resetFromClientDrawer(navigation, 'CreateRepair');
   const goAddVehicle = () => resetFromClientDrawer(navigation, 'CreateVehicle');
-  const goFindCenters = () => resetFromClientDrawer(navigation, 'ShopMap');
+  const goFindCenters = () => openServiceCenters(navigation);
   const goVehicles = () => resetFromClientDrawer(navigation, 'ClientVehicles');
   const goRepairs = () => resetFromClientDrawer(navigation, 'ClientRepairs');
   const goOffers = () =>
@@ -205,9 +230,7 @@ export default function HomeScreen({ navigation }) {
     return (
       <ScreenBackground>
         <View style={styles.center}>
-          <View style={styles.guestCard}>
-            <Text style={styles.guestTitle}>Welcome! Please Login or Register.</Text>
-          </View>
+          <ActivityIndicator size="large" color="#fff" />
         </View>
       </ScreenBackground>
     );
@@ -353,19 +376,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
-  },
-  guestCard: {
-    backgroundColor: COLORS.CARD_DARK,
-    borderRadius: 18,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER_SOFT,
-  },
-  guestTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
   },
   scroll: {
     paddingHorizontal: 14,

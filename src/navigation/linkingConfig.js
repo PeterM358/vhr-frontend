@@ -1,0 +1,18 @@
+/**
+ * User-facing web URL paths for React Navigation.
+ * Screen/component names are unchanged — only URL segments differ on web.
+ */
+
+export const linkingScreens = {
+  PublicHome: '',
+  Login: 'sign-in',
+  Register: 'sign-up',
+  Home: {
+    path: 'dashboard',
+    screens: {
+      HomeMain: '',
+    },
+  },
+  ShopMap: 'service-centers',
+  PasswordConfirmReset: 'reset-password/:uid/:token',
+};

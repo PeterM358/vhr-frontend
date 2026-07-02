@@ -23,6 +23,7 @@ import { COLORS } from '../styles/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { goBackFromServiceCenters } from '../navigation/serviceCentersNavigation';
 import { getServiceCenters, VEHICLE_TYPE_FILTER_CHIPS } from '../api/serviceCenters';
 import { spreadShopMarkersForMap } from '../utils/mapMarkerSpread';
 import { API_BASE_URL } from '../api/config';
@@ -196,7 +197,7 @@ export default function ShopMapScreen() {
                 styles.backPill,
                 (pressed || hovered) && styles.backPillPressed,
               ]}
-              onPress={() => navigation.navigate('Home')}
+              onPress={() => goBackFromServiceCenters(navigation)}
             >
               <Text style={styles.backPillIcon}>←</Text>
             </Pressable>
