@@ -11,12 +11,12 @@ import AuthManager from './context/AuthManager';
 import MessageDialogHost from './components/ui/MessageDialog';
 
 const handleDeepLink = ({ url }) => {
-  if (url) {
-    const path = url.replace(/.*?:\/\//g, '');
-    const [route, uid, token] = path.split('/');
-    if (route === 'reset-password' && uid && token) {
-      Linking.openURL(`service1001://reset-password/${uid}/${token}`);
-    }
+  if (!url) return;
+  // https://host/reset-password/uid/token or service1001://reset-password/uid/token
+  const match = url.match(/reset-password\/([^/?#]+)\/([^/?#]+)/);
+  if (match) {
+    const [, uid, token] = match;
+    Linking.openURL(`service1001://reset-password/${uid}/${token}`);
   }
 };
 

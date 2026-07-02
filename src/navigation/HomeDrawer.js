@@ -75,7 +75,7 @@ function CustomDrawerContent(props) {
           )}
         />
         <DrawerItem
-          label="Find Shops on Map"
+          label="Find Service Centers"
           onPress={() => resetFromClientDrawer(navigation, 'ShopMap')}
           icon={() => <Text>🗺️</Text>}
         />

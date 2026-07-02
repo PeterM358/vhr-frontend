@@ -2,6 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../env';
 import { syncPushDeviceToken, deactivatePushDeviceToken } from '../notifications/pushDeviceSync';
+import { messageFromApiError } from '../utils/apiErrorMessage';
 
 const normalizeLoginPhone = (value) => {
   if (!value) return '';
@@ -43,7 +44,7 @@ export const register = async (emailOrPhone, password, isClient, isShop) => {
     return loginResponse.data;
   } catch (error) {
     console.error('❌ Registration/Login error:', error.response?.data || error.message);
-    throw new Error('Registration or login failed.');
+    throw new Error(messageFromApiError(error, 'Registration or login failed.'));
   }
 };
 
@@ -159,7 +160,7 @@ export const requestPasswordReset = async (email) => {
   }
 };
 
-// ✅ Confirm Password Reset (set new password)
+// ✅ Confirm Password Reset (set new password; returns login tokens when successful)
 export const confirmPasswordReset = async (uid, token, newPassword) => {
   try {
     const response = await axios.post(`${API_BASE_URL}/api/users/password/confirm/`, {
@@ -167,10 +168,16 @@ export const confirmPasswordReset = async (uid, token, newPassword) => {
       token,
       new_password: newPassword,
     });
-    return response.data;
+    const data = response.data;
+    if (data?.access) {
+      const identifier = (data.email && String(data.email).trim()) || (data.phone && String(data.phone).trim()) || '';
+      await storeLoginData(data, identifier);
+      await syncPushDeviceToken(data.access);
+    }
+    return data;
   } catch (error) {
     console.error('❌ Password reset confirm failed:', error.response?.data || error.message);
-    throw new Error('Failed to reset password.');
+    throw new Error(messageFromApiError(error, 'Failed to reset password.'));
   }
 };
 

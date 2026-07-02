@@ -1,12 +1,10 @@
 // PATH: src/screens/PasswordConfirmResetScreen.js
 
-import React, { useState, useEffect } from 'react';
-import { useLinkTo } from '@react-navigation/native';
+import React, { useContext, useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
   TextInput,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,58 +12,74 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Text } from 'react-native-paper';
 import { confirmPasswordReset } from '../api/auth';
+import { AuthContext } from '../context/AuthManager';
 import BASE_STYLES from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
+import { showMessage } from '../utils/crossPlatformAlert';
+import {
+  applyAuthSession,
+  authDisplayIdentifier,
+  resolvePasswordResetParams,
+} from '../utils/authSession';
+import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 
 export default function PasswordConfirmResetScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const headerReserve = insets.top + (Platform.OS === 'ios' ? 52 : 56);
-  const { uid, token } = route.params || {};
+  const authContext = useContext(AuthContext);
+  const { uid, token } = useMemo(() => resolvePasswordResetParams(route), [route]);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!uid || !token) {
-      Alert.alert('Invalid link', 'Missing token or user ID.');
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
-    }
-  }, [uid, token]);
+  const [error, setError] = useState('');
 
   const handleConfirmReset = async () => {
+    setError('');
+
     if (!uid || !token) {
-      Alert.alert('Invalid link', 'Missing token or user ID.');
+      const message = 'This reset link is invalid or incomplete. Request a new password reset email.';
+      setError(message);
+      showMessage('Invalid link', message, { variant: 'error' });
       return;
     }
 
     if (!password.trim() || !confirmPassword.trim()) {
-      Alert.alert('Error', 'Please fill in all fields.');
+      setError('Please fill in both password fields.');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match.');
+      setError('Passwords do not match.');
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters.');
+      setError('Password must be at least 6 characters.');
       return;
     }
 
     try {
       setLoading(true);
-      await confirmPasswordReset(uid, token, password.trim());
-      Alert.alert('Success', 'Password reset successful.');
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
-    } catch (error) {
-      Alert.alert('Error', error.message);
+      const data = await confirmPasswordReset(uid, token, password.trim());
+
+      if (!data?.access) {
+        throw new Error('Password was reset but sign-in failed. Please log in manually.');
+      }
+
+      const identifier = authDisplayIdentifier(data);
+      await applyAuthSession(data, identifier, authContext);
+
+      if (data.is_shop) {
+        const shopRoute = await resolveShopEntryRoute();
+        navigation.reset(buildShopAuthReset(shopRoute));
+      } else {
+        navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      }
+    } catch (err) {
+      console.error('Password reset confirm failed:', err);
+      const message = err.message || 'Failed to reset password.';
+      setError(message);
+      showMessage('Error', message, { variant: 'error' });
     } finally {
       setLoading(false);
     }
@@ -85,6 +99,7 @@ export default function PasswordConfirmResetScreen({ route, navigation }) {
               paddingBottom: Math.max(insets.bottom, 16) + 24,
             },
           ]}
+          keyboardShouldPersistTaps="handled"
         >
           <View style={styles.card}>
             <Text style={styles.title}>Enter New Password</Text>
@@ -95,6 +110,8 @@ export default function PasswordConfirmResetScreen({ route, navigation }) {
               secureTextEntry
               value={password}
               onChangeText={setPassword}
+              autoComplete="new-password"
+              textContentType="newPassword"
             />
             <TextInput
               style={styles.input}
@@ -103,8 +120,16 @@ export default function PasswordConfirmResetScreen({ route, navigation }) {
               secureTextEntry
               value={confirmPassword}
               onChangeText={setConfirmPassword}
+              autoComplete="new-password"
+              textContentType="newPassword"
             />
-            <Button mode="contained" onPress={handleConfirmReset} loading={loading}>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            <Button
+              mode="contained"
+              onPress={handleConfirmReset}
+              loading={loading}
+              disabled={loading}
+            >
               Reset Password
             </Button>
           </View>
@@ -142,5 +167,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     color: '#fff',
     backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  errorText: {
+    color: '#fca5a5',
+    marginBottom: 12,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

@@ -1,14 +1,23 @@
 /**
  * PATH: src/screens/ShopHomeScreen.js
+ * Veversal partner platform dashboard — open work first, ERP modules as tiles.
  */
 
-import React, { useContext, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, FlatList, Pressable } from 'react-native';
-import { DrawerActions, useNavigation, useFocusEffect } from '@react-navigation/native';
-import { Appbar, Badge, Button, useTheme } from 'react-native-paper';
+import React, { useContext, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  ScrollView,
+  Pressable,
+} from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { Appbar, Badge, Button } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logout } from '../api/auth';
 import { getRepairs, getShopCalendar } from '../api/repairs';
+import { getMyOffers } from '../api/offers';
 import {
   cacheUnscheduledCount,
   readCachedUnscheduledCount,
@@ -18,38 +27,53 @@ import {
   fetchShopProfileCompleteness,
   gateRepairNavigation,
 } from '../utils/shopProfileGate';
-import {
-  setCachedShopRepairs,
-} from '../utils/shopRepairsPrefetch';
+import { setCachedShopRepairs } from '../utils/shopRepairsPrefetch';
 import ShopProfileSetupBanner from '../components/shop/ShopProfileSetupBanner';
 import { getMyShopProfiles } from '../api/profiles';
 import { formatShopDisplayName } from '../utils/shopDisplayName';
-
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
-import Logo from '../assets/images/logo.svg';
 import ScreenBackground from '../components/ScreenBackground';
 import FloatingCard from '../components/ui/FloatingCard';
+import DashboardHero from '../components/dashboard/DashboardHero';
+import DashboardSection from '../components/dashboard/DashboardSection';
+import DashboardActionTile from '../components/dashboard/DashboardActionTile';
+import PartnerActivationBanner from '../components/dashboard/PartnerActivationBanner';
+import PartnerEmptyRequestsState from '../components/dashboard/PartnerEmptyRequestsState';
 import { COLORS } from '../constants/colors';
+import { todayCalendarRange, isScheduledToday } from '../utils/dashboardDate';
+import {
+  canSendPartnerOffers,
+  isPartnerSubscriptionActive,
+} from '../utils/partnerSubscription';
+import { showMessage } from '../utils/crossPlatformAlert';
+import { resetShopDrawerRepairs } from '../navigation/drawerNavigation';
 
 const SHOP_TOP_BAR = 'rgba(11,18,32,0.92)';
 
 export default function ShopHomeScreen() {
   const navigation = useNavigation();
-  const theme = useTheme();
-
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
   const { notifications } = useContext(WebSocketContext);
 
   const [loading, setLoading] = useState(true);
-  const [shopDisplayName, setShopDisplayName] = useState('Shop');
+  const [shopProfile, setShopProfile] = useState(null);
+  const [shopDisplayName, setShopDisplayName] = useState('Service center');
   const [openRepairs, setOpenRepairs] = useState([]);
+  const [ongoingRepairs, setOngoingRepairs] = useState([]);
+  const [pendingOffers, setPendingOffers] = useState([]);
+  const [todayBookings, setTodayBookings] = useState([]);
   const [repairsLoading, setRepairsLoading] = useState(true);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
   const [unscheduledCount, setUnscheduledCount] = useState(0);
   const [profileComplete, setProfileComplete] = useState(true);
   const [missingProfileFields, setMissingProfileFields] = useState([]);
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
   const lastRepairNotifIdRef = React.useRef(null);
+
+  const partnerActive = isPartnerSubscriptionActive(shopProfile);
+  const canSendOffers = canSendPartnerOffers(shopProfile);
 
   const loadOpenRepairs = React.useCallback(async ({ background = false } = {}) => {
     if (!background) setRepairsLoading(true);
@@ -64,6 +88,29 @@ export default function ShopHomeScreen() {
       setOpenRepairs([]);
     } finally {
       if (!background) setRepairsLoading(false);
+    }
+  }, []);
+
+  const loadDashboardMetrics = React.useCallback(async () => {
+    setDashboardLoading(true);
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      const shopId = await AsyncStorage.getItem('@current_shop_id');
+      const { from, to } = todayCalendarRange();
+
+      const [ongoing, offers, calendar] = await Promise.all([
+        getRepairs(token, 'ongoing').catch(() => []),
+        getMyOffers(token).catch(() => []),
+        getShopCalendar(token, { from, to, shopId }).catch(() => ({ scheduled: [] })),
+      ]);
+
+      setOngoingRepairs(Array.isArray(ongoing) ? ongoing : []);
+      const offerRows = Array.isArray(offers) ? offers : [];
+      setPendingOffers(offerRows.filter((o) => !o.is_booked));
+      const scheduled = Array.isArray(calendar?.scheduled) ? calendar.scheduled : [];
+      setTodayBookings(scheduled.filter(isScheduledToday));
+    } finally {
+      setDashboardLoading(false);
     }
   }, []);
 
@@ -94,7 +141,9 @@ export default function ShopHomeScreen() {
       const loadShopUser = async () => {
         try {
           const profiles = await getMyShopProfiles();
-          const shopName = profiles?.[0]?.name?.trim();
+          const profile = profiles?.[0] || null;
+          setShopProfile(profile);
+          const shopName = profile?.name?.trim();
           if (shopName) {
             setShopDisplayName(formatShopDisplayName(shopName));
           } else {
@@ -106,6 +155,7 @@ export default function ShopHomeScreen() {
             setShopDisplayName(display);
           }
         } catch {
+          setShopProfile(null);
           setShopDisplayName('Service center');
         } finally {
           setLoading(false);
@@ -131,8 +181,9 @@ export default function ShopHomeScreen() {
       refreshProfileGate();
       loadShopUser();
       loadOpenRepairs();
+      loadDashboardMetrics();
       loadUnscheduledBadge();
-    }, [refreshProfileGate, loadOpenRepairs])
+    }, [refreshProfileGate, loadOpenRepairs, loadDashboardMetrics])
   );
 
   const handleRepairPress = (repairId) => {
@@ -147,34 +198,205 @@ export default function ShopHomeScreen() {
     navigation.navigate('RepairDetail', { repairId });
   };
 
+  const handleSendOffer = async (repairId) => {
+    if (!canSendOffers) {
+      showMessage(
+        'Partner activation required',
+        'Activate your Veversal partner account to send offers to customers.',
+        { variant: 'info' }
+      );
+      navigation.navigate('ShopProfile', { requireSetup: true });
+      return;
+    }
+    if (
+      !gateRepairNavigation(navigation, {
+        isComplete: profileComplete,
+        missingFields: missingProfileFields,
+      })
+    ) {
+      return;
+    }
+    const shopId = await AsyncStorage.getItem('@current_shop_id');
+    navigation.navigate('CreateOrUpdateOffer', {
+      repairId,
+      shopId: shopId ? Number(shopId) : undefined,
+      selectedOfferParts: [],
+    });
+  };
+
   const handleLogout = async () => {
     await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
   };
 
-  const renderRepair = ({ item }) => {
+  const tileRows = useMemo(
+    () => [
+      [
+        {
+          key: 'pending-offers',
+          icon: 'file-send-outline',
+          title: 'Pending Offers',
+          subtitle: 'Sent, awaiting customer acceptance',
+          count: pendingOffers.length,
+          onPress: () => resetShopDrawerRepairs(navigation),
+        },
+        {
+          key: 'active',
+          icon: 'car-wrench',
+          title: 'Active Repairs',
+          subtitle: 'Jobs currently in progress',
+          count: ongoingRepairs.length,
+          onPress: () => resetShopDrawerRepairs(navigation),
+        },
+      ],
+      [
+        {
+          key: 'bookings',
+          icon: 'calendar-check',
+          title: 'Bookings',
+          subtitle: "Today's confirmed appointments",
+          count: todayBookings.length,
+          onPress: () =>
+            navigation.navigate('ShopCalendar', {
+              returnTo: 'ShopDashboard',
+              backLabel: 'Home',
+            }),
+        },
+        {
+          key: 'calendar',
+          icon: 'calendar-month-outline',
+          title: 'Calendar',
+          subtitle: 'Schedule, reschedule and capacity',
+          count: unscheduledCount > 0 ? unscheduledCount : undefined,
+          onPress: () =>
+            navigation.navigate('ShopCalendar', {
+              returnTo: 'ShopDashboard',
+              backLabel: 'Home',
+            }),
+        },
+      ],
+      [
+        {
+          key: 'customers',
+          icon: 'account-group-outline',
+          title: 'Customers & Vehicles',
+          subtitle: 'Authorized clients and fleet records',
+          onPress: () => navigation.navigate('AuthorizedClients'),
+        },
+        {
+          key: 'documents',
+          icon: 'file-document-outline',
+          title: 'Documents',
+          subtitle: 'Invoices, repair docs, warranty evidence',
+          placeholder: true,
+          onPress: () =>
+            showMessage('Coming soon', 'Central document import is on the Veversal ERP roadmap.', {
+              variant: 'info',
+            }),
+        },
+      ],
+      [
+        {
+          key: 'invoices',
+          icon: 'receipt-text-outline',
+          title: 'Invoices',
+          subtitle: 'Quotes, billing and accounting exports',
+          onPress: () => navigation.navigate('ShopInvoicing'),
+        },
+        {
+          key: 'inventory',
+          icon: 'warehouse',
+          title: 'Inventory',
+          subtitle: 'Parts, warehouse and stock receiving',
+          placeholder: true,
+          onPress: () => navigation.navigate('ShopWarehouse'),
+        },
+      ],
+      [
+        {
+          key: 'stats',
+          icon: 'chart-line',
+          title: 'Statistics',
+          subtitle: 'Revenue, throughput and customer growth',
+          placeholder: true,
+          onPress: () =>
+            showMessage(
+              'Statistics',
+              `Snapshot: ${openRepairs.length} open · ${ongoingRepairs.length} active · ${pendingOffers.length} pending offers.`,
+              { variant: 'info' }
+            ),
+        },
+        {
+          key: 'website',
+          icon: 'web',
+          title: 'Website & SEO',
+          subtitle: 'Public page, services, photos, booking',
+          onPress: () => navigation.navigate('ShopProfile'),
+        },
+      ],
+      [
+        {
+          key: 'ai',
+          icon: 'robot-outline',
+          title: 'AI Assistant',
+          subtitle: 'Reply, describe repairs, translate',
+          placeholder: true,
+          onPress: () =>
+            showMessage('AI Assistant', 'Veversal AI assistant is planned for partner workflows.', {
+              variant: 'info',
+            }),
+        },
+        {
+          key: 'subscription',
+          icon: 'shield-star-outline',
+          title: 'Subscription',
+          subtitle: 'Partner plan and activation',
+          placeholder: !partnerActive,
+          onPress: () => navigation.navigate('ShopProfile', { requireSetup: !profileComplete }),
+        },
+      ],
+    ],
+    [
+      navigation,
+      openRepairs.length,
+      pendingOffers.length,
+      todayBookings.length,
+      ongoingRepairs.length,
+      unscheduledCount,
+      partnerActive,
+      profileComplete,
+    ]
+  );
+
+  const renderOpenRepair = (item) => {
     const plate = String(item.vehicle_license_plate || '').trim();
-    const showPlate = Boolean(plate);
+    const title = `${item.vehicle_make || ''} ${item.vehicle_model || ''}`.trim() || 'Vehicle';
     return (
-    <FloatingCard onPress={() => handleRepairPress(item.id)}>
-      <Text style={styles.repairTitle} numberOfLines={2}>
-        {`${item.vehicle_make || ''} ${item.vehicle_model || ''}`.trim() || 'Vehicle'}
-      </Text>
-      {showPlate ? (
-        <Text style={styles.repairMeta}>{plate}</Text>
-      ) : (
-        <Text style={styles.repairMeta}>Plate hidden until booking</Text>
-      )}
-      {!!item.description && (
-        <Text style={styles.repairDesc} numberOfLines={2}>
-          {item.description}
+      <FloatingCard key={String(item.id)} onPress={() => handleRepairPress(item.id)} accent>
+        <Text style={styles.repairTitle} numberOfLines={2}>
+          {title}
         </Text>
-      )}
-      {item.kilometers != null && item.kilometers !== '' && (
         <Text style={styles.repairMeta}>
-          {Number(item.kilometers).toLocaleString()} km
+          {plate || 'Plate hidden until booking'}
         </Text>
-      )}
-    </FloatingCard>
+        {item.description ? (
+          <Text style={styles.repairDesc} numberOfLines={2}>
+            {item.description}
+          </Text>
+        ) : null}
+        <View style={styles.repairActions}>
+          <Button
+            mode="contained"
+            compact
+            onPress={() => handleSendOffer(item.id)}
+            style={styles.sendOfferBtn}
+          >
+            Send Offer
+          </Button>
+          <Button mode="text" compact onPress={() => handleRepairPress(item.id)} textColor={COLORS.PRIMARY}>
+            Details
+          </Button>
+        </View>
+      </FloatingCard>
     );
   };
 
@@ -191,17 +413,9 @@ export default function ShopHomeScreen() {
   return (
     <ScreenBackground safeArea={false}>
       <Appbar.Header style={{ backgroundColor: SHOP_TOP_BAR }}>
-        <Appbar.Action
-          icon="menu"
-          onPress={() => navigation.openDrawer()}
-          color="#fff"
-        />
+        <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color="#fff" />
         <Pressable
-          onPress={() =>
-            navigation.navigate('ShopProfile', {
-              requireSetup: !profileComplete,
-            })
-          }
+          onPress={() => navigation.navigate('ShopProfile', { requireSetup: !profileComplete })}
           style={styles.titlePressable}
           accessibilityRole="button"
           accessibilityLabel="Open center details"
@@ -229,80 +443,65 @@ export default function ShopHomeScreen() {
             onPress={() => navigation.navigate('ShopNotificationsScreen')}
             color="#fff"
           />
-          {unreadCount > 0 && (
-            <Badge style={styles.notificationBadge}>{unreadCount}</Badge>
-          )}
+          {unreadCount > 0 ? <Badge style={styles.notificationBadge}>{unreadCount}</Badge> : null}
         </View>
-        <Appbar.Action
-          icon="logout"
-          onPress={handleLogout}
-          color="#fff"
-        />
+        <Appbar.Action icon="logout" onPress={handleLogout} color="#fff" />
       </Appbar.Header>
 
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {!profileComplete ? (
           <ShopProfileSetupBanner
             missingFields={missingProfileFields}
-            onCompletePress={() =>
-              navigation.navigate('ShopProfile', { requireSetup: true })
-            }
+            onCompletePress={() => navigation.navigate('ShopProfile', { requireSetup: true })}
           />
         ) : null}
 
-        <View style={styles.headerCard}>
-          <Logo width={72} height={72} style={styles.shopLogo} />
-          <Text style={styles.welcomeText}>
-            Welcome to Your Shop Dashboard
-          </Text>
-          <Button
-            mode="contained"
-            icon="map"
-            onPress={() => navigation.navigate('ShopMap')}
-            style={[styles.mapButton, { backgroundColor: theme.colors.primary }]}
-            contentStyle={styles.mapButtonContent}
-            labelStyle={styles.mapButtonLabel}
-          >
-            Find Shops on Map
-          </Button>
-        </View>
+        {!partnerActive ? (
+          <PartnerActivationBanner
+            openRequestCount={openRepairs.length}
+            onActivatePress={() => navigation.navigate('ShopProfile', { requireSetup: true })}
+          />
+        ) : null}
 
-        <View style={styles.repairsSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              Open Repair Requests
-            </Text>
-            <Button
-              mode="text"
-              compact
-              onPress={() =>
-                navigation.dispatch(DrawerActions.jumpTo('RepairsList'))
-              }
-              labelStyle={{ color: '#fff' }}
-            >
-              See all
-            </Button>
-          </View>
+        <DashboardHero
+          compact
+          title="Veversal Partner Platform"
+          subtitle="Run your entire service center from one place — repair requests, bookings, customers, documents, sales, reports and your auto-generated website."
+        />
 
+        <DashboardSection
+          title="Open Repair Requests"
+          subtitle="New customer repair requests are waiting for your offer."
+          actionLabel="View Requests"
+          onActionPress={() => resetShopDrawerRepairs(navigation)}
+        >
           {repairsLoading ? (
-            <ActivityIndicator size="small" color="#fff" style={{ marginTop: 12 }} />
+            <ActivityIndicator color="#fff" style={{ marginVertical: 12 }} />
+          ) : openRepairs.length === 0 ? (
+            <PartnerEmptyRequestsState />
           ) : (
-            <FlatList
-              data={openRepairs}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={renderRepair}
-              contentContainerStyle={styles.repairsListContent}
-              ListEmptyComponent={
-                <FloatingCard accent={false} style={styles.emptyCard}>
-                  <Text style={styles.emptyText}>
-                    No open requests from customers yet
-                  </Text>
-                </FloatingCard>
-              }
-            />
+            openRepairs.slice(0, 5).map(renderOpenRepair)
           )}
-        </View>
-      </View>
+        </DashboardSection>
+
+        <DashboardSection
+          title="Partner workspace"
+          subtitle="ERP modules for operations, sales, inventory and your public presence."
+        >
+          {dashboardLoading ? (
+            <ActivityIndicator color="#fff" style={{ marginVertical: 8 }} />
+          ) : (
+            tileRows.map((row, rowIndex) => (
+              <View key={`row-${rowIndex}`} style={styles.tileRow}>
+                {row.map((tile) => (
+                  <DashboardActionTile key={tile.key} {...tile} />
+                ))}
+                {row.length === 1 ? <View style={styles.tileSpacer} /> : null}
+              </View>
+            ))
+          )}
+        </DashboardSection>
+      </ScrollView>
     </ScreenBackground>
   );
 }
@@ -323,71 +522,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'red',
     color: 'white',
   },
-  content: {
-    flex: 1,
+  scroll: {
     paddingHorizontal: 12,
     paddingTop: 12,
-    backgroundColor: 'transparent',
+    paddingBottom: 28,
   },
   loaderCenter: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerCard: {
-    backgroundColor: 'rgba(5,15,30,0.72)',
-    borderColor: 'rgba(255,255,255,0.16)',
-    borderWidth: 1,
-    borderRadius: 18,
-    paddingVertical: 18,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  shopLogo: {
-    alignSelf: 'center',
-    marginBottom: 10,
-  },
-  welcomeText: {
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 14,
-    color: '#fff',
-  },
-  mapButton: {
-    alignSelf: 'stretch',
-    borderRadius: 12,
-    elevation: 2,
-  },
-  mapButtonContent: {
-    flexDirection: 'row-reverse',
-    height: 46,
-  },
-  mapButtonLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  repairsSection: {
-    flex: 1,
-    paddingTop: 4,
-    backgroundColor: 'transparent',
-  },
-  sectionHeader: {
+  tileRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
+    gap: 10,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  repairsListContent: {
-    paddingBottom: 12,
-    paddingHorizontal: 2,
+  tileSpacer: {
+    flex: 1,
   },
   repairTitle: {
     fontSize: 16,
@@ -403,15 +553,15 @@ const styles = StyleSheet.create({
   repairMeta: {
     fontSize: 12,
     color: COLORS.TEXT_MUTED,
-    marginTop: 6,
+    marginTop: 2,
   },
-  emptyCard: {
+  repairActions: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    justifyContent: 'space-between',
+    marginTop: 10,
   },
-  emptyText: {
-    textAlign: 'center',
-    color: COLORS.TEXT_MUTED,
-    fontSize: 14,
+  sendOfferBtn: {
+    borderRadius: 8,
   },
 });

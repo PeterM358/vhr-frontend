@@ -10,13 +10,14 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { Text, Badge } from 'react-native-paper';
 import ClientPromotions from '../components/client/ClientPromotions';
 import ClientRepairOffers from '../components/client/ClientRepairOffers';
-import NotificationsList from '../components/client/NotificationsList';
+import NotificationCenterPlaceholder from '../components/client/NotificationCenterPlaceholder';
+import { showMessage } from '../utils/crossPlatformAlert';
 import ScreenBackground from '../components/ScreenBackground';
 import { WebSocketContext } from '../context/WebSocketManager';
 
 const TABS = [
-  { id: 'inbox', label: 'Inbox' },
-  { id: 'repairs', label: 'Repairs' },
+  { id: 'inbox', label: 'Alerts' },
+  { id: 'repairs', label: 'Offers' },
   { id: 'promos', label: 'Promos' },
 ];
 
@@ -112,7 +113,13 @@ export default function ClientActivityScreen({ navigation }) {
 
         <View style={styles.content}>
           <View style={[styles.tabContent, activeTab === 'inbox' ? styles.active : styles.inactive]}>
-            <NotificationsList activityReturnTo="ClientActivity" />
+            <NotificationCenterPlaceholder
+              onPlaceholderAction={(item) =>
+                showMessage(item.title, `${item.description}\n\nLive routing will be added with the notification backend.`, {
+                  variant: 'info',
+                })
+              }
+            />
           </View>
           <View style={[styles.tabContent, activeTab === 'repairs' ? styles.active : styles.inactive]}>
             <ClientRepairOffers

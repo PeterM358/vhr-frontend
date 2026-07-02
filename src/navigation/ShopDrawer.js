@@ -128,7 +128,7 @@ function CustomDrawerContent(props) {
         />
 
         <DrawerItem
-          label="Switch Shop"
+          label="Switch Service Center"
           onPress={() => resetFromShopDrawer(navigation, 'ChooseShop')}
           icon={() => <Text>🏪</Text>}
         />

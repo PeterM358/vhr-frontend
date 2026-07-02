@@ -24,7 +24,10 @@ import {
   notificationActionHint,
 } from '../../utils/clientNotificationRouting';
 
-export default function NotificationsList({ activityReturnTo = 'ClientActivity' }) {
+export default function NotificationsList({
+  activityReturnTo = 'ClientActivity',
+  embedded = false,
+}) {
   const [loading, setLoading] = useState(true);
   const [remoteNotifications, setRemoteNotifications] = useState([]);
   const { notifications: liveNotifications = [], setNotifications } =
@@ -120,31 +123,42 @@ export default function NotificationsList({ activityReturnTo = 'ClientActivity' 
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, embedded && styles.embeddedCenter]}>
         <ActivityIndicator size="large" color="#fff" />
       </View>
     );
   }
 
-  return (
-    <View style={styles.container}>
-        {mergedNotifications.length === 0 ? (
-          <EmptyStateCard
-            icon="bell-outline"
-            title="No notifications yet"
-            subtitle="Offers, promotions, bookings, and reschedule updates appear here."
-          />
-        ) : (
-          <FlatList
-            data={mergedNotifications}
-            keyExtractor={(item) =>
-              item.id?.toString() ?? Math.random().toString()
-            }
-            renderItem={renderItem}
-            contentContainerStyle={styles.listContent}
-          />
-        )}
+  const listBody =
+    mergedNotifications.length === 0 ? (
+      embedded ? (
+        <Text style={styles.embeddedEmpty}>No recent activity in your live feed yet.</Text>
+      ) : (
+        <EmptyStateCard
+          icon="bell-outline"
+          title="No notifications yet"
+          subtitle="Offers, promotions, bookings, and reschedule updates appear here."
+        />
+      )
+    ) : embedded ? (
+      <View style={styles.embeddedList}>
+        {mergedNotifications.slice(0, 8).map((item) => (
+          <View key={item.id?.toString() ?? Math.random().toString()}>
+            {renderItem({ item })}
+          </View>
+        ))}
       </View>
+    ) : (
+      <FlatList
+        data={mergedNotifications}
+        keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
+        renderItem={renderItem}
+        contentContainerStyle={styles.listContent}
+      />
+    );
+
+  return (
+    <View style={[styles.container, embedded && styles.embeddedContainer]}>{listBody}</View>
   );
 }
 
@@ -159,6 +173,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 12,
     backgroundColor: 'transparent',
+  },
+  embeddedContainer: {
+    flex: 0,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+  },
+  embeddedCenter: {
+    minHeight: 80,
+  },
+  embeddedList: {
+    paddingBottom: 8,
+  },
+  embeddedEmpty: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+    paddingVertical: 12,
   },
   heading: {
     color: '#fff',

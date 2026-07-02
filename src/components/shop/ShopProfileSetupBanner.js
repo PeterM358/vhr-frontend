@@ -7,7 +7,7 @@ export default function ShopProfileSetupBanner({ missingFields, onCompletePress 
   return (
     <AppCard variant="dark" contentStyle={styles.inner}>
       <Text style={styles.title}>
-        Complete your shop profile to open repair requests from clients near you
+        Complete your service center profile to open repair requests from clients near you
       </Text>
       {missingFields.length > 0 ? (
         <Text style={styles.missing}>Still needed: {missingFields.join(', ')}</Text>

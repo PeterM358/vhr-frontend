@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { StyleSheet, View, Pressable, Platform } from 'react-native';
 import { Text, TextInput, Button, Portal, Dialog, ActivityIndicator, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { register } from '../api/auth';
+import { AuthContext } from '../context/AuthManager';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import BaseStyles from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
@@ -14,6 +17,7 @@ export default function RegisterScreen({ navigation }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const headerReserve = insets.top + (Platform.OS === 'ios' ? 52 : 56);
+  const { setIsAuthenticated, setAuthToken, setUserEmailOrPhone } = useContext(AuthContext);
 
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -21,6 +25,29 @@ export default function RegisterScreen({ navigation }) {
   const [saving, setSaving] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
+
+  const applyAuthSession = async (data, identifier) => {
+    setAuthToken(data.access);
+    setIsAuthenticated(true);
+    setUserEmailOrPhone(identifier);
+
+    await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.access);
+    await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refresh);
+    await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, data.user_id?.toString() || '');
+    await AsyncStorage.setItem(STORAGE_KEYS.IS_SHOP, data.is_shop ? 'true' : 'false');
+    await AsyncStorage.setItem(STORAGE_KEYS.IS_CLIENT, data.is_client ? 'true' : 'false');
+
+    if (data.shop_profiles && data.shop_profiles.length > 0) {
+      await AsyncStorage.setItem(STORAGE_KEYS.SHOP_PROFILES, JSON.stringify(data.shop_profiles));
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.CURRENT_SHOP_ID,
+        data.shop_profiles[0].id.toString()
+      );
+    } else {
+      await AsyncStorage.removeItem(STORAGE_KEYS.SHOP_PROFILES);
+      await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SHOP_ID);
+    }
+  };
 
   const saveRegistration = async () => {
     if (!emailOrPhone.trim()) {
@@ -31,33 +58,30 @@ export default function RegisterScreen({ navigation }) {
 
     setSaving(true);
     try {
+      const identifier = emailOrPhone.trim();
       const result = await register(
-        emailOrPhone.trim(),
+        identifier,
         password,
         role === 'client',
         role === 'shop'
       );
 
-      setDialogMessage('Registration successful!');
-      setDialogVisible(true);
+      await applyAuthSession(result, identifier);
 
-      setTimeout(async () => {
-        setDialogVisible(false);
-        if (result.is_shop) {
-          const route = await resolveShopEntryRoute();
-          navigation.reset(buildShopAuthReset(route));
-        } else if (result.is_client) {
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'Home' }],
-          });
-        } else {
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-          });
-        }
-      }, 1500);
+      if (result.is_shop) {
+        const route = await resolveShopEntryRoute();
+        navigation.reset(buildShopAuthReset(route));
+      } else if (result.is_client) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Home' }],
+        });
+      } else {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      }
     } catch (err) {
       console.error('Registration error:', err);
       setDialogMessage(err.message || 'Failed to register');
@@ -89,27 +113,8 @@ export default function RegisterScreen({ navigation }) {
 
             <Text style={styles.title}>Create your account</Text>
             <Text style={styles.subtitle}>
-              Choose client or repair shop, then add your sign-in details.
+              Choose client or service center, then add your sign-in details.
             </Text>
-
-            <TextInput
-              label="Email or Phone"
-              mode="outlined"
-              value={emailOrPhone}
-              onChangeText={setEmailOrPhone}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              style={styles.input}
-            />
-
-            <TextInput
-              label="Password"
-              mode="outlined"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              style={styles.input}
-            />
 
             <Text style={styles.rolePrompt}>Account type</Text>
 
@@ -141,11 +146,30 @@ export default function RegisterScreen({ navigation }) {
                 <Text
                   style={[styles.roleTitle, role === 'shop' && styles.roleTitleSelected]}
                 >
-                  Repair shop
+                  Service center
                 </Text>
                 <Text style={styles.roleSub}>Serve clients & manage jobs</Text>
               </Pressable>
             </View>
+
+            <TextInput
+              label="Email or Phone"
+              mode="outlined"
+              value={emailOrPhone}
+              onChangeText={setEmailOrPhone}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              style={styles.input}
+            />
+
+            <TextInput
+              label="Password"
+              mode="outlined"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+              style={styles.input}
+            />
 
             {saving ? (
               <ActivityIndicator animating size="small" color={COLORS.PRIMARY} style={{ marginTop: 8 }} />

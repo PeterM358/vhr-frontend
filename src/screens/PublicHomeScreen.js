@@ -22,12 +22,12 @@ export default function PublicHomeScreen({ navigation }) {
         ]}
       >
         <View style={styles.card}>
-          <Text style={styles.title}>Welcome</Text>
+          <Text style={styles.title}>Welcome to Veversal</Text>
           <View style={BaseStyles.logoContainer}>
             <Logo width={160} height={160} />
           </View>
           <Text style={styles.subtitle}>
-            Browse repair shops before signing in.
+            Your vehicle service universe — explore service centers before signing in.
           </Text>
 
           <Button
@@ -37,7 +37,7 @@ export default function PublicHomeScreen({ navigation }) {
             contentStyle={BaseStyles.loginButtonContent}
             labelStyle={BaseStyles.loginButtonLabel}
           >
-            Browse Shops
+            Find Service Centers
           </Button>
 
           <Button

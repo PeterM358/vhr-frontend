@@ -160,10 +160,18 @@ function vehicleDetailsHeaderLeft(navigation) {
   );
 }
 
+function getLinkingPrefixes() {
+  const prefixes = ['service1001://'];
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin) {
+    prefixes.push(window.location.origin);
+  }
+  return prefixes;
+}
+
 export default function AppNavigator() {
-  // Deep linking configuration
+  // Deep linking: native scheme + https web URLs from transactional emails
   const linking = {
-    prefixes: ['service1001://'],
+    prefixes: getLinkingPrefixes(),
     config: {
       screens: {
         PasswordConfirmReset: 'reset-password/:uid/:token',
@@ -199,7 +207,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ShopMap"
           component={ShopMapScreen}
-          options={{ headerShown: false, title: 'Find Shops on Map' }}
+          options={{ headerShown: false, title: 'Find Service Centers' }}
         />
         <Stack.Screen
           name="ClientVehicles"
