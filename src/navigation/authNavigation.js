@@ -6,6 +6,14 @@
 import { Platform } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
 
+function getRootNavigation(navigation) {
+  let current = navigation;
+  while (current.getParent?.()) {
+    current = current.getParent();
+  }
+  return current;
+}
+
 export const CLIENT_DASHBOARD_ROUTE = {
   name: 'Home',
   state: {
@@ -52,4 +60,13 @@ export function resetToSignIn(navigation) {
     })
   );
   syncWebPath('/sign-in');
+}
+
+/** Push sign-in from landing — keeps back navigation to /. */
+export function navigateToSignIn(navigation) {
+  const root = getRootNavigation(navigation);
+  root.navigate('Login');
+  if (Platform.OS === 'web') {
+    syncWebPath('/sign-in');
+  }
 }

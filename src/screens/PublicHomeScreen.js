@@ -9,7 +9,7 @@ import Logo from '../assets/images/logo.svg';
 import ScreenBackground from '../components/ScreenBackground';
 
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
-import { resetToClientDashboard } from '../navigation/authNavigation';
+import { navigateToSignIn, resetToClientDashboard } from '../navigation/authNavigation';
 
 export default function PublicHomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -63,7 +63,7 @@ export default function PublicHomeScreen({ navigation }) {
 
           <Button
             mode="outlined"
-            onPress={() => navigation.navigate('Login')}
+            onPress={() => navigateToSignIn(navigation)}
             style={[BaseStyles.loginButton, styles.outlinedBtn]}
             textColor="#fff"
           >

@@ -7,6 +7,7 @@ export const linkingScreens = {
   PublicHome: '',
   Login: 'sign-in',
   Register: 'sign-up',
+  PasswordRequestReset: 'forgot-password',
   Home: {
     path: 'dashboard',
     screens: {

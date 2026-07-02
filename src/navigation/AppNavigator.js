@@ -10,6 +10,8 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
+import LoginErrorBoundary from '../components/auth/LoginErrorBoundary';
+import { resetToPublicHome } from './authNavigation';
 import RegisterScreen from '../screens/RegisterScreen';
 import PublicHomeScreen from '../screens/PublicHomeScreen';
 import ClientVehiclesScreen from '../screens/ClientVehiclesScreen';
@@ -74,6 +76,18 @@ import { buildAppLinking, redirectLegacyWebUrl } from './webLinking';
 import NavigationFallback from './NavigationFallback';
 
 const Stack = createNativeStackNavigator();
+
+function LoginScreenRoute(props) {
+  const { navigation } = props;
+  return (
+    <LoginErrorBoundary
+      onRetry={() => navigation.replace('Login')}
+      onGoHome={() => resetToPublicHome(navigation)}
+    >
+      <LoginScreen {...props} />
+    </LoginErrorBoundary>
+  );
+}
 
 /** Floating header: back/title over ScreenBackground — no solid blue bar */
 const transparentStackHeader = {
@@ -191,8 +205,8 @@ export default function AppNavigator() {
         <Stack.Screen name="PublicHome" component={PublicHomeScreen} options={{ headerShown: false }} />
         <Stack.Screen
           name="Login"
-          component={LoginScreen}
-          options={{ ...transparentStackHeader, title: '' }}
+          component={LoginScreenRoute}
+          options={{ ...transparentStackHeader, title: 'Sign in', headerShown: Platform.OS === 'web' ? false : true }}
         />
         <Stack.Screen
           name="Register"

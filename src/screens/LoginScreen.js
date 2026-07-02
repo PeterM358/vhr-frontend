@@ -1,22 +1,20 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useCallback, useContext, useState, useEffect } from 'react';
 import { ScrollView, StyleSheet, View, Platform } from 'react-native';
 import { Text, TextInput, Button, ActivityIndicator, useTheme } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { login } from '../api/auth';
+import { login, googleLogin } from '../api/auth';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import { resetToClientDashboard } from '../navigation/authNavigation';
 import { AuthContext } from '../context/AuthManager';
 import Logo from '../assets/images/logo.svg';
 import { STORAGE_KEYS } from '../constants/storageKeys';
-import * as Google from 'expo-auth-session/providers/google';
-import { googleLogin } from '../api/auth';
-import { makeRedirectUri } from 'expo-auth-session';
 import BaseStyles from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
 import { COLORS } from '../constants/colors';
+import { shouldEnableGoogleOAuth } from '../components/auth/googleOAuthConfig';
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen({ navigation, route }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { setIsAuthenticated, setAuthToken, setUserEmailOrPhone } = useContext(AuthContext);
@@ -30,124 +28,125 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [GoogleOAuthBridge, setGoogleOAuthBridge] = useState(null);
+
+  // route is optional on web deep links — never assume params exist
+  void route;
+
+  useEffect(() => {
+    if (!shouldEnableGoogleOAuth()) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    import('../components/auth/LoginGoogleOAuthBridge')
+      .then((mod) => {
+        if (!cancelled) {
+          setGoogleOAuthBridge(() => mod.default);
+        }
+      })
+      .catch((err) => {
+        console.warn('Google OAuth module unavailable:', err?.message || err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const loadLastLogin = async () => {
-      const last = await AsyncStorage.getItem('@last_login_email');
-      if (!last) return;
-      if (last.startsWith('+')) {
-        setLoginMethod('phone');
-        const digits = last.slice(1);
-        if (digits.startsWith('359')) {
-          setPhonePrefix('+359');
-          setPhoneNational(digits.slice(3));
+      try {
+        const last = await AsyncStorage.getItem('@last_login_email');
+        if (!last) return;
+        if (last.startsWith('+')) {
+          setLoginMethod('phone');
+          const digits = last.slice(1);
+          if (digits.startsWith('359')) {
+            setPhonePrefix('+359');
+            setPhoneNational(digits.slice(3));
+          } else {
+            setPhonePrefix('+');
+            setPhoneNational(digits);
+          }
         } else {
-          setPhonePrefix('+');
-          setPhoneNational(digits);
+          setLoginMethod('email');
+          setEmail(last);
         }
-      } else {
-        setLoginMethod('email');
-        setEmail(last);
+      } finally {
+        setReady(true);
       }
     };
     loadLastLogin();
   }, []);
 
-  const redirectUri = makeRedirectUri({ useProxy: true });
-
-  const [googleRequest, googleResponse, promptGoogleLogin] = Google.useAuthRequest(
-    {
-      expoClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-      androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-      iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    },
-    { useProxy: true }
-  );
-
-  useEffect(() => {
-    console.log('🟢 Google response changed:', googleResponse);
-
-    const handleGoogleLogin = async () => {
-      console.log('🟢 Starting handleGoogleLogin with response:', googleResponse);
-
-      if (googleResponse?.type === 'success') {
-        try {
-          const { code } = googleResponse.params;
-          console.log('📡 Authorization Code:', code);
-
-          console.log('🔁 Using redirect URI for token exchange:', redirectUri);
-
-          console.log('📤 Requesting token exchange with code:', code);
-          const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-              code,
-              client_id: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-              client_secret: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_SECRET,
-              redirect_uri: redirectUri,
-              grant_type: 'authorization_code',
-            }).toString(),
-          });
-
-          console.log('⏳ Waiting for token response...');
-          const tokenData = await tokenResponse.json();
-          console.log('🔐 Received tokenData from Google:', tokenData);
-
-          if (!tokenData.id_token) {
-            console.error('❌ No id_token received from token exchange');
-            setError('Google login failed: No ID token received.');
-            return;
-          }
-
-          const id_token = tokenData.id_token;
-          console.log('📡 Sending id_token to Django:', id_token);
-
-          const data = await googleLogin(id_token);
-          console.log('✅ Google Login Response from backend:', data);
-
-          setAuthToken(data.access);
-          setIsAuthenticated(true);
-          setUserEmailOrPhone(data.email);
-
-          await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.access);
-          await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refresh);
-          await AsyncStorage.setItem(STORAGE_KEYS.IS_SHOP, data.is_shop ? 'true' : 'false');
-          await AsyncStorage.setItem(STORAGE_KEYS.IS_CLIENT, data.is_client ? 'true' : 'false');
-
-          if (data.is_shop) {
-            const route = await resolveShopEntryRoute();
-            navigation.reset(buildShopAuthReset(route));
-          } else {
-            resetToClientDashboard(navigation);
-          }
-        } catch (error) {
-          console.error('❌ Google login error', error);
-          setError('Google login failed. Try again.');
-        }
-      } else {
-        console.warn('⚠️ Google login response type is not success:', googleResponse?.type);
+  const handleGoogleOAuthResponse = useCallback(
+    async (googleResponse, redirectUri) => {
+      if (googleResponse?.type !== 'success') {
+        return;
       }
-    };
 
-    handleGoogleLogin();
-  }, [googleResponse]);
+      try {
+        const { code } = googleResponse.params || {};
+        if (!code) {
+          setError('Google login failed: No authorization code received.');
+          return;
+        }
+
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            code,
+            client_id: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '',
+            client_secret: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_SECRET || '',
+            redirect_uri: redirectUri,
+            grant_type: 'authorization_code',
+          }).toString(),
+        });
+
+        const tokenData = await tokenResponse.json();
+        if (!tokenData.id_token) {
+          setError('Google login failed: No ID token received.');
+          return;
+        }
+
+        const data = await googleLogin(tokenData.id_token);
+
+        setAuthToken(data.access);
+        setIsAuthenticated(true);
+        setUserEmailOrPhone(data.email);
+
+        await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.access);
+        await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refresh);
+        await AsyncStorage.setItem(STORAGE_KEYS.IS_SHOP, data.is_shop ? 'true' : 'false');
+        await AsyncStorage.setItem(STORAGE_KEYS.IS_CLIENT, data.is_client ? 'true' : 'false');
+
+        if (data.is_shop) {
+          const shopRoute = await resolveShopEntryRoute();
+          navigation.reset(buildShopAuthReset(shopRoute));
+        } else {
+          resetToClientDashboard(navigation);
+        }
+      } catch (oauthError) {
+        console.error('Google login error', oauthError);
+        setError('Google login failed. Try again.');
+      }
+    },
+    [navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone]
+  );
 
   const handleLogin = async () => {
     const identifier =
       loginMethod === 'phone'
         ? `${(phonePrefix || '').trim()}${(phoneNational || '').trim()}`
         : (email || '').trim();
-    console.log('🟢 Starting handleLogin with:', identifier);
     setError('');
     setLoading(true);
     try {
       await AsyncStorage.setItem('@last_login_email', identifier);
-      console.log('📤 Sending login request...');
       const data = await login(identifier, password);
-
-      console.log('✅ Login success. Data:', data);
 
       setAuthToken(data.access);
       setIsAuthenticated(true);
@@ -162,21 +161,19 @@ export default function LoginScreen({ navigation }) {
       if (data.shop_profiles && data.shop_profiles.length > 0) {
         await AsyncStorage.setItem(STORAGE_KEYS.SHOP_PROFILES, JSON.stringify(data.shop_profiles));
         await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_SHOP_ID, data.shop_profiles[0].id.toString());
-        console.log('✅ Default CURRENT_SHOP_ID set to:', data.shop_profiles[0].id);
       } else {
         await AsyncStorage.removeItem(STORAGE_KEYS.SHOP_PROFILES);
         await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SHOP_ID);
-        console.log('⚠️ No shop profiles found');
       }
 
-          if (data.is_shop) {
-            const route = await resolveShopEntryRoute();
-            navigation.reset(buildShopAuthReset(route));
-          } else {
-            resetToClientDashboard(navigation);
-          }
+      if (data.is_shop) {
+        const shopRoute = await resolveShopEntryRoute();
+        navigation.reset(buildShopAuthReset(shopRoute));
+      } else {
+        resetToClientDashboard(navigation);
+      }
     } catch (err) {
-      console.error('❌ Login error', err);
+      console.error('Login error', err);
       setError('Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
@@ -184,9 +181,21 @@ export default function LoginScreen({ navigation }) {
   };
 
   const goToRegister = () => navigation.navigate('Register');
+  const googleOAuthEnabled = shouldEnableGoogleOAuth();
+
+  if (!ready) {
+    return (
+      <ScreenBackground safeArea={false}>
+        <View style={styles.loadingCenter}>
+          <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+        </View>
+      </ScreenBackground>
+    );
+  }
 
   return (
     <ScreenBackground safeArea={false}>
+      {GoogleOAuthBridge ? <GoogleOAuthBridge onOAuthResponse={handleGoogleOAuthResponse} /> : null}
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
@@ -204,7 +213,9 @@ export default function LoginScreen({ navigation }) {
           <Text style={styles.kicker}>Sign in</Text>
           <Text style={styles.title}>Welcome back</Text>
           <Text style={styles.subtitle}>
-            Choose your login method and enter your password.
+            {googleOAuthEnabled
+              ? 'Choose your login method and enter your password.'
+              : 'Enter your email or phone and password to continue.'}
           </Text>
 
           {error ? (
@@ -287,7 +298,6 @@ export default function LoginScreen({ navigation }) {
           ) : (
             <Button
               mode="contained"
-              icon="login"
               onPress={handleLogin}
               style={[BaseStyles.loginButton, styles.fullBtn]}
               contentStyle={BaseStyles.loginButtonContent}
@@ -309,6 +319,11 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  loadingCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   scroll: {
     flexGrow: 1,
     justifyContent: 'center',
