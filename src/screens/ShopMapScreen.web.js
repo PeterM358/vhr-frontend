@@ -28,7 +28,7 @@ import { getServiceCenters, VEHICLE_TYPE_FILTER_CHIPS } from '../api/serviceCent
 import { spreadShopMarkersForMap } from '../utils/mapMarkerSpread';
 import { API_BASE_URL } from '../api/config';
 import ScreenBackground from '../components/ScreenBackground';
-import BASE_STYLES from '../styles/base';
+import { getWebGeolocation } from '../utils/webGeolocation';
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -58,6 +58,8 @@ export default function ShopMapScreen() {
   const zoom = 12;
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState(null);
+  const [locating, setLocating] = useState(false);
+  const [geoHint, setGeoHint] = useState('');
   userLocRef.current = userLocation;
 
   const [selectedVehicleType, setSelectedVehicleType] = useState(null);
@@ -155,19 +157,36 @@ export default function ShopMapScreen() {
   }, [selectedVehicleType, selectedCategory, selectedRepairType]);
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const coords = [position.coords.latitude, position.coords.longitude];
-          setUserLocation(coords);
-          setCenter(coords);
-        },
-        () => {
-          console.warn('Geolocation permission denied or unavailable.');
-        }
-      );
-    }
+    let cancelled = false;
+    getWebGeolocation()
+      .then(({ latitude, longitude }) => {
+        if (cancelled) return;
+        const coords = [latitude, longitude];
+        setUserLocation(coords);
+        setCenter(coords);
+      })
+      .catch(() => {
+        // Permission denied or unavailable — user can tap Locate me.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  const handleLocateMe = async () => {
+    setLocating(true);
+    setGeoHint('');
+    try {
+      const { latitude, longitude } = await getWebGeolocation();
+      const coords = [latitude, longitude];
+      setUserLocation(coords);
+      setCenter(coords);
+    } catch (err) {
+      setGeoHint(err?.message || 'Could not get your location.');
+    } finally {
+      setLocating(false);
+    }
+  };
 
   useEffect(() => {
     fetchShops();
@@ -200,6 +219,17 @@ export default function ShopMapScreen() {
               onPress={() => goBackFromServiceCenters(navigation)}
             >
               <Text style={styles.backPillIcon}>←</Text>
+            </Pressable>
+            <Pressable
+              style={({ hovered, pressed }) => [
+                styles.locatePill,
+                (pressed || hovered) && styles.locatePillPressed,
+                locating && styles.locatePillDisabled,
+              ]}
+              onPress={handleLocateMe}
+              disabled={locating}
+            >
+              <Text style={styles.locatePillText}>{locating ? '…' : 'Locate me'}</Text>
             </Pressable>
             <View style={styles.searchContainer}>
               <TextInput
@@ -282,6 +312,9 @@ export default function ShopMapScreen() {
               );
             })}
           </ScrollView>
+          {geoHint ? (
+            <Text style={styles.geoHint}>{geoHint}</Text>
+          ) : null}
         </View>
 
         <MapContainer center={center} zoom={zoom} style={styles.map} zoomControl={false}>
@@ -406,6 +439,42 @@ const styles = StyleSheet.create({
   rowFirst: {
     flexDirection: 'row',
     alignItems: 'stretch',
+    gap: 10,
+  },
+  locatePill: {
+    minWidth: 88,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.22)',
+    cursor: 'pointer',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
+  },
+  locatePillPressed: {
+    opacity: 0.92,
+  },
+  locatePillDisabled: {
+    opacity: 0.7,
+  },
+  locatePillText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  geoHint: {
+    marginTop: 8,
+    color: '#fde68a',
+    fontSize: 12,
+    lineHeight: 16,
+    backgroundColor: 'rgba(15,23,42,0.88)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   backPill: {
     width: 46,
@@ -414,7 +483,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15,23,42,0.92)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 0,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.22)',
     cursor: 'pointer',

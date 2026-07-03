@@ -5,7 +5,7 @@
 import 'leaflet/dist/leaflet.css';
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { MapContainer, TileLayer, Marker, useMapEvents, ZoomControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, ZoomControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Text } from 'react-native-paper';
@@ -14,6 +14,7 @@ import MapPickerChrome from '../components/map/MapPickerChrome';
 import ScreenBackground from '../components/ScreenBackground';
 import { COLORS } from '../constants/colors';
 import BASE_STYLES from '../styles/base';
+import { getWebGeolocation } from '../utils/webGeolocation';
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -39,6 +40,16 @@ function MapClickHandler({ onPick }) {
   return null;
 }
 
+function ChangeView({ center, zoom }) {
+  const map = useMap();
+  React.useEffect(() => {
+    if (center) {
+      map.setView(center, zoom);
+    }
+  }, [center, zoom, map]);
+  return null;
+}
+
 export default function MapLocationPickerScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const returnScreen = route.params?.returnScreen || 'AddManualServiceCenter';
@@ -49,13 +60,31 @@ export default function MapLocationPickerScreen({ navigation, route }) {
   const [pin, setPin] = useState(() =>
     initialLat != null && initialLon != null ? [initialLat, initialLon] : null
   );
-
-  const center = pin || (initialLat != null && initialLon != null ? [initialLat, initialLon] : DEFAULT_CENTER);
+  const [mapCenter, setMapCenter] = useState(() =>
+    initialLat != null && initialLon != null ? [initialLat, initialLon] : DEFAULT_CENTER
+  );
+  const [locating, setLocating] = useState(false);
+  const [geoHint, setGeoHint] = useState('');
 
   const pinLabel = useMemo(() => {
-    if (!pin) return 'Click the map to place a pin';
+    if (!pin) return 'Click the map to place a pin, or use your location';
     return `${pin[0].toFixed(5)}, ${pin[1].toFixed(5)}`;
   }, [pin]);
+
+  const handleLocateMe = async () => {
+    setLocating(true);
+    setGeoHint('');
+    try {
+      const { latitude, longitude } = await getWebGeolocation();
+      const coords = [latitude, longitude];
+      setPin(coords);
+      setMapCenter(coords);
+    } catch (err) {
+      setGeoHint(err?.message || 'Could not get your location.');
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const handleConfirm = () => {
     if (!pin) return;
@@ -79,11 +108,17 @@ export default function MapLocationPickerScreen({ navigation, route }) {
     <ScreenBackground safeArea={false}>
       <View style={BASE_STYLES.flexFill}>
         <View style={styles.mapWrap}>
-          <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+          <MapContainer
+            center={mapCenter}
+            zoom={13}
+            style={{ height: '100%', width: '100%' }}
+            zoomControl={false}
+          >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
+            <ChangeView center={mapCenter} zoom={13} />
             <ZoomControl position="bottomright" />
             <MapClickHandler onPick={setPin} />
             {pin ? (
@@ -105,11 +140,28 @@ export default function MapLocationPickerScreen({ navigation, route }) {
           topInset={insets.top}
           title="Pick location on map"
           onBack={() => navigation.goBack()}
+          rightAction={
+            <Button
+              mode="contained-tonal"
+              compact
+              icon="crosshairs-gps"
+              loading={locating}
+              disabled={locating}
+              onPress={handleLocateMe}
+              labelStyle={styles.locateLabel}
+            >
+              Locate me
+            </Button>
+          }
         />
 
         <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
           <Text style={styles.coordHint}>{pinLabel}</Text>
-          <Button mode="contained" onPress={handleConfirm} disabled={!pin}>
+          {geoHint ? <Text style={styles.geoError}>{geoHint}</Text> : null}
+          <Button mode="outlined" icon="crosshairs-gps" onPress={handleLocateMe} loading={locating} disabled={locating}>
+            Use my location
+          </Button>
+          <Button mode="contained" onPress={handleConfirm} disabled={!pin} style={styles.confirmBtn}>
             Use this location
           </Button>
         </View>
@@ -125,9 +177,15 @@ const styles = StyleSheet.create({
     left: 12,
     right: 12,
     bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.96)',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 12,
+    gap: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(15,23,42,0.12)',
   },
-  coordHint: { color: COLORS.TEXT_MUTED, marginBottom: 10, textAlign: 'center' },
+  coordHint: { color: COLORS.TEXT_MUTED, textAlign: 'center' },
+  geoError: { color: '#b45309', fontSize: 13, textAlign: 'center', lineHeight: 18 },
+  confirmBtn: { marginTop: 2 },
+  locateLabel: { fontSize: 13 },
 });

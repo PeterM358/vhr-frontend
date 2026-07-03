@@ -7,7 +7,7 @@ import { View, StyleSheet, Pressable } from 'react-native';
 import { Text } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
-export default function MapPickerChrome({ topInset, title, onBack }) {
+export default function MapPickerChrome({ topInset, title, onBack, rightAction = null }) {
   return (
     <View style={[styles.bar, { paddingTop: topInset + 8 }]} pointerEvents="box-none">
       <Pressable
@@ -22,7 +22,7 @@ export default function MapPickerChrome({ topInset, title, onBack }) {
       <Text style={styles.title} numberOfLines={1}>
         {title}
       </Text>
-      <View style={styles.spacer} />
+      <View style={styles.rightSlot}>{rightAction}</View>
     </View>
   );
 }
@@ -62,4 +62,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   spacer: { width: 72 },
+  rightSlot: {
+    minWidth: 72,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
 });

@@ -37,6 +37,8 @@ export default function MapLocationPickerScreen({ navigation, route }) {
   const [region, setRegion] = useState(DEFAULT_REGION);
   const [pin, setPin] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [locating, setLocating] = useState(false);
+  const [geoHint, setGeoHint] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +86,30 @@ export default function MapLocationPickerScreen({ navigation, route }) {
     if (!pin) return 'Tap the map to place a pin';
     return `${pin.latitude.toFixed(5)}, ${pin.longitude.toFixed(5)}`;
   }, [pin]);
+
+  const handleLocateMe = async () => {
+    setLocating(true);
+    setGeoHint('');
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        throw new Error('Location permission denied. Enable location in settings or place a pin manually.');
+      }
+      const loc = await Location.getCurrentPositionAsync({});
+      const next = {
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      };
+      setRegion(next);
+      setPin({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+    } catch (e) {
+      setGeoHint(e?.message || 'Could not get your location.');
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const handleMapPress = useCallback((e) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
@@ -140,10 +166,26 @@ export default function MapLocationPickerScreen({ navigation, route }) {
           topInset={insets.top}
           title="Pick location on map"
           onBack={() => navigation.goBack()}
+          rightAction={
+            <Button
+              mode="contained-tonal"
+              compact
+              icon="crosshairs-gps"
+              loading={locating}
+              disabled={locating}
+              onPress={handleLocateMe}
+            >
+              Locate
+            </Button>
+          }
         />
 
         <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
           <Text style={styles.coordHint}>{pinLabel}</Text>
+          {geoHint ? <Text style={styles.geoError}>{geoHint}</Text> : null}
+          <Button mode="outlined" icon="crosshairs-gps" onPress={handleLocateMe} loading={locating} disabled={locating}>
+            Use my location
+          </Button>
           <Button mode="contained" onPress={handleConfirm} disabled={!pin} style={styles.confirmBtn}>
             Use this location
           </Button>
@@ -161,16 +203,22 @@ const styles = StyleSheet.create({
     left: 12,
     right: 12,
     bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.96)',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 12,
+    gap: 8,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(15,23,42,0.12)',
   },
   coordHint: {
     color: COLORS.TEXT_MUTED,
-    marginBottom: 10,
     textAlign: 'center',
+  },
+  geoError: {
+    color: '#b45309',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   confirmBtn: { borderRadius: 10 },
 });

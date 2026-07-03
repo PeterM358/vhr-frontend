@@ -34,12 +34,13 @@ export default function AppCard({
 
 const styles = StyleSheet.create({
   darkCard: {
-    backgroundColor: COLORS.CARD_DARK,
+    backgroundColor: '#0f172a',
     borderRadius: 20,
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
     borderColor: COLORS.BORDER_SOFT,
+    overflow: 'hidden',
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },

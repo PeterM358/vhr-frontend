@@ -599,6 +599,12 @@ export default function ShopProfileScreen({ navigation, route }) {
       ]);
 
       setCountries(countryList);
+      if (!countryList?.length) {
+        setDialogMessage(
+          'Country list is empty on the server. Ask your administrator to run: python manage.py seed_bootstrap'
+        );
+        setDialogVisible(true);
+      }
       setMakeOptions(Array.isArray(makes) ? makes : []);
       if (token) await loadTaxonomy(token);
 
@@ -1776,7 +1782,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.96)',
+    backgroundColor: '#ffffff',
     borderRadius: 14,
     padding: 14,
     marginBottom: 10,

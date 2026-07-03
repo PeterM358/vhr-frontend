@@ -43,10 +43,11 @@ export default function FloatingCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.CARD_FLOATING,
+    backgroundColor: '#f8fafc',
     borderRadius: 20,
     padding: 16,
     marginBottom: 14,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
