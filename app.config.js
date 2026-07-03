@@ -52,7 +52,9 @@ export default {
       }
     },
     web: {
-      favicon: "./src/assets/icons/favicon.png",
+      name: "Veversal",
+      description: "Your vehicle service universe.",
+      favicon: "./src/assets/icons/icon.png",
       bundler: "metro",
       output: "single",
       meta: {
