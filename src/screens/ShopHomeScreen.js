@@ -38,6 +38,7 @@ import FloatingCard from '../components/ui/FloatingCard';
 import DashboardHero from '../components/dashboard/DashboardHero';
 import DashboardSection from '../components/dashboard/DashboardSection';
 import DashboardActionTile from '../components/dashboard/DashboardActionTile';
+import DashboardComingSoonSection from '../components/dashboard/DashboardComingSoonSection';
 import PartnerActivationBanner from '../components/dashboard/PartnerActivationBanner';
 import PartnerEmptyRequestsState from '../components/dashboard/PartnerEmptyRequestsState';
 import { COLORS } from '../constants/colors';
@@ -228,7 +229,7 @@ export default function ShopHomeScreen() {
     await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
   };
 
-  const tileRows = useMemo(
+  const operationsTiles = useMemo(
     () => [
       [
         {
@@ -250,121 +251,118 @@ export default function ShopHomeScreen() {
       ],
       [
         {
-          key: 'bookings',
-          icon: 'calendar-check',
-          title: 'Bookings',
-          subtitle: "Today's confirmed appointments",
-          count: todayBookings.length,
-          onPress: () =>
-            navigation.navigate('ShopCalendar', {
-              returnTo: 'ShopDashboard',
-              backLabel: 'Home',
-            }),
-        },
-        {
-          key: 'calendar',
+          key: 'bookings-calendar',
           icon: 'calendar-month-outline',
-          title: 'Calendar',
-          subtitle: 'Schedule, reschedule and capacity',
-          count: unscheduledCount > 0 ? unscheduledCount : undefined,
+          title: 'Bookings / Calendar',
+          subtitle: "Today's appointments, schedule and capacity",
+          count:
+            todayBookings.length > 0
+              ? todayBookings.length
+              : unscheduledCount > 0
+                ? unscheduledCount
+                : undefined,
           onPress: () =>
             navigation.navigate('ShopCalendar', {
               returnTo: 'ShopDashboard',
               backLabel: 'Home',
             }),
         },
-      ],
-      [
         {
-          key: 'customers',
-          icon: 'account-group-outline',
-          title: 'Customers & Vehicles',
-          subtitle: 'Authorized clients and fleet records',
-          onPress: () => navigation.navigate('AuthorizedClients'),
-        },
-        {
-          key: 'documents',
-          icon: 'file-document-outline',
-          title: 'Documents',
-          subtitle: 'Invoices, repair docs, warranty evidence',
-          placeholder: true,
+          key: 'profile',
+          icon: 'store-cog-outline',
+          title: 'Service Center Profile',
+          subtitle: 'Name, location, services, hours and contact',
           onPress: () =>
-            showMessage('Coming soon', 'Central document import is on the Veversal ERP roadmap.', {
-              variant: 'info',
+            navigation.navigate('ShopProfile', {
+              requireSetup: !profileComplete,
             }),
         },
       ],
       [
         {
-          key: 'invoices',
-          icon: 'receipt-text-outline',
-          title: 'Invoices',
-          subtitle: 'Quotes, billing and accounting exports',
-          onPress: () => navigation.navigate('ShopInvoicing'),
-        },
-        {
-          key: 'inventory',
-          icon: 'warehouse',
-          title: 'Inventory',
-          subtitle: 'Parts, warehouse and stock receiving',
-          placeholder: true,
-          onPress: () => navigation.navigate('ShopWarehouse'),
-        },
-      ],
-      [
-        {
-          key: 'stats',
-          icon: 'chart-line',
-          title: 'Statistics',
-          subtitle: 'Revenue, throughput and customer growth',
-          placeholder: true,
-          onPress: () =>
-            showMessage(
-              'Statistics',
-              `Snapshot: ${openRepairs.length} open · ${ongoingRepairs.length} active · ${pendingOffers.length} pending offers.`,
-              { variant: 'info' }
-            ),
-        },
-        {
-          key: 'website',
+          key: 'public-preview',
           icon: 'web',
-          title: 'Website & SEO',
-          subtitle: 'Public page, services, photos, booking',
-          onPress: () => navigation.navigate('ShopProfile'),
-        },
-      ],
-      [
-        {
-          key: 'ai',
-          icon: 'robot-outline',
-          title: 'AI Assistant',
-          subtitle: 'Reply, describe repairs, translate',
-          placeholder: true,
+          title: 'Public Page Preview',
+          subtitle: 'How clients see your shop on the map and in search',
           onPress: () =>
-            showMessage('AI Assistant', 'Veversal AI assistant is planned for partner workflows.', {
-              variant: 'info',
+            navigation.navigate('ShopProfile', {
+              requireSetup: !profileComplete,
+              expandSection: 'public_preview',
             }),
-        },
-        {
-          key: 'subscription',
-          icon: 'shield-star-outline',
-          title: 'Subscription',
-          subtitle: 'Partner plan and activation',
-          placeholder: !partnerActive,
-          onPress: () => navigation.navigate('ShopProfile', { requireSetup: !profileComplete }),
         },
       ],
     ],
     [
       navigation,
-      openRepairs.length,
       pendingOffers.length,
       todayBookings.length,
       ongoingRepairs.length,
       unscheduledCount,
-      partnerActive,
       profileComplete,
     ]
+  );
+
+  const comingSoonItems = useMemo(
+    () => [
+      {
+        key: 'documents',
+        icon: 'file-document-outline',
+        title: 'Documents',
+        subtitle: 'Invoices, repair docs and warranty evidence in one place',
+        onPress: () =>
+          showMessage('Coming soon', 'Central document import is on the Veversal partner roadmap.', {
+            variant: 'info',
+          }),
+      },
+      {
+        key: 'inventory',
+        icon: 'warehouse',
+        title: 'Inventory',
+        subtitle: 'Parts, warehouse stock and receiving workflows',
+        onPress: () =>
+          showMessage('Coming soon', 'Inventory management is planned for a future release.', {
+            variant: 'info',
+          }),
+      },
+      {
+        key: 'reports',
+        icon: 'chart-line',
+        title: 'Reports',
+        subtitle: 'Revenue, throughput and customer growth snapshots',
+        onPress: () =>
+          showMessage(
+            'Coming soon',
+            `Reports are planned for a future release. Snapshot today: ${openRepairs.length} open · ${ongoingRepairs.length} active · ${pendingOffers.length} pending offers.`,
+            { variant: 'info' }
+          ),
+      },
+      {
+        key: 'customers',
+        icon: 'account-group-outline',
+        title: 'Customers & Vehicles',
+        subtitle: 'Authorized clients and fleet records',
+        onPress: () =>
+          showMessage(
+            'Coming soon',
+            'Customer and vehicle CRM tools are planned for a future partner release.',
+            { variant: 'info' }
+          ),
+      },
+      {
+        key: 'market-intelligence',
+        icon: 'chart-timeline-variant',
+        title: 'Market Intelligence',
+        subtitle:
+          'Compare your prices with city averages and understand what services customers are requesting most.',
+        onPress: () =>
+          showMessage(
+            'Market Intelligence',
+            'Compare your prices with city averages and understand what services customers are requesting most.',
+            { variant: 'info' }
+          ),
+      },
+    ],
+    [openRepairs.length, ongoingRepairs.length, pendingOffers.length]
   );
 
   const renderOpenRepair = (item) => {
@@ -466,7 +464,7 @@ export default function ShopHomeScreen() {
         <DashboardHero
           compact
           title="Veversal Partner Platform"
-          subtitle="Run your entire service center from one place — repair requests, bookings, customers, documents, sales, reports and your auto-generated website."
+          subtitle="Open repair requests, send offers, manage bookings, and keep your public service center page up to date."
         />
 
         <DashboardSection
@@ -485,13 +483,13 @@ export default function ShopHomeScreen() {
         </DashboardSection>
 
         <DashboardSection
-          title="Partner workspace"
-          subtitle="ERP modules for operations, sales, inventory and your public presence."
+          title="Operations"
+          subtitle="Daily partner workflows — requests, offers, schedule and your public presence."
         >
           {dashboardLoading ? (
             <ActivityIndicator color="#fff" style={{ marginVertical: 8 }} />
           ) : (
-            tileRows.map((row, rowIndex) => (
+            operationsTiles.map((row, rowIndex) => (
               <View key={`row-${rowIndex}`} style={styles.tileRow}>
                 {row.map((tile) => (
                   <DashboardActionTile key={tile.key} {...tile} />
@@ -501,6 +499,8 @@ export default function ShopHomeScreen() {
             ))
           )}
         </DashboardSection>
+
+        <DashboardComingSoonSection items={comingSoonItems} />
       </ScrollView>
     </ScreenBackground>
   );

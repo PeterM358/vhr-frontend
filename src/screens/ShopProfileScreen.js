@@ -335,6 +335,12 @@ export default function ShopProfileScreen({ navigation, route }) {
     sectionsInitialized.current = true;
   }, [profile, profileForCompleteness, requireSetup]);
 
+  useEffect(() => {
+    const key = route.params?.expandSection;
+    if (!key) return;
+    setExpandedSections((prev) => ({ ...prev, [key]: true }));
+  }, [route.params?.expandSection]);
+
   const applyMapPick = useCallback(
     async (pick) => {
       const lat = Number(pick.latitude);
