@@ -5,10 +5,10 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import FloatingCard from '../ui/FloatingCard';
 import { COLORS } from '../../constants/colors';
 
-export default function DashboardComingSoonSection({ items = [] }) {
+export default function DashboardComingSoonSection({ items = [], featured = null }) {
   const [expanded, setExpanded] = useState(false);
 
-  if (!items.length) return null;
+  if (!items.length && !featured) return null;
 
   return (
     <View style={styles.wrap}>
@@ -31,8 +31,10 @@ export default function DashboardComingSoonSection({ items = [] }) {
           />
         </Pressable>
 
-        {expanded
-          ? items.map((item) => (
+        {expanded ? (
+          <>
+            {featured}
+            {items.map((item) => (
               <Pressable
                 key={item.key}
                 onPress={item.onPress}
@@ -48,8 +50,9 @@ export default function DashboardComingSoonSection({ items = [] }) {
                 </View>
                 <Text style={styles.soonBadge}>Soon</Text>
               </Pressable>
-            ))
-          : null}
+            ))}
+          </>
+        ) : null}
       </FloatingCard>
     </View>
   );

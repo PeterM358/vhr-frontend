@@ -3,9 +3,9 @@ import 'dotenv/config';
 
 export default {
   expo: {
-    name: "vhr-frontend",
-    slug: "vhr-frontend",
-    scheme: "service1001", // 👈 ADD THIS
+    name: "Veversal",
+    slug: "veversal",
+    scheme: "service1001",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./src/assets/icons/icon.png",
@@ -53,12 +53,15 @@ export default {
     },
     web: {
       name: "Veversal",
+      shortName: "Veversal",
       description: "Your vehicle service universe.",
       favicon: "./src/assets/icons/icon.png",
       bundler: "metro",
       output: "single",
       meta: {
-        viewport: "width=device-width, initial-scale=1"
+        viewport: "width=device-width, initial-scale=1",
+        "application-name": "Veversal",
+        "apple-mobile-web-app-title": "Veversal",
       },
       links: [
         "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"

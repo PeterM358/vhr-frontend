@@ -1,5 +1,7 @@
+import { Platform } from 'react-native';
 import { getMyShopProfiles } from '../api/profiles';
 import { isShopProfileEssentialsComplete } from './shopProfileCompleteness';
+import { PARTNER_DASHBOARD_PATH, syncWebPath } from '../navigation/authNavigation';
 
 /**
  * After shop login/register, land on the dashboard. Incomplete profiles see a
@@ -19,5 +21,8 @@ export async function resolveShopEntryRoute() {
 }
 
 export function buildShopAuthReset(route) {
+  if (Platform.OS === 'web') {
+    syncWebPath(PARTNER_DASHBOARD_PATH);
+  }
   return { index: 0, routes: [{ name: route.name, params: route.params }] };
 }

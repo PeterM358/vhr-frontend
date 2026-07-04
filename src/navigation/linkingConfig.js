@@ -14,6 +14,14 @@ export const linkingScreens = {
       HomeMain: '',
     },
   },
+  ShopHome: {
+    path: 'partner',
+    screens: {
+      ShopDashboard: 'dashboard',
+    },
+  },
   ShopMap: 'service-centers',
   PasswordConfirmReset: 'reset-password/:uid/:token',
 };
+
+export const linkingConfig = { screens: linkingScreens };

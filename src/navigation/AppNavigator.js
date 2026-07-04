@@ -2,9 +2,9 @@
  * PATH: src/navigation/AppNavigator.js
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Platform, Pressable, Text } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, getPathFromState } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -73,6 +73,8 @@ import PasswordRequestResetScreen from '../screens/PasswordRequestResetScreen';
 import PasswordConfirmResetScreen from '../screens/PasswordConfirmResetScreen';
 
 import { buildAppLinking, redirectLegacyWebUrl } from './webLinking';
+import { linkingConfig } from './linkingConfig';
+import { syncWebDocumentTitle } from './webDocumentTitle';
 import NavigationFallback from './NavigationFallback';
 
 const Stack = createNativeStackNavigator();
@@ -186,13 +188,34 @@ function getLinkingPrefixes() {
 
 export default function AppNavigator() {
   const linking = buildAppLinking(getLinkingPrefixes());
+  const navigationRef = useRef(null);
 
   useEffect(() => {
     redirectLegacyWebUrl();
   }, []);
 
+  const handleNavigationStateChange = () => {
+    if (Platform.OS !== 'web' || !navigationRef.current) {
+      return;
+    }
+    try {
+      const path = getPathFromState(navigationRef.current.getRootState(), linkingConfig);
+      const pathname = path ? `/${String(path).replace(/^\//, '')}` : '/';
+      syncWebDocumentTitle(pathname === '/PublicHome' ? '/' : pathname);
+    } catch {
+      syncWebDocumentTitle(window.location.pathname);
+    }
+  };
+
   return (
-    <NavigationContainer linking={linking} fallback={<NavigationFallback />}>
+    <NavigationContainer
+      ref={navigationRef}
+      linking={linking}
+      fallback={<NavigationFallback />}
+      documentTitle={{ enabled: false }}
+      onReady={handleNavigationStateChange}
+      onStateChange={handleNavigationStateChange}
+    >
       <Stack.Navigator
         initialRouteName="AuthLoading"
         screenOptions={{

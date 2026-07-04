@@ -39,6 +39,7 @@ import DashboardHero from '../components/dashboard/DashboardHero';
 import DashboardSection from '../components/dashboard/DashboardSection';
 import DashboardActionTile from '../components/dashboard/DashboardActionTile';
 import DashboardComingSoonSection from '../components/dashboard/DashboardComingSoonSection';
+import ReadyToDriveComingSoonCard from '../components/dashboard/ReadyToDriveComingSoonCard';
 import PartnerActivationBanner from '../components/dashboard/PartnerActivationBanner';
 import PartnerEmptyRequestsState from '../components/dashboard/PartnerEmptyRequestsState';
 import { COLORS } from '../constants/colors';
@@ -500,7 +501,10 @@ export default function ShopHomeScreen() {
           )}
         </DashboardSection>
 
-        <DashboardComingSoonSection items={comingSoonItems} />
+        <DashboardComingSoonSection
+          featured={<ReadyToDriveComingSoonCard />}
+          items={comingSoonItems}
+        />
       </ScrollView>
     </ScreenBackground>
   );

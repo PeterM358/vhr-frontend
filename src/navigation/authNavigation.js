@@ -5,6 +5,7 @@
 
 import { Platform } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
+import { syncWebDocumentTitle } from './webDocumentTitle';
 
 function getRootNavigation(navigation) {
   let current = navigation;
@@ -30,7 +31,10 @@ export function syncWebPath(pathname) {
   if (window.location.pathname !== pathname) {
     window.history.replaceState(window.history.state, '', `${pathname}${search}${hash}`);
   }
+  syncWebDocumentTitle(pathname);
 }
+
+export const PARTNER_DASHBOARD_PATH = '/partner/dashboard';
 
 export function resetToClientDashboard(navigation) {
   navigation.dispatch(

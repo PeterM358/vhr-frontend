@@ -6,6 +6,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resetFromClientDrawer } from './drawerNavigation';
+import { syncWebPath } from './authNavigation';
 
 function getRootNavigation(navigation) {
   let current = navigation;
@@ -41,7 +42,13 @@ export async function goBackFromServiceCenters(navigation) {
   const root = getRootNavigation(navigation);
   if (authed) {
     root.navigate('Home', { screen: 'HomeMain' });
+    if (Platform.OS === 'web') {
+      syncWebPath('/dashboard');
+    }
   } else {
     root.navigate('PublicHome');
+    if (Platform.OS === 'web') {
+      syncWebPath('/');
+    }
   }
 }
