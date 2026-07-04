@@ -4,7 +4,8 @@
 
 import 'leaflet/dist/leaflet.css';
 import React, { useMemo, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { MapContainer, TileLayer, Marker, useMapEvents, ZoomControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -155,6 +156,20 @@ export default function MapLocationPickerScreen({ navigation, route }) {
           }
         />
 
+        <Pressable
+          style={[styles.locateFab, { bottom: insets.bottom + 168 }]}
+          onPress={handleLocateMe}
+          disabled={locating}
+          accessibilityRole="button"
+          accessibilityLabel="Locate me"
+        >
+          {locating ? (
+            <ActivityIndicator color={COLORS.PRIMARY} size="small" />
+          ) : (
+            <MaterialCommunityIcons name="crosshairs-gps" size={26} color={COLORS.PRIMARY} />
+          )}
+        </Pressable>
+
         <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
           <Text style={styles.coordHint}>{pinLabel}</Text>
           {geoHint ? <Text style={styles.geoError}>{geoHint}</Text> : null}
@@ -188,4 +203,22 @@ const styles = StyleSheet.create({
   geoError: { color: '#b45309', fontSize: 13, textAlign: 'center', lineHeight: 18 },
   confirmBtn: { marginTop: 2 },
   locateLabel: { fontSize: 13 },
+  locateFab: {
+    position: 'absolute',
+    right: 16,
+    zIndex: 500,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(15,23,42,0.12)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
 });

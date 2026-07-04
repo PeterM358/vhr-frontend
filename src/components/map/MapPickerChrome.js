@@ -63,7 +63,8 @@ const styles = StyleSheet.create({
   },
   spacer: { width: 72 },
   rightSlot: {
-    minWidth: 72,
+    minWidth: 96,
+    maxWidth: 120,
     alignItems: 'flex-end',
     justifyContent: 'center',
   },

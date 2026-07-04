@@ -63,6 +63,7 @@ import {
   isShopProfileEssentialsComplete,
 } from '../utils/shopProfileCompleteness';
 import ShopProfileCompletionCard from '../components/shop/ShopProfileCompletionCard';
+import ShopProfileMissingAlert from '../components/shop/ShopProfileMissingAlert';
 import { getInitialShopProfileExpandedSections } from '../utils/shopProfileGate';
 import ShopProfileAccordionSection from '../components/shop/ShopProfileAccordionSection';
 import { parseOptionalCoordinate, roundCoordinateForApi } from '../utils/manualServiceCenter';
@@ -1109,9 +1110,10 @@ export default function ShopProfileScreen({ navigation, route }) {
       >
         <ShopProfileCompletionCard
           percent={completionPercent}
-          missingFields={missingFields}
           strengthHints={strengthHints}
         />
+
+        {!isEssentialsComplete ? <ShopProfileMissingAlert fields={missingFields} /> : null}
 
         {showSetupBanner ? (
           <AppCard variant="dark" contentStyle={styles.setupBannerInner}>
@@ -1127,7 +1129,11 @@ export default function ShopProfileScreen({ navigation, route }) {
           <>
             <Pressable
               onPress={openMapPicker}
-              style={({ pressed }) => [styles.mapCtaCard, pressed && styles.mapCtaCardPressed]}
+              style={({ pressed }) => [
+                styles.mapCtaCard,
+                missingFields.includes('map pin') && styles.mapCtaCardAttention,
+                pressed && styles.mapCtaCardPressed,
+              ]}
               accessibilityRole="button"
               accessibilityLabel="Place pin on map"
             >
@@ -1164,6 +1170,7 @@ export default function ShopProfileScreen({ navigation, route }) {
           title="Shop name"
           expanded={!!expandedSections.basic}
           onToggle={() => toggleSection('basic')}
+          needsAttention={missingFields.includes('shop name')}
         >
           <TextInput
             label="Service center name"
@@ -1178,6 +1185,7 @@ export default function ShopProfileScreen({ navigation, route }) {
           title="Vehicle types you service"
           expanded={!!expandedSections.vehicle_types}
           onToggle={() => toggleSection('vehicle_types')}
+          needsAttention={missingFields.includes('vehicle type')}
         >
           <Text style={styles.helperText}>
             Full-service centers can tap Select all. Required for map discovery.
@@ -1332,6 +1340,12 @@ export default function ShopProfileScreen({ navigation, route }) {
           title="Location details"
           expanded={!!expandedSections.location}
           onToggle={() => toggleSection('location')}
+          needsAttention={
+            missingFields.includes('map pin') ||
+            missingFields.includes('address') ||
+            missingFields.includes('country') ||
+            missingFields.includes('city')
+          }
         >
           <Text style={styles.helperText}>
             Usually filled from the map pin. Adjust street, country, or city if needed.
@@ -1758,8 +1772,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   setupBannerInner: {
+    gap: 6,
     paddingVertical: 14,
-    marginBottom: 10,
   },
   setupBannerTitle: {
     color: '#fff',
@@ -1771,12 +1785,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.92)',
     fontSize: 14,
     lineHeight: 20,
-  },
-  setupBannerMissing: {
-    color: '#fde68a',
-    fontSize: 13,
-    marginTop: 8,
-    fontWeight: '600',
   },
   mapCtaCard: {
     flexDirection: 'row',
@@ -1791,6 +1799,10 @@ const styles = StyleSheet.create({
   },
   mapCtaCardPressed: {
     opacity: 0.92,
+  },
+  mapCtaCardAttention: {
+    borderColor: '#f59e0b',
+    backgroundColor: '#fffbeb',
   },
   mapCtaIconWrap: {
     width: 44,

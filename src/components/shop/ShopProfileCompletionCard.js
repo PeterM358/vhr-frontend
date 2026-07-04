@@ -8,7 +8,6 @@ import { COLORS } from '../../constants/colors';
 
 export default function ShopProfileCompletionCard({
   percent = 0,
-  missingFields = [],
   strengthHints = [],
 }) {
   const complete = percent >= 100;
@@ -31,9 +30,6 @@ export default function ShopProfileCompletionCard({
         color={complete ? '#4ade80' : COLORS.PRIMARY}
         style={styles.bar}
       />
-      {!complete && missingFields.length ? (
-        <Text style={styles.missing}>Still needed: {missingFields.join(', ')}</Text>
-      ) : null}
       {complete ? (
         <Text style={styles.readyText}>
           Clients can find you on the map and open repair requests.
@@ -49,7 +45,6 @@ export default function ShopProfileCompletionCard({
 const styles = StyleSheet.create({
   inner: {
     gap: 8,
-    marginBottom: 12,
   },
   headerRow: {
     flexDirection: 'row',
@@ -74,11 +69,6 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-  missing: {
-    color: '#fbbf24',
-    fontSize: 13,
-    lineHeight: 18,
   },
   readyText: {
     color: 'rgba(255,255,255,0.82)',

@@ -29,7 +29,7 @@ export default function ShopProfileSetupBanner({ missingFields, onCompletePress 
 const styles = StyleSheet.create({
   inner: {
     paddingVertical: 14,
-    marginBottom: 12,
+    gap: 8,
   },
   title: {
     color: '#fff',
