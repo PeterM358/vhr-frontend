@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+concurrency:
+  group: veversal-beta-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -16,13 +21,36 @@ jobs:
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           set -euo pipefail
+          for var in SSH_HOST SSH_PORT SSH_USER SSH_PRIVATE_KEY; do
+            if [[ -z "${!var:-}" ]]; then
+              echo "::error::Missing GitHub secret: $var"
+              exit 1
+            fi
+          done
           mkdir -p ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Verify SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key \
+            -p "$SSH_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            "$SSH_USER@$SSH_HOST" \
+            'echo SSH OK'
 
       - name: Deploy beta
         env:
@@ -36,4 +64,5 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile=~/.ssh/known_hosts \
             "$SSH_USER@$SSH_HOST" \
-            'set -euo pipefail && cd /opt/veversal/backend && ./deploy/deploy_beta.sh'
+            'set -euo pipefail && cd /opt/veversal/backend && bash deploy/deploy_beta.sh' \
+            || { echo "::error::Remote deploy_beta.sh failed — SSH to the server and run: bash deploy/deploy_beta.sh"; exit 1; }
