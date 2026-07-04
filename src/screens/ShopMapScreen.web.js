@@ -20,6 +20,7 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import { COLORS } from '../styles/colors';
+import BASE_STYLES from '../styles/base';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useNavigation, useRoute } from '@react-navigation/native';
