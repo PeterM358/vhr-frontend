@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useLayoutEffect, useCallback } from 'react';
+import React, { useEffect, useState, useLayoutEffect, useCallback, useRef } from 'react';
 import {
   View,
   Alert,
@@ -10,6 +10,7 @@ import {
   Platform,
   Pressable,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -184,6 +185,41 @@ export default function ShopDetailScreen({ route, navigation }) {
   const [requestSheetOpen, setRequestSheetOpen] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [loadErrorMessage, setLoadErrorMessage] = useState('');
+  const skipNextVehicleFocusReload = useRef(true);
+
+  const reloadClientVehicles = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      const storedIsShop = await AsyncStorage.getItem('@is_shop');
+      if (!token || storedIsShop === 'true') {
+        setVehicles([]);
+        return;
+      }
+      const vehicleData = await getVehicles(token);
+      setVehicles(vehicleData);
+    } catch (error) {
+      console.warn('Failed to refresh vehicles on shop detail:', error);
+    }
+  }, []);
+
+  const goAddVehicle = useCallback(() => {
+    navigation.navigate('CreateVehicle');
+  }, [navigation]);
+
+  const handleRequestServicePress = useCallback(() => {
+    if (isLoggedIn && isClientAccount && vehicles.length === 0) {
+      Alert.alert(
+        'Add a vehicle first',
+        'You need at least one vehicle before requesting a repair.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Add Vehicle', onPress: goAddVehicle },
+        ]
+      );
+      return;
+    }
+    setRequestSheetOpen(true);
+  }, [goAddVehicle, isClientAccount, isLoggedIn, vehicles.length]);
 
   const loadData = useCallback(async () => {
     setLoadError(false);
@@ -271,6 +307,16 @@ export default function ShopDetailScreen({ route, navigation }) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (skipNextVehicleFocusReload.current) {
+        skipNextVehicleFocusReload.current = false;
+        return;
+      }
+      reloadClientVehicles();
+    }, [reloadClientVehicles])
+  );
 
   useLayoutEffect(() => {
     if (!shop?.name) {
@@ -768,7 +814,12 @@ export default function ShopDetailScreen({ route, navigation }) {
                 without authorizing only grants access to that job and related prior work in the same category.
               </Text>
               {vehicles.length === 0 ? (
-                <Text style={styles.placeholderOnCard}>You have no vehicles registered.</Text>
+                <>
+                  <Text style={styles.placeholderOnCard}>You have no vehicles registered.</Text>
+                  <Button mode="contained" onPress={goAddVehicle} style={styles.addFirstVehicleBtn}>
+                    Add your first vehicle
+                  </Button>
+                </>
               ) : (
                 vehicles.map((item) => {
                   const isAuthorized = item.shared_with_shops.some(
@@ -799,7 +850,7 @@ export default function ShopDetailScreen({ route, navigation }) {
 
       {showClientRequest ? (
         <Pressable
-          onPress={() => setRequestSheetOpen(true)}
+          onPress={handleRequestServicePress}
           style={({ pressed }) => [
             styles.requestFab,
             { bottom: insets.bottom + 16 },
@@ -1126,5 +1177,9 @@ const styles = StyleSheet.create({
   },
   authButton: {
     alignSelf: 'flex-start',
+  },
+  addFirstVehicleBtn: {
+    marginTop: 12,
+    alignSelf: 'stretch',
   },
 });
