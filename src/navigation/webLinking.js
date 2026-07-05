@@ -65,6 +65,19 @@ function parseShopIdFromSearch(search) {
   return Number.isFinite(id) ? id : null;
 }
 
+function legacyShopDetailNavigationState() {
+  if (typeof window === 'undefined') return null;
+  const pathname = window.location.pathname || '';
+  if (pathname !== '/ShopDetail' && !pathname.startsWith('/ShopDetail/')) {
+    return null;
+  }
+  const shopId = parseShopIdFromSearch(window.location.search);
+  if (!shopId) return null;
+  return {
+    routes: [{ name: 'ShopDetail', params: { shopId } }],
+  };
+}
+
 /**
  * Replace legacy browser URLs in the address bar (bookmarks, old history).
  */
@@ -99,19 +112,17 @@ export async function redirectLegacyWebUrl() {
     if (shopId) {
       try {
         const resolved = await resolveShopSeoPath(shopId, 'en');
-        if (resolved?.canonical_path) {
-          target = resolved.canonical_path;
-        }
+        target = resolved?.canonical_path || `/service-center/${shopId}`;
       } catch {
-        target = '/service-centers';
+        target = `/service-center/${shopId}`;
       }
     } else {
       target = '/service-centers';
     }
   }
 
-  if (target && target !== pathname) {
-    window.history.replaceState(window.history.state, '', `${target}${target.includes('?') ? '' : ''}${hash}`);
+  if (target && target !== `${pathname}${search}`) {
+    window.history.replaceState(window.history.state, '', `${target}${hash}`);
   }
 
   syncWebDocumentTitle(target || pathname);
@@ -130,6 +141,10 @@ export function buildAppLinking(prefixes) {
   return {
     ...base,
     getStateFromPath(path, options) {
+      const legacyShop = legacyShopDetailNavigationState();
+      if (legacyShop) {
+        return legacyShop;
+      }
       const normalized = normalizeWebLinkingPath(path);
       const seoState = getNavigationStateFromSeoPath(normalized);
       if (seoState) {

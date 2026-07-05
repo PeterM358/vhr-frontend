@@ -21,6 +21,15 @@ export const linkingScreens = {
     },
   },
   ShopMap: 'service-centers',
+  ShopDetail: {
+    path: 'service-center/:shopId',
+    parse: {
+      shopId: (value) => {
+        const id = parseInt(String(value), 10);
+        return Number.isFinite(id) ? id : undefined;
+      },
+    },
+  },
   PasswordConfirmReset: 'reset-password/:uid/:token',
 };
 

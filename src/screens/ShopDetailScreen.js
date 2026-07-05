@@ -18,7 +18,7 @@ import { formatDayHoursWithLunch, parseLunchBreak } from '../utils/shopWorkingHo
 import { getVehicles, updateVehicle } from '../api/vehicles';
 import { getShopById, deleteShopImage } from '../api/shops';
 import { fetchSeoServiceCenterDetail, resolveShopSeoPath } from '../api/seo';
-import { applySeoPageMeta } from '../utils/seo/seoMetadata.web';
+import { applySeoPageMeta } from '../utils/seo/seoMetadata';
 
 import { Text, Button, ActivityIndicator, useTheme, Chip, Divider } from 'react-native-paper';
 import ScreenBackground from '../components/ScreenBackground';
@@ -183,11 +183,17 @@ export default function ShopDetailScreen({ route, navigation }) {
   const [isShopAccount, setIsShopAccount] = useState(false);
   const [requestSheetOpen, setRequestSheetOpen] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [loadErrorMessage, setLoadErrorMessage] = useState('');
 
   const loadData = useCallback(async () => {
     setLoadError(false);
+    setLoadErrorMessage('');
     setLoading(true);
     try {
+      if (!resolvedShopId && !(locale && citySlug && centerSlug)) {
+        throw new Error('Missing service center identifier.');
+      }
+
       const token = await AsyncStorage.getItem('@access_token');
       const storedUserId = await AsyncStorage.getItem('@user_id');
       const storedIsShop = await AsyncStorage.getItem('@is_shop');
@@ -207,8 +213,10 @@ export default function ShopDetailScreen({ route, navigation }) {
             if (resolved?.canonical_path && typeof window !== 'undefined') {
               window.history.replaceState(window.history.state, '', resolved.canonical_path);
             }
-          } catch (resolveError) {
-            // Keep legacy URL when slugs are not configured yet.
+          } catch {
+            if (typeof window !== 'undefined') {
+              window.history.replaceState(window.history.state, '', `/service-center/${resolvedShopId}`);
+            }
           }
         }
       }
@@ -245,7 +253,17 @@ export default function ShopDetailScreen({ route, navigation }) {
       console.error('Failed to load shop detail:', error);
       setShop(null);
       setLoadError(true);
-      Alert.alert('Error', 'Failed to load service center details.');
+      const message = String(error?.message || '');
+      if (/failed to fetch|network|connection refused|load failed/i.test(message)) {
+        setLoadErrorMessage('The Veversal service is temporarily unavailable. Please try again in a moment.');
+      } else if (/missing service center identifier/i.test(message)) {
+        setLoadErrorMessage('This service center link is invalid or outdated.');
+      } else {
+        setLoadErrorMessage('Check your connection and try again.');
+      }
+      if (Platform.OS !== 'web') {
+        Alert.alert('Error', 'Failed to load service center details.');
+      }
     } finally {
       setLoading(false);
     }
@@ -378,7 +396,7 @@ export default function ShopDetailScreen({ route, navigation }) {
         <View style={styles.center}>
           <EmptyStateCard
             title="Could not load service center"
-            subtitle="Check your connection and try again."
+            subtitle={loadErrorMessage || 'Check your connection and try again.'}
             icon="alert-circle-outline"
           />
           <Button mode="contained" onPress={loadData} style={styles.retryBtn}>

@@ -12,7 +12,7 @@ import {
 import AppCard from '../components/ui/AppCard';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
 import ScreenBackground from '../components/ScreenBackground';
-import { applySeoPageMeta } from '../utils/seo/seoMetadata.web';
+import { applySeoPageMeta } from '../utils/seo/seoMetadata';
 
 const IMPORTED_STATUSES = new Set(['imported', 'unverified']);
 

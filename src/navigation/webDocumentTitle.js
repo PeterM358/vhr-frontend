@@ -24,6 +24,12 @@ export function normalizeWebTitlePath(pathname) {
 
 export function getWebDocumentTitle(pathname) {
   const normalized = normalizeWebTitlePath(pathname);
+  if (PATH_TITLES[normalized]) {
+    return PATH_TITLES[normalized];
+  }
+  if (normalized.startsWith('/service-center/')) {
+    return `${BASE_TITLE} Service Center`;
+  }
   return PATH_TITLES[normalized] ?? BASE_TITLE;
 }
 
