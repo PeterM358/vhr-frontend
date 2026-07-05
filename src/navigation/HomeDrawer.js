@@ -3,18 +3,22 @@
  */
 
 import React, { useContext } from 'react';
-import { View, StyleSheet, Image } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import { useNavigation } from '@react-navigation/native';
-import { Text, Badge } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import HomeScreen from '../screens/HomeScreen';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import { logout } from '../api/auth';
 import { resetFromClientDrawer } from './drawerNavigation';
 import { openServiceCenters } from './serviceCentersNavigation';
-
-import MainText from '../assets/images/main-text.png'; // ✅ Your bottom makeing image
+import {
+  DrawerMenuIcon,
+  DrawerLabelWithBadge,
+  DrawerVeversalLogoFooter,
+} from './DrawerBranding';
+import { COLORS } from '../constants/colors';
 
 const Drawer = createDrawerNavigator();
 
@@ -40,27 +44,45 @@ function CustomDrawerContent(props) {
         <DrawerItem
           label="Home"
           onPress={() => props.navigation.closeDrawer()}
-          icon={() => <Text>🏠</Text>}
+          icon={({ color, size }) => <DrawerMenuIcon name="home-outline" color={color} size={size} />}
+          labelStyle={styles.itemLabel}
+          activeTintColor={COLORS.PRIMARY}
+          inactiveTintColor={COLORS.TEXT_DARK}
         />
 
         <DrawerItem
           label="Profile"
           onPress={() => resetFromClientDrawer(navigation, 'ClientProfile')}
-          icon={() => <Text>👤</Text>}
+          icon={({ color, size }) => (
+            <DrawerMenuIcon name="account-circle-outline" color={color} size={size} />
+          )}
+          labelStyle={styles.itemLabel}
+          activeTintColor={COLORS.PRIMARY}
+          inactiveTintColor={COLORS.TEXT_DARK}
         />
 
         <DrawerItem
           label="Repairs"
           onPress={() => resetFromClientDrawer(navigation, 'ClientRepairs')}
-          icon={() => <Text>🛠️</Text>}
+          icon={({ color, size }) => <DrawerMenuIcon name="wrench-outline" color={color} size={size} />}
+          labelStyle={styles.itemLabel}
+          activeTintColor={COLORS.PRIMARY}
+          inactiveTintColor={COLORS.TEXT_DARK}
         />
+
         <DrawerItem
           label="Vehicles"
           onPress={() => resetFromClientDrawer(navigation, 'ClientVehicles')}
-          icon={() => <Text>🚗</Text>}
+          icon={({ color, size }) => <DrawerMenuIcon name="car-outline" color={color} size={size} />}
+          labelStyle={styles.itemLabel}
+          activeTintColor={COLORS.PRIMARY}
+          inactiveTintColor={COLORS.TEXT_DARK}
         />
+
         <DrawerItem
-          label="Activity"
+          label={() => (
+            <DrawerLabelWithBadge label="Activity" badge={unreadNotifications} />
+          )}
           onPress={() =>
             resetFromClientDrawer(navigation, 'ClientActivity', {
               returnTo: 'Home',
@@ -68,28 +90,36 @@ function CustomDrawerContent(props) {
               initialTab: unreadNotifications > 0 ? 'inbox' : 'repairs',
             })
           }
-          icon={() => (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text>🔔</Text>
-              {unreadNotifications > 0 ? <Badge>{unreadNotifications}</Badge> : null}
-            </View>
-          )}
+          icon={({ color, size }) => <DrawerMenuIcon name="bell-outline" color={color} size={size} />}
+          labelStyle={styles.itemLabel}
+          activeTintColor={COLORS.PRIMARY}
+          inactiveTintColor={COLORS.TEXT_DARK}
         />
+
         <DrawerItem
           label="Find Service Centers"
           onPress={() => openServiceCenters(navigation)}
-          icon={() => <Text>🗺️</Text>}
+          icon={({ color, size }) => (
+            <DrawerMenuIcon name="map-marker-radius" color={color} size={size} />
+          )}
+          labelStyle={styles.itemLabel}
+          activeTintColor={COLORS.PRIMARY}
+          inactiveTintColor={COLORS.TEXT_DARK}
         />
+
+        <View style={styles.divider} />
+
         <DrawerItem
           label="Logout"
           onPress={handleLogout}
-          icon={() => <Text>🚪</Text>}
+          icon={({ color, size }) => <DrawerMenuIcon name="logout" color={color} size={size} />}
+          labelStyle={styles.itemLabel}
+          activeTintColor={COLORS.PRIMARY}
+          inactiveTintColor={COLORS.TEXT_DARK}
         />
       </View>
 
-      <View style={styles.logoBottomContainer}>
-        <Image source={MainText} style={styles.logoImage} resizeMode="contain" />
-      </View>
+      <DrawerVeversalLogoFooter />
     </DrawerContentScrollView>
   );
 }
@@ -97,7 +127,13 @@ function CustomDrawerContent(props) {
 export default function HomeDrawer() {
   return (
     <Drawer.Navigator
-      screenOptions={{ headerShown: false }}
+      screenOptions={{
+        headerShown: false,
+        drawerActiveTintColor: COLORS.PRIMARY,
+        drawerInactiveTintColor: COLORS.TEXT_DARK,
+        drawerLabelStyle: styles.itemLabel,
+        drawerItemStyle: styles.drawerItem,
+      }}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
       <Drawer.Screen name="HomeMain" component={HomeScreen} />
@@ -109,24 +145,34 @@ const styles = StyleSheet.create({
   drawerContainer: {
     flex: 1,
     justifyContent: 'space-between',
-    paddingTop: 40,
-    paddingBottom: 20,
+    paddingTop: 36,
+    paddingBottom: 16,
   },
   menuContainer: {
     flexGrow: 1,
   },
   drawerTitle: {
-    marginLeft: 16,
-    marginBottom: 8,
-    fontSize: 18,
-    fontWeight: 'bold',
+    marginLeft: 20,
+    marginBottom: 12,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: COLORS.TEXT_MUTED,
   },
-  logoBottomContainer: {
-    alignItems: 'center',
-    marginTop: 16,
+  itemLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    marginLeft: -8,
   },
-  logoImage: {
-    width: 140,
-    height: 50,
+  drawerItem: {
+    marginHorizontal: 8,
+    borderRadius: 10,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(15,23,42,0.1)',
+    marginVertical: 8,
+    marginHorizontal: 20,
   },
 });
