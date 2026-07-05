@@ -285,7 +285,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ShopDetail"
           component={ShopDetailScreen}
-          options={{ title: 'Service Details' }}
+          options={{ title: 'Service Center Details' }}
         />
         <Stack.Screen name="PromotionDetail" component={PromotionDetailScreen} options={{ title: 'Promotion Details' }}/>
         <Stack.Screen

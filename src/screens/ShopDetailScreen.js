@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useLayoutEffect, useCallback } from 'react';
 import {
   View,
   Alert,
@@ -16,6 +16,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 
 import { formatDayHoursWithLunch, parseLunchBreak } from '../utils/shopWorkingHours';
 import { getVehicles, updateVehicle } from '../api/vehicles';
+import { getShopById, deleteShopImage } from '../api/shops';
 
 import { Text, Button, ActivityIndicator, useTheme, Chip, Divider } from 'react-native-paper';
 import ScreenBackground from '../components/ScreenBackground';
@@ -178,12 +179,11 @@ export default function ShopDetailScreen({ route, navigation }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isShopAccount, setIsShopAccount] = useState(false);
   const [requestSheetOpen, setRequestSheetOpen] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, [shopId]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
+    setLoadError(false);
+    setLoading(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
       const storedUserId = await AsyncStorage.getItem('@user_id');
@@ -214,7 +214,7 @@ export default function ShopDetailScreen({ route, navigation }) {
         uid != null && owners.some((u) => Number(u?.id ?? u) === uid)
       );
 
-      if (!isShopAccount) {
+      if (!shopUser) {
         const vehicleData = await getVehicles(token);
         setVehicles(vehicleData);
       } else {
@@ -222,11 +222,28 @@ export default function ShopDetailScreen({ route, navigation }) {
       }
     } catch (error) {
       console.error('Failed to load shop detail:', error);
-      Alert.alert('Error', 'Failed to load service details.');
+      setShop(null);
+      setLoadError(true);
+      Alert.alert('Error', 'Failed to load service center details.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [shopId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useLayoutEffect(() => {
+    if (!shop?.name) {
+      navigation.setOptions({ title: 'Service Center Details' });
+      return;
+    }
+    const displayName = formatShopDisplayName(shop.name);
+    navigation.setOptions({
+      title: displayName.length > 32 ? `${displayName.slice(0, 29)}…` : displayName,
+    });
+  }, [navigation, shop?.name]);
 
   const applyAuthorizationChange = async (vehicle, isAuthorized) => {
     const token = await AsyncStorage.getItem('@access_token');
@@ -324,11 +341,28 @@ export default function ShopDetailScreen({ route, navigation }) {
     }
   };
 
-  if (loading || !shop) {
+  if (loading) {
     return (
       <ScreenBackground safeArea={false}>
         <View style={styles.center}>
           <ActivityIndicator animating size="large" color="#fff" />
+        </View>
+      </ScreenBackground>
+    );
+  }
+
+  if (loadError || !shop) {
+    return (
+      <ScreenBackground safeArea={false}>
+        <View style={styles.center}>
+          <EmptyStateCard
+            title="Could not load service center"
+            subtitle="Check your connection and try again."
+            icon="alert-circle-outline"
+          />
+          <Button mode="contained" onPress={loadData} style={styles.retryBtn}>
+            Retry
+          </Button>
         </View>
       </ScreenBackground>
     );
@@ -754,6 +788,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  retryBtn: {
+    marginTop: 16,
+    alignSelf: 'stretch',
+    maxWidth: 280,
   },
   container: { flex: 1, backgroundColor: 'transparent' },
   listContent: {
