@@ -17,6 +17,8 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { formatDayHoursWithLunch, parseLunchBreak } from '../utils/shopWorkingHours';
 import { getVehicles, updateVehicle } from '../api/vehicles';
 import { getShopById, deleteShopImage } from '../api/shops';
+import { fetchSeoServiceCenterDetail, resolveShopSeoPath } from '../api/seo';
+import { applySeoPageMeta } from '../utils/seo/seoMetadata.web';
 
 import { Text, Button, ActivityIndicator, useTheme, Chip, Divider } from 'react-native-paper';
 import ScreenBackground from '../components/ScreenBackground';
@@ -166,7 +168,8 @@ function formatRatingSnippet(avg, count) {
 }
 
 export default function ShopDetailScreen({ route, navigation }) {
-  const { shopId } = route.params;
+  const { shopId, locale, citySlug, centerSlug } = route.params || {};
+  const resolvedShopId = shopId;
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const headerUnderlay = insets.top + (Platform.OS === 'ios' ? 44 : 56);
@@ -189,8 +192,28 @@ export default function ShopDetailScreen({ route, navigation }) {
       const storedUserId = await AsyncStorage.getItem('@user_id');
       const storedIsShop = await AsyncStorage.getItem('@is_shop');
 
+      let shopData;
+      if (locale && citySlug && centerSlug) {
+        const seoPayload = await fetchSeoServiceCenterDetail(locale, citySlug, centerSlug);
+        shopData = seoPayload.service_center;
+        if (Platform.OS === 'web') {
+          applySeoPageMeta(seoPayload.meta, seoPayload.structured_data);
+        }
+      } else {
+        shopData = await getShopById(resolvedShopId, token || null);
+        if (Platform.OS === 'web' && resolvedShopId) {
+          try {
+            const resolved = await resolveShopSeoPath(resolvedShopId, 'en');
+            if (resolved?.canonical_path && typeof window !== 'undefined') {
+              window.history.replaceState(window.history.state, '', resolved.canonical_path);
+            }
+          } catch (resolveError) {
+            // Keep legacy URL when slugs are not configured yet.
+          }
+        }
+      }
+
       if (!token) {
-        const shopData = await getShopById(shopId, null);
         setShop(shopData);
         setIsOwner(false);
         setIsClientAccount(false);
@@ -204,8 +227,6 @@ export default function ShopDetailScreen({ route, navigation }) {
       setIsLoggedIn(true);
       setIsShopAccount(shopUser);
       setIsClientAccount(!shopUser);
-
-      const shopData = await getShopById(shopId, token);
       setShop(shopData);
 
       const uid = storedUserId ? parseInt(storedUserId, 10) : null;
@@ -228,7 +249,7 @@ export default function ShopDetailScreen({ route, navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [shopId]);
+  }, [resolvedShopId, locale, citySlug, centerSlug]);
 
   useEffect(() => {
     loadData();
@@ -511,6 +532,11 @@ export default function ShopDetailScreen({ route, navigation }) {
           <View style={styles.heroTitleRow}>
             <Text style={styles.heroTitle}>{serviceName}</Text>
             {shop.is_verified ? <StatusBadge status="verified" /> : null}
+            {!shop.is_verified && shop.verification_status_label ? (
+              <Chip compact icon="information-outline" style={styles.verificationChip}>
+                {shop.verification_status_label}
+              </Chip>
+            ) : null}
           </View>
           <Text style={styles.heroSubtitle}>{subtitleType}</Text>
           {shop.offers_guarantee ? (
@@ -843,6 +869,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  verificationChip: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   heroTitle: {
     fontSize: 22,

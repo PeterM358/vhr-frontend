@@ -11,6 +11,11 @@ import {
 } from '@react-navigation/native';
 import { linkingConfig } from './linkingConfig';
 import { syncWebDocumentTitle } from './webDocumentTitle';
+import { resolveShopSeoPath } from '../api/seo';
+import {
+  getNavigationStateFromSeoPath,
+  getSeoPathFromNavigationState,
+} from '../utils/seo/seoPaths';
 
 /** Strip leading slash and normalize legacy path segments before parsing. */
 export function normalizeWebLinkingPath(path) {
@@ -51,6 +56,15 @@ async function hasStoredAuthToken() {
   return !!(token && token !== 'null' && token !== 'undefined');
 }
 
+function parseShopIdFromSearch(search) {
+  if (!search) return null;
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const raw = params.get('shopId') || params.get('shop_id');
+  if (!raw) return null;
+  const id = parseInt(raw, 10);
+  return Number.isFinite(id) ? id : null;
+}
+
 /**
  * Replace legacy browser URLs in the address bar (bookmarks, old history).
  */
@@ -80,10 +94,24 @@ export async function redirectLegacyWebUrl() {
     if (!authed) {
       target = '/';
     }
+  } else if (pathname === '/ShopDetail' || pathname.startsWith('/ShopDetail/')) {
+    const shopId = parseShopIdFromSearch(search);
+    if (shopId) {
+      try {
+        const resolved = await resolveShopSeoPath(shopId, 'en');
+        if (resolved?.canonical_path) {
+          target = resolved.canonical_path;
+        }
+      } catch {
+        target = '/service-centers';
+      }
+    } else {
+      target = '/service-centers';
+    }
   }
 
   if (target && target !== pathname) {
-    window.history.replaceState(window.history.state, '', `${target}${search}${hash}`);
+    window.history.replaceState(window.history.state, '', `${target}${target.includes('?') ? '' : ''}${hash}`);
   }
 
   syncWebDocumentTitle(target || pathname);
@@ -103,12 +131,20 @@ export function buildAppLinking(prefixes) {
     ...base,
     getStateFromPath(path, options) {
       const normalized = normalizeWebLinkingPath(path);
+      const seoState = getNavigationStateFromSeoPath(normalized);
+      if (seoState) {
+        return seoState;
+      }
       return getStateFromPathDefault(normalized, {
         ...options,
         ...linkingConfig,
       });
     },
     getPathFromState(state, options) {
+      const seoPath = getSeoPathFromNavigationState(state);
+      if (seoPath) {
+        return seoPath.replace(/^\//, '');
+      }
       return getPathFromStateDefault(state, {
         ...options,
         ...linkingConfig,

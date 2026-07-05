@@ -14,6 +14,7 @@ import LoginErrorBoundary from '../components/auth/LoginErrorBoundary';
 import { resetToPublicHome } from './authNavigation';
 import RegisterScreen from '../screens/RegisterScreen';
 import PublicHomeScreen from '../screens/PublicHomeScreen';
+import PublicSeoPageScreen from '../screens/PublicSeoPageScreen';
 import ClientVehiclesScreen from '../screens/ClientVehiclesScreen';
 import ShopMapScreen from '../screens/ShopMapScreen';
 import VehicleDetailScreen from '../screens/VehicleDetailScreen';
@@ -281,6 +282,11 @@ export default function AppNavigator() {
           name="EditVehicleDetails"
           component={EditVehicleDetailsScreen}
           options={{ title: 'Technical details' }}
+        />
+        <Stack.Screen
+          name="PublicSeoPage"
+          component={PublicSeoPageScreen}
+          options={{ title: 'Veversal' }}
         />
         <Stack.Screen
           name="ShopDetail"
