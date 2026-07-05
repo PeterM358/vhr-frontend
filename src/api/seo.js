@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './config';
+import { buildServiceCenterPath } from '../utils/seo/seoPaths';
 
 function buildQuery(params = {}) {
   const qs = new URLSearchParams();
@@ -62,6 +63,59 @@ export function resolveShopSeoPath(shopId, locale = 'en') {
   return seoFetch(`/api/public/seo/service-centers/resolve/${shopId}/`, { locale });
 }
 
+export function buildFallbackShopPath(shopId) {
+  return `/service-center/${shopId}`;
+}
+
+export function buildShopPublicPathFromShop(shop, locale = 'en', shopId = null) {
+  const citySlug = shop?.city_slug || shop?.city_slug_en;
+  const centerSlug = shop?.public_slug || shop?.slug;
+  if (citySlug && centerSlug) {
+    return buildServiceCenterPath({ locale, citySlug, centerSlug });
+  }
+  if (shopId != null) {
+    return buildFallbackShopPath(shopId);
+  }
+  if (shop?.id != null) {
+    return buildFallbackShopPath(shop.id);
+  }
+  return null;
+}
+
 export function fetchSeoTaxonomy(locale = 'en') {
   return seoFetch('/api/public/seo/taxonomy/', { locale });
+}
+
+export async function loadShopDetailWithOptionalSeo({
+  shopId,
+  locale,
+  citySlug,
+  centerSlug,
+  token,
+  getShopById,
+}) {
+  if (locale && citySlug && centerSlug) {
+    try {
+      const seoPayload = await fetchSeoServiceCenterDetail(locale, citySlug, centerSlug);
+      return { shop: seoPayload.service_center, seoPayload };
+    } catch (err) {
+      if (shopId && getShopById) {
+        const shop = await getShopById(shopId, token || null);
+        return { shop, seoPayload: null, seoFallback: true };
+      }
+      throw err;
+    }
+  }
+
+  const shop = await getShopById(shopId, token || null);
+  return { shop, seoPayload: null };
+}
+
+export function syncShopDetailWebUrl(shop, shopId, locale = 'en') {
+  if (typeof window === 'undefined') {
+    return buildFallbackShopPath(shopId);
+  }
+  const path = buildShopPublicPathFromShop(shop, locale, shopId) || buildFallbackShopPath(shopId);
+  window.history.replaceState(window.history.state, '', path);
+  return path;
 }

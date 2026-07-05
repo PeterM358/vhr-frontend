@@ -25,13 +25,19 @@ export default function App() {
 
   useEffect(() => {
     let unsubscribeOnMessage = () => {};
-    import('firebase/messaging').then(({ getMessaging, onMessage }) => {
-      const messaging = getMessaging();
-      unsubscribeOnMessage = onMessage(messaging, payload => {
-        devLog('Foreground notification received', payload?.messageId || 'unknown');
-        Alert.alert(payload.notification?.title || '🔔 Notification', payload.notification?.body || '');
-      });
-    });
+    if (Platform.OS !== 'web') {
+      import('firebase/messaging')
+        .then(({ getMessaging, onMessage }) => {
+          const messaging = getMessaging();
+          unsubscribeOnMessage = onMessage(messaging, (payload) => {
+            devLog('Foreground notification received', payload?.messageId || 'unknown');
+            Alert.alert(payload.notification?.title || '🔔 Notification', payload.notification?.body || '');
+          });
+        })
+        .catch((err) => {
+          devLog('Firebase messaging unavailable', err?.message || err);
+        });
+    }
 
     const subscription = Linking.addEventListener('url', handleDeepLink);
 

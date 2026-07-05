@@ -17,8 +17,8 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { formatDayHoursWithLunch, parseLunchBreak } from '../utils/shopWorkingHours';
 import { getVehicles, updateVehicle } from '../api/vehicles';
 import { getShopById, deleteShopImage } from '../api/shops';
-import { fetchSeoServiceCenterDetail, resolveShopSeoPath } from '../api/seo';
 import { applySeoPageMeta } from '../utils/seo/seoMetadata';
+import { loadShopDetailWithOptionalSeo, syncShopDetailWebUrl } from '../api/seo';
 
 import { Text, Button, ActivityIndicator, useTheme, Chip, Divider } from 'react-native-paper';
 import ScreenBackground from '../components/ScreenBackground';
@@ -199,25 +199,24 @@ export default function ShopDetailScreen({ route, navigation }) {
       const storedIsShop = await AsyncStorage.getItem('@is_shop');
 
       let shopData;
-      if (locale && citySlug && centerSlug) {
-        const seoPayload = await fetchSeoServiceCenterDetail(locale, citySlug, centerSlug);
-        shopData = seoPayload.service_center;
-        if (Platform.OS === 'web') {
+      let seoPayload = null;
+      const detail = await loadShopDetailWithOptionalSeo({
+        shopId: resolvedShopId,
+        locale,
+        citySlug,
+        centerSlug,
+        token,
+        getShopById,
+      });
+      shopData = detail.shop;
+      seoPayload = detail.seoPayload;
+
+      if (Platform.OS === 'web') {
+        if (seoPayload?.meta) {
           applySeoPageMeta(seoPayload.meta, seoPayload.structured_data);
         }
-      } else {
-        shopData = await getShopById(resolvedShopId, token || null);
-        if (Platform.OS === 'web' && resolvedShopId) {
-          try {
-            const resolved = await resolveShopSeoPath(resolvedShopId, 'en');
-            if (resolved?.canonical_path && typeof window !== 'undefined') {
-              window.history.replaceState(window.history.state, '', resolved.canonical_path);
-            }
-          } catch {
-            if (typeof window !== 'undefined') {
-              window.history.replaceState(window.history.state, '', `/service-center/${resolvedShopId}`);
-            }
-          }
+        if (resolvedShopId) {
+          syncShopDetailWebUrl(shopData, resolvedShopId, locale || 'en');
         }
       }
 

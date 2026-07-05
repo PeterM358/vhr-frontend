@@ -76,6 +76,7 @@ import PasswordConfirmResetScreen from '../screens/PasswordConfirmResetScreen';
 import { buildAppLinking, redirectLegacyWebUrl } from './webLinking';
 import { linkingConfig } from './linkingConfig';
 import { syncWebDocumentTitle } from './webDocumentTitle';
+import { blurActiveElementOnWeb } from '../utils/webFocus';
 import NavigationFallback from './NavigationFallback';
 
 const Stack = createNativeStackNavigator();
@@ -196,6 +197,9 @@ export default function AppNavigator() {
   }, []);
 
   const handleNavigationStateChange = () => {
+    if (Platform.OS === 'web') {
+      blurActiveElementOnWeb();
+    }
     if (Platform.OS !== 'web' || !navigationRef.current) {
       return;
     }

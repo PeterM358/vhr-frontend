@@ -396,13 +396,16 @@ export default function ShopMapScreen() {
 
                     <Pressable
                       style={[styles.popupButton, styles.detailsButton]}
-                      onPress={() =>
+                      onPress={() => {
+                        if (typeof document !== 'undefined' && document.activeElement?.blur) {
+                          document.activeElement.blur();
+                        }
                         navigation.navigate('ShopDetail', {
                           shopId: shop.id,
                           returnTo: route.params?.returnTo,
                           vehicleId: route.params?.vehicleId,
-                        })
-                      }
+                        });
+                      }}
                     >
                       <Text style={styles.popupButtonText}>View Details</Text>
                     </Pressable>

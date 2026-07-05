@@ -11,7 +11,7 @@ import {
 } from '@react-navigation/native';
 import { linkingConfig } from './linkingConfig';
 import { syncWebDocumentTitle } from './webDocumentTitle';
-import { resolveShopSeoPath } from '../api/seo';
+import { buildFallbackShopPath } from '../api/seo';
 import {
   getNavigationStateFromSeoPath,
   getSeoPathFromNavigationState,
@@ -110,12 +110,7 @@ export async function redirectLegacyWebUrl() {
   } else if (pathname === '/ShopDetail' || pathname.startsWith('/ShopDetail/')) {
     const shopId = parseShopIdFromSearch(search);
     if (shopId) {
-      try {
-        const resolved = await resolveShopSeoPath(shopId, 'en');
-        target = resolved?.canonical_path || `/service-center/${shopId}`;
-      } catch {
-        target = `/service-center/${shopId}`;
-      }
+      target = buildFallbackShopPath(shopId);
     } else {
       target = '/service-centers';
     }

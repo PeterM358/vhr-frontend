@@ -14,6 +14,7 @@ import ScreenBackground from '../components/ScreenBackground';
 import { COLORS } from '../constants/colors';
 import { shouldEnableGoogleOAuth } from '../components/auth/googleOAuthConfig';
 import { safeError, safeWarn } from '../utils/logger';
+import LoginGoogleOAuthBridge from '../components/auth/LoginGoogleOAuthBridge';
 
 export default function LoginScreen({ navigation, route }) {
   const theme = useTheme();
@@ -30,31 +31,10 @@ export default function LoginScreen({ navigation, route }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
-  const [GoogleOAuthBridge, setGoogleOAuthBridge] = useState(null);
+  const googleOAuthEnabled = shouldEnableGoogleOAuth();
 
   // route is optional on web deep links — never assume params exist
   void route;
-
-  useEffect(() => {
-    if (!shouldEnableGoogleOAuth()) {
-      return undefined;
-    }
-
-    let cancelled = false;
-    import('../components/auth/LoginGoogleOAuthBridge')
-      .then((mod) => {
-        if (!cancelled) {
-          setGoogleOAuthBridge(() => mod.default);
-        }
-      })
-      .catch((err) => {
-        safeWarn('Google OAuth module unavailable', err);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     const loadLastLogin = async () => {
@@ -182,7 +162,6 @@ export default function LoginScreen({ navigation, route }) {
   };
 
   const goToRegister = () => navigation.navigate('Register');
-  const googleOAuthEnabled = shouldEnableGoogleOAuth();
 
   if (!ready) {
     return (
@@ -196,7 +175,9 @@ export default function LoginScreen({ navigation, route }) {
 
   return (
     <ScreenBackground safeArea={false}>
-      {GoogleOAuthBridge ? <GoogleOAuthBridge onOAuthResponse={handleGoogleOAuthResponse} /> : null}
+      {googleOAuthEnabled ? (
+        <LoginGoogleOAuthBridge onOAuthResponse={handleGoogleOAuthResponse} />
+      ) : null}
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
