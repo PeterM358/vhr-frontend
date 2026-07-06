@@ -6,6 +6,7 @@
 import { Platform } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
 import { syncWebDocumentTitle } from './webDocumentTitle';
+import { normalizeVehicleWebPath } from './webRoutes';
 
 function getRootNavigation(navigation) {
   let current = navigation;
@@ -27,11 +28,13 @@ export function syncWebPath(pathname) {
   if (Platform.OS !== 'web' || typeof window === 'undefined') {
     return;
   }
-  const { search, hash } = window.location;
-  if (window.location.pathname !== pathname) {
-    window.history.replaceState(window.history.state, '', `${pathname}${search}${hash}`);
+  const normalized = normalizeVehicleWebPath(pathname);
+  const { hash } = window.location;
+  const target = `${normalized}${hash}`;
+  if (`${window.location.pathname}${window.location.search}` !== normalized) {
+    window.history.replaceState(window.history.state, '', target);
   }
-  syncWebDocumentTitle(pathname);
+  syncWebDocumentTitle(normalized.split('?')[0]);
 }
 
 export const PARTNER_DASHBOARD_PATH = '/partner/dashboard';

@@ -16,7 +16,7 @@ import {
   getNavigationStateFromSeoPath,
   getSeoPathFromNavigationState,
 } from '../utils/seo/seoPaths';
-import { parseServiceRecordQuery } from './webRoutes';
+import { normalizeVehicleWebPath, parseServiceRecordQuery } from './webRoutes';
 
 function findFocusedRoute(state) {
   if (!state?.routes?.length) return null;
@@ -122,11 +122,7 @@ export function getVehicleNavigationStateFromPath(path) {
 /** Collapse duplicated my-vehicles segments produced by stacked sibling routes. */
 export function collapseDuplicateVehiclePath(path) {
   if (!path) return path;
-  const normalized = String(path).replace(/^\//, '');
-  if (normalized.includes('my-vehicles/my-vehicles')) {
-    return normalized.replace(/my-vehicles\/my-vehicles/g, 'my-vehicles');
-  }
-  return normalized;
+  return normalizeVehicleWebPath(`/${String(path).replace(/^\//, '')}`).replace(/^\//, '');
 }
 
 /** Strip leading slash and normalize legacy path segments before parsing. */
@@ -216,7 +212,10 @@ export async function redirectLegacyWebUrl() {
   const { pathname, search, hash } = window.location;
   let target = null;
 
-  if (pathname === '/PublicHome' || pathname.startsWith('/PublicHome/')) {
+  const canonicalVehiclePath = normalizeVehicleWebPath(`${pathname}${search}`);
+  if (canonicalVehiclePath !== `${pathname}${search}`) {
+    target = canonicalVehiclePath;
+  } else if (pathname === '/PublicHome' || pathname.startsWith('/PublicHome/')) {
     target = '/';
   } else if (pathname === '/ShopMap' || pathname.startsWith('/ShopMap/')) {
     target = pathname.replace(/^\/ShopMap/, '/service-centers');

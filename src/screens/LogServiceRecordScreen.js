@@ -5,7 +5,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { StyleSheet, View, Alert, Pressable } from 'react-native';
+import { StyleSheet, View, Alert, Pressable, Platform } from 'react-native';
 import ScreenBackground from '../components/ScreenBackground';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
@@ -85,6 +85,7 @@ import {
   hasOdometerPhotoAttachment,
   parseOdometerKm,
 } from '../utils/finalizeMileageValidation';
+import { navigateToVehicleDetail } from '../navigation/webNavigation';
 
 async function applyPostCreateReminderPatches({
   token,
@@ -952,6 +953,10 @@ export default function LogServiceRecordScreen({ navigation, route }) {
         Number.isFinite(parseInt(selectedShopProfileId, 10));
       const returnToVehicleHistory = () => {
         AsyncStorage.removeItem(STORAGE_KEYS.logServiceRecordDraftKey(String(vid))).catch(() => {});
+        if (Platform.OS === 'web') {
+          navigateToVehicleDetail(navigation, vid, { scrollToServiceHistory: true });
+          return;
+        }
         navigation.navigate({
           name: 'VehicleDetail',
           params: {

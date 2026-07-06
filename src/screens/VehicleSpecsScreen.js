@@ -19,6 +19,10 @@ import {
 import MileageEvidenceCard from '../components/vehicle/MileageEvidenceCard';
 import MileageConfidenceSheet from '../components/vehicle/MileageConfidenceSheet';
 import { mileageConfidenceCategoryPill, resolveMileageFactorAction } from '../utils/mileageConfidence';
+import {
+  navigateToVehicleDetail,
+  navigateToVehicleServiceRecordNew,
+} from '../navigation/webNavigation';
 
 function isoToDisplayDate(isoDate) {
   const raw = String(isoDate || '').trim();
@@ -72,8 +76,7 @@ export default function VehicleSpecsScreen({ navigation, route }) {
         return;
       }
       if (action === 'log_service' || action === 'log_service_receipt' || action === 'log_service_odometer') {
-        navigation.navigate('LogServiceRecord', {
-          vehicleId,
+        navigateToVehicleServiceRecordNew(navigation, vehicleId, {
           returnTo: 'VehicleSpecs',
           origin: 'VehicleSpecs',
         });
@@ -95,8 +98,7 @@ export default function VehicleSpecsScreen({ navigation, route }) {
       if (action === 'vehicle_specs') {
         return;
       }
-      navigation.navigate('VehicleDetail', {
-        vehicleId,
+      navigateToVehicleDetail(navigation, vehicleId, {
         mileageIntent: { action, repairId: intent.repairId },
       });
     },

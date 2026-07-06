@@ -1,48 +1,88 @@
 /**
- * Web-only navigation helpers that pair screen navigation with canonical paths.
- * Native callers should keep using navigation.navigate(screenName, params) directly.
+ * Web navigation helpers: reset stack to avoid duplicated URL segments on web.
+ * Native callers keep using navigation.navigate(screenName, params) directly.
  */
 
 import { Platform } from 'react-native';
-import {
-  dashboard,
-  vehicleAdd,
-  vehicleDetail,
-  vehicleList,
-  vehicleServiceRecordNew,
-  vehicleSpecs,
-} from './webRoutes';
-import { syncWebPath } from './authNavigation';
+import { CommonActions } from '@react-navigation/native';
 
-function maybeSyncWebPath(path) {
-  if (Platform.OS === 'web' && path) {
-    syncWebPath(path);
+const HOME_ROUTE = { name: 'Home' };
+
+function getRootNavigation(navigation) {
+  let current = navigation;
+  while (current.getParent?.()) {
+    current = current.getParent();
   }
+  return current;
+}
+
+/** Replace root stack on web so linking never concatenates sibling my-vehicles paths. */
+function resetWebRoutes(navigation, tailRoutes) {
+  const root = getRootNavigation(navigation);
+  root.dispatch(
+    CommonActions.reset({
+      index: tailRoutes.length,
+      routes: [HOME_ROUTE, ...tailRoutes],
+    })
+  );
 }
 
 export function navigateToDashboard(navigation) {
+  const root = getRootNavigation(navigation);
+  if (Platform.OS === 'web') {
+    root.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [
+          {
+            name: 'Home',
+            state: { routes: [{ name: 'HomeMain' }], index: 0 },
+          },
+        ],
+      })
+    );
+    return;
+  }
   navigation.navigate('Home');
-  maybeSyncWebPath(dashboard());
 }
 
 export function navigateToVehicleList(navigation) {
+  if (Platform.OS === 'web') {
+    resetWebRoutes(navigation, [{ name: 'ClientVehicles' }]);
+    return;
+  }
   navigation.navigate('ClientVehicles');
-  maybeSyncWebPath(vehicleList());
 }
 
 export function navigateToVehicleAdd(navigation) {
+  if (Platform.OS === 'web') {
+    resetWebRoutes(navigation, [{ name: 'CreateVehicle' }]);
+    return;
+  }
   navigation.navigate('CreateVehicle');
-  maybeSyncWebPath(vehicleAdd());
 }
 
 export function navigateToVehicleDetail(navigation, vehicleId, params = {}) {
+  if (Platform.OS === 'web') {
+    resetWebRoutes(navigation, [
+      { name: 'ClientVehicles' },
+      { name: 'VehicleDetail', params: { vehicleId, ...params } },
+    ]);
+    return;
+  }
   navigation.navigate('VehicleDetail', { vehicleId, ...params });
-  maybeSyncWebPath(vehicleDetail(vehicleId));
 }
 
 export function navigateToVehicleSpecs(navigation, vehicleId, params = {}) {
+  if (Platform.OS === 'web') {
+    resetWebRoutes(navigation, [
+      { name: 'ClientVehicles' },
+      { name: 'VehicleDetail', params: { vehicleId } },
+      { name: 'VehicleSpecs', params: { vehicleId, ...params } },
+    ]);
+    return;
+  }
   navigation.navigate('VehicleSpecs', { vehicleId, ...params });
-  maybeSyncWebPath(vehicleSpecs(vehicleId));
 }
 
 export function navigateToVehicleServiceRecordNew(navigation, vehicleId, params = {}) {
@@ -53,10 +93,14 @@ export function navigateToVehicleServiceRecordNew(navigation, vehicleId, params 
   };
   if (type != null) routeParams.type = type;
   if (prefillKm != null) routeParams.prefillKm = prefillKm;
+
+  if (Platform.OS === 'web') {
+    resetWebRoutes(navigation, [
+      { name: 'ClientVehicles' },
+      { name: 'VehicleDetail', params: { vehicleId } },
+      { name: 'LogServiceRecord', params: routeParams },
+    ]);
+    return;
+  }
   navigation.navigate('LogServiceRecord', routeParams);
-  maybeSyncWebPath(
-    vehicleServiceRecordNew(vehicleId, {
-      ...(type != null ? { type } : {}),
-    })
-  );
 }
