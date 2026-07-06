@@ -2,7 +2,7 @@
 /**
  * Shared Google Maps-style discovery UI (list + map) for public and partner explore.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { COLORS } from '../styles/colors';
 import BASE_STYLES from '../styles/base';
@@ -30,6 +31,9 @@ import BackHeaderButton from '../components/navigation/BackHeaderButton';
 import ScreenBackground from '../components/ScreenBackground';
 import ServiceCenterListCard from '../components/serviceCenters/ServiceCenterListCard';
 import PartnerMarketComparisonCard from '../components/partner/PartnerMarketComparisonCard';
+import { DiscoveryFilterChip } from '../components/serviceCenters/DiscoveryFilterChip';
+import DiscoveryExpandedFiltersPanel from '../components/serviceCenters/DiscoveryExpandedFiltersPanel';
+import DiscoveryFiltersBottomSheet from '../components/serviceCenters/DiscoveryFiltersBottomSheet.web';
 import { DISCOVERY_QUICK_VEHICLE_CHIPS } from '../api/serviceCenters';
 import { spreadShopMarkersForMap } from '../utils/mapMarkerSpread';
 import { getWebGeolocation } from '../utils/webGeolocation';
@@ -37,8 +41,6 @@ import { ensureLeafletCss } from '../utils/leafletAssets.web';
 import {
   useServiceCenterDiscovery,
   SORT_OPTIONS,
-  RATING_FILTER_OPTIONS,
-  DISTANCE_FILTER_OPTIONS,
 } from '../hooks/useServiceCenterDiscovery';
 import { applyDiscoverySeoMeta } from '../utils/seo/seoMetadata';
 import {
@@ -52,7 +54,6 @@ import {
 } from '../utils/serviceRecordDraftStorage';
 
 const DEFAULT_MAP_CENTER = [42.6977, 23.3219];
-
 function configureLeafletIcons() {
   delete L.Icon.Default.prototype._getIconUrl;
   L.Icon.Default.mergeOptions({
@@ -78,13 +79,15 @@ function FocusMarker({ position }) {
   return null;
 }
 
-function FilterSection({ title, children }) {
+function AnimatedExpandedFilters({ visible, children }) {
   return (
-    <View style={styles.filterSection}>
-      <Text style={styles.filterSectionTitle}>{title}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-        {children}
-      </ScrollView>
+    <View
+      style={[
+        styles.expandedFiltersWrap,
+        visible ? styles.expandedFiltersOpen : styles.expandedFiltersClosed,
+      ]}
+    >
+      {children}
     </View>
   );
 }
@@ -115,7 +118,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   const [geoHint, setGeoHint] = useState('');
   const [mobileTab, setMobileTab] = useState('list');
   const [selectedListId, setSelectedListId] = useState(null);
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const cardRefs = useRef({});
   const zoom = 12;
 
@@ -156,6 +159,26 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     loadFilterTaxonomy,
   } = discovery;
 
+  const closeFilters = useCallback(() => setFiltersOpen(false), []);
+
+  const openFilters = useCallback(() => {
+    setFiltersOpen(true);
+    loadFilterTaxonomy().catch(() => {});
+  }, [loadFilterTaxonomy]);
+
+  const toggleFilters = useCallback(() => {
+    if (filtersOpen) {
+      closeFilters();
+    } else {
+      openFilters();
+    }
+  }, [filtersOpen, closeFilters, openFilters]);
+
+  const handleSearch = useCallback(async () => {
+    await runSearch();
+    closeFilters();
+  }, [runSearch, closeFilters]);
+
   useEffect(() => {
     let alive = true;
     ensureLeafletCss()
@@ -168,12 +191,6 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
       alive = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (filtersExpanded) {
-      loadFilterTaxonomy().catch(() => {});
-    }
-  }, [filtersExpanded, loadFilterTaxonomy]);
 
   useEffect(() => {
     if (matchedCity?.latitude != null && matchedCity?.longitude != null) {
@@ -196,6 +213,17 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
       node.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [selectedListId]);
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape' && filtersOpen) {
+        e.preventDefault();
+        closeFilters();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [filtersOpen, closeFilters]);
 
   const mapShops = useMemo(
     () =>
@@ -291,7 +319,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     if (Number.isFinite(lat) && Number.isFinite(lon)) setCenter([lat, lon]);
   };
 
-  const activeFilterCount = [
+  const activeAdvancedFilterCount = [
     selectedCategory,
     selectedRepairType,
     selectedBrand,
@@ -299,143 +327,116 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     radiusKm,
   ].filter(Boolean).length;
 
+  const filtersLabel = useMemo(() => {
+    if (filtersOpen && isDesktop) return 'Filters (expanded)';
+    if (activeAdvancedFilterCount) return `Filters (${activeAdvancedFilterCount})`;
+    return 'Filters';
+  }, [filtersOpen, isDesktop, activeAdvancedFilterCount]);
+
+  const expandedFilterProps = {
+    selectedVehicleType,
+    setSelectedVehicleType,
+    selectedCategory,
+    setSelectedCategory,
+    selectedRepairType,
+    setSelectedRepairType,
+    selectedBrand,
+    setSelectedBrand,
+    minRating,
+    setMinRating,
+    radiusKm,
+    setRadiusKm,
+    categoryOptions,
+    repairTypeChipOptions,
+    brands,
+  };
+
   const cityLabel = matchedCity?.name || 'Sofia';
 
-  const filterChrome = (
-    <View style={styles.filterChrome}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-        {DISCOVERY_QUICK_VEHICLE_CHIPS.map((vt) => {
-          const on = selectedVehicleType === vt.code;
-          return (
-            <Pressable
-              key={vt.code}
-              onPress={() => setSelectedVehicleType(on ? null : vt.code)}
-              style={[styles.chip, on && styles.chipSelected]}
-            >
-              <Text style={[styles.chipText, on && styles.chipTextSelected]}>{vt.label}</Text>
-            </Pressable>
-          );
-        })}
+  const quickChipsRow = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.filterRow}
+      contentContainerStyle={styles.filterRowContent}
+    >
+      <DiscoveryFilterChip
+        label={filtersLabel}
+        icon="tune-variant"
+        variant="filters"
+        onPress={toggleFilters}
+      />
+      {DISCOVERY_QUICK_VEHICLE_CHIPS.map((vt) => {
+        const on = selectedVehicleType === vt.code;
+        return (
+          <DiscoveryFilterChip
+            key={vt.code}
+            label={vt.label}
+            selected={on}
+            onPress={() => setSelectedVehicleType(on ? null : vt.code)}
+          />
+        );
+      })}
+      <DiscoveryFilterChip
+        label="Open now"
+        selected={openNowOnly}
+        onPress={() => setOpenNowOnly((v) => !v)}
+      />
+      <DiscoveryFilterChip
+        label="Verified"
+        selected={verifiedOnly}
+        onPress={() => setVerifiedOnly((v) => !v)}
+      />
+    </ScrollView>
+  );
+
+  const stickyToolbar = (
+    <View style={styles.stickyToolbar}>
+      <View style={styles.header}>
+        <BackHeaderButton
+          onPress={() =>
+            partnerMode ? navigateToPartnerDashboard(navigation) : goBackFromServiceCenters(navigation)
+          }
+          label="Back"
+          variant="glass"
+          iconOnly={false}
+        />
+        <Text style={styles.title}>{partnerMode ? 'Explore Service Centers' : 'Find Service Centers'}</Text>
+      </View>
+
+      <View style={styles.searchRow}>
+        <TextInput
+          placeholder="Search centers, city, service, brand..."
+          value={addressQuery}
+          onChangeText={setAddressQuery}
+          onSubmitEditing={() => handleSearch().catch(() => {})}
+          style={styles.searchInput}
+          returnKeyType="search"
+        />
         <Pressable
-          onPress={() => setOpenNowOnly((v) => !v)}
-          style={[styles.chip, openNowOnly && styles.chipSelected]}
+          style={[styles.locatePill, locating && styles.locatePillDisabled]}
+          onPress={handleLocateMe}
+          disabled={locating}
         >
-          <Text style={[styles.chipText, openNowOnly && styles.chipTextSelected]}>Open now</Text>
+          <Text style={styles.locatePillText}>{locating ? '…' : 'Locate me'}</Text>
         </Pressable>
-        <Pressable
-          onPress={() => setVerifiedOnly((v) => !v)}
-          style={[styles.chip, verifiedOnly && styles.chipSelected]}
-        >
-          <Text style={[styles.chipText, verifiedOnly && styles.chipTextSelected]}>Verified</Text>
+        <Pressable style={styles.searchButton} onPress={() => handleSearch().catch(() => {})}>
+          <Text style={styles.searchButtonText}>Search</Text>
         </Pressable>
-        <Pressable
-          onPress={() => setFiltersExpanded((v) => !v)}
-          style={[styles.chip, styles.filtersToggle, filtersExpanded && styles.chipSelected]}
-        >
-          <Text style={[styles.chipText, filtersExpanded && styles.chipTextSelected]}>
-            Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}
-          </Text>
-        </Pressable>
-      </ScrollView>
+      </View>
 
-      {filtersExpanded ? (
-        <View style={styles.expandedFilters}>
-          <FilterSection title="Vehicle type">
-            <Pressable
-              onPress={() => setSelectedVehicleType(null)}
-              style={[styles.chip, selectedVehicleType === null && styles.chipSelected]}
-            >
-              <Text style={styles.chipText}>Any</Text>
+      <View style={styles.filterChrome}>{quickChipsRow}</View>
+
+      {isDesktop ? (
+        <AnimatedExpandedFilters visible={filtersOpen}>
+          <View style={styles.expandedFilters}>
+            <Pressable onPress={closeFilters} style={styles.hideFiltersRow}>
+              <MaterialCommunityIcons name="chevron-up" size={18} color={COLORS.primary} />
+              <Text style={styles.hideFiltersText}>Hide filters</Text>
             </Pressable>
-            {DISCOVERY_QUICK_VEHICLE_CHIPS.map((vt) => (
-              <Pressable
-                key={`all-${vt.code}`}
-                onPress={() => setSelectedVehicleType(selectedVehicleType === vt.code ? null : vt.code)}
-                style={[styles.chip, selectedVehicleType === vt.code && styles.chipSelected]}
-              >
-                <Text style={styles.chipText}>{vt.label}</Text>
-              </Pressable>
-            ))}
-          </FilterSection>
-
-          <FilterSection title="Service category">
-            <Pressable
-              onPress={() => setSelectedCategory(null)}
-              style={[styles.chip, selectedCategory === null && styles.chipSelected]}
-            >
-              <Text style={styles.chipText}>Any</Text>
-            </Pressable>
-            {categoryOptions.map((c) => (
-              <Pressable
-                key={c.slug}
-                onPress={() => setSelectedCategory(selectedCategory === c.slug ? null : c.slug)}
-                style={[styles.chip, selectedCategory === c.slug && styles.chipSelected]}
-              >
-                <Text style={styles.chipText}>{c.name}</Text>
-              </Pressable>
-            ))}
-          </FilterSection>
-
-          <FilterSection title="Service">
-            <Pressable
-              onPress={() => setSelectedRepairType('')}
-              style={[styles.chip, !selectedRepairType && styles.chipSelected]}
-            >
-              <Text style={styles.chipText}>Any</Text>
-            </Pressable>
-            {repairTypeChipOptions.map((rt) => (
-              <Pressable
-                key={rt.id}
-                onPress={() => setSelectedRepairType(selectedRepairType === rt.slug ? '' : rt.slug)}
-                style={[styles.chip, selectedRepairType === rt.slug && styles.chipSelected]}
-              >
-                <Text style={styles.chipText}>{rt.name}</Text>
-              </Pressable>
-            ))}
-          </FilterSection>
-
-          <FilterSection title="Brand">
-            <Pressable
-              onPress={() => setSelectedBrand(null)}
-              style={[styles.chip, !selectedBrand && styles.chipSelected]}
-            >
-              <Text style={styles.chipText}>Any</Text>
-            </Pressable>
-            {brands.slice(0, 40).map((brand) => (
-              <Pressable
-                key={brand.id}
-                onPress={() => setSelectedBrand(selectedBrand === String(brand.id) ? null : String(brand.id))}
-                style={[styles.chip, selectedBrand === String(brand.id) && styles.chipSelected]}
-              >
-                <Text style={styles.chipText}>{brand.name}</Text>
-              </Pressable>
-            ))}
-          </FilterSection>
-
-          <FilterSection title="Rating">
-            {RATING_FILTER_OPTIONS.map((opt) => (
-              <Pressable
-                key={opt.label}
-                onPress={() => setMinRating(opt.value)}
-                style={[styles.chip, minRating === opt.value && styles.chipSelected]}
-              >
-                <Text style={styles.chipText}>{opt.label}</Text>
-              </Pressable>
-            ))}
-          </FilterSection>
-
-          <FilterSection title="Distance">
-            {DISTANCE_FILTER_OPTIONS.map((opt) => (
-              <Pressable
-                key={opt.label}
-                onPress={() => setRadiusKm(opt.value)}
-                style={[styles.chip, radiusKm === opt.value && styles.chipSelected]}
-              >
-                <Text style={styles.chipText}>{opt.label}</Text>
-              </Pressable>
-            ))}
-          </FilterSection>
-        </View>
+            <DiscoveryExpandedFiltersPanel {...expandedFilterProps} />
+          </View>
+        </AnimatedExpandedFilters>
       ) : null}
     </View>
   );
@@ -600,40 +601,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   return (
     <ScreenBackground safeArea={false} contentMaxWidth={false}>
       <View style={styles.container}>
-        <View style={styles.header}>
-          <BackHeaderButton
-            onPress={() =>
-              partnerMode ? navigateToPartnerDashboard(navigation) : goBackFromServiceCenters(navigation)
-            }
-            label="Back"
-            variant="glass"
-            iconOnly={false}
-          />
-          <Text style={styles.title}>{partnerMode ? 'Explore Service Centers' : 'Find Service Centers'}</Text>
-        </View>
-
-        <View style={styles.searchRow}>
-          <TextInput
-            placeholder="Search centers, city, service, brand..."
-            value={addressQuery}
-            onChangeText={setAddressQuery}
-            onSubmitEditing={() => runSearch().catch(() => {})}
-            style={styles.searchInput}
-            returnKeyType="search"
-          />
-          <Pressable
-            style={[styles.locatePill, locating && styles.locatePillDisabled]}
-            onPress={handleLocateMe}
-            disabled={locating}
-          >
-            <Text style={styles.locatePillText}>{locating ? '…' : 'Locate me'}</Text>
-          </Pressable>
-          <Pressable style={styles.searchButton} onPress={() => runSearch().catch(() => {})}>
-            <Text style={styles.searchButtonText}>Search</Text>
-          </Pressable>
-        </View>
-
-        {filterChrome}
+        {stickyToolbar}
         {geoHint ? <Text style={styles.geoHint}>{geoHint}</Text> : null}
         {userLocatedExplicitly ? (
           <Text style={styles.locationHint}>Distances shown from your current location.</Text>
@@ -661,16 +629,39 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
         <View style={[styles.body, isDesktop && styles.bodyDesktop]}>
           {(!isDesktop && mobileTab === 'list') || isDesktop ? listPanel : null}
           {(!isDesktop && mobileTab === 'map') || isDesktop ? (
-            <View style={styles.mapWrap}>{mapPanel}</View>
+            <View style={styles.mapWrap}>
+              {mapPanel}
+              {filtersOpen ? <View style={styles.mapDimOverlay} pointerEvents="none" /> : null}
+            </View>
           ) : null}
         </View>
       </View>
+
+      {!isDesktop ? (
+        <DiscoveryFiltersBottomSheet
+          visible={filtersOpen}
+          onClose={closeFilters}
+          onApply={() => handleSearch().catch(() => {})}
+          activeFilterCount={activeAdvancedFilterCount}
+          filterProps={expandedFilterProps}
+        />
+      ) : null}
     </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  stickyToolbar: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 40,
+    backgroundColor: 'rgba(255,255,255,0.97)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e2e8f0',
+    paddingBottom: 4,
+    backdropFilter: 'blur(8px)',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -705,36 +696,46 @@ const styles = StyleSheet.create({
   },
   searchButtonText: { color: '#fff', fontWeight: '700' },
   filterChrome: { paddingHorizontal: 16, paddingTop: 8 },
-  filterRow: { maxHeight: 42, marginBottom: 4 },
+  filterRow: { maxHeight: 46 },
+  filterRowContent: {
+    alignItems: 'center',
+    paddingRight: 8,
+  },
+  expandedFiltersWrap: {
+    overflow: 'hidden',
+    transitionProperty: 'max-height, opacity',
+    transitionDuration: '200ms',
+    transitionTimingFunction: 'ease',
+  },
+  expandedFiltersOpen: {
+    maxHeight: 720,
+    opacity: 1,
+  },
+  expandedFiltersClosed: {
+    maxHeight: 0,
+    opacity: 0,
+  },
   expandedFilters: {
+    marginHorizontal: 16,
     marginTop: 4,
-    paddingTop: 8,
+    paddingTop: 10,
+    paddingBottom: 4,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#e2e8f0',
   },
-  filterSection: { marginBottom: 8 },
-  filterSectionTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 16,
-    backgroundColor: '#f8fafc',
-    marginRight: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.12)',
+  hideFiltersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
     cursor: 'pointer',
   },
-  chipSelected: { backgroundColor: '#e2edff', borderColor: COLORS.primary },
-  chipText: { fontSize: 13, color: '#0f172a', fontWeight: '500' },
-  chipTextSelected: { color: COLORS.primary, fontWeight: '700' },
-  filtersToggle: { backgroundColor: '#fff' },
+  hideFiltersText: {
+    color: COLORS.primary,
+    fontWeight: '700',
+    fontSize: 13,
+  },
   geoHint: { marginHorizontal: 16, marginTop: 4, color: '#b45309', fontSize: 12 },
   locationHint: {
     marginHorizontal: 16,
@@ -768,8 +769,13 @@ const styles = StyleSheet.create({
   sortChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   sortChipText: { fontSize: 12, fontWeight: '600', color: '#334155' },
   sortChipTextActive: { color: '#fff' },
-  mapWrap: { flex: 2, minHeight: 320 },
+  mapWrap: { flex: 2, minHeight: 320, position: 'relative' },
   map: { flex: 1, height: '100%', width: '100%' },
+  mapDimOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.08)',
+    zIndex: 500,
+  },
   mapLoading: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' },
   mobileTabs: {
     flexDirection: 'row',

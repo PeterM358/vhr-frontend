@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Chip, Text } from 'react-native-paper';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { formatDistanceAway, distanceKmFromUser } from '../../utils/distance';
 import { isShopOpenNow } from '../../utils/shopOpenNow';
@@ -13,6 +14,30 @@ function summarizeList(items, maxVisible = 3) {
   const visible = list.slice(0, maxVisible).join(', ');
   const moreCount = Math.max(0, list.length - maxVisible);
   return { visible, moreCount };
+}
+
+function CardActionButton({ label, icon, onPress, primary = false }) {
+  return (
+    <Pressable
+      onPress={(e) => {
+        e?.stopPropagation?.();
+        onPress?.();
+      }}
+      style={({ pressed }) => [
+        styles.actionBtn,
+        primary ? styles.actionBtnPrimary : styles.actionBtnSecondary,
+        pressed && styles.actionBtnPressed,
+      ]}
+    >
+      <MaterialCommunityIcons
+        name={icon}
+        size={15}
+        color={primary ? '#fff' : COLORS.primary}
+        style={styles.actionBtnIcon}
+      />
+      <Text style={[styles.actionBtnText, primary && styles.actionBtnTextPrimary]}>{label}</Text>
+    </Pressable>
+  );
 }
 
 export default function ServiceCenterListCard({
@@ -109,18 +134,17 @@ export default function ServiceCenterListCard({
       </View>
 
       <View style={styles.actions}>
-        <Pressable onPress={onViewProfile} style={styles.actionButton}>
-          <Text style={styles.actionLink}>View profile</Text>
-        </Pressable>
+        <CardActionButton label="View profile" icon="store-outline" onPress={onViewProfile} />
         {onDirections ? (
-          <Pressable onPress={onDirections} style={styles.actionButton}>
-            <Text style={styles.actionLink}>Directions</Text>
-          </Pressable>
+          <CardActionButton label="Directions" icon="directions" onPress={onDirections} />
         ) : null}
         {onRequestService ? (
-          <Pressable onPress={onRequestService} style={styles.actionButton}>
-            <Text style={styles.actionLink}>Request service</Text>
-          </Pressable>
+          <CardActionButton
+            label="Request service"
+            icon="wrench-outline"
+            onPress={onRequestService}
+            primary
+          />
         ) : null}
       </View>
     </Pressable>
@@ -130,30 +154,32 @@ export default function ServiceCenterListCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(15,23,42,0.1)',
     shadowColor: '#0f172a',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     cursor: 'pointer',
   },
   cardSelected: {
     borderColor: COLORS.primary,
-    backgroundColor: 'rgba(226,237,255,0.42)',
-    shadowOpacity: 0.12,
+    borderWidth: 1.5,
+    backgroundColor: 'rgba(226,237,255,0.5)',
+    shadowOpacity: 0.14,
   },
   cardPressed: {
-    opacity: 0.96,
+    opacity: 0.97,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 10,
+    marginBottom: 2,
   },
   name: {
     flex: 1,
@@ -162,17 +188,17 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   muted: {
-    marginTop: 4,
+    marginTop: 6,
     color: '#64748b',
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 19,
   },
   metaRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: 8,
-    marginTop: 8,
+    marginTop: 10,
   },
   meta: {
     fontSize: 12,
@@ -189,16 +215,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   tags: {
-    marginTop: 6,
+    marginTop: 8,
     fontSize: 12,
     color: '#475569',
-    lineHeight: 17,
+    lineHeight: 18,
   },
   badgeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginTop: 10,
+    marginTop: 12,
   },
   openChip: {
     height: 24,
@@ -230,19 +256,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: 12,
-    paddingTop: 10,
+    marginTop: 14,
+    paddingTop: 14,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#e2e8f0',
   },
-  actionButton: {
-    paddingVertical: 2,
-    paddingHorizontal: 2,
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
     cursor: 'pointer',
   },
-  actionLink: {
+  actionBtnSecondary: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  actionBtnPrimary: {
+    backgroundColor: COLORS.primary,
+    borderWidth: 1,
+    borderColor: COLORS.primaryDark,
+  },
+  actionBtnPressed: {
+    opacity: 0.88,
+  },
+  actionBtnIcon: {
+    marginRight: 5,
+  },
+  actionBtnText: {
     color: COLORS.primary,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 12,
+  },
+  actionBtnTextPrimary: {
+    color: '#fff',
   },
 });
