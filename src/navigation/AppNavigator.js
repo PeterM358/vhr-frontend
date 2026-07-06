@@ -488,10 +488,20 @@ export default function AppNavigator() {
           })}
         />
         <Stack.Screen
+          name="PartnerBookings"
+          component={ClientDashboardPlaceholderScreen}
+          options={({ navigation }) => ({
+            ...transparentStackHeader,
+            title: 'Bookings',
+            headerLeft: shopHomeHeaderLeft(navigation),
+            headerBackVisible: false,
+          })}
+        />
+        <Stack.Screen
           name="AuthorizedClients"
           component={AuthorizedClients}
           options={({ navigation }) => ({
-            title: 'Authorized Clients',
+            title: 'Clients',
             headerLeft: shopHomeHeaderLeft(navigation),
             headerBackVisible: false,
           })}
@@ -505,7 +515,15 @@ export default function AppNavigator() {
             headerBackVisible: false,
           })}
         />
-        <Stack.Screen name="RepairsList" component={RepairsList} options={{ title: 'Repairs' }}/>
+        <Stack.Screen
+          name="RepairsList"
+          component={RepairsList}
+          options={({ navigation }) => ({
+            title: 'Repairs',
+            headerLeft: shopHomeHeaderLeft(navigation),
+            headerBackVisible: false,
+          })}
+        />
         <Stack.Screen
           name="NotificationsList"
           component={NotificationsList}

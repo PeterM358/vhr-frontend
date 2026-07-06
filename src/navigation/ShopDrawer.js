@@ -3,7 +3,7 @@
  */
 
 import React, { useContext, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Text } from 'react-native-paper';
@@ -21,6 +21,17 @@ import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import { logout } from '../api/auth';
 import { resetFromShopDrawer, resetShopDrawerRepairs } from './drawerNavigation';
+import {
+  navigateToPartnerCalendar,
+  navigateToPartnerClients,
+  navigateToPartnerInvoicing,
+  navigateToPartnerNotifications,
+  navigateToPartnerProfile,
+  navigateToPartnerPromotions,
+  navigateToPartnerServices,
+  navigateToPartnerSwitchCenter,
+  navigateToPartnerWarehouse,
+} from './webNavigation';
 import { readCachedUnscheduledCount } from '../utils/shopCalendarBadge';
 import {
   DrawerMenuIcon,
@@ -74,7 +85,13 @@ function CustomDrawerContent(props) {
 
         <DrawerItem
           label="Center details"
-          onPress={() => resetFromShopDrawer(navigation, 'ShopProfile')}
+          onPress={() => {
+            if (Platform.OS === 'web') {
+              navigateToPartnerProfile(navigation);
+            } else {
+              resetFromShopDrawer(navigation, 'ShopProfile');
+            }
+          }}
           icon={({ color, size }) => <DrawerMenuIcon name="store-outline" color={color} size={size} />}
           labelStyle={styles.itemLabel}
           activeTintColor={COLORS.PRIMARY}
@@ -84,10 +101,14 @@ function CustomDrawerContent(props) {
         <DrawerItem
           label={() => <DrawerLabelWithBadge label="Calendar" badge={unscheduledCount} />}
           onPress={() => {
-            props.navigation.navigate('ShopCalendar', {
-              returnTo: 'ShopDashboard',
-              backLabel: 'Home',
-            });
+            if (Platform.OS === 'web') {
+              navigateToPartnerCalendar(navigation);
+            } else {
+              props.navigation.navigate('ShopCalendar', {
+                returnTo: 'ShopDashboard',
+                backLabel: 'Home',
+              });
+            }
             props.navigation.closeDrawer();
           }}
           icon={({ color, size }) => (
@@ -109,7 +130,13 @@ function CustomDrawerContent(props) {
 
         <DrawerItem
           label="Clients"
-          onPress={() => resetFromShopDrawer(navigation, 'AuthorizedClients')}
+          onPress={() => {
+            if (Platform.OS === 'web') {
+              navigateToPartnerClients(navigation);
+            } else {
+              resetFromShopDrawer(navigation, 'AuthorizedClients');
+            }
+          }}
           icon={({ color, size }) => (
             <DrawerMenuIcon name="account-group-outline" color={color} size={size} />
           )}
@@ -120,7 +147,13 @@ function CustomDrawerContent(props) {
 
         <DrawerItem
           label="Promotions"
-          onPress={() => resetFromShopDrawer(navigation, 'ShopPromotions')}
+          onPress={() => {
+            if (Platform.OS === 'web') {
+              navigateToPartnerPromotions(navigation);
+            } else {
+              resetFromShopDrawer(navigation, 'ShopPromotions');
+            }
+          }}
           icon={({ color, size }) => <DrawerMenuIcon name="tag-outline" color={color} size={size} />}
           labelStyle={styles.itemLabel}
           activeTintColor={COLORS.PRIMARY}
@@ -130,7 +163,11 @@ function CustomDrawerContent(props) {
         <DrawerItem
           label="Warehouse"
           onPress={() => {
-            props.navigation.navigate('ShopWarehouse');
+            if (Platform.OS === 'web') {
+              navigateToPartnerWarehouse(navigation);
+            } else {
+              props.navigation.navigate('ShopWarehouse');
+            }
             props.navigation.closeDrawer();
           }}
           icon={({ color, size }) => <DrawerMenuIcon name="warehouse" color={color} size={size} />}
@@ -141,7 +178,13 @@ function CustomDrawerContent(props) {
 
         <DrawerItem
           label="Invoicing"
-          onPress={() => resetFromShopDrawer(navigation, 'ShopInvoicing')}
+          onPress={() => {
+            if (Platform.OS === 'web') {
+              navigateToPartnerInvoicing(navigation);
+            } else {
+              resetFromShopDrawer(navigation, 'ShopInvoicing');
+            }
+          }}
           icon={({ color, size }) => (
             <DrawerMenuIcon name="receipt-text-outline" color={color} size={size} />
           )}
@@ -152,7 +195,13 @@ function CustomDrawerContent(props) {
 
         <DrawerItem
           label="Price list"
-          onPress={() => resetFromShopDrawer(navigation, 'ShopServiceMenu')}
+          onPress={() => {
+            if (Platform.OS === 'web') {
+              navigateToPartnerServices(navigation);
+            } else {
+              resetFromShopDrawer(navigation, 'ShopServiceMenu');
+            }
+          }}
           icon={({ color, size }) => (
             <DrawerMenuIcon name="clipboard-list-outline" color={color} size={size} />
           )}
@@ -163,7 +212,13 @@ function CustomDrawerContent(props) {
 
         <DrawerItem
           label={() => <DrawerLabelWithBadge label="Notifications" badge={unreadCount} />}
-          onPress={() => resetFromShopDrawer(navigation, 'NotificationsList')}
+          onPress={() => {
+            if (Platform.OS === 'web') {
+              navigateToPartnerNotifications(navigation);
+            } else {
+              resetFromShopDrawer(navigation, 'NotificationsList');
+            }
+          }}
           icon={({ color, size }) => <DrawerMenuIcon name="bell-outline" color={color} size={size} />}
           labelStyle={styles.itemLabel}
           activeTintColor={COLORS.PRIMARY}
@@ -172,7 +227,13 @@ function CustomDrawerContent(props) {
 
         <DrawerItem
           label="Switch Service Center"
-          onPress={() => resetFromShopDrawer(navigation, 'ChooseShop')}
+          onPress={() => {
+            if (Platform.OS === 'web') {
+              navigateToPartnerSwitchCenter(navigation);
+            } else {
+              resetFromShopDrawer(navigation, 'ChooseShop');
+            }
+          }}
           icon={({ color, size }) => <DrawerMenuIcon name="swap-horizontal" color={color} size={size} />}
           labelStyle={styles.itemLabel}
           activeTintColor={COLORS.PRIMARY}

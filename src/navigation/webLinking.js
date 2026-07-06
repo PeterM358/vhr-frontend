@@ -26,6 +26,16 @@ import {
   partnerDashboard,
   partnerProfile,
   partnerPublicPreview,
+  partnerRepairs,
+  partnerBookings,
+  partnerCalendar,
+  partnerClients,
+  partnerPromotions,
+  partnerWarehouse,
+  partnerInvoicing,
+  partnerServices,
+  partnerNotifications,
+  partnerSwitchCenter,
   profile,
   repairRequests,
   serviceCenters,
@@ -130,6 +140,27 @@ export function getCanonicalWebPath(state) {
     case 'ShopHome':
     case 'ShopDashboard':
       return partnerDashboard();
+    case 'RepairsList':
+      return partnerRepairs();
+    case 'ShopCalendar':
+      return partnerCalendar();
+    case 'AuthorizedClients':
+      return partnerClients();
+    case 'ShopPromotions':
+      return partnerPromotions();
+    case 'ShopWarehouse':
+      return partnerWarehouse();
+    case 'ShopInvoicing':
+      return partnerInvoicing();
+    case 'ShopServiceMenu':
+      return partnerServices();
+    case 'NotificationsList':
+    case 'ShopNotificationsScreen':
+      return partnerNotifications();
+    case 'ChooseShop':
+      return partnerSwitchCenter();
+    case 'PartnerBookings':
+      return partnerBookings();
     default:
       return null;
   }
@@ -309,14 +340,14 @@ export function getPartnerNavigationStateFromPath(path) {
   const [pathPart, queryPart] = trimmed.split('?');
   const query = parseRouteQuery(queryPart);
 
+  const partnerHome = {
+    name: 'ShopHome',
+    state: { routes: [{ name: 'ShopDashboard' }], index: 0 },
+  };
+
   if (pathPart === 'partner/dashboard') {
     return {
-      routes: [
-        {
-          name: 'ShopHome',
-          state: { routes: [{ name: 'ShopDashboard' }], index: 0 },
-        },
-      ],
+      routes: [partnerHome],
     };
   }
   if (pathPart === 'partner/profile') {
@@ -331,6 +362,102 @@ export function getPartnerNavigationStateFromPath(path) {
   if (pathPart === 'partner/public-preview') {
     return {
       routes: [{ name: 'ShopProfile', params: { expandSection: 'public_preview', ...query } }],
+    };
+  }
+  if (pathPart === 'partner/repairs') {
+    return {
+      routes: [
+        {
+          name: 'ShopHome',
+          state: {
+            index: 1,
+            routes: [{ name: 'ShopDashboard' }, { name: 'RepairsList' }],
+          },
+        },
+      ],
+    };
+  }
+  if (pathPart === 'partner/calendar') {
+    return {
+      routes: [
+        {
+          name: 'ShopHome',
+          state: {
+            index: 1,
+            routes: [
+              { name: 'ShopDashboard' },
+              {
+                name: 'ShopCalendar',
+                params: { returnTo: 'ShopDashboard', backLabel: 'Home' },
+              },
+            ],
+          },
+        },
+      ],
+    };
+  }
+  if (pathPart === 'partner/warehouse') {
+    return {
+      routes: [
+        {
+          name: 'ShopHome',
+          state: {
+            index: 1,
+            routes: [{ name: 'ShopDashboard' }, { name: 'ShopWarehouse' }],
+          },
+        },
+      ],
+    };
+  }
+  if (pathPart === 'partner/clients') {
+    return {
+      routes: [partnerHome, { name: 'AuthorizedClients' }],
+      index: 1,
+    };
+  }
+  if (pathPart === 'partner/promotions') {
+    return {
+      routes: [partnerHome, { name: 'ShopPromotions' }],
+      index: 1,
+    };
+  }
+  if (pathPart === 'partner/invoicing') {
+    return {
+      routes: [partnerHome, { name: 'ShopInvoicing' }],
+      index: 1,
+    };
+  }
+  if (pathPart === 'partner/services') {
+    return {
+      routes: [partnerHome, { name: 'ShopServiceMenu' }],
+      index: 1,
+    };
+  }
+  if (pathPart === 'partner/notifications') {
+    return {
+      routes: [partnerHome, { name: 'NotificationsList' }],
+      index: 1,
+    };
+  }
+  if (pathPart === 'partner/switch-center') {
+    return {
+      routes: [partnerHome, { name: 'ChooseShop' }],
+      index: 1,
+    };
+  }
+  if (pathPart === 'partner/bookings') {
+    return {
+      routes: [
+        partnerHome,
+        {
+          name: 'PartnerBookings',
+          params: {
+            title: 'Bookings',
+            body: 'Your service center bookings and appointment history will appear here.',
+          },
+        },
+      ],
+      index: 1,
     };
   }
 
@@ -405,6 +532,33 @@ export function normalizeWebLinkingPath(path) {
   }
   if (trimmed === 'ShopProfile' || trimmed.startsWith('ShopProfile/')) {
     return 'partner/profile';
+  }
+  if (trimmed === 'partner/RepairsList' || trimmed.startsWith('partner/RepairsList')) {
+    return 'partner/repairs';
+  }
+  if (trimmed === 'partner/ShopCalendar' || trimmed.startsWith('partner/ShopCalendar')) {
+    return 'partner/calendar';
+  }
+  if (trimmed === 'partner/ShopWarehouse' || trimmed.startsWith('partner/ShopWarehouse')) {
+    return 'partner/warehouse';
+  }
+  if (trimmed === 'AuthorizedClients' || trimmed.startsWith('AuthorizedClients')) {
+    return 'partner/clients';
+  }
+  if (trimmed === 'ShopPromotions' || trimmed.startsWith('ShopPromotions')) {
+    return 'partner/promotions';
+  }
+  if (trimmed === 'ShopInvoicing' || trimmed.startsWith('ShopInvoicing')) {
+    return 'partner/invoicing';
+  }
+  if (trimmed === 'ShopServiceMenu' || trimmed.startsWith('ShopServiceMenu')) {
+    return 'partner/services';
+  }
+  if (trimmed === 'NotificationsList' || trimmed.startsWith('NotificationsList')) {
+    return 'partner/notifications';
+  }
+  if (trimmed === 'ChooseShop' || trimmed.startsWith('ChooseShop')) {
+    return 'partner/switch-center';
   }
   if (trimmed === 'ShopDetail' || trimmed.startsWith('ShopDetail/')) {
     const shopId = trimmed.match(/shopId[=:](\d+)/i)?.[1];
@@ -539,6 +693,24 @@ export async function redirectLegacyWebUrl() {
     } else {
       target = '/partner/profile';
     }
+  } else if (pathname === '/partner/RepairsList' || pathname.startsWith('/partner/RepairsList')) {
+    target = '/partner/repairs';
+  } else if (pathname === '/partner/ShopCalendar' || pathname.startsWith('/partner/ShopCalendar')) {
+    target = '/partner/calendar';
+  } else if (pathname === '/partner/ShopWarehouse' || pathname.startsWith('/partner/ShopWarehouse')) {
+    target = '/partner/warehouse';
+  } else if (pathname === '/AuthorizedClients' || pathname.startsWith('/AuthorizedClients')) {
+    target = '/partner/clients';
+  } else if (pathname === '/ShopPromotions' || pathname.startsWith('/ShopPromotions')) {
+    target = '/partner/promotions';
+  } else if (pathname === '/ShopInvoicing' || pathname.startsWith('/ShopInvoicing')) {
+    target = '/partner/invoicing';
+  } else if (pathname === '/ShopServiceMenu' || pathname.startsWith('/ShopServiceMenu')) {
+    target = '/partner/services';
+  } else if (pathname === '/NotificationsList' || pathname.startsWith('/NotificationsList')) {
+    target = '/partner/notifications';
+  } else if (pathname === '/ChooseShop' || pathname.startsWith('/ChooseShop')) {
+    target = '/partner/switch-center';
   } else if (/^\/service-center\/\d+/.test(pathname)) {
     target = pathname.replace(/^\/service-center/, '/service-centers');
   } else if (

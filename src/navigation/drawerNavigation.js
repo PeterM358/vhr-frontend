@@ -10,6 +10,15 @@ import {
   notifications,
   partnerProfile,
   partnerPublicPreview,
+  partnerRepairs,
+  partnerCalendar,
+  partnerClients,
+  partnerPromotions,
+  partnerWarehouse,
+  partnerInvoicing,
+  partnerServices,
+  partnerNotifications,
+  partnerSwitchCenter,
   profile,
   repairRequests,
   serviceHistory,
@@ -42,6 +51,15 @@ const SHOP_WEB_PATH_BY_SCREEN = {
     }
     return partnerProfile(params);
   },
+  RepairsList: () => partnerRepairs(),
+  AuthorizedClients: () => partnerClients(),
+  ShopPromotions: () => partnerPromotions(),
+  ShopInvoicing: () => partnerInvoicing(),
+  ShopServiceMenu: () => partnerServices(),
+  NotificationsList: () => partnerNotifications(),
+  ChooseShop: () => partnerSwitchCenter(),
+  ShopWarehouse: () => partnerWarehouse(),
+  ShopCalendar: () => partnerCalendar(),
 };
 
 function resolveDrawerWebPath(screenName, params) {
@@ -107,4 +125,8 @@ export function resetShopDrawerRepairs(navigation) {
       ],
     })
   );
+  if (Platform.OS === 'web') {
+    syncWebPath(partnerRepairs());
+    requestAnimationFrame(() => syncWebPath(partnerRepairs()));
+  }
 }

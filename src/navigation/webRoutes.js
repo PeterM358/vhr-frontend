@@ -153,6 +153,34 @@ export function normalizeWebPath(input) {
     return `${PARTNER}/dashboard${query}`;
   }
 
+  if (raw === 'partner/RepairsList' || raw.endsWith('/partner/RepairsList')) {
+    return `${PARTNER}/repairs${query}`;
+  }
+  if (raw === 'partner/ShopCalendar' || raw.startsWith('partner/ShopCalendar')) {
+    return `${PARTNER}/calendar${query}`;
+  }
+  if (raw === 'partner/ShopWarehouse' || raw.startsWith('partner/ShopWarehouse')) {
+    return `${PARTNER}/warehouse${query}`;
+  }
+  if (raw === 'AuthorizedClients' || raw.startsWith('AuthorizedClients')) {
+    return `${PARTNER}/clients${query}`;
+  }
+  if (raw === 'ShopPromotions' || raw.startsWith('ShopPromotions')) {
+    return `${PARTNER}/promotions${query}`;
+  }
+  if (raw === 'ShopInvoicing' || raw.startsWith('ShopInvoicing')) {
+    return `${PARTNER}/invoicing${query}`;
+  }
+  if (raw === 'ShopServiceMenu' || raw.startsWith('ShopServiceMenu')) {
+    return `${PARTNER}/services${query}`;
+  }
+  if (raw === 'NotificationsList' || raw.startsWith('NotificationsList')) {
+    return `${PARTNER}/notifications${query}`;
+  }
+  if (raw === 'ChooseShop' || raw.startsWith('ChooseShop')) {
+    return `${PARTNER}/switch-center${query}`;
+  }
+
   return pathWithOptionalSlash.startsWith('/')
     ? `${pathWithOptionalSlash}${query}`
     : `/${raw}${query}`;
@@ -246,6 +274,46 @@ export function partnerProfile(params = {}) {
 
 export function partnerPublicPreview(params = {}) {
   return buildPathWithQuery(`${PARTNER}/public-preview`, params);
+}
+
+export function partnerRepairs(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/repairs`, params);
+}
+
+export function partnerBookings(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/bookings`, params);
+}
+
+export function partnerCalendar(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/calendar`, params);
+}
+
+export function partnerClients(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/clients`, params);
+}
+
+export function partnerPromotions(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/promotions`, params);
+}
+
+export function partnerWarehouse(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/warehouse`, params);
+}
+
+export function partnerInvoicing(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/invoicing`, params);
+}
+
+export function partnerServices(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/services`, params);
+}
+
+export function partnerNotifications(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/notifications`, params);
+}
+
+export function partnerSwitchCenter(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/switch-center`, params);
 }
 
 function buildPathWithQuery(base, params = {}) {

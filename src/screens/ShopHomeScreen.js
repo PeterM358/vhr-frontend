@@ -29,7 +29,7 @@ import {
   gateRepairNavigation,
 } from '../utils/shopProfileGate';
 import { setCachedShopRepairs } from '../utils/shopRepairsPrefetch';
-import { navigateToPartnerProfile, navigateToPartnerPublicPreview } from '../navigation/webNavigation';
+import { navigateToPartnerProfile, navigateToPartnerPublicPreview, navigateToPartnerCalendar, navigateToPartnerNotifications } from '../navigation/webNavigation';
 import ShopProfileSetupBanner from '../components/shop/ShopProfileSetupBanner';
 import { getMyShopProfiles } from '../api/profiles';
 import { formatShopDisplayName } from '../utils/shopDisplayName';
@@ -280,11 +280,16 @@ export default function ShopHomeScreen() {
               : unscheduledCount > 0
                 ? unscheduledCount
                 : undefined,
-          onPress: () =>
+          onPress: () => {
+            if (Platform.OS === 'web') {
+              navigateToPartnerCalendar(navigation);
+              return;
+            }
             navigation.navigate('ShopCalendar', {
               returnTo: 'ShopDashboard',
               backLabel: 'Home',
-            }),
+            });
+          },
         },
         {
           key: 'profile',
@@ -302,7 +307,7 @@ export default function ShopHomeScreen() {
           key: 'public-preview',
           icon: 'web',
           title: 'Public Page Preview',
-          subtitle: 'How clients see your shop on the map and in search',
+          subtitle: 'How clients see your service center on the map and in search',
           onPress: () =>
             openPartnerPublicPreview(navigation, {
               requireSetup: !profileComplete,
@@ -441,12 +446,16 @@ export default function ShopHomeScreen() {
         <View style={styles.iconWithBadge}>
           <Appbar.Action
             icon="calendar-month-outline"
-            onPress={() =>
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                navigateToPartnerCalendar(navigation);
+                return;
+              }
               navigation.navigate('ShopCalendar', {
                 returnTo: 'ShopDashboard',
                 backLabel: 'Home',
-              })
-            }
+              });
+            }}
             color="#fff"
           />
           {unscheduledCount > 0 ? (
@@ -456,7 +465,13 @@ export default function ShopHomeScreen() {
         <View style={styles.iconWithBadge}>
           <Appbar.Action
             icon="bell-outline"
-            onPress={() => navigation.navigate('ShopNotificationsScreen')}
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                navigateToPartnerNotifications(navigation);
+                return;
+              }
+              navigation.navigate('ShopNotificationsScreen');
+            }}
             color="#fff"
           />
           {unreadCount > 0 ? <Badge style={styles.notificationBadge}>{unreadCount}</Badge> : null}

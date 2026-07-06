@@ -57,19 +57,18 @@ export const ManageVehicleServiceCentersScreen = lazyScreen(
 export const AddObligationPaymentScreen = lazyScreen(() => import('../screens/AddObligationPaymentScreen'));
 export const CreatePromotionScreen = lazyScreen(() => import('../screens/CreatePromotionScreen'));
 export const ShopRegisterClientScreen = lazyScreen(() => import('../screens/ShopRegisterClientScreen'));
-export const ChooseShopScreen = lazyScreen(() => import('../screens/ChooseShopScreen'));
+// Partner screens — static imports avoid Metro async chunk module ID mismatches on web
+export { default as ChooseShopScreen } from '../screens/ChooseShopScreen';
 export const ClientServiceHistoryScreen = lazyScreen(() => import('../screens/ClientServiceHistoryScreen'));
-export const ClientDashboardPlaceholderScreen = lazyScreen(
-  () => import('../screens/ClientDashboardPlaceholderScreen')
-);
-export const AuthorizedClients = lazyScreen(() => import('../components/shop/AuthorizedClients'));
-export const ShopPromotions = lazyScreen(() => import('../components/shop/ShopPromotions'));
-export const NotificationsList = lazyScreen(() => import('../components/shop/NotificationsList'));
-export const RepairsList = lazyScreen(() => import('../components/shop/RepairsList'));
+export { default as ClientDashboardPlaceholderScreen } from '../screens/ClientDashboardPlaceholderScreen';
+export { default as AuthorizedClients } from '../components/shop/AuthorizedClients';
+export { default as ShopPromotions } from '../components/shop/ShopPromotions';
+export { default as NotificationsList } from '../components/shop/NotificationsList';
+export { default as RepairsList } from '../components/shop/RepairsList';
 export const NotificationsWithAppbar = lazyScreen(() => import('../components/shop/NotificationsWithAppbar'));
-export const ShopServiceMenuScreen = lazyScreen(() => import('../screens/ShopServiceMenuScreen'));
-export const ShopInvoicingScreen = lazyScreen(() => import('../screens/ShopInvoicingScreen'));
-export const ShopWarehouseReceiveScreen = lazyScreen(() => import('../screens/ShopWarehouseReceiveScreen'));
+export { default as ShopServiceMenuScreen } from '../screens/ShopServiceMenuScreen';
+export { default as ShopInvoicingScreen } from '../screens/ShopInvoicingScreen';
+export { default as ShopWarehouseReceiveScreen } from '../screens/ShopWarehouseReceiveScreen';
 export const ShopInvoiceDetailScreen = lazyScreen(() => import('../screens/ShopInvoiceDetailScreen'));
 export const AddShopPartScreen = lazyScreen(() => import('../screens/AddShopPartScreen'));
 export const SelectRepairPartsScreen = lazyScreen(() => import('../screens/SelectRepairPartsScreen'));

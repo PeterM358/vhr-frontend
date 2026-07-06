@@ -26,7 +26,22 @@ import {
   partnerDashboard,
   partnerProfile,
   partnerPublicPreview,
+  partnerRepairs,
+  partnerBookings,
+  partnerCalendar,
+  partnerClients,
+  partnerPromotions,
+  partnerWarehouse,
+  partnerInvoicing,
+  partnerServices,
+  partnerNotifications,
+  partnerSwitchCenter,
 } from './webRoutes';
+
+const PARTNER_HOME_ROUTE = {
+  name: 'ShopHome',
+  state: { routes: [{ name: 'ShopDashboard' }], index: 0 },
+};
 
 const HOME_ROUTE = { name: 'Home' };
 
@@ -338,4 +353,153 @@ export function navigateToPartnerPublicPreview(navigation, params = {}) {
     return;
   }
   navigation.navigate('ShopProfile', previewParams);
+}
+
+function resetPartnerStackWebRoutes(navigation, tailRoutes, absolutePath) {
+  const root = getRootNavigation(navigation);
+  root.dispatch(
+    CommonActions.reset({
+      index: tailRoutes.length,
+      routes: [PARTNER_HOME_ROUTE, ...tailRoutes],
+    })
+  );
+  if (absolutePath) {
+    syncWebPath(absolutePath);
+    requestAnimationFrame(() => syncWebPath(absolutePath));
+  }
+}
+
+function resetPartnerDrawerWebRoutes(navigation, drawerScreen, params, absolutePath) {
+  const root = getRootNavigation(navigation);
+  root.dispatch(
+    CommonActions.reset({
+      index: 0,
+      routes: [
+        {
+          name: 'ShopHome',
+          state: {
+            index: 1,
+            routes: [{ name: 'ShopDashboard' }, { name: drawerScreen, params }],
+          },
+        },
+      ],
+    })
+  );
+  if (absolutePath) {
+    syncWebPath(absolutePath);
+    requestAnimationFrame(() => syncWebPath(absolutePath));
+  }
+}
+
+export function navigateToPartnerRepairs(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerDrawerWebRoutes(navigation, 'RepairsList', undefined, partnerRepairs());
+    return;
+  }
+  const root = getRootNavigation(navigation);
+  root.dispatch(
+    CommonActions.reset({
+      index: 0,
+      routes: [
+        {
+          name: 'ShopHome',
+          state: {
+            index: 1,
+            routes: [{ name: 'ShopDashboard' }, { name: 'RepairsList' }],
+          },
+        },
+      ],
+    })
+  );
+}
+
+export function navigateToPartnerCalendar(navigation, params = {}) {
+  const routeParams = {
+    returnTo: 'ShopDashboard',
+    backLabel: 'Home',
+    ...params,
+  };
+  if (Platform.OS === 'web') {
+    resetPartnerDrawerWebRoutes(navigation, 'ShopCalendar', routeParams, partnerCalendar());
+    return;
+  }
+  navigation.navigate('ShopCalendar', routeParams);
+}
+
+export function navigateToPartnerClients(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'AuthorizedClients' }], partnerClients());
+    return;
+  }
+  const root = getRootNavigation(navigation);
+  root.navigate('AuthorizedClients');
+}
+
+export function navigateToPartnerPromotions(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'ShopPromotions' }], partnerPromotions());
+    return;
+  }
+  const root = getRootNavigation(navigation);
+  root.navigate('ShopPromotions');
+}
+
+export function navigateToPartnerWarehouse(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerDrawerWebRoutes(navigation, 'ShopWarehouse', undefined, partnerWarehouse());
+    return;
+  }
+  navigation.navigate('ShopWarehouse');
+}
+
+export function navigateToPartnerInvoicing(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'ShopInvoicing' }], partnerInvoicing());
+    return;
+  }
+  const root = getRootNavigation(navigation);
+  root.navigate('ShopInvoicing');
+}
+
+export function navigateToPartnerServices(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'ShopServiceMenu' }], partnerServices());
+    return;
+  }
+  const root = getRootNavigation(navigation);
+  root.navigate('ShopServiceMenu');
+}
+
+export function navigateToPartnerNotifications(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'NotificationsList' }], partnerNotifications());
+    return;
+  }
+  const root = getRootNavigation(navigation);
+  root.navigate('NotificationsList');
+}
+
+export function navigateToPartnerSwitchCenter(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'ChooseShop' }], partnerSwitchCenter());
+    return;
+  }
+  const root = getRootNavigation(navigation);
+  root.navigate('ChooseShop');
+}
+
+export function navigateToPartnerBookings(navigation) {
+  const routeParams = {
+    title: 'Bookings',
+    body: 'Your service center bookings and appointment history will appear here.',
+  };
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(
+      navigation,
+      [{ name: 'PartnerBookings', params: routeParams }],
+      partnerBookings()
+    );
+    return;
+  }
+  navigation.navigate('PartnerBookings', routeParams);
 }
