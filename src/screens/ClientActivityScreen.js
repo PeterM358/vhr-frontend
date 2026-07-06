@@ -3,7 +3,7 @@
  */
 
 import React, { useContext, useEffect, useState } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable, Platform } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Badge } from 'react-native-paper';
@@ -13,6 +13,7 @@ import NotificationCenterPlaceholder from '../components/client/NotificationCent
 import { showMessage } from '../utils/crossPlatformAlert';
 import ScreenBackground from '../components/ScreenBackground';
 import BackHeaderButton from '../components/navigation/BackHeaderButton';
+import { navigateToDashboard } from '../navigation/webNavigation';
 import { WebSocketContext } from '../context/WebSocketManager';
 
 const TABS = [
@@ -35,7 +36,7 @@ export default function ClientActivityScreen({ navigation }) {
   const { notifications } = useContext(WebSocketContext);
 
   const returnTo = route.params?.returnTo || 'Home';
-  const backLabel = route.params?.backLabel || 'Home';
+  const backLabel = route.params?.backLabel || 'Dashboard';
 
   const [activeTab, setActiveTab] = useState(() => resolveInitialTab(route));
   const [unseenPromoCount, setUnseenPromoCount] = useState(0);
@@ -52,6 +53,12 @@ export default function ClientActivityScreen({ navigation }) {
   }, [route.params?.initialTab]);
 
   const handleBack = () => {
+    if (returnTo === 'Home' || returnTo === 'HomeMain') {
+      if (Platform.OS === 'web') {
+        navigateToDashboard(navigation);
+        return;
+      }
+    }
     navigation.navigate(returnTo);
   };
 
@@ -77,7 +84,7 @@ export default function ClientActivityScreen({ navigation }) {
             accessibilityLabel={`Back to ${backLabel}`}
           />
           <View pointerEvents="none" style={styles.titleAbsolute}>
-            <Text style={styles.screenTitle}>Activity</Text>
+            <Text style={styles.screenTitle}>Notifications</Text>
           </View>
           <View style={styles.headerSideSpacer} />
         </View>

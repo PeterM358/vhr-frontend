@@ -8,6 +8,11 @@ import { CommonActions } from '@react-navigation/native';
 import { syncWebPath } from './authNavigation';
 import {
   dashboard,
+  notifications,
+  repairRequests,
+  serviceHistory,
+  bookings,
+  documents,
   vehicleAdd,
   vehicleDetail,
   vehicles,
@@ -152,6 +157,86 @@ export function navigateToVehicleServiceRecordCenter(navigation, vehicleId, para
     return;
   }
   navigation.navigate('ServiceRecordServiceCenter', routeParams);
+}
+
+export function navigateToNotifications(navigation, params = {}) {
+  const routeParams = {
+    initialTab: 'inbox',
+    returnTo: 'Home',
+    backLabel: 'Dashboard',
+    ...params,
+  };
+  if (Platform.OS === 'web') {
+    resetWebRoutes(navigation, [{ name: 'ClientActivity', params: routeParams }], notifications());
+    return;
+  }
+  navigation.navigate('ClientActivity', routeParams);
+}
+
+export function navigateToRepairRequests(navigation, params = {}) {
+  const { tab, ...rest } = params;
+  const routeParams = { ...rest };
+  if (tab) routeParams.initialTab = tab;
+  const path = tab ? repairRequests({ tab }) : repairRequests();
+  if (Platform.OS === 'web') {
+    resetWebRoutes(navigation, [{ name: 'ClientRepairs', params: routeParams }], path);
+    return;
+  }
+  navigation.navigate('ClientRepairs', routeParams);
+}
+
+export function navigateToServiceHistory(navigation) {
+  if (Platform.OS === 'web') {
+    resetWebRoutes(navigation, [{ name: 'ClientServiceHistory' }], serviceHistory());
+    return;
+  }
+  navigation.navigate('ClientServiceHistory');
+}
+
+export function navigateToBookings(navigation) {
+  if (Platform.OS === 'web') {
+    resetWebRoutes(
+      navigation,
+      [
+        {
+          name: 'ClientBookings',
+          params: {
+            title: 'Bookings',
+            body: 'Your upcoming and past service bookings will appear here.',
+          },
+        },
+      ],
+      bookings()
+    );
+    return;
+  }
+  navigation.navigate('ClientBookings', {
+    title: 'Bookings',
+    body: 'Your upcoming and past service bookings will appear here.',
+  });
+}
+
+export function navigateToDocuments(navigation) {
+  if (Platform.OS === 'web') {
+    resetWebRoutes(
+      navigation,
+      [
+        {
+          name: 'ClientDocuments',
+          params: {
+            title: 'Documents',
+            body: 'Vehicle documents, invoices and warranty files will be collected here.',
+          },
+        },
+      ],
+      documents()
+    );
+    return;
+  }
+  navigation.navigate('ClientDocuments', {
+    title: 'Documents',
+    body: 'Vehicle documents, invoices and warranty files will be collected here.',
+  });
 }
 
 export function navigateToVehicleServiceRecordCenterAdd(navigation, vehicleId, params = {}) {

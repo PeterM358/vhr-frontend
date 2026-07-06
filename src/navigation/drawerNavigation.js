@@ -6,7 +6,13 @@
 import { Platform } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
 import { syncWebPath } from './authNavigation';
-import { vehicleAdd, vehicles } from './webRoutes';
+import {
+  notifications,
+  repairRequests,
+  serviceHistory,
+  vehicleAdd,
+  vehicles,
+} from './webRoutes';
 
 function getRootNavigation(navigation) {
   let current = navigation;
@@ -19,7 +25,18 @@ function getRootNavigation(navigation) {
 const WEB_PATH_BY_SCREEN = {
   ClientVehicles: vehicles(),
   CreateVehicle: vehicleAdd(),
+  ClientActivity: notifications(),
+  ClientNotifications: notifications(),
+  ClientRepairs: repairRequests(),
+  ClientServiceHistory: serviceHistory(),
 };
+
+function resolveDrawerWebPath(screenName, params) {
+  if (screenName === 'ClientRepairs' && (params?.initialTab === 'offers' || params?.tab === 'offers')) {
+    return repairRequests({ tab: 'offers' });
+  }
+  return WEB_PATH_BY_SCREEN[screenName] || null;
+}
 
 export function resetFromClientDrawer(navigation, screenName, params) {
   const root = getRootNavigation(navigation);
@@ -31,9 +48,10 @@ export function resetFromClientDrawer(navigation, screenName, params) {
     })
   );
   if (Platform.OS === 'web') {
-    const webPath = WEB_PATH_BY_SCREEN[screenName];
+    const webPath = resolveDrawerWebPath(screenName, params);
     if (webPath) {
       syncWebPath(webPath);
+      requestAnimationFrame(() => syncWebPath(webPath));
     }
   }
 }

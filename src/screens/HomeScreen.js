@@ -33,7 +33,15 @@ import FloatingCard from '../components/ui/FloatingCard';
 import { NOTIFICATION_CENTER_PLACEHOLDERS } from '../constants/clientDashboardPlaceholders';
 import { COLORS } from '../constants/colors';
 import { resetFromClientDrawer } from '../navigation/drawerNavigation';
-import { navigateToVehicleDetail } from '../navigation/webNavigation';
+import {
+  navigateToNotifications,
+  navigateToRepairRequests,
+  navigateToServiceHistory,
+  navigateToVehicleAdd,
+  navigateToVehicleDetail,
+  navigateToVehicleList,
+} from '../navigation/webNavigation';
+import { API_BASE_URL } from '../api/config';
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import { resetToPublicHome } from '../navigation/authNavigation';
 import { showMessage } from '../utils/crossPlatformAlert';
@@ -80,6 +88,7 @@ export default function HomeScreen({ navigation }) {
   const [openRepairs, setOpenRepairs] = useState([]);
   const [recentRepairs, setRecentRepairs] = useState([]);
   const [openRequestsCount, setOpenRequestsCount] = useState(0);
+  const [pendingOffersCount, setPendingOffersCount] = useState(0);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [sessionChecked, setSessionChecked] = useState(false);
 
@@ -113,15 +122,26 @@ export default function HomeScreen({ navigation }) {
         setDashboardLoading(true);
         try {
           const token = await AsyncStorage.getItem('@access_token');
-          const [vehicleRows, repairRows] = await Promise.all([
+          const [vehicleRows, repairRows, offersRes] = await Promise.all([
             getVehicles().catch(() => []),
             getRepairs(token, 'open').catch(() => []),
+            fetch(`${API_BASE_URL}/api/offers/`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => null),
           ]);
           const safeVehicles = Array.isArray(vehicleRows) ? vehicleRows : [];
           const safeRepairs = Array.isArray(repairRows) ? repairRows : [];
+          let offersCount = 0;
+          if (offersRes?.ok) {
+            const offerRows = await offersRes.json().catch(() => []);
+            offersCount = Array.isArray(offerRows)
+              ? offerRows.filter((offer) => !offer.is_booked).length
+              : 0;
+          }
           setVehicles(safeVehicles);
           setOpenRepairs(safeRepairs);
           setOpenRequestsCount(safeRepairs.length);
+          setPendingOffersCount(offersCount);
           setRecentRepairs(safeRepairs.slice(0, 4));
         } finally {
           setDashboardLoading(false);
@@ -149,33 +169,36 @@ export default function HomeScreen({ navigation }) {
   };
 
   const goRequestService = () => resetFromClientDrawer(navigation, 'CreateRepair');
-  const goAddVehicle = () => resetFromClientDrawer(navigation, 'CreateVehicle');
+  const goAddVehicle = () => {
+    const root = navigation.getParent?.() || navigation;
+    navigateToVehicleAdd(root);
+  };
   const goFindCenters = () => openServiceCenters(navigation);
   const goVehicleDetail = (vehicle) => {
     if (!vehicle?.id) return;
     const root = navigation.getParent?.() || navigation;
     navigateToVehicleDetail(root, vehicle.id);
   };
-  const goVehicles = () => resetFromClientDrawer(navigation, 'ClientVehicles');
-  const goRepairs = () => resetFromClientDrawer(navigation, 'ClientRepairs');
-  const goOffers = () =>
-    resetFromClientDrawer(navigation, 'ClientActivity', {
-      returnTo: 'Home',
-      backLabel: 'Home',
-      initialTab: 'repairs',
-    });
-  const goNotificationCenter = () =>
-    resetFromClientDrawer(navigation, 'ClientActivity', {
-      returnTo: 'Home',
-      backLabel: 'Home',
-      initialTab: 'inbox',
-    });
-  const goDocuments = () =>
-    showMessage(
-      'Documents',
-      'Your vehicle documents, invoices and warranty files will be collected here soon.',
-      { variant: 'info' }
-    );
+  const goVehicles = () => {
+    const root = navigation.getParent?.() || navigation;
+    navigateToVehicleList(root);
+  };
+  const goRepairs = () => {
+    const root = navigation.getParent?.() || navigation;
+    navigateToRepairRequests(root);
+  };
+  const goPendingOffers = () => {
+    const root = navigation.getParent?.() || navigation;
+    navigateToRepairRequests(root, { tab: 'offers' });
+  };
+  const goNotificationCenter = () => {
+    const root = navigation.getParent?.() || navigation;
+    navigateToNotifications(root);
+  };
+  const goServiceHistory = () => {
+    const root = navigation.getParent?.() || navigation;
+    navigateToServiceHistory(root);
+  };
 
   const summaryItems = useMemo(
     () => [
@@ -186,10 +209,20 @@ export default function HomeScreen({ navigation }) {
         label: 'Open Requests',
         onPress: goRepairs,
       },
-      { key: 'offers', value: 0, label: 'Offers', onPress: goOffers },
-      { key: 'documents', value: 0, label: 'Documents', onPress: goDocuments },
+      {
+        key: 'offers',
+        value: pendingOffersCount,
+        label: 'Pending Offers',
+        onPress: goPendingOffers,
+      },
+      {
+        key: 'alerts',
+        value: unreadNotifications,
+        label: 'Unread Alerts',
+        onPress: goNotificationCenter,
+      },
     ],
-    [vehicles.length, openRequestsCount]
+    [vehicles.length, openRequestsCount, pendingOffersCount, unreadNotifications]
   );
 
   const quickActions = useMemo(
@@ -199,13 +232,13 @@ export default function HomeScreen({ navigation }) {
         key: 'history',
         icon: 'book-open-page-variant',
         label: 'Service History',
-        onPress: goVehicles,
+        onPress: goServiceHistory,
       },
       {
-        key: 'offers',
-        icon: 'tag-outline',
-        label: 'Offers',
-        onPress: goOffers,
+        key: 'repairs',
+        icon: 'wrench-outline',
+        label: 'Repair Requests',
+        onPress: goRepairs,
       },
       {
         key: 'notifications',

@@ -78,6 +78,13 @@ export const linkingScreens = {
       },
     },
   },
+  ClientActivity: 'dashboard/notifications',
+  ClientNotifications: 'dashboard/notifications',
+  ClientRepairs: 'dashboard/repair-requests',
+  ClientServiceHistory: 'dashboard/service-history',
+  OffersScreen: 'dashboard/offers',
+  ClientBookings: 'dashboard/bookings',
+  ClientDocuments: 'dashboard/documents',
 };
 
 export const linkingConfig = { screens: linkingScreens };

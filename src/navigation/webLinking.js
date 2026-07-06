@@ -18,8 +18,13 @@ import {
 } from '../utils/seo/seoPaths';
 import {
   dashboard,
+  documents,
   normalizeWebPath,
+  notifications,
+  parseRouteQuery,
   parseServiceRecordQuery,
+  repairRequests,
+  serviceHistory,
   vehicleAdd,
   vehicleDetail,
   vehicleServiceRecordNew,
@@ -90,6 +95,21 @@ export function getCanonicalWebPath(state) {
       return vehicleId != null ? vehicleServiceRecordCenter(vehicleId) : vehicles();
     case 'AddManualServiceCenter':
       return vehicleId != null ? vehicleServiceRecordCenterAdd(vehicleId) : vehicles();
+    case 'ClientActivity':
+    case 'ClientNotifications':
+      return notifications();
+    case 'ClientRepairs': {
+      const tab = params.initialTab || params.tab;
+      return tab === 'offers' ? repairRequests({ tab: 'offers' }) : repairRequests();
+    }
+    case 'OffersScreen':
+      return repairRequests({ tab: 'offers' });
+    case 'ClientServiceHistory':
+      return serviceHistory();
+    case 'ClientBookings':
+      return `${dashboard()}/bookings`;
+    case 'ClientDocuments':
+      return documents();
     default:
       return null;
   }
@@ -179,6 +199,59 @@ export function getVehicleNavigationStateFromPath(path) {
   return null;
 }
 
+/** Parse dashboard section paths (notifications, repairs, service history, etc.). */
+export function getDashboardNavigationStateFromPath(path) {
+  const trimmed = String(path || '').replace(/^\//, '').replace(/\/$/, '');
+  if (!trimmed.startsWith('dashboard/')) return null;
+  if (trimmed.startsWith('dashboard/vehicles')) return null;
+
+  const [pathPart, queryPart] = trimmed.split('?');
+  const query = parseRouteQuery(queryPart);
+
+  if (pathPart === 'dashboard/notifications') {
+    return vehicleStackState([
+      {
+        name: 'ClientActivity',
+        params: { initialTab: 'inbox', returnTo: 'Home', backLabel: 'Dashboard' },
+      },
+    ]);
+  }
+  if (pathPart === 'dashboard/repair-requests') {
+    const tab = query.tab || 'open';
+    return vehicleStackState([{ name: 'ClientRepairs', params: { initialTab: tab } }]);
+  }
+  if (pathPart === 'dashboard/offers') {
+    return vehicleStackState([{ name: 'ClientRepairs', params: { initialTab: 'offers' } }]);
+  }
+  if (pathPart === 'dashboard/service-history') {
+    return vehicleStackState([{ name: 'ClientServiceHistory' }]);
+  }
+  if (pathPart === 'dashboard/bookings') {
+    return vehicleStackState([
+      {
+        name: 'ClientBookings',
+        params: {
+          title: 'Bookings',
+          body: 'Your upcoming and past service bookings will appear here.',
+        },
+      },
+    ]);
+  }
+  if (pathPart === 'dashboard/documents') {
+    return vehicleStackState([
+      {
+        name: 'ClientDocuments',
+        params: {
+          title: 'Documents',
+          body: 'Vehicle documents, invoices and warranty files will be collected here.',
+        },
+      },
+    ]);
+  }
+
+  return null;
+}
+
 /** @deprecated */
 export function collapseDuplicateVehiclePath(path) {
   if (!path) return path;
@@ -235,6 +308,12 @@ export function normalizeWebLinkingPath(path) {
   }
   if (trimmed.startsWith('VehicleDetail/')) {
     return trimmed.replace(/^VehicleDetail/, 'dashboard/vehicles');
+  }
+  if (trimmed === 'ClientActivity' || trimmed.startsWith('ClientActivity/')) {
+    return 'dashboard/notifications';
+  }
+  if (trimmed === 'ClientRepairs' || trimmed.startsWith('ClientRepairs/')) {
+    return 'dashboard/repair-requests';
   }
 
   return trimmed;
@@ -323,6 +402,11 @@ export async function redirectLegacyWebUrl() {
     target = '/dashboard/vehicles/add';
   } else if (pathname === '/VehicleDetail' || pathname.startsWith('/VehicleDetail/')) {
     target = pathname.replace(/^\/VehicleDetail/, '/dashboard/vehicles');
+  } else if (pathname === '/ClientActivity' || pathname.startsWith('/ClientActivity/')) {
+    target = '/dashboard/notifications';
+  } else if (pathname === '/ClientRepairs' || pathname.startsWith('/ClientRepairs/')) {
+    const tab = new URLSearchParams(search).get('tab');
+    target = tab === 'offers' ? '/dashboard/repair-requests?tab=offers' : '/dashboard/repair-requests';
   } else if (
     (pathname === '/dashboard/vehicles' || pathname.startsWith('/dashboard/vehicles/')) &&
     !(await hasStoredAuthToken())
@@ -369,6 +453,10 @@ export function buildAppLinking(prefixes) {
       const vehicleState = getVehicleNavigationStateFromPath(normalized);
       if (vehicleState) {
         return vehicleState;
+      }
+      const dashboardState = getDashboardNavigationStateFromPath(normalized);
+      if (dashboardState) {
+        return dashboardState;
       }
       return getStateFromPathDefault(normalized, linkingConfig);
     },

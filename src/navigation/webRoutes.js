@@ -1,6 +1,6 @@
 /**
  * Canonical absolute web paths (always start with "/").
- * Never use relative segments like "dashboard/vehicles/2" without the leading slash.
+ * Never use relative segments — React Navigation pushState requires root-absolute paths.
  */
 
 const DASHBOARD = '/dashboard';
@@ -28,6 +28,36 @@ function lastGlobalMatch(raw, pattern) {
     last = match;
   }
   return last;
+}
+
+const DASHBOARD_SECTION_PATTERNS = [
+  'dashboard/vehicles',
+  'dashboard/service-history',
+  'dashboard/repair-requests',
+  'dashboard/offers',
+  'dashboard/notifications',
+  'dashboard/bookings',
+  'dashboard/documents',
+];
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeDashboardSection(raw, query) {
+  for (const section of DASHBOARD_SECTION_PATTERNS) {
+    const match = lastGlobalMatch(raw, escapeRegex(section));
+    if (match) {
+      if (section === 'dashboard/offers') {
+        return `${DASHBOARD}/repair-requests?tab=offers`;
+      }
+      return `/${section}${query}`;
+    }
+  }
+  if (raw === 'dashboard' || raw.endsWith('/dashboard')) {
+    return `${DASHBOARD}${query}`;
+  }
+  return null;
 }
 
 /** Map legacy or duplicated URLs to a single canonical absolute path. */
@@ -85,8 +115,13 @@ export function normalizeWebPath(input) {
     return `${VEHICLES}${query}`;
   }
 
-  if (raw === 'dashboard' || raw.startsWith('dashboard/')) {
-    return `${DASHBOARD}${query}`;
+  if (raw.includes('dashboard/offers')) {
+    return `${DASHBOARD}/repair-requests?tab=offers`;
+  }
+
+  const dashboardSection = normalizeDashboardSection(raw, query);
+  if (dashboardSection) {
+    return dashboardSection;
   }
 
   return pathWithOptionalSlash.startsWith('/')
@@ -121,15 +156,7 @@ export function vehicleSpecs(id) {
 }
 
 export function vehicleServiceRecordNew(id, params = {}) {
-  const qs = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value != null && value !== '') {
-      qs.set(key, String(value));
-    }
-  });
-  const query = qs.toString();
-  const base = `${VEHICLES}/${normalizeId(id)}/service-record/new`;
-  return query ? `${base}?${query}` : base;
+  return buildPathWithQuery(`${VEHICLES}/${normalizeId(id)}/service-record/new`, params);
 }
 
 export function vehicleServiceRecordCenter(id) {
@@ -140,10 +167,45 @@ export function vehicleServiceRecordCenterAdd(id) {
   return `${VEHICLES}/${normalizeId(id)}/service-record/service-center/add`;
 }
 
+export function serviceHistory() {
+  return `${DASHBOARD}/service-history`;
+}
+
+export function repairRequests(params = {}) {
+  return buildPathWithQuery(`${DASHBOARD}/repair-requests`, params);
+}
+
+export function offers(params = {}) {
+  return buildPathWithQuery(`${DASHBOARD}/offers`, params);
+}
+
+export function notifications(params = {}) {
+  return buildPathWithQuery(`${DASHBOARD}/notifications`, params);
+}
+
+export function bookings(params = {}) {
+  return buildPathWithQuery(`${DASHBOARD}/bookings`, params);
+}
+
+export function documents(params = {}) {
+  return buildPathWithQuery(`${DASHBOARD}/documents`, params);
+}
+
+function buildPathWithQuery(base, params = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value != null && value !== '') {
+      qs.set(key, String(value));
+    }
+  });
+  const query = qs.toString();
+  return query ? `${base}?${query}` : base;
+}
+
 /**
- * Parse query string from a service-record path or params object.
+ * Parse query string from a path or params object.
  */
-export function parseServiceRecordQuery(searchOrParams) {
+export function parseRouteQuery(searchOrParams) {
   if (!searchOrParams) return {};
   if (typeof searchOrParams === 'object') {
     return { ...searchOrParams };
@@ -152,3 +214,6 @@ export function parseServiceRecordQuery(searchOrParams) {
   if (!raw) return {};
   return Object.fromEntries(new URLSearchParams(raw));
 }
+
+/** @deprecated */
+export const parseServiceRecordQuery = parseRouteQuery;

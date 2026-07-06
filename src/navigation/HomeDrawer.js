@@ -14,6 +14,11 @@ import { logout } from '../api/auth';
 import { resetFromClientDrawer } from './drawerNavigation';
 import { openServiceCenters } from './serviceCentersNavigation';
 import {
+  navigateToNotifications,
+  navigateToRepairRequests,
+  navigateToVehicleList,
+} from './webNavigation';
+import {
   DrawerMenuIcon,
   DrawerLabelWithBadge,
   DrawerVeversalLogoFooter,
@@ -62,8 +67,11 @@ function CustomDrawerContent(props) {
         />
 
         <DrawerItem
-          label="Repairs"
-          onPress={() => resetFromClientDrawer(navigation, 'ClientRepairs')}
+          label="Repair Requests"
+          onPress={() => {
+            const root = navigation.getParent?.() || navigation;
+            navigateToRepairRequests(root);
+          }}
           icon={({ color, size }) => <DrawerMenuIcon name="wrench-outline" color={color} size={size} />}
           labelStyle={styles.itemLabel}
           activeTintColor={COLORS.PRIMARY}
@@ -72,7 +80,10 @@ function CustomDrawerContent(props) {
 
         <DrawerItem
           label="Vehicles"
-          onPress={() => resetFromClientDrawer(navigation, 'ClientVehicles')}
+          onPress={() => {
+            const root = navigation.getParent?.() || navigation;
+            navigateToVehicleList(root);
+          }}
           icon={({ color, size }) => <DrawerMenuIcon name="car-outline" color={color} size={size} />}
           labelStyle={styles.itemLabel}
           activeTintColor={COLORS.PRIMARY}
@@ -81,15 +92,12 @@ function CustomDrawerContent(props) {
 
         <DrawerItem
           label={() => (
-            <DrawerLabelWithBadge label="Activity" badge={unreadNotifications} />
+            <DrawerLabelWithBadge label="Notifications" badge={unreadNotifications} />
           )}
-          onPress={() =>
-            resetFromClientDrawer(navigation, 'ClientActivity', {
-              returnTo: 'Home',
-              backLabel: 'Home',
-              initialTab: unreadNotifications > 0 ? 'inbox' : 'repairs',
-            })
-          }
+          onPress={() => {
+            const root = navigation.getParent?.() || navigation;
+            navigateToNotifications(root);
+          }}
           icon={({ color, size }) => <DrawerMenuIcon name="bell-outline" color={color} size={size} />}
           labelStyle={styles.itemLabel}
           activeTintColor={COLORS.PRIMARY}

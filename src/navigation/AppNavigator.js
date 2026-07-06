@@ -37,6 +37,8 @@ import CreatePromotionScreen from '../screens/CreatePromotionScreen';
 import ShopRegisterClientScreen from '../screens/ShopRegisterClientScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
 import ClientActivityScreen from '../screens/ClientActivityScreen';
+import ClientServiceHistoryScreen from '../screens/ClientServiceHistoryScreen';
+import ClientDashboardPlaceholderScreen from '../screens/ClientDashboardPlaceholderScreen';
 
 import AuthorizedClients from '../components/shop/AuthorizedClients';
 import ShopPromotions from '../components/shop/ShopPromotions';
@@ -315,7 +317,7 @@ export default function AppNavigator() {
             const fromVehicleDetail = !!route.params?.fromVehicleDetail;
             return {
               ...transparentStackHeader,
-              title: fromVehicleDetail ? 'Vehicle Repairs' : 'Repairs',
+              title: fromVehicleDetail ? 'Vehicle Repairs' : 'Repair Requests',
               ...(fromVehicleDetail
                 ? {}
                 : { headerLeft: homeHeaderLeft(navigation), headerBackVisible: false }),
@@ -331,7 +333,14 @@ export default function AppNavigator() {
             if (returnTo === 'ClientActivity' || returnTo === 'ClientNotifications') {
               return {
                 title: 'Repair',
-                headerLeft: stackBackHeaderLeft(navigation, backLabel || 'Activity'),
+                headerLeft: stackBackHeaderLeft(navigation, backLabel || 'Notifications'),
+                headerBackVisible: false,
+              };
+            }
+            if (returnTo === 'ClientRepairs' || returnTo === 'ClientServiceHistory') {
+              return {
+                title: 'Repair',
+                headerLeft: stackBackHeaderLeft(navigation, backLabel || 'Dashboard'),
                 headerBackVisible: false,
               };
             }
@@ -411,17 +420,47 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ClientActivity"
           component={ClientActivityScreen}
-          options={{ headerShown: false, title: 'Activity' }}
+          options={{ headerShown: false, title: 'Notifications' }}
         />
         <Stack.Screen
           name="OffersScreen"
           component={ClientActivityScreen}
-          options={{ headerShown: false, title: 'Activity' }}
+          options={{ headerShown: false, title: 'Notifications' }}
         />
         <Stack.Screen
           name="ClientNotifications"
           component={ClientActivityScreen}
-          options={{ headerShown: false, title: 'Activity' }}
+          options={{ headerShown: false, title: 'Notifications' }}
+        />
+        <Stack.Screen
+          name="ClientServiceHistory"
+          component={ClientServiceHistoryScreen}
+          options={({ navigation }) => ({
+            ...transparentStackHeader,
+            title: 'Service History',
+            headerLeft: homeHeaderLeft(navigation),
+            headerBackVisible: false,
+          })}
+        />
+        <Stack.Screen
+          name="ClientBookings"
+          component={ClientDashboardPlaceholderScreen}
+          options={({ navigation }) => ({
+            ...transparentStackHeader,
+            title: 'Bookings',
+            headerLeft: homeHeaderLeft(navigation),
+            headerBackVisible: false,
+          })}
+        />
+        <Stack.Screen
+          name="ClientDocuments"
+          component={ClientDashboardPlaceholderScreen}
+          options={({ navigation }) => ({
+            ...transparentStackHeader,
+            title: 'Documents',
+            headerLeft: homeHeaderLeft(navigation),
+            headerBackVisible: false,
+          })}
         />
         <Stack.Screen
           name="AuthorizedClients"

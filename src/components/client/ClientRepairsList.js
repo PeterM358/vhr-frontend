@@ -1,7 +1,7 @@
 // PATH: src/components/client/ClientRepairsList.js
 
 import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { View, FlatList, StyleSheet, Pressable } from 'react-native';
+import { View, FlatList, StyleSheet, Pressable, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRepairs } from '../../api/repairs';
 import { Text, ActivityIndicator } from 'react-native-paper';
@@ -10,20 +10,32 @@ import ScreenBackground from '../ScreenBackground';
 import FloatingCard from '../ui/FloatingCard';
 import StatusBadge from '../ui/StatusBadge';
 import EmptyStateCard from '../ui/EmptyStateCard';
+import ClientRepairOffers from './ClientRepairOffers';
 import { COLORS } from '../../constants/colors';
 import { useStackBodyPaddingTop } from '../../navigation/stackContentInset';
+import { syncWebPath } from '../../navigation/authNavigation';
+import { repairRequests } from '../../navigation/webRoutes';
 
 const TAB_OPTIONS = [
   { key: 'open', label: 'Open' },
+  { key: 'offers', label: 'Offers' },
   { key: 'ongoing', label: 'Ongoing' },
   { key: 'done', label: 'Done' },
 ];
+
+function resolveInitialTab(route) {
+  const tab = route.params?.initialTab || route.params?.tab;
+  if (tab && TAB_OPTIONS.some((item) => item.key === tab)) {
+    return tab;
+  }
+  return 'open';
+}
 
 export default function ClientRepairsList({ navigation, route }) {
   const bodyPadTop = useStackBodyPaddingTop(12);
   const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('open');
+  const [statusFilter, setStatusFilter] = useState(() => resolveInitialTab(route));
   const scopedVehicleId = route.params?.vehicleId ? Number(route.params.vehicleId) : null;
 
   useLayoutEffect(() => {
@@ -35,6 +47,18 @@ export default function ClientRepairsList({ navigation, route }) {
   }, [navigation, route.params]);
 
   useEffect(() => {
+    const tab = route.params?.initialTab || route.params?.tab;
+    if (tab && TAB_OPTIONS.some((item) => item.key === tab)) {
+      setStatusFilter(tab);
+    }
+  }, [route.params?.initialTab, route.params?.tab]);
+
+  useEffect(() => {
+    if (statusFilter === 'offers') {
+      setLoading(false);
+      return undefined;
+    }
+
     const fetchRepairs = async () => {
       setLoading(true);
       try {
@@ -50,6 +74,15 @@ export default function ClientRepairsList({ navigation, route }) {
 
     fetchRepairs();
   }, [statusFilter]);
+
+  const selectTab = (tabKey) => {
+    setStatusFilter(tabKey);
+    if (Platform.OS === 'web' && !route.params?.fromVehicleDetail) {
+      const path =
+        tabKey === 'offers' ? repairRequests({ tab: 'offers' }) : repairRequests();
+      syncWebPath(path);
+    }
+  };
 
   const visibleRepairs = useMemo(() => {
     if (!scopedVehicleId) return repairs;
@@ -110,7 +143,7 @@ export default function ClientRepairsList({ navigation, route }) {
             return (
               <Pressable
                 key={tab.key}
-                onPress={() => setStatusFilter(tab.key)}
+                onPress={() => selectTab(tab.key)}
                 style={({ pressed }) => [
                   styles.tab,
                   active ? styles.tabActive : styles.tabInactive,
@@ -130,7 +163,11 @@ export default function ClientRepairsList({ navigation, route }) {
           })}
         </View>
 
-        {loading ? (
+        {statusFilter === 'offers' ? (
+          <View style={styles.offersWrap}>
+            <ClientRepairOffers activityReturnTo="ClientRepairs" />
+          </View>
+        ) : loading ? (
           <ActivityIndicator
             size="large"
             color="#fff"
@@ -161,6 +198,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 12,
     backgroundColor: 'transparent',
+  },
+  offersWrap: {
+    flex: 1,
   },
   tabRow: {
     flexDirection: 'row',

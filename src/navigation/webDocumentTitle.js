@@ -16,6 +16,11 @@ const PATH_TITLES = {
   '/forgot-password': BASE_TITLE,
   '/dashboard/vehicles': `${BASE_TITLE} My Vehicles`,
   '/dashboard/vehicles/add': `${BASE_TITLE} Add Vehicle`,
+  '/dashboard/notifications': `${BASE_TITLE} Notifications`,
+  '/dashboard/repair-requests': `${BASE_TITLE} Repair Requests`,
+  '/dashboard/service-history': `${BASE_TITLE} Service History`,
+  '/dashboard/bookings': `${BASE_TITLE} Bookings`,
+  '/dashboard/documents': `${BASE_TITLE} Documents`,
 };
 
 function vehicleDetailTitle(pathname) {
