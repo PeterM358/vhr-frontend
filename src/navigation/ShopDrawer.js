@@ -28,6 +28,7 @@ import {
   navigateToPartnerNotifications,
   navigateToPartnerProfile,
   navigateToPartnerPromotions,
+  navigateToPartnerServiceCenters,
   navigateToPartnerServices,
   navigateToPartnerSwitchCenter,
   navigateToPartnerWarehouse,
@@ -220,6 +221,22 @@ function CustomDrawerContent(props) {
             }
           }}
           icon={({ color, size }) => <DrawerMenuIcon name="bell-outline" color={color} size={size} />}
+          labelStyle={styles.itemLabel}
+          activeTintColor={COLORS.PRIMARY}
+          inactiveTintColor={COLORS.TEXT_DARK}
+        />
+
+        <DrawerItem
+          label="Explore Service Centers"
+          onPress={() => {
+            if (Platform.OS === 'web') {
+              navigateToPartnerServiceCenters(navigation);
+            } else {
+              resetFromShopDrawer(navigation, 'PartnerServiceCenters');
+            }
+            props.navigation.closeDrawer();
+          }}
+          icon={({ color, size }) => <DrawerMenuIcon name="map-search-outline" color={color} size={size} />}
           labelStyle={styles.itemLabel}
           activeTintColor={COLORS.PRIMARY}
           inactiveTintColor={COLORS.TEXT_DARK}

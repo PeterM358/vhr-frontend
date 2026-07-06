@@ -36,6 +36,7 @@ import {
   partnerServices,
   partnerNotifications,
   partnerSwitchCenter,
+  partnerServiceCenters,
   profile,
   repairRequests,
   serviceCenters,
@@ -159,6 +160,8 @@ export function getCanonicalWebPath(state) {
       return partnerNotifications();
     case 'ChooseShop':
       return partnerSwitchCenter();
+    case 'PartnerServiceCenters':
+      return partnerServiceCenters();
     case 'PartnerBookings':
       return partnerBookings();
     default:
@@ -316,6 +319,44 @@ export function getServiceCenterNavigationStateFromPath(path) {
     return { routes: [{ name: 'ShopMap' }] };
   }
 
+  const cityOnly = pathPart.match(/^service-centers\/([^/]+)$/);
+  if (cityOnly && !/^\d+$/.test(cityOnly[1])) {
+    return {
+      routes: [{ name: 'PublicSeoPage', params: { type: 'city', locale: 'en', citySlug: cityOnly[1] } }],
+    };
+  }
+
+  const explicitCenter = pathPart.match(/^service-centers\/([^/]+)\/c\/([^/]+)$/);
+  if (explicitCenter) {
+    return {
+      routes: [
+        { name: 'ShopMap' },
+        {
+          name: 'ShopDetail',
+          params: { locale: 'en', citySlug: explicitCenter[1], centerSlug: explicitCenter[2] },
+        },
+      ],
+      index: 1,
+    };
+  }
+
+  const segmentMatch = pathPart.match(/^service-centers\/([^/]+)\/([^/]+)$/);
+  if (segmentMatch && !/^\d+$/.test(segmentMatch[2])) {
+    return {
+      routes: [
+        {
+          name: 'PublicSeoPage',
+          params: {
+            type: 'city_segment',
+            locale: 'en',
+            citySlug: segmentMatch[1],
+            segment: segmentMatch[2],
+          },
+        },
+      ],
+    };
+  }
+
   const match = pathPart.match(/^service-centers\/(\d+)$/);
   if (match) {
     const shopId = parseInt(match[1], 10);
@@ -442,6 +483,12 @@ export function getPartnerNavigationStateFromPath(path) {
   if (pathPart === 'partner/switch-center') {
     return {
       routes: [partnerHome, { name: 'ChooseShop' }],
+      index: 1,
+    };
+  }
+  if (pathPart === 'partner/service-centers') {
+    return {
+      routes: [partnerHome, { name: 'PartnerServiceCenters' }],
       index: 1,
     };
   }

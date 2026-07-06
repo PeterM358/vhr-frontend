@@ -5,9 +5,11 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 
 import {
   fetchSeoCityDirectory,
+  fetchSeoCitySegment,
   fetchSeoCompositeLanding,
   fetchSeoServiceCity,
   fetchSeoVehicleServiceCity,
+  resolveSeoPathSegment,
 } from '../api/seo';
 import AppCard from '../components/ui/AppCard';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
@@ -61,7 +63,7 @@ function CenterCard({ center, locale, navigation }) {
 
 export default function PublicSeoPageScreen({ route, navigation }) {
   const theme = useTheme();
-  const { type, locale = 'en', citySlug, repairSlug, vehicleSlug, landingSlug } = route.params || {};
+  const { type, locale = 'en', citySlug, repairSlug, vehicleSlug, landingSlug, segment } = route.params || {};
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -73,6 +75,18 @@ export default function PublicSeoPageScreen({ route, navigation }) {
       let data;
       if (type === 'city') {
         data = await fetchSeoCityDirectory(locale, citySlug);
+      } else if (type === 'city_segment') {
+        const resolved = await resolveSeoPathSegment(locale, citySlug, segment);
+        if (resolved.page_type === 'service_center') {
+          navigation.replace('ShopDetail', {
+            locale,
+            citySlug: resolved.city_slug,
+            centerSlug: resolved.center_slug,
+            shopId: resolved.shop_id,
+          });
+          return;
+        }
+        data = await fetchSeoCitySegment(locale, citySlug, segment);
       } else if (type === 'vehicle_service_city') {
         data = await fetchSeoVehicleServiceCity(locale, vehicleSlug, repairSlug, citySlug);
       } else if (type === 'landing') {
@@ -95,7 +109,7 @@ export default function PublicSeoPageScreen({ route, navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [type, locale, citySlug, repairSlug, vehicleSlug, landingSlug]);
+  }, [type, locale, citySlug, repairSlug, vehicleSlug, landingSlug, segment, navigation]);
 
   useEffect(() => {
     loadPage();

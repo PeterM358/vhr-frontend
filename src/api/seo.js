@@ -51,8 +51,18 @@ export function fetchSeoCompositeLanding(locale, landingSlug, citySlug) {
 
 export function fetchSeoServiceCenterDetail(locale, citySlug, centerSlug) {
   return seoFetch(
-    `/api/public/seo/service-centers/${encodeURIComponent(locale)}/${encodeURIComponent(citySlug)}/${encodeURIComponent(centerSlug)}/`
+    `/api/public/seo/service-centers/${encodeURIComponent(locale)}/${encodeURIComponent(citySlug)}/c/${encodeURIComponent(centerSlug)}/`
   );
+}
+
+export function fetchSeoCitySegment(locale, citySlug, segment) {
+  return seoFetch(
+    `/api/public/seo/service-centers/${encodeURIComponent(locale)}/${encodeURIComponent(citySlug)}/${encodeURIComponent(segment)}/`
+  );
+}
+
+export function resolveSeoPathSegment(locale, citySlug, segment) {
+  return seoFetch('/api/public/seo/resolve-path/', { locale, city_slug: citySlug, segment });
 }
 
 export function fetchSeoServiceCenters(params = {}) {

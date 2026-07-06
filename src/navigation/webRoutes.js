@@ -180,6 +180,9 @@ export function normalizeWebPath(input) {
   if (raw === 'ChooseShop' || raw.startsWith('ChooseShop')) {
     return `${PARTNER}/switch-center${query}`;
   }
+  if (raw === 'partner/service-centers' || raw.endsWith('/partner/service-centers')) {
+    return `${PARTNER}/service-centers${query}`;
+  }
 
   return pathWithOptionalSlash.startsWith('/')
     ? `${pathWithOptionalSlash}${query}`
@@ -314,6 +317,10 @@ export function partnerNotifications(params = {}) {
 
 export function partnerSwitchCenter(params = {}) {
   return buildPathWithQuery(`${PARTNER}/switch-center`, params);
+}
+
+export function partnerServiceCenters(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/service-centers`, params);
 }
 
 function buildPathWithQuery(base, params = {}) {

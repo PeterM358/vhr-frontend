@@ -24,6 +24,7 @@ export { default as CreateVehicleScreen } from '../screens/CreateVehicleScreen';
 export { default as CreatePromotionScreen } from '../screens/CreatePromotionScreen';
 export { default as ShopRegisterClientScreen } from '../screens/ShopRegisterClientScreen';
 export { default as ChooseShopScreen } from '../screens/ChooseShopScreen';
+export { default as PartnerServiceCentersScreen } from '../screens/PartnerServiceCentersScreen';
 export { default as ClientActivityScreen } from '../screens/ClientActivityScreen';
 export { default as ClientServiceHistoryScreen } from '../screens/ClientServiceHistoryScreen';
 export { default as ClientDashboardPlaceholderScreen } from '../screens/ClientDashboardPlaceholderScreen';

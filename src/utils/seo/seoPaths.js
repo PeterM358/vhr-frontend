@@ -1,5 +1,8 @@
 /**
  * Parse and build locale-aware public SEO URL paths.
+ *
+ * Future: /service-centers/:city/:brand landing pages (vehicle brand filter) — not implemented;
+ * use repair-type directory paths and map brand filters instead.
  */
 
 export const SEO_LOCALES = ['en', 'bg'];
@@ -28,6 +31,18 @@ export function buildCityDirectoryPath({ locale = 'en', citySlug }) {
 export function buildServiceCityPath({ locale = 'en', repairSlug, citySlug }) {
   const loc = normalizeSeoLocale(locale);
   return `/${loc}/${repairSlug}/${citySlug}`;
+}
+
+export function buildServiceCenterExplicitPath({ locale = 'en', citySlug, centerSlug }) {
+  const loc = normalizeSeoLocale(locale);
+  const segment = cityDirectorySegment(loc);
+  return `/${loc}/${segment}/${citySlug}/c/${centerSlug}`;
+}
+
+export function buildServiceCityDirectoryPath({ locale = 'en', citySlug, repairSlug }) {
+  const loc = normalizeSeoLocale(locale);
+  const segment = cityDirectorySegment(loc);
+  return `/${loc}/${segment}/${citySlug}/${repairSlug}`;
 }
 
 export function buildVehicleServiceCityPath({ locale = 'en', vehicleSlug, repairSlug, citySlug }) {
@@ -74,12 +89,21 @@ export function parsePublicSeoPath(path) {
     };
   }
 
-  if (segment === citySegment && parts.length === 4) {
+  if (segment === citySegment && parts.length === 5 && parts[3] === 'c') {
     return {
       type: 'service_center',
       locale,
       citySlug: parts[2],
-      centerSlug: parts[3],
+      centerSlug: parts[4],
+    };
+  }
+
+  if (segment === citySegment && parts.length === 4) {
+    return {
+      type: 'city_segment',
+      locale,
+      citySlug: parts[2],
+      segment: parts[3],
     };
   }
 
@@ -115,7 +139,17 @@ export function parsePublicSeoPath(path) {
 export function buildPathFromSeoParams(params = {}) {
   const { type, locale = 'en', citySlug, centerSlug, repairSlug, vehicleSlug, landingSlug } = params;
   if (type === 'service_center' && citySlug && centerSlug) {
-    return buildServiceCenterPath({ locale, citySlug, centerSlug });
+    return buildServiceCenterExplicitPath({ locale, citySlug, centerSlug });
+  }
+  if (type === 'city_segment' && citySlug && params.segment) {
+    return buildServiceCityDirectoryPath({
+      locale,
+      citySlug,
+      repairSlug: params.repairSlug || params.segment,
+    });
+  }
+  if (type === 'service_city_directory' && citySlug && repairSlug) {
+    return buildServiceCityDirectoryPath({ locale, citySlug, repairSlug });
   }
   if (type === 'city' && citySlug) {
     return buildCityDirectoryPath({ locale, citySlug });
@@ -132,6 +166,12 @@ export function buildPathFromSeoParams(params = {}) {
 export function getNavigationStateFromSeoPath(path) {
   const parsed = parsePublicSeoPath(path);
   if (!parsed) return null;
+
+  if (parsed.type === 'city_segment') {
+    return {
+      routes: [{ name: 'PublicSeoPage', params: parsed }],
+    };
+  }
 
   if (parsed.type === 'service_center') {
     return {

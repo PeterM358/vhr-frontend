@@ -36,6 +36,7 @@ import {
   partnerServices,
   partnerNotifications,
   partnerSwitchCenter,
+  partnerServiceCenters,
 } from './webRoutes';
 
 const PARTNER_HOME_ROUTE = {
@@ -486,6 +487,19 @@ export function navigateToPartnerSwitchCenter(navigation) {
   }
   const root = getRootNavigation(navigation);
   root.navigate('ChooseShop');
+}
+
+export function navigateToPartnerServiceCenters(navigation, params = {}) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(
+      navigation,
+      [{ name: 'PartnerServiceCenters', params }],
+      partnerServiceCenters()
+    );
+    return;
+  }
+  const root = getRootNavigation(navigation);
+  root.navigate('PartnerServiceCenters', params);
 }
 
 export function navigateToPartnerBookings(navigation) {
