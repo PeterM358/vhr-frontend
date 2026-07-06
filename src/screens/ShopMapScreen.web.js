@@ -1,5 +1,5 @@
 /**
- * Lazy loader — Leaflet lives in ShopMapScreen.impl.web.js (separate chunk).
+ * Lazy loader — Leaflet lives in mapsBundle.web.js (shared async chunk).
  */
 
 import React, { useEffect, useState } from 'react';
@@ -10,9 +10,9 @@ export default function ShopMapScreen(props) {
 
   useEffect(() => {
     let alive = true;
-    import('./ShopMapScreen.impl.web')
+    import('./mapsBundle.web')
       .then((mod) => {
-        if (alive) setImpl(() => mod.default);
+        if (alive) setImpl(() => mod.ShopMapScreen);
       })
       .catch((err) => {
         console.error('Failed to load map screen', err);
