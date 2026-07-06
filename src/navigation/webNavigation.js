@@ -13,6 +13,7 @@ import {
   serviceHistory,
   bookings,
   documents,
+  profile,
   vehicleAdd,
   vehicleDetail,
   vehicles,
@@ -237,6 +238,14 @@ export function navigateToDocuments(navigation) {
     title: 'Documents',
     body: 'Vehicle documents, invoices and warranty files will be collected here.',
   });
+}
+
+export function navigateToProfile(navigation) {
+  if (Platform.OS === 'web') {
+    resetWebRoutes(navigation, [{ name: 'ClientProfile' }], profile());
+    return;
+  }
+  navigation.navigate('ClientProfile');
 }
 
 export function navigateToVehicleServiceRecordCenterAdd(navigation, vehicleId, params = {}) {

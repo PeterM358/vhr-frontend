@@ -38,6 +38,7 @@ const DASHBOARD_SECTION_PATTERNS = [
   'dashboard/notifications',
   'dashboard/bookings',
   'dashboard/documents',
+  'dashboard/profile',
 ];
 
 function escapeRegex(value) {
@@ -189,6 +190,10 @@ export function bookings(params = {}) {
 
 export function documents(params = {}) {
   return buildPathWithQuery(`${DASHBOARD}/documents`, params);
+}
+
+export function profile(params = {}) {
+  return buildPathWithQuery(`${DASHBOARD}/profile`, params);
 }
 
 function buildPathWithQuery(base, params = {}) {

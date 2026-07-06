@@ -21,6 +21,7 @@ const PATH_TITLES = {
   '/dashboard/service-history': `${BASE_TITLE} Service History`,
   '/dashboard/bookings': `${BASE_TITLE} Bookings`,
   '/dashboard/documents': `${BASE_TITLE} Documents`,
+  '/dashboard/profile': `${BASE_TITLE} Profile`,
 };
 
 function vehicleDetailTitle(pathname) {

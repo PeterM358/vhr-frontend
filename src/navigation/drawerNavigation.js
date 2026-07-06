@@ -8,6 +8,7 @@ import { CommonActions } from '@react-navigation/native';
 import { syncWebPath } from './authNavigation';
 import {
   notifications,
+  profile,
   repairRequests,
   serviceHistory,
   vehicleAdd,
@@ -29,6 +30,7 @@ const WEB_PATH_BY_SCREEN = {
   ClientNotifications: notifications(),
   ClientRepairs: repairRequests(),
   ClientServiceHistory: serviceHistory(),
+  ClientProfile: profile(),
 };
 
 function resolveDrawerWebPath(screenName, params) {

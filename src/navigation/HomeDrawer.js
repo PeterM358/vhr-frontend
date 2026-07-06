@@ -11,10 +11,10 @@ import HomeScreen from '../screens/HomeScreen';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import { logout } from '../api/auth';
-import { resetFromClientDrawer } from './drawerNavigation';
 import { openServiceCenters } from './serviceCentersNavigation';
 import {
   navigateToNotifications,
+  navigateToProfile,
   navigateToRepairRequests,
   navigateToVehicleList,
 } from './webNavigation';
@@ -57,7 +57,10 @@ function CustomDrawerContent(props) {
 
         <DrawerItem
           label="Profile"
-          onPress={() => resetFromClientDrawer(navigation, 'ClientProfile')}
+          onPress={() => {
+            const root = navigation.getParent?.() || navigation;
+            navigateToProfile(root);
+          }}
           icon={({ color, size }) => (
             <DrawerMenuIcon name="account-circle-outline" color={color} size={size} />
           )}

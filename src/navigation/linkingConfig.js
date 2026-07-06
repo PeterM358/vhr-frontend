@@ -83,6 +83,7 @@ export const linkingScreens = {
   ClientServiceHistory: 'dashboard/service-history',
   ClientBookings: 'dashboard/bookings',
   ClientDocuments: 'dashboard/documents',
+  ClientProfile: 'dashboard/profile',
 };
 
 export const linkingConfig = { screens: linkingScreens };
