@@ -33,6 +33,7 @@ import FloatingCard from '../components/ui/FloatingCard';
 import { NOTIFICATION_CENTER_PLACEHOLDERS } from '../constants/clientDashboardPlaceholders';
 import { COLORS } from '../constants/colors';
 import { resetFromClientDrawer } from '../navigation/drawerNavigation';
+import { navigateToVehicleDetail } from '../navigation/webNavigation';
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import { resetToPublicHome } from '../navigation/authNavigation';
 import { showMessage } from '../utils/crossPlatformAlert';
@@ -153,7 +154,7 @@ export default function HomeScreen({ navigation }) {
   const goVehicleDetail = (vehicle) => {
     if (!vehicle?.id) return;
     const root = navigation.getParent?.() || navigation;
-    root.navigate('VehicleDetail', { vehicleId: vehicle.id });
+    navigateToVehicleDetail(root, vehicle.id);
   };
   const goVehicles = () => resetFromClientDrawer(navigation, 'ClientVehicles');
   const goRepairs = () => resetFromClientDrawer(navigation, 'ClientRepairs');

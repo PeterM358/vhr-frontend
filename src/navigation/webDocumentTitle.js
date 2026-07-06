@@ -18,6 +18,19 @@ const PATH_TITLES = {
   '/my-vehicles/add': `${BASE_TITLE} Add Vehicle`,
 };
 
+function vehicleDetailTitle(pathname) {
+  if (/^\/my-vehicles\/\d+$/.test(pathname)) {
+    return `${BASE_TITLE} Vehicle Details`;
+  }
+  if (/^\/my-vehicles\/\d+\/specs$/.test(pathname)) {
+    return `${BASE_TITLE} Vehicle Specs`;
+  }
+  if (/^\/my-vehicles\/\d+\/service-record\/new$/.test(pathname)) {
+    return `${BASE_TITLE} Add Service Record`;
+  }
+  return null;
+}
+
 export function normalizeWebTitlePath(pathname) {
   const raw = String(pathname || '/').split('?')[0].split('#')[0];
   if (!raw || raw === '/') return '/';
@@ -28,6 +41,10 @@ export function getWebDocumentTitle(pathname) {
   const normalized = normalizeWebTitlePath(pathname);
   if (PATH_TITLES[normalized]) {
     return PATH_TITLES[normalized];
+  }
+  const vehicleTitle = vehicleDetailTitle(normalized);
+  if (vehicleTitle) {
+    return vehicleTitle;
   }
   if (normalized.startsWith('/service-center/')) {
     return `${BASE_TITLE} Service Center`;

@@ -3,7 +3,10 @@
  * Back from those screens should return to Home / ShopHome, not stale detail history.
  */
 
+import { Platform } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
+import { syncWebPath } from './authNavigation';
+import { vehicleAdd, vehicleList } from './webRoutes';
 
 function getRootNavigation(navigation) {
   let current = navigation;
@@ -12,6 +15,11 @@ function getRootNavigation(navigation) {
   }
   return current;
 }
+
+const WEB_PATH_BY_SCREEN = {
+  ClientVehicles: vehicleList(),
+  CreateVehicle: vehicleAdd(),
+};
 
 export function resetFromClientDrawer(navigation, screenName, params) {
   const root = getRootNavigation(navigation);
@@ -22,6 +30,12 @@ export function resetFromClientDrawer(navigation, screenName, params) {
       routes: [{ name: 'Home' }, target],
     })
   );
+  if (Platform.OS === 'web') {
+    const webPath = WEB_PATH_BY_SCREEN[screenName];
+    if (webPath) {
+      syncWebPath(webPath);
+    }
+  }
 }
 
 export function resetFromShopDrawer(navigation, screenName, params) {

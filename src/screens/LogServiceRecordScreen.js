@@ -68,6 +68,8 @@ import {
   filterServiceRecordRepairTypes,
   classifyServiceRecordFormVariant,
   resolveOwnerLoggedRepairMoney,
+  findServiceRecordTypeByVariant,
+  resolveServiceRecordVariantParam,
 } from '../utils/serviceRecordRepairTypes';
 import {
   pickOdometerPhotoAttachment,
@@ -542,6 +544,24 @@ export default function LogServiceRecordScreen({ navigation, route }) {
     };
     load();
   }, [vehicleId]);
+
+  useEffect(() => {
+    if (loading || repairTypeId || !filteredTypes.length) return;
+    const typeParam = route.params?.type;
+    if (!typeParam) return;
+    const variant = resolveServiceRecordVariantParam(typeParam);
+    const match = findServiceRecordTypeByVariant(filteredTypes, variant);
+    if (match?.id != null) {
+      setRepairTypeId(String(match.id));
+    }
+  }, [loading, repairTypeId, filteredTypes, route.params?.type]);
+
+  useEffect(() => {
+    if (!vehicle || finalKilometers) return;
+    if (route.params?.prefillKm !== true) return;
+    if (vehicle.kilometers == null || vehicle.kilometers === '') return;
+    setFinalKilometers(String(vehicle.kilometers));
+  }, [vehicle, route.params?.prefillKm, finalKilometers]);
 
   useEffect(() => {
     if (!repairTypeId) return;

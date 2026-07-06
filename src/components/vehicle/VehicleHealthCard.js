@@ -184,7 +184,7 @@ export default function VehicleHealthCard({ health, onAction }) {
               <InlineAction
                 label={row.button}
                 accent={theme.accent}
-                onPress={() => onAction?.(row.actionKey)}
+                onPress={() => onAction?.(row.actionKey, row)}
               />
             </View>
           ))}
@@ -200,7 +200,7 @@ export default function VehicleHealthCard({ health, onAction }) {
         <Button
           mode="contained"
           compact
-          onPress={() => onAction?.('add_service_history')}
+          onPress={() => onAction?.('add_service_history', null)}
           style={styles.primaryCta}
           labelStyle={styles.primaryCtaLabel}
           buttonColor={theme.accent}

@@ -49,6 +49,7 @@ import {
 } from '../utils/mileageConfidence';
 import { mapHealthFromApi } from '../utils/vehicleHealthStatus';
 import { formatBookingAccessHint, formatRevokeConfirmMessage } from '../utils/shopDataAccess';
+import { navigateToVehicleServiceRecordNew, navigateToVehicleSpecs } from '../navigation/webNavigation';
 
 const BASE_VEHICLE_REMINDER_SECTION_ROWS = [
   { reminder_type: 'insurance', label: 'Insurance', icon: 'shield-check-outline' },
@@ -151,6 +152,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
 
   const theme = useTheme();
   const scrollRef = useRef(null);
+  const remindersSectionRef = useRef(null);
   const sectionScrollYs = useRef({
     activeRepairs: null,
     serviceHistory: null,
@@ -251,7 +253,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
   };
 
   const openVehicleSpecs = () => {
-    navigation.navigate('VehicleSpecs', { vehicleId });
+    navigateToVehicleSpecs(navigation, vehicleId);
   };
 
   const openKmModal = () => {
@@ -403,6 +405,45 @@ export default function VehicleDetailScreen({ route, navigation }) {
     scrollRef.current.scrollTo({ y: Math.max(0, y - 10), animated: true });
   }, []);
 
+  const scrollToRemindersSection = useCallback(() => {
+    setSectionsExpanded((prev) => ({ ...prev, remindersObligations: true }));
+
+    const doScroll = (attempt = 0) => {
+      const scrollNode = scrollRef.current;
+      const sectionNode = remindersSectionRef.current;
+      if (scrollNode && sectionNode?.measureLayout) {
+        try {
+          sectionNode.measureLayout(
+            scrollNode.getInnerViewNode?.() ?? scrollNode,
+            (_x, y) => {
+              scrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true });
+            },
+            () => {
+              if (attempt < 8) {
+                setTimeout(() => doScroll(attempt + 1), 80);
+              }
+            }
+          );
+          return;
+        } catch (_err) {
+          // Fall back to cached layout offset below.
+        }
+      }
+      const cachedY = sectionScrollYs.current.reminders;
+      if (cachedY != null) {
+        scrollToY(cachedY);
+        return;
+      }
+      if (attempt < 8) {
+        setTimeout(() => doScroll(attempt + 1), 80);
+      }
+    };
+
+    requestAnimationFrame(() => {
+      setTimeout(() => doScroll(), 120);
+    });
+  }, [scrollToY]);
+
   const scrollToServiceHistorySection = useCallback(() => {
     if (!serviceHistorySorted.length) {
       Alert.alert('No completed service', 'Completed jobs will appear in service history.');
@@ -458,25 +499,34 @@ export default function VehicleDetailScreen({ route, navigation }) {
     });
   }, [scrollToY]);
 
-  const navigateLogServiceRecord = useCallback(() => {
-    navigation.navigate('LogServiceRecord', {
-      vehicleId,
-      returnTo: 'VehicleDetail',
-      origin: 'VehicleDetail',
-    });
-  }, [navigation, vehicleId]);
+  const navigateLogServiceRecord = useCallback(
+    (extraParams = {}) => {
+      navigateToVehicleServiceRecordNew(navigation, vehicleId, {
+        returnTo: 'VehicleDetail',
+        origin: 'VehicleDetail',
+        ...extraParams,
+      });
+    },
+    [navigation, vehicleId]
+  );
 
   const vehicleHealth = useMemo(() => mapHealthFromApi(vehicle), [vehicle]);
 
   const handleHealthAction = useCallback(
-    (actionKey) => {
+    (actionKey, row) => {
       switch (actionKey) {
         case 'update_km':
           openKmModal();
           break;
         case 'log_service':
         case 'add_service_history':
-          navigateLogServiceRecord();
+          if (row?.id === 'oil') {
+            navigateLogServiceRecord({ type: 'oil_service', prefillKm: true });
+          } else if (row?.id === 'brake') {
+            navigateLogServiceRecord({ type: 'brake', prefillKm: true });
+          } else {
+            navigateLogServiceRecord();
+          }
           break;
         case 'schedule':
         case 'schedule_maintenance':
@@ -497,16 +547,13 @@ export default function VehicleDetailScreen({ route, navigation }) {
           break;
         case 'reminders':
         case 'configure_reminders':
-          setSectionsExpanded((prev) => ({ ...prev, remindersObligations: true }));
-          requestAnimationFrame(() => {
-            setTimeout(() => scrollToY(sectionScrollYs.current.reminders), 80);
-          });
+          scrollToRemindersSection();
           break;
         default:
           break;
       }
     },
-    [navigation, vehicleId, navigateLogServiceRecord, scrollToY]
+    [navigation, vehicleId, navigateLogServiceRecord, scrollToRemindersSection, openKmModal]
   );
 
   const handleMileageFactorPress = useCallback(
@@ -543,7 +590,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
           }
           break;
         case 'vehicle_specs':
-          navigation.navigate('VehicleSpecs', { vehicleId });
+          navigateToVehicleSpecs(navigation, vehicleId);
           break;
         default:
           scrollToServiceHistorySection();
@@ -913,11 +960,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
       {
         text: 'Add service record',
         onPress: () =>
-          navigation.navigate('LogServiceRecord', {
-            vehicleId,
-            returnTo: 'VehicleDetail',
-            origin: 'VehicleDetail',
-          }),
+          navigateLogServiceRecord(),
       },
       {
         text: 'Add obligation / payment',
@@ -1253,6 +1296,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
 
           <FloatingCard>
             <View
+              ref={remindersSectionRef}
               collapsable={false}
               onLayout={(e) => {
                 sectionScrollYs.current.reminders = e.nativeEvent.layout.y;

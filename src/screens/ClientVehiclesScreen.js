@@ -7,6 +7,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 
 import ScreenBackground from '../components/ScreenBackground';
 import { useStackBodyPaddingTop } from '../navigation/stackContentInset';
+import { navigateToVehicleAdd, navigateToVehicleDetail } from '../navigation/webNavigation';
 
 export default function ClientVehiclesScreen({ navigation }) {
   const bodyPadTop = useStackBodyPaddingTop(12);
@@ -46,7 +47,7 @@ export default function ClientVehiclesScreen({ navigation }) {
     <TouchableRipple
       style={styles.card}
       borderless
-      onPress={() => navigation.navigate('VehicleDetail', { vehicleId: item.id })}
+      onPress={() => navigateToVehicleDetail(navigation, item.id)}
     >
       <View style={styles.cardInner}>
         <View style={styles.thumb}>
@@ -108,7 +109,7 @@ export default function ClientVehiclesScreen({ navigation }) {
         <FAB
           icon="plus"
           style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-          onPress={() => navigation.navigate('CreateVehicle')}
+          onPress={() => navigateToVehicleAdd(navigation)}
           label="Add Vehicle"
           color={theme.colors.onPrimary}
         />

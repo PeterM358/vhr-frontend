@@ -19,6 +19,19 @@ export function filterServiceRecordRepairTypes(types) {
   });
 }
 
+/** Map health-action / URL type tokens to form variants. */
+export function resolveServiceRecordVariantParam(typeParam) {
+  const key = String(typeParam || '').toLowerCase();
+  if (key === 'oil_service' || key === 'oil') return 'oil';
+  if (key === 'brake' || key === 'brake_service') return 'brake_service';
+  return key || null;
+}
+
+export function findServiceRecordTypeByVariant(types, variant) {
+  if (!variant || !Array.isArray(types)) return null;
+  return types.find((type) => classifyServiceRecordFormVariant(type) === variant) || null;
+}
+
 /** Drives conditional fields on Add Service Record (completed work only). */
 export function classifyServiceRecordFormVariant(type) {
   if (!type) return 'generic';

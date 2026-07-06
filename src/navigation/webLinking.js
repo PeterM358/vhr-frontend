@@ -16,6 +16,108 @@ import {
   getNavigationStateFromSeoPath,
   getSeoPathFromNavigationState,
 } from '../utils/seo/seoPaths';
+import { parseServiceRecordQuery } from './webRoutes';
+
+function findFocusedRoute(state) {
+  if (!state?.routes?.length) return null;
+  const index = typeof state.index === 'number' ? state.index : state.routes.length - 1;
+  let route = state.routes[index];
+  while (route?.state?.routes?.length) {
+    const nestedIndex =
+      typeof route.state.index === 'number' ? route.state.index : route.state.routes.length - 1;
+    route = route.state.routes[nestedIndex];
+  }
+  return route;
+}
+
+function buildServiceRecordPathSuffix(params = {}) {
+  const query = new URLSearchParams();
+  if (params.type != null && params.type !== '') {
+    query.set('type', String(params.type));
+  }
+  const serialized = query.toString();
+  return serialized ? `?${serialized}` : '';
+}
+
+/** Emit a single canonical path for the focused route (avoids stacked my-vehicles segments). */
+export function getCanonicalWebPath(state) {
+  const route = findFocusedRoute(state);
+  if (!route?.name) return null;
+
+  const params = route.params || {};
+  const vehicleId = params.vehicleId;
+
+  switch (route.name) {
+    case 'PublicHome':
+      return '';
+    case 'Home':
+    case 'HomeMain':
+      return 'dashboard';
+    case 'ClientVehicles':
+      return 'my-vehicles';
+    case 'CreateVehicle':
+      return 'my-vehicles/add';
+    case 'VehicleDetail':
+      return vehicleId != null ? `my-vehicles/${vehicleId}` : 'my-vehicles';
+    case 'VehicleSpecs':
+      return vehicleId != null ? `my-vehicles/${vehicleId}/specs` : 'my-vehicles';
+    case 'LogServiceRecord':
+      return vehicleId != null
+        ? `my-vehicles/${vehicleId}/service-record/new${buildServiceRecordPathSuffix(params)}`
+        : 'my-vehicles';
+    default:
+      return null;
+  }
+}
+
+/** Parse vehicle-related web paths into navigation state. */
+export function getVehicleNavigationStateFromPath(path) {
+  const trimmed = String(path || '').replace(/^\//, '').replace(/\/$/, '');
+  if (!trimmed) return null;
+
+  const [pathPart, queryPart] = trimmed.split('?');
+  const query = parseServiceRecordQuery(queryPart);
+
+  if (pathPart === 'my-vehicles') {
+    return { routes: [{ name: 'ClientVehicles' }] };
+  }
+  if (pathPart === 'my-vehicles/add') {
+    return { routes: [{ name: 'CreateVehicle' }] };
+  }
+
+  let match = pathPart.match(/^my-vehicles\/(\d+)\/service-record\/new$/);
+  if (match) {
+    const id = parseInt(match[1], 10);
+    if (!Number.isFinite(id)) return null;
+    return {
+      routes: [
+        {
+          name: 'LogServiceRecord',
+          params: {
+            vehicleId: id,
+            ...query,
+          },
+        },
+      ],
+    };
+  }
+
+  match = pathPart.match(/^my-vehicles\/(\d+)\/specs$/);
+  if (match) {
+    const id = parseInt(match[1], 10);
+    if (!Number.isFinite(id)) return null;
+    return { routes: [{ name: 'VehicleSpecs', params: { vehicleId: id } }] };
+  }
+
+  match = pathPart.match(/^my-vehicles\/(\d+)$/);
+  if (match) {
+    const id = parseInt(match[1], 10);
+    if (!Number.isFinite(id)) return null;
+    return { routes: [{ name: 'VehicleDetail', params: { vehicleId: id } }] };
+  }
+
+  return null;
+}
 
 /** Collapse duplicated my-vehicles segments produced by stacked sibling routes. */
 export function collapseDuplicateVehiclePath(path) {
@@ -61,6 +163,9 @@ export function normalizeWebLinkingPath(path) {
     return trimmed.replace(/^ClientVehicles/, 'my-vehicles');
   }
   if (trimmed === 'CreateVehicle' || trimmed.startsWith('CreateVehicle/')) {
+    return 'my-vehicles/add';
+  }
+  if (trimmed === 'add' || trimmed.startsWith('add/')) {
     return 'my-vehicles/add';
   }
   if (trimmed.startsWith('my-vehicles/my-vehicles/')) {
@@ -133,6 +238,8 @@ export async function redirectLegacyWebUrl() {
     target = pathname.replace(/^\/ClientVehicles/, '/my-vehicles');
   } else if (pathname === '/CreateVehicle' || pathname.startsWith('/CreateVehicle/')) {
     target = '/my-vehicles/add';
+  } else if (pathname === '/add' || pathname.startsWith('/add/')) {
+    target = '/my-vehicles/add';
   } else if (pathname.startsWith('/my-vehicles/my-vehicles/')) {
     target = pathname.replace(/^\/my-vehicles\/my-vehicles/, '/my-vehicles');
   } else if (pathname === '/VehicleDetail' || pathname.startsWith('/VehicleDetail/')) {
@@ -180,6 +287,10 @@ export function buildAppLinking(prefixes) {
       if (seoState) {
         return seoState;
       }
+      const vehicleState = getVehicleNavigationStateFromPath(normalized);
+      if (vehicleState) {
+        return vehicleState;
+      }
       return getStateFromPathDefault(normalized, {
         ...options,
         ...linkingConfig,
@@ -189,6 +300,10 @@ export function buildAppLinking(prefixes) {
       const seoPath = getSeoPathFromNavigationState(state);
       if (seoPath) {
         return seoPath.replace(/^\//, '');
+      }
+      const canonical = getCanonicalWebPath(state);
+      if (canonical != null) {
+        return collapseDuplicateVehiclePath(canonical);
       }
       const path = collapseDuplicateVehiclePath(
         getPathFromStateDefault(state, {

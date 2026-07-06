@@ -73,11 +73,12 @@ import SelectOfferPartsScreen from '../screens/SelectOfferPartsScreen';
 import PasswordRequestResetScreen from '../screens/PasswordRequestResetScreen';
 import PasswordConfirmResetScreen from '../screens/PasswordConfirmResetScreen';
 
-import { buildAppLinking, redirectLegacyWebUrl, collapseDuplicateVehiclePath } from './webLinking';
+import { buildAppLinking, redirectLegacyWebUrl, collapseDuplicateVehiclePath, getCanonicalWebPath } from './webLinking';
 import { linkingConfig } from './linkingConfig';
 import { syncWebDocumentTitle } from './webDocumentTitle';
 import { blurActiveElementOnWeb } from '../utils/webFocus';
 import NavigationFallback from './NavigationFallback';
+import { navigateToDashboard, navigateToVehicleDetail, navigateToVehicleList } from './webNavigation';
 
 const Stack = createNativeStackNavigator();
 
@@ -151,7 +152,25 @@ function drawerHeaderLeft(navigation, homeRoute, label = 'Home') {
 }
 
 function homeHeaderLeft(navigation) {
-  return drawerHeaderLeft(navigation, 'Home', 'Home');
+  return () => (
+    <Pressable
+      onPress={() => navigateToDashboard(navigation)}
+      accessibilityRole="button"
+      accessibilityLabel="Back"
+      hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        minHeight: Platform.OS === 'android' ? 52 : 44,
+        paddingVertical: 8,
+        paddingRight: 10,
+        paddingLeft: Platform.OS === 'android' ? 4 : 0,
+      }}
+    >
+      <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
+      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>Home</Text>
+    </Pressable>
+  );
 }
 
 function shopHomeHeaderLeft(navigation) {
@@ -161,7 +180,7 @@ function shopHomeHeaderLeft(navigation) {
 function vehicleDetailsHeaderLeft(navigation) {
   return () => (
     <Pressable
-      onPress={() => navigation.navigate('ClientVehicles')}
+      onPress={() => navigateToVehicleList(navigation)}
       accessibilityRole="button"
       accessibilityLabel="Back to vehicles"
       hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
@@ -176,6 +195,50 @@ function vehicleDetailsHeaderLeft(navigation) {
     >
       <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
       <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>My Vehicles</Text>
+    </Pressable>
+  );
+}
+
+function vehicleSpecsHeaderLeft(navigation, vehicleId) {
+  return () => (
+    <Pressable
+      onPress={() => navigateToVehicleDetail(navigation, vehicleId)}
+      accessibilityRole="button"
+      accessibilityLabel="Back to vehicle details"
+      hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        minHeight: Platform.OS === 'android' ? 52 : 44,
+        paddingVertical: 8,
+        paddingRight: 10,
+        paddingLeft: Platform.OS === 'android' ? 4 : 0,
+      }}
+    >
+      <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
+      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>Vehicle</Text>
+    </Pressable>
+  );
+}
+
+function logServiceRecordHeaderLeft(navigation, vehicleId) {
+  return () => (
+    <Pressable
+      onPress={() => navigateToVehicleDetail(navigation, vehicleId)}
+      accessibilityRole="button"
+      accessibilityLabel="Back to vehicle details"
+      hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        minHeight: Platform.OS === 'android' ? 52 : 44,
+        paddingVertical: 8,
+        paddingRight: 10,
+        paddingLeft: Platform.OS === 'android' ? 4 : 0,
+      }}
+    >
+      <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
+      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>Vehicle</Text>
     </Pressable>
   );
 }
@@ -204,9 +267,12 @@ export default function AppNavigator() {
       return;
     }
     try {
-      const path = collapseDuplicateVehiclePath(
-        getPathFromState(navigationRef.current.getRootState(), linkingConfig)
-      );
+      const rootState = navigationRef.current.getRootState();
+      const canonical = getCanonicalWebPath(rootState);
+      const path =
+        canonical != null
+          ? collapseDuplicateVehiclePath(canonical)
+          : collapseDuplicateVehiclePath(getPathFromState(rootState, linkingConfig));
       const pathname = path ? `/${String(path).replace(/^\//, '')}` : '/';
       syncWebDocumentTitle(pathname === '/PublicHome' ? '/' : pathname);
     } catch {
@@ -282,7 +348,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="VehicleSpecs"
           component={VehicleSpecsScreen}
-          options={{ title: 'Vehicle specs' }}
+          options={({ navigation, route }) => ({
+            title: 'Vehicle specs',
+            headerLeft: vehicleSpecsHeaderLeft(navigation, route.params?.vehicleId),
+            headerBackVisible: false,
+          })}
         />
         <Stack.Screen
           name="EditVehicleDetails"
@@ -341,7 +411,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="LogServiceRecord"
           component={LogServiceRecordScreen}
-          options={{ title: 'Add Service Record' }}
+          options={({ navigation, route }) => ({
+            title: 'Add Service Record',
+            headerLeft: logServiceRecordHeaderLeft(navigation, route.params?.vehicleId),
+            headerBackVisible: false,
+          })}
         />
         <Stack.Screen
           name="AddManualServiceCenter"
