@@ -25,6 +25,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { goBackFromServiceCenters } from '../navigation/serviceCentersNavigation';
+import { navigateToVehicleServiceRecordNew } from '../navigation/webNavigation';
+import {
+  loadServiceRecordFormDraft,
+  saveServiceRecordFormDraft,
+} from '../utils/serviceRecordDraftStorage';
 import { getServiceCenters, VEHICLE_TYPE_FILTER_CHIPS } from '../api/serviceCenters';
 import { spreadShopMarkersForMap } from '../utils/mapMarkerSpread';
 import { API_BASE_URL } from '../api/config';
@@ -195,6 +200,22 @@ export default function ShopMapScreen() {
 
   const handleSearch = () => {
     fetchShops();
+  };
+
+  const pickForServiceRecord = Boolean(route.params?.pickShopForServiceRecord);
+  const serviceRecordVehicleId = route.params?.vehicleId;
+
+  const selectCenterForServiceRecord = async (shop) => {
+    if (!serviceRecordVehicleId || !shop?.id) return;
+    const existing = (await loadServiceRecordFormDraft(serviceRecordVehicleId)) || {};
+    await saveServiceRecordFormDraft(serviceRecordVehicleId, {
+      ...existing,
+      providerMode: 'authorized',
+      selectedShopProfileId: String(shop.id),
+    });
+    navigateToVehicleServiceRecordNew(navigation, serviceRecordVehicleId, {
+      type: route.params?.type,
+    });
   };
 
   if (loading) {
@@ -394,6 +415,20 @@ export default function ShopMapScreen() {
                       <Text style={{ marginBottom: 4, color: '#64748b' }}>{capabilityLine}</Text>
                     ) : null}
 
+                    {pickForServiceRecord ? (
+                      <Pressable
+                        style={[styles.popupButton, styles.selectButton]}
+                        onPress={() => {
+                          if (typeof document !== 'undefined' && document.activeElement?.blur) {
+                            document.activeElement.blur();
+                          }
+                          selectCenterForServiceRecord(shop);
+                        }}
+                      >
+                        <Text style={styles.popupButtonText}>Use for this record</Text>
+                      </Pressable>
+                    ) : null}
+
                     <Pressable
                       style={[styles.popupButton, styles.detailsButton]}
                       onPress={() => {
@@ -574,6 +609,10 @@ const styles = StyleSheet.create({
     marginTop: 6,
     alignItems: 'center',
     cursor: 'pointer',
+  },
+  selectButton: {
+    backgroundColor: '#16a34a',
+    marginBottom: 6,
   },
   detailsButton: {
     backgroundColor: COLORS.primary,

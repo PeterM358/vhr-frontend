@@ -37,6 +37,22 @@ export function normalizeWebPath(input) {
   const { path: pathWithOptionalSlash, query } = splitPathAndQuery(input);
   const raw = pathWithOptionalSlash.replace(/^\//, '');
 
+  const serviceCenterAdd = lastGlobalMatch(
+    raw,
+    String.raw`(?:dashboard\/vehicles|my-vehicles)\/(\d+)\/service-record\/service-center\/add`
+  );
+  if (serviceCenterAdd) {
+    return `${VEHICLES}/${serviceCenterAdd[1]}/service-record/service-center/add${query}`;
+  }
+
+  const serviceCenter = lastGlobalMatch(
+    raw,
+    String.raw`(?:dashboard\/vehicles|my-vehicles)\/(\d+)\/service-record\/service-center`
+  );
+  if (serviceCenter) {
+    return `${VEHICLES}/${serviceCenter[1]}/service-record/service-center${query}`;
+  }
+
   const serviceRecord = lastGlobalMatch(
     raw,
     String.raw`(?:dashboard\/vehicles|my-vehicles)\/(\d+)\/service-record\/new`
@@ -114,6 +130,14 @@ export function vehicleServiceRecordNew(id, params = {}) {
   const query = qs.toString();
   const base = `${VEHICLES}/${normalizeId(id)}/service-record/new`;
   return query ? `${base}?${query}` : base;
+}
+
+export function vehicleServiceRecordCenter(id) {
+  return `${VEHICLES}/${normalizeId(id)}/service-record/service-center`;
+}
+
+export function vehicleServiceRecordCenterAdd(id) {
+  return `${VEHICLES}/${normalizeId(id)}/service-record/service-center/add`;
 }
 
 /**

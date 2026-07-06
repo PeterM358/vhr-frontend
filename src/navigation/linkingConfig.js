@@ -60,6 +60,24 @@ export const linkingScreens = {
       },
     },
   },
+  ServiceRecordServiceCenter: {
+    path: 'dashboard/vehicles/:vehicleId/service-record/service-center',
+    parse: {
+      vehicleId: (value) => {
+        const id = parseInt(String(value), 10);
+        return Number.isFinite(id) ? id : undefined;
+      },
+    },
+  },
+  AddManualServiceCenter: {
+    path: 'dashboard/vehicles/:vehicleId/service-record/service-center/add',
+    parse: {
+      vehicleId: (value) => {
+        const id = parseInt(String(value), 10);
+        return Number.isFinite(id) ? id : undefined;
+      },
+    },
+  },
 };
 
 export const linkingConfig = { screens: linkingScreens };

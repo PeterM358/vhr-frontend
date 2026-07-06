@@ -12,6 +12,8 @@ import {
   vehicleDetail,
   vehicles,
   vehicleServiceRecordNew,
+  vehicleServiceRecordCenter,
+  vehicleServiceRecordCenterAdd,
   vehicleSpecs,
 } from './webRoutes';
 
@@ -129,4 +131,46 @@ export function navigateToVehicleServiceRecordNew(navigation, vehicleId, params 
     return;
   }
   navigation.navigate('LogServiceRecord', routeParams);
+}
+
+export function navigateToVehicleServiceRecordCenter(navigation, vehicleId, params = {}) {
+  const { type, ...rest } = params;
+  const routeParams = { vehicleId, ...rest };
+  if (type != null) routeParams.type = type;
+
+  if (Platform.OS === 'web') {
+    resetWebRoutes(
+      navigation,
+      [
+        { name: 'ClientVehicles' },
+        { name: 'VehicleDetail', params: { vehicleId } },
+        { name: 'LogServiceRecord', params: { vehicleId, type } },
+        { name: 'ServiceRecordServiceCenter', params: routeParams },
+      ],
+      vehicleServiceRecordCenter(vehicleId)
+    );
+    return;
+  }
+  navigation.navigate('ServiceRecordServiceCenter', routeParams);
+}
+
+export function navigateToVehicleServiceRecordCenterAdd(navigation, vehicleId, params = {}) {
+  const { type, ...rest } = params;
+  const routeParams = { vehicleId, ...rest };
+  if (type != null) routeParams.type = type;
+
+  if (Platform.OS === 'web') {
+    resetWebRoutes(
+      navigation,
+      [
+        { name: 'ClientVehicles' },
+        { name: 'VehicleDetail', params: { vehicleId } },
+        { name: 'LogServiceRecord', params: { vehicleId, type } },
+        { name: 'AddManualServiceCenter', params: routeParams },
+      ],
+      vehicleServiceRecordCenterAdd(vehicleId)
+    );
+    return;
+  }
+  navigation.navigate('AddManualServiceCenter', routeParams);
 }

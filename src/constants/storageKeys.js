@@ -8,4 +8,6 @@ export const STORAGE_KEYS = {
   SHOP_PROFILES: '@shop_profiles',
   CURRENT_SHOP_ID: '@current_shop_id',
   logServiceRecordDraftKey: (vehicleId) => `@log_service_record_draft_${vehicleId}`,
+  serviceRecordDraftKey: (vehicleId) => `serviceRecordDraft:${vehicleId}`,
+  serviceRecordManualDraftKey: (vehicleId) => `serviceRecordManualDraft:${vehicleId}`,
 };

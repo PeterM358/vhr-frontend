@@ -25,6 +25,12 @@ function vehicleDetailTitle(pathname) {
   if (/^\/dashboard\/vehicles\/\d+\/specs$/.test(pathname)) {
     return `${BASE_TITLE} Vehicle Specs`;
   }
+  if (/^\/dashboard\/vehicles\/\d+\/service-record\/service-center\/add$/.test(pathname)) {
+    return `${BASE_TITLE} Add Service Center`;
+  }
+  if (/^\/dashboard\/vehicles\/\d+\/service-record\/service-center$/.test(pathname)) {
+    return `${BASE_TITLE} Choose Service Center`;
+  }
   if (/^\/dashboard\/vehicles\/\d+\/service-record\/new$/.test(pathname)) {
     return `${BASE_TITLE} Add Service Record`;
   }

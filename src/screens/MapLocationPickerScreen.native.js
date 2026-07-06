@@ -127,7 +127,6 @@ export default function MapLocationPickerScreen({ navigation, route }) {
         },
         draft: route.params?.preservedDraft ?? route.params?.draft,
         vehicleId: route.params?.vehicleId,
-        logServiceRecordDraft: route.params?.logServiceRecordDraft,
         requireSetup: route.params?.requireSetup,
       },
       merge: true,

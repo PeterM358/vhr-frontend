@@ -16,7 +16,6 @@ import {
   ActivityIndicator,
   Portal,
   Dialog,
-  Switch,
 } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -85,7 +84,17 @@ import {
   hasOdometerPhotoAttachment,
   parseOdometerKm,
 } from '../utils/finalizeMileageValidation';
-import { navigateToVehicleDetail } from '../navigation/webNavigation';
+import {
+  navigateToVehicleDetail,
+  navigateToVehicleServiceRecordCenter,
+  navigateToVehicleServiceRecordCenterAdd,
+} from '../navigation/webNavigation';
+import {
+  saveServiceRecordFormDraft,
+  loadServiceRecordFormDraft,
+  loadServiceRecordManualCenterDraft,
+  clearServiceRecordDrafts,
+} from '../utils/serviceRecordDraftStorage';
 
 async function applyPostCreateReminderPatches({
   token,
@@ -325,6 +334,26 @@ export default function LogServiceRecordScreen({ navigation, route }) {
     [currentManualDraft]
   );
 
+  const selectedProviderLabel = useMemo(() => {
+    if (providerMode === 'self') return 'I did it myself';
+    if (providerMode === 'authorized' && selectedShopProfileId) {
+      const hit = allProviderOptions.find(
+        (o) => o.kind === 'shop' && String(o.shopId) === String(selectedShopProfileId)
+      );
+      return hit?.label?.replace(/ · authorized$/, '') || 'Selected service center';
+    }
+    if (providerMode === 'manual' && hasManualCenter) {
+      return workshopSummary.title || 'Unlisted service center';
+    }
+    return null;
+  }, [
+    providerMode,
+    selectedShopProfileId,
+    allProviderOptions,
+    hasManualCenter,
+    workshopSummary.title,
+  ]);
+
   useEffect(() => {
     navigation.setOptions({ title: 'Add Service Record' });
   }, [navigation]);
@@ -374,10 +403,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
     async (draft) => {
       if (!vehicleId || !draft) return;
       try {
-        await AsyncStorage.setItem(
-          STORAGE_KEYS.logServiceRecordDraftKey(vehicleId),
-          JSON.stringify(draft)
-        );
+        await saveServiceRecordFormDraft(vehicleId, draft);
       } catch (e) {
         console.warn('Could not persist service record draft', e);
       }
@@ -413,37 +439,75 @@ export default function LogServiceRecordScreen({ navigation, route }) {
     });
   }, []);
 
-  const openAddWorkshop = useCallback(
-    (extraParams = {}) => {
-      const formDraft = buildCurrentFormDraft();
-      persistFormDraftToStorage(formDraft);
-      navigation.setParams({ logServiceRecordDraft: formDraft });
-      navigation.navigate('AddManualServiceCenter', {
-        vehicleId,
-        repairTypeLabel: selectedType?.name || '',
-        logServiceRecordDraft: formDraft,
-        ...extraParams,
+  const openServiceCenterHub = useCallback(async () => {
+    const formDraft = buildCurrentFormDraft();
+    await persistFormDraftToStorage(formDraft);
+    if (Platform.OS === 'web') {
+      navigateToVehicleServiceRecordCenter(navigation, vehicleId, {
+        type: route.params?.type,
+        formDraft,
       });
-    },
-    [buildCurrentFormDraft, navigation, vehicleId, selectedType?.name, persistFormDraftToStorage]
-  );
+      return;
+    }
+    navigation.navigate('ServiceRecordServiceCenter', {
+      vehicleId,
+      type: route.params?.type,
+      formDraft,
+    });
+  }, [
+    buildCurrentFormDraft,
+    navigation,
+    vehicleId,
+    route.params?.type,
+    persistFormDraftToStorage,
+  ]);
+
+  const openEditManualCenter = useCallback(async () => {
+    const formDraft = buildCurrentFormDraft();
+    await persistFormDraftToStorage(formDraft);
+    if (Platform.OS === 'web') {
+      navigateToVehicleServiceRecordCenterAdd(navigation, vehicleId, {
+        type: route.params?.type,
+      });
+      return;
+    }
+    navigation.navigate('AddManualServiceCenter', {
+      vehicleId,
+      type: route.params?.type,
+      draft: currentManualDraft,
+    });
+  }, [
+    buildCurrentFormDraft,
+    currentManualDraft,
+    navigation,
+    vehicleId,
+    route.params?.type,
+    persistFormDraftToStorage,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       (async () => {
-        const paramDraft = route.params?.logServiceRecordDraft;
-        if (paramDraft) {
-          lastFormDraftKeyRef.current = '';
-          restoreFormDraft(paramDraft);
-          return;
-        }
         if (!vehicleId) return;
         try {
-          const raw = await AsyncStorage.getItem(STORAGE_KEYS.logServiceRecordDraftKey(vehicleId));
-          if (cancelled || !raw) return;
-          lastFormDraftKeyRef.current = '';
-          restoreFormDraft(JSON.parse(raw));
+          const draft = await loadServiceRecordFormDraft(vehicleId);
+          if (!cancelled && draft) {
+            lastFormDraftKeyRef.current = '';
+            restoreFormDraft(draft);
+          }
+
+          const patch = route.params?.providerPatch;
+          if (!cancelled && patch) {
+            lastFormDraftKeyRef.current = '';
+            restoreFormDraft({ ...(draft || {}), ...patch });
+            navigation.setParams({ providerPatch: undefined });
+          }
+
+          const manualDraft = await loadServiceRecordManualCenterDraft(vehicleId);
+          if (!cancelled && manualDraft && manualDraftHasData(manualDraft)) {
+            applyManualDraft(manualDraft);
+          }
         } catch (e) {
           console.warn('Could not restore service record draft', e);
         }
@@ -451,39 +515,22 @@ export default function LogServiceRecordScreen({ navigation, route }) {
       return () => {
         cancelled = true;
       };
-    }, [route.params?.logServiceRecordDraft, restoreFormDraft, vehicleId])
+    }, [
+      vehicleId,
+      route.params?.providerPatch,
+      restoreFormDraft,
+      applyManualDraft,
+      navigation,
+    ])
   );
 
   useEffect(() => {
     const draft = route.params?.manualServiceCenterDraft;
     if (!draft) return;
-    const formDraft = route.params?.logServiceRecordDraft;
     lastFormDraftKeyRef.current = '';
-    if (formDraft) {
-      restoreFormDraft(formDraft);
-    } else if (vehicleId) {
-      AsyncStorage.getItem(STORAGE_KEYS.logServiceRecordDraftKey(vehicleId))
-        .then((raw) => {
-          if (raw) {
-            lastFormDraftKeyRef.current = '';
-            restoreFormDraft(JSON.parse(raw));
-          }
-        })
-        .catch(() => {});
-    }
     applyManualDraft(draft);
-    navigation.setParams({
-      manualServiceCenterDraft: undefined,
-      logServiceRecordDraft: undefined,
-    });
-  }, [
-    route.params?.manualServiceCenterDraft,
-    route.params?.logServiceRecordDraft,
-    applyManualDraft,
-    restoreFormDraft,
-    navigation,
-    vehicleId,
-  ]);
+    navigation.setParams({ manualServiceCenterDraft: undefined });
+  }, [route.params?.manualServiceCenterDraft, applyManualDraft, navigation]);
 
   useEffect(() => {
     if (variant !== 'oil') return;
@@ -953,6 +1000,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
         Number.isFinite(parseInt(selectedShopProfileId, 10));
       const returnToVehicleHistory = () => {
         AsyncStorage.removeItem(STORAGE_KEYS.logServiceRecordDraftKey(String(vid))).catch(() => {});
+        clearServiceRecordDrafts(vid).catch(() => {});
         if (Platform.OS === 'web') {
           navigateToVehicleDetail(navigation, vid, { scrollToServiceHistory: true });
           return;
@@ -1241,208 +1289,68 @@ export default function LogServiceRecordScreen({ navigation, route }) {
               Service provider
             </Text>
             <Text style={styles.sectionHint}>
-              Optional. Authorized centers have access to this vehicle. Previously used workshops appear as
-              unconfirmed until they join the platform.
+              Optional. Link who performed the work, or mark it as owner-performed.
             </Text>
-            <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>Self repair</Text>
-              <Switch
-                value={providerMode === 'self'}
-                onValueChange={(on) => {
-                  if (on) {
-                    setProviderMode('self');
-                    setSelectedShopProfileId('');
-                    clearManualProviderFields();
-                  } else {
-                    setProviderMode(null);
-                  }
-                }}
-              />
-            </View>
-            {providerMode !== 'self' ? (
-              <>
-                {!hasManualCenter ? (
-                  <>
-                    <Text variant="labelLarge" style={styles.label}>
-                      Service center
-                    </Text>
-                    {hasProviderPickerOptions ? (
-                      <>
-                        {showProviderFilters ? (
-                          <>
-                            <TextInput
-                              mode="outlined"
-                              value={providerSearchQuery}
-                              onChangeText={setProviderSearchQuery}
-                              placeholder="Search by name, city, phone…"
-                              style={styles.input}
-                              dense
-                            />
-                            {providerCities.length > 1 ? (
-                              <>
-                                <Text variant="labelLarge" style={styles.label}>
-                                  City
-                                </Text>
-                                <View style={styles.pickerContainer}>
-                                  <Picker
-                                    selectedValue={providerCityFilter}
-                                    onValueChange={setProviderCityFilter}
-                                    style={styles.picker}
-                                  >
-                                    <Picker.Item label="— All cities —" value="" />
-                                    {providerCities.map((city) => (
-                                      <Picker.Item key={city} label={city} value={city} />
-                                    ))}
-                                  </Picker>
-                                </View>
-                              </>
-                            ) : null}
-                            {canFilterByNearMe ? (
-                              <View style={styles.providerFilterRow}>
-                                <Button
-                                  mode={providerNearMe ? 'contained' : 'outlined'}
-                                  compact
-                                  loading={providerLocationLoading}
-                                  disabled={providerLocationLoading}
-                                  onPress={toggleProviderNearMe}
-                                  icon={() => (
-                                    <MaterialCommunityIcons
-                                      name="crosshairs-gps"
-                                      size={18}
-                                      color={providerNearMe ? '#fff' : COLORS.PRIMARY}
-                                    />
-                                  )}
-                                >
-                                  Near me
-                                </Button>
-                                {providerNearMe ? (
-                                  <Text style={styles.providerFilterHint}>
-                                    Within 40 km · workshops with map pin only
-                                  </Text>
-                                ) : null}
-                              </View>
-                            ) : null}
-                            <Text style={styles.providerFilterCount}>
-                              Showing {filteredProviderOptions.length} of {allProviderOptions.length}
-                            </Text>
-                          </>
-                        ) : null}
-                        {filteredProviderOptions.length ? (
-                          <View style={styles.pickerContainer}>
-                            <Picker
-                              selectedValue={providerPickerValue}
-                              onValueChange={(value) => {
-                                const parsed = parseProviderPickerValue(value);
-                                if (parsed.type === 'none') {
-                                  setProviderMode(null);
-                                  setSelectedShopProfileId('');
-                                  clearManualProviderFields();
-                                  return;
-                                }
-                                if (parsed.type === 'shop') {
-                                  setSelectedShopProfileId(parsed.shopId);
-                                  setProviderMode('authorized');
-                                  clearManualProviderFields();
-                                  return;
-                                }
-                                if (parsed.type === 'workshop') {
-                                  const entry = allProviderOptions.find(
-                                    (opt) => opt.workshopKey === parsed.workshopKey
-                                  );
-                                  if (entry?.workshopDraft) applyManualDraft(entry.workshopDraft);
-                                }
-                              }}
-                              style={styles.picker}
-                            >
-                              <Picker.Item label="— None —" value="" />
-                              {filteredProviderOptions.map((option) => (
-                                <Picker.Item
-                                  key={option.pickerValue}
-                                  label={formatProviderOptionLabel(option)}
-                                  value={option.pickerValue}
-                                />
-                              ))}
-                            </Picker>
-                          </View>
-                        ) : (
-                          <Text style={styles.sectionHint}>
-                            No centers match your filters. Clear search, city, or Near me — or add a new workshop
-                            below.
-                          </Text>
-                        )}
-                      </>
-                    ) : (
-                      <Text style={styles.sectionHint}>
-                        No service centers yet. Grant access via Find service centers on the vehicle, or add a
-                        workshop below.
-                      </Text>
-                    )}
-                    {authorizedCenters.length ? (
-                      <Text style={styles.sectionHint}>
-                        Authorized centers can see this vehicle on the platform. Linking a record still needs their
-                        confirmation.
-                      </Text>
-                    ) : null}
-                    {knownWorkshops.length ? (
-                      <Text style={styles.sectionHint}>
-                        Unconfirmed workshops were logged on past records — they are not on the platform yet.
-                      </Text>
-                    ) : null}
-                    <Button
-                      mode="outlined"
-                      icon={() => (
-                        <MaterialCommunityIcons name="store-plus-outline" size={20} color={COLORS.PRIMARY} />
-                      )}
-                      onPress={() => openAddWorkshop()}
-                      style={styles.unlistedToggleBtn}
-                    >
-                      Add workshop (map + phone)
-                    </Button>
-                  </>
-                ) : (
-                  <View style={styles.manualSummaryCard}>
-                    <Text variant="titleSmall" style={styles.unlistedTitle}>
-                      Workshop
-                    </Text>
-                    <Text style={styles.manualSummaryName}>{workshopSummary.title}</Text>
-                    {workshopSummary.lines.map((line) => (
+
+            {selectedProviderLabel ? (
+              <View style={styles.manualSummaryCard}>
+                <Text variant="titleSmall" style={styles.unlistedTitle}>
+                  {providerMode === 'self' ? 'Self-performed' : 'Service center'}
+                </Text>
+                <Text style={styles.manualSummaryName}>{selectedProviderLabel}</Text>
+                {providerMode === 'manual'
+                  ? workshopSummary.lines.map((line) => (
                       <Text key={line} style={styles.manualSummaryMeta}>
                         {line}
                       </Text>
-                    ))}
-                    {String(manualPhone || '').trim() ? (
-                      <Text style={styles.manualSummaryMeta}>{manualPhone}</Text>
-                    ) : null}
-                    {String(manualEmail || '').trim() ? (
-                      <Text style={styles.manualSummaryMeta}>{manualEmail}</Text>
-                    ) : null}
-                    <Text style={styles.manualSummaryHint}>
-                      Saved in our workshop directory and linked to this record — not authorized on your vehicle
-                      until they join the platform.
-                    </Text>
-                    <View style={styles.manualSummaryActions}>
-                      <Button
-                        mode="outlined"
-                        compact
-                        onPress={() => openAddWorkshop({ draft: currentManualDraft })}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        mode="text"
-                        compact
-                        onPress={() => {
-                          setProviderMode(null);
-                          clearManualProviderFields();
-                        }}
-                      >
-                        Remove
-                      </Button>
-                    </View>
-                  </View>
+                    ))
+                  : null}
+                {providerMode === 'manual' && String(manualPhone || '').trim() ? (
+                  <Text style={styles.manualSummaryMeta}>{manualPhone}</Text>
+                ) : null}
+                {providerMode === 'manual' && String(manualEmail || '').trim() ? (
+                  <Text style={styles.manualSummaryMeta}>{manualEmail}</Text>
+                ) : null}
+                {providerMode === 'manual' ? (
+                  <Text style={styles.manualSummaryHint}>
+                    Saved in the directory and linked to this record — not authorized on your vehicle
+                    until they join the platform.
+                  </Text>
+                ) : null}
+                <View style={styles.manualSummaryActions}>
+                  {providerMode === 'manual' ? (
+                    <Button mode="outlined" compact onPress={openEditManualCenter}>
+                      Edit
+                    </Button>
+                  ) : null}
+                  <Button mode="outlined" compact onPress={openServiceCenterHub}>
+                    Change
+                  </Button>
+                  <Button
+                    mode="text"
+                    compact
+                    onPress={() => {
+                      setProviderMode(null);
+                      setSelectedShopProfileId('');
+                      clearManualProviderFields();
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </View>
+              </View>
+            ) : (
+              <Button
+                mode="outlined"
+                icon={() => (
+                  <MaterialCommunityIcons name="account-hard-hat" size={20} color={COLORS.PRIMARY} />
                 )}
-              </>
-            ) : null}
+                onPress={openServiceCenterHub}
+                style={styles.unlistedToggleBtn}
+              >
+                Who performed this service?
+              </Button>
+            )}
           </FloatingCard>
 
           <FloatingCard>

@@ -35,6 +35,14 @@ import {
   dialPrefixForCountry,
   parseStoredPhone,
 } from '../utils/phoneE164';
+import {
+  navigateToVehicleServiceRecordNew,
+} from '../navigation/webNavigation';
+import {
+  saveServiceRecordManualCenterDraft,
+  loadServiceRecordFormDraft,
+  saveServiceRecordFormDraft,
+} from '../utils/serviceRecordDraftStorage';
 
 function applyPhoneFromDraft(draft, setPhonePrefix, setPhoneNational) {
   if (!draft) return;
@@ -321,7 +329,6 @@ export default function AddManualServiceCenterScreen({ navigation, route }) {
       returnScreen: 'AddManualServiceCenter',
       vehicleId,
       preservedDraft: draft,
-      logServiceRecordDraft: route.params?.logServiceRecordDraft,
       initialLatitude: lat,
       initialLongitude: lon,
     });
@@ -419,7 +426,7 @@ export default function AddManualServiceCenterScreen({ navigation, route }) {
     };
   }, [route.params?.mapPick, route.params?.draft, loading, countries, applyMapPick, navigation]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const manualErr = validateManualServiceCenterInput({
       phone: phoneE164,
       email: manualEmail,
@@ -436,12 +443,24 @@ export default function AddManualServiceCenterScreen({ navigation, route }) {
     }
 
     const draft = buildCurrentDraft();
+    await saveServiceRecordManualCenterDraft(vehicleId, draft);
+    const formDraft = await loadServiceRecordFormDraft(vehicleId);
+    await saveServiceRecordFormDraft(vehicleId, {
+      ...(formDraft || {}),
+      providerMode: 'manual',
+      selectedShopProfileId: '',
+    });
+
+    if (Platform.OS === 'web') {
+      navigateToVehicleServiceRecordNew(navigation, vehicleId, { type: route.params?.type });
+      return;
+    }
     navigation.navigate({
       name: 'LogServiceRecord',
       params: {
         vehicleId,
+        type: route.params?.type,
         manualServiceCenterDraft: draft,
-        logServiceRecordDraft: route.params?.logServiceRecordDraft,
       },
       merge: true,
     });
@@ -623,7 +642,7 @@ export default function AddManualServiceCenterScreen({ navigation, route }) {
 
         <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
           <Button mode="contained" onPress={handleSave} style={styles.saveBtn} contentStyle={styles.saveBtnContent}>
-            Save workshop & link record
+            Save service center and link record
           </Button>
           <Text style={styles.bottomHint}>
             Adds to our workshop directory and attaches to this service record.

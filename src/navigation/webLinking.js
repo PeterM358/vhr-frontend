@@ -23,6 +23,8 @@ import {
   vehicleAdd,
   vehicleDetail,
   vehicleServiceRecordNew,
+  vehicleServiceRecordCenter,
+  vehicleServiceRecordCenterAdd,
   vehicleSpecs,
   vehicles,
 } from './webRoutes';
@@ -84,6 +86,10 @@ export function getCanonicalWebPath(state) {
       return vehicleId != null
         ? vehicleServiceRecordNew(vehicleId, { type: params.type })
         : vehicles();
+    case 'ServiceRecordServiceCenter':
+      return vehicleId != null ? vehicleServiceRecordCenter(vehicleId) : vehicles();
+    case 'AddManualServiceCenter':
+      return vehicleId != null ? vehicleServiceRecordCenterAdd(vehicleId) : vehicles();
     default:
       return null;
   }
@@ -107,7 +113,35 @@ export function getVehicleNavigationStateFromPath(path) {
     return vehicleStackState([{ name: 'CreateVehicle' }]);
   }
 
-  let match = pathPart.match(new RegExp(`^${base.replace('/', '\\/')}\\/(\\d+)\\/service-record\\/new$`));
+  let match = pathPart.match(
+    new RegExp(`^${base.replace('/', '\\/')}\\/(\\d+)\\/service-record\\/service-center\\/add$`)
+  );
+  if (match) {
+    const id = parseInt(match[1], 10);
+    if (!Number.isFinite(id)) return null;
+    return vehicleStackState([
+      { name: 'ClientVehicles' },
+      { name: 'VehicleDetail', params: { vehicleId: id } },
+      { name: 'LogServiceRecord', params: { vehicleId: id, ...query } },
+      { name: 'AddManualServiceCenter', params: { vehicleId: id, ...query } },
+    ]);
+  }
+
+  match = pathPart.match(
+    new RegExp(`^${base.replace('/', '\\/')}\\/(\\d+)\\/service-record\\/service-center$`)
+  );
+  if (match) {
+    const id = parseInt(match[1], 10);
+    if (!Number.isFinite(id)) return null;
+    return vehicleStackState([
+      { name: 'ClientVehicles' },
+      { name: 'VehicleDetail', params: { vehicleId: id } },
+      { name: 'LogServiceRecord', params: { vehicleId: id, ...query } },
+      { name: 'ServiceRecordServiceCenter', params: { vehicleId: id, ...query } },
+    ]);
+  }
+
+  match = pathPart.match(new RegExp(`^${base.replace('/', '\\/')}\\/(\\d+)\\/service-record\\/new$`));
   if (match) {
     const id = parseInt(match[1], 10);
     if (!Number.isFinite(id)) return null;
@@ -188,6 +222,14 @@ export function normalizeWebLinkingPath(path) {
   if (trimmed === 'CreateVehicle' || trimmed.startsWith('CreateVehicle/')) {
     return 'dashboard/vehicles/add';
   }
+  if (trimmed === 'LogServiceRecord' || trimmed.startsWith('LogServiceRecord')) {
+    const vid = trimmed.match(/vehicleId[=:](\d+)/i)?.[1];
+    return vid ? `dashboard/vehicles/${vid}/service-record/new` : 'dashboard/vehicles';
+  }
+  if (trimmed === 'AddManualServiceCenter' || trimmed.startsWith('AddManualServiceCenter')) {
+    const vid = trimmed.match(/vehicleId[=:](\d+)/i)?.[1];
+    return vid ? `dashboard/vehicles/${vid}/service-record/service-center/add` : 'dashboard/vehicles';
+  }
   if (trimmed === 'add' || trimmed.startsWith('add/')) {
     return 'dashboard/vehicles/add';
   }
@@ -201,6 +243,15 @@ export function normalizeWebLinkingPath(path) {
 async function hasStoredAuthToken() {
   const token = await AsyncStorage.getItem('@access_token');
   return !!(token && token !== 'null' && token !== 'undefined');
+}
+
+function parseVehicleIdFromSearch(search) {
+  if (!search) return null;
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const raw = params.get('vehicleId') || params.get('vehicle_id');
+  if (!raw) return null;
+  const id = parseInt(raw, 10);
+  return Number.isFinite(id) ? id : null;
 }
 
 function parseShopIdFromSearch(search) {
@@ -262,6 +313,12 @@ export async function redirectLegacyWebUrl() {
     target = pathname.replace(/^\/ClientVehicles/, '/dashboard/vehicles');
   } else if (pathname === '/CreateVehicle' || pathname.startsWith('/CreateVehicle/')) {
     target = '/dashboard/vehicles/add';
+  } else if (pathname === '/LogServiceRecord' || pathname.startsWith('/LogServiceRecord')) {
+    const vid = parseVehicleIdFromSearch(search);
+    target = vid ? `/dashboard/vehicles/${vid}/service-record/new` : '/dashboard/vehicles';
+  } else if (pathname === '/AddManualServiceCenter' || pathname.startsWith('/AddManualServiceCenter')) {
+    const vid = parseVehicleIdFromSearch(search);
+    target = vid ? `/dashboard/vehicles/${vid}/service-record/service-center/add` : '/dashboard/vehicles';
   } else if (pathname === '/add' || pathname.startsWith('/add/')) {
     target = '/dashboard/vehicles/add';
   } else if (pathname === '/VehicleDetail' || pathname.startsWith('/VehicleDetail/')) {

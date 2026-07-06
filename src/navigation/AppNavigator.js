@@ -27,6 +27,7 @@ import ClientRepairsList from '../components/client/ClientRepairsList';
 import RepairDetailScreen from '../screens/RepairDetailScreen';
 import CreateRepairScreen from '../screens/CreateRepairScreen';
 import LogServiceRecordScreen from '../screens/LogServiceRecordScreen';
+import ServiceRecordServiceCenterScreen from '../screens/ServiceRecordServiceCenterScreen';
 import MapLocationPickerScreen from '../screens/MapLocationPickerScreen';
 import AddManualServiceCenterScreen from '../screens/AddManualServiceCenterScreen';
 import ManageVehicleServiceCentersScreen from '../screens/ManageVehicleServiceCentersScreen';
@@ -80,7 +81,7 @@ import { normalizeWebPath } from './webRoutes';
 import { syncWebDocumentTitle } from './webDocumentTitle';
 import { blurActiveElementOnWeb } from '../utils/webFocus';
 import NavigationFallback from './NavigationFallback';
-import { navigateToDashboard, navigateToVehicleDetail, navigateToVehicleList } from './webNavigation';
+import { navigateToDashboard, navigateToVehicleDetail, navigateToVehicleList, navigateToVehicleServiceRecordNew, navigateToVehicleServiceRecordCenter } from './webNavigation';
 
 const Stack = createNativeStackNavigator();
 
@@ -241,6 +242,28 @@ function logServiceRecordHeaderLeft(navigation, vehicleId) {
     >
       <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
       <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>Vehicle</Text>
+    </Pressable>
+  );
+}
+
+function serviceRecordCenterHeaderLeft(navigation, vehicleId) {
+  return () => (
+    <Pressable
+      onPress={() => navigateToVehicleServiceRecordNew(navigation, vehicleId)}
+      accessibilityRole="button"
+      accessibilityLabel="Back to service record"
+      hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        minHeight: Platform.OS === 'android' ? 52 : 44,
+        paddingVertical: 8,
+        paddingRight: 10,
+        paddingLeft: Platform.OS === 'android' ? 4 : 0,
+      }}
+    >
+      <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
+      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>Record</Text>
     </Pressable>
   );
 }
@@ -423,9 +446,22 @@ export default function AppNavigator() {
           })}
         />
         <Stack.Screen
+          name="ServiceRecordServiceCenter"
+          component={ServiceRecordServiceCenterScreen}
+          options={({ navigation, route }) => ({
+            title: 'Service center',
+            headerLeft: serviceRecordCenterHeaderLeft(navigation, route.params?.vehicleId),
+            headerBackVisible: false,
+          })}
+        />
+        <Stack.Screen
           name="AddManualServiceCenter"
           component={AddManualServiceCenterScreen}
-          options={{ title: 'Add service center' }}
+          options={({ navigation, route }) => ({
+            title: 'Add service center',
+            headerLeft: serviceRecordCenterHeaderLeft(navigation, route.params?.vehicleId),
+            headerBackVisible: false,
+          })}
         />
         <Stack.Screen
           name="MapLocationPicker"
