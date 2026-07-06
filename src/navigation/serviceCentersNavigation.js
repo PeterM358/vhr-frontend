@@ -27,13 +27,18 @@ async function hasStoredAuthToken() {
 }
 
 function resolvePublicSlug(shopOrSlug, params = {}) {
+  let slug = null;
   if (typeof shopOrSlug === 'string') {
-    return shopOrSlug.trim().toLowerCase();
+    slug = shopOrSlug.trim().toLowerCase();
+  } else if (shopOrSlug && typeof shopOrSlug === 'object') {
+    slug = shopOrSlug.public_slug || shopOrSlug.slug || null;
+  } else {
+    slug = params.public_slug || params.slug || null;
   }
-  if (shopOrSlug && typeof shopOrSlug === 'object') {
-    return shopOrSlug.public_slug || shopOrSlug.slug || null;
+  if (slug && /^\d+$/.test(slug)) {
+    return null;
   }
-  return params.public_slug || params.slug || null;
+  return slug;
 }
 
 /** Open the service centers map from any entry point. */
@@ -51,11 +56,19 @@ export function openServiceCenters(navigation, params) {
 /** Open a public service center profile by canonical slug. */
 export function navigateToServiceCenterProfile(navigation, shopOrSlug, params = {}) {
   const slug = resolvePublicSlug(shopOrSlug, params);
+  const shopId =
+    params.shopId ??
+    (typeof shopOrSlug === 'object' ? shopOrSlug?.id : null) ??
+    (typeof shopOrSlug === 'number' ? shopOrSlug : null) ??
+    (typeof shopOrSlug === 'string' && /^\d+$/.test(shopOrSlug.trim()) ? parseInt(shopOrSlug, 10) : null);
   if (Platform.OS === 'web' && slug) {
-    navigateToServiceCenterProfileWeb(navigation, slug, params);
+    navigateToServiceCenterProfileWeb(navigation, slug, { shopId, ...params });
     return;
   }
-  const shopId = typeof shopOrSlug === 'object' ? shopOrSlug?.id : params.shopId;
+  if (shopId != null) {
+    navigateToServiceCenterDetail(navigation, shopId, params);
+    return;
+  }
   navigation.navigate('ShopDetail', { centerSlug: slug, shopId, ...params });
 }
 

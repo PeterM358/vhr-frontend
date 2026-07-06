@@ -76,9 +76,13 @@ function buildServiceRecordPathSuffix(params = {}) {
 }
 
 function vehicleStackState(tailRoutes) {
+  const homeRoute = {
+    name: 'Home',
+    state: { routes: [{ name: 'HomeMain' }], index: 0 },
+  };
   return {
     index: tailRoutes.length,
-    routes: [{ name: 'Home' }, ...tailRoutes],
+    routes: [homeRoute, ...tailRoutes],
   };
 }
 

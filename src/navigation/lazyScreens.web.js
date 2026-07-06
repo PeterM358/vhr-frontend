@@ -44,9 +44,9 @@ export const AddManualServiceCenterScreen = lazyScreen(() => import('../screens/
 export const PublicSeoPageScreen = lazyScreen(() => import('../screens/PublicSeoPageScreen'));
 export const VehicleSpecsScreen = lazyScreen(() => import('../screens/VehicleSpecsScreen'));
 export { default as ShopDetailScreen } from '../screens/ShopDetailScreen';
+export { default as CreateRepairScreen } from '../screens/CreateRepairScreen';
 export const PromotionDetailScreen = lazyScreen(() => import('../screens/PromotionDetailScreen'));
 export const RepairDetailScreen = lazyScreen(() => import('../screens/RepairDetailScreen'));
-export const CreateRepairScreen = lazyScreen(() => import('../screens/CreateRepairScreen'));
 export const LogServiceRecordScreen = lazyScreen(() => import('../screens/LogServiceRecordScreen'));
 export const ServiceRecordServiceCenterScreen = lazyScreen(
   () => import('../screens/ServiceRecordServiceCenterScreen')

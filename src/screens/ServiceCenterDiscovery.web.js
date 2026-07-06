@@ -46,6 +46,7 @@ import { applyDiscoverySeoMeta } from '../utils/seo/seoMetadata';
 import {
   goBackFromServiceCenters,
   navigateToServiceCenterProfile,
+  navigateToServiceCenterDetail,
 } from '../navigation/serviceCentersNavigation';
 import { navigateToPartnerDashboard, navigateToVehicleServiceRecordNew, navigateToRepairRequestNew } from '../navigation/webNavigation';
 import {
@@ -279,19 +280,16 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
 
   const openShopProfile = (shop) => {
     const slug = shop.public_slug || shop.slug;
-    if (slug) {
-      navigateToServiceCenterProfile(navigation, slug, {
-        returnTo: route.params?.returnTo,
-        vehicleId: route.params?.vehicleId,
-        shopId: shop.id,
-      });
-      return;
-    }
-    navigateToServiceCenterProfile(navigation, String(shop.id), {
+    const profileParams = {
       returnTo: route.params?.returnTo,
       vehicleId: route.params?.vehicleId,
       shopId: shop.id,
-    });
+    };
+    if (slug) {
+      navigateToServiceCenterProfile(navigation, slug, profileParams);
+      return;
+    }
+    navigateToServiceCenterDetail(navigation, shop.id, profileParams);
   };
 
   const handleRequestService = (shop) => {

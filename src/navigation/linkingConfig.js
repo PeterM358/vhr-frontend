@@ -30,6 +30,9 @@ export const linkingScreens = {
   ShopMap: 'service-centers',
   ShopDetail: {
     path: 'service-center/:centerSlug',
+    parse: {
+      centerSlug: (value) => String(value || '').trim().toLowerCase(),
+    },
   },
   ShopProfile: 'partner/profile',
   ShopInvoicing: 'partner/invoicing',

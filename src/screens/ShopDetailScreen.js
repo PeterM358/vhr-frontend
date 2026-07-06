@@ -168,9 +168,16 @@ function formatRatingSnippet(avg, count) {
   return `${star}`;
 }
 
+function isNumericCenterSegment(value) {
+  return /^\d+$/.test(String(value || '').trim());
+}
+
 export default function ShopDetailScreen({ route, navigation }) {
   const { shopId, locale, citySlug, centerSlug } = route.params || {};
-  const resolvedShopId = shopId;
+  const numericCenterSlug = centerSlug && isNumericCenterSegment(centerSlug);
+  const resolvedShopId =
+    shopId != null ? shopId : numericCenterSlug ? parseInt(String(centerSlug).trim(), 10) : null;
+  const resolvedCenterSlug = numericCenterSlug ? undefined : centerSlug;
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const headerUnderlay = insets.top + (Platform.OS === 'ios' ? 44 : 56);
@@ -226,7 +233,7 @@ export default function ShopDetailScreen({ route, navigation }) {
     setLoadErrorMessage('');
     setLoading(true);
     try {
-      if (!resolvedShopId && !centerSlug && !(locale && citySlug && centerSlug)) {
+      if (!resolvedShopId && !resolvedCenterSlug && !(locale && citySlug && resolvedCenterSlug)) {
         throw new Error('Missing service center identifier.');
       }
 
@@ -240,7 +247,7 @@ export default function ShopDetailScreen({ route, navigation }) {
         shopId: resolvedShopId,
         locale: locale || 'en',
         citySlug,
-        centerSlug,
+        centerSlug: resolvedCenterSlug,
         token,
         getShopById,
       });

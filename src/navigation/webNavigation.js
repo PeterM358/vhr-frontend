@@ -46,7 +46,10 @@ const PARTNER_HOME_ROUTE = {
   state: { routes: [{ name: 'ShopDashboard' }], index: 0 },
 };
 
-const HOME_ROUTE = { name: 'Home' };
+const HOME_ROUTE = {
+  name: 'Home',
+  state: { routes: [{ name: 'HomeMain' }], index: 0 },
+};
 
 async function hasStoredAuthToken() {
   const token = await AsyncStorage.getItem('@access_token');
@@ -358,7 +361,15 @@ export function navigateToServiceCenters(navigation, params = {}) {
 }
 
 export function navigateToServiceCenterProfile(navigation, centerSlug, params = {}) {
-  const routeParams = { centerSlug, ...params };
+  const slug = String(centerSlug || '').trim().toLowerCase();
+  if (/^\d+$/.test(slug)) {
+    navigateToServiceCenterDetail(navigation, parseInt(slug, 10), {
+      ...params,
+      shopId: parseInt(slug, 10),
+    });
+    return;
+  }
+  const routeParams = { centerSlug: slug, ...params };
   if (Platform.OS === 'web') {
     navigation.navigate('ShopDetail', routeParams);
     syncWebPath(serviceCenterProfile(centerSlug));

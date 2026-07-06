@@ -100,6 +100,10 @@ export function fetchSeoTaxonomy(locale = 'en') {
   return seoFetch('/api/public/seo/taxonomy/', { locale });
 }
 
+function isNumericSegment(value) {
+  return /^\d+$/.test(String(value || '').trim());
+}
+
 export async function loadShopDetailWithOptionalSeo({
   shopId,
   locale = 'en',
@@ -108,33 +112,43 @@ export async function loadShopDetailWithOptionalSeo({
   token,
   getShopById,
 }) {
-  if (centerSlug) {
+  const numericSlug = centerSlug && isNumericSegment(centerSlug);
+  const effectiveShopId =
+    shopId != null ? shopId : numericSlug ? parseInt(String(centerSlug).trim(), 10) : null;
+  const slugForSeo = centerSlug && !numericSlug ? centerSlug : null;
+
+  if (slugForSeo) {
     try {
-      const seoPayload = await fetchSeoProfileBySlug(centerSlug, locale);
+      const seoPayload = await fetchSeoProfileBySlug(slugForSeo, locale);
       return { shop: seoPayload.service_center, seoPayload };
     } catch (err) {
-      if (shopId && getShopById) {
-        const shop = await getShopById(shopId, token || null);
+      if (effectiveShopId && getShopById) {
+        const shop = await getShopById(effectiveShopId, token || null);
         return { shop, seoPayload: null, seoFallback: true };
       }
       throw err;
     }
   }
 
-  if (locale && citySlug && centerSlug) {
+  if (locale && citySlug && centerSlug && !numericSlug) {
     try {
       const seoPayload = await fetchSeoServiceCenterDetail(locale, citySlug, centerSlug);
       return { shop: seoPayload.service_center, seoPayload };
     } catch (err) {
-      if (shopId && getShopById) {
-        const shop = await getShopById(shopId, token || null);
+      if (effectiveShopId && getShopById) {
+        const shop = await getShopById(effectiveShopId, token || null);
         return { shop, seoPayload: null, seoFallback: true };
       }
       throw err;
     }
   }
 
-  const shop = await getShopById(shopId, token || null);
+  if (!effectiveShopId || !getShopById) {
+    const err = new Error('Missing service center identifier.');
+    throw err;
+  }
+
+  const shop = await getShopById(effectiveShopId, token || null);
   return { shop, seoPayload: null };
 }
 
