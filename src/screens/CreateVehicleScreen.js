@@ -31,8 +31,8 @@ import { stackContentPaddingTop } from '../navigation/stackContentInset';
 import FloatingCard from '../components/ui/FloatingCard';
 import { COLORS } from '../constants/colors';
 import VehicleCollapsibleFormSections from '../components/vehicle/VehicleCollapsibleFormSections';
-import VehicleCatalogIdentityBlock from '../components/vehicle/VehicleCatalogIdentityBlock';
 import VehicleCreateCatalogStep from '../components/vehicle/VehicleCreateCatalogStep';
+import VehicleManualModelStep from '../components/vehicle/VehicleManualModelStep';
 import VehicleCatalogEbikeTrailerSection from '../components/vehicle/VehicleCatalogEbikeTrailerSection';
 import VehicleRegistrationIdentityBlock from '../components/vehicle/VehicleRegistrationIdentityBlock';
 import VehicleSpecSuggestionCard from '../components/vehicle/VehicleSpecSuggestionCard';
@@ -44,6 +44,7 @@ import {
   enginesForFuel,
 } from '../components/vehicle/useVehicleMaintenanceSpec';
 import { applyVehicleCatalogFieldsToPayload } from '../components/vehicle/vehicleIdentityPayload';
+import { resolveLegacyModelId } from '../components/vehicle/resolveLegacyModel';
 import {
   VEHICLE_OPTIONAL_GROUPS,
   vehicleToFormStrings,
@@ -73,6 +74,8 @@ export default function CreateVehicleScreen({ navigation, route }) {
 
   const [selectedMake, setSelectedMake] = useState('');
   const [selectedModelLegacy, setSelectedModelLegacy] = useState('');
+  const [manualModelText, setManualModelText] = useState('');
+  const [manualBrandLocked, setManualBrandLocked] = useState(false);
 
   const [catalogEbikeSystems, setCatalogEbikeSystems] = useState([]);
   const [catalogTrailerTypes, setCatalogTrailerTypes] = useState([]);
@@ -167,11 +170,6 @@ export default function CreateVehicleScreen({ navigation, route }) {
     setCatalogTrim('');
   };
 
-  const onLegacyMakeChange = (v) => {
-    setSelectedMake(v);
-    setSelectedModelLegacy('');
-  };
-
   const reloadCountries = useCallback(async () => {
     setCountriesState((prev) => ({ ...prev, status: 'loading', error: '' }));
     try {
@@ -226,17 +224,31 @@ export default function CreateVehicleScreen({ navigation, route }) {
     setManualMode(next);
     setSpecApplied(false);
     if (next) {
-      setCatalogBrand('');
       setCatalogModel('');
       setCatalogGeneration('');
       setCatalogEngine('');
       setCatalogTrim('');
       setSelectedYear('');
+      setSelectedModelLegacy('');
+      setManualModelText('');
     } else {
       setSelectedMake('');
       setSelectedModelLegacy('');
+      setManualModelText('');
+      setManualBrandLocked(false);
     }
   };
+
+  const onLegacyMakeChange = (v) => {
+    setSelectedMake(v);
+    setSelectedModelLegacy('');
+    setManualModelText('');
+  };
+
+  const selectedCatalogBrandName = useMemo(() => {
+    const brand = catalogBrands.find((b) => String(b.id) === String(catalogBrand));
+    return brand?.name || '';
+  }, [catalogBrands, catalogBrand]);
 
   const selectedEngineRow = useMemo(
     () => catalogEngines.find((row) => String(row.id) === String(catalogEngine)),
@@ -269,24 +281,64 @@ export default function CreateVehicleScreen({ navigation, route }) {
   };
 
   const openManualFromCatalog = () => {
-    const brand = catalogBrands.find((b) => String(b.id) === String(catalogBrand));
-    setManualModeWrapped(true);
-    if (brand && makes?.length) {
-      const match = makes.find(
-        (m) => String(m.name || '').toLowerCase() === String(brand.name || '').toLowerCase()
-      );
-      if (match) setSelectedMake(String(match.id));
+    if (hasVehicleTypePicker && !selectedVehicleType) {
+      Alert.alert('Validation', 'Select a vehicle type first.');
+      return;
     }
+    if (!catalogBrand) {
+      Alert.alert('Validation', 'Select a brand first.');
+      return;
+    }
+    const brand = catalogBrands.find((b) => String(b.id) === String(catalogBrand));
+    const match =
+      brand && makes?.length
+        ? makes.find(
+            (m) => String(m.name || '').toLowerCase() === String(brand.name || '').toLowerCase()
+          )
+        : null;
+    setManualBrandLocked(Boolean(match));
+    setSelectedMake(match ? String(match.id) : '');
+    setSelectedModelLegacy('');
+    setManualModelText('');
+    setManualMode(true);
+    setSpecApplied(false);
+    setCatalogModel('');
+    setCatalogGeneration('');
+    setCatalogEngine('');
+    setCatalogTrim('');
+    setSelectedYear('');
   };
 
   const handleSave = async () => {
+    let resolvedModelLegacy = selectedModelLegacy;
     if (manualMode) {
-      if (!selectedMake || !selectedModelLegacy) {
-        Alert.alert('Validation', 'Choose make and model, or switch to catalog selection.');
+      if (!selectedMake) {
+        Alert.alert('Validation', 'Choose a make / brand.');
+        return;
+      }
+      const modelText = String(manualModelText ?? '').trim();
+      if (!modelText) {
+        Alert.alert('Validation', 'Enter your vehicle model.');
+        return;
+      }
+      resolvedModelLegacy = resolveLegacyModelId(legacyModels, modelText);
+      if (!resolvedModelLegacy) {
+        Alert.alert(
+          'Model not recognized',
+          'We could not match that model name. Check the spelling or tap a suggestion below the model field.'
+        );
+        return;
+      }
+      if (!selectedYear) {
+        Alert.alert('Validation', 'Choose the vehicle year.');
+        return;
+      }
+      if (!optionalStrings.fuel_type) {
+        Alert.alert('Validation', 'Choose a fuel type.');
         return;
       }
     } else if (!catalogBrand || !catalogModel) {
-      Alert.alert('Validation', 'Choose a catalog brand and model, or use manual entry.');
+      Alert.alert('Validation', 'Choose a catalog brand and model, or enter your model manually.');
       return;
     } else if (!selectedYear) {
       Alert.alert('Validation', 'Choose the vehicle year.');
@@ -338,7 +390,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
       applyVehicleCatalogFieldsToPayload(payload, {
         manualMode,
         selectedMake,
-        selectedModelLegacy,
+        selectedModelLegacy: resolvedModelLegacy,
         catalogBrand,
         catalogModel,
         catalogGeneration,
@@ -499,41 +551,24 @@ export default function CreateVehicleScreen({ navigation, route }) {
                 onOpenManual={openManualFromCatalog}
               />
             ) : (
-              <>
-                <Text style={styles.hintMuted}>Enter make and model manually.</Text>
-                <VehicleCatalogIdentityBlock
-                  manualMode
-                  onManualModeChange={setManualModeWrapped}
-                  catalogBrands={catalogBrands}
-                  catalogModels={catalogModels}
-                  catalogGenerations={catalogGenerations}
-                  catalogEngines={catalogEngines}
-                  catalogTrims={catalogTrims}
-                  selectedCatalogBrand={catalogBrand}
-                  onCatalogBrandChange={onCatalogBrandChange}
-                  selectedCatalogModel={catalogModel}
-                  onCatalogModelChange={onCatalogModelChange}
-                  selectedCatalogGeneration={catalogGeneration}
-                  onCatalogGenerationChange={onCatalogGenerationChange}
-                  selectedCatalogEngine={catalogEngine}
-                  onCatalogEngineChange={setCatalogEngine}
-                  selectedCatalogTrim={catalogTrim}
-                  onCatalogTrimChange={setCatalogTrim}
-                  makes={makes}
-                  models={legacyModels}
-                  selectedMake={selectedMake}
-                  onMakeChange={onLegacyMakeChange}
-                  selectedModelLegacy={selectedModelLegacy}
-                  onModelLegacyChange={setSelectedModelLegacy}
-                  manualGenerationText={optionalStrings.generation ?? ''}
-                  onManualGenerationTextChange={(t) => changeOptionalString('generation', t)}
-                  manualEngineCodeText={optionalStrings.engine_code ?? ''}
-                  onManualEngineCodeTextChange={(t) => changeOptionalString('engine_code', t)}
-                />
-                <Button mode="text" onPress={() => setManualModeWrapped(false)} compact>
-                  Back to catalog selection
-                </Button>
-              </>
+              <VehicleManualModelStep
+                brandLocked={manualBrandLocked}
+                brandName={selectedCatalogBrandName}
+                makes={makes}
+                selectedMake={selectedMake}
+                onMakeChange={onLegacyMakeChange}
+                manualModelText={manualModelText}
+                onManualModelTextChange={setManualModelText}
+                legacyModels={legacyModels}
+                selectedYear={selectedYear}
+                onSelectedYearChange={setSelectedYear}
+                fuelType={optionalStrings.fuel_type}
+                onFuelTypeChange={(v) => {
+                  setSpecApplied(false);
+                  changeOptionalString('fuel_type', v);
+                }}
+                onBackToCatalog={() => setManualModeWrapped(false)}
+              />
             )}
           </FloatingCard>
 

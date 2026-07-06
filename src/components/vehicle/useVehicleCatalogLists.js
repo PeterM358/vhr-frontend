@@ -28,8 +28,7 @@ export function useVehicleCatalogLists({
 
   useEffect(() => {
     if (manualMode) {
-      setCatalogBrands([]);
-      return;
+      return undefined;
     }
     let cancelled = false;
     (async () => {
@@ -47,9 +46,12 @@ export function useVehicleCatalogLists({
   }, [manualMode, selectedVehicleType]);
 
   useEffect(() => {
-    if (manualMode || !catalogBrand) {
+    if (manualMode) {
+      return undefined;
+    }
+    if (!catalogBrand) {
       setCatalogModels([]);
-      return;
+      return undefined;
     }
     let cancelled = false;
     (async () => {
@@ -67,9 +69,12 @@ export function useVehicleCatalogLists({
   }, [manualMode, catalogBrand, selectedVehicleType]);
 
   useEffect(() => {
-    if (manualMode || !catalogModel) {
+    if (manualMode) {
+      return undefined;
+    }
+    if (!catalogModel) {
       setCatalogGenerations([]);
-      return;
+      return undefined;
     }
     let cancelled = false;
     (async () => {
@@ -87,10 +92,13 @@ export function useVehicleCatalogLists({
   }, [manualMode, catalogModel]);
 
   useEffect(() => {
-    if (manualMode || !catalogGeneration) {
+    if (manualMode) {
+      return undefined;
+    }
+    if (!catalogGeneration) {
       setCatalogEngines([]);
       setCatalogTrims([]);
-      return;
+      return undefined;
     }
     let cancelled = false;
     (async () => {

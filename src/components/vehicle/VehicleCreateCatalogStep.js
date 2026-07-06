@@ -38,6 +38,9 @@ export default function VehicleCreateCatalogStep({
     () => enginesForFuel(catalogEngines, fuelType),
     [catalogEngines, fuelType]
   );
+  const modelsMissing = Boolean(catalogBrand) && catalogModels.length === 0;
+  const canPickModel = Boolean(catalogBrand) && catalogModels.length > 0;
+  const catalogReady = Boolean(catalogModel);
 
   const handleYearChange = (year) => {
     onSelectedYearChange(year);
@@ -54,7 +57,7 @@ export default function VehicleCreateCatalogStep({
   return (
     <View>
       <Text style={styles.lead}>
-        Start with your vehicle from our catalog. We&apos;ll suggest maintenance specs when we have them.
+        Select your vehicle type, brand, model, year, and fuel type from our catalog.
       </Text>
 
       {hasVehicleTypePicker ? (
@@ -85,67 +88,82 @@ export default function VehicleCreateCatalogStep({
         </Picker>
       </View>
 
-      <Text style={styles.label}>Model *</Text>
-      {catalogBrand && catalogModels.length === 0 ? (
+      {modelsMissing ? (
         <View style={styles.gapBox}>
-          <Text style={styles.gapText}>No catalog models for this brand yet.</Text>
-          <Button mode="contained" compact onPress={onOpenManual}>
-            Add manually
+          <Text style={styles.gapTitle}>No catalog models for this brand yet</Text>
+          <Text style={styles.gapText}>
+            You can still add your vehicle by entering the model name manually.
+          </Text>
+          <Button mode="contained" onPress={onOpenManual} style={styles.gapBtn}>
+            Enter model manually
           </Button>
         </View>
       ) : null}
-      <View style={styles.pickerContainer}>
-        <Picker
-          selectedValue={catalogModel}
-          onValueChange={onCatalogModelChange}
-          style={styles.picker}
-          enabled={!!catalogBrand}
-        >
-          <Picker.Item label="Select model" value="" />
-          {catalogModels.map((m) => (
-            <Picker.Item key={m.id} label={m.name} value={String(m.id)} />
-          ))}
-        </Picker>
-      </View>
 
-      <Text style={styles.label}>Year *</Text>
-      <View style={styles.pickerContainer}>
-        <Picker
-          selectedValue={selectedYear}
-          onValueChange={handleYearChange}
-          style={styles.picker}
-          enabled={!!catalogModel}
-        >
-          <Picker.Item label="Select year" value="" />
-          {yearOptions.map((y) => (
-            <Picker.Item key={y} label={String(y)} value={String(y)} />
-          ))}
-        </Picker>
-      </View>
-
-      <FuelTypeChips value={fuelType} onChange={handleFuelChange} disabled={!catalogModel} />
-
-      {matchingEngines.length > 1 ? (
+      {canPickModel ? (
         <>
-          <Text style={styles.label}>Engine / variant</Text>
+          <Text style={styles.label}>Model *</Text>
           <View style={styles.pickerContainer}>
             <Picker
-              selectedValue={catalogEngine}
-              onValueChange={onCatalogEngineChange}
+              selectedValue={catalogModel}
+              onValueChange={onCatalogModelChange}
               style={styles.picker}
             >
-              <Picker.Item label="Select engine" value="" />
-              {matchingEngines.map((e) => (
-                <Picker.Item key={e.id} label={e.name} value={String(e.id)} />
+              <Picker.Item label="Select model" value="" />
+              {catalogModels.map((m) => (
+                <Picker.Item key={m.id} label={m.name} value={String(m.id)} />
               ))}
             </Picker>
           </View>
+          <Pressable onPress={onOpenManual} style={styles.inlineManualLink}>
+            <Text style={styles.inlineManualLinkText}>Can&apos;t find your model? Enter it manually</Text>
+          </Pressable>
         </>
       ) : null}
 
-      <Pressable onPress={onOpenManual} style={styles.manualLink}>
-        <Text style={styles.manualLinkText}>Can&apos;t find your vehicle? Add manually</Text>
-      </Pressable>
+      {catalogReady ? (
+        <>
+          <Text style={styles.label}>Year *</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={selectedYear}
+              onValueChange={handleYearChange}
+              style={styles.picker}
+            >
+              <Picker.Item label="Select year" value="" />
+              {yearOptions.map((y) => (
+                <Picker.Item key={y} label={String(y)} value={String(y)} />
+              ))}
+            </Picker>
+          </View>
+
+          <FuelTypeChips value={fuelType} onChange={handleFuelChange} />
+
+          {matchingEngines.length > 1 ? (
+            <>
+              <Text style={styles.label}>Engine / variant</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={catalogEngine}
+                  onValueChange={onCatalogEngineChange}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select engine" value="" />
+                  {matchingEngines.map((e) => (
+                    <Picker.Item key={e.id} label={e.name} value={String(e.id)} />
+                  ))}
+                </Picker>
+              </View>
+            </>
+          ) : null}
+        </>
+      ) : null}
+
+      {catalogBrand && !modelsMissing && !catalogModel ? (
+        <Pressable onPress={onOpenManual} style={styles.manualLink}>
+          <Text style={styles.manualLinkText}>Can&apos;t find your vehicle? Enter model manually</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -174,15 +192,38 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   gapBox: {
-    marginBottom: 8,
-    padding: 12,
+    marginTop: 12,
+    marginBottom: 4,
+    padding: 14,
     borderRadius: 10,
     backgroundColor: 'rgba(37,99,235,0.06)',
-    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(37,99,235,0.15)',
+    gap: 10,
+  },
+  gapTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.TEXT_DARK,
   },
   gapText: {
     fontSize: 13,
     color: COLORS.TEXT_DARK,
+    lineHeight: 18,
+  },
+  gapBtn: {
+    alignSelf: 'flex-start',
+  },
+  inlineManualLink: {
+    marginTop: 4,
+    marginBottom: 2,
+    paddingVertical: 4,
+  },
+  inlineManualLinkText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.PRIMARY,
+    textDecorationLine: 'underline',
   },
   manualLink: {
     marginTop: 16,
