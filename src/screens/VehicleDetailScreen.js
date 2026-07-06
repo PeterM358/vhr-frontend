@@ -475,9 +475,11 @@ export default function VehicleDetailScreen({ route, navigation }) {
           openKmModal();
           break;
         case 'log_service':
+        case 'add_service_history':
           navigateLogServiceRecord();
           break;
         case 'schedule':
+        case 'schedule_maintenance':
           navigation.navigate('CreateRepair', {
             vehicleId,
             mode: 'request',
@@ -494,6 +496,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
           });
           break;
         case 'reminders':
+        case 'configure_reminders':
           setSectionsExpanded((prev) => ({ ...prev, remindersObligations: true }));
           requestAnimationFrame(() => {
             setTimeout(() => scrollToY(sectionScrollYs.current.reminders), 80);

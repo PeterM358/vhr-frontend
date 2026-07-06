@@ -1,5 +1,5 @@
 /**
- * Maps backend ``vehicle.health`` payloads to UI presentation.
+ * Maps backend vehicle health payloads to UI presentation.
  * Health rules live in the API — keep icons/colors here only.
  */
 
@@ -29,10 +29,13 @@ const STATUS_CONFIG = {
 
 const ACTION_LABELS = {
   update_km: { label: 'Update kilometers', icon: 'speedometer' },
+  add_service_history: { label: 'Add service history', icon: 'book-plus-outline' },
   log_service: { label: 'Add service history', icon: 'book-plus-outline' },
+  configure_reminders: { label: 'Configure reminders', icon: 'bell-outline' },
+  reminders: { label: 'Configure reminders', icon: 'bell-outline' },
+  schedule_maintenance: { label: 'Schedule maintenance', icon: 'calendar-clock' },
   schedule: { label: 'Schedule maintenance', icon: 'calendar-clock' },
   book_repair: { label: 'Book repair', icon: 'wrench' },
-  reminders: { label: 'Configure reminders', icon: 'bell-outline' },
 };
 
 export function vehicleDisplayTitle(vehicle) {
@@ -44,26 +47,42 @@ export function vehicleDisplayTitle(vehicle) {
   return legacy || 'Your vehicle';
 }
 
+function normalizeHealthRaw(vehicle) {
+  if (vehicle?.health && typeof vehicle.health === 'object') {
+    return vehicle.health;
+  }
+  if (vehicle?.health_status) {
+    return {
+      status: vehicle.health_status,
+      status_label: STATUS_CONFIG[vehicle.health_status]?.label,
+      short_reason: vehicle.short_reason,
+      reasons: [],
+      suggested_actions: [],
+    };
+  }
+  return null;
+}
+
 export function mapHealthFromApi(vehicle) {
-  const raw = vehicle?.health;
-  if (!raw || typeof raw !== 'object') {
+  const raw = normalizeHealthRaw(vehicle);
+  if (!raw) {
     return fallbackHealth();
   }
 
   const status = raw.status || 'healthy';
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.healthy;
-  const issues = Array.isArray(raw.issues) ? raw.issues : [];
+  const reasons = Array.isArray(raw.reasons) ? raw.reasons : Array.isArray(raw.issues) ? raw.issues : [];
 
   return {
     status,
     ...cfg,
     status_label: raw.status_label || cfg.label,
-    subtitle: raw.subtitle || cfg.label,
-    shortReason: raw.dashboard_summary || raw.subtitle || cfg.label,
-    reasons: issues.map((row) => ({
+    subtitle: raw.subtitle || raw.short_reason || cfg.label,
+    shortReason: raw.short_reason || raw.dashboard_summary || raw.subtitle || cfg.label,
+    reasons: reasons.map((row) => ({
       key: row.key,
       label: row.label,
-      severity: row.severity,
+      severity: row.level || row.severity || 'maintenance',
       icon: row.icon || 'alert-circle-outline',
     })),
     actions: healthActionButtonsFromApi(raw),
@@ -79,12 +98,16 @@ function fallbackHealth() {
     subtitle: 'No urgent issues found.',
     shortReason: 'No urgent issues found.',
     reasons: [],
-    actions: healthActionButtonsFromApi({ status: 'healthy', actions: ['log_service'] }),
+    actions: healthActionButtonsFromApi({ status: 'healthy', suggested_actions: ['add_service_history'] }),
   };
 }
 
 export function healthActionButtonsFromApi(health) {
-  const keys = Array.isArray(health?.actions) ? health.actions : [];
+  const keys = Array.isArray(health?.suggested_actions)
+    ? health.suggested_actions
+    : Array.isArray(health?.actions)
+      ? health.actions
+      : [];
   return keys
     .map((key) => {
       const meta = ACTION_LABELS[key];
@@ -92,14 +115,4 @@ export function healthActionButtonsFromApi(health) {
       return { key, ...meta };
     })
     .filter(Boolean);
-}
-
-/** @deprecated Use mapHealthFromApi(vehicle) — health is computed on the backend. */
-export function computeVehicleHealth() {
-  return fallbackHealth();
-}
-
-/** @deprecated Use healthActionButtonsFromApi */
-export function healthActionButtons(health) {
-  return healthActionButtonsFromApi(health);
 }
