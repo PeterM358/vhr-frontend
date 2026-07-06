@@ -17,12 +17,14 @@ import BASE_STYLES from '../styles/base';
 import { getWebGeolocation } from '../utils/webGeolocation';
 import { ensureLeafletCss } from '../utils/leafletAssets.web';
 
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+function configureLeafletIcons() {
+  delete L.Icon.Default.prototype._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  });
+}
 
 const DEFAULT_CENTER = [42.6977, 23.3219];
 
@@ -60,6 +62,7 @@ export default function MapLocationPickerScreen({ navigation, route }) {
     let alive = true;
     ensureLeafletCss()
       .then(() => {
+        configureLeafletIcons();
         if (alive) setMapReady(true);
       })
       .catch((err) => {

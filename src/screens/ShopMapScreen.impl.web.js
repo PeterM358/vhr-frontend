@@ -37,12 +37,14 @@ import ScreenBackground from '../components/ScreenBackground';
 import { getWebGeolocation } from '../utils/webGeolocation';
 import { ensureLeafletCss } from '../utils/leafletAssets.web';
 
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+function configureLeafletIcons() {
+  delete L.Icon.Default.prototype._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  });
+}
 
 function ChangeView({ center, zoom }) {
   const map = useMap();
@@ -97,6 +99,7 @@ export default function ShopMapScreen() {
     let alive = true;
     ensureLeafletCss()
       .then(() => {
+        configureLeafletIcons();
         if (alive) setMapReady(true);
       })
       .catch((err) => {

@@ -57,6 +57,7 @@ export default {
       description: "Your vehicle service universe.",
       favicon: "./src/assets/icons/icon.png",
       bundler: "metro",
+      output: "single",
       meta: {
         viewport: "width=device-width, initial-scale=1",
         "application-name": "Veversal",
