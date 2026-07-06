@@ -27,14 +27,24 @@
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {
         overflow: hidden;
+        margin: 0;
+        background-color: #0b1220;
+        background-image:
+          linear-gradient(to bottom, rgba(0, 0, 0, 0.65) 0%, rgba(0, 0, 0, 0.45) 50%, rgba(0, 0, 0, 0.75) 100%),
+          url('/backgrounds/background-web.jpg');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
       }
       /* These styles make the root element full-height */
       #root {
         display: flex;
         height: 100%;
         flex: 1;
+        background: transparent;
       }
     </style>
+    <link rel="preload" href="/backgrounds/background-web.jpg" as="image" type="image/jpeg" />
   </head>
 
   <body>

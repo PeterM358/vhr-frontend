@@ -1,17 +1,10 @@
-// Web implementation: avoid react-native-svg percentage Rect + ImageBackground blur —
-// that combo often renders as a solid black region (top-left) on react-native-web.
-// Uses a CSS gradient overlay instead; ignores blurRadius / gradientStops for parity.
-// Web layout policy (foreground column only; background stays full-bleed):
-// - Default: WEB_CONTENT_MAX_WIDTH_DEFAULT (720). Do not add unrelated maxWidth on
-//   whole-screen wrappers unless there is a specific reason (narrow inner panels for
-//   auth forms, cards, chat bubbles, etc., are fine).
-// - Use contentMaxWidth={false} only for maps / other full-width layouts.
-// - Use contentMaxWidth={WEB_CONTENT_MAX_WIDTH_WIDE} for shop dashboard / table-heavy admin.
+// Web implementation: premium blurred automotive background + dark gradient overlay.
 
 import React from 'react';
 import { ImageBackground, StyleSheet, SafeAreaView, View } from 'react-native';
 
 import { BACKGROUNDS } from '../constants/images';
+import { WEB_BACKGROUND_URL } from '../constants/webBackground';
 
 /** Default centered content column on web (maps use `contentMaxWidth={false}`). */
 export const WEB_CONTENT_MAX_WIDTH_DEFAULT = 720;
@@ -19,17 +12,39 @@ export const WEB_CONTENT_MAX_WIDTH_DEFAULT = 720;
 /** Shop dashboard / dense tables — pass as `contentMaxWidth` when wiring those screens. */
 export const WEB_CONTENT_MAX_WIDTH_WIDE = 960;
 
-const WEB_GRADIENT_BACKGROUND = {
-  backgroundColor: '#0b1220',
-  backgroundImage:
-    'radial-gradient(1200px 600px at 20% 0%, rgba(37, 99, 235, 0.22) 0%, rgba(11, 18, 32, 0) 55%), linear-gradient(180deg, #0f172a 0%, #0b1220 45%, #05070d 100%)',
-};
-
 const WEB_OVERLAY = {
   ...StyleSheet.absoluteFillObject,
   backgroundImage:
     'linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.75) 100%)',
 };
+
+function resolveBackgroundSource(source) {
+  if (source) return source;
+  return BACKGROUNDS.default ?? { uri: WEB_BACKGROUND_URL };
+}
+
+function WebPremiumBackground({ source }) {
+  const resolved = resolveBackgroundSource(source);
+  const uri = typeof resolved === 'object' && resolved.uri ? resolved.uri : WEB_BACKGROUND_URL;
+
+  return (
+    <View pointerEvents="none" style={styles.bgLayer}>
+      <img
+        src={uri}
+        alt=""
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          filter: 'blur(2px) brightness(0.68)',
+          transform: 'scale(1.04)',
+        }}
+      />
+    </View>
+  );
+}
 
 export default function ScreenBackground({
   source,
@@ -54,11 +69,15 @@ export default function ScreenBackground({
         }
       : null;
 
-  const resolvedSource = source ?? BACKGROUNDS.default;
+  const resolvedSource = resolveBackgroundSource(source);
+  const usePremiumWebBg =
+    !source &&
+    (resolvedSource?.uri === WEB_BACKGROUND_URL || BACKGROUNDS.default?.uri === WEB_BACKGROUND_URL);
 
-  if (!resolvedSource) {
+  if (usePremiumWebBg) {
     return (
-      <View style={[styles.image, WEB_GRADIENT_BACKGROUND, style]}>
+      <View style={[styles.image, style]}>
+        <WebPremiumBackground source={source} />
         <View pointerEvents="none" style={WEB_OVERLAY} />
         <Wrapper style={[styles.content, contentStyle, constrain]}>{children}</Wrapper>
       </View>
@@ -83,6 +102,12 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'stretch',
     minHeight: '100vh',
+    backgroundColor: '#0b1220',
+    overflow: 'hidden',
+  },
+  bgLayer: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
   },
   content: {
     flex: 1,

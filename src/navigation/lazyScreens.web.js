@@ -28,23 +28,22 @@ export { default as AuthLoadingScreen } from '../screens/AuthLoadingScreen';
 export { default as PromotionDetailScreen } from '../screens/PromotionDetailScreen';
 export { default as ClientRepairsList } from '../components/client/ClientRepairsList';
 export { default as CreateRepairScreen } from '../screens/CreateRepairScreen';
-export { default as LogServiceRecordScreen } from '../screens/LogServiceRecordScreen';
-export { default as ServiceRecordServiceCenterScreen } from '../screens/ServiceRecordServiceCenterScreen';
 export { default as ManageVehicleServiceCentersScreen } from '../screens/ManageVehicleServiceCentersScreen';
 export { default as AddObligationPaymentScreen } from '../screens/AddObligationPaymentScreen';
-export { default as CreateVehicleScreen } from '../screens/CreateVehicleScreen';
 export { default as CreatePromotionScreen } from '../screens/CreatePromotionScreen';
 export { default as ShopRegisterClientScreen } from '../screens/ShopRegisterClientScreen';
 export { default as ChooseShopScreen } from '../screens/ChooseShopScreen';
 export { default as ClientActivityScreen } from '../screens/ClientActivityScreen';
 export { default as ClientServiceHistoryScreen } from '../screens/ClientServiceHistoryScreen';
-export { default as ClientDashboardPlaceholderScreen } from '../screens/ClientDashboardPlaceholderScreen';
-export { default as ShopProfileScreen } from '../screens/ShopProfileScreen';
+export { default as AuthorizedClients } from '../components/shop/AuthorizedClients';
+export { default as ShopPromotions } from '../components/shop/ShopPromotions';
+export { default as NotificationsList } from '../components/shop/NotificationsList';
+export { default as RepairsList } from '../components/shop/RepairsList';
+export { default as NotificationsWithAppbar } from '../components/shop/NotificationsWithAppbar';
 export { default as ShopServiceMenuScreen } from '../screens/ShopServiceMenuScreen';
 export { default as ShopInvoicingScreen } from '../screens/ShopInvoicingScreen';
 export { default as ShopWarehouseReceiveScreen } from '../screens/ShopWarehouseReceiveScreen';
 export { default as ShopInvoiceDetailScreen } from '../screens/ShopInvoiceDetailScreen';
-export { default as ClientProfileScreen } from '../screens/ClientProfileScreen';
 export { default as AddShopPartScreen } from '../screens/AddShopPartScreen';
 export { default as SelectRepairPartsScreen } from '../screens/SelectRepairPartsScreen';
 export { default as CreateMasterPartScreen } from '../screens/CreateMasterPartScreen';
@@ -56,14 +55,19 @@ export { default as CreateOrUpdateOfferScreen } from '../screens/CreateOrUpdateO
 export { default as SelectOfferPartsScreen } from '../screens/SelectOfferPartsScreen';
 export { default as PasswordRequestResetScreen } from '../screens/PasswordRequestResetScreen';
 export { default as PasswordConfirmResetScreen } from '../screens/PasswordConfirmResetScreen';
-export { default as AuthorizedClients } from '../components/shop/AuthorizedClients';
-export { default as ShopPromotions } from '../components/shop/ShopPromotions';
-export { default as NotificationsList } from '../components/shop/NotificationsList';
-export { default as RepairsList } from '../components/shop/RepairsList';
-export { default as NotificationsWithAppbar } from '../components/shop/NotificationsWithAppbar';
 
 export const ShopMapScreen = lazyScreen(() => import('../screens/ShopMapScreen'));
 export const MapLocationPickerScreen = lazyScreen(() => import('../screens/MapLocationPickerScreen'));
 export const VehicleSpecsScreen = lazyScreen(() => import('../screens/VehicleSpecsScreen'));
 export const AddManualServiceCenterScreen = lazyScreen(() => import('../screens/AddManualServiceCenterScreen'));
 export const RepairDetailScreen = lazyScreen(() => import('../screens/RepairDetailScreen'));
+export const ClientProfileScreen = lazyScreen(() => import('../screens/ClientProfileScreen'));
+export const CreateVehicleScreen = lazyScreen(() => import('../screens/CreateVehicleScreen'));
+export const LogServiceRecordScreen = lazyScreen(() => import('../screens/LogServiceRecordScreen'));
+export const ServiceRecordServiceCenterScreen = lazyScreen(
+  () => import('../screens/ServiceRecordServiceCenterScreen')
+);
+export const ClientDashboardPlaceholderScreen = lazyScreen(
+  () => import('../screens/ClientDashboardPlaceholderScreen')
+);
+export const ShopProfileScreen = lazyScreen(() => import('../screens/ShopProfileScreen'));

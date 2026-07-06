@@ -1,7 +1,9 @@
-// Web: avoid bundling multi-megabyte PNG backgrounds — ScreenBackground.web uses CSS instead.
+// Web: lightweight JPEG background (~167KB) — native keeps full PNG in images.js.
+
+import { WEB_BACKGROUND_URL } from './webBackground';
 
 export const BACKGROUNDS = {
-  default: null,
+  default: { uri: WEB_BACKGROUND_URL },
 };
 
 export const ICONS = {
