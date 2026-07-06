@@ -81,6 +81,20 @@ export async function getCitiesForCountry(countryId, options = {}) {
   );
 }
 
+/** Search cities for discovery (lazy; cached per search term). */
+export async function searchDiscoveryCities(search, options = {}) {
+  const term = String(search || '').trim();
+  if (!term) return [];
+  const params = new URLSearchParams();
+  params.set('search', term);
+  if (options.country) params.set('country', String(options.country));
+  if (options.limit != null) params.set('limit', String(options.limit));
+  const res = await fetch(`${API_BASE_URL}/api/profiles/cities/?${params.toString()}`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
 export async function getClientProfile() {
   const token = await AsyncStorage.getItem('@access_token');
   const res = await fetch(`${API_BASE_URL}/api/profiles/client-profile/`, {

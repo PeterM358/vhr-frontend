@@ -10,11 +10,15 @@ const COUNTRIES_STORAGE_KEY = `${STORAGE_PREFIX}countries_v1`;
 const COUNTRIES_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CITIES_TTL_MS = 24 * 60 * 60 * 1000;
 const VEHICLE_TYPES_TTL_MS = 24 * 60 * 60 * 1000;
+const REPAIR_TYPES_TTL_MS = 24 * 60 * 60 * 1000;
+const VEHICLE_MAKES_TTL_MS = 24 * 60 * 60 * 1000;
 
 const memory = {
   countries: { data: null, at: 0, promise: null },
   cities: new Map(),
   vehicleTypes: { data: null, at: 0, promise: null },
+  repairTypes: { data: null, at: 0, promise: null },
+  vehicleMakes: { data: null, at: 0, promise: null },
 };
 
 function isFresh(at, ttl) {
@@ -54,6 +58,8 @@ export function invalidateReferenceDataCache() {
   memory.countries = { data: null, at: 0, promise: null };
   memory.cities.clear();
   memory.vehicleTypes = { data: null, at: 0, promise: null };
+  memory.repairTypes = { data: null, at: 0, promise: null };
+  memory.vehicleMakes = { data: null, at: 0, promise: null };
 }
 
 export async function fetchCountriesCached(fetcher, { force = false } = {}) {
@@ -142,3 +148,32 @@ export async function fetchVehicleTypesCached(fetcher, { force = false } = {}) {
 
   return bucket.promise;
 }
+
+function createSimpleBucketFetcher(bucketName, ttl) {
+  return async function fetchCached(fetcher, { force = false } = {}) {
+    const bucket = memory[bucketName];
+    if (!force && bucket.data && isFresh(bucket.at, ttl)) {
+      return bucket.data;
+    }
+    if (bucket.promise) {
+      return bucket.promise;
+    }
+
+    bucket.promise = fetcher()
+      .then((data) => {
+        bucket.data = data;
+        bucket.at = Date.now();
+        bucket.promise = null;
+        return data;
+      })
+      .catch((err) => {
+        bucket.promise = null;
+        throw err;
+      });
+
+    return bucket.promise;
+  };
+}
+
+export const fetchRepairTypesCached = createSimpleBucketFetcher('repairTypes', REPAIR_TYPES_TTL_MS);
+export const fetchVehicleMakesCached = createSimpleBucketFetcher('vehicleMakes', VEHICLE_MAKES_TTL_MS);

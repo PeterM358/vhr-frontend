@@ -3,17 +3,20 @@ import { API_BASE_URL } from './config';
 /** Quick-pick vehicle filters; values are `VehicleType.code` (backend filter). */
 export const VEHICLE_TYPE_FILTER_CHIPS = [
   { code: 'car', label: 'Car' },
-  { code: 'van', label: 'Van' },
   { code: 'truck', label: 'Truck' },
   { code: 'motorcycle', label: 'Motorcycle' },
-  { code: 'bicycle', label: 'Bicycle' },
+  { code: 'bicycle', label: 'Bike' },
   { code: 'ebike', label: 'E-bike' },
 ];
+
+/** Visible quick-pick chips on discovery (subset of full vehicle list). */
+export const DISCOVERY_QUICK_VEHICLE_CHIPS = VEHICLE_TYPE_FILTER_CHIPS;
 
 export async function getServiceCenters(filters = {}, init = {}) {
   const params = new URLSearchParams();
 
-  if (filters.address) params.append('address', filters.address);
+  if (filters.search) params.append('search', filters.search);
+  else if (filters.address) params.append('search', filters.address);
   if (filters.vehicle_type) params.append('vehicle_type', filters.vehicle_type);
   if (filters.category) params.append('category', filters.category);
   if (filters.repair_type) params.append('repair_type', filters.repair_type);
