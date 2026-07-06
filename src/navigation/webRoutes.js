@@ -5,6 +5,8 @@
 
 const DASHBOARD = '/dashboard';
 const VEHICLES = '/dashboard/vehicles';
+const SERVICE_CENTERS = '/service-centers';
+const PARTNER = '/partner';
 
 function normalizeId(id) {
   const n = parseInt(String(id), 10);
@@ -125,6 +127,32 @@ export function normalizeWebPath(input) {
     return dashboardSection;
   }
 
+  const legacyServiceCenter = lastGlobalMatch(raw, String.raw`service-center\/(\d+)`);
+  if (legacyServiceCenter) {
+    return `${SERVICE_CENTERS}/${legacyServiceCenter[1]}${query}`;
+  }
+
+  if (raw === 'ShopMap' || raw.endsWith('/ShopMap')) {
+    return `${SERVICE_CENTERS}${query}`;
+  }
+  if (raw.startsWith('ShopMap/')) {
+    return `${SERVICE_CENTERS}${raw.slice('ShopMap'.length)}${query}`;
+  }
+  if (raw === 'ShopDetail' || raw.startsWith('ShopDetail/')) {
+    const shopId = parseRouteQuery(query).shopId || parseRouteQuery(query).shop_id;
+    return shopId ? `${SERVICE_CENTERS}/${normalizeId(shopId)}` : `${SERVICE_CENTERS}${query}`;
+  }
+  if (raw === 'ShopProfile' || raw.startsWith('ShopProfile/')) {
+    const profileQuery = parseRouteQuery(query);
+    if (profileQuery.expandSection === 'public_preview') {
+      return `${PARTNER}/public-preview${query}`;
+    }
+    return `${PARTNER}/profile${query}`;
+  }
+  if (raw === 'ShopHome/ShopDashboard' || raw === 'ShopHome' || raw.startsWith('ShopHome/')) {
+    return `${PARTNER}/dashboard${query}`;
+  }
+
   return pathWithOptionalSlash.startsWith('/')
     ? `${pathWithOptionalSlash}${query}`
     : `/${raw}${query}`;
@@ -194,6 +222,30 @@ export function documents(params = {}) {
 
 export function profile(params = {}) {
   return buildPathWithQuery(`${DASHBOARD}/profile`, params);
+}
+
+export function serviceCenters() {
+  return SERVICE_CENTERS;
+}
+
+export function serviceCenterDetail(id) {
+  return `${SERVICE_CENTERS}/${normalizeId(id)}`;
+}
+
+export function partnerDashboard() {
+  return `${PARTNER}/dashboard`;
+}
+
+export function partnerProfile(params = {}) {
+  const query = {};
+  if (params.requireSetup === true || params.requireSetup === 'true') {
+    query.requireSetup = 'true';
+  }
+  return buildPathWithQuery(`${PARTNER}/profile`, query);
+}
+
+export function partnerPublicPreview(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/public-preview`, params);
 }
 
 function buildPathWithQuery(base, params = {}) {

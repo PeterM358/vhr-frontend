@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Pressable,
+  Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Appbar, Badge, Button } from 'react-native-paper';
@@ -28,6 +29,7 @@ import {
   gateRepairNavigation,
 } from '../utils/shopProfileGate';
 import { setCachedShopRepairs } from '../utils/shopRepairsPrefetch';
+import { navigateToPartnerProfile, navigateToPartnerPublicPreview } from '../navigation/webNavigation';
 import ShopProfileSetupBanner from '../components/shop/ShopProfileSetupBanner';
 import { getMyShopProfiles } from '../api/profiles';
 import { formatShopDisplayName } from '../utils/shopDisplayName';
@@ -52,6 +54,22 @@ import { showMessage } from '../utils/crossPlatformAlert';
 import { resetShopDrawerRepairs } from '../navigation/drawerNavigation';
 
 const SHOP_TOP_BAR = 'rgba(11,18,32,0.92)';
+
+function openPartnerProfile(navigation, params = {}) {
+  if (Platform.OS === 'web') {
+    navigateToPartnerProfile(navigation, params);
+    return;
+  }
+  navigation.navigate('ShopProfile', params);
+}
+
+function openPartnerPublicPreview(navigation, params = {}) {
+  if (Platform.OS === 'web') {
+    navigateToPartnerPublicPreview(navigation, params);
+    return;
+  }
+  navigation.navigate('ShopProfile', { expandSection: 'public_preview', ...params });
+}
 
 export default function ShopHomeScreen() {
   const navigation = useNavigation();
@@ -207,7 +225,7 @@ export default function ShopHomeScreen() {
         'Activate your Veversal partner account to send offers to customers.',
         { variant: 'info' }
       );
-      navigation.navigate('ShopProfile', { requireSetup: true });
+      openPartnerProfile(navigation, { requireSetup: true });
       return;
     }
     if (
@@ -274,7 +292,7 @@ export default function ShopHomeScreen() {
           title: 'Service Center Profile',
           subtitle: 'Name, location, services, hours and contact',
           onPress: () =>
-            navigation.navigate('ShopProfile', {
+            openPartnerProfile(navigation, {
               requireSetup: !profileComplete,
             }),
         },
@@ -286,9 +304,8 @@ export default function ShopHomeScreen() {
           title: 'Public Page Preview',
           subtitle: 'How clients see your shop on the map and in search',
           onPress: () =>
-            navigation.navigate('ShopProfile', {
+            openPartnerPublicPreview(navigation, {
               requireSetup: !profileComplete,
-              expandSection: 'public_preview',
             }),
         },
       ],
@@ -414,7 +431,7 @@ export default function ShopHomeScreen() {
       <Appbar.Header style={{ backgroundColor: SHOP_TOP_BAR }}>
         <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color="#fff" />
         <Pressable
-          onPress={() => navigation.navigate('ShopProfile', { requireSetup: !profileComplete })}
+          onPress={() => openPartnerProfile(navigation, { requireSetup: !profileComplete })}
           style={styles.titlePressable}
           accessibilityRole="button"
           accessibilityLabel="Open center details"
@@ -451,14 +468,14 @@ export default function ShopHomeScreen() {
         {!profileComplete ? (
           <ShopProfileSetupBanner
             missingFields={missingProfileFields}
-            onCompletePress={() => navigation.navigate('ShopProfile', { requireSetup: true })}
+            onCompletePress={() => openPartnerProfile(navigation, { requireSetup: true })}
           />
         ) : null}
 
         {!partnerActive ? (
           <PartnerActivationBanner
             openRequestCount={openRepairs.length}
-            onActivatePress={() => navigation.navigate('ShopProfile', { requireSetup: true })}
+            onActivatePress={() => openPartnerProfile(navigation, { requireSetup: true })}
           />
         ) : null}
 

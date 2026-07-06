@@ -23,8 +23,13 @@ import {
   notifications,
   parseRouteQuery,
   parseServiceRecordQuery,
+  partnerDashboard,
+  partnerProfile,
+  partnerPublicPreview,
   profile,
   repairRequests,
+  serviceCenters,
+  serviceCenterDetail,
   serviceHistory,
   vehicleAdd,
   vehicleDetail,
@@ -113,6 +118,18 @@ export function getCanonicalWebPath(state) {
       return documents();
     case 'ClientProfile':
       return profile();
+    case 'ShopMap':
+      return serviceCenters();
+    case 'ShopDetail':
+      return params.shopId != null ? serviceCenterDetail(params.shopId) : serviceCenters();
+    case 'ShopProfile':
+      if (params.expandSection === 'public_preview') {
+        return partnerPublicPreview();
+      }
+      return partnerProfile(params);
+    case 'ShopHome':
+    case 'ShopDashboard':
+      return partnerDashboard();
     default:
       return null;
   }
@@ -258,6 +275,68 @@ export function getDashboardNavigationStateFromPath(path) {
   return null;
 }
 
+/** Parse public service center paths into navigation state. */
+export function getServiceCenterNavigationStateFromPath(path) {
+  const trimmed = String(path || '').replace(/^\//, '').replace(/\/$/, '');
+  if (!trimmed.startsWith('service-centers')) return null;
+
+  const [pathPart] = trimmed.split('?');
+  if (pathPart === 'service-centers') {
+    return { routes: [{ name: 'ShopMap' }] };
+  }
+
+  const match = pathPart.match(/^service-centers\/(\d+)$/);
+  if (match) {
+    const shopId = parseInt(match[1], 10);
+    if (!Number.isFinite(shopId)) return null;
+    return {
+      routes: [
+        { name: 'ShopMap' },
+        { name: 'ShopDetail', params: { shopId } },
+      ],
+      index: 1,
+    };
+  }
+
+  return null;
+}
+
+/** Parse partner dashboard/profile paths into navigation state. */
+export function getPartnerNavigationStateFromPath(path) {
+  const trimmed = String(path || '').replace(/^\//, '').replace(/\/$/, '');
+  if (!trimmed.startsWith('partner/')) return null;
+
+  const [pathPart, queryPart] = trimmed.split('?');
+  const query = parseRouteQuery(queryPart);
+
+  if (pathPart === 'partner/dashboard') {
+    return {
+      routes: [
+        {
+          name: 'ShopHome',
+          state: { routes: [{ name: 'ShopDashboard' }], index: 0 },
+        },
+      ],
+    };
+  }
+  if (pathPart === 'partner/profile') {
+    const params = {};
+    if (query.requireSetup === 'true' || query.requireSetup === true) {
+      params.requireSetup = true;
+    }
+    return {
+      routes: [{ name: 'ShopProfile', params }],
+    };
+  }
+  if (pathPart === 'partner/public-preview') {
+    return {
+      routes: [{ name: 'ShopProfile', params: { expandSection: 'public_preview', ...query } }],
+    };
+  }
+
+  return null;
+}
+
 /** @deprecated */
 export function collapseDuplicateVehiclePath(path) {
   if (!path) return path;
@@ -324,6 +403,13 @@ export function normalizeWebLinkingPath(path) {
   if (trimmed === 'ClientProfile' || trimmed.startsWith('ClientProfile/')) {
     return 'dashboard/profile';
   }
+  if (trimmed === 'ShopProfile' || trimmed.startsWith('ShopProfile/')) {
+    return 'partner/profile';
+  }
+  if (trimmed === 'ShopDetail' || trimmed.startsWith('ShopDetail/')) {
+    const shopId = trimmed.match(/shopId[=:](\d+)/i)?.[1];
+    return shopId ? `service-centers/${shopId}` : 'service-centers';
+  }
 
   return trimmed;
 }
@@ -360,7 +446,33 @@ function legacyShopDetailNavigationState() {
   const shopId = parseShopIdFromSearch(window.location.search);
   if (!shopId) return null;
   return {
-    routes: [{ name: 'ShopDetail', params: { shopId } }],
+    routes: [
+      { name: 'ShopMap' },
+      { name: 'ShopDetail', params: { shopId } },
+    ],
+    index: 1,
+  };
+}
+
+function legacyShopProfileNavigationState() {
+  if (typeof window === 'undefined') return null;
+  const pathname = window.location.pathname || '';
+  if (pathname !== '/ShopProfile' && !pathname.startsWith('/ShopProfile/')) {
+    return null;
+  }
+  const search = window.location.search || '';
+  const query = parseRouteQuery(search);
+  if (query.expandSection === 'public_preview') {
+    return {
+      routes: [{ name: 'ShopProfile', params: { expandSection: 'public_preview' } }],
+    };
+  }
+  const params = {};
+  if (query.requireSetup === 'true' || query.requireSetup === true) {
+    params.requireSetup = true;
+  }
+  return {
+    routes: [{ name: 'ShopProfile', params }],
   };
 }
 
@@ -418,6 +530,17 @@ export async function redirectLegacyWebUrl() {
     target = tab === 'offers' ? '/dashboard/repair-requests?tab=offers' : '/dashboard/repair-requests';
   } else if (pathname === '/ClientProfile' || pathname.startsWith('/ClientProfile/')) {
     target = '/dashboard/profile';
+  } else if (pathname === '/ShopProfile' || pathname.startsWith('/ShopProfile/')) {
+    const query = parseRouteQuery(search);
+    if (query.expandSection === 'public_preview') {
+      target = '/partner/public-preview';
+    } else if (query.requireSetup === 'true') {
+      target = '/partner/profile?requireSetup=true';
+    } else {
+      target = '/partner/profile';
+    }
+  } else if (/^\/service-center\/\d+/.test(pathname)) {
+    target = pathname.replace(/^\/service-center/, '/service-centers');
   } else if (
     (pathname === '/dashboard/vehicles' || pathname.startsWith('/dashboard/vehicles/')) &&
     !(await hasStoredAuthToken())
@@ -456,10 +579,22 @@ export function buildAppLinking(prefixes) {
       if (legacyShop) {
         return legacyShop;
       }
+      const legacyProfile = legacyShopProfileNavigationState();
+      if (legacyProfile) {
+        return legacyProfile;
+      }
       const normalized = normalizeWebLinkingPath(path);
       const seoState = getNavigationStateFromSeoPath(normalized);
       if (seoState) {
         return seoState;
+      }
+      const serviceCenterState = getServiceCenterNavigationStateFromPath(normalized);
+      if (serviceCenterState) {
+        return serviceCenterState;
+      }
+      const partnerState = getPartnerNavigationStateFromPath(normalized);
+      if (partnerState) {
+        return partnerState;
       }
       const vehicleState = getVehicleNavigationStateFromPath(normalized);
       if (vehicleState) {

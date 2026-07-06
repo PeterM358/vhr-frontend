@@ -23,7 +23,7 @@ import BASE_STYLES from '../styles/base';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { goBackFromServiceCenters } from '../navigation/serviceCentersNavigation';
+import { goBackFromServiceCenters, navigateToServiceCenterDetail } from '../navigation/serviceCentersNavigation';
 import BackHeaderButton from '../components/navigation/BackHeaderButton';
 import { navigateToVehicleServiceRecordNew } from '../navigation/webNavigation';
 import {
@@ -456,8 +456,7 @@ export default function ShopMapScreen() {
                         if (typeof document !== 'undefined' && document.activeElement?.blur) {
                           document.activeElement.blur();
                         }
-                        navigation.navigate('ShopDetail', {
-                          shopId: shop.id,
+                        navigateToServiceCenterDetail(navigation, shop.id, {
                           returnTo: route.params?.returnTo,
                           vehicleId: route.params?.vehicleId,
                         });

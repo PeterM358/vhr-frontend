@@ -34,7 +34,8 @@ export { default as MapLocationPickerScreen } from '../screens/MapLocationPicker
 
 // Profile / reference-data screens (countries/cities loaded on demand)
 export const ClientProfileScreen = lazyScreen(() => import('../screens/ClientProfileScreen'));
-export const ShopProfileScreen = lazyScreen(() => import('../screens/ShopProfileScreen'));
+// Service center detail/profile — static imports avoid Metro async chunk module ID mismatches on web
+export { default as ShopProfileScreen } from '../screens/ShopProfileScreen';
 export const EditVehicleDetailsScreen = lazyScreen(() => import('../screens/EditVehicleDetailsScreen'));
 export const CreateVehicleScreen = lazyScreen(() => import('../screens/CreateVehicleScreen'));
 export const AddManualServiceCenterScreen = lazyScreen(() => import('../screens/AddManualServiceCenterScreen'));
@@ -42,7 +43,7 @@ export const AddManualServiceCenterScreen = lazyScreen(() => import('../screens/
 // Heavy or rarely-used screens
 export const PublicSeoPageScreen = lazyScreen(() => import('../screens/PublicSeoPageScreen'));
 export const VehicleSpecsScreen = lazyScreen(() => import('../screens/VehicleSpecsScreen'));
-export const ShopDetailScreen = lazyScreen(() => import('../screens/ShopDetailScreen'));
+export { default as ShopDetailScreen } from '../screens/ShopDetailScreen';
 export const PromotionDetailScreen = lazyScreen(() => import('../screens/PromotionDetailScreen'));
 export const RepairDetailScreen = lazyScreen(() => import('../screens/RepairDetailScreen'));
 export const CreateRepairScreen = lazyScreen(() => import('../screens/CreateRepairScreen'));

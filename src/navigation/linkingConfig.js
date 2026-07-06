@@ -22,7 +22,7 @@ export const linkingScreens = {
   },
   ShopMap: 'service-centers',
   ShopDetail: {
-    path: 'service-center/:shopId',
+    path: 'service-centers/:shopId',
     parse: {
       shopId: (value) => {
         const id = parseInt(String(value), 10);
@@ -30,6 +30,7 @@ export const linkingScreens = {
       },
     },
   },
+  ShopProfile: 'partner/profile',
   PasswordConfirmReset: 'reset-password/:uid/:token',
   ClientVehicles: 'dashboard/vehicles',
   CreateVehicle: 'dashboard/vehicles/add',

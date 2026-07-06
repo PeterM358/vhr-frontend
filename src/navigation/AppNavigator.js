@@ -75,7 +75,7 @@ import { normalizeWebPath } from './webRoutes';
 import { syncWebDocumentTitle } from './webDocumentTitle';
 import { blurActiveElementOnWeb } from '../utils/webFocus';
 import NavigationFallback from './NavigationFallback';
-import { navigateToDashboard, navigateToVehicleDetail, navigateToVehicleList, navigateToVehicleServiceRecordNew, navigateToVehicleServiceRecordCenter } from './webNavigation';
+import { navigateToDashboard, navigateToVehicleDetail, navigateToVehicleList, navigateToVehicleServiceRecordNew, navigateToVehicleServiceRecordCenter, navigateToServiceCenters, navigateToPartnerDashboard } from './webNavigation';
 
 const Stack = createNativeStackNavigator();
 
@@ -129,7 +129,32 @@ function homeHeaderLeft(navigation) {
 }
 
 function shopHomeHeaderLeft(navigation) {
+  if (Platform.OS === 'web') {
+    return createBackHeaderLeft({
+      onPress: () => navigateToPartnerDashboard(navigation),
+      label: 'Dashboard',
+      accessibilityLabel: 'Back to partner dashboard',
+    });
+  }
   return drawerHeaderLeft(navigation, 'ShopHome', 'Home');
+}
+
+function shopDetailHeaderLeft(navigation, route) {
+  const { returnTo } = route.params || {};
+  if (returnTo) {
+    return stackBackHeaderLeft(navigation, 'Back');
+  }
+  return createBackHeaderLeft({
+    onPress: () => {
+      if (navigation.canGoBack?.()) {
+        navigation.goBack();
+      } else {
+        navigateToServiceCenters(navigation);
+      }
+    },
+    label: 'Map',
+    accessibilityLabel: 'Back to service centers map',
+  });
 }
 
 function vehicleDetailsHeaderLeft(navigation) {
@@ -299,7 +324,15 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ShopDetail"
           component={ShopDetailScreen}
-          options={{ title: 'Service Center Details' }}
+          options={({ navigation, route }) => ({
+            title: 'Service Center Details',
+            ...(Platform.OS === 'web'
+              ? {
+                  headerLeft: shopDetailHeaderLeft(navigation, route),
+                  headerBackVisible: false,
+                }
+              : {}),
+          })}
         />
         <Stack.Screen name="PromotionDetail" component={PromotionDetailScreen} options={{ title: 'Promotion Details' }}/>
         <Stack.Screen

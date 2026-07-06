@@ -10,6 +10,8 @@ const PATH_TITLES = {
   '/': BASE_TITLE,
   '/dashboard': `${BASE_TITLE} Dashboard`,
   '/partner/dashboard': `${BASE_TITLE} Partner Dashboard`,
+  '/partner/profile': `${BASE_TITLE} Partner Profile`,
+  '/partner/public-preview': `${BASE_TITLE} Public Page Preview`,
   '/service-centers': `${BASE_TITLE} Service Centers`,
   '/sign-in': BASE_TITLE,
   '/sign-up': BASE_TITLE,
@@ -57,6 +59,9 @@ export function getWebDocumentTitle(pathname) {
   const vehicleTitle = vehicleDetailTitle(normalized);
   if (vehicleTitle) {
     return vehicleTitle;
+  }
+  if (normalized.startsWith('/service-centers/')) {
+    return `${BASE_TITLE} Service Center`;
   }
   if (normalized.startsWith('/service-center/')) {
     return `${BASE_TITLE} Service Center`;

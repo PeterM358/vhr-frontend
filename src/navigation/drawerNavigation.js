@@ -8,6 +8,8 @@ import { CommonActions } from '@react-navigation/native';
 import { syncWebPath } from './authNavigation';
 import {
   notifications,
+  partnerProfile,
+  partnerPublicPreview,
   profile,
   repairRequests,
   serviceHistory,
@@ -33,11 +35,25 @@ const WEB_PATH_BY_SCREEN = {
   ClientProfile: profile(),
 };
 
+const SHOP_WEB_PATH_BY_SCREEN = {
+  ShopProfile: (params) => {
+    if (params?.expandSection === 'public_preview') {
+      return partnerPublicPreview();
+    }
+    return partnerProfile(params);
+  },
+};
+
 function resolveDrawerWebPath(screenName, params) {
   if (screenName === 'ClientRepairs' && (params?.initialTab === 'offers' || params?.tab === 'offers')) {
     return repairRequests({ tab: 'offers' });
   }
   return WEB_PATH_BY_SCREEN[screenName] || null;
+}
+
+function resolveShopDrawerWebPath(screenName, params) {
+  const resolver = SHOP_WEB_PATH_BY_SCREEN[screenName];
+  return resolver ? resolver(params) : null;
 }
 
 export function resetFromClientDrawer(navigation, screenName, params) {
@@ -64,6 +80,13 @@ export function resetFromShopDrawer(navigation, screenName, params) {
     root.navigate(screenName, params);
   } else {
     root.navigate(screenName);
+  }
+  if (Platform.OS === 'web') {
+    const webPath = resolveShopDrawerWebPath(screenName, params);
+    if (webPath) {
+      syncWebPath(webPath);
+      requestAnimationFrame(() => syncWebPath(webPath));
+    }
   }
 }
 

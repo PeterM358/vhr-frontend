@@ -7,6 +7,8 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resetFromClientDrawer } from './drawerNavigation';
 import { syncWebPath } from './authNavigation';
+import { serviceCenters } from './webRoutes';
+import { navigateToServiceCenterDetail as navigateToServiceCenterDetailWeb } from './webNavigation';
 
 function getRootNavigation(navigation) {
   let current = navigation;
@@ -26,9 +28,20 @@ export function openServiceCenters(navigation, params) {
   const root = getRootNavigation(navigation);
   if (Platform.OS === 'web') {
     root.navigate('ShopMap', params);
+    syncWebPath(serviceCenters());
+    requestAnimationFrame(() => syncWebPath(serviceCenters()));
     return;
   }
   resetFromClientDrawer(navigation, 'ShopMap', params);
+}
+
+/** Open a public service center detail page. */
+export function navigateToServiceCenterDetail(navigation, shopId, params = {}) {
+  if (Platform.OS === 'web') {
+    navigateToServiceCenterDetailWeb(navigation, shopId, params);
+    return;
+  }
+  navigation.navigate('ShopDetail', { shopId, ...params });
 }
 
 /** Back from service centers — respects browser history on web. */

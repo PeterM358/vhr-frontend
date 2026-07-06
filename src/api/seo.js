@@ -64,7 +64,7 @@ export function resolveShopSeoPath(shopId, locale = 'en') {
 }
 
 export function buildFallbackShopPath(shopId) {
-  return `/service-center/${shopId}`;
+  return `/service-centers/${shopId}`;
 }
 
 export function buildShopPublicPathFromShop(shop, locale = 'en', shopId = null) {

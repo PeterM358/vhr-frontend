@@ -21,6 +21,11 @@ import {
   vehicleServiceRecordCenter,
   vehicleServiceRecordCenterAdd,
   vehicleSpecs,
+  serviceCenters,
+  serviceCenterDetail,
+  partnerDashboard,
+  partnerProfile,
+  partnerPublicPreview,
 } from './webRoutes';
 
 const HOME_ROUTE = { name: 'Home' };
@@ -267,4 +272,70 @@ export function navigateToVehicleServiceRecordCenterAdd(navigation, vehicleId, p
     return;
   }
   navigation.navigate('AddManualServiceCenter', routeParams);
+}
+
+export function navigateToServiceCenters(navigation, params = {}) {
+  const root = getRootNavigation(navigation);
+  if (Platform.OS === 'web') {
+    root.navigate('ShopMap', params);
+    syncWebPath(serviceCenters());
+    requestAnimationFrame(() => syncWebPath(serviceCenters()));
+    return;
+  }
+  root.navigate('ShopMap', params);
+}
+
+export function navigateToServiceCenterDetail(navigation, shopId, params = {}) {
+  const routeParams = { shopId, ...params };
+  if (Platform.OS === 'web') {
+    navigation.navigate('ShopDetail', routeParams);
+    syncWebPath(serviceCenterDetail(shopId));
+    requestAnimationFrame(() => syncWebPath(serviceCenterDetail(shopId)));
+    return;
+  }
+  navigation.navigate('ShopDetail', routeParams);
+}
+
+export function navigateToPartnerDashboard(navigation) {
+  const root = getRootNavigation(navigation);
+  if (Platform.OS === 'web') {
+    root.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [
+          {
+            name: 'ShopHome',
+            state: { routes: [{ name: 'ShopDashboard' }], index: 0 },
+          },
+        ],
+      })
+    );
+    syncWebPath(partnerDashboard());
+    requestAnimationFrame(() => syncWebPath(partnerDashboard()));
+    return;
+  }
+  root.navigate('ShopHome', { screen: 'ShopDashboard' });
+}
+
+export function navigateToPartnerProfile(navigation, params = {}) {
+  const root = getRootNavigation(navigation);
+  if (Platform.OS === 'web') {
+    root.navigate('ShopProfile', params);
+    syncWebPath(partnerProfile(params));
+    requestAnimationFrame(() => syncWebPath(partnerProfile(params)));
+    return;
+  }
+  root.navigate('ShopProfile', params);
+}
+
+export function navigateToPartnerPublicPreview(navigation, params = {}) {
+  const previewParams = { expandSection: 'public_preview', ...params };
+  if (Platform.OS === 'web') {
+    const root = getRootNavigation(navigation);
+    root.navigate('ShopProfile', previewParams);
+    syncWebPath(partnerPublicPreview(params));
+    requestAnimationFrame(() => syncWebPath(partnerPublicPreview(params)));
+    return;
+  }
+  navigation.navigate('ShopProfile', previewParams);
 }
