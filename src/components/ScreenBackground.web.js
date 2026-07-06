@@ -19,9 +19,14 @@ export const WEB_CONTENT_MAX_WIDTH_DEFAULT = 720;
 /** Shop dashboard / dense tables — pass as `contentMaxWidth` when wiring those screens. */
 export const WEB_CONTENT_MAX_WIDTH_WIDE = 960;
 
+const WEB_GRADIENT_BACKGROUND = {
+  backgroundColor: '#0b1220',
+  backgroundImage:
+    'radial-gradient(1200px 600px at 20% 0%, rgba(37, 99, 235, 0.22) 0%, rgba(11, 18, 32, 0) 55%), linear-gradient(180deg, #0f172a 0%, #0b1220 45%, #05070d 100%)',
+};
+
 const WEB_OVERLAY = {
   ...StyleSheet.absoluteFillObject,
-  // RN Web forwards this to the DOM (matches default native gradient intent).
   backgroundImage:
     'linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.75) 100%)',
 };
@@ -32,7 +37,6 @@ export default function ScreenBackground({
   resizeMode = 'cover',
   safeArea = true,
   gradientStops: _gradientStops,
-  /** `false` / `null` = full width. Number = max width (px); default WEB_CONTENT_MAX_WIDTH_DEFAULT. */
   contentMaxWidth = WEB_CONTENT_MAX_WIDTH_DEFAULT,
   style,
   contentStyle,
@@ -50,9 +54,20 @@ export default function ScreenBackground({
         }
       : null;
 
+  const resolvedSource = source ?? BACKGROUNDS.default;
+
+  if (!resolvedSource) {
+    return (
+      <View style={[styles.image, WEB_GRADIENT_BACKGROUND, style]}>
+        <View pointerEvents="none" style={WEB_OVERLAY} />
+        <Wrapper style={[styles.content, contentStyle, constrain]}>{children}</Wrapper>
+      </View>
+    );
+  }
+
   return (
     <ImageBackground
-      source={source ?? BACKGROUNDS.default}
+      source={resolvedSource}
       style={[styles.image, style]}
       resizeMode={resizeMode}
     >

@@ -8,73 +8,65 @@ import { NavigationContainer, getPathFromState } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBackHeaderLeft } from '../components/navigation/BackHeaderButton';
 
+import {
+  LoginScreen,
+  RegisterScreen,
+  PublicHomeScreen,
+  PublicSeoPageScreen,
+  ClientVehiclesScreen,
+  ShopMapScreen,
+  VehicleDetailScreen,
+  VehicleSpecsScreen,
+  EditVehicleDetailsScreen,
+  ShopDetailScreen,
+  AuthLoadingScreen,
+  PromotionDetailScreen,
+  ClientRepairsList,
+  RepairDetailScreen,
+  CreateRepairScreen,
+  LogServiceRecordScreen,
+  ServiceRecordServiceCenterScreen,
+  MapLocationPickerScreen,
+  AddManualServiceCenterScreen,
+  ManageVehicleServiceCentersScreen,
+  AddObligationPaymentScreen,
+  CreateVehicleScreen,
+  CreatePromotionScreen,
+  ShopRegisterClientScreen,
+  ChooseShopScreen,
+  ClientActivityScreen,
+  ClientServiceHistoryScreen,
+  ClientDashboardPlaceholderScreen,
+  AuthorizedClients,
+  ShopPromotions,
+  NotificationsList,
+  RepairsList,
+  NotificationsWithAppbar,
+  ShopProfileScreen,
+  ShopServiceMenuScreen,
+  ShopInvoicingScreen,
+  ShopWarehouseReceiveScreen,
+  ShopInvoiceDetailScreen,
+  ClientProfileScreen,
+  AddShopPartScreen,
+  SelectRepairPartsScreen,
+  CreateMasterPartScreen,
+  RepairChatScreen,
+  ClientLogRepairScreen,
+  ClientRequestRepairScreen,
+  OfferChatScreen,
+  CreateOrUpdateOfferScreen,
+  SelectOfferPartsScreen,
+  PasswordRequestResetScreen,
+  PasswordConfirmResetScreen,
+} from './lazyScreens';
+
 // Screens
-import LoginScreen from '../screens/LoginScreen';
 import LoginErrorBoundary from '../components/auth/LoginErrorBoundary';
 import { resetToPublicHome } from './authNavigation';
-import RegisterScreen from '../screens/RegisterScreen';
-import PublicHomeScreen from '../screens/PublicHomeScreen';
-import PublicSeoPageScreen from '../screens/PublicSeoPageScreen';
-import ClientVehiclesScreen from '../screens/ClientVehiclesScreen';
-import ShopMapScreen from '../screens/ShopMapScreen';
-import VehicleDetailScreen from '../screens/VehicleDetailScreen';
-import VehicleSpecsScreen from '../screens/VehicleSpecsScreen';
-import EditVehicleDetailsScreen from '../screens/EditVehicleDetailsScreen';
-import ShopDetailScreen from '../screens/ShopDetailScreen';
-import AuthLoadingScreen from '../screens/AuthLoadingScreen';
-import PromotionDetailScreen from '../screens/PromotionDetailScreen';
-import ClientRepairsList from '../components/client/ClientRepairsList';
-import RepairDetailScreen from '../screens/RepairDetailScreen';
-import CreateRepairScreen from '../screens/CreateRepairScreen';
-import LogServiceRecordScreen from '../screens/LogServiceRecordScreen';
-import ServiceRecordServiceCenterScreen from '../screens/ServiceRecordServiceCenterScreen';
-import MapLocationPickerScreen from '../screens/MapLocationPickerScreen';
-import AddManualServiceCenterScreen from '../screens/AddManualServiceCenterScreen';
-import ManageVehicleServiceCentersScreen from '../screens/ManageVehicleServiceCentersScreen';
-import AddObligationPaymentScreen from '../screens/AddObligationPaymentScreen';
-import CreateVehicleScreen from '../screens/CreateVehicleScreen';
-import CreatePromotionScreen from '../screens/CreatePromotionScreen';
-import ShopRegisterClientScreen from '../screens/ShopRegisterClientScreen';
-import ChooseShopScreen from '../screens/ChooseShopScreen';
-import ClientActivityScreen from '../screens/ClientActivityScreen';
-import ClientServiceHistoryScreen from '../screens/ClientServiceHistoryScreen';
-import ClientDashboardPlaceholderScreen from '../screens/ClientDashboardPlaceholderScreen';
-
-import AuthorizedClients from '../components/shop/AuthorizedClients';
-import ShopPromotions from '../components/shop/ShopPromotions';
-import NotificationsList from '../components/shop/NotificationsList';
-import RepairsList from '../components/shop/RepairsList';
 
 import ShopDrawer from './ShopDrawer';
 import HomeDrawer from './HomeDrawer';
-import NotificationsWithAppbar from '../components/shop/NotificationsWithAppbar';
-
-import ShopProfileScreen from '../screens/ShopProfileScreen';
-import ShopServiceMenuScreen from '../screens/ShopServiceMenuScreen';
-import ShopInvoicingScreen from '../screens/ShopInvoicingScreen';
-import ShopWarehouseReceiveScreen from '../screens/ShopWarehouseReceiveScreen';
-import ShopInvoiceDetailScreen from '../screens/ShopInvoiceDetailScreen';
-import ClientProfileScreen from '../screens/ClientProfileScreen';
-import AddShopPartScreen from '../screens/AddShopPartScreen';
-
-import SelectRepairPartsScreen from '../screens/SelectRepairPartsScreen';
-import CreateMasterPartScreen from '../screens/CreateMasterPartScreen';
-import RepairChatScreen from '../screens/RepairChatScreen';
-
-// import SelectPartsForCreateScreen from '../screens/SelectPartsForCreateScreen';
-// import ManageRepairPartsScreen from '../screens/ManageRepairPartsScreen';
-
-
-import ClientLogRepairScreen from '../screens/ClientLogRepairScreen';
-import ClientRequestRepairScreen from '../screens/ClientRequestRepairScreen';
-
-import OfferChatScreen from '../screens/OfferChatScreen';
-import CreateOrUpdateOfferScreen from '../screens/CreateOrUpdateOfferScreen';
-import SelectOfferPartsScreen from '../screens/SelectOfferPartsScreen';
-
-
-import PasswordRequestResetScreen from '../screens/PasswordRequestResetScreen';
-import PasswordConfirmResetScreen from '../screens/PasswordConfirmResetScreen';
 
 import { buildAppLinking, redirectLegacyWebUrl, collapseDuplicateVehiclePath, getCanonicalWebPath } from './webLinking';
 import { linkingConfig } from './linkingConfig';

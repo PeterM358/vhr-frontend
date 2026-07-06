@@ -63,9 +63,6 @@ export default {
         "application-name": "Veversal",
         "apple-mobile-web-app-title": "Veversal",
       },
-      links: [
-        "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      ]
     },
     extra: {
       eas: {

@@ -1,8 +1,7 @@
-// Central registry for static image assets.
-// Add new images here and import them via this module instead of hardcoding paths.
+// Web: avoid bundling multi-megabyte PNG backgrounds — ScreenBackground.web uses CSS instead.
 
 export const BACKGROUNDS = {
-  default: require('../assets/backgrounds/background.png'),
+  default: null,
 };
 
 export const ICONS = {

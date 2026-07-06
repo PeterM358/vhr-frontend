@@ -1,5 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from './config';
+import { fetchVehicleTypesCached } from '../utils/referenceDataCache';
+
+async function fetchVehicleTypesRaw() {
+  const token = await AsyncStorage.getItem('@access_token');
+  const res = await fetch(`${API_BASE_URL}/api/vehicles/types/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load vehicle types');
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows : [];
+}
 
 export async function getVehicles() {
   const token = await AsyncStorage.getItem('@access_token');
@@ -79,14 +90,8 @@ export async function createVehicleExpense(vehicleId, payload, token) {
   return response.json();
 }
 
-export async function getVehicleTypes() {
-  const token = await AsyncStorage.getItem('@access_token');
-  const res = await fetch(`${API_BASE_URL}/api/vehicles/types/`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error('Failed to load vehicle types');
-  const rows = await res.json();
-  return Array.isArray(rows) ? rows : [];
+export async function getVehicleTypes(options = {}) {
+  return fetchVehicleTypesCached(() => fetchVehicleTypesRaw(), options);
 }
 
 export async function getMakes() {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useLayoutEffect } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -28,8 +28,10 @@ import { stackContentPaddingTop } from '../navigation/stackContentInset';
 import FloatingCard from '../components/ui/FloatingCard';
 import AppCard from '../components/ui/AppCard';
 import { COLORS } from '../constants/colors';
+import useDebouncedValue from '../utils/useDebouncedValue';
 
 const CONTACT_PREFERENCE_STORAGE_KEY = '@client_profile_contact_preference';
+const INITIAL_CITY_LIMIT = 120;
 /** Fallback when API country has no phone_code yet */
 const COUNTRY_PHONE_PREFIX_FALLBACK = {
   bulgaria: '+359',
@@ -85,6 +87,27 @@ function buildE164Phone(prefix, national) {
   return full;
 }
 
+function ensureSelectedCity(cityList, selectedId, selectedName) {
+  if (!selectedId) return cityList;
+  if (cityList.some((city) => Number(city.id) === Number(selectedId))) {
+    return cityList;
+  }
+  return [{ id: selectedId, name: selectedName || 'Selected city' }, ...cityList];
+}
+
+function ProfileSkeleton() {
+  return (
+    <ScreenBackground safeArea={false}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={[styles.skeletonBlock, styles.skeletonHero]} />
+        <View style={[styles.skeletonBlock, styles.skeletonCard]} />
+        <View style={[styles.skeletonBlock, styles.skeletonCard]} />
+        <View style={[styles.skeletonBlock, styles.skeletonCard]} />
+      </ScrollView>
+    </ScreenBackground>
+  );
+}
+
 export default function ClientProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
 
@@ -92,6 +115,8 @@ export default function ClientProfileScreen({ navigation }) {
   const [countries, setCountries] = useState([]);
   const [cities, setCities] = useState([]);
   const [loadingCities, setLoadingCities] = useState(false);
+  const [citySearch, setCitySearch] = useState('');
+  const debouncedCitySearch = useDebouncedValue(citySearch, 300);
   const [displayName, setDisplayName] = useState('');
   const [contactPreference, setContactPreference] = useState('phone');
   const [phonePrefix, setPhonePrefix] = useState('');
@@ -107,19 +132,32 @@ export default function ClientProfileScreen({ navigation }) {
     loadData();
   }, []);
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <Button
-          mode="text"
-          onPress={handleSave}
-          labelStyle={{ color: '#fff', fontSize: 16 }}
-        >
-          Save
-        </Button>
-      ),
-    });
-  }, [navigation, profile, phonePrefix, phoneNational, contactPreference, displayName, cities, countries]);
+  const loadCities = useCallback(async (countryId, search = '', selectedCityId = null, selectedCityName = '') => {
+    if (!countryId) {
+      setCities([]);
+      return;
+    }
+    setLoadingCities(true);
+    try {
+      const trimmed = String(search || '').trim();
+      const cityList = await getCitiesForCountry(countryId, {
+        search: trimmed.length >= 2 ? trimmed : undefined,
+        limit: trimmed.length >= 2 ? 50 : INITIAL_CITY_LIMIT,
+      });
+      const rows = Array.isArray(cityList) ? cityList : [];
+      setCities(ensureSelectedCity(rows, selectedCityId, selectedCityName));
+    } catch (e) {
+      console.warn('Could not load cities for selected country', e);
+      setCities([]);
+    } finally {
+      setLoadingCities(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!profile?.country) return;
+    loadCities(profile.country, debouncedCitySearch, profile.city, profile.city_name);
+  }, [profile?.country, profile?.city, profile?.city_name, debouncedCitySearch, loadCities]);
 
   const loadData = async () => {
     setLoading(true);
@@ -151,18 +189,6 @@ export default function ClientProfileScreen({ navigation }) {
       }
       setPhonePrefix(initialPrefix);
       setPhoneNational(initialNational);
-      if (clientData?.country) {
-        setLoadingCities(true);
-        try {
-          const cityList = await getCitiesForCountry(clientData.country);
-          setCities(cityList);
-        } catch (e) {
-          console.warn('Could not load cities for selected country', e);
-          setCities([]);
-        } finally {
-          setLoadingCities(false);
-        }
-      }
     } catch (err) {
       console.error(err);
       setDialogMessage('Error loading profile data');
@@ -178,6 +204,7 @@ export default function ClientProfileScreen({ navigation }) {
     if (fromCountry) {
       setPhonePrefix(fromCountry);
     }
+    setCitySearch('');
     setProfile({
       ...profile,
       country: value,
@@ -185,18 +212,22 @@ export default function ClientProfileScreen({ navigation }) {
     });
     setCities([]);
     if (!value) return;
-    setLoadingCities(true);
-    try {
-      const cityList = await getCitiesForCountry(value);
-      setCities(cityList);
-    } catch (err) {
-      console.error(err);
-      setDialogMessage('Error loading cities for this country');
-      setDialogVisible(true);
-    } finally {
-      setLoadingCities(false);
-    }
+    await loadCities(value);
   };
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Button
+          mode="text"
+          onPress={handleSave}
+          labelStyle={{ color: '#fff', fontSize: 16 }}
+        >
+          Save
+        </Button>
+      ),
+    });
+  }, [navigation, profile, phonePrefix, phoneNational, contactPreference, displayName, cities, countries]);
 
   const handleSave = async () => {
     if (!profile) return;
@@ -265,11 +296,7 @@ export default function ClientProfileScreen({ navigation }) {
   };
 
   if (loading) {
-    return (
-      <ScreenBackground safeArea={false}>
-        <ActivityIndicator style={styles.loading} color="#fff" />
-      </ScreenBackground>
-    );
+    return <ProfileSkeleton />;
   }
 
   if (!profile) {
@@ -343,6 +370,16 @@ export default function ClientProfileScreen({ navigation }) {
           </View>
 
           <Text variant="labelLarge" style={styles.label}>City (selectable)</Text>
+          {!!profile.country ? (
+            <TextInput
+              label="Search city"
+              mode="outlined"
+              value={citySearch}
+              onChangeText={setCitySearch}
+              placeholder="Type at least 2 letters to search"
+              style={styles.input}
+            />
+          ) : null}
           <View style={styles.pickerWrap}>
             <Picker
               selectedValue={profile.city}
@@ -514,5 +551,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  skeletonBlock: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 16,
+  },
+  skeletonHero: {
+    height: 96,
+    marginBottom: 4,
+  },
+  skeletonCard: {
+    height: 160,
   },
 });
