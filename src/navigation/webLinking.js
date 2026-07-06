@@ -11,6 +11,7 @@ import {
 } from '@react-navigation/native';
 import { linkingConfig } from './linkingConfig';
 import { syncWebDocumentTitle } from './webDocumentTitle';
+import { storeAuthReturnUrl } from './authNavigation';
 import { resolveLegacyShopPath } from '../api/seo';
 import {
   getLegacyRedirectTarget,
@@ -40,6 +41,7 @@ import {
   partnerServiceCenters,
   profile,
   repairRequests,
+  repairRequestNew,
   serviceCenters,
   serviceCenterProfile,
   serviceHistory,
@@ -119,6 +121,14 @@ export function getCanonicalWebPath(state) {
     case 'ClientRepairs': {
       const tab = params.initialTab || params.tab;
       return tab === 'offers' ? repairRequests({ tab: 'offers' }) : repairRequests();
+    }
+    case 'CreateRepair': {
+      const serviceCenter = params.serviceCenter ?? params.shopId;
+      return repairRequestNew({
+        serviceCenter,
+        repairType: params.repairType,
+        vehicleType: params.vehicleType,
+      });
     }
     case 'OffersScreen':
       return repairRequests({ tab: 'offers' });
@@ -278,6 +288,21 @@ export function getDashboardNavigationStateFromPath(path) {
     const tab = query.tab || 'open';
     return vehicleStackState([{ name: 'ClientRepairs', params: { initialTab: tab } }]);
   }
+  if (pathPart === 'dashboard/repair-requests/new') {
+    const serviceCenter = query.serviceCenter || query.serviceCenterId || query.shopId;
+    const centerId = serviceCenter != null ? parseInt(String(serviceCenter), 10) : null;
+    const routeParams = {
+      repairType: query.repairType || undefined,
+      vehicleType: query.vehicleType || undefined,
+    };
+    if (centerId != null && Number.isFinite(centerId)) {
+      routeParams.serviceCenter = centerId;
+      routeParams.shopId = centerId;
+      routeParams.targetingMode = 'selected_centers';
+      routeParams.selectedCenterIds = [centerId];
+    }
+    return vehicleStackState([{ name: 'CreateRepair', params: routeParams }]);
+  }
   if (pathPart === 'dashboard/offers') {
     return vehicleStackState([{ name: 'ClientRepairs', params: { initialTab: 'offers' } }]);
   }
@@ -311,6 +336,37 @@ export function getDashboardNavigationStateFromPath(path) {
   }
 
   return null;
+}
+
+/** Resolve a canonical absolute web path into a navigation state (web deep links). */
+export function resolveNavigationStateFromCanonicalPath(input) {
+  const normalized = normalizeWebLinkingPath(String(input || '').replace(/^\//, ''));
+  const serviceCenterState = getServiceCenterNavigationStateFromPath(normalized);
+  if (serviceCenterState?.redirectPath) {
+    const redirected = normalizeWebLinkingPath(
+      String(serviceCenterState.redirectPath).replace(/^\//, '')
+    );
+    const redirectedState = getServiceCenterNavigationStateFromPath(redirected);
+    if (redirectedState?.routes) {
+      return redirectedState;
+    }
+  }
+  if (serviceCenterState?.routes) {
+    return serviceCenterState;
+  }
+  const partnerState = getPartnerNavigationStateFromPath(normalized);
+  if (partnerState) {
+    return partnerState;
+  }
+  const vehicleState = getVehicleNavigationStateFromPath(normalized);
+  if (vehicleState) {
+    return vehicleState;
+  }
+  const dashboardState = getDashboardNavigationStateFromPath(normalized);
+  if (dashboardState) {
+    return dashboardState;
+  }
+  return getStateFromPathDefault(normalized, linkingConfig);
 }
 
 /** Parse public service center and SEO discovery paths into navigation state. */
@@ -539,6 +595,9 @@ export function normalizeWebLinkingPath(path) {
   if (trimmed === 'ClientRepairs' || trimmed.startsWith('ClientRepairs/')) {
     return 'dashboard/repair-requests';
   }
+  if (trimmed === 'CreateRepair' || trimmed.startsWith('CreateRepair')) {
+    return 'dashboard/repair-requests/new';
+  }
   if (trimmed === 'ClientProfile' || trimmed.startsWith('ClientProfile/')) {
     return 'dashboard/profile';
   }
@@ -670,6 +729,23 @@ export async function redirectLegacyWebUrl() {
     target = authed
       ? pathname.replace(/^\/Home\/HomeMain/, '/dashboard')
       : '/';
+  } else if (pathname === '/CreateRepair' || pathname.startsWith('/CreateRepair')) {
+    const query = parseRouteQuery(search);
+    const serviceCenter = query.shopId || query.shop_id || query.serviceCenter || query.serviceCenterId;
+    const nextParams = {};
+    if (serviceCenter) nextParams.serviceCenter = serviceCenter;
+    if (query.repairType) nextParams.repairType = query.repairType;
+    if (query.vehicleType) nextParams.vehicleType = query.vehicleType;
+    target = repairRequestNew(nextParams);
+  } else if (
+    pathname === '/dashboard/repair-requests/new' ||
+    pathname.startsWith('/dashboard/repair-requests/new')
+  ) {
+    const authed = await hasStoredAuthToken();
+    if (!authed) {
+      await storeAuthReturnUrl(`${pathname}${search}`);
+      target = '/sign-in';
+    }
   } else if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) {
     const authed = await hasStoredAuthToken();
     if (!authed) {
@@ -790,30 +866,9 @@ export function buildAppLinking(prefixes) {
         return legacyProfile;
       }
       const normalized = normalizeWebLinkingPath(path);
-      const serviceCenterState = getServiceCenterNavigationStateFromPath(normalized);
-      if (serviceCenterState?.redirectPath) {
-        const redirected = normalizeWebLinkingPath(
-          String(serviceCenterState.redirectPath).replace(/^\//, '')
-        );
-        const redirectedState = getServiceCenterNavigationStateFromPath(redirected);
-        if (redirectedState?.routes) {
-          return redirectedState;
-        }
-      }
-      if (serviceCenterState?.routes) {
-        return serviceCenterState;
-      }
-      const partnerState = getPartnerNavigationStateFromPath(normalized);
-      if (partnerState) {
-        return partnerState;
-      }
-      const vehicleState = getVehicleNavigationStateFromPath(normalized);
-      if (vehicleState) {
-        return vehicleState;
-      }
-      const dashboardState = getDashboardNavigationStateFromPath(normalized);
-      if (dashboardState) {
-        return dashboardState;
+      const resolved = resolveNavigationStateFromCanonicalPath(normalized);
+      if (resolved?.routes) {
+        return resolved;
       }
       return getStateFromPathDefault(normalized, linkingConfig);
     },

@@ -48,7 +48,11 @@ export default function CreateRepairScreen({ navigation, route }) {
   const isEditMode = route.params?.mode === 'edit_request';
   const editRepairId = route.params?.repairId ? Number(route.params.repairId) : null;
   const preselectedVehicleId = route.params?.vehicleId?.toString() || '';
-  const preselectedShopId = route.params?.shopId ? Number(route.params.shopId) : null;
+  const preselectedShopId = route.params?.shopId
+    ? Number(route.params.shopId)
+    : route.params?.serviceCenter
+      ? Number(route.params.serviceCenter)
+      : null;
   const fromVehicleDetail = route.params?.origin === 'VehicleDetail' || route.params?.returnTo === 'VehicleDetail';
   const fromShopDetail = route.params?.origin === 'ShopDetail' || route.params?.returnTo === 'ShopDetail';
   const [vehicles, setVehicles] = useState([]);
@@ -187,6 +191,15 @@ export default function CreateRepairScreen({ navigation, route }) {
       setVisitTimeSlot(visitTimeSlots[0]);
     }
   }, [visitTimeSlots, visitTimeSlot]);
+
+  useEffect(() => {
+    const slug = route.params?.repairType;
+    if (!slug || !repairTypes.length || repairTypeId) return;
+    const match = repairTypes.find(
+      (t) => t.slug === slug || t.repair_type_slug === slug
+    );
+    if (match) setRepairTypeId(String(match.id));
+  }, [repairTypes, route.params?.repairType, repairTypeId]);
 
   // Initial data load
   useEffect(() => {

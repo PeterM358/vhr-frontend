@@ -122,6 +122,15 @@ export function normalizeWebPath(input) {
     return `${DASHBOARD}/repair-requests?tab=offers`;
   }
 
+  if (raw.includes('dashboard/repair-requests/new')) {
+    const q = parseRouteQuery(query);
+    return repairRequestNew({
+      serviceCenter: q.serviceCenter || q.serviceCenterId || q.shopId || q.shop_id,
+      repairType: q.repairType,
+      vehicleType: q.vehicleType,
+    });
+  }
+
   const dashboardSection = normalizeDashboardSection(raw, query);
   if (dashboardSection) {
     return dashboardSection;
@@ -135,6 +144,22 @@ export function normalizeWebPath(input) {
   const legacyServiceCenterSlug = lastGlobalMatch(raw, String.raw`service-center\/(\d+)`);
   if (legacyServiceCenterSlug) {
     return `${SERVICE_CENTERS}/${legacyServiceCenterSlug[1]}${query}`;
+  }
+
+  if (raw === 'CreateRepair' || raw.endsWith('/CreateRepair')) {
+    const legacyQuery = parseRouteQuery(query);
+    const serviceCenter =
+      legacyQuery.shopId ||
+      legacyQuery.shop_id ||
+      legacyQuery.serviceCenter ||
+      legacyQuery.serviceCenterId;
+    const nextParams = {};
+    if (serviceCenter != null && serviceCenter !== '') {
+      nextParams.serviceCenter = normalizeId(serviceCenter);
+    }
+    if (legacyQuery.repairType) nextParams.repairType = legacyQuery.repairType;
+    if (legacyQuery.vehicleType) nextParams.vehicleType = legacyQuery.vehicleType;
+    return repairRequestNew(nextParams);
   }
 
   if (raw === 'ShopMap' || raw.endsWith('/ShopMap')) {
@@ -238,6 +263,22 @@ export function serviceHistory() {
 
 export function repairRequests(params = {}) {
   return buildPathWithQuery(`${DASHBOARD}/repair-requests`, params);
+}
+
+export function repairRequestNew(params = {}) {
+  const query = {};
+  const serviceCenter =
+    params.serviceCenter ?? params.serviceCenterId ?? params.shopId ?? params.shop_id;
+  if (serviceCenter != null && serviceCenter !== '') {
+    query.serviceCenter = String(normalizeId(serviceCenter));
+  }
+  if (params.repairType != null && params.repairType !== '') {
+    query.repairType = String(params.repairType);
+  }
+  if (params.vehicleType != null && params.vehicleType !== '') {
+    query.vehicleType = String(params.vehicleType);
+  }
+  return buildPathWithQuery(`${DASHBOARD}/repair-requests/new`, query);
 }
 
 export function offers(params = {}) {

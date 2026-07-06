@@ -11,6 +11,7 @@ import { collectShopRepairOptions } from '../../utils/shopRepairOptions';
 import { buildVisitSlotOptions, formatPreferredVisitNote, buildPreferredVisitTimes } from '../../utils/shopVisitSlots';
 import { parseOdometerKm } from '../../utils/finalizeMileageValidation';
 import { formatShopDisplayName } from '../../utils/shopDisplayName';
+import { navigateToRepairRequestNew } from '../../navigation/webNavigation';
 
 const VISIBLE_SERVICE_CHIPS = 6;
 
@@ -24,6 +25,8 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
     onClose,
     hideActions = false,
     onActionStateChange,
+    repairType,
+    vehicleType,
   },
   ref
 ) {
@@ -63,17 +66,15 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
   const openFullRequest = () => {
     onClose?.();
     const selectedRepair = repairOptions.find((row) => String(row.id) === String(repairTypeId));
-    navigation.navigate('CreateRepair', {
+    navigateToRepairRequestNew(navigation, {
+      serviceCenter: shopId,
+      repairType: repairType || selectedRepair?.slug || undefined,
+      vehicleType,
       vehicleId: vehicleId || undefined,
       repairTypeId: repairTypeId || undefined,
-      targetingMode: 'selected_centers',
-      selectedCenterIds: [Number(shopId)],
       description: selectedRepair ? `${selectedRepair.name} at ${shopName}` : `Request at ${shopName}`,
       availabilityNotes: formatPreferredVisitNote(selectedDay, timeSlot),
       symptoms: note.trim() || undefined,
-      origin: 'ShopDetail',
-      returnTo: 'ShopDetail',
-      shopId: Number(shopId),
     });
   };
 
@@ -156,7 +157,11 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
           mode="contained"
           onPress={() => {
             onClose?.();
-            navigation.navigate('Login');
+            navigateToRepairRequestNew(navigation, {
+              serviceCenter: shopId,
+              repairType,
+              vehicleType,
+            });
           }}
           style={styles.primaryBtn}
         >

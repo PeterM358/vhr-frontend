@@ -23,6 +23,8 @@ export default function ShopQuickRequestSheet({
   vehicles,
   navigation,
   isLoggedIn,
+  repairType,
+  vehicleType,
 }) {
   const insets = useSafeAreaInsets();
   const formRef = useRef(null);
@@ -67,6 +69,8 @@ export default function ShopQuickRequestSheet({
                 navigation={navigation}
                 isLoggedIn={isLoggedIn}
                 onClose={onClose}
+                repairType={repairType}
+                vehicleType={vehicleType}
               />
             </ScrollView>
 

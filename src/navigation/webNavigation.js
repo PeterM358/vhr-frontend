@@ -5,11 +5,13 @@
 
 import { Platform } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
-import { syncWebPath } from './authNavigation';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { syncWebPath, storeAuthReturnUrl } from './authNavigation';
 import {
   dashboard,
   notifications,
   repairRequests,
+  repairRequestNew,
   serviceHistory,
   bookings,
   documents,
@@ -45,6 +47,28 @@ const PARTNER_HOME_ROUTE = {
 };
 
 const HOME_ROUTE = { name: 'Home' };
+
+async function hasStoredAuthToken() {
+  const token = await AsyncStorage.getItem('@access_token');
+  return !!(token && token !== 'null' && token !== 'undefined');
+}
+
+function buildRepairRequestRouteParams(params = {}) {
+  const serviceCenter =
+    params.serviceCenter ?? params.serviceCenterId ?? params.shopId ?? params.shop_id;
+  const centerId =
+    serviceCenter != null && serviceCenter !== '' ? Number(serviceCenter) : null;
+  const routeParams = { ...params };
+  if (centerId != null && !Number.isNaN(centerId)) {
+    routeParams.serviceCenter = centerId;
+    routeParams.shopId = centerId;
+    routeParams.targetingMode = 'selected_centers';
+    routeParams.selectedCenterIds = [centerId];
+  }
+  delete routeParams.origin;
+  delete routeParams.returnTo;
+  return routeParams;
+}
 
 function getRootNavigation(navigation) {
   let current = navigation;
@@ -205,6 +229,38 @@ export function navigateToRepairRequests(navigation, params = {}) {
     return;
   }
   navigation.navigate('ClientRepairs', routeParams);
+}
+
+export async function navigateToRepairRequestNew(navigation, params = {}) {
+  const { repairType, vehicleType, ...rest } = params;
+  const serviceCenter =
+    rest.serviceCenter ?? rest.serviceCenterId ?? rest.shopId ?? rest.shop_id;
+  const routeParams = buildRepairRequestRouteParams({
+    serviceCenter,
+    repairType,
+    vehicleType,
+    ...rest,
+  });
+  const path = repairRequestNew({ serviceCenter, repairType, vehicleType });
+
+  const authed = await hasStoredAuthToken();
+  if (!authed) {
+    await storeAuthReturnUrl(path);
+    const root = getRootNavigation(navigation);
+    root.navigate('Login');
+    if (Platform.OS === 'web') {
+      syncWebPath('/sign-in');
+      requestAnimationFrame(() => syncWebPath('/sign-in'));
+    }
+    return;
+  }
+
+  const root = getRootNavigation(navigation);
+  if (Platform.OS === 'web') {
+    resetWebRoutes(root, [{ name: 'CreateRepair', params: routeParams }], path);
+    return;
+  }
+  root.navigate('CreateRepair', routeParams);
 }
 
 export function navigateToServiceHistory(navigation) {

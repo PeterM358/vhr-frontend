@@ -870,6 +870,8 @@ export default function ShopDetailScreen({ route, navigation }) {
         vehicles={vehicles}
         navigation={navigation}
         isLoggedIn={isLoggedIn}
+        repairType={route.params?.repairType}
+        vehicleType={route.params?.vehicleType}
       />
     </ScreenBackground>
   );

@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
   IS_CLIENT: '@is_client',
   SHOP_PROFILES: '@shop_profiles',
   CURRENT_SHOP_ID: '@current_shop_id',
+  AUTH_RETURN_URL: '@auth_return_url',
   logServiceRecordDraftKey: (vehicleId) => `@log_service_record_draft_${vehicleId}`,
   serviceRecordDraftKey: (vehicleId) => `serviceRecordDraft:${vehicleId}`,
   serviceRecordManualDraftKey: (vehicleId) => `serviceRecordManualDraft:${vehicleId}`,

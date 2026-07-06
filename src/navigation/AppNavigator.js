@@ -140,6 +140,20 @@ function shopHomeHeaderLeft(navigation) {
   return drawerHeaderLeft(navigation, 'ShopHome', 'Home');
 }
 
+function createRepairRequestHeaderLeft(navigation) {
+  return createBackHeaderLeft({
+    onPress: () => {
+      if (navigation.canGoBack?.()) {
+        navigation.goBack();
+      } else {
+        navigateToServiceCenters(navigation);
+      }
+    },
+    label: 'Back',
+    accessibilityLabel: 'Back to previous page',
+  });
+}
+
 function shopDetailHeaderLeft(navigation, route) {
   const { returnTo } = route.params || {};
   if (returnTo) {
@@ -380,7 +394,19 @@ export default function AppNavigator() {
             return { title: 'Repair Details' };
           }}
         />
-        <Stack.Screen name="CreateRepair" component={CreateRepairScreen} options={{ title: 'Request Service' }}/>
+        <Stack.Screen
+          name="CreateRepair"
+          component={CreateRepairScreen}
+          options={({ navigation }) => ({
+            title: 'Request Service',
+            ...(Platform.OS === 'web'
+              ? {
+                  headerLeft: createRepairRequestHeaderLeft(navigation),
+                  headerBackVisible: false,
+                }
+              : {}),
+          })}
+        />
         <Stack.Screen
           name="LogServiceRecord"
           component={LogServiceRecordScreen}

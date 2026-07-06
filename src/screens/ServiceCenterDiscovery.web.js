@@ -47,7 +47,7 @@ import {
   goBackFromServiceCenters,
   navigateToServiceCenterProfile,
 } from '../navigation/serviceCentersNavigation';
-import { navigateToPartnerDashboard, navigateToVehicleServiceRecordNew } from '../navigation/webNavigation';
+import { navigateToPartnerDashboard, navigateToVehicleServiceRecordNew, navigateToRepairRequestNew } from '../navigation/webNavigation';
 import {
   loadServiceRecordFormDraft,
   saveServiceRecordFormDraft,
@@ -295,10 +295,10 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   };
 
   const handleRequestService = (shop) => {
-    navigation.navigate('CreateRepair', {
-      shopId: shop.id,
-      origin: 'ShopMap',
-      returnTo: 'ShopMap',
+    navigateToRepairRequestNew(navigation, {
+      serviceCenter: shop.id,
+      repairType: route.params?.repairType || selectedRepairType || undefined,
+      vehicleType: route.params?.vehicleType || selectedVehicleType || undefined,
     });
   };
 
@@ -580,6 +580,11 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
                 <Pressable style={styles.popupButton} onPress={() => openShopProfile(shop)}>
                   <Text style={styles.popupButtonText}>View profile</Text>
                 </Pressable>
+                {!pickForServiceRecord ? (
+                  <Pressable style={styles.popupButton} onPress={() => handleRequestService(shop)}>
+                    <Text style={styles.popupButtonText}>Request service</Text>
+                  </Pressable>
+                ) : null}
               </View>
             </Popup>
           </Marker>

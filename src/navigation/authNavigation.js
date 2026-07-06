@@ -5,8 +5,10 @@
 
 import { Platform } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { syncWebDocumentTitle } from './webDocumentTitle';
 import { normalizeWebPath } from './webRoutes';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 
 function getRootNavigation(navigation) {
   let current = navigation;
@@ -76,4 +78,21 @@ export function navigateToSignIn(navigation) {
   if (Platform.OS === 'web') {
     syncWebPath('/sign-in');
   }
+}
+
+export async function storeAuthReturnUrl(path) {
+  const normalized = normalizeWebPath(path);
+  if (!normalized || normalized === '/sign-in' || normalized === '/sign-up') return;
+  await AsyncStorage.setItem(STORAGE_KEYS.AUTH_RETURN_URL, normalized);
+}
+
+export async function consumeAuthReturnUrl() {
+  const stored = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_RETURN_URL);
+  await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_RETURN_URL);
+  if (!stored || stored === 'null' || stored === 'undefined') return null;
+  return normalizeWebPath(stored);
+}
+
+export async function clearAuthReturnUrl() {
+  await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_RETURN_URL);
 }

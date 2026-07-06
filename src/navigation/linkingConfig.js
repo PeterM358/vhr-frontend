@@ -85,6 +85,7 @@ export const linkingScreens = {
   },
   ClientActivity: 'dashboard/notifications',
   ClientRepairs: 'dashboard/repair-requests',
+  CreateRepair: 'dashboard/repair-requests/new',
   ClientServiceHistory: 'dashboard/service-history',
   ClientBookings: 'dashboard/bookings',
   ClientDocuments: 'dashboard/documents',

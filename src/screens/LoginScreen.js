@@ -5,7 +5,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { login, googleLogin } from '../api/auth';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
-import { resetToClientDashboard } from '../navigation/authNavigation';
+import { resetToClientDashboard, consumeAuthReturnUrl, syncWebPath } from '../navigation/authNavigation';
+import { resolveNavigationStateFromCanonicalPath } from '../navigation/webLinking';
+import { CommonActions } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthManager';
 import Logo from '../assets/images/logo.svg';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -62,6 +64,30 @@ export default function LoginScreen({ navigation, route }) {
     loadLastLogin();
   }, []);
 
+  const finishClientLogin = useCallback(
+    async (navigationRef) => {
+      const returnPath = await consumeAuthReturnUrl();
+      if (returnPath) {
+        const state = resolveNavigationStateFromCanonicalPath(returnPath);
+        if (state?.routes?.length) {
+          navigationRef.dispatch(
+            CommonActions.reset({
+              index: typeof state.index === 'number' ? state.index : state.routes.length - 1,
+              routes: state.routes,
+            })
+          );
+          if (Platform.OS === 'web') {
+            syncWebPath(returnPath);
+            requestAnimationFrame(() => syncWebPath(returnPath));
+          }
+          return;
+        }
+      }
+      resetToClientDashboard(navigationRef);
+    },
+    []
+  );
+
   const handleGoogleOAuthResponse = useCallback(
     async (googleResponse, redirectUri) => {
       if (googleResponse?.type !== 'success') {
@@ -108,14 +134,14 @@ export default function LoginScreen({ navigation, route }) {
           const shopRoute = await resolveShopEntryRoute();
           navigation.reset(buildShopAuthReset(shopRoute));
         } else {
-          resetToClientDashboard(navigation);
+          await finishClientLogin(navigation);
         }
       } catch (oauthError) {
         safeError('Google login failed', oauthError);
         setError('Google login failed. Try again.');
       }
     },
-    [navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone]
+    [navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone, finishClientLogin]
   );
 
   const handleLogin = async () => {
@@ -151,7 +177,7 @@ export default function LoginScreen({ navigation, route }) {
         const shopRoute = await resolveShopEntryRoute();
         navigation.reset(buildShopAuthReset(shopRoute));
       } else {
-        resetToClientDashboard(navigation);
+        await finishClientLogin(navigation);
       }
     } catch (err) {
       safeError('Login failed', err);
