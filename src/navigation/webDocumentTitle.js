@@ -14,6 +14,8 @@ const PATH_TITLES = {
   '/sign-in': BASE_TITLE,
   '/sign-up': BASE_TITLE,
   '/forgot-password': BASE_TITLE,
+  '/my-vehicles': `${BASE_TITLE} My Vehicles`,
+  '/my-vehicles/add': `${BASE_TITLE} Add Vehicle`,
 };
 
 export function normalizeWebTitlePath(pathname) {

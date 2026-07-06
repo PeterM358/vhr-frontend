@@ -141,6 +141,34 @@ function catalogQuery(params) {
   return s ? `?${s}` : '';
 }
 
+export async function lookupVehicleMaintenanceSpec({
+  vehicleType,
+  catalogBrand,
+  catalogModel,
+  catalogGeneration,
+  catalogEngine,
+  year,
+  fuelType,
+  engineCode,
+}) {
+  const token = await AsyncStorage.getItem('@access_token');
+  const qs = catalogQuery({
+    vehicle_type: vehicleType,
+    catalog_brand: catalogBrand,
+    catalog_model: catalogModel,
+    catalog_generation: catalogGeneration,
+    catalog_engine: catalogEngine,
+    year,
+    fuel_type: fuelType,
+    engine_code: engineCode,
+  });
+  const res = await fetch(`${API_BASE_URL}/api/vehicles/catalog/specs/lookup/${qs}`, {
+    headers: withAuthHeaders(token),
+  });
+  if (!res.ok) return { found: false, spec: null };
+  return res.json();
+}
+
 export async function getCatalogBrands(vehicleTypeIdOrCode) {
   const token = await AsyncStorage.getItem('@access_token');
   const qs = catalogQuery({ vehicle_type: vehicleTypeIdOrCode });

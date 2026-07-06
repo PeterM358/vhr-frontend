@@ -361,7 +361,7 @@ export default function AppNavigator() {
           component={AddObligationPaymentScreen}
           options={{ title: 'Add Obligation / Payment' }}
         />
-        <Stack.Screen name="CreateVehicle" component={CreateVehicleScreen} options={{ title: 'Create Vehicle' }}/>
+        <Stack.Screen name="CreateVehicle" component={CreateVehicleScreen} options={{ title: 'Add vehicle' }}/>
         <Stack.Screen name="CreatePromotion" component={CreatePromotionScreen} options={{ title: 'Create Promotion' }}/>
         <Stack.Screen name="ShopRegisterClient" component={ShopRegisterClientScreen} options={{ title: 'Register Client' }}/>
         <Stack.Screen

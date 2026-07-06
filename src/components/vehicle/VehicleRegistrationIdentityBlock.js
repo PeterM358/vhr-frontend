@@ -48,6 +48,8 @@ export default function VehicleRegistrationIdentityBlock({
   disabled = false,
   hideTitle = false,
   hideHint = false,
+  /** When true, only render registration country (date handled elsewhere). */
+  countryOnly = false,
   /** When true and date is set, first registration date is read-only (fill once). */
   lockFirstRegistrationDate = false,
 }) {
@@ -135,25 +137,29 @@ export default function VehicleRegistrationIdentityBlock({
 
   const renderWebFields = () => (
     <>
-      {!hideHint ? (
+      {!countryOnly && !hideHint ? (
         <Text style={styles.hintMuted}>
           Optional. Month and year when the vehicle was first registered. Country can be updated later.
         </Text>
       ) : null}
-      <Text style={styles.fieldLabel}>First registration</Text>
-      {dateLocked ? (
-        <Text style={styles.rowValue}>{dateSummary}</Text>
-      ) : (
-        <WebDateInput
-          value={monthValueForWeb}
-          onChange={handleRegistrationDateChange}
-          inputType="month"
-          max={currentMonthIsoMax()}
-          min="1980-01"
-          style={disabled ? { opacity: 0.6 } : undefined}
-        />
-      )}
-      <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Registration country</Text>
+      {!countryOnly ? (
+        <>
+          <Text style={styles.fieldLabel}>First registration</Text>
+          {dateLocked ? (
+            <Text style={styles.rowValue}>{dateSummary}</Text>
+          ) : (
+            <WebDateInput
+              value={monthValueForWeb}
+              onChange={handleRegistrationDateChange}
+              inputType="month"
+              max={currentMonthIsoMax()}
+              min="1980-01"
+              style={disabled ? { opacity: 0.6 } : undefined}
+            />
+          )}
+        </>
+      ) : null}
+      <Text style={[styles.fieldLabel, { marginTop: countryOnly ? 0 : 12 }]}>Registration country</Text>
       <View style={styles.countryRow}>
         <View style={styles.countryPickerFlex}>{renderCountryPickerInline()}</View>
         <Button
@@ -209,13 +215,14 @@ export default function VehicleRegistrationIdentityBlock({
 
   const renderCompactRows = () => (
     <>
-      {!hideHint ? (
+      {!countryOnly && !hideHint ? (
         <Text style={styles.hintMuted}>
           Optional. Add first registration if you skipped it at create. You can change country later (e.g. if the vehicle was registered abroad).
           {dateLocked ? ' First registration date cannot be changed after it is saved.' : ''}
         </Text>
       ) : null}
 
+      {!countryOnly ? (
       <Pressable
         onPress={openDateEditor}
         disabled={disabled || dateLocked}
@@ -233,6 +240,7 @@ export default function VehicleRegistrationIdentityBlock({
           <MaterialCommunityIcons name="chevron-right" size={22} color={COLORS.TEXT_MUTED} />
         ) : null}
       </Pressable>
+      ) : null}
 
       <Pressable
         onPress={openCountryEditor}

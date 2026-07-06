@@ -31,6 +31,17 @@ export const linkingScreens = {
     },
   },
   PasswordConfirmReset: 'reset-password/:uid/:token',
+  ClientVehicles: 'my-vehicles',
+  CreateVehicle: 'my-vehicles/add',
+  VehicleDetail: {
+    path: 'my-vehicles/:vehicleId',
+    parse: {
+      vehicleId: (value) => {
+        const id = parseInt(String(value), 10);
+        return Number.isFinite(id) ? id : undefined;
+      },
+    },
+  },
 };
 
 export const linkingConfig = { screens: linkingScreens };

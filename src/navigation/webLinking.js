@@ -47,6 +47,15 @@ export function normalizeWebLinkingPath(path) {
   if (trimmed.startsWith('ShopHome/')) {
     return 'partner/dashboard';
   }
+  if (trimmed === 'ClientVehicles' || trimmed.startsWith('ClientVehicles/')) {
+    return trimmed.replace(/^ClientVehicles/, 'my-vehicles');
+  }
+  if (trimmed === 'CreateVehicle' || trimmed.startsWith('CreateVehicle/')) {
+    return 'my-vehicles/add';
+  }
+  if (trimmed.startsWith('VehicleDetail/')) {
+    return trimmed.replace(/^VehicleDetail/, 'my-vehicles');
+  }
 
   return trimmed;
 }
@@ -107,6 +116,17 @@ export async function redirectLegacyWebUrl() {
     if (!authed) {
       target = '/';
     }
+  } else if (pathname === '/ClientVehicles' || pathname.startsWith('/ClientVehicles/')) {
+    target = pathname.replace(/^\/ClientVehicles/, '/my-vehicles');
+  } else if (pathname === '/CreateVehicle' || pathname.startsWith('/CreateVehicle/')) {
+    target = '/my-vehicles/add';
+  } else if (pathname === '/VehicleDetail' || pathname.startsWith('/VehicleDetail/')) {
+    target = pathname.replace(/^\/VehicleDetail/, '/my-vehicles');
+  } else if (
+    (pathname === '/my-vehicles' || pathname.startsWith('/my-vehicles/')) &&
+    !(await hasStoredAuthToken())
+  ) {
+    target = '/';
   } else if (pathname === '/ShopDetail' || pathname.startsWith('/ShopDetail/')) {
     const shopId = parseShopIdFromSearch(search);
     if (shopId) {

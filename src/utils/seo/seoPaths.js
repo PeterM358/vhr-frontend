@@ -46,6 +46,7 @@ const RESERVED_ROOT_SEGMENTS = new Set([
   'dashboard',
   'partner',
   'service-centers',
+  'my-vehicles',
 ]);
 
 /**

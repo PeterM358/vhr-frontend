@@ -16,7 +16,6 @@ import {
   Dialog,
 } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Picker } from '@react-native-picker/picker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { getCountries } from '../api/profiles';
 import {
@@ -33,9 +32,17 @@ import FloatingCard from '../components/ui/FloatingCard';
 import { COLORS } from '../constants/colors';
 import VehicleCollapsibleFormSections from '../components/vehicle/VehicleCollapsibleFormSections';
 import VehicleCatalogIdentityBlock from '../components/vehicle/VehicleCatalogIdentityBlock';
+import VehicleCreateCatalogStep from '../components/vehicle/VehicleCreateCatalogStep';
 import VehicleCatalogEbikeTrailerSection from '../components/vehicle/VehicleCatalogEbikeTrailerSection';
 import VehicleRegistrationIdentityBlock from '../components/vehicle/VehicleRegistrationIdentityBlock';
+import VehicleSpecSuggestionCard from '../components/vehicle/VehicleSpecSuggestionCard';
+import MonthYearPicker from '../components/vehicle/MonthYearPicker';
 import { useVehicleCatalogLists } from '../components/vehicle/useVehicleCatalogLists';
+import {
+  useVehicleMaintenanceSpec,
+  maintenanceSpecToFormStrings,
+  enginesForFuel,
+} from '../components/vehicle/useVehicleMaintenanceSpec';
 import { applyVehicleCatalogFieldsToPayload } from '../components/vehicle/vehicleIdentityPayload';
 import {
   VEHICLE_OPTIONAL_GROUPS,
@@ -87,6 +94,8 @@ export default function CreateVehicleScreen({ navigation, route }) {
   const [kilometers, setKilometers] = useState('');
   const [licensePlate, setLicensePlate] = useState('');
   const [vin, setVin] = useState('');
+  const [selectedYear, setSelectedYear] = useState('');
+  const [specApplied, setSpecApplied] = useState(false);
 
   const [optionalStrings, setOptionalStrings] = useState(() => vehicleToFormStrings({}));
   const [optionalBools, setOptionalBools] = useState(() => vehicleToFormBools({}));
@@ -148,6 +157,8 @@ export default function CreateVehicleScreen({ navigation, route }) {
     setCatalogGeneration('');
     setCatalogEngine('');
     setCatalogTrim('');
+    setSelectedYear('');
+    setSpecApplied(false);
   };
 
   const onCatalogGenerationChange = (v) => {
@@ -213,15 +224,58 @@ export default function CreateVehicleScreen({ navigation, route }) {
 
   const setManualModeWrapped = (next) => {
     setManualMode(next);
+    setSpecApplied(false);
     if (next) {
       setCatalogBrand('');
       setCatalogModel('');
       setCatalogGeneration('');
       setCatalogEngine('');
       setCatalogTrim('');
+      setSelectedYear('');
     } else {
       setSelectedMake('');
       setSelectedModelLegacy('');
+    }
+  };
+
+  const selectedEngineRow = useMemo(
+    () => catalogEngines.find((row) => String(row.id) === String(catalogEngine)),
+    [catalogEngines, catalogEngine]
+  );
+
+  const { loading: specLoading, found: specFound, spec } = useVehicleMaintenanceSpec({
+    vehicleTypeId: selectedVehicleType,
+    catalogBrand,
+    catalogModel,
+    catalogGeneration,
+    catalogEngine,
+    year: selectedYear,
+    fuelType: optionalStrings.fuel_type,
+    engineCode: selectedEngineRow?.engine_code || optionalStrings.engine_code,
+  });
+
+  useEffect(() => {
+    if (!optionalStrings.fuel_type || manualMode) return;
+    const matches = enginesForFuel(catalogEngines, optionalStrings.fuel_type);
+    if (matches.length === 1 && String(matches[0].id) !== String(catalogEngine)) {
+      setCatalogEngine(String(matches[0].id));
+    }
+  }, [optionalStrings.fuel_type, catalogEngines, catalogEngine, manualMode]);
+
+  const applySuggestedSpecs = () => {
+    const mapped = maintenanceSpecToFormStrings(spec);
+    setOptionalStrings((prev) => ({ ...prev, ...mapped }));
+    setSpecApplied(true);
+  };
+
+  const openManualFromCatalog = () => {
+    const brand = catalogBrands.find((b) => String(b.id) === String(catalogBrand));
+    setManualModeWrapped(true);
+    if (brand && makes?.length) {
+      const match = makes.find(
+        (m) => String(m.name || '').toLowerCase() === String(brand.name || '').toLowerCase()
+      );
+      if (match) setSelectedMake(String(match.id));
     }
   };
 
@@ -233,6 +287,12 @@ export default function CreateVehicleScreen({ navigation, route }) {
       }
     } else if (!catalogBrand || !catalogModel) {
       Alert.alert('Validation', 'Choose a catalog brand and model, or use manual entry.');
+      return;
+    } else if (!selectedYear) {
+      Alert.alert('Validation', 'Choose the vehicle year.');
+      return;
+    } else if (!optionalStrings.fuel_type) {
+      Alert.alert('Validation', 'Choose a fuel type.');
       return;
     }
 
@@ -343,8 +403,15 @@ export default function CreateVehicleScreen({ navigation, route }) {
         powered_equipment_enabled: poweredEquipmentEnabled,
       });
     const resolved = resolveRelevantVehicleFieldGroups(backendFieldGroups, local);
-    // Mileage evidence is for service history trust — not needed when adding a vehicle.
-    return resolved.filter((group) => group.key !== 'odometer');
+    return resolved
+      .filter((group) => group.key !== 'odometer')
+      .map((group) => {
+        if (group.key !== 'technical') return group;
+        return {
+          ...group,
+          fields: (group.fields || []).filter((field) => field.key !== 'fuel_type'),
+        };
+      });
   }, [
     selectedVehicleTypeCode,
     optionalStrings,
@@ -403,30 +470,87 @@ export default function CreateVehicleScreen({ navigation, route }) {
           extraScrollHeight={20}
         >
           <FloatingCard>
-            <Text style={styles.cardTitle}>Basic information</Text>
-            <Text style={styles.hint}>Required fields are marked *</Text>
-
-            {hasVehicleTypePicker ? (
-              <>
-                <Text style={styles.label}>Vehicle type</Text>
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={selectedVehicleType}
-                    onValueChange={setSelectedVehicleType}
-                    style={styles.picker}
-                  >
-                    <Picker.Item label="Not specified" value="" />
-                    {vehicleTypes.map((vt) => (
-                      <Picker.Item key={vt.id} label={vt.name} value={vt.id.toString()} />
-                    ))}
-                  </Picker>
-                </View>
-              </>
+            <Text style={styles.cardTitle}>Your vehicle</Text>
+            {!manualMode ? (
+              <VehicleCreateCatalogStep
+                hasVehicleTypePicker={hasVehicleTypePicker}
+                vehicleTypes={vehicleTypes}
+                selectedVehicleType={selectedVehicleType}
+                onVehicleTypeChange={setSelectedVehicleType}
+                catalogBrands={catalogBrands}
+                catalogModels={catalogModels}
+                catalogGenerations={catalogGenerations}
+                catalogEngines={catalogEngines}
+                catalogBrand={catalogBrand}
+                onCatalogBrandChange={onCatalogBrandChange}
+                catalogModel={catalogModel}
+                onCatalogModelChange={onCatalogModelChange}
+                selectedYear={selectedYear}
+                onSelectedYearChange={setSelectedYear}
+                catalogGeneration={catalogGeneration}
+                onCatalogGenerationChange={onCatalogGenerationChange}
+                catalogEngine={catalogEngine}
+                onCatalogEngineChange={setCatalogEngine}
+                fuelType={optionalStrings.fuel_type}
+                onFuelTypeChange={(v) => {
+                  setSpecApplied(false);
+                  changeOptionalString('fuel_type', v);
+                }}
+                onOpenManual={openManualFromCatalog}
+              />
             ) : (
-              <Text style={styles.hintMuted}>Vehicle type can be set later when available.</Text>
+              <>
+                <Text style={styles.hintMuted}>Enter make and model manually.</Text>
+                <VehicleCatalogIdentityBlock
+                  manualMode
+                  onManualModeChange={setManualModeWrapped}
+                  catalogBrands={catalogBrands}
+                  catalogModels={catalogModels}
+                  catalogGenerations={catalogGenerations}
+                  catalogEngines={catalogEngines}
+                  catalogTrims={catalogTrims}
+                  selectedCatalogBrand={catalogBrand}
+                  onCatalogBrandChange={onCatalogBrandChange}
+                  selectedCatalogModel={catalogModel}
+                  onCatalogModelChange={onCatalogModelChange}
+                  selectedCatalogGeneration={catalogGeneration}
+                  onCatalogGenerationChange={onCatalogGenerationChange}
+                  selectedCatalogEngine={catalogEngine}
+                  onCatalogEngineChange={setCatalogEngine}
+                  selectedCatalogTrim={catalogTrim}
+                  onCatalogTrimChange={setCatalogTrim}
+                  makes={makes}
+                  models={legacyModels}
+                  selectedMake={selectedMake}
+                  onMakeChange={onLegacyMakeChange}
+                  selectedModelLegacy={selectedModelLegacy}
+                  onModelLegacyChange={setSelectedModelLegacy}
+                  manualGenerationText={optionalStrings.generation ?? ''}
+                  onManualGenerationTextChange={(t) => changeOptionalString('generation', t)}
+                  manualEngineCodeText={optionalStrings.engine_code ?? ''}
+                  onManualEngineCodeTextChange={(t) => changeOptionalString('engine_code', t)}
+                />
+                <Button mode="text" onPress={() => setManualModeWrapped(false)} compact>
+                  Back to catalog selection
+                </Button>
+              </>
             )}
+          </FloatingCard>
 
-            <Text style={styles.label}>License plate</Text>
+          {!manualMode ? (
+            <VehicleSpecSuggestionCard
+              loading={specLoading}
+              found={specFound}
+              spec={spec}
+              applied={specApplied}
+              onApply={applySuggestedSpecs}
+            />
+          ) : null}
+
+          <FloatingCard>
+            <Text style={styles.cardTitle}>Registration & mileage</Text>
+
+            <Text style={styles.label}>Registration number</Text>
             <TextInput
               mode="outlined"
               value={licensePlate}
@@ -435,15 +559,11 @@ export default function CreateVehicleScreen({ navigation, route }) {
               style={styles.input}
             />
 
-            <Text style={styles.label}>VIN</Text>
-            <TextInput
-              mode="outlined"
-              value={vin}
-              onChangeText={setVin}
-              placeholder={vinHint}
-              style={styles.input}
+            <MonthYearPicker
+              valueIso={firstRegIso}
+              onChangeIso={setFirstRegIso}
+              label="First registration (optional)"
             />
-            <Text style={styles.microHint}>{vinHint}</Text>
 
             <VehicleRegistrationIdentityBlock
               firstRegistrationIso={firstRegIso}
@@ -452,6 +572,9 @@ export default function CreateVehicleScreen({ navigation, route }) {
               onChangeRegistrationCountryIso={setRegCountryIso}
               countriesState={countriesState}
               onRetryCountries={reloadCountries}
+              hideTitle
+              hideHint
+              countryOnly
             />
 
             <Text style={styles.label}>Kilometers</Text>
@@ -464,40 +587,15 @@ export default function CreateVehicleScreen({ navigation, route }) {
               style={styles.input}
             />
 
-            <Text style={[styles.subheading, { marginTop: 8 }]}>Make & model</Text>
-            <Text style={styles.hintMuted}>
-              Use the catalog when available; switch to manual entry if your vehicle is not listed.
-            </Text>
-
-            <VehicleCatalogIdentityBlock
-              manualMode={manualMode}
-              onManualModeChange={setManualModeWrapped}
-              catalogBrands={catalogBrands}
-              catalogModels={catalogModels}
-              catalogGenerations={catalogGenerations}
-              catalogEngines={catalogEngines}
-              catalogTrims={catalogTrims}
-              selectedCatalogBrand={catalogBrand}
-              onCatalogBrandChange={onCatalogBrandChange}
-              selectedCatalogModel={catalogModel}
-              onCatalogModelChange={onCatalogModelChange}
-              selectedCatalogGeneration={catalogGeneration}
-              onCatalogGenerationChange={onCatalogGenerationChange}
-              selectedCatalogEngine={catalogEngine}
-              onCatalogEngineChange={setCatalogEngine}
-              selectedCatalogTrim={catalogTrim}
-              onCatalogTrimChange={setCatalogTrim}
-              makes={makes}
-              models={legacyModels}
-              selectedMake={selectedMake}
-              onMakeChange={onLegacyMakeChange}
-              selectedModelLegacy={selectedModelLegacy}
-              onModelLegacyChange={setSelectedModelLegacy}
-              manualGenerationText={optionalStrings.generation ?? ''}
-              onManualGenerationTextChange={(t) => changeOptionalString('generation', t)}
-              manualEngineCodeText={optionalStrings.engine_code ?? ''}
-              onManualEngineCodeTextChange={(t) => changeOptionalString('engine_code', t)}
+            <Text style={styles.label}>VIN (optional)</Text>
+            <TextInput
+              mode="outlined"
+              value={vin}
+              onChangeText={setVin}
+              placeholder={vinHint}
+              style={styles.input}
             />
+            <Text style={styles.microHint}>{vinHint}</Text>
           </FloatingCard>
 
           {showEbikeCatalogSection || showTrailerCatalogSection ? (
@@ -513,7 +611,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
             />
           ) : null}
 
-          <Text style={styles.optionalIntro}>Optional details (collapsed)</Text>
+          <Text style={styles.optionalIntro}>Advanced details (optional)</Text>
           {showTrailerPoweredEquipmentToggle ? (
             <FloatingCard style={{ marginBottom: 10 }}>
               <Text style={styles.cardTitle}>Powered equipment</Text>
