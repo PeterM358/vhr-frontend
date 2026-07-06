@@ -1,14 +1,31 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Text, Button } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import FloatingCard from '../ui/FloatingCard';
 import { COLORS } from '../../constants/colors';
+import {
+  computeVehicleHealth,
+  vehicleDisplayTitle,
+} from '../../utils/vehicleHealthStatus';
 
-/**
- * TODO(backend): vehicle health scores from mileage, service history, recalls.
- */
-export default function VehicleHealthSection({ vehicles = [] }) {
+const MAX_VISIBLE = 3;
+
+export default function VehicleHealthSection({
+  vehicles = [],
+  repairs = [],
+  onVehiclePress,
+  onViewAllPress,
+}) {
+  const rows = useMemo(
+    () =>
+      vehicles.slice(0, MAX_VISIBLE).map((vehicle) => ({
+        vehicle,
+        health: computeVehicleHealth(vehicle, { repairs }),
+      })),
+    [vehicles, repairs]
+  );
+
   if (!vehicles.length) {
     return (
       <FloatingCard accent={false}>
@@ -23,34 +40,31 @@ export default function VehicleHealthSection({ vehicles = [] }) {
 
   return (
     <View style={styles.list}>
-      {vehicles.slice(0, 3).map((vehicle, index) => {
-        const title =
-          [vehicle.make_name || vehicle.make, vehicle.model_name || vehicle.model]
-            .filter(Boolean)
-            .join(' ') || 'Your vehicle';
+      {rows.map(({ vehicle, health }) => {
+        const title = vehicleDisplayTitle(vehicle);
         const plate = vehicle.license_plate || vehicle.plate;
-        // Rotate placeholder statuses for demo until backend provides real health.
-        const statusKeys = ['healthy', 'maintenance', 'urgent', 'unknown'];
-        const statusKey = statusKeys[index % statusKeys.length];
-        const status = {
-          healthy: { label: 'Healthy', color: '#059669', icon: 'check-circle-outline' },
-          maintenance: { label: 'Maintenance recommended', color: '#d97706', icon: 'wrench-clock' },
-          urgent: { label: 'Urgent attention', color: '#dc2626', icon: 'alert-circle-outline' },
-          unknown: { label: 'No history available', color: '#64748b', icon: 'help-circle-outline' },
-        }[statusKey];
 
         return (
-          <FloatingCard key={String(vehicle.id)} style={styles.card}>
+          <FloatingCard
+            key={String(vehicle.id)}
+            style={styles.card}
+            onPress={() => onVehiclePress?.(vehicle)}
+          >
             <Text style={styles.vehicleTitle}>{title}</Text>
             {plate ? <Text style={styles.plate}>{plate}</Text> : null}
             <View style={styles.statusRow}>
-              <MaterialCommunityIcons name={status.icon} size={18} color={status.color} />
-              <Text style={[styles.statusLabel, { color: status.color }]}>{status.label}</Text>
+              <MaterialCommunityIcons name={health.icon} size={18} color={health.color} />
+              <Text style={[styles.statusLabel, { color: health.color }]}>{health.label}</Text>
             </View>
-            <Text style={styles.hint}>Health insights will use your service history and reminders.</Text>
+            <Text style={styles.hint}>{health.shortReason}</Text>
           </FloatingCard>
         );
       })}
+      {vehicles.length > MAX_VISIBLE ? (
+        <Button mode="text" onPress={onViewAllPress} style={styles.viewAllBtn}>
+          View all vehicles
+        </Button>
+      ) : null}
     </View>
   );
 }
@@ -98,5 +112,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.TEXT_MUTED,
     lineHeight: 17,
+  },
+  viewAllBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 2,
   },
 });

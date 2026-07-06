@@ -76,6 +76,7 @@ export default function HomeScreen({ navigation }) {
   const { notifications } = useContext(WebSocketContext);
 
   const [vehicles, setVehicles] = useState([]);
+  const [openRepairs, setOpenRepairs] = useState([]);
   const [recentRepairs, setRecentRepairs] = useState([]);
   const [openRequestsCount, setOpenRequestsCount] = useState(0);
   const [dashboardLoading, setDashboardLoading] = useState(true);
@@ -118,6 +119,7 @@ export default function HomeScreen({ navigation }) {
           const safeVehicles = Array.isArray(vehicleRows) ? vehicleRows : [];
           const safeRepairs = Array.isArray(repairRows) ? repairRows : [];
           setVehicles(safeVehicles);
+          setOpenRepairs(safeRepairs);
           setOpenRequestsCount(safeRepairs.length);
           setRecentRepairs(safeRepairs.slice(0, 4));
         } finally {
@@ -148,6 +150,11 @@ export default function HomeScreen({ navigation }) {
   const goRequestService = () => resetFromClientDrawer(navigation, 'CreateRepair');
   const goAddVehicle = () => resetFromClientDrawer(navigation, 'CreateVehicle');
   const goFindCenters = () => openServiceCenters(navigation);
+  const goVehicleDetail = (vehicle) => {
+    if (!vehicle?.id) return;
+    const root = navigation.getParent?.() || navigation;
+    root.navigate('VehicleDetail', { vehicleId: vehicle.id });
+  };
   const goVehicles = () => resetFromClientDrawer(navigation, 'ClientVehicles');
   const goRepairs = () => resetFromClientDrawer(navigation, 'ClientRepairs');
   const goOffers = () =>
@@ -276,7 +283,12 @@ export default function HomeScreen({ navigation }) {
           title="Vehicle Health"
           subtitle="Prevent problems before they happen — see status, risks and service gaps per vehicle."
         >
-          <VehicleHealthSection vehicles={vehicles} />
+          <VehicleHealthSection
+            vehicles={vehicles}
+            repairs={openRepairs}
+            onVehiclePress={goVehicleDetail}
+            onViewAllPress={goVehicles}
+          />
         </DashboardSection>
 
         <DashboardSection

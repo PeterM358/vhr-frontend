@@ -41,11 +41,13 @@ import {
 import { formatServiceRecordProvider } from '../utils/serviceRecordProvider';
 import MileageConfidenceSheet from '../components/vehicle/MileageConfidenceSheet';
 import VehicleForecastCard from '../components/vehicle/VehicleForecastCard';
+import VehicleHealthCard from '../components/vehicle/VehicleHealthCard';
 import {
   heroConfidenceSubtitle,
   mileageConfidenceCategoryPill,
   resolveMileageFactorAction,
 } from '../utils/mileageConfidence';
+import { computeVehicleHealth } from '../utils/vehicleHealthStatus';
 import { formatBookingAccessHint, formatRevokeConfirmMessage } from '../utils/shopDataAccess';
 
 const BASE_VEHICLE_REMINDER_SECTION_ROWS = [
@@ -153,6 +155,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
     activeRepairs: null,
     serviceHistory: null,
     authorizedCenters: null,
+    reminders: null,
   });
 
   useEffect(() => {
@@ -462,6 +465,49 @@ export default function VehicleDetailScreen({ route, navigation }) {
       origin: 'VehicleDetail',
     });
   }, [navigation, vehicleId]);
+
+  const vehicleHealth = useMemo(
+    () => computeVehicleHealth(vehicle, { repairs }),
+    [vehicle, repairs]
+  );
+
+  const handleHealthAction = useCallback(
+    (actionKey) => {
+      switch (actionKey) {
+        case 'update_km':
+          openKmModal();
+          break;
+        case 'log_service':
+          navigateLogServiceRecord();
+          break;
+        case 'schedule':
+          navigation.navigate('CreateRepair', {
+            vehicleId,
+            mode: 'request',
+            returnTo: 'VehicleDetail',
+            origin: 'VehicleDetail',
+          });
+          break;
+        case 'book_repair':
+          navigation.navigate('CreateRepair', {
+            vehicleId,
+            mode: 'request',
+            returnTo: 'VehicleDetail',
+            origin: 'VehicleDetail',
+          });
+          break;
+        case 'reminders':
+          setSectionsExpanded((prev) => ({ ...prev, remindersObligations: true }));
+          requestAnimationFrame(() => {
+            setTimeout(() => scrollToY(sectionScrollYs.current.reminders), 80);
+          });
+          break;
+        default:
+          break;
+      }
+    },
+    [navigation, vehicleId, navigateLogServiceRecord, scrollToY]
+  );
 
   const handleMileageFactorPress = useCallback(
     (factor) => {
@@ -1135,6 +1181,10 @@ export default function VehicleDetailScreen({ route, navigation }) {
             ) : null}
           </AppCard>
 
+          {!isShop ? (
+            <VehicleHealthCard health={vehicleHealth} onAction={handleHealthAction} />
+          ) : null}
+
           <FloatingCard>
             <Text style={styles.sectionTitle}>Vehicle info</Text>
             <View style={styles.infoGrid}>
@@ -1202,6 +1252,12 @@ export default function VehicleDetailScreen({ route, navigation }) {
           <OptionalVehicleGroupsReadonly vehicle={vehicle} />
 
           <FloatingCard>
+            <View
+              collapsable={false}
+              onLayout={(e) => {
+                sectionScrollYs.current.reminders = e.nativeEvent.layout.y;
+              }}
+            >
             <SectionHeader title="Reminders & obligations" sectionKey="remindersObligations" />
             {sectionsExpanded.remindersObligations ? (
               <>
@@ -1273,6 +1329,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
                 })}
               </>
             ) : null}
+            </View>
           </FloatingCard>
 
           <View
@@ -1450,20 +1507,18 @@ export default function VehicleDetailScreen({ route, navigation }) {
           contentContainerStyle={styles.sheetModal}
         >
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <Text style={styles.modalTitle}>Update kilometers</Text>
+            <Text style={styles.modalTitle}>Current kilometers</Text>
             <Text style={styles.modalMuted}>
-              Current:{' '}
-              {vehicle.kilometers != null && vehicle.kilometers !== ''
-                ? `${Number(vehicle.kilometers).toLocaleString()} km`
-                : '—'}
+              Enter your current odometer reading. It will be saved as today&apos;s reading — no date picker needed.
             </Text>
             <TextInput
               mode="outlined"
-              label="New kilometers"
+              label="Kilometers"
               value={kmDraft}
               onChangeText={setKmDraft}
               keyboardType="number-pad"
               style={styles.modalInput}
+              placeholder="e.g. 125000"
             />
             <View style={styles.modalActions}>
               <Button mode="text" onPress={() => !kmSaving && setKmModalVisible(false)} disabled={kmSaving}>
