@@ -18,6 +18,7 @@ import { getServiceCenters, VEHICLE_TYPE_FILTER_CHIPS } from '../api/serviceCent
 import { spreadShopMarkersForMap, regionForMapPoints } from '../utils/mapMarkerSpread';
 import { API_BASE_URL } from '../api/config';
 import ScreenBackground from '../components/ScreenBackground';
+import BackHeaderButton from '../components/navigation/BackHeaderButton';
 import BASE_STYLES from '../styles/base';
 import { devLog } from '../utils/logger';
 
@@ -249,15 +250,11 @@ export default function ShopMapScreen({ navigation, route }) {
 
         <View style={[styles.chromeColumn, { paddingTop: insets.top + 10 }]} pointerEvents="box-none">
           <View style={styles.rowBackSearch}>
-            <Pressable
+            <BackHeaderButton
               onPress={() => navigation.navigate('Home')}
-              style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-            >
-              <MaterialCommunityIcons name="chevron-left" size={28} color="#fff" />
-            </Pressable>
+              label="Back"
+              variant="glass"
+            />
 
             <Surface style={styles.searchSurface} elevation={4}>
               <TextInput

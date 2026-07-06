@@ -25,6 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { goBackFromServiceCenters } from '../navigation/serviceCentersNavigation';
+import BackHeaderButton from '../components/navigation/BackHeaderButton';
 import { navigateToVehicleServiceRecordNew } from '../navigation/webNavigation';
 import {
   loadServiceRecordFormDraft,
@@ -233,15 +234,12 @@ export default function ShopMapScreen() {
       <View style={styles.container}>
         <View style={styles.topChrome} pointerEvents="box-none">
           <View style={styles.rowFirst}>
-            <Pressable
-              style={({ hovered, pressed }) => [
-                styles.backPill,
-                (pressed || hovered) && styles.backPillPressed,
-              ]}
+            <BackHeaderButton
               onPress={() => goBackFromServiceCenters(navigation)}
-            >
-              <Text style={styles.backPillIcon}>←</Text>
-            </Pressable>
+              label="Back"
+              variant="glass"
+              iconOnly={false}
+            />
             <Pressable
               style={({ hovered, pressed }) => [
                 styles.locatePill,

@@ -3,10 +3,10 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { Platform, Pressable, Text } from 'react-native';
+import { Platform } from 'react-native';
 import { NavigationContainer, getPathFromState } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { createBackHeaderLeft } from '../components/navigation/BackHeaderButton';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -110,70 +110,28 @@ const transparentStackHeader = {
 
 /** Pop one screen — use when returning to the screen below (avoids duplicate stack entries). */
 function stackBackHeaderLeft(navigation, label = 'Back') {
-  return () => (
-    <Pressable
-      onPress={() => navigation.goBack()}
-      accessibilityRole="button"
-      accessibilityLabel="Back"
-      hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        minHeight: Platform.OS === 'android' ? 52 : 44,
-        paddingVertical: 8,
-        paddingRight: 10,
-        paddingLeft: Platform.OS === 'android' ? 4 : 0,
-      }}
-    >
-      <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
-      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>{label}</Text>
-    </Pressable>
-  );
+  return createBackHeaderLeft({
+    onPress: () => navigation.goBack(),
+    label,
+    accessibilityLabel: `Back to ${label}`,
+  });
 }
 
 /** Large hit target + label; avoids tiny default back control on Android with transparent headers. */
 function drawerHeaderLeft(navigation, homeRoute, label = 'Home') {
-  return () => (
-    <Pressable
-      onPress={() => navigation.navigate(homeRoute)}
-      accessibilityRole="button"
-      accessibilityLabel="Back"
-      hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        minHeight: Platform.OS === 'android' ? 52 : 44,
-        paddingVertical: 8,
-        paddingRight: 10,
-        paddingLeft: Platform.OS === 'android' ? 4 : 0,
-      }}
-    >
-      <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
-      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>{label}</Text>
-    </Pressable>
-  );
+  return createBackHeaderLeft({
+    onPress: () => navigation.navigate(homeRoute),
+    label,
+    accessibilityLabel: `Back to ${label}`,
+  });
 }
 
 function homeHeaderLeft(navigation) {
-  return () => (
-    <Pressable
-      onPress={() => navigateToDashboard(navigation)}
-      accessibilityRole="button"
-      accessibilityLabel="Back"
-      hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        minHeight: Platform.OS === 'android' ? 52 : 44,
-        paddingVertical: 8,
-        paddingRight: 10,
-        paddingLeft: Platform.OS === 'android' ? 4 : 0,
-      }}
-    >
-      <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
-      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>Home</Text>
-    </Pressable>
-  );
+  return createBackHeaderLeft({
+    onPress: () => navigateToDashboard(navigation),
+    label: 'Dashboard',
+    accessibilityLabel: 'Back to dashboard',
+  });
 }
 
 function shopHomeHeaderLeft(navigation) {
@@ -181,91 +139,43 @@ function shopHomeHeaderLeft(navigation) {
 }
 
 function vehicleDetailsHeaderLeft(navigation) {
-  return () => (
-    <Pressable
-      onPress={() => navigateToVehicleList(navigation)}
-      accessibilityRole="button"
-      accessibilityLabel="Back to vehicles"
-      hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        minHeight: Platform.OS === 'android' ? 52 : 44,
-        paddingVertical: 8,
-        paddingRight: 10,
-        paddingLeft: Platform.OS === 'android' ? 4 : 0,
-      }}
-    >
-      <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
-      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>My Vehicles</Text>
-    </Pressable>
-  );
+  return createBackHeaderLeft({
+    onPress: () => navigateToVehicleList(navigation),
+    label: 'My Vehicles',
+    accessibilityLabel: 'Back to my vehicles',
+  });
 }
 
 function vehicleSpecsHeaderLeft(navigation, vehicleId) {
-  return () => (
-    <Pressable
-      onPress={() => navigateToVehicleDetail(navigation, vehicleId)}
-      accessibilityRole="button"
-      accessibilityLabel="Back to vehicle details"
-      hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        minHeight: Platform.OS === 'android' ? 52 : 44,
-        paddingVertical: 8,
-        paddingRight: 10,
-        paddingLeft: Platform.OS === 'android' ? 4 : 0,
-      }}
-    >
-      <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
-      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>Vehicle</Text>
-    </Pressable>
-  );
+  return createBackHeaderLeft({
+    onPress: () => navigateToVehicleDetail(navigation, vehicleId),
+    label: 'Vehicle',
+    accessibilityLabel: 'Back to vehicle details',
+  });
 }
 
 function logServiceRecordHeaderLeft(navigation, vehicleId) {
-  return () => (
-    <Pressable
-      onPress={() => navigateToVehicleDetail(navigation, vehicleId)}
-      accessibilityRole="button"
-      accessibilityLabel="Back to vehicle details"
-      hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        minHeight: Platform.OS === 'android' ? 52 : 44,
-        paddingVertical: 8,
-        paddingRight: 10,
-        paddingLeft: Platform.OS === 'android' ? 4 : 0,
-      }}
-    >
-      <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
-      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>Vehicle</Text>
-    </Pressable>
-  );
+  return createBackHeaderLeft({
+    onPress: () => navigateToVehicleDetail(navigation, vehicleId),
+    label: 'Vehicle',
+    accessibilityLabel: 'Back to vehicle details',
+  });
 }
 
 function serviceRecordCenterHeaderLeft(navigation, vehicleId) {
-  return () => (
-    <Pressable
-      onPress={() => navigateToVehicleServiceRecordNew(navigation, vehicleId)}
-      accessibilityRole="button"
-      accessibilityLabel="Back to service record"
-      hitSlop={{ top: 18, bottom: 18, left: 10, right: 10 }}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        minHeight: Platform.OS === 'android' ? 52 : 44,
-        paddingVertical: 8,
-        paddingRight: 10,
-        paddingLeft: Platform.OS === 'android' ? 4 : 0,
-      }}
-    >
-      <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
-      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 2 }}>Record</Text>
-    </Pressable>
-  );
+  return createBackHeaderLeft({
+    onPress: () => navigateToVehicleServiceRecordNew(navigation, vehicleId),
+    label: 'Record',
+    accessibilityLabel: 'Back to service record',
+  });
+}
+
+function createVehicleHeaderLeft(navigation) {
+  return createBackHeaderLeft({
+    onPress: () => navigateToVehicleList(navigation),
+    label: 'My Vehicles',
+    accessibilityLabel: 'Back to my vehicles',
+  });
 }
 
 function getLinkingPrefixes() {
@@ -478,7 +388,15 @@ export default function AppNavigator() {
           component={AddObligationPaymentScreen}
           options={{ title: 'Add Obligation / Payment' }}
         />
-        <Stack.Screen name="CreateVehicle" component={CreateVehicleScreen} options={{ title: 'Add vehicle' }}/>
+        <Stack.Screen
+          name="CreateVehicle"
+          component={CreateVehicleScreen}
+          options={({ navigation }) => ({
+            title: 'Add vehicle',
+            headerLeft: createVehicleHeaderLeft(navigation),
+            headerBackVisible: false,
+          })}
+        />
         <Stack.Screen name="CreatePromotion" component={CreatePromotionScreen} options={{ title: 'Create Promotion' }}/>
         <Stack.Screen name="ShopRegisterClient" component={ShopRegisterClientScreen} options={{ title: 'Register Client' }}/>
         <Stack.Screen

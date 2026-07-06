@@ -6,13 +6,13 @@ import React, { useContext, useEffect, useState } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Text, Badge } from 'react-native-paper';
 import ClientPromotions from '../components/client/ClientPromotions';
 import ClientRepairOffers from '../components/client/ClientRepairOffers';
 import NotificationCenterPlaceholder from '../components/client/NotificationCenterPlaceholder';
 import { showMessage } from '../utils/crossPlatformAlert';
 import ScreenBackground from '../components/ScreenBackground';
+import BackHeaderButton from '../components/navigation/BackHeaderButton';
 import { WebSocketContext } from '../context/WebSocketManager';
 
 const TABS = [
@@ -70,16 +70,12 @@ export default function ClientActivityScreen({ navigation }) {
     <ScreenBackground safeArea={false}>
       <View style={[styles.root, { paddingTop: topPad }]}>
         <View style={styles.headerRow}>
-          <Pressable
+          <BackHeaderButton
             onPress={handleBack}
-            style={({ pressed }) => [styles.homeRow, pressed && styles.pressed]}
-            hitSlop={{ top: 16, bottom: 16, left: 8, right: 12 }}
-            accessibilityRole="button"
+            label={backLabel}
+            variant="glass"
             accessibilityLabel={`Back to ${backLabel}`}
-          >
-            <MaterialCommunityIcons name="chevron-left" size={26} color="#fff" />
-            <Text style={styles.homeLabel}>{backLabel}</Text>
-          </Pressable>
+          />
           <View pointerEvents="none" style={styles.titleAbsolute}>
             <Text style={styles.screenTitle}>Activity</Text>
           </View>
