@@ -1,13 +1,14 @@
 import React from 'react';
 
 /**
- * Web-only native date input (Metro uses native branch in ServiceRecordDatePicker).
- * @param {string} [min] - YYYY-MM-DD
- * @param {string} [max] - YYYY-MM-DD
+ * Web-only native date/month input (Metro uses native branch elsewhere).
+ * @param {string} [min] - YYYY-MM-DD or YYYY-MM
+ * @param {string} [max] - YYYY-MM-DD or YYYY-MM
+ * @param {'date'|'month'} [inputType] - month is better for first registration
  */
-export default function WebDateInput({ value, onChange, style, min, max }) {
+export default function WebDateInput({ value, onChange, style, min, max, inputType = 'date' }) {
   return React.createElement('input', {
-    type: 'date',
+    type: inputType,
     value: value || '',
     min: min || undefined,
     max: max || undefined,

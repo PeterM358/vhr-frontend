@@ -43,12 +43,35 @@ export function isSaneServiceIso(iso) {
   return raw >= '1980-01-01';
 }
 
-/** Display as DD.MM.YYYY for labels and Android date rows. */
+/** Display as DD.MM.YYYY for labels and Android date rows. Accepts YYYY-MM (month picker). */
 export function isoToDisplayDate(iso) {
   const raw = String(iso || '').trim();
+  if (/^\d{4}-\d{2}$/.test(raw)) {
+    const [y, m] = raw.split('-');
+    return `01.${m}.${y}`;
+  }
   if (!raw || !ISO_DATE.test(raw)) {
     return '';
   }
   const [y, m, d] = raw.split('-');
   return `${d}.${m}.${y}`;
+}
+
+/** Normalize month (YYYY-MM) or date (YYYY-MM-DD) to full ISO date for API. */
+export function normalizeRegistrationDateForApi(iso) {
+  const raw = String(iso || '').trim();
+  if (/^\d{4}-\d{2}$/.test(raw)) {
+    return `${raw}-01`;
+  }
+  if (ISO_DATE.test(raw)) {
+    return raw;
+  }
+  return '';
+}
+
+export function currentMonthIsoMax() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
 }

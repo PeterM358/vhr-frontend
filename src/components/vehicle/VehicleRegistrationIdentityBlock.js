@@ -6,11 +6,13 @@ import {
   Platform,
   Modal,
   KeyboardAvoidingView,
+  Alert,
 } from 'react-native';
 import { Text, Button, ActivityIndicator } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import * as Location from 'expo-location';
 import { COLORS } from '../../constants/colors';
 import WebDateInput from './WebDateInput';
 import {
@@ -18,8 +20,12 @@ import {
   localDateToIso,
   registrationDatePickerPlaceholder,
   isoToDisplayDate,
+  normalizeRegistrationDateForApi,
+  currentMonthIsoMax,
 } from './dateFieldUtils';
 import { profileCountriesToPickerOptions } from './vehicleFormConfig';
+import { getWebGeolocation } from '../../utils/webGeolocation';
+import { reverseGeocodeLatLon } from '../../utils/reverseGeocodeLocation';
 
 function countryLabelForIso(iso, options) {
   const code = String(iso || '').trim().toUpperCase();
@@ -49,6 +55,56 @@ export default function VehicleRegistrationIdentityBlock({
   const [countryModalOpen, setCountryModalOpen] = useState(false);
   const [androidDateOpen, setAndroidDateOpen] = useState(false);
   const [draftDate, setDraftDate] = useState(firstRegistrationIso || '');
+  const [locating, setLocating] = useState(false);
+
+  const monthValueForWeb = useMemo(() => {
+    const raw = String(firstRegistrationIso || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return raw.slice(0, 7);
+    }
+    if (/^\d{4}-\d{2}$/.test(raw)) {
+      return raw;
+    }
+    return '';
+  }, [firstRegistrationIso]);
+
+  const handleRegistrationDateChange = (value) => {
+    onChangeFirstRegistrationIso(normalizeRegistrationDateForApi(value) || value);
+  };
+
+  const handleLocateRegistrationCountry = async () => {
+    if (disabled || locating) return;
+    setLocating(true);
+    try {
+      let latitude;
+      let longitude;
+      if (Platform.OS === 'web') {
+        const coords = await getWebGeolocation();
+        latitude = coords.latitude;
+        longitude = coords.longitude;
+      } else {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Location', 'Allow location access to detect your country.');
+          return;
+        }
+        const loc = await Location.getCurrentPositionAsync({});
+        latitude = loc.coords.latitude;
+        longitude = loc.coords.longitude;
+      }
+      const geo = await reverseGeocodeLatLon(latitude, longitude);
+      const iso = String(geo?.countryIso || '').trim().toUpperCase();
+      if (!iso) {
+        Alert.alert('Location', 'Could not determine your country from location.');
+        return;
+      }
+      onChangeRegistrationCountryIso(iso);
+    } catch (error) {
+      Alert.alert('Location', error?.message || 'Could not get your location.');
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const options = profileCountriesToPickerOptions(countriesState.rows || []);
   const countryLabel = countryLabelForIso(registrationCountryIso, options);
@@ -81,7 +137,7 @@ export default function VehicleRegistrationIdentityBlock({
     <>
       {!hideHint ? (
         <Text style={styles.hintMuted}>
-          Optional. Not filled from VIN or plate yet. Country can be updated if the vehicle is registered elsewhere later.
+          Optional. Month and year when the vehicle was first registered. Country can be updated later.
         </Text>
       ) : null}
       <Text style={styles.fieldLabel}>First registration</Text>
@@ -89,13 +145,29 @@ export default function VehicleRegistrationIdentityBlock({
         <Text style={styles.rowValue}>{dateSummary}</Text>
       ) : (
         <WebDateInput
-          value={firstRegistrationIso || ''}
-          onChange={onChangeFirstRegistrationIso}
+          value={monthValueForWeb}
+          onChange={handleRegistrationDateChange}
+          inputType="month"
+          max={currentMonthIsoMax()}
+          min="1980-01"
           style={disabled ? { opacity: 0.6 } : undefined}
         />
       )}
       <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Registration country</Text>
-      {renderCountryPickerInline()}
+      <View style={styles.countryRow}>
+        <View style={styles.countryPickerFlex}>{renderCountryPickerInline()}</View>
+        <Button
+          mode="outlined"
+          compact
+          icon="crosshairs-gps"
+          loading={locating}
+          disabled={disabled || locating}
+          onPress={handleLocateRegistrationCountry}
+          style={styles.locateBtn}
+        >
+          Locate me
+        </Button>
+      </View>
     </>
   );
 
@@ -179,10 +251,12 @@ export default function VehicleRegistrationIdentityBlock({
           value={pickerDate}
           mode="date"
           display="default"
+          maximumDate={new Date()}
+          minimumDate={new Date(1980, 0, 1)}
           onChange={(event, d) => {
             setAndroidDateOpen(false);
             if (event.type === 'set' && d) {
-              onChangeFirstRegistrationIso(localDateToIso(d));
+              handleRegistrationDateChange(localDateToIso(d));
             }
           }}
         />
@@ -193,17 +267,20 @@ export default function VehicleRegistrationIdentityBlock({
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
               <Text style={styles.modalTitle}>First registration</Text>
+              <Text style={styles.modalHint}>Pick the month and year the vehicle was first registered.</Text>
               <DateTimePicker
                 value={pickerDate}
                 mode="date"
                 display="spinner"
+                maximumDate={new Date()}
+                minimumDate={new Date(1980, 0, 1)}
                 onChange={(_e, d) => {
                   if (d) setDraftDate(localDateToIso(d));
                 }}
                 style={styles.modalPicker}
               />
               <View style={styles.modalActions}>
-                <Button mode="text" onPress={() => onChangeFirstRegistrationIso('')}>
+                <Button mode="text" onPress={() => handleRegistrationDateChange('')}>
                   Clear
                 </Button>
                 <Button mode="text" onPress={() => setDateModalOpen(false)}>
@@ -212,7 +289,7 @@ export default function VehicleRegistrationIdentityBlock({
                 <Button
                   mode="contained"
                   onPress={() => {
-                    onChangeFirstRegistrationIso(draftDate || '');
+                    handleRegistrationDateChange(draftDate || '');
                     setDateModalOpen(false);
                   }}
                 >
@@ -375,6 +452,26 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_DARK,
     marginBottom: 8,
     textAlign: 'center',
+  },
+  modalHint: {
+    fontSize: 13,
+    color: COLORS.TEXT_MUTED,
+    textAlign: 'center',
+    marginBottom: 8,
+    lineHeight: 18,
+  },
+  countryRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  countryPickerFlex: {
+    flex: 1,
+    minWidth: 0,
+  },
+  locateBtn: {
+    marginTop: 0,
+    alignSelf: 'center',
   },
   modalPicker: {
     alignSelf: 'stretch',

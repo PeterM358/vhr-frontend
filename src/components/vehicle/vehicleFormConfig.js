@@ -34,8 +34,8 @@ export const VEHICLE_OPTIONAL_GROUPS = [
     title: 'Maintenance specifications',
     helperText: 'These are vehicle specifications, not service reminders.',
     fields: [
-      { key: 'oil_specification', label: 'Oil specification', kind: 'text' },
-      { key: 'battery_type', label: 'Battery type', kind: 'text' },
+      { key: 'oil_specification', label: 'Oil specification', kind: 'text', placeholder: 'e.g. 5W-30, 0W-20' },
+      { key: 'battery_type', label: 'Battery type', kind: 'text', placeholder: 'e.g. AGM 70Ah, EFB 60Ah' },
       { key: 'tire_size_front', label: 'Tire size (front)', kind: 'text' },
       { key: 'tire_size_rear', label: 'Tire size (rear)', kind: 'text' },
       { key: 'brake_disc_front', label: 'Brake disc (front)', kind: 'text' },

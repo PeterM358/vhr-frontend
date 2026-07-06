@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
-import { Text, TextInput } from 'react-native-paper';
+import { Text, TextInput, Button } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
 import { COLORS } from '../../constants/colors';
 
@@ -76,6 +76,32 @@ export default function VehicleCatalogIdentityBlock({
           </View>
 
           <Text style={styles.label}>Model (catalog)</Text>
+          {selectedCatalogBrand && catalogModels.length === 0 ? (
+            <View style={styles.catalogGapBox}>
+              <Text style={styles.catalogGapText}>
+                No models are loaded for this brand in the catalog yet. Use manual entry to pick make and model
+                from the full list.
+              </Text>
+              <Button
+                mode="contained"
+                compact
+                onPress={() => {
+                  const brand = catalogBrands.find((b) => String(b.id) === String(selectedCatalogBrand));
+                  onManualModeChange(true);
+                  if (brand && makes?.length) {
+                    const match = makes.find(
+                      (m) => String(m.name || '').toLowerCase() === String(brand.name || '').toLowerCase()
+                    );
+                    if (match) {
+                      onMakeChange(String(match.id));
+                    }
+                  }
+                }}
+              >
+                Enter make & model manually
+              </Button>
+            </View>
+          ) : null}
           <View style={styles.pickerContainer}>
             <Picker
               selectedValue={selectedCatalogModel}
@@ -202,6 +228,20 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_MUTED,
     fontStyle: 'italic',
     marginBottom: 10,
+  },
+  catalogGapBox: {
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(37,99,235,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(37,99,235,0.15)',
+    gap: 10,
+  },
+  catalogGapText: {
+    fontSize: 13,
+    color: COLORS.TEXT_DARK,
+    lineHeight: 18,
   },
   label: {
     marginTop: 12,

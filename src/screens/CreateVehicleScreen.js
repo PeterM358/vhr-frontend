@@ -342,7 +342,9 @@ export default function CreateVehicleScreen({ navigation, route }) {
         ...optionalBools,
         powered_equipment_enabled: poweredEquipmentEnabled,
       });
-    return resolveRelevantVehicleFieldGroups(backendFieldGroups, local);
+    const resolved = resolveRelevantVehicleFieldGroups(backendFieldGroups, local);
+    // Mileage evidence is for service history trust — not needed when adding a vehicle.
+    return resolved.filter((group) => group.key !== 'odometer');
   }, [
     selectedVehicleTypeCode,
     optionalStrings,
