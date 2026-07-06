@@ -6,12 +6,13 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  CommonActions,
   getPathFromState as getPathFromStateDefault,
   getStateFromPath as getStateFromPathDefault,
 } from '@react-navigation/native';
 import { linkingConfig } from './linkingConfig';
 import { syncWebDocumentTitle } from './webDocumentTitle';
-import { storeAuthReturnUrl } from './authNavigation';
+import { storeAuthReturnUrl, syncWebPath } from './authNavigation';
 import { resolveLegacyShopPath } from '../api/seo';
 import {
   getLegacyRedirectTarget,
@@ -340,6 +341,48 @@ export function getDashboardNavigationStateFromPath(path) {
   }
 
   return null;
+}
+
+function getRootNavigation(navigation) {
+  let current = navigation;
+  while (current.getParent?.()) {
+    current = current.getParent();
+  }
+  return current;
+}
+
+/** Client/partner dashboard paths that require sign-in on web. */
+export function isProtectedWebPath(path) {
+  const pathOnly = String(path || '')
+    .split('?')[0]
+    .replace(/^\//, '')
+    .replace(/\/$/, '');
+  return (
+    pathOnly === 'dashboard' ||
+    pathOnly.startsWith('dashboard/') ||
+    pathOnly.startsWith('partner/')
+  );
+}
+
+/** Reset the root stack from a canonical browser path (login return URLs, web deep links). */
+export function resetNavigationToCanonicalPath(navigation, path) {
+  const normalized = normalizeWebPath(path);
+  const state = resolveNavigationStateFromCanonicalPath(normalized);
+  if (!state?.routes?.length) {
+    return false;
+  }
+  const root = getRootNavigation(navigation);
+  root.dispatch(
+    CommonActions.reset({
+      index: typeof state.index === 'number' ? state.index : state.routes.length - 1,
+      routes: state.routes,
+    })
+  );
+  syncWebPath(normalized);
+  if (Platform.OS === 'web') {
+    requestAnimationFrame(() => syncWebPath(normalized));
+  }
+  return true;
 }
 
 /** Resolve a canonical absolute web path into a navigation state (web deep links). */

@@ -1,26 +1,15 @@
 import React, { useEffect } from 'react';
 import { ActivityIndicator, View, StyleSheet, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CommonActions } from '@react-navigation/native';
 import ScreenBackground from '../components/ScreenBackground';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
-import { resetToClientDashboard, resetToPublicHome, syncWebPath } from '../navigation/authNavigation';
-import { resolveNavigationStateFromCanonicalPath } from '../navigation/webLinking';
-
-function resetToWebDeepLink(navigation, path) {
-  const state = resolveNavigationStateFromCanonicalPath(path);
-  if (!state?.routes?.length) {
-    return false;
-  }
-  navigation.dispatch(
-    CommonActions.reset({
-      index: typeof state.index === 'number' ? state.index : state.routes.length - 1,
-      routes: state.routes,
-    })
-  );
-  syncWebPath(path);
-  return true;
-}
+import {
+  resetToClientDashboard,
+  resetToPublicHome,
+  resetToSignIn,
+  storeAuthReturnUrl,
+} from '../navigation/authNavigation';
+import { isProtectedWebPath, resetNavigationToCanonicalPath } from '../navigation/webLinking';
 
 export default function AuthLoadingScreen({ navigation }) {
   useEffect(() => {
@@ -33,10 +22,17 @@ export default function AuthLoadingScreen({ navigation }) {
         const trimmed = currentPath.replace(/^\//, '');
         if (trimmed && trimmed !== 'AuthLoading') {
           if (!token) {
-            resetToPublicHome(navigation);
+            if (isProtectedWebPath(trimmed)) {
+              await storeAuthReturnUrl(currentPath);
+              resetToSignIn(navigation);
+              return;
+            }
+            if (resetNavigationToCanonicalPath(navigation, currentPath)) {
+              return;
+            }
             return;
           }
-          if (resetToWebDeepLink(navigation, trimmed)) {
+          if (resetNavigationToCanonicalPath(navigation, currentPath)) {
             return;
           }
         }

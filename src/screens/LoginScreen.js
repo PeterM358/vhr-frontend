@@ -5,9 +5,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { login, googleLogin } from '../api/auth';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
-import { resetToClientDashboard, consumeAuthReturnUrl, syncWebPath } from '../navigation/authNavigation';
-import { resolveNavigationStateFromCanonicalPath } from '../navigation/webLinking';
-import { CommonActions } from '@react-navigation/native';
+import { resetToClientDashboard, consumeAuthReturnUrl } from '../navigation/authNavigation';
+import { resetNavigationToCanonicalPath } from '../navigation/webLinking';
 import { AuthContext } from '../context/AuthManager';
 import Logo from '../assets/images/logo.svg';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -64,29 +63,13 @@ export default function LoginScreen({ navigation, route }) {
     loadLastLogin();
   }, []);
 
-  const finishClientLogin = useCallback(
-    async (navigationRef) => {
-      const returnPath = await consumeAuthReturnUrl();
-      if (returnPath) {
-        const state = resolveNavigationStateFromCanonicalPath(returnPath);
-        if (state?.routes?.length) {
-          navigationRef.dispatch(
-            CommonActions.reset({
-              index: typeof state.index === 'number' ? state.index : state.routes.length - 1,
-              routes: state.routes,
-            })
-          );
-          if (Platform.OS === 'web') {
-            syncWebPath(returnPath);
-            requestAnimationFrame(() => syncWebPath(returnPath));
-          }
-          return;
-        }
-      }
-      resetToClientDashboard(navigationRef);
-    },
-    []
-  );
+  const finishClientLogin = useCallback(async (navigationRef) => {
+    const returnPath = await consumeAuthReturnUrl();
+    if (returnPath && resetNavigationToCanonicalPath(navigationRef, returnPath)) {
+      return;
+    }
+    resetToClientDashboard(navigationRef);
+  }, []);
 
   const handleGoogleOAuthResponse = useCallback(
     async (googleResponse, redirectUri) => {

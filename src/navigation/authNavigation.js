@@ -42,7 +42,7 @@ export function syncWebPath(pathname) {
 export const PARTNER_DASHBOARD_PATH = '/partner/dashboard';
 
 export function resetToClientDashboard(navigation) {
-  navigation.dispatch(
+  getRootNavigation(navigation).dispatch(
     CommonActions.reset({
       index: 0,
       routes: [CLIENT_DASHBOARD_ROUTE],
@@ -52,7 +52,7 @@ export function resetToClientDashboard(navigation) {
 }
 
 export function resetToPublicHome(navigation) {
-  navigation.dispatch(
+  getRootNavigation(navigation).dispatch(
     CommonActions.reset({
       index: 0,
       routes: [{ name: 'PublicHome' }],
@@ -62,7 +62,7 @@ export function resetToPublicHome(navigation) {
 }
 
 export function resetToSignIn(navigation) {
-  navigation.dispatch(
+  getRootNavigation(navigation).dispatch(
     CommonActions.reset({
       index: 0,
       routes: [{ name: 'Login' }],
