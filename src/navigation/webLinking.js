@@ -313,10 +313,7 @@ export function buildAppLinking(prefixes) {
       if (vehicleState) {
         return vehicleState;
       }
-      return getStateFromPathDefault(normalized, {
-        ...options,
-        config: linkingConfig,
-      });
+      return getStateFromPathDefault(normalized, linkingConfig);
     },
     getPathFromState(state, options) {
       const seoPath = getSeoPathFromNavigationState(state);
@@ -327,10 +324,7 @@ export function buildAppLinking(prefixes) {
       if (canonical != null) {
         return normalizeWebPath(canonical);
       }
-      const fallback = getPathFromStateDefault(state, {
-        ...options,
-        config: linkingConfig,
-      });
+      const fallback = getPathFromStateDefault(state, linkingConfig);
       return normalizeWebPath(`/${String(fallback || '').replace(/^\//, '')}`);
     },
   };
