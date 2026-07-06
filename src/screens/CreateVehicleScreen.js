@@ -74,6 +74,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
 
   const [selectedMake, setSelectedMake] = useState('');
   const [selectedModelLegacy, setSelectedModelLegacy] = useState('');
+  const [selectedModelKey, setSelectedModelKey] = useState('');
   const [manualModelText, setManualModelText] = useState('');
   const [manualBrandLocked, setManualBrandLocked] = useState(false);
 
@@ -138,6 +139,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
     catalogEngines,
     catalogTrims,
     legacyModels,
+    legacyMakeId,
   } = useVehicleCatalogLists({
     manualMode,
     selectedVehicleType,
@@ -145,6 +147,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
     catalogModel,
     catalogGeneration,
     selectedMake,
+    makes,
   });
 
   const onCatalogBrandChange = (v) => {
@@ -153,15 +156,36 @@ export default function CreateVehicleScreen({ navigation, route }) {
     setCatalogGeneration('');
     setCatalogEngine('');
     setCatalogTrim('');
+    setSelectedModelKey('');
+    setSelectedModelLegacy('');
+    setSelectedMake('');
   };
 
-  const onCatalogModelChange = (v) => {
-    setCatalogModel(v);
+  const onMergedModelChange = (key) => {
+    setSelectedModelKey(key);
     setCatalogGeneration('');
     setCatalogEngine('');
     setCatalogTrim('');
-    setSelectedYear('');
     setSpecApplied(false);
+    if (!key) {
+      setCatalogModel('');
+      setSelectedModelLegacy('');
+      setSelectedMake('');
+      return;
+    }
+    if (String(key).startsWith('catalog:')) {
+      setCatalogModel(String(key).slice('catalog:'.length));
+      setSelectedModelLegacy('');
+      setSelectedMake('');
+      setSelectedYear('');
+      return;
+    }
+    if (String(key).startsWith('legacy:')) {
+      setCatalogModel('');
+      setSelectedModelLegacy(String(key).slice('legacy:'.length));
+      if (legacyMakeId) setSelectedMake(legacyMakeId);
+      setSelectedYear('');
+    }
   };
 
   const onCatalogGenerationChange = (v) => {
@@ -228,12 +252,13 @@ export default function CreateVehicleScreen({ navigation, route }) {
       setCatalogGeneration('');
       setCatalogEngine('');
       setCatalogTrim('');
-      setSelectedYear('');
+      setSelectedModelKey('');
       setSelectedModelLegacy('');
       setManualModelText('');
     } else {
       setSelectedMake('');
       setSelectedModelLegacy('');
+      setSelectedModelKey('');
       setManualModelText('');
       setManualBrandLocked(false);
     }
@@ -297,8 +322,9 @@ export default function CreateVehicleScreen({ navigation, route }) {
           )
         : null;
     setManualBrandLocked(Boolean(match));
-    setSelectedMake(match ? String(match.id) : '');
+    setSelectedMake(match ? String(match.id) : legacyMakeId || '');
     setSelectedModelLegacy('');
+    setSelectedModelKey('');
     setManualModelText('');
     setManualMode(true);
     setSpecApplied(false);
@@ -306,7 +332,6 @@ export default function CreateVehicleScreen({ navigation, route }) {
     setCatalogGeneration('');
     setCatalogEngine('');
     setCatalogTrim('');
-    setSelectedYear('');
   };
 
   const handleSave = async () => {
@@ -337,7 +362,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
         Alert.alert('Validation', 'Choose a fuel type.');
         return;
       }
-    } else if (!catalogBrand || !catalogModel) {
+    } else if (!catalogBrand || (!catalogModel && !selectedModelLegacy)) {
       Alert.alert('Validation', 'Choose a catalog brand and model, or enter your model manually.');
       return;
     } else if (!selectedYear) {
@@ -531,12 +556,13 @@ export default function CreateVehicleScreen({ navigation, route }) {
                 onVehicleTypeChange={setSelectedVehicleType}
                 catalogBrands={catalogBrands}
                 catalogModels={catalogModels}
+                legacyModels={legacyModels}
                 catalogGenerations={catalogGenerations}
                 catalogEngines={catalogEngines}
                 catalogBrand={catalogBrand}
                 onCatalogBrandChange={onCatalogBrandChange}
-                catalogModel={catalogModel}
-                onCatalogModelChange={onCatalogModelChange}
+                selectedModelKey={selectedModelKey}
+                onMergedModelChange={onMergedModelChange}
                 selectedYear={selectedYear}
                 onSelectedYearChange={setSelectedYear}
                 catalogGeneration={catalogGeneration}
@@ -548,6 +574,11 @@ export default function CreateVehicleScreen({ navigation, route }) {
                   setSpecApplied(false);
                   changeOptionalString('fuel_type', v);
                 }}
+                licensePlate={licensePlate}
+                onLicensePlateChange={setLicensePlate}
+                vin={vin}
+                onVinChange={setVin}
+                vinHint={vinHint}
                 onOpenManual={openManualFromCatalog}
               />
             ) : (
@@ -567,6 +598,11 @@ export default function CreateVehicleScreen({ navigation, route }) {
                   setSpecApplied(false);
                   changeOptionalString('fuel_type', v);
                 }}
+                licensePlate={licensePlate}
+                onLicensePlateChange={setLicensePlate}
+                vin={vin}
+                onVinChange={setVin}
+                vinHint={vinHint}
                 onBackToCatalog={() => setManualModeWrapped(false)}
               />
             )}
@@ -584,15 +620,6 @@ export default function CreateVehicleScreen({ navigation, route }) {
 
           <FloatingCard>
             <Text style={styles.cardTitle}>Registration & mileage</Text>
-
-            <Text style={styles.label}>Registration number</Text>
-            <TextInput
-              mode="outlined"
-              value={licensePlate}
-              onChangeText={setLicensePlate}
-              placeholder="e.g. CA1234AB"
-              style={styles.input}
-            />
 
             <MonthYearPicker
               valueIso={firstRegIso}
@@ -621,16 +648,6 @@ export default function CreateVehicleScreen({ navigation, route }) {
               keyboardType="number-pad"
               style={styles.input}
             />
-
-            <Text style={styles.label}>VIN (optional)</Text>
-            <TextInput
-              mode="outlined"
-              value={vin}
-              onChangeText={setVin}
-              placeholder={vinHint}
-              style={styles.input}
-            />
-            <Text style={styles.microHint}>{vinHint}</Text>
           </FloatingCard>
 
           {showEbikeCatalogSection || showTrailerCatalogSection ? (

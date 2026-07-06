@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   getCatalogBrands,
   getCatalogModels,
@@ -8,8 +8,18 @@ import {
   getModelsForMake,
 } from '../../api/vehicles';
 
+function resolveLegacyMakeId(catalogBrand, catalogBrands, makes) {
+  if (!catalogBrand || !catalogBrands?.length || !makes?.length) return '';
+  const brand = catalogBrands.find((b) => String(b.id) === String(catalogBrand));
+  if (!brand) return '';
+  const match = makes.find(
+    (m) => String(m.name || '').toLowerCase() === String(brand.name || '').toLowerCase()
+  );
+  return match ? String(match.id) : '';
+}
+
 /**
- * Loads catalog dropdown lists and legacy models when manualMode / parent ids change.
+ * Loads catalog dropdown lists and legacy models for the selected brand/make.
  */
 export function useVehicleCatalogLists({
   manualMode,
@@ -18,13 +28,24 @@ export function useVehicleCatalogLists({
   catalogModel,
   catalogGeneration,
   selectedMake,
+  makes,
+  catalogBrands,
 }) {
-  const [catalogBrands, setCatalogBrands] = useState([]);
+  const [catalogBrandsState, setCatalogBrandsState] = useState([]);
   const [catalogModels, setCatalogModels] = useState([]);
   const [catalogGenerations, setCatalogGenerations] = useState([]);
   const [catalogEngines, setCatalogEngines] = useState([]);
   const [catalogTrims, setCatalogTrims] = useState([]);
   const [legacyModels, setLegacyModels] = useState([]);
+
+  const catalogBrandsList = catalogBrands ?? catalogBrandsState;
+
+  const legacyMakeId = useMemo(() => {
+    if (manualMode) {
+      return selectedMake ? String(selectedMake) : '';
+    }
+    return resolveLegacyMakeId(catalogBrand, catalogBrandsList, makes);
+  }, [manualMode, selectedMake, catalogBrand, catalogBrandsList, makes]);
 
   useEffect(() => {
     if (manualMode) {
@@ -34,10 +55,10 @@ export function useVehicleCatalogLists({
     (async () => {
       try {
         const rows = await getCatalogBrands(selectedVehicleType || undefined);
-        if (!cancelled) setCatalogBrands(rows);
+        if (!cancelled) setCatalogBrandsState(rows);
       } catch (e) {
         console.warn(e);
-        if (!cancelled) setCatalogBrands([]);
+        if (!cancelled) setCatalogBrandsState([]);
       }
     })();
     return () => {
@@ -125,14 +146,14 @@ export function useVehicleCatalogLists({
   }, [manualMode, catalogGeneration]);
 
   useEffect(() => {
-    if (!manualMode || !selectedMake) {
+    if (!legacyMakeId) {
       setLegacyModels([]);
-      return;
+      return undefined;
     }
     let cancelled = false;
     (async () => {
       try {
-        const rows = await getModelsForMake(selectedMake);
+        const rows = await getModelsForMake(legacyMakeId);
         if (!cancelled) setLegacyModels(rows);
       } catch (e) {
         console.warn(e);
@@ -142,14 +163,15 @@ export function useVehicleCatalogLists({
     return () => {
       cancelled = true;
     };
-  }, [manualMode, selectedMake]);
+  }, [legacyMakeId]);
 
   return {
-    catalogBrands,
+    catalogBrands: catalogBrandsList,
     catalogModels,
     catalogGenerations,
     catalogEngines,
     catalogTrims,
     legacyModels,
+    legacyMakeId,
   };
 }

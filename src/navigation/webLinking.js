@@ -17,6 +17,16 @@ import {
   getSeoPathFromNavigationState,
 } from '../utils/seo/seoPaths';
 
+/** Collapse duplicated my-vehicles segments produced by stacked sibling routes. */
+export function collapseDuplicateVehiclePath(path) {
+  if (!path) return path;
+  const normalized = String(path).replace(/^\//, '');
+  if (normalized.includes('my-vehicles/my-vehicles')) {
+    return normalized.replace(/my-vehicles\/my-vehicles/g, 'my-vehicles');
+  }
+  return normalized;
+}
+
 /** Strip leading slash and normalize legacy path segments before parsing. */
 export function normalizeWebLinkingPath(path) {
   if (!path) return '';
@@ -52,6 +62,9 @@ export function normalizeWebLinkingPath(path) {
   }
   if (trimmed === 'CreateVehicle' || trimmed.startsWith('CreateVehicle/')) {
     return 'my-vehicles/add';
+  }
+  if (trimmed.startsWith('my-vehicles/my-vehicles/')) {
+    return trimmed.replace(/^my-vehicles\/my-vehicles/, 'my-vehicles');
   }
   if (trimmed.startsWith('VehicleDetail/')) {
     return trimmed.replace(/^VehicleDetail/, 'my-vehicles');
@@ -120,6 +133,8 @@ export async function redirectLegacyWebUrl() {
     target = pathname.replace(/^\/ClientVehicles/, '/my-vehicles');
   } else if (pathname === '/CreateVehicle' || pathname.startsWith('/CreateVehicle/')) {
     target = '/my-vehicles/add';
+  } else if (pathname.startsWith('/my-vehicles/my-vehicles/')) {
+    target = pathname.replace(/^\/my-vehicles\/my-vehicles/, '/my-vehicles');
   } else if (pathname === '/VehicleDetail' || pathname.startsWith('/VehicleDetail/')) {
     target = pathname.replace(/^\/VehicleDetail/, '/my-vehicles');
   } else if (
@@ -175,10 +190,13 @@ export function buildAppLinking(prefixes) {
       if (seoPath) {
         return seoPath.replace(/^\//, '');
       }
-      return getPathFromStateDefault(state, {
-        ...options,
-        ...linkingConfig,
-      });
+      const path = collapseDuplicateVehiclePath(
+        getPathFromStateDefault(state, {
+          ...options,
+          ...linkingConfig,
+        })
+      );
+      return path;
     },
   };
 }

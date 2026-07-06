@@ -20,6 +20,11 @@ export default function VehicleManualModelStep({
   onSelectedYearChange,
   fuelType,
   onFuelTypeChange,
+  licensePlate,
+  onLicensePlateChange,
+  vin,
+  onVinChange,
+  vinHint,
   onBackToCatalog,
 }) {
   const yearOptions = useMemo(() => yearsFromGenerations([]), []);
@@ -78,7 +83,7 @@ export default function VehicleManualModelStep({
           <View style={styles.suggestionRow}>
             {suggestions.map((m) => (
               <Pressable
-                key={m.id}
+                key={`${m.id}-${m.name}`}
                 onPress={() => applySuggestion(m.name)}
                 style={({ pressed }) => [styles.suggestionChip, pressed && styles.suggestionChipPressed]}
               >
@@ -100,6 +105,25 @@ export default function VehicleManualModelStep({
       </View>
 
       <FuelTypeChips value={fuelType} onChange={onFuelTypeChange} />
+
+      <Text style={styles.label}>Registration number</Text>
+      <TextInput
+        mode="outlined"
+        value={licensePlate}
+        onChangeText={onLicensePlateChange}
+        placeholder="e.g. CA1234AB"
+        style={styles.input}
+      />
+
+      <Text style={styles.label}>VIN (optional)</Text>
+      <TextInput
+        mode="outlined"
+        value={vin}
+        onChangeText={onVinChange}
+        placeholder={vinHint}
+        style={styles.input}
+      />
+      {vinHint ? <Text style={styles.microHint}>{vinHint}</Text> : null}
 
       <Button mode="text" onPress={onBackToCatalog} compact style={styles.backBtn}>
         Back to catalog selection
@@ -124,6 +148,12 @@ const styles = StyleSheet.create({
   input: {
     marginBottom: 4,
     backgroundColor: '#fff',
+  },
+  microHint: {
+    fontSize: 12,
+    color: COLORS.TEXT_MUTED,
+    marginTop: -4,
+    marginBottom: 4,
   },
   pickerContainer: {
     borderWidth: 1,

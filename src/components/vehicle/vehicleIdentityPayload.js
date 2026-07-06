@@ -32,6 +32,14 @@ export function applyVehicleCatalogFieldsToPayload(payload, options) {
     payload.catalog_generation = null;
     payload.catalog_engine = null;
     payload.catalog_trim = null;
+  } else if (selectedModelLegacy && selectedMake) {
+    payload.make = id(selectedMake);
+    payload.model = id(selectedModelLegacy);
+    payload.catalog_brand = null;
+    payload.catalog_model = null;
+    payload.catalog_generation = null;
+    payload.catalog_engine = null;
+    payload.catalog_trim = null;
   } else {
     payload.make = null;
     payload.model = null;

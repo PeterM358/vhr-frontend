@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
-import { Text, Button } from 'react-native-paper';
+import { Text, Button, TextInput } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
 import { COLORS } from '../../constants/colors';
 import FuelTypeChips from './FuelTypeChips';
@@ -9,6 +9,7 @@ import {
   generationForYear,
   enginesForFuel,
 } from './useVehicleMaintenanceSpec';
+import { mergeCatalogAndLegacyModels } from './resolveLegacyModel';
 
 export default function VehicleCreateCatalogStep({
   hasVehicleTypePicker,
@@ -17,12 +18,13 @@ export default function VehicleCreateCatalogStep({
   onVehicleTypeChange,
   catalogBrands,
   catalogModels,
+  legacyModels,
   catalogGenerations,
   catalogEngines,
   catalogBrand,
   onCatalogBrandChange,
-  catalogModel,
-  onCatalogModelChange,
+  selectedModelKey,
+  onMergedModelChange,
   selectedYear,
   onSelectedYearChange,
   catalogGeneration,
@@ -31,16 +33,25 @@ export default function VehicleCreateCatalogStep({
   onCatalogEngineChange,
   fuelType,
   onFuelTypeChange,
+  licensePlate,
+  onLicensePlateChange,
+  vin,
+  onVinChange,
+  vinHint,
   onOpenManual,
 }) {
+  const mergedModels = useMemo(
+    () => mergeCatalogAndLegacyModels(catalogModels, legacyModels),
+    [catalogModels, legacyModels]
+  );
   const yearOptions = useMemo(() => yearsFromGenerations(catalogGenerations), [catalogGenerations]);
   const matchingEngines = useMemo(
     () => enginesForFuel(catalogEngines, fuelType),
     [catalogEngines, fuelType]
   );
-  const modelsMissing = Boolean(catalogBrand) && catalogModels.length === 0;
-  const canPickModel = Boolean(catalogBrand) && catalogModels.length > 0;
-  const catalogReady = Boolean(catalogModel);
+  const modelsMissing = Boolean(catalogBrand) && mergedModels.length === 0;
+  const canPickModel = Boolean(catalogBrand) && mergedModels.length > 0;
+  const modelReady = Boolean(selectedModelKey);
 
   const handleYearChange = (year) => {
     onSelectedYearChange(year);
@@ -90,12 +101,12 @@ export default function VehicleCreateCatalogStep({
 
       {modelsMissing ? (
         <View style={styles.gapBox}>
-          <Text style={styles.gapTitle}>No catalog models for this brand yet</Text>
+          <Text style={styles.gapTitle}>No models found for this brand</Text>
           <Text style={styles.gapText}>
             You can still add your vehicle by entering the model name manually.
           </Text>
           <Button mode="contained" onPress={onOpenManual} style={styles.gapBtn}>
-            Enter model manually
+            Add model manually
           </Button>
         </View>
       ) : null}
@@ -105,23 +116,25 @@ export default function VehicleCreateCatalogStep({
           <Text style={styles.label}>Model *</Text>
           <View style={styles.pickerContainer}>
             <Picker
-              selectedValue={catalogModel}
-              onValueChange={onCatalogModelChange}
+              selectedValue={selectedModelKey}
+              onValueChange={onMergedModelChange}
               style={styles.picker}
             >
               <Picker.Item label="Select model" value="" />
-              {catalogModels.map((m) => (
-                <Picker.Item key={m.id} label={m.name} value={String(m.id)} />
+              {mergedModels.map((m) => (
+                <Picker.Item key={m.key} label={m.name} value={m.key} />
               ))}
             </Picker>
           </View>
           <Pressable onPress={onOpenManual} style={styles.inlineManualLink}>
-            <Text style={styles.inlineManualLinkText}>Can&apos;t find your model? Enter it manually</Text>
+            <Text style={styles.inlineManualLinkText}>
+              Can&apos;t find your model? Add model manually
+            </Text>
           </Pressable>
         </>
       ) : null}
 
-      {catalogReady ? (
+      {modelReady ? (
         <>
           <Text style={styles.label}>Year *</Text>
           <View style={styles.pickerContainer}>
@@ -156,13 +169,26 @@ export default function VehicleCreateCatalogStep({
               </View>
             </>
           ) : null}
-        </>
-      ) : null}
 
-      {catalogBrand && !modelsMissing && !catalogModel ? (
-        <Pressable onPress={onOpenManual} style={styles.manualLink}>
-          <Text style={styles.manualLinkText}>Can&apos;t find your vehicle? Enter model manually</Text>
-        </Pressable>
+          <Text style={styles.label}>Registration number</Text>
+          <TextInput
+            mode="outlined"
+            value={licensePlate}
+            onChangeText={onLicensePlateChange}
+            placeholder="e.g. CA1234AB"
+            style={styles.input}
+          />
+
+          <Text style={styles.label}>VIN (optional)</Text>
+          <TextInput
+            mode="outlined"
+            value={vin}
+            onChangeText={onVinChange}
+            placeholder={vinHint}
+            style={styles.input}
+          />
+          {vinHint ? <Text style={styles.microHint}>{vinHint}</Text> : null}
+        </>
       ) : null}
     </View>
   );
@@ -180,6 +206,16 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     fontWeight: '600',
     color: COLORS.TEXT_DARK,
+  },
+  input: {
+    marginBottom: 4,
+    backgroundColor: '#fff',
+  },
+  microHint: {
+    fontSize: 12,
+    color: COLORS.TEXT_MUTED,
+    marginTop: -4,
+    marginBottom: 4,
   },
   pickerContainer: {
     borderWidth: 1,
@@ -221,16 +257,6 @@ const styles = StyleSheet.create({
   },
   inlineManualLinkText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.PRIMARY,
-    textDecorationLine: 'underline',
-  },
-  manualLink: {
-    marginTop: 16,
-    paddingVertical: 8,
-  },
-  manualLinkText: {
-    fontSize: 14,
     fontWeight: '600',
     color: COLORS.PRIMARY,
     textDecorationLine: 'underline',

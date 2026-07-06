@@ -32,7 +32,7 @@ export const linkingScreens = {
   },
   PasswordConfirmReset: 'reset-password/:uid/:token',
   ClientVehicles: 'my-vehicles',
-  CreateVehicle: 'my-vehicles/add',
+  CreateVehicle: 'add',
   VehicleDetail: {
     path: 'my-vehicles/:vehicleId',
     parse: {

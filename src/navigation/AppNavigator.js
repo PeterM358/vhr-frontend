@@ -73,7 +73,7 @@ import SelectOfferPartsScreen from '../screens/SelectOfferPartsScreen';
 import PasswordRequestResetScreen from '../screens/PasswordRequestResetScreen';
 import PasswordConfirmResetScreen from '../screens/PasswordConfirmResetScreen';
 
-import { buildAppLinking, redirectLegacyWebUrl } from './webLinking';
+import { buildAppLinking, redirectLegacyWebUrl, collapseDuplicateVehiclePath } from './webLinking';
 import { linkingConfig } from './linkingConfig';
 import { syncWebDocumentTitle } from './webDocumentTitle';
 import { blurActiveElementOnWeb } from '../utils/webFocus';
@@ -204,7 +204,9 @@ export default function AppNavigator() {
       return;
     }
     try {
-      const path = getPathFromState(navigationRef.current.getRootState(), linkingConfig);
+      const path = collapseDuplicateVehiclePath(
+        getPathFromState(navigationRef.current.getRootState(), linkingConfig)
+      );
       const pathname = path ? `/${String(path).replace(/^\//, '')}` : '/';
       syncWebDocumentTitle(pathname === '/PublicHome' ? '/' : pathname);
     } catch {
