@@ -6,7 +6,7 @@
 import { Platform } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
 import { syncWebDocumentTitle } from './webDocumentTitle';
-import { normalizeVehicleWebPath } from './webRoutes';
+import { normalizeWebPath } from './webRoutes';
 
 function getRootNavigation(navigation) {
   let current = navigation;
@@ -28,7 +28,7 @@ export function syncWebPath(pathname) {
   if (Platform.OS !== 'web' || typeof window === 'undefined') {
     return;
   }
-  const normalized = normalizeVehicleWebPath(pathname);
+  const normalized = normalizeWebPath(pathname);
   const { hash } = window.location;
   const target = `${normalized}${hash}`;
   if (`${window.location.pathname}${window.location.search}` !== normalized) {

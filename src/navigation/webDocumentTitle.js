@@ -14,18 +14,18 @@ const PATH_TITLES = {
   '/sign-in': BASE_TITLE,
   '/sign-up': BASE_TITLE,
   '/forgot-password': BASE_TITLE,
-  '/my-vehicles': `${BASE_TITLE} My Vehicles`,
-  '/my-vehicles/add': `${BASE_TITLE} Add Vehicle`,
+  '/dashboard/vehicles': `${BASE_TITLE} My Vehicles`,
+  '/dashboard/vehicles/add': `${BASE_TITLE} Add Vehicle`,
 };
 
 function vehicleDetailTitle(pathname) {
-  if (/^\/my-vehicles\/\d+$/.test(pathname)) {
+  if (/^\/dashboard\/vehicles\/\d+$/.test(pathname)) {
     return `${BASE_TITLE} Vehicle Details`;
   }
-  if (/^\/my-vehicles\/\d+\/specs$/.test(pathname)) {
+  if (/^\/dashboard\/vehicles\/\d+\/specs$/.test(pathname)) {
     return `${BASE_TITLE} Vehicle Specs`;
   }
-  if (/^\/my-vehicles\/\d+\/service-record\/new$/.test(pathname)) {
+  if (/^\/dashboard\/vehicles\/\d+\/service-record\/new$/.test(pathname)) {
     return `${BASE_TITLE} Add Service Record`;
   }
   return null;

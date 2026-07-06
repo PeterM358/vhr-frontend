@@ -31,10 +31,10 @@ export const linkingScreens = {
     },
   },
   PasswordConfirmReset: 'reset-password/:uid/:token',
-  ClientVehicles: 'my-vehicles',
-  CreateVehicle: 'my-vehicles/add',
+  ClientVehicles: 'dashboard/vehicles',
+  CreateVehicle: 'dashboard/vehicles/add',
   VehicleDetail: {
-    path: 'my-vehicles/:vehicleId',
+    path: 'dashboard/vehicles/:vehicleId',
     parse: {
       vehicleId: (value) => {
         const id = parseInt(String(value), 10);
@@ -43,7 +43,7 @@ export const linkingScreens = {
     },
   },
   VehicleSpecs: {
-    path: 'my-vehicles/:vehicleId/specs',
+    path: 'dashboard/vehicles/:vehicleId/specs',
     parse: {
       vehicleId: (value) => {
         const id = parseInt(String(value), 10);
@@ -52,7 +52,7 @@ export const linkingScreens = {
     },
   },
   LogServiceRecord: {
-    path: 'my-vehicles/:vehicleId/service-record/new',
+    path: 'dashboard/vehicles/:vehicleId/service-record/new',
     parse: {
       vehicleId: (value) => {
         const id = parseInt(String(value), 10);

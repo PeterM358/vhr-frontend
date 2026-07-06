@@ -1,10 +1,19 @@
 /**
- * Web navigation helpers: reset stack to avoid duplicated URL segments on web.
+ * Web navigation helpers: reset stack and set canonical absolute browser URLs.
  * Native callers keep using navigation.navigate(screenName, params) directly.
  */
 
 import { Platform } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
+import { syncWebPath } from './authNavigation';
+import {
+  dashboard,
+  vehicleAdd,
+  vehicleDetail,
+  vehicles,
+  vehicleServiceRecordNew,
+  vehicleSpecs,
+} from './webRoutes';
 
 const HOME_ROUTE = { name: 'Home' };
 
@@ -16,8 +25,7 @@ function getRootNavigation(navigation) {
   return current;
 }
 
-/** Replace root stack on web so linking never concatenates sibling my-vehicles paths. */
-function resetWebRoutes(navigation, tailRoutes) {
+function resetWebRoutes(navigation, tailRoutes, absolutePath) {
   const root = getRootNavigation(navigation);
   root.dispatch(
     CommonActions.reset({
@@ -25,6 +33,10 @@ function resetWebRoutes(navigation, tailRoutes) {
       routes: [HOME_ROUTE, ...tailRoutes],
     })
   );
+  if (absolutePath) {
+    syncWebPath(absolutePath);
+    requestAnimationFrame(() => syncWebPath(absolutePath));
+  }
 }
 
 export function navigateToDashboard(navigation) {
@@ -41,6 +53,8 @@ export function navigateToDashboard(navigation) {
         ],
       })
     );
+    syncWebPath(dashboard());
+    requestAnimationFrame(() => syncWebPath(dashboard()));
     return;
   }
   navigation.navigate('Home');
@@ -48,7 +62,7 @@ export function navigateToDashboard(navigation) {
 
 export function navigateToVehicleList(navigation) {
   if (Platform.OS === 'web') {
-    resetWebRoutes(navigation, [{ name: 'ClientVehicles' }]);
+    resetWebRoutes(navigation, [{ name: 'ClientVehicles' }], vehicles());
     return;
   }
   navigation.navigate('ClientVehicles');
@@ -56,7 +70,7 @@ export function navigateToVehicleList(navigation) {
 
 export function navigateToVehicleAdd(navigation) {
   if (Platform.OS === 'web') {
-    resetWebRoutes(navigation, [{ name: 'CreateVehicle' }]);
+    resetWebRoutes(navigation, [{ name: 'CreateVehicle' }], vehicleAdd());
     return;
   }
   navigation.navigate('CreateVehicle');
@@ -64,10 +78,14 @@ export function navigateToVehicleAdd(navigation) {
 
 export function navigateToVehicleDetail(navigation, vehicleId, params = {}) {
   if (Platform.OS === 'web') {
-    resetWebRoutes(navigation, [
-      { name: 'ClientVehicles' },
-      { name: 'VehicleDetail', params: { vehicleId, ...params } },
-    ]);
+    resetWebRoutes(
+      navigation,
+      [
+        { name: 'ClientVehicles' },
+        { name: 'VehicleDetail', params: { vehicleId, ...params } },
+      ],
+      vehicleDetail(vehicleId)
+    );
     return;
   }
   navigation.navigate('VehicleDetail', { vehicleId, ...params });
@@ -75,11 +93,15 @@ export function navigateToVehicleDetail(navigation, vehicleId, params = {}) {
 
 export function navigateToVehicleSpecs(navigation, vehicleId, params = {}) {
   if (Platform.OS === 'web') {
-    resetWebRoutes(navigation, [
-      { name: 'ClientVehicles' },
-      { name: 'VehicleDetail', params: { vehicleId } },
-      { name: 'VehicleSpecs', params: { vehicleId, ...params } },
-    ]);
+    resetWebRoutes(
+      navigation,
+      [
+        { name: 'ClientVehicles' },
+        { name: 'VehicleDetail', params: { vehicleId } },
+        { name: 'VehicleSpecs', params: { vehicleId, ...params } },
+      ],
+      vehicleSpecs(vehicleId)
+    );
     return;
   }
   navigation.navigate('VehicleSpecs', { vehicleId, ...params });
@@ -95,11 +117,15 @@ export function navigateToVehicleServiceRecordNew(navigation, vehicleId, params 
   if (prefillKm != null) routeParams.prefillKm = prefillKm;
 
   if (Platform.OS === 'web') {
-    resetWebRoutes(navigation, [
-      { name: 'ClientVehicles' },
-      { name: 'VehicleDetail', params: { vehicleId } },
-      { name: 'LogServiceRecord', params: routeParams },
-    ]);
+    resetWebRoutes(
+      navigation,
+      [
+        { name: 'ClientVehicles' },
+        { name: 'VehicleDetail', params: { vehicleId } },
+        { name: 'LogServiceRecord', params: routeParams },
+      ],
+      vehicleServiceRecordNew(vehicleId, type != null ? { type } : {})
+    );
     return;
   }
   navigation.navigate('LogServiceRecord', routeParams);

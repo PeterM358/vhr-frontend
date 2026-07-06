@@ -6,7 +6,7 @@
 import { Platform } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
 import { syncWebPath } from './authNavigation';
-import { vehicleAdd, vehicleList } from './webRoutes';
+import { vehicleAdd, vehicles } from './webRoutes';
 
 function getRootNavigation(navigation) {
   let current = navigation;
@@ -17,7 +17,7 @@ function getRootNavigation(navigation) {
 }
 
 const WEB_PATH_BY_SCREEN = {
-  ClientVehicles: vehicleList(),
+  ClientVehicles: vehicles(),
   CreateVehicle: vehicleAdd(),
 };
 

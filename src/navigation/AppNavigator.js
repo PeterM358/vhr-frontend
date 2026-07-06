@@ -76,7 +76,7 @@ import PasswordConfirmResetScreen from '../screens/PasswordConfirmResetScreen';
 import { buildAppLinking, redirectLegacyWebUrl, collapseDuplicateVehiclePath, getCanonicalWebPath } from './webLinking';
 import { linkingConfig } from './linkingConfig';
 import { syncWebPath } from './authNavigation';
-import { normalizeVehicleWebPath } from './webRoutes';
+import { normalizeWebPath } from './webRoutes';
 import { syncWebDocumentTitle } from './webDocumentTitle';
 import { blurActiveElementOnWeb } from '../utils/webFocus';
 import NavigationFallback from './NavigationFallback';
@@ -271,14 +271,14 @@ export default function AppNavigator() {
     try {
       const rootState = navigationRef.current.getRootState();
       const canonical = getCanonicalWebPath(rootState);
-      const path =
+      const pathname =
         canonical != null
-          ? collapseDuplicateVehiclePath(canonical)
-          : collapseDuplicateVehiclePath(getPathFromState(rootState, linkingConfig));
-      const pathname = path
-        ? normalizeVehicleWebPath(`/${String(path).replace(/^\//, '')}`)
-        : '/';
+          ? normalizeWebPath(canonical)
+          : normalizeWebPath(
+              collapseDuplicateVehiclePath(getPathFromState(rootState, linkingConfig)) || '/'
+            );
       syncWebPath(pathname);
+      requestAnimationFrame(() => syncWebPath(pathname));
       syncWebDocumentTitle(pathname === '/PublicHome' ? '/' : pathname.split('?')[0]);
     } catch {
       syncWebDocumentTitle(window.location.pathname);
