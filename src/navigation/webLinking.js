@@ -11,8 +11,9 @@ import {
 } from '@react-navigation/native';
 import { linkingConfig } from './linkingConfig';
 import { syncWebDocumentTitle } from './webDocumentTitle';
-import { buildFallbackShopPath } from '../api/seo';
+import { resolveLegacyShopPath } from '../api/seo';
 import {
+  getLegacyRedirectTarget,
   getNavigationStateFromSeoPath,
   getSeoPathFromNavigationState,
 } from '../utils/seo/seoPaths';
@@ -40,7 +41,7 @@ import {
   profile,
   repairRequests,
   serviceCenters,
-  serviceCenterDetail,
+  serviceCenterProfile,
   serviceHistory,
   vehicleAdd,
   vehicleDetail,
@@ -132,7 +133,10 @@ export function getCanonicalWebPath(state) {
     case 'ShopMap':
       return serviceCenters();
     case 'ShopDetail':
-      return params.shopId != null ? serviceCenterDetail(params.shopId) : serviceCenters();
+      if (params.centerSlug) {
+        return serviceCenterProfile(params.centerSlug);
+      }
+      return serviceCenters();
     case 'ShopProfile':
       if (params.expandSection === 'public_preview') {
         return partnerPublicPreview();
@@ -309,65 +313,26 @@ export function getDashboardNavigationStateFromPath(path) {
   return null;
 }
 
-/** Parse public service center paths into navigation state. */
+/** Parse public service center and SEO discovery paths into navigation state. */
 export function getServiceCenterNavigationStateFromPath(path) {
   const trimmed = String(path || '').replace(/^\//, '').replace(/\/$/, '');
-  if (!trimmed.startsWith('service-centers')) return null;
+  const [pathPart, queryPart] = trimmed.split('?');
+  const query = parseRouteQuery(queryPart);
 
-  const [pathPart] = trimmed.split('?');
-  if (pathPart === 'service-centers') {
-    return { routes: [{ name: 'ShopMap' }] };
-  }
-
-  const cityOnly = pathPart.match(/^service-centers\/([^/]+)$/);
-  if (cityOnly && !/^\d+$/.test(cityOnly[1])) {
+  if (query.type === 'city' && query.citySlug) {
     return {
-      routes: [{ name: 'PublicSeoPage', params: { type: 'city', locale: 'en', citySlug: cityOnly[1] } }],
+      routes: [{ name: 'ShopMap', params: { citySlug: String(query.citySlug).toLowerCase() } }],
     };
   }
 
-  const explicitCenter = pathPart.match(/^service-centers\/([^/]+)\/c\/([^/]+)$/);
-  if (explicitCenter) {
-    return {
-      routes: [
-        { name: 'ShopMap' },
-        {
-          name: 'ShopDetail',
-          params: { locale: 'en', citySlug: explicitCenter[1], centerSlug: explicitCenter[2] },
-        },
-      ],
-      index: 1,
-    };
+  const legacyRedirect = getLegacyRedirectTarget(pathPart);
+  if (legacyRedirect) {
+    return { redirectPath: legacyRedirect };
   }
 
-  const segmentMatch = pathPart.match(/^service-centers\/([^/]+)\/([^/]+)$/);
-  if (segmentMatch && !/^\d+$/.test(segmentMatch[2])) {
-    return {
-      routes: [
-        {
-          name: 'PublicSeoPage',
-          params: {
-            type: 'city_segment',
-            locale: 'en',
-            citySlug: segmentMatch[1],
-            segment: segmentMatch[2],
-          },
-        },
-      ],
-    };
-  }
-
-  const match = pathPart.match(/^service-centers\/(\d+)$/);
-  if (match) {
-    const shopId = parseInt(match[1], 10);
-    if (!Number.isFinite(shopId)) return null;
-    return {
-      routes: [
-        { name: 'ShopMap' },
-        { name: 'ShopDetail', params: { shopId } },
-      ],
-      index: 1,
-    };
+  const seoState = getNavigationStateFromSeoPath(pathPart);
+  if (seoState) {
+    return seoState;
   }
 
   return null;
@@ -758,17 +723,39 @@ export async function redirectLegacyWebUrl() {
     target = '/partner/notifications';
   } else if (pathname === '/ChooseShop' || pathname.startsWith('/ChooseShop')) {
     target = '/partner/switch-center';
-  } else if (/^\/service-center\/\d+/.test(pathname)) {
-    target = pathname.replace(/^\/service-center/, '/service-centers');
-  } else if (
+  } else if (pathname === '/PublicSeoPage' || pathname.startsWith('/PublicSeoPage')) {
+    const query = parseRouteQuery(search);
+    if (query.type === 'city' && query.citySlug) {
+      target = `/service-centers/${String(query.citySlug).toLowerCase()}`;
+    } else {
+      target = '/service-centers';
+    }
+  } else {
+    const legacySeo = getLegacyRedirectTarget(pathname.replace(/^\//, ''));
+    if (legacySeo) {
+      target = legacySeo;
+    }
+  }
+
+  if (!target) {
+    const numericCenter = pathname.match(/^\/service-centers\/(\d+)$/);
+    const numericProfile = pathname.match(/^\/service-center\/(\d+)$/);
+    const shopId = numericCenter?.[1] || numericProfile?.[1];
+    if (shopId) {
+      target = await resolveLegacyShopPath(parseInt(shopId, 10));
+    }
+  }
+
+  if (
+    !target &&
     (pathname === '/dashboard/vehicles' || pathname.startsWith('/dashboard/vehicles/')) &&
     !(await hasStoredAuthToken())
   ) {
     target = '/';
-  } else if (pathname === '/ShopDetail' || pathname.startsWith('/ShopDetail/')) {
+  } else if (!target && (pathname === '/ShopDetail' || pathname.startsWith('/ShopDetail/'))) {
     const shopId = parseShopIdFromSearch(search);
     if (shopId) {
-      target = buildFallbackShopPath(shopId);
+      target = await resolveLegacyShopPath(shopId);
     } else {
       target = '/service-centers';
     }
@@ -803,12 +790,17 @@ export function buildAppLinking(prefixes) {
         return legacyProfile;
       }
       const normalized = normalizeWebLinkingPath(path);
-      const seoState = getNavigationStateFromSeoPath(normalized);
-      if (seoState) {
-        return seoState;
-      }
       const serviceCenterState = getServiceCenterNavigationStateFromPath(normalized);
-      if (serviceCenterState) {
+      if (serviceCenterState?.redirectPath) {
+        const redirected = normalizeWebLinkingPath(
+          String(serviceCenterState.redirectPath).replace(/^\//, '')
+        );
+        const redirectedState = getServiceCenterNavigationStateFromPath(redirected);
+        if (redirectedState?.routes) {
+          return redirectedState;
+        }
+      }
+      if (serviceCenterState?.routes) {
         return serviceCenterState;
       }
       const partnerState = getPartnerNavigationStateFromPath(normalized);

@@ -127,9 +127,14 @@ export function normalizeWebPath(input) {
     return dashboardSection;
   }
 
-  const legacyServiceCenter = lastGlobalMatch(raw, String.raw`service-center\/(\d+)`);
+  const legacyServiceCenter = lastGlobalMatch(raw, String.raw`service-centers\/(\d+)`);
   if (legacyServiceCenter) {
     return `${SERVICE_CENTERS}/${legacyServiceCenter[1]}${query}`;
+  }
+
+  const legacyServiceCenterSlug = lastGlobalMatch(raw, String.raw`service-center\/(\d+)`);
+  if (legacyServiceCenterSlug) {
+    return `${SERVICE_CENTERS}/${legacyServiceCenterSlug[1]}${query}`;
   }
 
   if (raw === 'ShopMap' || raw.endsWith('/ShopMap')) {
@@ -259,6 +264,39 @@ export function serviceCenters() {
   return SERVICE_CENTERS;
 }
 
+export function serviceCentersCity(citySlug) {
+  return `${SERVICE_CENTERS}/${String(citySlug || '').trim().toLowerCase()}`;
+}
+
+export function vehicleServiceCenters(vehicleCode, citySlug, repairSlug) {
+  const prefix = {
+    car: 'car-service-centers',
+    truck: 'truck-service-centers',
+    motorcycle: 'motorcycle-service-centers',
+    bicycle: 'bike-service-centers',
+    ebike: 'ebike-service-centers',
+    scooter: 'scooter-service-centers',
+  }[String(vehicleCode || '').trim().toLowerCase()];
+  if (!prefix) return SERVICE_CENTERS;
+  const city = String(citySlug || '').trim().toLowerCase();
+  const repair = String(repairSlug || '').trim().toLowerCase();
+  if (city && repair) return `/${prefix}/${city}/${repair}`;
+  if (city) return `/${prefix}/${city}`;
+  return `/${prefix}`;
+}
+
+export function repairFirst(repairSlug, citySlug) {
+  const repair = String(repairSlug || '').trim().toLowerCase();
+  if (!repair) return SERVICE_CENTERS;
+  const city = String(citySlug || '').trim().toLowerCase();
+  return city ? `/${repair}/${city}` : `/${repair}`;
+}
+
+export function serviceCenterProfile(slug) {
+  return `/service-center/${String(slug || '').trim().toLowerCase()}`;
+}
+
+/** @deprecated use serviceCenterProfile(slug) after resolving public_slug */
 export function serviceCenterDetail(id) {
   return `${SERVICE_CENTERS}/${normalizeId(id)}`;
 }

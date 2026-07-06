@@ -1,5 +1,5 @@
 import { API_BASE_URL } from './config';
-import { buildServiceCenterPath } from '../utils/seo/seoPaths';
+import { serviceCenterProfilePath } from '../utils/seo/seoPaths';
 
 function buildQuery(params = {}) {
   const qs = new URLSearchParams();
@@ -55,6 +55,10 @@ export function fetchSeoServiceCenterDetail(locale, citySlug, centerSlug) {
   );
 }
 
+export function fetchSeoProfileBySlug(centerSlug, locale = 'en') {
+  return seoFetch(`/api/public/seo/service-center/${encodeURIComponent(centerSlug)}/`, { locale });
+}
+
 export function fetchSeoCitySegment(locale, citySlug, segment) {
   return seoFetch(
     `/api/public/seo/service-centers/${encodeURIComponent(locale)}/${encodeURIComponent(citySlug)}/${encodeURIComponent(segment)}/`
@@ -63,6 +67,10 @@ export function fetchSeoCitySegment(locale, citySlug, segment) {
 
 export function resolveSeoPathSegment(locale, citySlug, segment) {
   return seoFetch('/api/public/seo/resolve-path/', { locale, city_slug: citySlug, segment });
+}
+
+export function resolveSeoWebPath(path, locale = 'en') {
+  return seoFetch('/api/public/seo/resolve-web-path/', { path, locale });
 }
 
 export function fetchSeoServiceCenters(params = {}) {
@@ -77,14 +85,10 @@ export function buildFallbackShopPath(shopId) {
   return `/service-centers/${shopId}`;
 }
 
-export function buildShopPublicPathFromShop(shop, locale = 'en', shopId = null) {
-  const citySlug = shop?.city_slug || shop?.city_slug_en;
-  const centerSlug = shop?.public_slug || shop?.slug;
-  if (citySlug && centerSlug) {
-    return buildServiceCenterPath({ locale, citySlug, centerSlug });
-  }
-  if (shopId != null) {
-    return buildFallbackShopPath(shopId);
+export function buildShopPublicPathFromShop(shop) {
+  const slug = shop?.public_slug || shop?.slug;
+  if (slug) {
+    return serviceCenterProfilePath(slug);
   }
   if (shop?.id != null) {
     return buildFallbackShopPath(shop.id);
@@ -98,12 +102,25 @@ export function fetchSeoTaxonomy(locale = 'en') {
 
 export async function loadShopDetailWithOptionalSeo({
   shopId,
-  locale,
+  locale = 'en',
   citySlug,
   centerSlug,
   token,
   getShopById,
 }) {
+  if (centerSlug) {
+    try {
+      const seoPayload = await fetchSeoProfileBySlug(centerSlug, locale);
+      return { shop: seoPayload.service_center, seoPayload };
+    } catch (err) {
+      if (shopId && getShopById) {
+        const shop = await getShopById(shopId, token || null);
+        return { shop, seoPayload: null, seoFallback: true };
+      }
+      throw err;
+    }
+  }
+
   if (locale && citySlug && centerSlug) {
     try {
       const seoPayload = await fetchSeoServiceCenterDetail(locale, citySlug, centerSlug);
@@ -121,11 +138,20 @@ export async function loadShopDetailWithOptionalSeo({
   return { shop, seoPayload: null };
 }
 
-export function syncShopDetailWebUrl(shop, shopId, locale = 'en') {
+export function syncShopDetailWebUrl(shop, shopId) {
   if (typeof window === 'undefined') {
     return buildFallbackShopPath(shopId);
   }
-  const path = buildShopPublicPathFromShop(shop, locale, shopId) || buildFallbackShopPath(shopId);
+  const path = buildShopPublicPathFromShop(shop) || buildFallbackShopPath(shopId);
   window.history.replaceState(window.history.state, '', path);
   return path;
+}
+
+export async function resolveLegacyShopPath(shopId, locale = 'en') {
+  try {
+    const resolved = await resolveShopSeoPath(shopId, locale);
+    return resolved.canonical_path || buildFallbackShopPath(shopId);
+  } catch {
+    return buildFallbackShopPath(shopId);
+  }
 }

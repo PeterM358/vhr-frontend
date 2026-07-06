@@ -70,11 +70,17 @@ export function getWebDocumentTitle(pathname) {
   if (vehicleTitle) {
     return vehicleTitle;
   }
-  if (normalized.startsWith('/service-centers/')) {
-    return `${BASE_TITLE} Service Center`;
+  if (normalized.startsWith('/service-centers')) {
+    return `${BASE_TITLE} Service Centers`;
   }
   if (normalized.startsWith('/service-center/')) {
     return `${BASE_TITLE} Service Center`;
+  }
+  if (/^\/(car|truck|motorcycle|bike|ebike|scooter)-service-centers/.test(normalized)) {
+    return `${BASE_TITLE} Service Centers`;
+  }
+  if (/^\/(oil-change|brake-repair|clutch-repair|timing-belt-replacement|diagnostics)(\/|$)/.test(normalized)) {
+    return `${BASE_TITLE} Service Centers`;
   }
   return PATH_TITLES[normalized] ?? BASE_TITLE;
 }

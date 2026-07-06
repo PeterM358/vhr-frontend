@@ -22,7 +22,7 @@ import {
   vehicleServiceRecordCenterAdd,
   vehicleSpecs,
   serviceCenters,
-  serviceCenterDetail,
+  serviceCenterProfile,
   partnerDashboard,
   partnerProfile,
   partnerPublicPreview,
@@ -301,12 +301,27 @@ export function navigateToServiceCenters(navigation, params = {}) {
   root.navigate('ShopMap', params);
 }
 
+export function navigateToServiceCenterProfile(navigation, centerSlug, params = {}) {
+  const routeParams = { centerSlug, ...params };
+  if (Platform.OS === 'web') {
+    navigation.navigate('ShopDetail', routeParams);
+    syncWebPath(serviceCenterProfile(centerSlug));
+    requestAnimationFrame(() => syncWebPath(serviceCenterProfile(centerSlug)));
+    return;
+  }
+  navigation.navigate('ShopDetail', routeParams);
+}
+
+/** @deprecated use navigateToServiceCenterProfile when public_slug is available */
 export function navigateToServiceCenterDetail(navigation, shopId, params = {}) {
+  const slug = params.public_slug || params.slug || params.centerSlug;
+  if (slug) {
+    navigateToServiceCenterProfile(navigation, slug, { shopId, ...params });
+    return;
+  }
   const routeParams = { shopId, ...params };
   if (Platform.OS === 'web') {
     navigation.navigate('ShopDetail', routeParams);
-    syncWebPath(serviceCenterDetail(shopId));
-    requestAnimationFrame(() => syncWebPath(serviceCenterDetail(shopId)));
     return;
   }
   navigation.navigate('ShopDetail', routeParams);

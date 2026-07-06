@@ -1,57 +1,24 @@
 /**
- * Parse and build locale-aware public SEO URL paths.
- *
- * Future: /service-centers/:city/:brand landing pages (vehicle brand filter) — not implemented;
- * use repair-type directory paths and map brand filters instead.
+ * Locale-free public SEO URL paths for service center discovery and profiles.
  */
 
-export const SEO_LOCALES = ['en', 'bg'];
+export const VEHICLE_TYPE_ROUTE_PREFIXES = {
+  'car-service-centers': 'car',
+  'truck-service-centers': 'truck',
+  'motorcycle-service-centers': 'motorcycle',
+  'bike-service-centers': 'bicycle',
+  'ebike-service-centers': 'ebike',
+  'scooter-service-centers': 'scooter',
+};
 
-export function normalizeSeoLocale(value, fallback = 'en') {
-  const loc = String(value || fallback).trim().toLowerCase();
-  return SEO_LOCALES.includes(loc) ? loc : fallback;
-}
-
-export function cityDirectorySegment(locale) {
-  return normalizeSeoLocale(locale) === 'bg' ? 'servizi' : 'service-centers';
-}
-
-export function buildServiceCenterPath({ locale = 'en', citySlug, centerSlug }) {
-  const loc = normalizeSeoLocale(locale);
-  const segment = cityDirectorySegment(loc);
-  return `/${loc}/${segment}/${citySlug}/${centerSlug}`;
-}
-
-export function buildCityDirectoryPath({ locale = 'en', citySlug }) {
-  const loc = normalizeSeoLocale(locale);
-  const segment = cityDirectorySegment(loc);
-  return `/${loc}/${segment}/${citySlug}`;
-}
-
-export function buildServiceCityPath({ locale = 'en', repairSlug, citySlug }) {
-  const loc = normalizeSeoLocale(locale);
-  return `/${loc}/${repairSlug}/${citySlug}`;
-}
-
-export function buildServiceCenterExplicitPath({ locale = 'en', citySlug, centerSlug }) {
-  const loc = normalizeSeoLocale(locale);
-  const segment = cityDirectorySegment(loc);
-  return `/${loc}/${segment}/${citySlug}/c/${centerSlug}`;
-}
-
-export function buildServiceCityDirectoryPath({ locale = 'en', citySlug, repairSlug }) {
-  const loc = normalizeSeoLocale(locale);
-  const segment = cityDirectorySegment(loc);
-  return `/${loc}/${segment}/${citySlug}/${repairSlug}`;
-}
-
-export function buildVehicleServiceCityPath({ locale = 'en', vehicleSlug, repairSlug, citySlug }) {
-  const loc = normalizeSeoLocale(locale);
-  if (loc === 'bg') {
-    return `/${loc}/${repairSlug}-na-${vehicleSlug}/${citySlug}`;
-  }
-  return `/${loc}/${vehicleSlug}-${repairSlug}/${citySlug}`;
-}
+export const LEGACY_CITY_VEHICLE_SEGMENTS = {
+  'car-service': 'car',
+  'truck-service': 'truck',
+  'motorcycle-service': 'motorcycle',
+  'bike-service': 'bicycle',
+  'ebike-service': 'ebike',
+  'scooter-service': 'scooter',
+};
 
 const RESERVED_ROOT_SEGMENTS = new Set([
   'sign-in',
@@ -61,127 +28,258 @@ const RESERVED_ROOT_SEGMENTS = new Set([
   'dashboard',
   'partner',
   'service-centers',
-  'dashboard',
-  'my-vehicles',
+  'service-center',
+  'PublicHome',
+  'ShopMap',
+  'ShopDetail',
+  'en',
+  'bg',
 ]);
 
+export function vehicleRoutePrefixForCode(code) {
+  const target = String(code || '').trim().toLowerCase();
+  return (
+    Object.entries(VEHICLE_TYPE_ROUTE_PREFIXES).find(([, vehicleCode]) => vehicleCode === target)?.[0] || null
+  );
+}
+
+export function vehicleCodeFromRoutePrefix(prefix) {
+  return VEHICLE_TYPE_ROUTE_PREFIXES[String(prefix || '').trim().toLowerCase()] || null;
+}
+
+export function serviceCentersPath() {
+  return '/service-centers';
+}
+
+export function serviceCentersCityPath(citySlug) {
+  return `/service-centers/${String(citySlug || '').trim().toLowerCase()}`;
+}
+
+export function vehicleServiceCentersPath(vehicleCode, citySlug, repairSlug) {
+  const prefix = vehicleRoutePrefixForCode(vehicleCode);
+  if (!prefix) return serviceCentersPath();
+  const city = String(citySlug || '').trim().toLowerCase();
+  const repair = String(repairSlug || '').trim().toLowerCase();
+  if (city && repair) return `/${prefix}/${city}/${repair}`;
+  if (city) return `/${prefix}/${city}`;
+  return `/${prefix}`;
+}
+
+export function repairFirstPath(repairSlug, citySlug) {
+  const repair = String(repairSlug || '').trim().toLowerCase();
+  if (!repair) return serviceCentersPath();
+  const city = String(citySlug || '').trim().toLowerCase();
+  return city ? `/${repair}/${city}` : `/${repair}`;
+}
+
+export function serviceCenterProfilePath(slug) {
+  return `/service-center/${String(slug || '').trim().toLowerCase()}`;
+}
+
+function normalizePathParts(path) {
+  const trimmed = String(path || '').replace(/^\//, '').replace(/\/$/, '');
+  if (!trimmed) return [];
+  return trimmed.split('/').filter(Boolean).map((part) => part.trim().toLowerCase());
+}
+
 /**
- * Parse normalized web path (no leading slash) into SEO navigation params.
+ * Parse a normalized web path (no leading slash) into discovery/profile params.
  */
 export function parsePublicSeoPath(path) {
-  const trimmed = String(path || '').replace(/^\//, '').replace(/\/$/, '');
-  if (!trimmed) return null;
+  const parts = normalizePathParts(path);
+  if (!parts.length) return null;
 
-  const parts = trimmed.split('/').filter(Boolean);
-  if (parts.length < 2) return null;
-
-  const locale = normalizeSeoLocale(parts[0], '');
-  if (!SEO_LOCALES.includes(locale)) return null;
-
-  const segment = parts[1];
-  const citySegment = cityDirectorySegment(locale);
-
-  if (segment === citySegment && parts.length === 3) {
-    return {
-      type: 'city',
-      locale,
-      citySlug: parts[2],
-    };
+  if (parts[0] === 'en' || parts[0] === 'bg') {
+    const inner = parsePublicSeoPath(parts.slice(1).join('/'));
+    if (inner) {
+      return { ...inner, legacyLocalePrefix: parts[0] };
+    }
+    return null;
   }
 
-  if (segment === citySegment && parts.length === 5 && parts[3] === 'c') {
-    return {
-      type: 'service_center',
-      locale,
-      citySlug: parts[2],
-      centerSlug: parts[4],
-    };
-  }
-
-  if (segment === citySegment && parts.length === 4) {
-    return {
-      type: 'city_segment',
-      locale,
-      citySlug: parts[2],
-      segment: parts[3],
-    };
-  }
-
-  if (parts.length === 3 && !RESERVED_ROOT_SEGMENTS.has(segment) && segment !== citySegment) {
-    const landingSlug = segment;
-    const citySlug = parts[2];
-    if (locale === 'bg' && landingSlug.includes('-na-')) {
-      const splitAt = landingSlug.lastIndexOf('-na-');
-      const repairSlug = landingSlug.slice(0, splitAt);
-      const vehicleSlug = landingSlug.slice(splitAt + 4);
-      if (repairSlug && vehicleSlug) {
+  if (parts[0] === 'service-centers') {
+    if (parts.length === 1) {
+      return { type: 'discovery_root' };
+    }
+    if (parts.length === 2) {
+      if (/^\d+$/.test(parts[1])) {
+        return { type: 'legacy_numeric_profile', shopId: parseInt(parts[1], 10) };
+      }
+      return { type: 'city', citySlug: parts[1] };
+    }
+    if (parts.length === 4 && parts[2] === 'c') {
+      return {
+        type: 'legacy_explicit_center',
+        citySlug: parts[1],
+        centerSlug: parts[3],
+      };
+    }
+    if (parts.length === 3) {
+      const [citySlug, segment] = [parts[1], parts[2]];
+      if (LEGACY_CITY_VEHICLE_SEGMENTS[segment]) {
         return {
-          type: 'vehicle_service_city',
-          locale,
-          landingSlug,
-          repairSlug,
-          vehicleSlug,
+          type: 'legacy_city_vehicle',
           citySlug,
+          vehicleType: LEGACY_CITY_VEHICLE_SEGMENTS[segment],
         };
       }
+      return {
+        type: 'legacy_city_repair',
+        citySlug,
+        repairSlug: segment,
+      };
     }
-    return {
-      type: 'landing',
-      locale,
-      landingSlug,
-      citySlug,
-    };
+    if (parts.length === 4 && LEGACY_CITY_VEHICLE_SEGMENTS[parts[2]]) {
+      return {
+        type: 'legacy_city_vehicle_repair',
+        citySlug: parts[1],
+        vehicleType: LEGACY_CITY_VEHICLE_SEGMENTS[parts[2]],
+        repairSlug: parts[3],
+      };
+    }
+    return null;
+  }
+
+  if (parts[0] === 'service-center') {
+    if (parts.length !== 2) return null;
+    if (/^\d+$/.test(parts[1])) {
+      return { type: 'legacy_numeric_profile', shopId: parseInt(parts[1], 10) };
+    }
+    return { type: 'service_center_profile', centerSlug: parts[1] };
+  }
+
+  const vehicleType = vehicleCodeFromRoutePrefix(parts[0]);
+  if (vehicleType) {
+    if (parts.length === 1) {
+      return { type: 'vehicle_discovery', vehicleType };
+    }
+    if (parts.length === 2) {
+      return { type: 'vehicle_city', vehicleType, citySlug: parts[1] };
+    }
+    if (parts.length === 3) {
+      return {
+        type: 'vehicle_repair_city',
+        vehicleType,
+        citySlug: parts[1],
+        repairSlug: parts[2],
+      };
+    }
+    return null;
+  }
+
+  if (RESERVED_ROOT_SEGMENTS.has(parts[0])) {
+    return null;
+  }
+
+  if (parts.length === 1) {
+    return { type: 'repair_first', repairSlug: parts[0] };
+  }
+  if (parts.length === 2) {
+    return { type: 'repair_first_city', repairSlug: parts[0], citySlug: parts[1] };
   }
 
   return null;
 }
 
 export function buildPathFromSeoParams(params = {}) {
-  const { type, locale = 'en', citySlug, centerSlug, repairSlug, vehicleSlug, landingSlug } = params;
-  if (type === 'service_center' && citySlug && centerSlug) {
-    return buildServiceCenterExplicitPath({ locale, citySlug, centerSlug });
+  const { type } = params;
+  if (type === 'discovery_root') return serviceCentersPath();
+  if (type === 'city' && params.citySlug) return serviceCentersCityPath(params.citySlug);
+  if (type === 'vehicle_discovery' && params.vehicleType) {
+    return vehicleServiceCentersPath(params.vehicleType);
   }
-  if (type === 'city_segment' && citySlug && params.segment) {
-    return buildServiceCityDirectoryPath({
-      locale,
-      citySlug,
-      repairSlug: params.repairSlug || params.segment,
-    });
+  if (type === 'vehicle_city' && params.vehicleType && params.citySlug) {
+    return vehicleServiceCentersPath(params.vehicleType, params.citySlug);
   }
-  if (type === 'service_city_directory' && citySlug && repairSlug) {
-    return buildServiceCityDirectoryPath({ locale, citySlug, repairSlug });
+  if (type === 'vehicle_repair_city' && params.vehicleType && params.citySlug && params.repairSlug) {
+    return vehicleServiceCentersPath(params.vehicleType, params.citySlug, params.repairSlug);
   }
-  if (type === 'city' && citySlug) {
-    return buildCityDirectoryPath({ locale, citySlug });
+  if (type === 'repair_first' && params.repairSlug) {
+    return repairFirstPath(params.repairSlug);
   }
-  if (type === 'vehicle_service_city' && citySlug && repairSlug && vehicleSlug) {
-    return buildVehicleServiceCityPath({ locale, vehicleSlug, repairSlug, citySlug });
+  if (type === 'repair_first_city' && params.repairSlug && params.citySlug) {
+    return repairFirstPath(params.repairSlug, params.citySlug);
   }
-  if (type === 'landing' && citySlug && (repairSlug || landingSlug)) {
-    return buildServiceCityPath({ locale, repairSlug: repairSlug || landingSlug, citySlug });
+  if (type === 'service_center_profile' && params.centerSlug) {
+    return serviceCenterProfilePath(params.centerSlug);
   }
   return null;
+}
+
+export function getLegacyRedirectTarget(path) {
+  const parsed = parsePublicSeoPath(path);
+  if (!parsed) return null;
+
+  switch (parsed.type) {
+    case 'legacy_explicit_center':
+      return serviceCenterProfilePath(parsed.centerSlug);
+    case 'legacy_city_vehicle':
+      return vehicleServiceCentersPath(parsed.vehicleType, parsed.citySlug);
+    case 'legacy_city_vehicle_repair':
+      return vehicleServiceCentersPath(parsed.vehicleType, parsed.citySlug, parsed.repairSlug);
+    case 'legacy_city_repair':
+      return repairFirstPath(parsed.repairSlug, parsed.citySlug);
+    default:
+      if (parsed.legacyLocalePrefix) {
+        return buildPathFromSeoParams(parsed) || null;
+      }
+      return null;
+  }
+}
+
+function discoveryParamsFromParsed(parsed) {
+  if (!parsed) return {};
+  return {
+    citySlug: parsed.citySlug || null,
+    vehicleType: parsed.vehicleType || null,
+    repairType: parsed.repairSlug || null,
+  };
 }
 
 export function getNavigationStateFromSeoPath(path) {
   const parsed = parsePublicSeoPath(path);
   if (!parsed) return null;
 
-  if (parsed.type === 'city_segment') {
+  const redirect = getLegacyRedirectTarget(path);
+  if (redirect) {
+    return { redirectPath: redirect };
+  }
+
+  if (parsed.type === 'legacy_numeric_profile') {
     return {
-      routes: [{ name: 'PublicSeoPage', params: parsed }],
+      routes: [
+        { name: 'ShopMap' },
+        { name: 'ShopDetail', params: { shopId: parsed.shopId } },
+      ],
+      index: 1,
     };
   }
 
-  if (parsed.type === 'service_center') {
+  if (parsed.type === 'service_center_profile') {
     return {
-      routes: [{ name: 'ShopDetail', params: parsed }],
+      routes: [
+        { name: 'ShopMap' },
+        { name: 'ShopDetail', params: { centerSlug: parsed.centerSlug } },
+      ],
+      index: 1,
     };
   }
 
-  return {
-    routes: [{ name: 'PublicSeoPage', params: parsed }],
-  };
+  if (
+    parsed.type === 'discovery_root' ||
+    parsed.type === 'city' ||
+    parsed.type === 'vehicle_discovery' ||
+    parsed.type === 'vehicle_city' ||
+    parsed.type === 'vehicle_repair_city' ||
+    parsed.type === 'repair_first' ||
+    parsed.type === 'repair_first_city'
+  ) {
+    return {
+      routes: [{ name: 'ShopMap', params: discoveryParamsFromParsed(parsed) }],
+    };
+  }
+
+  return null;
 }
 
 function findActiveRoute(state) {
@@ -198,11 +296,46 @@ function findActiveRoute(state) {
 export function getSeoPathFromNavigationState(state) {
   const route = findActiveRoute(state);
   if (!route) return null;
-  if (route.name === 'ShopDetail' && route.params?.citySlug && route.params?.centerSlug) {
-    return buildPathFromSeoParams({ type: 'service_center', ...route.params });
+
+  if (route.name === 'ShopDetail') {
+    if (route.params?.centerSlug) {
+      return serviceCenterProfilePath(route.params.centerSlug);
+    }
+    return null;
   }
-  if (route.name === 'PublicSeoPage' && route.params?.type) {
-    return buildPathFromSeoParams(route.params);
+
+  if (route.name === 'ShopMap') {
+    const { citySlug, vehicleType, repairType } = route.params || {};
+    if (vehicleType && citySlug && repairType) {
+      return vehicleServiceCentersPath(vehicleType, citySlug, repairType);
+    }
+    if (vehicleType && citySlug) {
+      return vehicleServiceCentersPath(vehicleType, citySlug);
+    }
+    if (vehicleType) {
+      return vehicleServiceCentersPath(vehicleType);
+    }
+    if (repairType && citySlug) {
+      return repairFirstPath(repairType, citySlug);
+    }
+    if (repairType) {
+      return repairFirstPath(repairType);
+    }
+    if (citySlug) {
+      return serviceCentersCityPath(citySlug);
+    }
+    return serviceCentersPath();
   }
+
   return null;
+}
+
+/** @deprecated use serviceCenterProfilePath */
+export function buildServiceCenterPath({ centerSlug }) {
+  return serviceCenterProfilePath(centerSlug);
+}
+
+/** @deprecated use serviceCentersCityPath */
+export function buildCityDirectoryPath({ citySlug }) {
+  return serviceCentersCityPath(citySlug);
 }

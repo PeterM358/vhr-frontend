@@ -35,9 +35,11 @@ import { spreadShopMarkersForMap } from '../utils/mapMarkerSpread';
 import { getWebGeolocation } from '../utils/webGeolocation';
 import { ensureLeafletCss } from '../utils/leafletAssets.web';
 import { useServiceCenterDiscovery, SORT_OPTIONS } from '../hooks/useServiceCenterDiscovery';
+import { applyDiscoverySeoMeta } from '../utils/seo/seoMetadata';
 import {
   goBackFromServiceCenters,
   navigateToServiceCenterDetail,
+  navigateToServiceCenterProfile,
 } from '../navigation/serviceCentersNavigation';
 import { navigateToPartnerDashboard, navigateToVehicleServiceRecordNew } from '../navigation/webNavigation';
 import {
@@ -81,6 +83,14 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     initialRepairType: route.params?.repairType || null,
     initialVehicleType: route.params?.vehicleType || null,
   });
+
+  useEffect(() => {
+    applyDiscoverySeoMeta({
+      citySlug: route.params?.citySlug || null,
+      vehicleType: route.params?.vehicleType || null,
+      repairType: route.params?.repairType || null,
+    });
+  }, [route.params?.citySlug, route.params?.vehicleType, route.params?.repairType]);
 
   const [mapReady, setMapReady] = useState(false);
   const [center, setCenter] = useState([42.6977, 23.3219]);
@@ -208,6 +218,15 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
 
   const openShop = (shop) => {
     setSelectedListId(shop.list_id || `shop-${shop.id}`);
+    const slug = shop.public_slug || shop.slug;
+    if (slug) {
+      navigateToServiceCenterProfile(navigation, slug, {
+        returnTo: route.params?.returnTo,
+        vehicleId: route.params?.vehicleId,
+        shopId: shop.id,
+      });
+      return;
+    }
     navigateToServiceCenterDetail(navigation, shop.id, {
       returnTo: route.params?.returnTo,
       vehicleId: route.params?.vehicleId,

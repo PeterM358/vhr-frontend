@@ -29,13 +29,7 @@ export const linkingScreens = {
   },
   ShopMap: 'service-centers',
   ShopDetail: {
-    path: 'service-centers/:shopId',
-    parse: {
-      shopId: (value) => {
-        const id = parseInt(String(value), 10);
-        return Number.isFinite(id) ? id : undefined;
-      },
-    },
+    path: 'service-center/:centerSlug',
   },
   ShopProfile: 'partner/profile',
   ShopInvoicing: 'partner/invoicing',

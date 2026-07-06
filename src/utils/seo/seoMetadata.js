@@ -9,3 +9,11 @@ export function applySeoPageMeta() {
 export function resetSeoPageMeta() {
   // No document head on native.
 }
+
+export function applyDiscoverySeoMeta() {
+  // No document head on native.
+}
+
+export function buildDiscoverySeoMeta() {
+  return null;
+}

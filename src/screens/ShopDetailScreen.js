@@ -226,7 +226,7 @@ export default function ShopDetailScreen({ route, navigation }) {
     setLoadErrorMessage('');
     setLoading(true);
     try {
-      if (!resolvedShopId && !(locale && citySlug && centerSlug)) {
+      if (!resolvedShopId && !centerSlug && !(locale && citySlug && centerSlug)) {
         throw new Error('Missing service center identifier.');
       }
 
@@ -238,7 +238,7 @@ export default function ShopDetailScreen({ route, navigation }) {
       let seoPayload = null;
       const detail = await loadShopDetailWithOptionalSeo({
         shopId: resolvedShopId,
-        locale,
+        locale: locale || 'en',
         citySlug,
         centerSlug,
         token,
@@ -251,9 +251,7 @@ export default function ShopDetailScreen({ route, navigation }) {
         if (seoPayload?.meta) {
           applySeoPageMeta(seoPayload.meta, seoPayload.structured_data);
         }
-        if (resolvedShopId) {
-          syncShopDetailWebUrl(shopData, resolvedShopId, locale || 'en');
-        }
+        syncShopDetailWebUrl(shopData, shopData?.id || resolvedShopId);
       }
 
       if (!token) {

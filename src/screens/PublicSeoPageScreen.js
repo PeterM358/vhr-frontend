@@ -28,15 +28,14 @@ function CenterCard({ center, locale, navigation }) {
       citySlug: center.city_slug,
       centerSlug: center.public_slug || center.slug,
     };
-    if (Platform.OS === 'web' && center.city_slug && (center.public_slug || center.slug)) {
+    if (Platform.OS === 'web' && (center.public_slug || center.slug)) {
       navigation.navigate('ShopDetail', {
-        locale,
-        citySlug: center.city_slug,
         centerSlug: center.public_slug || center.slug,
+        shopId: center.id,
       });
       return;
     }
-    navigation.navigate('ShopDetail', { shopId: center.id, ...pathParams });
+    navigation.navigate('ShopDetail', { shopId: center.id });
   };
 
   return (

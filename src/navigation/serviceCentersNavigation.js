@@ -8,7 +8,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resetFromClientDrawer } from './drawerNavigation';
 import { syncWebPath } from './authNavigation';
 import { serviceCenters } from './webRoutes';
-import { navigateToServiceCenterDetail as navigateToServiceCenterDetailWeb } from './webNavigation';
+import {
+  navigateToServiceCenterProfile as navigateToServiceCenterProfileWeb,
+  navigateToServiceCenterDetail as navigateToServiceCenterDetailWeb,
+} from './webNavigation';
 
 function getRootNavigation(navigation) {
   let current = navigation;
@@ -23,6 +26,16 @@ async function hasStoredAuthToken() {
   return !!(token && token !== 'null' && token !== 'undefined');
 }
 
+function resolvePublicSlug(shopOrSlug, params = {}) {
+  if (typeof shopOrSlug === 'string') {
+    return shopOrSlug.trim().toLowerCase();
+  }
+  if (shopOrSlug && typeof shopOrSlug === 'object') {
+    return shopOrSlug.public_slug || shopOrSlug.slug || null;
+  }
+  return params.public_slug || params.slug || null;
+}
+
 /** Open the service centers map from any entry point. */
 export function openServiceCenters(navigation, params) {
   const root = getRootNavigation(navigation);
@@ -35,13 +48,33 @@ export function openServiceCenters(navigation, params) {
   resetFromClientDrawer(navigation, 'ShopMap', params);
 }
 
-/** Open a public service center detail page. */
-export function navigateToServiceCenterDetail(navigation, shopId, params = {}) {
-  if (Platform.OS === 'web') {
-    navigateToServiceCenterDetailWeb(navigation, shopId, params);
+/** Open a public service center profile by canonical slug. */
+export function navigateToServiceCenterProfile(navigation, shopOrSlug, params = {}) {
+  const slug = resolvePublicSlug(shopOrSlug, params);
+  if (Platform.OS === 'web' && slug) {
+    navigateToServiceCenterProfileWeb(navigation, slug, params);
     return;
   }
-  navigation.navigate('ShopDetail', { shopId, ...params });
+  const shopId = typeof shopOrSlug === 'object' ? shopOrSlug?.id : params.shopId;
+  navigation.navigate('ShopDetail', { centerSlug: slug, shopId, ...params });
+}
+
+/** @deprecated prefer navigateToServiceCenterProfile(slug) */
+export function navigateToServiceCenterDetail(navigation, shopOrId, params = {}) {
+  if (typeof shopOrId === 'object') {
+    navigateToServiceCenterProfile(navigation, shopOrId, params);
+    return;
+  }
+  const slug = resolvePublicSlug(null, params);
+  if (slug) {
+    navigateToServiceCenterProfile(navigation, slug, { shopId: shopOrId, ...params });
+    return;
+  }
+  if (Platform.OS === 'web') {
+    navigateToServiceCenterDetailWeb(navigation, shopOrId, params);
+    return;
+  }
+  navigation.navigate('ShopDetail', { shopId: shopOrId, ...params });
 }
 
 /** Back from service centers — respects browser history on web. */
