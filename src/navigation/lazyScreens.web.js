@@ -28,9 +28,11 @@ export { default as ClientRepairsList } from '../components/client/ClientRepairs
 export { default as PasswordRequestResetScreen } from '../screens/PasswordRequestResetScreen';
 export { default as PasswordConfirmResetScreen } from '../screens/PasswordConfirmResetScreen';
 
-// Maps (Leaflet split into *.impl.web.js chunks)
-export const ShopMapScreen = lazyScreen(() => import('../screens/ShopMapScreen'));
-export const MapLocationPickerScreen = lazyScreen(() => import('../screens/MapLocationPickerScreen'));
+// Maps — single React.lazy boundary into Leaflet impl (no mapsBundle indirection)
+export const ShopMapScreen = lazyScreen(() => import('../screens/ShopMapScreen.impl.web'));
+export const MapLocationPickerScreen = lazyScreen(
+  () => import('../screens/MapLocationPickerScreen.impl.web')
+);
 
 // Profile / reference-data screens (countries/cities loaded on demand)
 export const ClientProfileScreen = lazyScreen(() => import('../screens/ClientProfileScreen'));
