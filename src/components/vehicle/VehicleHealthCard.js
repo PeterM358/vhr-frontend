@@ -4,13 +4,13 @@ import { Text, Button } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import FloatingCard from '../ui/FloatingCard';
 import { COLORS } from '../../constants/colors';
-import { healthActionButtons } from '../../utils/vehicleHealthStatus';
+import { healthActionButtonsFromApi } from '../../utils/vehicleHealthStatus';
 
 export default function VehicleHealthCard({ health, onAction }) {
   if (!health) return null;
 
   const isHealthy = health.status === 'healthy';
-  const actions = healthActionButtons(health);
+  const actions = Array.isArray(health.actions) ? health.actions : healthActionButtonsFromApi(health);
   const statusPrefix = isHealthy ? '✓' : health.status === 'needs_attention' ? '❗' : '⚠';
 
   return (
@@ -27,7 +27,7 @@ export default function VehicleHealthCard({ health, onAction }) {
       <View style={styles.headerRow}>
         <MaterialCommunityIcons name={health.icon} size={22} color={health.color} />
         <Text style={[styles.statusTitle, { color: health.color }]}>
-          {statusPrefix} {health.label}
+          {statusPrefix} {health.status_label || health.label}
         </Text>
       </View>
       <Text style={styles.subtitle}>{health.subtitle}</Text>

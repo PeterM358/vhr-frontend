@@ -47,7 +47,7 @@ import {
   mileageConfidenceCategoryPill,
   resolveMileageFactorAction,
 } from '../utils/mileageConfidence';
-import { computeVehicleHealth } from '../utils/vehicleHealthStatus';
+import { mapHealthFromApi } from '../utils/vehicleHealthStatus';
 import { formatBookingAccessHint, formatRevokeConfirmMessage } from '../utils/shopDataAccess';
 
 const BASE_VEHICLE_REMINDER_SECTION_ROWS = [
@@ -466,10 +466,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
     });
   }, [navigation, vehicleId]);
 
-  const vehicleHealth = useMemo(
-    () => computeVehicleHealth(vehicle, { repairs }),
-    [vehicle, repairs]
-  );
+  const vehicleHealth = useMemo(() => mapHealthFromApi(vehicle), [vehicle]);
 
   const handleHealthAction = useCallback(
     (actionKey) => {

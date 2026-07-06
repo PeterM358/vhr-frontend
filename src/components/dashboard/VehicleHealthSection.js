@@ -5,7 +5,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import FloatingCard from '../ui/FloatingCard';
 import { COLORS } from '../../constants/colors';
 import {
-  computeVehicleHealth,
+  mapHealthFromApi,
   vehicleDisplayTitle,
 } from '../../utils/vehicleHealthStatus';
 
@@ -13,7 +13,6 @@ const MAX_VISIBLE = 3;
 
 export default function VehicleHealthSection({
   vehicles = [],
-  repairs = [],
   onVehiclePress,
   onViewAllPress,
 }) {
@@ -21,9 +20,9 @@ export default function VehicleHealthSection({
     () =>
       vehicles.slice(0, MAX_VISIBLE).map((vehicle) => ({
         vehicle,
-        health: computeVehicleHealth(vehicle, { repairs }),
+        health: mapHealthFromApi(vehicle),
       })),
-    [vehicles, repairs]
+    [vehicles]
   );
 
   if (!vehicles.length) {
@@ -54,7 +53,9 @@ export default function VehicleHealthSection({
             {plate ? <Text style={styles.plate}>{plate}</Text> : null}
             <View style={styles.statusRow}>
               <MaterialCommunityIcons name={health.icon} size={18} color={health.color} />
-              <Text style={[styles.statusLabel, { color: health.color }]}>{health.label}</Text>
+              <Text style={[styles.statusLabel, { color: health.color }]}>
+                {health.status_label || health.label}
+              </Text>
             </View>
             <Text style={styles.hint}>{health.shortReason}</Text>
           </FloatingCard>

@@ -285,7 +285,6 @@ export default function HomeScreen({ navigation }) {
         >
           <VehicleHealthSection
             vehicles={vehicles}
-            repairs={openRepairs}
             onVehiclePress={goVehicleDetail}
             onViewAllPress={goVehicles}
           />
