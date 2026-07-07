@@ -7,9 +7,13 @@ import React, { useMemo } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BackHeaderButton from '../navigation/BackHeaderButton';
+import {
+  APP_NAV_BAR_CONTENT_HEIGHT,
+  APP_NAV_BAR_LARGE_TITLE_EXTRA,
+  appNavBarTotalHeight,
+} from './appNavBarMetrics';
 
-export const APP_NAV_BAR_CONTENT_HEIGHT = 44;
-export const APP_NAV_BAR_LARGE_TITLE_EXTRA = 28;
+export { APP_NAV_BAR_CONTENT_HEIGHT, APP_NAV_BAR_LARGE_TITLE_EXTRA, appNavBarTotalHeight };
 
 const VARIANT_STYLES = {
   glass: {
@@ -44,12 +48,6 @@ const SCROLLED_VARIANT_STYLES = {
     backVariant: 'light',
   },
 };
-
-export function appNavBarTotalHeight(insets, { largeTitle = false } = {}) {
-  const top = insets?.top ?? 0;
-  const extra = largeTitle ? APP_NAV_BAR_LARGE_TITLE_EXTRA : 0;
-  return top + APP_NAV_BAR_CONTENT_HEIGHT + extra;
-}
 
 export default function AppNavigationBar({
   title,

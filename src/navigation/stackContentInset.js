@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { appNavBarTotalHeight } from '../components/common/AppNavigationBar';
+import { appNavBarTotalHeight } from '../components/common/appNavBarMetrics';
 
 /**
  * Top padding for lists/scroll bodies when the root native stack uses a

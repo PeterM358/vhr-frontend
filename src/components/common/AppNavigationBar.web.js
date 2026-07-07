@@ -9,10 +9,7 @@ import BackHeaderButton from '../navigation/BackHeaderButton';
 import {
   APP_NAV_BAR_CONTENT_HEIGHT,
   APP_NAV_BAR_LARGE_TITLE_EXTRA,
-  appNavBarTotalHeight,
-} from './AppNavigationBar';
-
-export { APP_NAV_BAR_CONTENT_HEIGHT, APP_NAV_BAR_LARGE_TITLE_EXTRA, appNavBarTotalHeight };
+} from './appNavBarMetrics';
 
 const VARIANT_STYLES = {
   glass: {
