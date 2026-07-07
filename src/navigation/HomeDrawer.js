@@ -70,7 +70,7 @@ function CustomDrawerContent(props) {
         />
 
         <DrawerItem
-          label="Repair Requests"
+          label="Repairs"
           onPress={() => {
             const root = navigation.getParent?.() || navigation;
             navigateToRepairRequests(root);

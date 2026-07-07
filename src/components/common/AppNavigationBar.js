@@ -58,6 +58,7 @@ export default function AppNavigationBar({
   showBack = true,
   backLabel = 'Back',
   onBack,
+  leftAction,
   rightAction,
   variant = 'glass',
   largeTitle = false,
@@ -102,14 +103,15 @@ export default function AppNavigationBar({
       >
         <View style={[styles.bar, compact && styles.barCompact, largeTitle && styles.barLarge]}>
           <View style={[styles.sideSlot, compact && styles.sideSlotCompact]}>
-            {showBack && onBack ? (
-              <BackHeaderButton
-                onPress={onBack}
-                label={backLabel}
-                variant={theme.backVariant}
-                accessibilityLabel={`Back to ${backLabel}`}
-              />
-            ) : null}
+            {leftAction ??
+              (showBack && onBack ? (
+                <BackHeaderButton
+                  onPress={onBack}
+                  label={backLabel}
+                  variant={theme.backVariant}
+                  accessibilityLabel={`Back to ${backLabel}`}
+                />
+              ) : null)}
           </View>
 
           {!largeTitle ? (

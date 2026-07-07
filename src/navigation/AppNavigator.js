@@ -325,7 +325,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ClientRepairs"
           component={ClientRepairsList}
-          options={{ ...appNavBarScreenOptions, title: 'Repair Requests' }}
+          options={{ ...appNavBarScreenOptions, title: 'Repairs' }}
         />
         <Stack.Screen
           name="RepairDetail"

@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { Appbar, Badge, FAB, useTheme } from 'react-native-paper';
+import { FAB, useTheme } from 'react-native-paper';
 import { logout } from '../api/auth';
 import { getVehicles } from '../api/vehicles';
 import { getRepairs } from '../api/repairs';
@@ -20,6 +20,7 @@ import { isTerminalRepairStatus, normalizeRepairStatus } from '../utils/repairAr
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import ScreenBackground from '../components/ScreenBackground';
+import GlobalNavigationBar from '../components/common/GlobalNavigationBar';
 import DashboardSection from '../components/dashboard/DashboardSection';
 import DashboardHeroCard from '../components/dashboard/DashboardHeroCard';
 import DashboardSummaryRow from '../components/dashboard/DashboardSummaryRow';
@@ -42,9 +43,7 @@ import { API_BASE_URL } from '../api/config';
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import { resetToPublicHome } from '../navigation/authNavigation';
 
-const HOME_TOP_BAR = 'rgba(11,18,32,0.92)';
-
-const HERO_SUBTITLE = 'Your vehicles, service history, and repair requests — in one control center.';
+const HERO_SUBTITLE = 'Your vehicles, service history, and repairs — in one control center.';
 
 function toDisplayName(rawValue) {
   const raw = String(rawValue || '').trim();
@@ -349,17 +348,13 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <ScreenBackground safeArea={false}>
-      <Appbar.Header style={{ backgroundColor: HOME_TOP_BAR }}>
-        <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color="#fff" />
-        <Appbar.Content title={username} titleStyle={{ color: '#fff' }} />
-        <View style={styles.iconWithBadge}>
-          <Appbar.Action icon="bell-outline" onPress={goNotificationCenter} color="#fff" />
-          {unreadNotifications > 0 ? (
-            <Badge style={styles.notificationBadge}>{unreadNotifications}</Badge>
-          ) : null}
-        </View>
-        <Appbar.Action icon="logout" onPress={handleLogout} color="#fff" />
-      </Appbar.Header>
+      <GlobalNavigationBar
+        title={username}
+        unreadNotifications={unreadNotifications}
+        onMenuPress={() => navigation.openDrawer()}
+        onNotificationsPress={goNotificationCenter}
+        onLogoutPress={handleLogout}
+      />
 
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: scrollBottomPadding }]}
@@ -419,17 +414,6 @@ export default function HomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  iconWithBadge: {
-    position: 'relative',
-    marginRight: 8,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: 'red',
-    color: 'white',
-  },
   center: {
     flex: 1,
     justifyContent: 'center',

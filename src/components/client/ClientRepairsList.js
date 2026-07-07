@@ -19,10 +19,10 @@ import { syncWebPath } from '../../navigation/authNavigation';
 import { repairRequests } from '../../navigation/webRoutes';
 
 const TAB_OPTIONS = [
-  { key: 'open', label: 'Open' },
+  { key: 'open', label: 'Requests' },
   { key: 'offers', label: 'Offers' },
-  { key: 'ongoing', label: 'Ongoing' },
-  { key: 'done', label: 'Done' },
+  { key: 'ongoing', label: 'Active Repairs' },
+  { key: 'done', label: 'Completed Repairs' },
 ];
 
 function resolveInitialTab(route) {
@@ -39,7 +39,7 @@ export default function ClientRepairsList({ navigation, route }) {
   const goBackDefault = useGoBackOr(navigation);
   const goBackDashboard = useClientDashboardBack(navigation);
   const handleBack = fromVehicleDetail ? goBackDefault : goBackDashboard;
-  const screenTitle = fromVehicleDetail ? 'Vehicle Repairs' : 'Repair Requests';
+  const screenTitle = fromVehicleDetail ? 'Vehicle Repairs' : 'Repairs';
   const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState(() => resolveInitialTab(route));

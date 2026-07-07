@@ -30,7 +30,7 @@ const PATH_TITLES = {
   '/dashboard/vehicles': `${BASE_TITLE} My Vehicles`,
   '/dashboard/vehicles/add': `${BASE_TITLE} Add Vehicle`,
   '/dashboard/notifications': `${BASE_TITLE} Notifications`,
-  '/dashboard/repair-requests': `${BASE_TITLE} Repair Requests`,
+  '/dashboard/repair-requests': `${BASE_TITLE} Repairs`,
   '/dashboard/service-history': `${BASE_TITLE} Service History`,
   '/dashboard/bookings': `${BASE_TITLE} Bookings`,
   '/dashboard/documents': `${BASE_TITLE} Documents`,

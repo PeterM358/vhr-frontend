@@ -3,6 +3,39 @@
  * Filtering and sorting are server-side — see GET /api/repairs/repair/ query params.
  */
 
+import { formatMoneyAmount } from '../constants/currency';
+
+export function repairServiceTypeLabel(item) {
+  const name =
+    item?.final_repair_type_name ||
+    item?.effective_repair_type_name ||
+    item?.repair_type_name ||
+    null;
+  if (name) return name;
+  const desc = String(item?.description || '').trim();
+  if (desc) return desc.length > 56 ? `${desc.slice(0, 53)}…` : desc;
+  return 'Needs classification';
+}
+
+export function repairVehicleLabel(item) {
+  const makeModel = `${item?.vehicle_make ?? ''} ${item?.vehicle_model ?? ''}`.trim();
+  const plate = String(item?.vehicle_license_plate || '').trim();
+  if (makeModel && plate) return `${makeModel} · ${plate}`;
+  return makeModel || plate || 'Vehicle';
+}
+
+export function repairHistoryKmLabel(item) {
+  const km = repairListKmValue(item, 'done');
+  if (km == null || km === '') return null;
+  return `${Number(km).toLocaleString()} km`;
+}
+
+export function repairHistoryTotalLabel(item) {
+  const total = item?.total_price ?? item?.calculated_total_price;
+  if (total == null || total === '') return null;
+  return formatMoneyAmount(total, item?.currency);
+}
+
 export function getRepairSortTimestamp(item, statusTab) {
   if (statusTab === 'done') {
     return item?.completed_at || item?.created_at || null;
