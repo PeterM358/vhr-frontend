@@ -2,7 +2,7 @@
  * PATH: src/screens/CreateRepairScreen.js
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -29,9 +29,15 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { API_BASE_URL } from '../api/config';
 import { createRepair, getRepairById, updateRepair, uploadRepairMedia } from '../api/repairs';
 import { getServiceCenters } from '../api/serviceCenters';
+import { getShopById } from '../api/shops';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import FloatingCard from '../components/ui/FloatingCard';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
+import RepairRequestHeader from '../components/repairRequest/RepairRequestHeader';
+import RepairServiceSearch from '../components/repairRequest/RepairServiceSearch';
+import RepairServicePicker from '../components/repairRequest/RepairServicePicker';
+import SelectedServicePill from '../components/repairRequest/SelectedServicePill';
+import PreferredVisitPicker from '../components/repairRequest/PreferredVisitPicker';
 import { COLORS } from '../constants/colors';
 import { parseOdometerKm } from '../utils/finalizeMileageValidation';
 import {
@@ -39,8 +45,6 @@ import {
   buildPreferredVisitTimes,
   formatPreferredVisitNote,
 } from '../utils/shopVisitSlots';
-
-
 
 export default function CreateRepairScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
@@ -60,8 +64,6 @@ export default function CreateRepairScreen({ navigation, route }) {
 
   const [vehicleId, setVehicleId] = useState(preselectedVehicleId);
   const [repairTypeId, setRepairTypeId] = useState('');
-  const [serviceCategorySlug, setServiceCategorySlug] = useState('');
-  const [description, setDescription] = useState('');
   const [symptoms, setSymptoms] = useState('');
   const [visitDayOffset, setVisitDayOffset] = useState(1);
   const [visitTimeSlot, setVisitTimeSlot] = useState('09:00');
@@ -72,7 +74,7 @@ export default function CreateRepairScreen({ navigation, route }) {
   const [kilometers, setKilometers] = useState('');
   const [status] = useState('open');
   const [targetingMode, setTargetingMode] = useState(
-    route.params?.targetingMode || 'all_qualified'
+    preselectedShopId ? 'selected_centers' : route.params?.targetingMode || 'all_qualified'
   );
   const [serviceCenters, setServiceCenters] = useState([]);
   const [selectedCenterIds, setSelectedCenterIds] = useState(() => {
@@ -85,6 +87,11 @@ export default function CreateRepairScreen({ navigation, route }) {
   const [requiresGuarantee, setRequiresGuarantee] = useState(false);
   const [preferredRadiusKm, setPreferredRadiusKm] = useState('');
   const [loadingCenters, setLoadingCenters] = useState(false);
+  const [preselectedCenter, setPreselectedCenter] = useState(null);
+  const [serviceSearchQuery, setServiceSearchQuery] = useState('');
+  const [browseServicesExpanded, setBrowseServicesExpanded] = useState(false);
+  const [showAdvancedPreferences, setShowAdvancedPreferences] = useState(false);
+  const [centerPickerUnlocked, setCenterPickerUnlocked] = useState(!preselectedShopId);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -94,14 +101,14 @@ export default function CreateRepairScreen({ navigation, route }) {
   const [existingMedia, setExistingMedia] = useState([]);
   const [showVehiclePicker, setShowVehiclePicker] = useState(!preselectedVehicleId);
 
-  // Restore state when returning from related flows
   useEffect(() => {
     if (route.params) {
       if (route.params.vehicleId) setVehicleId(route.params.vehicleId.toString());
       if (route.params.repairTypeId) setRepairTypeId(route.params.repairTypeId.toString());
-      if (route.params.serviceCategorySlug !== undefined) setServiceCategorySlug(route.params.serviceCategorySlug);
-      if (route.params.description !== undefined) setDescription(route.params.description);
       if (route.params.symptoms !== undefined) setSymptoms(route.params.symptoms);
+      if (route.params.description !== undefined && !route.params.symptoms) {
+        setSymptoms(route.params.description);
+      }
       if (route.params.availabilityNotes !== undefined) {
         setAvailabilityNotes(route.params.availabilityNotes);
       }
@@ -120,7 +127,7 @@ export default function CreateRepairScreen({ navigation, route }) {
         setPreferredRadiusKm(route.params.preferredRadiusKm ? String(route.params.preferredRadiusKm) : '');
       }
     }
-  }, [route.params]);
+  }, [route.params, preselectedShopId]);
 
   const selectedVehicle = useMemo(
     () => vehicles.find((v) => String(v.id) === String(vehicleId)),
@@ -131,6 +138,14 @@ export default function CreateRepairScreen({ navigation, route }) {
     () => repairTypes.find((t) => String(t.id) === String(repairTypeId)),
     [repairTypes, repairTypeId]
   );
+
+  const headerServiceCenter = useMemo(() => {
+    if (preselectedCenter && !centerPickerUnlocked) return preselectedCenter;
+    if (preselectedShopId && selectedCenterIds.length === 1 && serviceCenters.length) {
+      return serviceCenters.find((c) => Number(c.id) === Number(selectedCenterIds[0])) || preselectedCenter;
+    }
+    return preselectedCenter;
+  }, [preselectedCenter, centerPickerUnlocked, preselectedShopId, selectedCenterIds, serviceCenters]);
 
   useEffect(() => {
     if (selectedVehicle) {
@@ -152,25 +167,6 @@ export default function CreateRepairScreen({ navigation, route }) {
       headerRight: () => null,
     });
   }, [navigation, isEditMode]);
-
-  const categoryOptions = useMemo(() => {
-    const map = {};
-    repairTypes.forEach((t) => {
-      const slug = t.category_slug;
-      const name = t.category_name || slug;
-      if (slug && name && !map[slug]) map[slug] = name;
-    });
-    return Object.entries(map)
-      .map(([slug, name]) => ({ slug, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [repairTypes]);
-
-  const filteredRepairTypes = useMemo(() => {
-    const rows = serviceCategorySlug
-      ? repairTypes.filter((t) => t.category_slug === serviceCategorySlug)
-      : repairTypes;
-    return [...rows].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-  }, [repairTypes, serviceCategorySlug]);
 
   const visitDays = useMemo(() => buildVisitSlotOptions(null, { maxDays: 14 }), []);
   const selectedVisitDay = useMemo(
@@ -201,7 +197,27 @@ export default function CreateRepairScreen({ navigation, route }) {
     if (match) setRepairTypeId(String(match.id));
   }, [repairTypes, route.params?.repairType, repairTypeId]);
 
-  // Initial data load
+  useEffect(() => {
+    if (!preselectedShopId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+        const shop = await getShopById(preselectedShopId, token);
+        if (!cancelled) {
+          setPreselectedCenter(shop);
+          setTargetingMode('selected_centers');
+          setSelectedCenterIds([preselectedShopId]);
+        }
+      } catch (err) {
+        console.warn('Failed to load preselected service center', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [preselectedShopId]);
+
   useEffect(() => {
     const fetchFormData = async () => {
       try {
@@ -229,8 +245,11 @@ export default function CreateRepairScreen({ navigation, route }) {
           }
           setVehicleId(String(editRepair.vehicle || ''));
           setRepairTypeId(editRepair.repair_type != null ? String(editRepair.repair_type) : '');
-          setDescription(editRepair.description || '');
-          setSymptoms(editRepair.symptoms || '');
+          const symptomText = [editRepair.symptoms, editRepair.description]
+            .map((s) => String(s || '').trim())
+            .filter(Boolean)
+            .join('\n\n');
+          setSymptoms(symptomText);
           setKilometers(editRepair.kilometers != null ? String(editRepair.kilometers) : '');
           setTargetingMode(editRepair.request_targeting_mode || 'all_qualified');
           setSelectedCenterIds(
@@ -282,13 +301,6 @@ export default function CreateRepairScreen({ navigation, route }) {
   }, []);
 
   useEffect(() => {
-    if (!repairTypeId) return;
-    if (!filteredRepairTypes.some((t) => String(t.id) === String(repairTypeId))) {
-      setRepairTypeId('');
-    }
-  }, [filteredRepairTypes, repairTypeId]);
-
-  useEffect(() => {
     const fetchCenters = async () => {
       if (targetingMode !== 'selected_centers') {
         setServiceCenters([]);
@@ -322,8 +334,8 @@ export default function CreateRepairScreen({ navigation, route }) {
   };
 
   const requestMediaPermission = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
+    const { status: perm } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (perm !== 'granted') {
       Alert.alert('Permission required', 'Allow access to photos/videos to attach media.');
       return false;
     }
@@ -383,21 +395,45 @@ export default function CreateRepairScreen({ navigation, route }) {
     setSelectedMedia((prev) => prev.filter((m) => m.localId !== localId));
   };
 
-  const selectServiceCategory = (slug) => {
-    setServiceCategorySlug(slug);
-  };
-
-  const selectRepairType = (type) => {
+  const selectRepairType = useCallback((type) => {
     setRepairTypeId(String(type.id));
-    if (type.category_slug) {
-      setServiceCategorySlug(type.category_slug);
-    }
-  };
+    setServiceSearchQuery('');
+    setBrowseServicesExpanded(false);
+  }, []);
+
+  const clearRepairType = useCallback(() => {
+    setRepairTypeId('');
+    setServiceSearchQuery('');
+  }, []);
+
+  const handleChangeServiceCenter = useCallback(() => {
+    setCenterPickerUnlocked(true);
+    setShowAdvancedPreferences(true);
+    setTargetingMode('selected_centers');
+  }, []);
 
   const resolvedRepairTypeId = useMemo(() => {
     if (repairTypeId) return repairTypeId;
     return '';
   }, [repairTypeId]);
+
+  const canSubmit = useMemo(() => {
+    if (!vehicleId || saving) return false;
+    const hasRepairType = Boolean(resolvedRepairTypeId || selectedRepairType?.id);
+    const hasWrittenDetails = Boolean(String(symptoms || '').trim());
+    const hasMedia = selectedMedia.length > 0;
+    const hasVisit = Boolean(selectedVisitDay && visitTimeSlot);
+    return hasVisit && (hasRepairType || hasWrittenDetails || hasMedia);
+  }, [
+    vehicleId,
+    saving,
+    resolvedRepairTypeId,
+    selectedRepairType?.id,
+    symptoms,
+    selectedMedia.length,
+    selectedVisitDay,
+    visitTimeSlot,
+  ]);
 
   const handleSubmitRequest = () => {
     if (!vehicleId) {
@@ -407,12 +443,11 @@ export default function CreateRepairScreen({ navigation, route }) {
     }
     const typeId = resolvedRepairTypeId || selectedRepairType?.id;
     const hasRepairType = Boolean(typeId);
-    const hasWrittenDetails =
-      Boolean(String(description || '').trim()) || Boolean(String(symptoms || '').trim());
+    const hasWrittenDetails = Boolean(String(symptoms || '').trim());
     const hasMedia = selectedMedia.length > 0;
     if (!hasRepairType && !hasWrittenDetails && !hasMedia) {
       setDialogMessage(
-        'Select a service type (e.g. Oil change), or add symptoms or photos so shops understand the request.'
+        'Select a service type (e.g. Oil change), or describe symptoms or add photos so service centers understand the request.'
       );
       setDialogVisible(true);
       return;
@@ -432,7 +467,6 @@ export default function CreateRepairScreen({ navigation, route }) {
     return fromInput != null ? fromInput : 0;
   };
 
-  // Save service request intake
   const saveRepair = async () => {
     setSaving(true);
     try {
@@ -452,10 +486,12 @@ export default function CreateRepairScreen({ navigation, route }) {
         throw new Error('Vehicle is required.');
       }
 
+      const symptomText = String(symptoms || '').trim();
+
       const body = {
         repair_type: typeIdForApi ? parseInt(String(typeIdForApi), 10) : null,
-        description: String(description || '').trim(),
-        symptoms: String(symptoms || '').trim(),
+        description: '',
+        symptoms: symptomText,
         kilometers: kmForApi,
         status,
         request_targeting_mode: targetingMode,
@@ -482,10 +518,10 @@ export default function CreateRepairScreen({ navigation, route }) {
       let savedRepairId = editRepairId;
       if (isEditMode && editRepairId) {
         const editPayload = { ...body };
-        delete editPayload.status; // keep current status unchanged
+        delete editPayload.status;
         delete editPayload.repair_parts_data;
         delete editPayload.shop_profile_id;
-        delete editPayload.vehicle; // do not allow changing vehicle in edit mode
+        delete editPayload.vehicle;
         try {
           await updateRepair(token, editRepairId, editPayload);
         } catch (patchErr) {
@@ -588,6 +624,11 @@ export default function CreateRepairScreen({ navigation, route }) {
     return <ActivityIndicator animating={true} size="large" style={{ flex: 1 }} />;
   }
 
+  const symptomsLabel = selectedRepairType ? 'Additional details' : 'Symptoms';
+  const symptomsPlaceholder = selectedRepairType
+    ? 'Add details if needed (optional)'
+    : 'Describe symptoms, noises, warning lights...';
+
   return (
     <ScreenBackground>
       <View style={styles.root}>
@@ -598,98 +639,79 @@ export default function CreateRepairScreen({ navigation, route }) {
           ]}
           keyboardShouldPersistTaps="always"
         >
-          <FloatingCard>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Problem</Text>
-            <Text style={styles.sectionHint}>
-              Share symptoms and details so service centers understand the issue quickly.
-            </Text>
-            <Text variant="labelLarge" style={styles.label}>Repair category</Text>
-            <View style={styles.centerChipsWrap}>
-              <Pressable
-                onPress={() => selectServiceCategory('')}
-                style={[styles.centerChip, !serviceCategorySlug && styles.centerChipSelected]}
-              >
-                <Text style={[styles.centerChipText, !serviceCategorySlug && styles.centerChipTextSelected]}>
-                  All
-                </Text>
-              </Pressable>
-              {categoryOptions.map((c) => {
-                const selected = serviceCategorySlug === c.slug;
-                return (
-                  <Pressable
-                    key={c.slug}
-                    onPress={() => selectServiceCategory(c.slug)}
-                    style={[styles.centerChip, selected && styles.centerChipSelected]}
-                  >
-                    <Text style={[styles.centerChipText, selected && styles.centerChipTextSelected]}>
-                      {c.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text variant="labelLarge" style={[styles.label, { marginTop: 8 }]}>Repair type</Text>
-            <View style={styles.centerChipsWrap}>
-              {filteredRepairTypes.length === 0 ? (
-                <Text style={styles.sectionHint}>No service types in this category.</Text>
-              ) : (
-                filteredRepairTypes.map((t) => {
-                  const selected = String(t.id) === String(repairTypeId);
-                  return (
-                    <Pressable
-                      key={t.id}
-                      onPress={() => selectRepairType(t)}
-                      style={[styles.centerChip, selected && styles.centerChipSelected]}
-                    >
-                      <Text style={[styles.centerChipText, selected && styles.centerChipTextSelected]}>
-                        {t.name}
-                      </Text>
-                    </Pressable>
-                  );
-                })
-              )}
-            </View>
-            <Text style={styles.sectionHint}>
-              {repairTypeId
-                ? `${selectedRepairType?.name || 'Service'} selected — description is optional.`
-                : 'Pick a service type (recommended) or describe the problem below.'}
-            </Text>
-            {selectedVehicle ? (
-              <View style={styles.vehicleSummaryCard}>
-                <View style={styles.vehicleSummaryMain}>
-                  <Text style={styles.vehicleSummaryPlate}>{selectedVehicle.license_plate || '�'}</Text>
-                  <Text style={styles.vehicleSummaryName}>
-                    {[selectedVehicle.make_name, selectedVehicle.model_name].filter(Boolean).join(' ') || 'Vehicle'}
-                  </Text>
-                  <Text style={styles.vehicleSummaryKm}>
-                    {selectedVehicle.kilometers != null && selectedVehicle.kilometers !== ''
-                      ? `${Number(selectedVehicle.kilometers).toLocaleString()} km`
-                      : 'Kilometers not set'}
-                  </Text>
-                </View>
-                {!isEditMode ? (
-                  <Button mode="text" compact onPress={() => setShowVehiclePicker((prev) => !prev)}>
-                    {showVehiclePicker ? 'Hide vehicle list' : 'Change vehicle'}
-                  </Button>
-                ) : null}
+          <RepairRequestHeader
+            serviceCenter={headerServiceCenter}
+            selectedVehicle={selectedVehicle}
+            onChangeVehicle={() => setShowVehiclePicker((prev) => !prev)}
+            onChangeServiceCenter={preselectedShopId ? handleChangeServiceCenter : null}
+            showVehiclePicker={showVehiclePicker}
+            isEditMode={isEditMode}
+          />
+
+          {!isEditMode && (!selectedVehicle || showVehiclePicker) ? (
+            <FloatingCard>
+              <Text variant="labelLarge" style={styles.label}>Vehicle *</Text>
+              <View style={styles.pickerContainer}>
+                <Picker selectedValue={vehicleId} onValueChange={setVehicleId} style={styles.picker}>
+                  {vehicles.map((v) => (
+                    <Picker.Item
+                      key={v.id}
+                      label={`${v.license_plate} (${v.make_name} ${v.model_name})`}
+                      value={v.id.toString()}
+                    />
+                  ))}
+                </Picker>
               </View>
-            ) : null}
-            {!isEditMode && (!selectedVehicle || showVehiclePicker) ? (
-              <>
-                <Text variant="labelLarge" style={styles.label}>Vehicle *</Text>
-                <View style={styles.pickerContainer}>
-                  <Picker selectedValue={vehicleId} onValueChange={setVehicleId} style={styles.picker}>
-                    {vehicles.map((v) => (
-                      <Picker.Item
-                        key={v.id}
-                        label={`${v.license_plate} (${v.make_name} ${v.model_name})`}
-                        value={v.id.toString()}
-                      />
-                    ))}
-                  </Picker>
-                </View>
-              </>
-            ) : null}
+            </FloatingCard>
+          ) : null}
+
+          <FloatingCard>
+            <RepairServiceSearch
+              repairTypes={repairTypes}
+              query={serviceSearchQuery}
+              onQueryChange={setServiceSearchQuery}
+              onSelectType={selectRepairType}
+              selectedTypeId={repairTypeId}
+            />
+            <RepairServicePicker
+              repairTypes={repairTypes}
+              selectedTypeId={repairTypeId}
+              onSelectType={selectRepairType}
+              expanded={browseServicesExpanded}
+              onToggleExpanded={() => setBrowseServicesExpanded((prev) => !prev)}
+            />
+            <SelectedServicePill repairType={selectedRepairType} onChange={clearRepairType} />
+
+            <Text variant="labelLarge" style={[styles.label, { marginTop: 12 }]}>
+              {symptomsLabel}
+            </Text>
+            <TextInput
+              mode="outlined"
+              value={symptoms}
+              onChangeText={setSymptoms}
+              placeholder={symptomsPlaceholder}
+              style={styles.input}
+              multiline
+            />
+
+            <PreferredVisitPicker
+              visitDays={visitDays}
+              visitDayOffset={visitDayOffset}
+              onDayChange={setVisitDayOffset}
+              visitTimeSlots={visitTimeSlots}
+              visitTimeSlot={visitTimeSlot}
+              onTimeChange={setVisitTimeSlot}
+              selectedVisitDay={selectedVisitDay}
+            />
+            <TextInput
+              mode="outlined"
+              value={visitExtraNotes}
+              onChangeText={setVisitExtraNotes}
+              placeholder="Extra timing notes (optional)"
+              style={styles.input}
+              multiline
+            />
+
             {fromVehicleDetail && selectedVehicle ? (
               <View style={styles.optionalKmInline}>
                 <Text variant="labelLarge" style={styles.label}>Kilometers (optional)</Text>
@@ -705,93 +727,17 @@ export default function CreateRepairScreen({ navigation, route }) {
                   keyboardType="numeric"
                   style={styles.input}
                 />
-                <Text style={styles.sectionHint}>
-                  Service requests use the odometer on your vehicle profile (shown above). Update it on
-                  the vehicle screen if it has changed since your last service.
-                </Text>
               </View>
             ) : null}
-            {fromShopDetail ? (
-              <Text style={styles.shopRequestNotice}>
-                Your preferred visit time is a suggestion only. Wait for the shop to confirm before you
-                bring your vehicle.
-              </Text>
-            ) : null}
-            <Text variant="labelLarge" style={styles.label}>Symptoms</Text>
-            <TextInput
-              mode="outlined"
-              value={symptoms}
-              onChangeText={setSymptoms}
-              placeholder="Describe symptoms, noises, warning lights..."
-              style={styles.input}
-              multiline
-            />
-            <Text variant="labelLarge" style={styles.label}>Preferred visit time</Text>
-            <Text style={styles.sectionHint}>
-              Pick a day and time. The shop must confirm before it counts as booked.
-            </Text>
-            <View style={styles.centerChipsWrap}>
-              {visitDays.map((day) => {
-                const selected = day.offset === visitDayOffset;
-                return (
-                  <Pressable
-                    key={day.offset}
-                    onPress={() => setVisitDayOffset(day.offset)}
-                    style={[styles.centerChip, selected && styles.centerChipSelected]}
-                  >
-                    <Text style={[styles.centerChipText, selected && styles.centerChipTextSelected]}>
-                      {day.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <View style={[styles.centerChipsWrap, { marginTop: 4 }]}>
-              {visitTimeSlots.map((slot) => {
-                const selected = slot === visitTimeSlot;
-                return (
-                  <Pressable
-                    key={slot}
-                    onPress={() => setVisitTimeSlot(slot)}
-                    style={[styles.centerChip, selected && styles.centerChipSelected]}
-                  >
-                    <Text style={[styles.centerChipText, selected && styles.centerChipTextSelected]}>
-                      {slot}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            {selectedVisitDay ? (
-              <Text style={styles.sectionHint}>
-                {formatPreferredVisitNote(selectedVisitDay, visitTimeSlot)}
-              </Text>
-            ) : null}
-            <TextInput
-              mode="outlined"
-              value={visitExtraNotes}
-              onChangeText={setVisitExtraNotes}
-              placeholder="Extra timing notes (optional)"
-              style={styles.input}
-              multiline
-            />
-            <Text variant="labelLarge" style={styles.label}>
-              {repairTypeId ? 'Extra notes (optional)' : 'Description'}
-            </Text>
-            <TextInput
-              mode="outlined"
-              value={description}
-              onChangeText={setDescription}
-              placeholder={
-                repairTypeId
-                  ? 'Anything else the shop should know (optional)'
-                  : 'What should the shop look at?'
-              }
-              style={styles.input}
-              multiline
-            />
 
-            <Text variant="labelLarge" style={styles.label}>Media</Text>
+            {fromShopDetail ? (
+              <Text style={styles.centerRequestNotice}>
+                Your preferred visit time is a suggestion only. The service center must confirm
+                before you bring your vehicle.
+              </Text>
+            ) : null}
+
+            <Text variant="labelLarge" style={styles.label}>Photos & videos</Text>
             <View style={styles.mediaActionsRow}>
               <Button mode="outlined" icon="camera" onPress={handlePickPhoto}>
                 Add photo
@@ -846,95 +792,114 @@ export default function CreateRepairScreen({ navigation, route }) {
           </FloatingCard>
 
           <FloatingCard>
-            <Text variant="titleMedium" style={styles.sectionTitle}>Preferences</Text>
-            <Text style={styles.sectionHint}>
-              Advanced routing options are available if you want more control.
-            </Text>
-            <Text variant="labelLarge" style={styles.label}>Who should receive request?</Text>
-            <View style={styles.targetingList}>
-              {[
-                { value: 'all_qualified', label: 'Nearby qualified service centers' },
-                { value: 'selected_centers', label: 'Selected service centers' },
-                { value: 'verified_only', label: 'Verified service centers only' },
-                { value: 'operator_assisted', label: 'Ask platform to help choose' },
-              ].map((opt) => {
-                const selected = targetingMode === opt.value;
-                return (
-                  <Pressable
-                    key={opt.value}
-                    onPress={() => setTargetingMode(opt.value)}
-                    style={[styles.targetingOption, selected && styles.targetingOptionSelected]}
-                  >
-                    <Text style={[styles.targetingOptionText, selected && styles.targetingOptionTextSelected]}>
-                      {opt.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            {targetingMode === 'selected_centers' ? (
-              <View style={styles.centerBlock}>
-                <Text style={styles.centerLabel}>Preferred service centers</Text>
-                {loadingCenters ? (
-                  <ActivityIndicator size="small" />
-                ) : serviceCenters.length ? (
-                  <View style={styles.centerChipsWrap}>
-                    {serviceCenters.map((c) => {
-                      const selected = selectedCenterIds.includes(Number(c.id));
-                      return (
-                        <Pressable
-                          key={c.id}
-                          onPress={() => toggleServiceCenterSelection(c.id)}
-                          style={[styles.centerChip, selected && styles.centerChipSelected]}
-                        >
-                          <Text style={[styles.centerChipText, selected && styles.centerChipTextSelected]}>
-                            {c.name || `Service Center #${c.id}`}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                ) : (
-                  <Text style={styles.emptySmall}>
-                    No matching service centers available for current vehicle/service filters.
-                  </Text>
-                )}
-              </View>
-            ) : null}
-
             <Pressable
-              onPress={() => setRequiresGuarantee((prev) => !prev)}
-              style={[styles.guaranteeCard, requiresGuarantee && styles.guaranteeCardSelected]}
+              onPress={() => setShowAdvancedPreferences((prev) => !prev)}
+              style={styles.preferencesToggle}
             >
-              <Text style={[styles.guaranteeTitle, requiresGuarantee && styles.guaranteeTitleSelected]}>
-                Request guaranteed service centers
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                Routing preferences
               </Text>
-              <Text style={[styles.guaranteeHelper, requiresGuarantee && styles.guaranteeHelperSelected]}>
-                Only service centers offering guarantee will receive this request.
+              <Text style={styles.preferencesToggleHint}>
+                {showAdvancedPreferences ? 'Hide' : 'Show'} advanced options
               </Text>
-              <View style={styles.guaranteeStateRow}>
-                <Text style={[styles.guaranteeStateText, requiresGuarantee && styles.guaranteeStateTextSelected]}>
-                  {requiresGuarantee ? 'Enabled' : 'Disabled'}
-                </Text>
-                <Button
-                  mode={requiresGuarantee ? 'contained-tonal' : 'outlined'}
-                  compact
-                  onPress={() => setRequiresGuarantee((prev) => !prev)}
-                >
-                  {requiresGuarantee ? 'Turn off' : 'Turn on'}
-                </Button>
-              </View>
             </Pressable>
-            <Text variant="labelLarge" style={styles.label}>Preferred radius (km)</Text>
-            <TextInput
-              mode="outlined"
-              value={preferredRadiusKm}
-              onChangeText={setPreferredRadiusKm}
-              keyboardType="numeric"
-              placeholder="Optional, e.g. 15"
-              style={styles.input}
-            />
+
+            {showAdvancedPreferences || centerPickerUnlocked ? (
+              <>
+                <Text style={styles.sectionHint}>
+                  Choose how your request is routed to service centers.
+                </Text>
+                <Text variant="labelLarge" style={styles.label}>Who should receive request?</Text>
+                <View style={styles.targetingList}>
+                  {[
+                    { value: 'all_qualified', label: 'Nearby qualified service centers' },
+                    { value: 'selected_centers', label: 'Selected service centers' },
+                    { value: 'verified_only', label: 'Verified service centers only' },
+                    { value: 'operator_assisted', label: 'Ask platform to help choose' },
+                  ].map((opt) => {
+                    const selected = targetingMode === opt.value;
+                    return (
+                      <Pressable
+                        key={opt.value}
+                        onPress={() => setTargetingMode(opt.value)}
+                        style={[styles.targetingOption, selected && styles.targetingOptionSelected]}
+                      >
+                        <Text style={[styles.targetingOptionText, selected && styles.targetingOptionTextSelected]}>
+                          {opt.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                {targetingMode === 'selected_centers' ? (
+                  <View style={styles.centerBlock}>
+                    <Text style={styles.centerLabel}>Preferred service centers</Text>
+                    {loadingCenters ? (
+                      <ActivityIndicator size="small" />
+                    ) : serviceCenters.length ? (
+                      <View style={styles.centerChipsWrap}>
+                        {serviceCenters.map((c) => {
+                          const selected = selectedCenterIds.includes(Number(c.id));
+                          return (
+                            <Pressable
+                              key={c.id}
+                              onPress={() => toggleServiceCenterSelection(c.id)}
+                              style={[styles.centerChip, selected && styles.centerChipSelected]}
+                            >
+                              <Text style={[styles.centerChipText, selected && styles.centerChipTextSelected]}>
+                                {c.name || `Service Center #${c.id}`}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    ) : (
+                      <Text style={styles.emptySmall}>
+                        No matching service centers available for current vehicle/service filters.
+                      </Text>
+                    )}
+                  </View>
+                ) : null}
+
+                <Pressable
+                  onPress={() => setRequiresGuarantee((prev) => !prev)}
+                  style={[styles.guaranteeCard, requiresGuarantee && styles.guaranteeCardSelected]}
+                >
+                  <Text style={[styles.guaranteeTitle, requiresGuarantee && styles.guaranteeTitleSelected]}>
+                    Request guaranteed service centers
+                  </Text>
+                  <Text style={[styles.guaranteeHelper, requiresGuarantee && styles.guaranteeHelperSelected]}>
+                    Only service centers offering guarantee will receive this request.
+                  </Text>
+                  <View style={styles.guaranteeStateRow}>
+                    <Text style={[styles.guaranteeStateText, requiresGuarantee && styles.guaranteeStateTextSelected]}>
+                      {requiresGuarantee ? 'Enabled' : 'Disabled'}
+                    </Text>
+                    <Button
+                      mode={requiresGuarantee ? 'contained-tonal' : 'outlined'}
+                      compact
+                      onPress={() => setRequiresGuarantee((prev) => !prev)}
+                    >
+                      {requiresGuarantee ? 'Turn off' : 'Turn on'}
+                    </Button>
+                  </View>
+                </Pressable>
+                <Text variant="labelLarge" style={styles.label}>Preferred radius (km)</Text>
+                <TextInput
+                  mode="outlined"
+                  value={preferredRadiusKm}
+                  onChangeText={setPreferredRadiusKm}
+                  keyboardType="numeric"
+                  placeholder="Optional, e.g. 15"
+                  style={styles.input}
+                />
+              </>
+            ) : (
+              <Text style={styles.sectionHint}>
+                Defaults route your request to nearby qualified service centers.
+              </Text>
+            )}
           </FloatingCard>
 
           {!(fromVehicleDetail && selectedVehicle) ? (
@@ -952,25 +917,8 @@ export default function CreateRepairScreen({ navigation, route }) {
               <Text style={styles.sectionHint}>
                 Optional current-km hint for this request.
               </Text>
-              <Text style={styles.sectionHint}>
-                You can later add invoices, parts, and final repair details to the vehicle history.
-              </Text>
-              {/* TODO(service-history): Add a separate "Log service record" flow outside this service-request intake screen. */}
-              {/* TODO(intake): Add manual repair logging mode separate from request-intake workflow. */}
-              {/* TODO(intake): Add invoice OCR intake for structured service-history extraction. */}
-              {/* TODO(intake): Add photo-based part extraction suggestions from uploaded media. */}
             </FloatingCard>
-          ) : (
-            <FloatingCard>
-              <Text style={styles.sectionHint}>
-                You can later add invoices, parts, and final repair details to the vehicle history.
-              </Text>
-              {/* TODO(service-history): Add a separate "Log service record" flow outside this service-request intake screen. */}
-              {/* TODO(intake): Add manual repair logging mode separate from request-intake workflow. */}
-              {/* TODO(intake): Add invoice OCR intake for structured service-history extraction. */}
-              {/* TODO(intake): Add photo-based part extraction suggestions from uploaded media. */}
-            </FloatingCard>
-          )}
+          ) : null}
         </KeyboardAwareScrollView>
 
         <View style={[styles.bottomActionBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
@@ -978,11 +926,11 @@ export default function CreateRepairScreen({ navigation, route }) {
             mode="contained"
             onPress={handleSubmitRequest}
             loading={saving}
-            disabled={saving}
+            disabled={!canSubmit}
             style={styles.sendButton}
             contentStyle={styles.sendButtonContent}
           >
-            {isEditMode ? 'Save changes' : 'Send request'}
+            {isEditMode ? 'Save changes' : 'Request service'}
           </Button>
         </View>
       </View>
@@ -1024,7 +972,7 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_MUTED,
     marginBottom: 10,
   },
-  shopRequestNotice: {
+  centerRequestNotice: {
     marginBottom: 10,
     padding: 10,
     borderRadius: 10,
@@ -1054,6 +1002,17 @@ const styles = StyleSheet.create({
   picker: {
     width: '100%',
   },
+  preferencesToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  preferencesToggleHint: {
+    color: COLORS.PRIMARY,
+    fontWeight: '600',
+    fontSize: 13,
+  },
   targetingList: {
     marginTop: 6,
     gap: 8,
@@ -1077,31 +1036,6 @@ const styles = StyleSheet.create({
   },
   targetingOptionTextSelected: {
     color: '#fff',
-  },
-  vehicleSummaryCard: {
-    borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.1)',
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    padding: 10,
-    marginBottom: 8,
-  },
-  vehicleSummaryMain: {
-    marginBottom: 4,
-  },
-  vehicleSummaryPlate: {
-    color: COLORS.TEXT_DARK,
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  vehicleSummaryName: {
-    color: COLORS.TEXT_DARK,
-    marginTop: 2,
-  },
-  vehicleSummaryKm: {
-    color: COLORS.TEXT_MUTED,
-    marginTop: 2,
-    fontSize: 12,
   },
   optionalKmInline: {
     marginBottom: 8,

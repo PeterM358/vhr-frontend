@@ -116,8 +116,8 @@ export function buildVisitSlotOptions(workingHours, { maxDays = 14, horizon = 21
 export function formatPreferredVisitNote(dayOption, timeSlot) {
   if (!dayOption) return '';
   const dateLabel = dayOption.label;
-  if (!timeSlot) return `Preferred visit: ${dateLabel} (pending shop confirmation)`;
-  return `Preferred visit: ${dateLabel}, ${timeSlot} (pending shop confirmation)`;
+  if (!timeSlot) return `Preferred visit: ${dateLabel} (pending service center confirmation)`;
+  return `Preferred visit: ${dateLabel}, ${timeSlot} (pending service center confirmation)`;
 }
 
 export function buildPreferredVisitTimes(dayOption, timeSlot) {
