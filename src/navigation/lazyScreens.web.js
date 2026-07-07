@@ -46,7 +46,7 @@ export const VehicleSpecsScreen = lazyScreen(() => import('../screens/VehicleSpe
 export { default as ShopDetailScreen } from '../screens/ShopDetailScreen';
 export { default as CreateRepairScreen } from '../screens/CreateRepairScreen';
 export const PromotionDetailScreen = lazyScreen(() => import('../screens/PromotionDetailScreen'));
-export const RepairDetailScreen = lazyScreen(() => import('../screens/RepairDetailScreen'));
+export { default as RepairDetailScreen } from '../screens/RepairDetailScreen';
 export const LogServiceRecordScreen = lazyScreen(() => import('../screens/LogServiceRecordScreen'));
 export const ServiceRecordServiceCenterScreen = lazyScreen(
   () => import('../screens/ServiceRecordServiceCenterScreen')

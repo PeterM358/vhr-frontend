@@ -89,6 +89,15 @@ export const linkingScreens = {
   ClientActivity: 'dashboard/notifications',
   ClientRepairs: 'dashboard/repair-requests',
   CreateRepair: 'dashboard/repair-requests/new',
+  RepairDetail: {
+    path: 'dashboard/repair-requests/:repairId',
+    parse: {
+      repairId: (value) => {
+        const id = parseInt(String(value), 10);
+        return Number.isFinite(id) ? id : undefined;
+      },
+    },
+  },
   ClientServiceHistory: 'dashboard/service-history',
   ClientBookings: 'dashboard/bookings',
   ClientDocuments: 'dashboard/documents',

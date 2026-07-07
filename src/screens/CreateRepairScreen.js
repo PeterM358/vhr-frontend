@@ -45,6 +45,7 @@ import {
   buildPreferredVisitTimes,
   formatPreferredVisitNote,
 } from '../utils/shopVisitSlots';
+import { navigateToRepairRequestDetail } from '../navigation/webNavigation';
 
 export default function CreateRepairScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
@@ -586,7 +587,10 @@ export default function CreateRepairScreen({ navigation, route }) {
         const parsedVehicleId = parseInt(vehicleId, 10);
 
         if (isEditMode && savedRepairId) {
-          navigation.navigate('RepairDetail', { repairId: savedRepairId });
+          navigateToRepairRequestDetail(navigation, savedRepairId, {
+            returnTo: 'ClientRepairs',
+            backLabel: 'Requests',
+          });
           return;
         }
         if (returnTo === 'VehicleDetail' || origin === 'VehicleDetail') {
@@ -608,11 +612,19 @@ export default function CreateRepairScreen({ navigation, route }) {
         }
 
         if (savedRepairId) {
-          navigation.navigate('RepairDetail', {
-            repairId: savedRepairId,
-            vehicleId: parsedVehicleId,
-            origin: returnTo || origin || null,
-          });
+          const shopId = preselectedShopId || route.params?.shopId;
+          if (shopId) {
+            navigateToRepairRequestDetail(navigation, savedRepairId, {
+              returnTo: 'ShopDetail',
+              shopId,
+              backLabel: 'Service center',
+            });
+          } else {
+            navigateToRepairRequestDetail(navigation, savedRepairId, {
+              returnTo: 'ClientRepairs',
+              backLabel: 'Dashboard',
+            });
+          }
           return;
         }
 

@@ -384,6 +384,13 @@ export default function AppNavigator() {
                 headerBackVisible: false,
               };
             }
+            if (returnTo === 'ShopDetail') {
+              return {
+                title: 'Repair',
+                headerLeft: stackBackHeaderLeft(navigation, backLabel || 'Service center'),
+                headerBackVisible: false,
+              };
+            }
             if (returnTo === 'ShopCalendar') {
               return {
                 title: 'Repair',

@@ -131,6 +131,22 @@ export function normalizeWebPath(input) {
     });
   }
 
+  const repairRequestDetailMatch = lastGlobalMatch(
+    raw,
+    String.raw`dashboard\/repair-requests\/(\d+)`
+  );
+  if (repairRequestDetailMatch) {
+    return repairRequestDetail(repairRequestDetailMatch[1]);
+  }
+
+  if (raw === 'RepairDetail' || raw.endsWith('/RepairDetail')) {
+    const legacyQuery = parseRouteQuery(query);
+    const repairId = legacyQuery.repairId || legacyQuery.repair_id;
+    if (repairId != null && repairId !== '') {
+      return repairRequestDetail(repairId);
+    }
+  }
+
   const dashboardSection = normalizeDashboardSection(raw, query);
   if (dashboardSection) {
     return dashboardSection;
@@ -279,6 +295,10 @@ export function repairRequestNew(params = {}) {
     query.vehicleType = String(params.vehicleType);
   }
   return buildPathWithQuery(`${DASHBOARD}/repair-requests/new`, query);
+}
+
+export function repairRequestDetail(id) {
+  return `${DASHBOARD}/repair-requests/${normalizeId(id)}`;
 }
 
 export function offers(params = {}) {

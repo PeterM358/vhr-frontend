@@ -43,6 +43,7 @@ import {
   profile,
   repairRequests,
   repairRequestNew,
+  repairRequestDetail,
   serviceCenters,
   serviceCenterProfile,
   serviceHistory,
@@ -135,6 +136,8 @@ export function getCanonicalWebPath(state) {
         vehicleType: params.vehicleType,
       });
     }
+    case 'RepairDetail':
+      return params.repairId != null ? repairRequestDetail(params.repairId) : repairRequests();
     case 'OffersScreen':
       return repairRequests({ tab: 'offers' });
     case 'ClientServiceHistory':
@@ -307,6 +310,15 @@ export function getDashboardNavigationStateFromPath(path) {
       routeParams.selectedCenterIds = [centerId];
     }
     return vehicleStackState([{ name: 'CreateRepair', params: routeParams }]);
+  }
+  const repairDetailMatch = pathPart.match(/^dashboard\/repair-requests\/(\d+)$/);
+  if (repairDetailMatch) {
+    const repairId = parseInt(repairDetailMatch[1], 10);
+    if (!Number.isFinite(repairId)) return null;
+    return vehicleStackState([
+      { name: 'ClientRepairs' },
+      { name: 'RepairDetail', params: { repairId, returnTo: 'ClientRepairs', backLabel: 'Requests' } },
+    ]);
   }
   if (pathPart === 'dashboard/offers') {
     return vehicleStackState([{ name: 'ClientRepairs', params: { initialTab: 'offers' } }]);
@@ -645,6 +657,10 @@ export function normalizeWebLinkingPath(path) {
   if (trimmed === 'CreateRepair' || trimmed.startsWith('CreateRepair')) {
     return 'dashboard/repair-requests/new';
   }
+  if (trimmed === 'RepairDetail' || trimmed.startsWith('RepairDetail')) {
+    const repairId = trimmed.match(/repairId[=:](\d+)/i)?.[1];
+    return repairId ? `dashboard/repair-requests/${repairId}` : 'dashboard/repair-requests';
+  }
   if (trimmed === 'ClientProfile' || trimmed.startsWith('ClientProfile/')) {
     return 'dashboard/profile';
   }
@@ -689,6 +705,29 @@ export function normalizeWebLinkingPath(path) {
 async function hasStoredAuthToken() {
   const token = await AsyncStorage.getItem('@access_token');
   return !!(token && token !== 'null' && token !== 'undefined');
+}
+
+function parseRepairIdFromSearch(search) {
+  if (!search) return null;
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const raw = params.get('repairId') || params.get('repair_id');
+  if (!raw) return null;
+  const id = parseInt(raw, 10);
+  return Number.isFinite(id) ? id : null;
+}
+
+function legacyRepairDetailNavigationState() {
+  if (typeof window === 'undefined') return null;
+  const pathname = window.location.pathname || '';
+  if (pathname !== '/RepairDetail' && !pathname.startsWith('/RepairDetail/')) {
+    return null;
+  }
+  const repairId = parseRepairIdFromSearch(window.location.search);
+  if (!repairId) return null;
+  return vehicleStackState([
+    { name: 'ClientRepairs' },
+    { name: 'RepairDetail', params: { repairId, returnTo: 'ClientRepairs', backLabel: 'Requests' } },
+  ]);
 }
 
 function parseVehicleIdFromSearch(search) {
@@ -784,6 +823,13 @@ export async function redirectLegacyWebUrl() {
     if (query.repairType) nextParams.repairType = query.repairType;
     if (query.vehicleType) nextParams.vehicleType = query.vehicleType;
     target = repairRequestNew(nextParams);
+  } else if (pathname === '/RepairDetail' || pathname.startsWith('/RepairDetail')) {
+    const repairId = parseRepairIdFromSearch(search);
+    if (repairId) {
+      target = repairRequestDetail(repairId);
+    } else {
+      target = repairRequests();
+    }
   } else if (
     pathname === '/dashboard/repair-requests/new' ||
     pathname.startsWith('/dashboard/repair-requests/new')
@@ -904,6 +950,10 @@ export function buildAppLinking(prefixes) {
   return {
     ...base,
     getStateFromPath(path, options) {
+      const legacyRepair = legacyRepairDetailNavigationState();
+      if (legacyRepair) {
+        return legacyRepair;
+      }
       const legacyShop = legacyShopDetailNavigationState();
       if (legacyShop) {
         return legacyShop;

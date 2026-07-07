@@ -12,6 +12,7 @@ import {
   notifications,
   repairRequests,
   repairRequestNew,
+  repairRequestDetail,
   serviceHistory,
   bookings,
   documents,
@@ -264,6 +265,39 @@ export async function navigateToRepairRequestNew(navigation, params = {}) {
     return;
   }
   root.navigate('CreateRepair', routeParams);
+}
+
+function buildRepairDetailRouteParams(repairId, params = {}) {
+  const routeParams = { repairId, ...params };
+  delete routeParams.origin;
+  delete routeParams.vehicleId;
+  return routeParams;
+}
+
+export function navigateToRepairRequestDetail(navigation, repairId, params = {}) {
+  const { returnTo, shopId, backLabel, ...rest } = params;
+  const routeParams = buildRepairDetailRouteParams(repairId, {
+    returnTo,
+    shopId,
+    backLabel,
+    ...rest,
+  });
+  const path = repairRequestDetail(repairId);
+
+  if (Platform.OS === 'web') {
+    const tailRoutes = [];
+    if (returnTo === 'ShopDetail' && shopId != null) {
+      tailRoutes.push({ name: 'ShopMap' });
+      tailRoutes.push({ name: 'ShopDetail', params: { shopId } });
+    } else if (returnTo === 'ClientRepairs') {
+      tailRoutes.push({ name: 'ClientRepairs' });
+    }
+    tailRoutes.push({ name: 'RepairDetail', params: routeParams });
+    resetWebRoutes(navigation, tailRoutes, path);
+    return;
+  }
+
+  navigation.navigate('RepairDetail', routeParams);
 }
 
 export function navigateToServiceHistory(navigation) {
