@@ -54,6 +54,7 @@ import {
   vehicleServiceRecordNew,
   vehicleServiceRecordCenter,
   vehicleServiceRecordCenterAdd,
+  vehicleReminderNew,
   vehicleSpecs,
   vehicles,
 } from './webRoutes';
@@ -118,6 +119,13 @@ export function getCanonicalWebPath(state) {
     case 'LogServiceRecord':
       return vehicleId != null
         ? vehicleServiceRecordNew(vehicleId, { type: params.type })
+        : vehicles();
+    case 'AddObligationPayment':
+      return vehicleId != null
+        ? vehicleReminderNew({
+            vehicleId,
+            reminderType: params.initialReminderType || params.reminderType || params.type,
+          })
         : vehicles();
     case 'ServiceRecordServiceCenter':
       return vehicleId != null ? vehicleServiceRecordCenter(vehicleId) : vehicles();
@@ -261,6 +269,24 @@ export function getVehicleNavigationStateFromPath(path) {
         name: 'LogServiceRecord',
         params: { vehicleId: id, ...query },
       },
+    ]);
+  }
+
+  match = pathPart.match(new RegExp(`^${base.replace('/', '\\/')}\\/(\\d+)\\/reminders\\/new$`));
+  if (match) {
+    const id = parseInt(match[1], 10);
+    if (!Number.isFinite(id)) return null;
+    const reminderType = query.reminderType || query.type || query.initialReminderType;
+    const routeParams = {
+      vehicleId: id,
+      returnTo: 'VehicleDetail',
+      ...query,
+    };
+    if (reminderType) routeParams.initialReminderType = reminderType;
+    return vehicleStackState([
+      { name: 'ClientVehicles' },
+      { name: 'VehicleDetail', params: { vehicleId: id } },
+      { name: 'AddObligationPayment', params: routeParams },
     ]);
   }
 
@@ -683,6 +709,11 @@ export function normalizeWebLinkingPath(path) {
     const vid = trimmed.match(/vehicleId[=:](\d+)/i)?.[1];
     return vid ? `dashboard/vehicles/${vid}/service-record/new` : 'dashboard/vehicles';
   }
+  if (trimmed === 'AddObligationPayment' || trimmed.startsWith('AddObligationPayment')) {
+    const vid = trimmed.match(/vehicleId[=:](\d+)/i)?.[1];
+    const reminderType = trimmed.match(/initialReminderType[=:]([^&/]+)/i)?.[1];
+    return vid ? vehicleReminderNew({ vehicleId: vid, reminderType }) : 'dashboard/vehicles';
+  }
   if (trimmed === 'AddManualServiceCenter' || trimmed.startsWith('AddManualServiceCenter')) {
     const vid = trimmed.match(/vehicleId[=:](\d+)/i)?.[1];
     return vid ? `dashboard/vehicles/${vid}/service-record/service-center/add` : 'dashboard/vehicles';
@@ -945,6 +976,11 @@ export async function redirectLegacyWebUrl() {
   } else if (pathname === '/LogServiceRecord' || pathname.startsWith('/LogServiceRecord')) {
     const vid = parseVehicleIdFromSearch(search);
     target = vid ? `/dashboard/vehicles/${vid}/service-record/new` : '/dashboard/vehicles';
+  } else if (pathname === '/AddObligationPayment' || pathname.startsWith('/AddObligationPayment')) {
+    const vid = parseVehicleIdFromSearch(search);
+    const query = parseRouteQuery(search);
+    const reminderType = query.initialReminderType || query.reminderType || query.type;
+    target = vid ? vehicleReminderNew({ vehicleId: vid, reminderType }) : vehicles();
   } else if (pathname === '/AddManualServiceCenter' || pathname.startsWith('/AddManualServiceCenter')) {
     const vid = parseVehicleIdFromSearch(search);
     target = vid ? `/dashboard/vehicles/${vid}/service-record/service-center/add` : '/dashboard/vehicles';

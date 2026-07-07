@@ -54,7 +54,7 @@ export const ServiceRecordServiceCenterScreen = lazyScreen(
 export const ManageVehicleServiceCentersScreen = lazyScreen(
   () => import('../screens/ManageVehicleServiceCentersScreen')
 );
-export const AddObligationPaymentScreen = lazyScreen(() => import('../screens/AddObligationPaymentScreen'));
+export { default as AddObligationPaymentScreen } from '../screens/AddObligationPaymentScreen';
 export const CreatePromotionScreen = lazyScreen(() => import('../screens/CreatePromotionScreen'));
 export const ShopRegisterClientScreen = lazyScreen(() => import('../screens/ShopRegisterClientScreen'));
 // Partner screens — static imports avoid Metro async chunk module ID mismatches on web

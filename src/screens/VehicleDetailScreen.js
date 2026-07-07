@@ -49,7 +49,7 @@ import {
 } from '../utils/mileageConfidence';
 import { mapHealthFromApi } from '../utils/vehicleHealthStatus';
 import { formatBookingAccessHint, formatRevokeConfirmMessage } from '../utils/shopDataAccess';
-import { navigateToVehicleServiceRecordNew, navigateToVehicleSpecs } from '../navigation/webNavigation';
+import { navigateToVehicleServiceRecordNew, navigateToVehicleReminderNew, navigateToVehicleSpecs } from '../navigation/webNavigation';
 
 const BASE_VEHICLE_REMINDER_SECTION_ROWS = [
   { reminder_type: 'insurance', label: 'Insurance', icon: 'shield-check-outline' },
@@ -510,6 +510,17 @@ export default function VehicleDetailScreen({ route, navigation }) {
     [navigation, vehicleId]
   );
 
+  const navigateObligationPayment = useCallback(
+    (extraParams = {}) => {
+      navigateToVehicleReminderNew(navigation, vehicleId, {
+        returnTo: 'VehicleDetail',
+        origin: 'VehicleDetail',
+        ...extraParams,
+      });
+    },
+    [navigation, vehicleId]
+  );
+
   const vehicleHealth = useMemo(() => mapHealthFromApi(vehicle), [vehicle]);
 
   const handleHealthAction = useCallback(
@@ -575,12 +586,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
           navigateLogServiceRecord();
           break;
         case 'add_obligation_inspection':
-          navigation.navigate('AddObligationPayment', {
-            vehicleId,
-            initialReminderType: 'technical_inspection',
-            returnTo: 'VehicleDetail',
-            origin: 'VehicleDetail',
-          });
+          navigateObligationPayment({ initialReminderType: 'technical_inspection' });
           break;
         case 'manage_authorized_centers':
           if (navigation.navigate) {
@@ -602,7 +608,9 @@ export default function VehicleDetailScreen({ route, navigation }) {
       scrollToServiceHistorySection,
       openRepairById,
       navigateLogServiceRecord,
+      navigateObligationPayment,
       scrollToAuthorizedCenters,
+      navigateToVehicleSpecs,
     ]
   );
 
@@ -964,12 +972,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
       },
       {
         text: 'Add obligation / payment',
-        onPress: () =>
-          navigation.navigate('AddObligationPayment', {
-            vehicleId,
-            returnTo: 'VehicleDetail',
-            origin: 'VehicleDetail',
-          }),
+        onPress: () => navigateObligationPayment(),
       },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -1323,11 +1326,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
                       key={row.reminder_type}
                       onPress={() => {
                         if (isObligationReminderType(row.reminder_type)) {
-                          navigation.navigate('AddObligationPayment', {
-                            vehicleId,
-                            initialReminderType: row.reminder_type,
-                            returnTo: 'VehicleDetail',
-                          });
+                          navigateObligationPayment({ initialReminderType: row.reminder_type });
                           return;
                         }
                         openReminderEditor(row, r);

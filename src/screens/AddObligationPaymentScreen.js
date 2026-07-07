@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View, Alert } from 'react-native';
+import { StyleSheet, View, Alert, Platform } from 'react-native';
 import ScreenBackground from '../components/ScreenBackground';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
@@ -31,6 +31,7 @@ import DocumentAttachmentList from '../components/documents/DocumentAttachmentLi
 import { pickObligationDocumentAttachment } from '../utils/pickDocumentFile';
 import { OBLIGATION_REMINDER_TO_DOCUMENT_TYPE } from '../utils/vehicleDocumentTypes';
 import { pickReminderForType } from '../utils/vehicleReminderUtils';
+import { navigateToVehicleDetail } from '../navigation/webNavigation';
 
 const OBLIGATION_CHOICES = [
   { reminder_type: 'insurance', label: 'Insurance', expense_type: 'insurance' },
@@ -62,7 +63,8 @@ function resolvedIso(valueIso) {
 export default function AddObligationPaymentScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const vehicleId = route.params?.vehicleId != null ? String(route.params.vehicleId) : '';
-  const initialReminderType = route.params?.initialReminderType || '';
+  const initialReminderType =
+    route.params?.initialReminderType || route.params?.reminderType || route.params?.type || '';
 
   const [vehicle, setVehicle] = useState(null);
   const [reminderType, setReminderType] = useState(
@@ -241,6 +243,10 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
       }
 
       const returnTo = route.params?.returnTo || 'VehicleDetail';
+      if (Platform.OS === 'web' && returnTo === 'VehicleDetail') {
+        navigateToVehicleDetail(navigation, vid, { expandReminders: true });
+        return;
+      }
       navigation.navigate({
         name: returnTo,
         params: { vehicleId: vid, expandReminders: true },

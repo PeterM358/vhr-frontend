@@ -22,6 +22,7 @@ import ScreenBackground from '../components/ScreenBackground';
 import FloatingCard from '../components/ui/FloatingCard';
 import { COLORS } from '../constants/colors';
 import { stackContentPaddingTop } from '../navigation/stackContentInset';
+import { navigateToVehicleReminderNew } from '../navigation/webNavigation';
 import VehicleCatalogEbikeTrailerSection from '../components/vehicle/VehicleCatalogEbikeTrailerSection';
 import VehicleRegistrationIdentityBlock from '../components/vehicle/VehicleRegistrationIdentityBlock';
 import VehicleCollapsibleFormSections from '../components/vehicle/VehicleCollapsibleFormSections';
@@ -119,8 +120,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
         return;
       }
       if (action === 'add_obligation_inspection') {
-        navigation.navigate('AddObligationPayment', {
-          vehicleId,
+        navigateToVehicleReminderNew(navigation, vehicleId, {
           initialReminderType: 'technical_inspection',
           returnTo: 'EditVehicleDetails',
           origin: 'EditVehicleDetails',

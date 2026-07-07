@@ -70,6 +70,15 @@ export const linkingScreens = {
       },
     },
   },
+  AddObligationPayment: {
+    path: 'dashboard/vehicles/:vehicleId/reminders/new',
+    parse: {
+      vehicleId: (value) => {
+        const id = parseInt(String(value), 10);
+        return Number.isFinite(id) ? id : undefined;
+      },
+    },
+  },
   ServiceRecordServiceCenter: {
     path: 'dashboard/vehicles/:vehicleId/service-record/service-center',
     parse: {

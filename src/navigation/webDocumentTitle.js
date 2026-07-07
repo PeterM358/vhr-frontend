@@ -53,6 +53,9 @@ function vehicleDetailTitle(pathname) {
   if (/^\/dashboard\/vehicles\/\d+\/service-record\/new$/.test(pathname)) {
     return `${BASE_TITLE} Add Service Record`;
   }
+  if (/^\/dashboard\/vehicles\/\d+\/reminders\/new$/.test(pathname)) {
+    return `${BASE_TITLE} Add Obligation / Payment`;
+  }
   return null;
 }
 

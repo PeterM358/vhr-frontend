@@ -21,6 +21,7 @@ import MileageConfidenceSheet from '../components/vehicle/MileageConfidenceSheet
 import { mileageConfidenceCategoryPill, resolveMileageFactorAction } from '../utils/mileageConfidence';
 import {
   navigateToVehicleDetail,
+  navigateToVehicleReminderNew,
   navigateToVehicleServiceRecordNew,
 } from '../navigation/webNavigation';
 
@@ -83,8 +84,7 @@ export default function VehicleSpecsScreen({ navigation, route }) {
         return;
       }
       if (action === 'add_obligation_inspection') {
-        navigation.navigate('AddObligationPayment', {
-          vehicleId,
+        navigateToVehicleReminderNew(navigation, vehicleId, {
           initialReminderType: 'technical_inspection',
           returnTo: 'VehicleSpecs',
           origin: 'VehicleSpecs',

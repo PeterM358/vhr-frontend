@@ -23,6 +23,7 @@ import {
   vehicleServiceRecordNew,
   vehicleServiceRecordCenter,
   vehicleServiceRecordCenterAdd,
+  vehicleReminderNew,
   vehicleSpecs,
   serviceCenters,
   serviceCenterProfile,
@@ -188,6 +189,32 @@ export function navigateToVehicleServiceRecordNew(navigation, vehicleId, params 
     return;
   }
   navigation.navigate('LogServiceRecord', routeParams);
+}
+
+export function navigateToVehicleReminderNew(navigation, vehicleId, params = {}) {
+  const { reminderType, initialReminderType, returnTo, origin, ...rest } = params;
+  const effectiveType = reminderType || initialReminderType;
+  const routeParams = {
+    vehicleId,
+    returnTo: returnTo || 'VehicleDetail',
+    ...rest,
+  };
+  if (effectiveType) routeParams.initialReminderType = effectiveType;
+  if (origin) routeParams.origin = origin;
+
+  if (Platform.OS === 'web') {
+    resetWebRoutes(
+      navigation,
+      [
+        { name: 'ClientVehicles' },
+        { name: 'VehicleDetail', params: { vehicleId } },
+        { name: 'AddObligationPayment', params: routeParams },
+      ],
+      vehicleReminderNew({ vehicleId, reminderType: effectiveType })
+    );
+    return;
+  }
+  navigation.navigate('AddObligationPayment', routeParams);
 }
 
 export function navigateToVehicleServiceRecordCenter(navigation, vehicleId, params = {}) {

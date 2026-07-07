@@ -94,6 +94,18 @@ export function normalizeWebPath(input) {
     return `${VEHICLES}/${serviceRecord[1]}/service-record/new${query}`;
   }
 
+  const reminderNew = lastGlobalMatch(
+    raw,
+    String.raw`(?:dashboard\/vehicles|my-vehicles)\/(\d+)\/reminders\/new`
+  );
+  if (reminderNew) {
+    const q = parseRouteQuery(query);
+    return vehicleReminderNew({
+      vehicleId: reminderNew[1],
+      reminderType: q.reminderType || q.type || q.initialReminderType,
+    });
+  }
+
   const specs = lastGlobalMatch(raw, String.raw`(?:dashboard\/vehicles|my-vehicles)\/(\d+)\/specs`);
   if (specs) {
     return `${VEHICLES}/${specs[1]}/specs${query}`;
@@ -160,6 +172,16 @@ export function normalizeWebPath(input) {
   const legacyServiceCenterSlug = lastGlobalMatch(raw, String.raw`service-center\/(\d+)`);
   if (legacyServiceCenterSlug) {
     return `${SERVICE_CENTERS}/${legacyServiceCenterSlug[1]}${query}`;
+  }
+
+  if (raw === 'AddObligationPayment' || raw.endsWith('/AddObligationPayment')) {
+    const legacyQuery = parseRouteQuery(query);
+    const vehicleId = legacyQuery.vehicleId || legacyQuery.vehicle_id;
+    const reminderType =
+      legacyQuery.initialReminderType || legacyQuery.reminderType || legacyQuery.type;
+    if (vehicleId != null && vehicleId !== '') {
+      return vehicleReminderNew({ vehicleId, reminderType });
+    }
   }
 
   if (raw === 'CreateRepair' || raw.endsWith('/CreateRepair')) {
@@ -281,6 +303,15 @@ export function vehicleSpecs(id) {
 
 export function vehicleServiceRecordNew(id, params = {}) {
   return buildPathWithQuery(`${VEHICLES}/${normalizeId(id)}/service-record/new`, params);
+}
+
+export function vehicleReminderNew({ vehicleId, reminderType } = {}) {
+  const query = {};
+  const type = reminderType;
+  if (type != null && type !== '') {
+    query.reminderType = String(type);
+  }
+  return buildPathWithQuery(`${VEHICLES}/${normalizeId(vehicleId)}/reminders/new`, query);
 }
 
 export function vehicleServiceRecordCenter(id) {
