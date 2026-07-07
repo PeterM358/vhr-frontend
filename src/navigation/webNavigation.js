@@ -30,6 +30,7 @@ import {
   partnerProfile,
   partnerPublicPreview,
   partnerRepairs,
+  partnerRepairOffer,
   partnerBookings,
   partnerCalendar,
   partnerClients,
@@ -528,6 +529,64 @@ export function navigateToPartnerRepairs(navigation) {
       ],
     })
   );
+}
+
+function buildPartnerOfferRouteParams(repairId, params = {}) {
+  const routeParams = {
+    repairId,
+    selectedOfferParts: params.selectedOfferParts,
+    existingOffer: params.existingOffer,
+    offerId: params.offerId ?? params.existingOffer?.id,
+    repairTypeId: params.repairTypeId,
+  };
+  Object.keys(routeParams).forEach((key) => {
+    if (routeParams[key] === undefined) {
+      delete routeParams[key];
+    }
+  });
+  return routeParams;
+}
+
+export function navigateToPartnerRepairOffer(navigation, repairId, params = {}) {
+  const { includeRepairDetail = true, ...rest } = params;
+  const routeParams = buildPartnerOfferRouteParams(repairId, rest);
+  const path = partnerRepairOffer(repairId, {
+    offerId: routeParams.offerId,
+  });
+
+  if (Platform.OS === 'web') {
+    const root = getRootNavigation(navigation);
+    const tailRoutes = [];
+    if (includeRepairDetail) {
+      tailRoutes.push({
+        name: 'RepairDetail',
+        params: { repairId, returnTo: 'RepairsList' },
+      });
+    }
+    tailRoutes.push({ name: 'CreateOrUpdateOffer', params: routeParams });
+
+    const partnerHomeRoute = includeRepairDetail
+      ? {
+          name: 'ShopHome',
+          state: {
+            index: 1,
+            routes: [{ name: 'ShopDashboard' }, { name: 'RepairsList' }],
+          },
+        }
+      : PARTNER_HOME_ROUTE;
+
+    root.dispatch(
+      CommonActions.reset({
+        index: tailRoutes.length,
+        routes: [partnerHomeRoute, ...tailRoutes],
+      })
+    );
+    syncWebPath(path);
+    requestAnimationFrame(() => syncWebPath(path));
+    return;
+  }
+
+  navigation.navigate('CreateOrUpdateOffer', routeParams);
 }
 
 export function navigateToPartnerCalendar(navigation, params = {}) {

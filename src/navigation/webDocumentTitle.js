@@ -76,6 +76,9 @@ export function getWebDocumentTitle(pathname) {
   if (normalized.startsWith('/service-center/')) {
     return `${BASE_TITLE} Service Center`;
   }
+  if (/^\/partner\/repairs\/\d+\/offer$/.test(normalized)) {
+    return `${BASE_TITLE} Send Proposal`;
+  }
   if (/^\/(car|truck|motorcycle|bike|ebike|scooter)-service-centers/.test(normalized)) {
     return `${BASE_TITLE} Service Centers`;
   }

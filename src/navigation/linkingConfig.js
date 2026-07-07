@@ -102,6 +102,15 @@ export const linkingScreens = {
   ClientBookings: 'dashboard/bookings',
   ClientDocuments: 'dashboard/documents',
   ClientProfile: 'dashboard/profile',
+  CreateOrUpdateOffer: {
+    path: 'partner/repairs/:repairId/offer',
+    parse: {
+      repairId: (value) => {
+        const id = parseInt(String(value), 10);
+        return Number.isFinite(id) ? id : undefined;
+      },
+    },
+  },
 };
 
 export const linkingConfig = { screens: linkingScreens };

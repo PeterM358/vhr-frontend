@@ -78,5 +78,5 @@ export const RepairChatScreen = lazyScreen(() => import('../screens/RepairChatSc
 export const ClientLogRepairScreen = lazyScreen(() => import('../screens/ClientLogRepairScreen'));
 export const ClientRequestRepairScreen = lazyScreen(() => import('../screens/ClientRequestRepairScreen'));
 export const OfferChatScreen = lazyScreen(() => import('../screens/OfferChatScreen'));
-export const CreateOrUpdateOfferScreen = lazyScreen(() => import('../screens/CreateOrUpdateOfferScreen'));
+export { default as CreateOrUpdateOfferScreen } from '../screens/CreateOrUpdateOfferScreen';
 export const SelectOfferPartsScreen = lazyScreen(() => import('../screens/SelectOfferPartsScreen'));

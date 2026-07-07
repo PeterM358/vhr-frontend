@@ -46,6 +46,7 @@ import { getOffersForRepair, bookOffer, unbookOffer, deleteOffer } from '../api/
 import { RepairsList } from '../components/shop/RepairsList';
 import ScreenBackground from '../components/ScreenBackground';
 import { useStackBodyPaddingTop } from '../navigation/stackContentInset';
+import { navigateToPartnerRepairOffer } from '../navigation/webNavigation';
 import { markRepairNotificationsRead } from '../api/notifications';
 import { WebSocketContext } from '../context/WebSocketManager';
 import {
@@ -1654,9 +1655,7 @@ export default function RepairDetailScreen({ route, navigation }) {
             <Button
               mode="contained"
               onPress={() =>
-                navigation.navigate('CreateOrUpdateOffer', {
-                  repairId,
-                  shopId: shopProfileId,
+                navigateToPartnerRepairOffer(navigation, repairId, {
                   selectedOfferParts: [],
                 })
               }
@@ -1746,9 +1745,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                         <Button
                           mode="outlined"
                           onPress={() =>
-                            navigation.navigate('CreateOrUpdateOffer', {
-                              repairId,
-                              shopId: shopProfileId,
+                            navigateToPartnerRepairOffer(navigation, repairId, {
                               offerId: offer.id,
                               existingOffer: offer,
                               selectedOfferParts: offer.parts || [],

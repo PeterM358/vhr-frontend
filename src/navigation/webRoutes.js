@@ -230,6 +230,21 @@ export function normalizeWebPath(input) {
     return `${PARTNER}/service-centers${query}`;
   }
 
+  const partnerRepairOfferMatch = lastGlobalMatch(raw, String.raw`partner\/repairs\/(\d+)\/offer`);
+  if (partnerRepairOfferMatch) {
+    return partnerRepairOffer(partnerRepairOfferMatch[1], parseRouteQuery(query));
+  }
+
+  if (raw === 'CreateOrUpdateOffer' || raw.endsWith('/CreateOrUpdateOffer')) {
+    const legacyQuery = parseRouteQuery(query);
+    const repairId = legacyQuery.repairId || legacyQuery.repair_id;
+    if (repairId != null && repairId !== '') {
+      const nextParams = {};
+      if (legacyQuery.offerId) nextParams.offerId = legacyQuery.offerId;
+      return partnerRepairOffer(repairId, nextParams);
+    }
+  }
+
   return pathWithOptionalSlash.startsWith('/')
     ? `${pathWithOptionalSlash}${query}`
     : `/${raw}${query}`;
@@ -380,6 +395,14 @@ export function partnerPublicPreview(params = {}) {
 
 export function partnerRepairs(params = {}) {
   return buildPathWithQuery(`${PARTNER}/repairs`, params);
+}
+
+export function partnerRepairOffer(repairId, params = {}) {
+  const query = {};
+  if (params.offerId != null && params.offerId !== '') {
+    query.offerId = String(normalizeId(params.offerId));
+  }
+  return buildPathWithQuery(`${PARTNER}/repairs/${normalizeId(repairId)}/offer`, query);
 }
 
 export function partnerBookings(params = {}) {

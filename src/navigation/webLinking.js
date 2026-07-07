@@ -30,6 +30,7 @@ import {
   partnerProfile,
   partnerPublicPreview,
   partnerRepairs,
+  partnerRepairOffer,
   partnerBookings,
   partnerCalendar,
   partnerClients,
@@ -186,6 +187,15 @@ export function getCanonicalWebPath(state) {
       return partnerServiceCenters();
     case 'PartnerBookings':
       return partnerBookings();
+    case 'CreateOrUpdateOffer': {
+      const repairId = params.repairId ?? params.existingOffer?.repair;
+      if (repairId != null) {
+        return partnerRepairOffer(repairId, {
+          offerId: params.offerId ?? params.existingOffer?.id,
+        });
+      }
+      return partnerRepairs();
+    }
     default:
       return null;
   }
@@ -498,6 +508,28 @@ export function getPartnerNavigationStateFromPath(path) {
       ],
     };
   }
+  const partnerRepairOfferMatch = pathPart.match(/^partner\/repairs\/(\d+)\/offer$/);
+  if (partnerRepairOfferMatch) {
+    const repairId = parseInt(partnerRepairOfferMatch[1], 10);
+    const offerParams = { repairId };
+    if (query.offerId) {
+      offerParams.offerId = parseInt(query.offerId, 10);
+    }
+    return {
+      routes: [
+        {
+          name: 'ShopHome',
+          state: {
+            index: 1,
+            routes: [{ name: 'ShopDashboard' }, { name: 'RepairsList' }],
+          },
+        },
+        { name: 'RepairDetail', params: { repairId, returnTo: 'RepairsList' } },
+        { name: 'CreateOrUpdateOffer', params: offerParams },
+      ],
+      index: 2,
+    };
+  }
   if (pathPart === 'partner/calendar') {
     return {
       routes: [
@@ -661,6 +693,10 @@ export function normalizeWebLinkingPath(path) {
     const repairId = trimmed.match(/repairId[=:](\d+)/i)?.[1];
     return repairId ? `dashboard/repair-requests/${repairId}` : 'dashboard/repair-requests';
   }
+  if (trimmed === 'CreateOrUpdateOffer' || trimmed.startsWith('CreateOrUpdateOffer')) {
+    const repairId = trimmed.match(/repairId[=:](\d+)/i)?.[1];
+    return repairId ? `partner/repairs/${repairId}/offer` : 'partner/repairs';
+  }
   if (trimmed === 'ClientProfile' || trimmed.startsWith('ClientProfile/')) {
     return 'dashboard/profile';
   }
@@ -728,6 +764,35 @@ function legacyRepairDetailNavigationState() {
     { name: 'ClientRepairs' },
     { name: 'RepairDetail', params: { repairId, returnTo: 'ClientRepairs', backLabel: 'Requests' } },
   ]);
+}
+
+function legacyCreateOrUpdateOfferNavigationState() {
+  if (typeof window === 'undefined') return null;
+  const pathname = window.location.pathname || '';
+  if (pathname !== '/CreateOrUpdateOffer' && !pathname.startsWith('/CreateOrUpdateOffer/')) {
+    return null;
+  }
+  const repairId = parseRepairIdFromSearch(window.location.search);
+  if (!repairId) return null;
+  const query = parseRouteQuery(window.location.search);
+  const offerParams = { repairId };
+  if (query.offerId) {
+    offerParams.offerId = parseInt(query.offerId, 10);
+  }
+  return {
+    routes: [
+      {
+        name: 'ShopHome',
+        state: {
+          index: 1,
+          routes: [{ name: 'ShopDashboard' }, { name: 'RepairsList' }],
+        },
+      },
+      { name: 'RepairDetail', params: { repairId, returnTo: 'RepairsList' } },
+      { name: 'CreateOrUpdateOffer', params: offerParams },
+    ],
+    index: 2,
+  };
 }
 
 function parseVehicleIdFromSearch(search) {
@@ -829,6 +894,16 @@ export async function redirectLegacyWebUrl() {
       target = repairRequestDetail(repairId);
     } else {
       target = repairRequests();
+    }
+  } else if (pathname === '/CreateOrUpdateOffer' || pathname.startsWith('/CreateOrUpdateOffer')) {
+    const query = parseRouteQuery(search);
+    const repairId = query.repairId || query.repair_id;
+    if (repairId) {
+      const nextParams = {};
+      if (query.offerId) nextParams.offerId = query.offerId;
+      target = partnerRepairOffer(repairId, nextParams);
+    } else {
+      target = partnerRepairs();
     }
   } else if (
     pathname === '/dashboard/repair-requests/new' ||
@@ -953,6 +1028,10 @@ export function buildAppLinking(prefixes) {
       const legacyRepair = legacyRepairDetailNavigationState();
       if (legacyRepair) {
         return legacyRepair;
+      }
+      const legacyOffer = legacyCreateOrUpdateOfferNavigationState();
+      if (legacyOffer) {
+        return legacyOffer;
       }
       const legacyShop = legacyShopDetailNavigationState();
       if (legacyShop) {

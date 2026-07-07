@@ -29,7 +29,7 @@ import {
   gateRepairNavigation,
 } from '../utils/shopProfileGate';
 import { setCachedShopRepairs } from '../utils/shopRepairsPrefetch';
-import { navigateToPartnerProfile, navigateToPartnerPublicPreview, navigateToPartnerCalendar, navigateToPartnerNotifications } from '../navigation/webNavigation';
+import { navigateToPartnerProfile, navigateToPartnerPublicPreview, navigateToPartnerCalendar, navigateToPartnerNotifications, navigateToPartnerRepairOffer } from '../navigation/webNavigation';
 import ShopProfileSetupBanner from '../components/shop/ShopProfileSetupBanner';
 import { getMyShopProfiles } from '../api/profiles';
 import { formatShopDisplayName } from '../utils/shopDisplayName';
@@ -236,11 +236,9 @@ export default function ShopHomeScreen() {
     ) {
       return;
     }
-    const shopId = await AsyncStorage.getItem('@current_shop_id');
-    navigation.navigate('CreateOrUpdateOffer', {
-      repairId,
-      shopId: shopId ? Number(shopId) : undefined,
+    navigateToPartnerRepairOffer(navigation, repairId, {
       selectedOfferParts: [],
+      includeRepairDetail: false,
     });
   };
 
