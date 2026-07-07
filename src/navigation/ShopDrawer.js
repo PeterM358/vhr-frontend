@@ -3,7 +3,7 @@
  */
 
 import React, { useContext, useState } from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, Platform } from 'react-native';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Text } from 'react-native-paper';
@@ -38,8 +38,10 @@ import {
   DrawerMenuIcon,
   DrawerLabelWithBadge,
   DrawerVeversalLogoFooter,
+  drawerGlassStyles,
+  drawerScreenOptions,
+  DRAWER_TINT,
 } from './DrawerBranding';
-import { COLORS } from '../constants/colors';
 
 const Drawer = createDrawerNavigator();
 
@@ -67,21 +69,29 @@ function CustomDrawerContent(props) {
     await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
   };
 
+  const itemProps = {
+    labelStyle: drawerGlassStyles.itemLabel,
+    activeTintColor: DRAWER_TINT.active,
+    inactiveTintColor: DRAWER_TINT.inactive,
+    activeBackgroundColor: DRAWER_TINT.activeBackground,
+    inactiveBackgroundColor: 'transparent',
+    style: drawerGlassStyles.drawerItem,
+  };
+
   return (
     <DrawerContentScrollView
       {...props}
-      contentContainerStyle={styles.drawerContainer}
+      style={drawerGlassStyles.scrollView}
+      contentContainerStyle={drawerGlassStyles.container}
     >
-      <View style={styles.menuContainer}>
-        <Text style={styles.drawerTitle}>Partner menu</Text>
+      <View style={drawerGlassStyles.menuContainer}>
+        <Text style={drawerGlassStyles.drawerTitle}>Partner menu</Text>
 
         <DrawerItem
           label="Home"
           onPress={() => props.navigation.closeDrawer()}
           icon={({ color, size }) => <DrawerMenuIcon name="home-outline" color={color} size={size} />}
-          labelStyle={styles.itemLabel}
-          activeTintColor={COLORS.PRIMARY}
-          inactiveTintColor={COLORS.TEXT_DARK}
+          {...itemProps}
         />
 
         <DrawerItem
@@ -94,9 +104,7 @@ function CustomDrawerContent(props) {
             }
           }}
           icon={({ color, size }) => <DrawerMenuIcon name="store-outline" color={color} size={size} />}
-          labelStyle={styles.itemLabel}
-          activeTintColor={COLORS.PRIMARY}
-          inactiveTintColor={COLORS.TEXT_DARK}
+          {...itemProps}
         />
 
         <DrawerItem
@@ -115,18 +123,14 @@ function CustomDrawerContent(props) {
           icon={({ color, size }) => (
             <DrawerMenuIcon name="calendar-month-outline" color={color} size={size} />
           )}
-          labelStyle={styles.itemLabel}
-          activeTintColor={COLORS.PRIMARY}
-          inactiveTintColor={COLORS.TEXT_DARK}
+          {...itemProps}
         />
 
         <DrawerItem
           label="Repairs"
           onPress={() => resetShopDrawerRepairs(navigation)}
           icon={({ color, size }) => <DrawerMenuIcon name="car-wrench" color={color} size={size} />}
-          labelStyle={styles.itemLabel}
-          activeTintColor={COLORS.PRIMARY}
-          inactiveTintColor={COLORS.TEXT_DARK}
+          {...itemProps}
         />
 
         <DrawerItem
@@ -141,9 +145,7 @@ function CustomDrawerContent(props) {
           icon={({ color, size }) => (
             <DrawerMenuIcon name="account-group-outline" color={color} size={size} />
           )}
-          labelStyle={styles.itemLabel}
-          activeTintColor={COLORS.PRIMARY}
-          inactiveTintColor={COLORS.TEXT_DARK}
+          {...itemProps}
         />
 
         <DrawerItem
@@ -156,9 +158,7 @@ function CustomDrawerContent(props) {
             }
           }}
           icon={({ color, size }) => <DrawerMenuIcon name="tag-outline" color={color} size={size} />}
-          labelStyle={styles.itemLabel}
-          activeTintColor={COLORS.PRIMARY}
-          inactiveTintColor={COLORS.TEXT_DARK}
+          {...itemProps}
         />
 
         <DrawerItem
@@ -172,9 +172,7 @@ function CustomDrawerContent(props) {
             props.navigation.closeDrawer();
           }}
           icon={({ color, size }) => <DrawerMenuIcon name="warehouse" color={color} size={size} />}
-          labelStyle={styles.itemLabel}
-          activeTintColor={COLORS.PRIMARY}
-          inactiveTintColor={COLORS.TEXT_DARK}
+          {...itemProps}
         />
 
         <DrawerItem
@@ -189,9 +187,7 @@ function CustomDrawerContent(props) {
           icon={({ color, size }) => (
             <DrawerMenuIcon name="receipt-text-outline" color={color} size={size} />
           )}
-          labelStyle={styles.itemLabel}
-          activeTintColor={COLORS.PRIMARY}
-          inactiveTintColor={COLORS.TEXT_DARK}
+          {...itemProps}
         />
 
         <DrawerItem
@@ -206,9 +202,7 @@ function CustomDrawerContent(props) {
           icon={({ color, size }) => (
             <DrawerMenuIcon name="clipboard-list-outline" color={color} size={size} />
           )}
-          labelStyle={styles.itemLabel}
-          activeTintColor={COLORS.PRIMARY}
-          inactiveTintColor={COLORS.TEXT_DARK}
+          {...itemProps}
         />
 
         <DrawerItem
@@ -221,9 +215,7 @@ function CustomDrawerContent(props) {
             }
           }}
           icon={({ color, size }) => <DrawerMenuIcon name="bell-outline" color={color} size={size} />}
-          labelStyle={styles.itemLabel}
-          activeTintColor={COLORS.PRIMARY}
-          inactiveTintColor={COLORS.TEXT_DARK}
+          {...itemProps}
         />
 
         <DrawerItem
@@ -233,9 +225,7 @@ function CustomDrawerContent(props) {
             navigateToPartnerServiceCenters(navigation);
           }}
           icon={({ color, size }) => <DrawerMenuIcon name="map-search-outline" color={color} size={size} />}
-          labelStyle={styles.itemLabel}
-          activeTintColor={COLORS.PRIMARY}
-          inactiveTintColor={COLORS.TEXT_DARK}
+          {...itemProps}
         />
 
         <DrawerItem
@@ -248,20 +238,16 @@ function CustomDrawerContent(props) {
             }
           }}
           icon={({ color, size }) => <DrawerMenuIcon name="swap-horizontal" color={color} size={size} />}
-          labelStyle={styles.itemLabel}
-          activeTintColor={COLORS.PRIMARY}
-          inactiveTintColor={COLORS.TEXT_DARK}
+          {...itemProps}
         />
 
-        <View style={styles.divider} />
+        <View style={drawerGlassStyles.divider} />
 
         <DrawerItem
           label="Logout"
           onPress={handleLogout}
           icon={({ color, size }) => <DrawerMenuIcon name="logout" color={color} size={size} />}
-          labelStyle={styles.itemLabel}
-          activeTintColor={COLORS.PRIMARY}
-          inactiveTintColor={COLORS.TEXT_DARK}
+          {...itemProps}
         />
       </View>
 
@@ -274,11 +260,9 @@ export default function ShopDrawer() {
   return (
     <Drawer.Navigator
       screenOptions={{
-        headerShown: false,
-        drawerActiveTintColor: COLORS.PRIMARY,
-        drawerInactiveTintColor: COLORS.TEXT_DARK,
-        drawerLabelStyle: styles.itemLabel,
-        drawerItemStyle: styles.drawerItem,
+        ...drawerScreenOptions,
+        drawerLabelStyle: drawerGlassStyles.itemLabel,
+        drawerItemStyle: drawerGlassStyles.drawerItem,
       }}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
@@ -293,39 +277,3 @@ export default function ShopDrawer() {
     </Drawer.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  drawerContainer: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingTop: 36,
-    paddingBottom: 16,
-  },
-  menuContainer: {
-    flexGrow: 1,
-  },
-  drawerTitle: {
-    marginLeft: 20,
-    marginBottom: 12,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    color: COLORS.TEXT_MUTED,
-  },
-  itemLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    marginLeft: -8,
-  },
-  drawerItem: {
-    marginHorizontal: 8,
-    borderRadius: 10,
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(15,23,42,0.1)',
-    marginVertical: 8,
-    marginHorizontal: 20,
-  },
-});

@@ -78,7 +78,24 @@ const STATUS_CONFIG = {
     bg: 'rgba(220,38,38,0.1)',
     border: 'rgba(220,38,38,0.35)',
   },
+  in_service: {
+    label: 'In service',
+    icon: 'car-wrench',
+    color: '#059669',
+    bg: 'rgba(5,150,105,0.1)',
+    border: 'rgba(5,150,105,0.35)',
+  },
 };
+
+/** Accent tokens for white health cards — left border + icon tint. */
+export function getHealthStatusAccent(status) {
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.healthy;
+  return {
+    color: cfg.color,
+    borderColor: cfg.border,
+    bgTint: cfg.bg,
+  };
+}
 
 const ACTION_LABELS = {
   update_km: { label: 'Update kilometers', icon: 'speedometer' },

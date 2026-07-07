@@ -83,7 +83,7 @@ export default function VehicleHealthSection({
         };
 
         return (
-          <FloatingCard key={String(vehicle.id)} style={styles.card}>
+          <FloatingCard key={String(vehicle.id)} statusAccent={health.status} style={styles.card}>
             <View style={styles.headerRow}>
               <View style={styles.titleBlock}>
                 <Text style={styles.vehicleTitle}>{title}</Text>

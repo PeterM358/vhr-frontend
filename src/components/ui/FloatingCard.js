@@ -4,18 +4,28 @@
 // Default is neutral (no stripe). Pass accent={true} only for selected /
 // highlighted rows (e.g. unread notification).
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, View, StyleSheet } from 'react-native';
 import { COLORS } from '../../constants/colors';
+import { getHealthStatusAccent } from '../../utils/vehicleHealthStatus';
 
 export default function FloatingCard({
   children,
   style,
   onPress,
   accent = false,
+  statusAccent = null,
   ...rest
 }) {
   const accentStyle = accent === true ? styles.accent : null;
+  const statusAccentStyle = useMemo(() => {
+    if (!statusAccent) return null;
+    const tokens = getHealthStatusAccent(statusAccent);
+    return {
+      borderLeftWidth: 4,
+      borderLeftColor: tokens.color,
+    };
+  }, [statusAccent]);
 
   if (onPress) {
     return (
@@ -24,6 +34,7 @@ export default function FloatingCard({
         style={({ pressed }) => [
           styles.card,
           accentStyle,
+          statusAccentStyle,
           pressed && styles.pressed,
           style,
         ]}
@@ -35,7 +46,7 @@ export default function FloatingCard({
   }
 
   return (
-    <View style={[styles.card, accentStyle, style]} {...rest}>
+    <View style={[styles.card, accentStyle, statusAccentStyle, style]} {...rest}>
       {children}
     </View>
   );

@@ -3,24 +3,8 @@ import { View, Pressable, StyleSheet } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import FloatingCard from '../ui/FloatingCard';
-
-const STATUS_THEME = {
-  healthy: {
-    accent: '#34d399',
-    border: 'rgba(52,211,153,0.45)',
-    bg: 'rgba(11,18,32,0.88)',
-  },
-  maintenance_recommended: {
-    accent: '#fb923c',
-    border: 'rgba(251,146,60,0.5)',
-    bg: 'rgba(11,18,32,0.9)',
-  },
-  needs_attention: {
-    accent: '#f87171',
-    border: 'rgba(248,113,113,0.55)',
-    bg: 'rgba(11,18,32,0.92)',
-  },
-};
+import { COLORS } from '../../constants/colors';
+import { getHealthStatusAccent } from '../../utils/vehicleHealthStatus';
 
 const REASON_ROW_MAP = {
   no_oil_service_history: {
@@ -134,10 +118,14 @@ function InlineAction({ label, accent, onPress }) {
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.inlineBtn, pressed && styles.inlineBtnPressed, { borderColor: accent }]}
+      style={({ pressed }) => [
+        styles.inlineBtn,
+        pressed && styles.inlineBtnPressed,
+        { borderColor: accent.color, backgroundColor: accent.bgTint },
+      ]}
       accessibilityRole="button"
     >
-      <Text style={[styles.inlineBtnText, { color: accent }]}>{label}</Text>
+      <Text style={[styles.inlineBtnText, { color: accent.color }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -147,26 +135,17 @@ export default function VehicleHealthCard({ health, onAction }) {
 
   if (!health) return null;
 
-  const theme = STATUS_THEME[health.status] || STATUS_THEME.healthy;
+  const accent = getHealthStatusAccent(health.status);
   const isHealthy = health.status === 'healthy';
   const showPrimaryCta =
     !isHealthy &&
     (health.reasons || []).some((row) => String(row.key || '').includes('history'));
 
   return (
-    <FloatingCard
-      style={[
-        styles.card,
-        {
-          backgroundColor: theme.bg,
-          borderWidth: 1,
-          borderColor: theme.border,
-        },
-      ]}
-    >
+    <FloatingCard statusAccent={health.status} style={styles.card}>
       <View style={styles.headerRow}>
-        <MaterialCommunityIcons name={health.icon} size={20} color={theme.accent} />
-        <Text style={[styles.statusTitle, { color: theme.accent }]}>
+        <MaterialCommunityIcons name={health.icon} size={20} color={accent.color} />
+        <Text style={[styles.statusTitle, { color: accent.color }]}>
           {health.status_label || health.label}
         </Text>
       </View>
@@ -176,14 +155,14 @@ export default function VehicleHealthCard({ health, onAction }) {
         <View style={styles.rowList}>
           {rows.map((row) => (
             <View key={row.id} style={styles.statusRow}>
-              <MaterialCommunityIcons name={row.icon} size={18} color={theme.accent} style={styles.rowIcon} />
+              <MaterialCommunityIcons name={row.icon} size={18} color={accent.color} style={styles.rowIcon} />
               <Text style={styles.rowLabel} numberOfLines={1}>
                 {row.label}
               </Text>
               <View style={styles.rowDots} />
               <InlineAction
                 label={row.button}
-                accent={theme.accent}
+                accent={accent}
                 onPress={() => onAction?.(row.actionKey, row)}
               />
             </View>
@@ -191,7 +170,7 @@ export default function VehicleHealthCard({ health, onAction }) {
         </View>
       ) : isHealthy ? (
         <View style={styles.healthyRow}>
-          <MaterialCommunityIcons name="check-circle-outline" size={18} color="#34d399" />
+          <MaterialCommunityIcons name="check-circle-outline" size={18} color={accent.color} />
           <Text style={styles.healthyText}>No urgent issues found.</Text>
         </View>
       ) : null}
@@ -203,8 +182,8 @@ export default function VehicleHealthCard({ health, onAction }) {
           onPress={() => onAction?.('add_service_history', null)}
           style={styles.primaryCta}
           labelStyle={styles.primaryCtaLabel}
-          buttonColor={theme.accent}
-          textColor="#0b1220"
+          buttonColor={accent.color}
+          textColor="#fff"
         >
           Add service history
         </Button>
@@ -232,7 +211,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.75)',
+    color: COLORS.TEXT_MUTED,
     lineHeight: 18,
     marginBottom: 12,
   },
@@ -253,13 +232,13 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+    color: COLORS.TEXT_DARK,
   },
   rowDots: {
     flex: 1,
     minWidth: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.18)',
+    borderBottomColor: 'rgba(15,23,42,0.12)',
     marginBottom: 4,
     marginHorizontal: 4,
   },
@@ -269,12 +248,10 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
-    backgroundColor: 'rgba(255,255,255,0.04)',
     justifyContent: 'center',
   },
   inlineBtnPressed: {
     opacity: 0.85,
-    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   inlineBtnText: {
     fontSize: 12,
@@ -289,7 +266,7 @@ const styles = StyleSheet.create({
   },
   healthyText: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.85)',
+    color: COLORS.TEXT_MUTED,
   },
   primaryCta: {
     marginTop: 12,
