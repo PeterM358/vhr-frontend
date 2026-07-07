@@ -589,6 +589,30 @@ export function navigateToPartnerRepairOffer(navigation, repairId, params = {}) 
   navigation.navigate('CreateOrUpdateOffer', routeParams);
 }
 
+export function navigateToPartnerRepairDetail(navigation, repairId, params = {}) {
+  const routeParams = {
+    repairId,
+    returnTo: 'ShopDashboard',
+    backLabel: 'Home',
+    ...params,
+  };
+
+  if (Platform.OS === 'web') {
+    const root = getRootNavigation(navigation);
+    root.dispatch(
+      CommonActions.reset({
+        index: 1,
+        routes: [PARTNER_HOME_ROUTE, { name: 'RepairDetail', params: routeParams }],
+      })
+    );
+    syncWebPath(partnerRepairs());
+    requestAnimationFrame(() => syncWebPath(partnerRepairs()));
+    return;
+  }
+
+  navigation.navigate('RepairDetail', routeParams);
+}
+
 export function navigateToPartnerCalendar(navigation, params = {}) {
   const routeParams = {
     returnTo: 'ShopDashboard',

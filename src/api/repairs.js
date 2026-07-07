@@ -53,6 +53,9 @@ export async function getRepairs(token, filtersOrStatus = null) {
   if (filters.paymentStatus != null && String(filters.paymentStatus).trim() !== '') {
     params.set('payment_status', String(filters.paymentStatus).trim());
   }
+  if (filters.shop_profile_id != null && String(filters.shop_profile_id).trim() !== '') {
+    params.set('shop_profile_id', String(filters.shop_profile_id).trim());
+  }
 
   const qs = params.toString();
   const url = `${API_BASE_URL}/api/repairs/repair/${qs ? `?${qs}` : ''}`;

@@ -14,7 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { Appbar, Badge, Button } from 'react-native-paper';
+import { Appbar, Badge } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logout } from '../api/auth';
 import { getRepairs, getShopCalendar } from '../api/repairs';
@@ -29,14 +29,19 @@ import {
   gateRepairNavigation,
 } from '../utils/shopProfileGate';
 import { setCachedShopRepairs } from '../utils/shopRepairsPrefetch';
-import { navigateToPartnerProfile, navigateToPartnerPublicPreview, navigateToPartnerCalendar, navigateToPartnerNotifications, navigateToPartnerRepairOffer } from '../navigation/webNavigation';
+import PartnerRepairRequestCard from '../components/shop/PartnerRepairRequestCard';
+import {
+  comparePartnerLifecycle,
+  countByLifecycle,
+  formatLifecycleCounterLine,
+} from '../utils/partnerRepairLifecycle';
+import { navigateToPartnerProfile, navigateToPartnerPublicPreview, navigateToPartnerCalendar, navigateToPartnerNotifications, navigateToPartnerRepairOffer, navigateToPartnerRepairDetail } from '../navigation/webNavigation';
 import ShopProfileSetupBanner from '../components/shop/ShopProfileSetupBanner';
 import { getMyShopProfiles } from '../api/profiles';
 import { formatShopDisplayName } from '../utils/shopDisplayName';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import ScreenBackground from '../components/ScreenBackground';
-import FloatingCard from '../components/ui/FloatingCard';
 import DashboardHero from '../components/dashboard/DashboardHero';
 import DashboardSection from '../components/dashboard/DashboardSection';
 import DashboardActionTile from '../components/dashboard/DashboardActionTile';
@@ -44,8 +49,6 @@ import DashboardComingSoonSection from '../components/dashboard/DashboardComingS
 import ReadyToDriveComingSoonCard from '../components/dashboard/ReadyToDriveComingSoonCard';
 import PartnerActivationBanner from '../components/dashboard/PartnerActivationBanner';
 import PartnerEmptyRequestsState from '../components/dashboard/PartnerEmptyRequestsState';
-import { COLORS } from '../constants/colors';
-import { todayCalendarRange, isScheduledToday } from '../utils/dashboardDate';
 import {
   canSendPartnerOffers,
   isPartnerSubscriptionActive,
@@ -79,7 +82,7 @@ export default function ShopHomeScreen() {
   const [loading, setLoading] = useState(true);
   const [shopProfile, setShopProfile] = useState(null);
   const [shopDisplayName, setShopDisplayName] = useState('Service center');
-  const [openRepairs, setOpenRepairs] = useState([]);
+  const [dashboardRepairs, setDashboardRepairs] = useState([]);
   const [ongoingRepairs, setOngoingRepairs] = useState([]);
   const [pendingOffers, setPendingOffers] = useState([]);
   const [todayBookings, setTodayBookings] = useState([]);
@@ -92,20 +95,44 @@ export default function ShopHomeScreen() {
   const unreadCount = notifications.filter((n) => !n.is_read).length;
   const lastRepairNotifIdRef = React.useRef(null);
 
+  const openRepairs = dashboardRepairs;
+  const lifecycleCounts = useMemo(() => countByLifecycle(dashboardRepairs), [dashboardRepairs]);
+  const lifecycleCounterLine = useMemo(
+    () => formatLifecycleCounterLine(lifecycleCounts),
+    [lifecycleCounts]
+  );
   const partnerActive = isPartnerSubscriptionActive(shopProfile);
   const canSendOffers = canSendPartnerOffers(shopProfile);
 
-  const loadOpenRepairs = React.useCallback(async ({ background = false } = {}) => {
+  const sortedDashboardRepairs = useMemo(
+    () => [...dashboardRepairs].sort(comparePartnerLifecycle),
+    [dashboardRepairs]
+  );
+
+  const loadDashboardRepairs = React.useCallback(async ({ background = false } = {}) => {
     if (!background) setRepairsLoading(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
-      const data = await getRepairs(token, 'open');
-      const rows = Array.isArray(data) ? data : [];
-      setOpenRepairs(rows);
-      setCachedShopRepairs('open', rows);
+      const shopId = await AsyncStorage.getItem('@current_shop_id');
+      const shopFilter = shopId ? { shop_profile_id: shopId } : {};
+
+      const [openRows, ongoingRows, doneRows, deniedRows] = await Promise.all([
+        getRepairs(token, { status: 'open', ...shopFilter }).catch(() => []),
+        getRepairs(token, { status: 'ongoing', ...shopFilter }).catch(() => []),
+        getRepairs(token, { status: 'done', ...shopFilter }).catch(() => []),
+        getRepairs(token, { status: 'denied', ...shopFilter }).catch(() => []),
+      ]);
+
+      const merged = new Map();
+      [...openRows, ...ongoingRows, ...doneRows, ...deniedRows].forEach((row) => {
+        if (row?.id != null) merged.set(row.id, row);
+      });
+      const rows = [...merged.values()];
+      setDashboardRepairs(rows);
+      setCachedShopRepairs('open', openRows);
     } catch (err) {
-      console.error('Failed to load open repairs', err);
-      setOpenRepairs([]);
+      console.error('Failed to load dashboard repairs', err);
+      setDashboardRepairs([]);
     } finally {
       if (!background) setRepairsLoading(false);
     }
@@ -143,8 +170,8 @@ export default function ShopHomeScreen() {
     ).toLowerCase();
     if (!eventType.includes('repair_request')) return;
     lastRepairNotifIdRef.current = latest.id;
-    loadOpenRepairs({ background: true });
-  }, [notifications, loadOpenRepairs]);
+    loadDashboardRepairs({ background: true });
+  }, [notifications, loadDashboardRepairs]);
 
   const refreshProfileGate = React.useCallback(async () => {
     try {
@@ -200,10 +227,10 @@ export default function ShopHomeScreen() {
 
       refreshProfileGate();
       loadShopUser();
-      loadOpenRepairs();
+      loadDashboardRepairs();
       loadDashboardMetrics();
       loadUnscheduledBadge();
-    }, [refreshProfileGate, loadOpenRepairs, loadDashboardMetrics])
+    }, [refreshProfileGate, loadDashboardRepairs, loadDashboardMetrics])
   );
 
   const handleRepairPress = (repairId) => {
@@ -215,10 +242,12 @@ export default function ShopHomeScreen() {
     ) {
       return;
     }
-    navigation.navigate('RepairDetail', { repairId });
+    navigateToPartnerRepairDetail(navigation, repairId, { returnTo: 'ShopDashboard', backLabel: 'Home' });
   };
 
-  const handleSendOffer = async (repairId) => {
+  const handleRepairOffer = (repair) => {
+    const repairId = repair?.id;
+    if (!repairId) return;
     if (!canSendOffers) {
       showMessage(
         'Partner activation required',
@@ -236,10 +265,14 @@ export default function ShopHomeScreen() {
     ) {
       return;
     }
-    navigateToPartnerRepairOffer(navigation, repairId, {
+    const offerParams = {
       selectedOfferParts: [],
       includeRepairDetail: false,
-    });
+    };
+    if (repair?.current_offer_id) {
+      offerParams.offerId = repair.current_offer_id;
+    }
+    navigateToPartnerRepairOffer(navigation, repairId, offerParams);
   };
 
   const handleLogout = async () => {
@@ -386,38 +419,16 @@ export default function ShopHomeScreen() {
     [openRepairs.length, ongoingRepairs.length, pendingOffers.length]
   );
 
-  const renderOpenRepair = (item) => {
-    const plate = String(item.vehicle_license_plate || '').trim();
-    const title = `${item.vehicle_make || ''} ${item.vehicle_model || ''}`.trim() || 'Vehicle';
-    return (
-      <FloatingCard key={String(item.id)} onPress={() => handleRepairPress(item.id)} accent>
-        <Text style={styles.repairTitle} numberOfLines={2}>
-          {title}
-        </Text>
-        <Text style={styles.repairMeta}>
-          {plate || 'Plate hidden until booking'}
-        </Text>
-        {item.description ? (
-          <Text style={styles.repairDesc} numberOfLines={2}>
-            {item.description}
-          </Text>
-        ) : null}
-        <View style={styles.repairActions}>
-          <Button
-            mode="contained"
-            compact
-            onPress={() => handleSendOffer(item.id)}
-            style={styles.sendOfferBtn}
-          >
-            Send Offer
-          </Button>
-          <Button mode="text" compact onPress={() => handleRepairPress(item.id)} textColor={COLORS.PRIMARY}>
-            Details
-          </Button>
-        </View>
-      </FloatingCard>
-    );
-  };
+  const renderDashboardRepair = (item) => (
+    <PartnerRepairRequestCard
+      key={String(item.id)}
+      repair={item}
+      canSendOffers={canSendOffers}
+      onPressDetails={(repair) => handleRepairPress(repair.id)}
+      onPressOffer={handleRepairOffer}
+      onPressPrimary={(repair) => handleRepairPress(repair.id)}
+    />
+  );
 
   if (loading) {
     return (
@@ -500,16 +511,19 @@ export default function ShopHomeScreen() {
 
         <DashboardSection
           title="Open Repair Requests"
-          subtitle="New customer repair requests are waiting for your offer."
+          subtitle={
+            lifecycleCounterLine ||
+            'New customer repair requests are waiting for your offer.'
+          }
           actionLabel="View Requests"
           onActionPress={() => resetShopDrawerRepairs(navigation)}
         >
           {repairsLoading ? (
             <ActivityIndicator color="#fff" style={{ marginVertical: 12 }} />
-          ) : openRepairs.length === 0 ? (
+          ) : sortedDashboardRepairs.length === 0 ? (
             <PartnerEmptyRequestsState />
           ) : (
-            openRepairs.slice(0, 5).map(renderOpenRepair)
+            sortedDashboardRepairs.slice(0, 8).map(renderDashboardRepair)
           )}
         </DashboardSection>
 
@@ -572,30 +586,5 @@ const styles = StyleSheet.create({
   },
   tileSpacer: {
     flex: 1,
-  },
-  repairTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.TEXT_DARK,
-    marginBottom: 4,
-  },
-  repairDesc: {
-    fontSize: 13,
-    color: COLORS.TEXT_MUTED,
-    lineHeight: 18,
-  },
-  repairMeta: {
-    fontSize: 12,
-    color: COLORS.TEXT_MUTED,
-    marginTop: 2,
-  },
-  repairActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 10,
-  },
-  sendOfferBtn: {
-    borderRadius: 8,
   },
 });
