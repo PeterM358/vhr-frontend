@@ -12,7 +12,6 @@ import {
   ActivityIndicator,
   ScrollView,
   useWindowDimensions,
-  Alert,
 } from 'react-native';
 import {
   MapContainer,
@@ -57,12 +56,8 @@ import {
   loadServiceRecordFormDraft,
   saveServiceRecordFormDraft,
 } from '../utils/serviceRecordDraftStorage';
-import { updateVehicle } from '../api/vehicles';
-import { formatAuthorizeConfirmMessage } from '../utils/shopDataAccess';
 import {
-  buildSharedShopIdsAfterToggle,
   formatVehicleAuthorizeLabel,
-  isShopAuthorizedForVehicle,
   resolveAuthorizeVehicleId,
 } from '../utils/vehicleShopAuthorization';
 
@@ -281,7 +276,6 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   const authorizeMode = authorizeVehicleId != null && !pickForServiceRecord;
 
   const [authorizeVehicle, setAuthorizeVehicle] = useState(null);
-  const [authorizeBusyShopId, setAuthorizeBusyShopId] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -319,35 +313,6 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     navigateToVehicleServiceRecordNew(navigation, serviceRecordVehicleId, {
       type: route.params?.type,
     });
-  };
-
-  const handleAuthorizeShop = (shop) => {
-    if (!authorizeVehicle || !shop?.id) return;
-    if (isShopAuthorizedForVehicle(authorizeVehicle, shop.id)) {
-      openShopProfile(shop);
-      return;
-    }
-    Alert.alert('Authorize service center?', formatAuthorizeConfirmMessage(shop.name), [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Authorize',
-        onPress: async () => {
-          setAuthorizeBusyShopId(shop.id);
-          try {
-            const token = await AsyncStorage.getItem('@access_token');
-            const nextIds = buildSharedShopIdsAfterToggle(authorizeVehicle, shop.id, true);
-            const updated = await updateVehicle(authorizeVehicle.id, { shared_with_shops_ids: nextIds }, token);
-            setAuthorizeVehicle(updated);
-            Alert.alert('Authorized', `${shop.name} can now see full mechanical history for this vehicle.`);
-          } catch (error) {
-            console.error(error);
-            Alert.alert('Error', 'Could not authorize this service center.');
-          } finally {
-            setAuthorizeBusyShopId(null);
-          }
-        },
-      },
-    ]);
   };
 
   const openShopProfile = (shop) => {
@@ -664,32 +629,12 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
                     <Text style={styles.popupButtonText}>Use for this record</Text>
                   </Pressable>
                 ) : null}
-                {authorizeMode ? (
-                  <Pressable
-                    style={[
-                      styles.popupButton,
-                      isShopAuthorizedForVehicle(authorizeVehicle, shop.id) && styles.popupButtonAuthorized,
-                    ]}
-                    onPress={() => handleAuthorizeShop(shop)}
-                    disabled={authorizeBusyShopId === shop.id}
-                  >
-                    <Text style={styles.popupButtonText}>
-                      {authorizeBusyShopId === shop.id
-                        ? 'Authorizing…'
-                        : isShopAuthorizedForVehicle(authorizeVehicle, shop.id)
-                          ? 'Authorized'
-                          : 'Authorize'}
-                    </Text>
-                  </Pressable>
-                ) : null}
+                <Pressable style={styles.popupButton} onPress={() => handleDirections(shop)}>
+                  <Text style={styles.popupButtonText}>Directions</Text>
+                </Pressable>
                 <Pressable style={styles.popupButtonSecondary} onPress={() => openShopProfile(shop)}>
                   <Text style={styles.popupButtonSecondaryText}>View profile</Text>
                 </Pressable>
-                {!pickForServiceRecord && !authorizeMode ? (
-                  <Pressable style={styles.popupButton} onPress={() => handleRequestService(shop)}>
-                    <Text style={styles.popupButtonText}>Request service</Text>
-                  </Pressable>
-                ) : null}
               </View>
             </Popup>
           </Marker>
@@ -716,8 +661,8 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
         <View style={styles.authorizeBanner}>
           <MaterialCommunityIcons name="car-info" size={18} color={COLORS.primary} />
           <Text style={styles.authorizeBannerText}>
-            Authorizing for {formatVehicleAuthorizeLabel(authorizeVehicle)}. Tap a pin to authorize or view
-            the shop profile.
+            Authorizing for {formatVehicleAuthorizeLabel(authorizeVehicle)}. Open a shop profile to choose
+            vehicles and authorize access.
           </Text>
         </View>
       ) : null}
@@ -947,9 +892,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     alignItems: 'center',
     cursor: 'pointer',
-  },
-  popupButtonAuthorized: {
-    backgroundColor: '#166534',
   },
   popupButtonSecondary: {
     backgroundColor: '#fff',

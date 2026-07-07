@@ -9,12 +9,18 @@ export function resolveAuthorizeVehicleId(routeParams = {}) {
   return Number.isFinite(id) ? id : null;
 }
 
-export function normalizeAuthorizedShopIds(vehicle) {
+export function getVehicleSharedShops(vehicle) {
   const raw =
     (Array.isArray(vehicle?.shared_with_shops) && vehicle.shared_with_shops) ||
     (Array.isArray(vehicle?.shared_with) && vehicle.shared_with) ||
     [];
-  return raw.map((center) => Number(center?.id ?? center)).filter(Number.isFinite);
+  return [...raw];
+}
+
+export function normalizeAuthorizedShopIds(vehicle) {
+  return getVehicleSharedShops(vehicle)
+    .map((center) => Number(center?.id ?? center))
+    .filter(Number.isFinite);
 }
 
 export function isShopAuthorizedForVehicle(vehicle, shopId) {

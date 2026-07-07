@@ -199,6 +199,9 @@ export default function ShopDetailScreen({ route, navigation }) {
   const [loadError, setLoadError] = useState(false);
   const [loadErrorMessage, setLoadErrorMessage] = useState('');
   const skipNextVehicleFocusReload = useRef(true);
+  const scrollRef = useRef(null);
+  const authorizationSectionY = useRef(0);
+  const vehicleRowYs = useRef({});
 
   const authorizeVehicleId = resolveAuthorizeVehicleId(route.params);
   const effectiveShopId = shop?.id ?? resolvedShopId;
@@ -348,6 +351,36 @@ export default function ShopDetailScreen({ route, navigation }) {
     });
   }, [navigation, shop?.name]);
 
+  const scrollToAuthorization = useCallback(
+    (targetVehicleId = authorizeVehicleId) => {
+      const scrollToY = (y) => {
+        scrollRef.current?.scrollTo({ y: Math.max(0, y - 16), animated: true });
+      };
+
+      if (targetVehicleId != null && vehicleRowYs.current[targetVehicleId] != null) {
+        scrollToY(vehicleRowYs.current[targetVehicleId]);
+      } else if (authorizationSectionY.current) {
+        scrollToY(authorizationSectionY.current);
+      }
+
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        const section = document.getElementById('authorization');
+        section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (targetVehicleId != null) {
+          const row = document.getElementById(`authorize-vehicle-${targetVehicleId}`);
+          row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    },
+    [authorizeVehicleId]
+  );
+
+  useEffect(() => {
+    if (!authorizeVehicleId || !isClientAccount || loading) return undefined;
+    const timer = setTimeout(() => scrollToAuthorization(authorizeVehicleId), 450);
+    return () => clearTimeout(timer);
+  }, [authorizeVehicleId, isClientAccount, loading, vehicles.length, scrollToAuthorization]);
+
   const applyAuthorizationChange = async (vehicle, isAuthorized) => {
     const token = await AsyncStorage.getItem('@access_token');
     const shopIdForAuth = shop?.id ?? resolvedShopId;
@@ -356,21 +389,8 @@ export default function ShopDetailScreen({ route, navigation }) {
     const updatedIds = buildSharedShopIdsAfterToggle(vehicle, shopIdForAuth, !isAuthorized);
 
     try {
-      await updateVehicle(vehicle.id, { shared_with_shops_ids: updatedIds }, token);
-
-      const displayName = shop?.name ?? GENERIC_TERM;
-      setVehicles((prev) =>
-        prev.map((v) =>
-          v.id === vehicle.id
-            ? {
-                ...v,
-                shared_with_shops: isAuthorized
-                  ? v.shared_with_shops.filter((s) => Number(s.id) !== Number(shopIdForAuth))
-                  : [...v.shared_with_shops, { id: shopIdForAuth, name: displayName }],
-              }
-            : v
-        )
-      );
+      const updated = await updateVehicle(vehicle.id, { shared_with_shops_ids: updatedIds }, token);
+      setVehicles((prev) => prev.map((v) => (v.id === vehicle.id ? updated : v)));
 
       const returnTo = route.params?.returnTo;
       const returnVehicleId = route.params?.vehicleId ?? authorizeVehicleId;
@@ -413,15 +433,6 @@ export default function ShopDetailScreen({ route, navigation }) {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Authorize', onPress: () => applyAuthorizationChange(vehicle, false) },
     ]);
-  };
-
-  const handleContextAuthorizePress = () => {
-    if (!authorizeVehicle) {
-      Alert.alert('Vehicle not found', 'Could not load the vehicle for authorization.');
-      return;
-    }
-    if (isAuthorizedForContextVehicle) return;
-    toggleAuthorization(authorizeVehicle);
   };
 
   const handleDeleteImage = async (imageId) => {
@@ -608,6 +619,7 @@ export default function ShopDetailScreen({ route, navigation }) {
   return (
     <ScreenBackground safeArea={false}>
       <ScrollView
+        ref={scrollRef}
         style={styles.container}
         contentContainerStyle={[
           styles.listContent,
@@ -678,43 +690,39 @@ export default function ShopDetailScreen({ route, navigation }) {
           </HeroIconRow>
         </AppCard>
 
-        {authorizeVehicleId && isClientAccount ? (
-          <FloatingCard style={styles.authorizeContextCard}>
-            <View style={styles.authorizeContextHeader}>
-              <MaterialCommunityIcons
-                name={isAuthorizedForContextVehicle ? 'shield-check' : 'shield-plus-outline'}
-                size={22}
-                color={isAuthorizedForContextVehicle ? '#166534' : COLORS.PRIMARY}
-              />
-              <View style={styles.authorizeContextCopy}>
-                <Text style={styles.authorizeContextTitle}>
-                  {isAuthorizedForContextVehicle ? 'Authorized for this vehicle' : 'Authorize for your vehicle'}
+        {isClientAccount ? (
+          <FloatingCard style={styles.authorizeScrollCard}>
+            {authorizeVehicleId && authorizeVehicle ? (
+              <View style={styles.authorizeScrollSummary}>
+                <MaterialCommunityIcons
+                  name={isAuthorizedForContextVehicle ? 'shield-check' : 'car-info'}
+                  size={20}
+                  color={isAuthorizedForContextVehicle ? '#166534' : COLORS.PRIMARY}
+                />
+                <Text style={styles.authorizeScrollSummaryText}>
+                  {isAuthorizedForContextVehicle
+                    ? `${formatVehicleAuthorizeLabel(authorizeVehicle)} is already authorized here.`
+                    : `Choose which vehicles to authorize for ${formatVehicleAuthorizeLabel(authorizeVehicle)}.`}
                 </Text>
-                <Text style={styles.authorizeContextSubtitle}>
-                  {formatVehicleAuthorizeLabel(authorizeVehicle)}
-                </Text>
+                {isAuthorizedForContextVehicle ? (
+                  <Chip compact icon="check" style={styles.authorizedChip}>
+                    Authorized
+                  </Chip>
+                ) : null}
               </View>
-              {isAuthorizedForContextVehicle ? (
-                <Chip compact icon="check" style={styles.authorizedChip}>
-                  Authorized
-                </Chip>
-              ) : null}
-            </View>
-            {!isAuthorizedForContextVehicle ? (
-              <Button
-                mode="contained"
-                icon="shield-check"
-                onPress={handleContextAuthorizePress}
-                disabled={!authorizeVehicle}
-                style={styles.authorizeContextButton}
-              >
-                Authorize this center
-              </Button>
             ) : (
-              <Text style={styles.authorizeContextHint}>
-                This center can see full mechanical history for this vehicle. Remove access below if needed.
+              <Text style={styles.authorizeScrollHint}>
+                Share full mechanical history with this service center for the vehicles you choose below.
               </Text>
             )}
+            <Button
+              mode="contained"
+              icon="shield-check"
+              onPress={() => scrollToAuthorization(authorizeVehicleId)}
+              style={styles.authorizeScrollButton}
+            >
+              Choose vehicles to authorize
+            </Button>
           </FloatingCard>
         ) : null}
 
@@ -872,7 +880,12 @@ export default function ShopDetailScreen({ route, navigation }) {
         ) : null}
 
         {isClientAccount ? (
-          <>
+          <View
+            nativeID="authorization"
+            onLayout={(e) => {
+              authorizationSectionY.current = e.nativeEvent.layout.y;
+            }}
+          >
             <Divider style={{ marginVertical: 12, opacity: 0.35 }} />
             <SectionHeading title="Authorize this service center" />
             <FloatingCard>
@@ -892,29 +905,41 @@ export default function ShopDetailScreen({ route, navigation }) {
                   const isAuthorized = isShopAuthorizedForVehicle(item, effectiveShopId);
                   const isContextVehicle =
                     authorizeVehicleId != null && Number(item.id) === Number(authorizeVehicleId);
-                  if (authorizeVehicleId != null && !isContextVehicle) {
-                    return null;
-                  }
                   return (
-                    <View key={item.id} style={styles.vehicleRow}>
-                      <Text style={styles.vehicleMeta}>
-                        {item.make_name} {item.model_name} ({item.license_plate})
-                      </Text>
+                    <View
+                      key={item.id}
+                      nativeID={`authorize-vehicle-${item.id}`}
+                      onLayout={(e) => {
+                        vehicleRowYs.current[item.id] = e.nativeEvent.layout.y + authorizationSectionY.current;
+                      }}
+                      style={[styles.vehicleRow, isContextVehicle && styles.vehicleRowHighlighted]}
+                    >
+                      <View style={styles.vehicleRowHeader}>
+                        <Text style={styles.vehicleMeta}>
+                          {item.make_name} {item.model_name} ({item.license_plate})
+                        </Text>
+                        {isAuthorized ? (
+                          <Chip compact icon="check" style={styles.authorizedRowChip}>
+                            Authorized
+                          </Chip>
+                        ) : null}
+                      </View>
                       <Button
-                        mode="contained"
+                        mode={isAuthorized ? 'outlined' : 'contained'}
                         compact
                         onPress={() => toggleAuthorization(item)}
                         style={styles.authButton}
-                        buttonColor={isAuthorized ? theme.colors.error : theme.colors.primary}
+                        buttonColor={isAuthorized ? undefined : theme.colors.primary}
+                        textColor={isAuthorized ? theme.colors.error : undefined}
                       >
-                        {isAuthorized ? 'Unauthorize' : 'Authorize'}
+                        {isAuthorized ? 'Remove access' : 'Authorize'}
                       </Button>
                     </View>
                   );
                 })
               )}
             </FloatingCard>
-          </>
+          </View>
         ) : null}
       </ScrollView>
 
@@ -1223,8 +1248,23 @@ const styles = StyleSheet.create({
   },
   vehicleRow: {
     paddingVertical: 12,
+    paddingHorizontal: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(15,23,42,0.08)',
+    borderRadius: 10,
+  },
+  vehicleRowHighlighted: {
+    backgroundColor: 'rgba(37,99,235,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(37,99,235,0.25)',
+    marginBottom: 4,
+  },
+  vehicleRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 10,
   },
   unclaimedBanner: {
     marginBottom: 8,
@@ -1254,40 +1294,37 @@ const styles = StyleSheet.create({
     marginTop: 12,
     alignSelf: 'stretch',
   },
-  authorizeContextCard: {
+  authorizeScrollCard: {
     marginTop: 10,
     borderColor: 'rgba(37,99,235,0.2)',
     backgroundColor: 'rgba(37,99,235,0.04)',
   },
-  authorizeContextHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
-  },
-  authorizeContextCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  authorizeContextTitle: {
-    fontWeight: '700',
+  authorizeScrollHint: {
     color: COLORS.TEXT_DARK,
-    fontSize: 16,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
   },
-  authorizeContextSubtitle: {
-    marginTop: 2,
-    color: COLORS.TEXT_MUTED,
-    fontSize: 13,
+  authorizeScrollSummary: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 12,
   },
-  authorizeContextButton: {
+  authorizeScrollSummaryText: {
+    flex: 1,
+    color: COLORS.TEXT_DARK,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  authorizeScrollButton: {
     alignSelf: 'stretch',
   },
-  authorizeContextHint: {
-    color: COLORS.TEXT_MUTED,
-    fontSize: 13,
-    lineHeight: 18,
-  },
   authorizedChip: {
+    backgroundColor: 'rgba(34,197,94,0.12)',
+  },
+  authorizedRowChip: {
     backgroundColor: 'rgba(34,197,94,0.12)',
   },
 });
