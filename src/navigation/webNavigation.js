@@ -24,6 +24,7 @@ import {
   vehicleServiceRecordCenter,
   vehicleServiceRecordCenterAdd,
   vehicleReminderNew,
+  vehicleManageServiceCenters,
   vehicleSpecs,
   serviceCenters,
   serviceCenterProfile,
@@ -215,6 +216,24 @@ export function navigateToVehicleReminderNew(navigation, vehicleId, params = {})
     return;
   }
   navigation.navigate('AddObligationPayment', routeParams);
+}
+
+export function navigateToVehicleManageServiceCenters(navigation, vehicleId, params = {}) {
+  const routeParams = { vehicleId, returnTo: 'VehicleDetail', ...params };
+
+  if (Platform.OS === 'web') {
+    resetWebRoutes(
+      navigation,
+      [
+        { name: 'ClientVehicles' },
+        { name: 'VehicleDetail', params: { vehicleId } },
+        { name: 'ManageVehicleServiceCenters', params: routeParams },
+      ],
+      vehicleManageServiceCenters(vehicleId)
+    );
+    return;
+  }
+  navigation.navigate('ManageVehicleServiceCenters', routeParams);
 }
 
 export function navigateToVehicleServiceRecordCenter(navigation, vehicleId, params = {}) {

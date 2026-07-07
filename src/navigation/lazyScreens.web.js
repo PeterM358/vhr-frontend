@@ -51,9 +51,7 @@ export const LogServiceRecordScreen = lazyScreen(() => import('../screens/LogSer
 export const ServiceRecordServiceCenterScreen = lazyScreen(
   () => import('../screens/ServiceRecordServiceCenterScreen')
 );
-export const ManageVehicleServiceCentersScreen = lazyScreen(
-  () => import('../screens/ManageVehicleServiceCentersScreen')
-);
+export { default as ManageVehicleServiceCentersScreen } from '../screens/ManageVehicleServiceCentersScreen';
 export { default as AddObligationPaymentScreen } from '../screens/AddObligationPaymentScreen';
 export const CreatePromotionScreen = lazyScreen(() => import('../screens/CreatePromotionScreen'));
 export const ShopRegisterClientScreen = lazyScreen(() => import('../screens/ShopRegisterClientScreen'));

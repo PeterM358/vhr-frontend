@@ -22,6 +22,7 @@ import { mileageConfidenceCategoryPill, resolveMileageFactorAction } from '../ut
 import {
   navigateToVehicleDetail,
   navigateToVehicleReminderNew,
+  navigateToVehicleManageServiceCenters,
   navigateToVehicleServiceRecordNew,
 } from '../navigation/webNavigation';
 
@@ -92,7 +93,10 @@ export default function VehicleSpecsScreen({ navigation, route }) {
         return;
       }
       if (action === 'manage_authorized_centers') {
-        navigation.navigate('ManageVehicleServiceCenters', { vehicleId });
+        navigateToVehicleManageServiceCenters(navigation, vehicleId, {
+          returnTo: 'VehicleSpecs',
+          origin: 'VehicleSpecs',
+        });
         return;
       }
       if (action === 'vehicle_specs') {

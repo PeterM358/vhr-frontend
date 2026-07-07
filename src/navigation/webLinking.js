@@ -55,6 +55,7 @@ import {
   vehicleServiceRecordCenter,
   vehicleServiceRecordCenterAdd,
   vehicleReminderNew,
+  vehicleManageServiceCenters,
   vehicleSpecs,
   vehicles,
 } from './webRoutes';
@@ -127,6 +128,8 @@ export function getCanonicalWebPath(state) {
             reminderType: params.initialReminderType || params.reminderType || params.type,
           })
         : vehicles();
+    case 'ManageVehicleServiceCenters':
+      return vehicleId != null ? vehicleManageServiceCenters(vehicleId) : vehicles();
     case 'ServiceRecordServiceCenter':
       return vehicleId != null ? vehicleServiceRecordCenter(vehicleId) : vehicles();
     case 'AddManualServiceCenter':
@@ -287,6 +290,17 @@ export function getVehicleNavigationStateFromPath(path) {
       { name: 'ClientVehicles' },
       { name: 'VehicleDetail', params: { vehicleId: id } },
       { name: 'AddObligationPayment', params: routeParams },
+    ]);
+  }
+
+  match = pathPart.match(new RegExp(`^${base.replace('/', '\\/')}\\/(\\d+)\\/service-centers$`));
+  if (match) {
+    const id = parseInt(match[1], 10);
+    if (!Number.isFinite(id)) return null;
+    return vehicleStackState([
+      { name: 'ClientVehicles' },
+      { name: 'VehicleDetail', params: { vehicleId: id } },
+      { name: 'ManageVehicleServiceCenters', params: { vehicleId: id, returnTo: 'VehicleDetail' } },
     ]);
   }
 
@@ -714,6 +728,10 @@ export function normalizeWebLinkingPath(path) {
     const reminderType = trimmed.match(/initialReminderType[=:]([^&/]+)/i)?.[1];
     return vid ? vehicleReminderNew({ vehicleId: vid, reminderType }) : 'dashboard/vehicles';
   }
+  if (trimmed === 'ManageVehicleServiceCenters' || trimmed.startsWith('ManageVehicleServiceCenters')) {
+    const vid = trimmed.match(/vehicleId[=:](\d+)/i)?.[1];
+    return vid ? vehicleManageServiceCenters(vid) : 'dashboard/vehicles';
+  }
   if (trimmed === 'AddManualServiceCenter' || trimmed.startsWith('AddManualServiceCenter')) {
     const vid = trimmed.match(/vehicleId[=:](\d+)/i)?.[1];
     return vid ? `dashboard/vehicles/${vid}/service-record/service-center/add` : 'dashboard/vehicles';
@@ -981,6 +999,9 @@ export async function redirectLegacyWebUrl() {
     const query = parseRouteQuery(search);
     const reminderType = query.initialReminderType || query.reminderType || query.type;
     target = vid ? vehicleReminderNew({ vehicleId: vid, reminderType }) : vehicles();
+  } else if (pathname === '/ManageVehicleServiceCenters' || pathname.startsWith('/ManageVehicleServiceCenters')) {
+    const vid = parseVehicleIdFromSearch(search);
+    target = vid ? vehicleManageServiceCenters(vid) : vehicles();
   } else if (pathname === '/AddManualServiceCenter' || pathname.startsWith('/AddManualServiceCenter')) {
     const vid = parseVehicleIdFromSearch(search);
     target = vid ? `/dashboard/vehicles/${vid}/service-record/service-center/add` : '/dashboard/vehicles';

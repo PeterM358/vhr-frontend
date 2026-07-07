@@ -22,7 +22,7 @@ import ScreenBackground from '../components/ScreenBackground';
 import FloatingCard from '../components/ui/FloatingCard';
 import { COLORS } from '../constants/colors';
 import { stackContentPaddingTop } from '../navigation/stackContentInset';
-import { navigateToVehicleReminderNew } from '../navigation/webNavigation';
+import { navigateToVehicleReminderNew, navigateToVehicleManageServiceCenters } from '../navigation/webNavigation';
 import VehicleCatalogEbikeTrailerSection from '../components/vehicle/VehicleCatalogEbikeTrailerSection';
 import VehicleRegistrationIdentityBlock from '../components/vehicle/VehicleRegistrationIdentityBlock';
 import VehicleCollapsibleFormSections from '../components/vehicle/VehicleCollapsibleFormSections';
@@ -128,7 +128,10 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
         return;
       }
       if (action === 'manage_authorized_centers') {
-        navigation.navigate('ManageVehicleServiceCenters', { vehicleId });
+        navigateToVehicleManageServiceCenters(navigation, vehicleId, {
+          returnTo: 'EditVehicleDetails',
+          origin: 'EditVehicleDetails',
+        });
         return;
       }
       if (action === 'vehicle_specs') {

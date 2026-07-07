@@ -49,7 +49,7 @@ import {
 } from '../utils/mileageConfidence';
 import { mapHealthFromApi } from '../utils/vehicleHealthStatus';
 import { formatBookingAccessHint, formatRevokeConfirmMessage } from '../utils/shopDataAccess';
-import { navigateToVehicleServiceRecordNew, navigateToVehicleReminderNew, navigateToVehicleSpecs } from '../navigation/webNavigation';
+import { navigateToVehicleServiceRecordNew, navigateToVehicleReminderNew, navigateToVehicleManageServiceCenters, navigateToVehicleSpecs } from '../navigation/webNavigation';
 
 const BASE_VEHICLE_REMINDER_SECTION_ROWS = [
   { reminder_type: 'insurance', label: 'Insurance', icon: 'shield-check-outline' },
@@ -589,11 +589,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
           navigateObligationPayment({ initialReminderType: 'technical_inspection' });
           break;
         case 'manage_authorized_centers':
-          if (navigation.navigate) {
-            navigation.navigate('ManageVehicleServiceCenters', { vehicleId });
-          } else {
-            scrollToAuthorizedCenters();
-          }
+          navigateToVehicleManageServiceCenters(navigation, vehicleId);
           break;
         case 'vehicle_specs':
           navigateToVehicleSpecs(navigation, vehicleId);
@@ -610,6 +606,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
       navigateLogServiceRecord,
       navigateObligationPayment,
       scrollToAuthorizedCenters,
+      navigateToVehicleManageServiceCenters,
       navigateToVehicleSpecs,
     ]
   );
@@ -1036,9 +1033,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
   };
 
   const handleManageServiceCenters = () => {
-    navigation.navigate('ManageVehicleServiceCenters', {
-      vehicleId: vehicle?.id ?? route.params?.vehicleId,
-    });
+    navigateToVehicleManageServiceCenters(navigation, vehicle?.id ?? route.params?.vehicleId);
   };
 
   const SectionHeader = ({ title, sectionKey }) => (
