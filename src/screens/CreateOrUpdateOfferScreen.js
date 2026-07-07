@@ -756,9 +756,11 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         const shopProfileId = await AsyncStorage.getItem('@current_shop_id');
         if (!token || !shopProfileId) return;
         const draft = await getOfferDraft(token, rid, shopProfileId);
-        if (active) setOfferDraft(draft);
+        if (active && draft) setOfferDraft(draft);
       } catch (err) {
-        console.warn('offer draft load failed', err);
+        if (__DEV__) {
+          console.warn('offer draft load failed', err);
+        }
       }
     };
     loadDraft();

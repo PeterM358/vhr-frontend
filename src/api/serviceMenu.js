@@ -77,6 +77,9 @@ export async function getOfferDraft(token, repairId, shopProfileId) {
     `${API_BASE_URL}/api/repairs/repair/${repairId}/offer-draft/?${qs}`,
     { headers: authHeaders(token) }
   );
+  if (response.status === 404) {
+    return null;
+  }
   if (!response.ok) {
     throw new Error(await parseError(response, 'Failed to load offer draft'));
   }
