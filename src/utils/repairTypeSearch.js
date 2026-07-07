@@ -8,22 +8,29 @@ export const POPULAR_REPAIR_PICKS = [
   { slug: 'brake-repair', label: 'Brake Repair' },
   { slug: 'diagnostics', label: 'Diagnostics' },
   { slug: 'ac-repair', label: 'AC Service' },
-  { slug: 'tire-change', label: 'Tires' },
   { slug: 'battery-replacement', label: 'Battery' },
+  { slug: 'tire-change', label: 'Tires' },
+  { slug: 'annual-service-check', label: 'Annual Service' },
+  { slug: 'general-inspection', label: 'Other' },
 ];
 
 /** Common phrases users type that map to repair type slugs. */
 const SLUG_SYNONYMS = {
   'oil-change': ['oil', 'lube', 'oil service', 'change oil'],
+  'filter-replacement': ['filter', 'air filter', 'cabin filter'],
+  'annual-service-check': ['annual', 'annual service', 'yearly service', 'service check'],
   'brake-repair': ['brake', 'brakes', 'brake noise', 'squeaking', 'grinding'],
-  diagnostics: ['check engine', 'warning light', 'scan', 'obd', 'diagnostic'],
+  'brake-fluid-change': ['brake fluid'],
+  diagnostics: ['check engine', 'warning light', 'scan', 'obd', 'diagnostic', 'noise', 'strange noise'],
   'ac-repair': ['ac', 'a/c', 'air conditioning', 'not cooling', 'ac not working'],
   'ac-refill': ['ac recharge', 'freon'],
   'ac-diagnostics': ['ac problem'],
   'tire-change': ['tire', 'tyre', 'tires', 'tyres', 'wheel'],
   'tire-repair': ['flat tire', 'puncture'],
-  'battery-replacement': ['battery', 'dead battery', 'won\'t start', 'jump start'],
+  'battery-replacement': ['battery', 'dead battery', "won't start", 'jump start'],
   'battery-check': ['battery test'],
+  'suspension-repair': ['noise', 'rattle', 'clunk', 'squeak', 'suspension'],
+  'general-inspection': ['other', 'not sure', 'general', 'unsure'],
 };
 
 function normalizeSlug(type) {
@@ -127,4 +134,35 @@ export function groupRepairTypesByCategory(repairTypes) {
       ),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function findTypeBySlug(repairTypes, slug) {
+  return repairTypes.find((t) => normalizeSlug(t) === slug) || null;
+}
+
+/**
+ * Resolve repair type for submit when user did not pick one explicitly.
+ * @returns {{ type: object|null, source: 'selected'|'matched'|'default'|null }}
+ */
+export function resolveRepairTypeForSubmit(repairTypes, selectedTypeId, problemText) {
+  if (selectedTypeId) {
+    const selected = repairTypes.find((t) => String(t.id) === String(selectedTypeId));
+    return { type: selected || null, source: 'selected' };
+  }
+
+  const text = String(problemText || '').trim();
+  if (text) {
+    const matches = searchRepairTypes(repairTypes, text, { limit: 1 });
+    if (matches[0]) {
+      return { type: matches[0], source: 'matched' };
+    }
+  }
+
+  const fallback =
+    findTypeBySlug(repairTypes, 'general-inspection') ||
+    findTypeBySlug(repairTypes, 'diagnostics') ||
+    repairTypes.find((t) => t.category_slug === 'other') ||
+    null;
+
+  return { type: fallback, source: fallback ? 'default' : null };
 }

@@ -8,7 +8,6 @@ import {
   View,
   Alert,
   Pressable,
-  Image,
 } from 'react-native';
 import ScreenBackground from '../components/ScreenBackground';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,7 +20,6 @@ import {
   ActivityIndicator,
   Portal,
   Dialog,
-  IconButton,
 } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -32,12 +30,14 @@ import { getServiceCenters } from '../api/serviceCenters';
 import { getShopById } from '../api/shops';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import FloatingCard from '../components/ui/FloatingCard';
-import EmptyStateCard from '../components/ui/EmptyStateCard';
 import RepairRequestHeader from '../components/repairRequest/RepairRequestHeader';
-import RepairServiceSearch from '../components/repairRequest/RepairServiceSearch';
+import RepairProblemInput from '../components/repairRequest/RepairProblemInput';
+import RepairPopularServices from '../components/repairRequest/RepairPopularServices';
 import RepairServicePicker from '../components/repairRequest/RepairServicePicker';
 import SelectedServicePill from '../components/repairRequest/SelectedServicePill';
+import RepairMediaSection from '../components/repairRequest/RepairMediaSection';
 import PreferredVisitPicker from '../components/repairRequest/PreferredVisitPicker';
+import { resolveRepairTypeForSubmit } from '../utils/repairTypeSearch';
 import { COLORS } from '../constants/colors';
 import { parseOdometerKm } from '../utils/finalizeMileageValidation';
 import {
@@ -58,7 +58,6 @@ export default function CreateRepairScreen({ navigation, route }) {
       ? Number(route.params.serviceCenter)
       : null;
   const fromVehicleDetail = route.params?.origin === 'VehicleDetail' || route.params?.returnTo === 'VehicleDetail';
-  const fromShopDetail = route.params?.origin === 'ShopDetail' || route.params?.returnTo === 'ShopDetail';
   const [vehicles, setVehicles] = useState([]);
   const [repairTypes, setRepairTypes] = useState([]);
 
@@ -88,8 +87,8 @@ export default function CreateRepairScreen({ navigation, route }) {
   const [preferredRadiusKm, setPreferredRadiusKm] = useState('');
   const [loadingCenters, setLoadingCenters] = useState(false);
   const [preselectedCenter, setPreselectedCenter] = useState(null);
-  const [serviceSearchQuery, setServiceSearchQuery] = useState('');
   const [browseServicesExpanded, setBrowseServicesExpanded] = useState(false);
+  const [submitTypeNotice, setSubmitTypeNotice] = useState('');
   const [showAdvancedPreferences, setShowAdvancedPreferences] = useState(false);
   const [centerPickerUnlocked, setCenterPickerUnlocked] = useState(!preselectedShopId);
 
@@ -397,13 +396,13 @@ export default function CreateRepairScreen({ navigation, route }) {
 
   const selectRepairType = useCallback((type) => {
     setRepairTypeId(String(type.id));
-    setServiceSearchQuery('');
+    setSubmitTypeNotice('');
     setBrowseServicesExpanded(false);
   }, []);
 
   const clearRepairType = useCallback(() => {
     setRepairTypeId('');
-    setServiceSearchQuery('');
+    setSubmitTypeNotice('');
   }, []);
 
   const handleChangeServiceCenter = useCallback(() => {
@@ -412,28 +411,37 @@ export default function CreateRepairScreen({ navigation, route }) {
     setTargetingMode('selected_centers');
   }, []);
 
-  const resolvedRepairTypeId = useMemo(() => {
-    if (repairTypeId) return repairTypeId;
-    return '';
-  }, [repairTypeId]);
+  const hasServiceCenter = useMemo(() => {
+    if (preselectedShopId || targetingMode === 'selected_centers') {
+      return selectedCenterIds.length > 0;
+    }
+    return true;
+  }, [preselectedShopId, targetingMode, selectedCenterIds.length]);
 
   const canSubmit = useMemo(() => {
-    if (!vehicleId || saving) return false;
-    const hasRepairType = Boolean(resolvedRepairTypeId || selectedRepairType?.id);
+    if (!vehicleId || saving || !hasServiceCenter) return false;
+    const hasRepairType = Boolean(repairTypeId);
     const hasWrittenDetails = Boolean(String(symptoms || '').trim());
-    const hasMedia = selectedMedia.length > 0;
     const hasVisit = Boolean(selectedVisitDay && visitTimeSlot);
-    return hasVisit && (hasRepairType || hasWrittenDetails || hasMedia);
+    return hasVisit && (hasRepairType || hasWrittenDetails);
   }, [
     vehicleId,
     saving,
-    resolvedRepairTypeId,
-    selectedRepairType?.id,
+    hasServiceCenter,
+    repairTypeId,
     symptoms,
-    selectedMedia.length,
     selectedVisitDay,
     visitTimeSlot,
   ]);
+
+  const inferredTypePreview = useMemo(() => {
+    if (repairTypeId) return null;
+    const text = String(symptoms || '').trim();
+    if (!text) return null;
+    const { type, source } = resolveRepairTypeForSubmit(repairTypes, repairTypeId, text);
+    if (!type || source === 'selected') return null;
+    return { type, source };
+  }, [repairTypes, repairTypeId, symptoms]);
 
   const handleSubmitRequest = () => {
     if (!vehicleId) {
@@ -441,13 +449,10 @@ export default function CreateRepairScreen({ navigation, route }) {
       setDialogVisible(true);
       return;
     }
-    const typeId = resolvedRepairTypeId || selectedRepairType?.id;
-    const hasRepairType = Boolean(typeId);
     const hasWrittenDetails = Boolean(String(symptoms || '').trim());
-    const hasMedia = selectedMedia.length > 0;
-    if (!hasRepairType && !hasWrittenDetails && !hasMedia) {
+    if (!repairTypeId && !hasWrittenDetails) {
       setDialogMessage(
-        'Select a service type (e.g. Oil change), or describe symptoms or add photos so service centers understand the request.'
+        'Describe the problem or pick a service type so the service center can understand your request.'
       );
       setDialogVisible(true);
       return;
@@ -457,7 +462,21 @@ export default function CreateRepairScreen({ navigation, route }) {
       setDialogVisible(true);
       return;
     }
-    saveRepair();
+
+    const resolved = resolveRepairTypeForSubmit(repairTypes, repairTypeId, symptoms);
+    if (!repairTypeId && resolved.type) {
+      if (resolved.source === 'matched') {
+        setSubmitTypeNotice(`We'll classify this as "${resolved.type.name}" based on your description.`);
+      } else if (resolved.source === 'default') {
+        setSubmitTypeNotice(
+          `No service type selected — we'll send this as "${resolved.type.name}" so the service center can review it.`
+        );
+      }
+    } else {
+      setSubmitTypeNotice('');
+    }
+
+    saveRepair(resolved.type?.id || repairTypeId);
   };
 
   const resolveKilometersForApi = () => {
@@ -467,7 +486,7 @@ export default function CreateRepairScreen({ navigation, route }) {
     return fromInput != null ? fromInput : 0;
   };
 
-  const saveRepair = async () => {
+  const saveRepair = async (resolvedTypeId = null) => {
     setSaving(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
@@ -480,7 +499,7 @@ export default function CreateRepairScreen({ navigation, route }) {
         .filter(Boolean)
         .join('. ');
 
-      const typeIdForApi = resolvedRepairTypeId || selectedRepairType?.id;
+      const typeIdForApi = resolvedTypeId || repairTypeId || selectedRepairType?.id;
       const parsedVehicleId = parseInt(vehicleId, 10);
       if (!Number.isFinite(parsedVehicleId)) {
         throw new Error('Vehicle is required.');
@@ -608,7 +627,7 @@ export default function CreateRepairScreen({ navigation, route }) {
       if (__DEV__) {
         console.warn('Repair request payload debug:', {
           vehicleId,
-          repairTypeId: resolvedRepairTypeId,
+          repairTypeId: typeIdForApi,
           selectedRepairTypeId: selectedRepairType?.id,
           responseText: err?.responseText,
         });
@@ -623,11 +642,6 @@ export default function CreateRepairScreen({ navigation, route }) {
   if (loading) {
     return <ActivityIndicator animating={true} size="large" style={{ flex: 1 }} />;
   }
-
-  const symptomsLabel = selectedRepairType ? 'Additional details' : 'Symptoms';
-  const symptomsPlaceholder = selectedRepairType
-    ? 'Add details if needed (optional)'
-    : 'Describe symptoms, noises, warning lights...';
 
   return (
     <ScreenBackground>
@@ -666,13 +680,22 @@ export default function CreateRepairScreen({ navigation, route }) {
           ) : null}
 
           <FloatingCard>
-            <RepairServiceSearch
+            <RepairProblemInput
+              value={symptoms}
+              onChangeText={setSymptoms}
               repairTypes={repairTypes}
-              query={serviceSearchQuery}
-              onQueryChange={setServiceSearchQuery}
-              onSelectType={selectRepairType}
               selectedTypeId={repairTypeId}
+              onSelectType={selectRepairType}
             />
+          </FloatingCard>
+
+          <FloatingCard>
+            <RepairPopularServices
+              repairTypes={repairTypes}
+              selectedTypeId={repairTypeId}
+              onSelectType={selectRepairType}
+            />
+            <SelectedServicePill repairType={selectedRepairType} onChange={clearRepairType} />
             <RepairServicePicker
               repairTypes={repairTypes}
               selectedTypeId={repairTypeId}
@@ -680,20 +703,27 @@ export default function CreateRepairScreen({ navigation, route }) {
               expanded={browseServicesExpanded}
               onToggleExpanded={() => setBrowseServicesExpanded((prev) => !prev)}
             />
-            <SelectedServicePill repairType={selectedRepairType} onChange={clearRepairType} />
+            {inferredTypePreview && !selectedRepairType ? (
+              <Text style={styles.inferredTypeNotice}>
+                {inferredTypePreview.source === 'matched'
+                  ? `Based on your description, this looks like "${inferredTypePreview.type.name}".`
+                  : `If you don't pick a type, we'll send this as "${inferredTypePreview.type.name}".`}
+              </Text>
+            ) : null}
+          </FloatingCard>
 
-            <Text variant="labelLarge" style={[styles.label, { marginTop: 12 }]}>
-              {symptomsLabel}
-            </Text>
-            <TextInput
-              mode="outlined"
-              value={symptoms}
-              onChangeText={setSymptoms}
-              placeholder={symptomsPlaceholder}
-              style={styles.input}
-              multiline
+          <FloatingCard>
+            <RepairMediaSection
+              selectedMedia={selectedMedia}
+              onPickPhoto={handlePickPhoto}
+              onPickVideo={handlePickVideo}
+              onRemoveMedia={removeSelectedMedia}
+              existingMedia={existingMedia}
+              isEditMode={isEditMode}
             />
+          </FloatingCard>
 
+          <FloatingCard>
             <PreferredVisitPicker
               visitDays={visitDays}
               visitDayOffset={visitDayOffset}
@@ -711,6 +741,9 @@ export default function CreateRepairScreen({ navigation, route }) {
               style={styles.input}
               multiline
             />
+            {submitTypeNotice ? (
+              <Text style={styles.submitTypeNotice}>{submitTypeNotice}</Text>
+            ) : null}
 
             {fromVehicleDetail && selectedVehicle ? (
               <View style={styles.optionalKmInline}>
@@ -727,66 +760,6 @@ export default function CreateRepairScreen({ navigation, route }) {
                   keyboardType="numeric"
                   style={styles.input}
                 />
-              </View>
-            ) : null}
-
-            {fromShopDetail ? (
-              <Text style={styles.centerRequestNotice}>
-                Your preferred visit time is a suggestion only. The service center must confirm
-                before you bring your vehicle.
-              </Text>
-            ) : null}
-
-            <Text variant="labelLarge" style={styles.label}>Photos & videos</Text>
-            <View style={styles.mediaActionsRow}>
-              <Button mode="outlined" icon="camera" onPress={handlePickPhoto}>
-                Add photo
-              </Button>
-              <Button mode="outlined" icon="video" onPress={handlePickVideo}>
-                Add video
-              </Button>
-            </View>
-            {selectedMedia.length > 0 ? (
-              <View style={styles.mediaPreviewList}>
-                {selectedMedia.map((item) => (
-                  <View key={item.localId} style={styles.mediaPreviewCard}>
-                    {item.mediaType === 'image' ? (
-                      <Image source={{ uri: item.uri }} style={styles.mediaPreviewImage} />
-                    ) : (
-                      <View style={styles.mediaPreviewVideo}>
-                        <Text style={styles.mediaPreviewVideoText}>Video</Text>
-                      </View>
-                    )}
-                    <Text numberOfLines={1} style={styles.mediaPreviewName}>{item.fileName}</Text>
-                    <IconButton
-                      icon="close"
-                      size={18}
-                      style={styles.mediaRemoveBtn}
-                      onPress={() => removeSelectedMedia(item.localId)}
-                    />
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <EmptyStateCard
-                icon="camera-outline"
-                title="No media selected yet"
-                subtitle="You can submit without media, or add photos/videos for better request quality."
-              />
-            )}
-            {isEditMode && existingMedia.length > 0 ? (
-              <View style={styles.readOnlyMediaWrap}>
-                <Text style={styles.label}>Existing media (read-only)</Text>
-                <Text style={styles.sectionHint}>
-                  Existing attachments are shown in request details. You can add more media here.
-                </Text>
-                {existingMedia.map((item, idx) => (
-                  <View key={`existing-${item.id || item.file || idx}`} style={styles.existingMediaItem}>
-                    <Text style={styles.mediaPreviewName}>
-                      {(item.description || item.file || item.url || 'Existing media').toString()}
-                    </Text>
-                  </View>
-                ))}
               </View>
             ) : null}
           </FloatingCard>
@@ -930,7 +903,7 @@ export default function CreateRepairScreen({ navigation, route }) {
             style={styles.sendButton}
             contentStyle={styles.sendButtonContent}
           >
-            {isEditMode ? 'Save changes' : 'Request service'}
+            {isEditMode ? 'Save changes' : 'Send request'}
           </Button>
         </View>
       </View>
@@ -972,17 +945,27 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_MUTED,
     marginBottom: 10,
   },
-  centerRequestNotice: {
-    marginBottom: 10,
+  inferredTypeNotice: {
+    marginTop: 10,
     padding: 10,
     borderRadius: 10,
-    backgroundColor: '#fff7ed',
+    backgroundColor: '#eff6ff',
     borderWidth: 1,
-    borderColor: '#fed7aa',
-    color: '#9a3412',
+    borderColor: '#bfdbfe',
+    color: '#1e40af',
     fontSize: 13,
     lineHeight: 19,
-    fontWeight: '600',
+  },
+  submitTypeNotice: {
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    color: '#166534',
+    fontSize: 13,
+    lineHeight: 19,
   },
   label: {
     marginTop: 10,
@@ -1119,64 +1102,6 @@ const styles = StyleSheet.create({
   emptySmall: {
     color: COLORS.TEXT_MUTED,
     marginTop: 6,
-  },
-  mediaActionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 10,
-  },
-  mediaPreviewList: {
-    gap: 8,
-  },
-  mediaPreviewCard: {
-    borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.08)',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 10,
-    position: 'relative',
-  },
-  mediaPreviewImage: {
-    width: '100%',
-    height: 140,
-    borderRadius: 8,
-    backgroundColor: '#e5e7eb',
-    marginBottom: 8,
-  },
-  mediaPreviewVideo: {
-    width: '100%',
-    height: 100,
-    borderRadius: 8,
-    backgroundColor: 'rgba(15,23,42,0.10)',
-    marginBottom: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mediaPreviewVideoText: {
-    fontWeight: '700',
-    color: COLORS.TEXT_DARK,
-  },
-  mediaPreviewName: {
-    color: COLORS.TEXT_DARK,
-    fontSize: 12,
-    paddingRight: 30,
-  },
-  mediaRemoveBtn: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-  },
-  readOnlyMediaWrap: {
-    marginTop: 10,
-  },
-  existingMediaItem: {
-    borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.08)',
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    padding: 8,
-    marginBottom: 6,
   },
   bottomActionBar: {
     position: 'absolute',

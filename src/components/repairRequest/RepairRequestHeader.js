@@ -17,107 +17,66 @@ export default function RepairRequestHeader({
     ? formatShopDisplayName(serviceCenter.name)
     : null;
 
+  const vehicleLine = selectedVehicle
+    ? [
+        selectedVehicle.license_plate,
+        [selectedVehicle.make_name, selectedVehicle.model_name].filter(Boolean).join(' '),
+      ]
+        .filter(Boolean)
+        .join(' ')
+    : null;
+
   return (
     <FloatingCard>
       {centerName ? (
-        <View style={styles.centerRow}>
-          <View style={styles.centerTextCol}>
-            <Text style={styles.centerLabel}>Requesting service from</Text>
-            <Text style={styles.centerName}>{centerName}</Text>
-          </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Requesting service from:</Text>
+          <Text style={styles.summaryValue}>{centerName}</Text>
           {onChangeServiceCenter ? (
-            <Button mode="text" compact onPress={onChangeServiceCenter}>
+            <Button mode="text" compact onPress={onChangeServiceCenter} style={styles.changeBtn}>
               Change
             </Button>
           ) : null}
         </View>
       ) : null}
 
-      {selectedVehicle ? (
-        <View style={[styles.vehicleCard, centerName && styles.vehicleCardSpaced]}>
-          <Text style={styles.vehiclePlate}>{selectedVehicle.license_plate || '—'}</Text>
-          <Text style={styles.vehicleName}>
-            {[selectedVehicle.make_name, selectedVehicle.model_name].filter(Boolean).join(' ') ||
-              'Vehicle'}
-          </Text>
-          <Text style={styles.vehicleKm}>
-            {selectedVehicle.kilometers != null && selectedVehicle.kilometers !== ''
-              ? `${Number(selectedVehicle.kilometers).toLocaleString()} km`
-              : 'Kilometers not set'}
-          </Text>
+      {vehicleLine ? (
+        <View style={[styles.summaryRow, centerName && styles.summaryRowSpaced]}>
+          <Text style={styles.summaryLabel}>Vehicle:</Text>
+          <Text style={styles.summaryValue}>{vehicleLine}</Text>
           {!isEditMode && onChangeVehicle ? (
-            <Button mode="text" compact onPress={onChangeVehicle} style={styles.changeVehicleBtn}>
-              {showVehiclePicker ? 'Hide vehicle list' : 'Change vehicle'}
+            <Button mode="text" compact onPress={onChangeVehicle} style={styles.changeBtn}>
+              {showVehiclePicker ? 'Hide list' : 'Change vehicle'}
             </Button>
           ) : null}
         </View>
       ) : null}
-
-      <Text style={styles.intro}>
-        Tell us what you need. The service center will confirm before your visit is booked.
-      </Text>
     </FloatingCard>
   );
 }
 
 const styles = StyleSheet.create({
-  centerRow: {
+  summaryRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 8,
-    marginBottom: 4,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
   },
-  centerTextCol: {
-    flex: 1,
-  },
-  centerLabel: {
-    fontSize: 12,
-    color: COLORS.TEXT_MUTED,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  centerName: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: COLORS.TEXT_DARK,
-    marginTop: 2,
-  },
-  vehicleCard: {
-    borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.08)',
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    padding: 10,
-    marginTop: 4,
-  },
-  vehicleCardSpaced: {
+  summaryRowSpaced: {
     marginTop: 10,
   },
-  vehiclePlate: {
-    color: COLORS.TEXT_DARK,
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  vehicleName: {
-    color: COLORS.TEXT_DARK,
-    marginTop: 2,
-  },
-  vehicleKm: {
-    color: COLORS.TEXT_MUTED,
-    marginTop: 2,
-    fontSize: 12,
-  },
-  changeVehicleBtn: {
-    alignSelf: 'flex-start',
-    marginLeft: -8,
-    marginTop: 2,
-  },
-  intro: {
-    color: COLORS.TEXT_MUTED,
+  summaryLabel: {
     fontSize: 14,
-    lineHeight: 20,
-    marginTop: 12,
+    color: COLORS.TEXT_MUTED,
+    fontWeight: '600',
+  },
+  summaryValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.TEXT_DARK,
+    flexShrink: 1,
+  },
+  changeBtn: {
+    marginLeft: 'auto',
   },
 });

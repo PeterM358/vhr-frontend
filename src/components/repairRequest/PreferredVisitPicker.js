@@ -16,11 +16,10 @@ export default function PreferredVisitPicker({
   return (
     <View style={styles.wrap}>
       <Text variant="labelLarge" style={styles.label}>
-        Preferred visit time
+        Preferred visit
       </Text>
       <Text style={styles.hint}>
-        Preferred visit — pending service center confirmation. The service center must confirm
-        before it counts as booked.
+        Preferred visit — the service center must confirm before it is booked.
       </Text>
 
       <ScrollView

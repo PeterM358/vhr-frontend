@@ -1,11 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { View, Pressable, StyleSheet } from 'react-native';
+import { View, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { COLORS } from '../../constants/colors';
 import { groupRepairTypesByCategory } from '../../utils/repairTypeSearch';
 
-const MAX_OPEN_CATEGORIES = 2;
+const ACCORDION_MAX_HEIGHT = 320;
 
 export default function RepairServicePicker({
   repairTypes,
@@ -15,76 +15,85 @@ export default function RepairServicePicker({
   onToggleExpanded,
 }) {
   const categories = groupRepairTypesByCategory(repairTypes);
-  const [openSlugs, setOpenSlugs] = useState([]);
+  const [openSlug, setOpenSlug] = useState(null);
 
   const toggleCategory = useCallback((slug) => {
-    setOpenSlugs((prev) => {
-      if (prev.includes(slug)) {
-        return prev.filter((s) => s !== slug);
-      }
-      const next = [...prev, slug];
-      if (next.length > MAX_OPEN_CATEGORIES) {
-        return next.slice(-MAX_OPEN_CATEGORIES);
-      }
-      return next;
-    });
+    setOpenSlug((prev) => (prev === slug ? null : slug));
   }, []);
 
   return (
     <View style={styles.wrap}>
-      <Button
-        mode="outlined"
-        icon={expanded ? 'chevron-up' : 'chevron-down'}
-        onPress={onToggleExpanded}
-        style={styles.browseBtn}
-        contentStyle={styles.browseBtnContent}
-      >
-        Browse all services
-      </Button>
+      {!expanded ? (
+        <Button
+          mode="outlined"
+          icon="chevron-down"
+          onPress={onToggleExpanded}
+          style={styles.browseBtn}
+          contentStyle={styles.browseBtnContent}
+        >
+          Browse all services
+        </Button>
+      ) : (
+        <View style={styles.expandedPanel}>
+          <Button
+            mode="text"
+            icon="chevron-up"
+            onPress={onToggleExpanded}
+            style={styles.hideBtn}
+            contentStyle={styles.hideBtnContent}
+            compact
+          >
+            Hide services
+          </Button>
 
-      {expanded ? (
-        <View style={styles.accordion}>
-          {categories.map((group) => {
-            const isOpen = openSlugs.includes(group.slug);
-            return (
-              <View key={group.slug} style={styles.categoryBlock}>
-                <Pressable
-                  onPress={() => toggleCategory(group.slug)}
-                  style={styles.categoryHeader}
-                >
-                  <Text style={styles.categoryTitle}>{group.name}</Text>
-                  <View style={styles.categoryMeta}>
-                    <Text style={styles.categoryCount}>{group.types.length}</Text>
-                    <MaterialCommunityIcons
-                      name={isOpen ? 'chevron-up' : 'chevron-down'}
-                      size={20}
-                      color={COLORS.TEXT_MUTED}
-                    />
-                  </View>
-                </Pressable>
-                {isOpen ? (
-                  <View style={styles.typeList}>
-                    {group.types.map((type) => {
-                      const selected = String(type.id) === String(selectedTypeId);
-                      return (
-                        <Pressable
-                          key={type.id}
-                          onPress={() => onSelectType(type)}
-                          style={[styles.typeRow, selected && styles.typeRowSelected]}
-                        >
-                          <Text style={[styles.typeName, selected && styles.typeNameSelected]}>
-                            {type.name}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                ) : null}
-              </View>
-            );
-          })}
+          <ScrollView
+            style={styles.accordionScroll}
+            contentContainerStyle={styles.accordionContent}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+          >
+            {categories.map((group) => {
+              const isOpen = openSlug === group.slug;
+              return (
+                <View key={group.slug} style={styles.categoryBlock}>
+                  <Pressable
+                    onPress={() => toggleCategory(group.slug)}
+                    style={styles.categoryHeader}
+                  >
+                    <Text style={styles.categoryTitle}>{group.name}</Text>
+                    <View style={styles.categoryMeta}>
+                      <Text style={styles.categoryCount}>{group.types.length}</Text>
+                      <MaterialCommunityIcons
+                        name={isOpen ? 'chevron-up' : 'chevron-down'}
+                        size={20}
+                        color={COLORS.TEXT_MUTED}
+                      />
+                    </View>
+                  </Pressable>
+                  {isOpen ? (
+                    <View style={styles.typeList}>
+                      {group.types.map((type) => {
+                        const selected = String(type.id) === String(selectedTypeId);
+                        return (
+                          <Pressable
+                            key={type.id}
+                            onPress={() => onSelectType(type)}
+                            style={[styles.typeRow, selected && styles.typeRowSelected]}
+                          >
+                            <Text style={[styles.typeName, selected && styles.typeNameSelected]}>
+                              {type.name}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
+          </ScrollView>
         </View>
-      ) : null}
+      )}
     </View>
   );
 }
@@ -100,13 +109,26 @@ const styles = StyleSheet.create({
   browseBtnContent: {
     flexDirection: 'row-reverse',
   },
-  accordion: {
-    marginTop: 10,
+  expandedPanel: {
     borderWidth: 1,
     borderColor: 'rgba(15,23,42,0.08)',
     borderRadius: 12,
     backgroundColor: '#fff',
     overflow: 'hidden',
+  },
+  hideBtn: {
+    alignSelf: 'flex-start',
+    marginLeft: 4,
+    marginTop: 2,
+  },
+  hideBtnContent: {
+    flexDirection: 'row-reverse',
+  },
+  accordionScroll: {
+    maxHeight: ACCORDION_MAX_HEIGHT,
+  },
+  accordionContent: {
+    paddingBottom: 4,
   },
   categoryBlock: {
     borderBottomWidth: StyleSheet.hairlineWidth,
