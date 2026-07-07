@@ -6,7 +6,6 @@
 import React, { useCallback, useContext, useMemo, useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   ActivityIndicator,
   ScrollView,
@@ -17,22 +16,21 @@ import { Appbar, Badge, FAB, useTheme } from 'react-native-paper';
 import { logout } from '../api/auth';
 import { getVehicles } from '../api/vehicles';
 import { getRepairs } from '../api/repairs';
-import { isTerminalRepairStatus } from '../utils/repairArrival';
+import { isTerminalRepairStatus, normalizeRepairStatus } from '../utils/repairArrival';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import ScreenBackground from '../components/ScreenBackground';
-import DashboardHero from '../components/dashboard/DashboardHero';
 import DashboardSection from '../components/dashboard/DashboardSection';
-import DashboardQuickActions from '../components/dashboard/DashboardQuickActions';
-import DashboardSummaryRow from '../components/dashboard/DashboardSummaryRow';
-import DashboardEmptyState from '../components/dashboard/DashboardEmptyState';
-import NotificationCenterPreview from '../components/dashboard/NotificationCenterPreview';
+import DashboardHeroCard from '../components/dashboard/DashboardHeroCard';
+import DashboardActionGrid from '../components/dashboard/DashboardActionGrid';
 import VehicleHealthSection from '../components/dashboard/VehicleHealthSection';
-import SmartRemindersCard from '../components/dashboard/SmartRemindersCard';
-import RecommendedForYouSection from '../components/dashboard/RecommendedForYouSection';
-import FloatingCard from '../components/ui/FloatingCard';
-import { NOTIFICATION_CENTER_PLACEHOLDERS } from '../constants/clientDashboardPlaceholders';
-import { COLORS } from '../constants/colors';
+import RecommendedActionsSection from '../components/dashboard/RecommendedActionsSection';
+import {
+  buildRecommendedActions,
+  buildRepairRequestsSubtitle,
+  buildServiceHistorySubtitle,
+  buildVehiclesTileSubtitle,
+} from '../utils/dashboardFormatters';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 import { resetFromClientDrawer } from '../navigation/drawerNavigation';
 import {
@@ -46,12 +44,10 @@ import {
 import { API_BASE_URL } from '../api/config';
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import { resetToPublicHome } from '../navigation/authNavigation';
-import { showMessage } from '../utils/crossPlatformAlert';
 
 const HOME_TOP_BAR = 'rgba(11,18,32,0.92)';
 
-const HERO_SUBTITLE =
-  'Manage your vehicles, discover trusted service centers, compare offers, get timely reminders and keep your complete service history in one place.';
+const HERO_SUBTITLE = 'Your vehicles, service history, and repair requests — in one control center.';
 
 function toDisplayName(rawValue) {
   const raw = String(rawValue || '').trim();
@@ -89,9 +85,8 @@ export default function HomeScreen({ navigation }) {
   const { notifications } = useContext(WebSocketContext);
 
   const [vehicles, setVehicles] = useState([]);
-  const [openRepairs, setOpenRepairs] = useState([]);
   const [activeRepairs, setActiveRepairs] = useState([]);
-  const [recentRepairs, setRecentRepairs] = useState([]);
+  const [completedRepairs, setCompletedRepairs] = useState([]);
   const [openRequestsCount, setOpenRequestsCount] = useState(0);
   const [pendingOffersCount, setPendingOffersCount] = useState(0);
   const [dashboardLoading, setDashboardLoading] = useState(true);
@@ -143,7 +138,10 @@ export default function HomeScreen({ navigation }) {
             (repair) => !isTerminalRepairStatus(repair?.status)
           );
           const openRepairRows = nonTerminalRepairs.filter(
-            (repair) => String(repair?.status || '').toLowerCase() === 'open'
+            (repair) => normalizeRepairStatus(repair?.status) === 'open'
+          );
+          const doneRepairs = safeRepairs.filter(
+            (repair) => normalizeRepairStatus(repair?.status) === 'done'
           );
           let offersCount = 0;
           if (offersRes?.ok) {
@@ -153,11 +151,10 @@ export default function HomeScreen({ navigation }) {
               : 0;
           }
           setVehicles(safeVehicles);
-          setOpenRepairs(openRepairRows);
           setActiveRepairs(nonTerminalRepairs);
+          setCompletedRepairs(doneRepairs);
           setOpenRequestsCount(openRepairRows.length);
           setPendingOffersCount(offersCount);
-          setRecentRepairs(openRepairRows.slice(0, 4));
         } finally {
           setDashboardLoading(false);
         }
@@ -185,7 +182,18 @@ export default function HomeScreen({ navigation }) {
     await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
   };
 
-  const goRequestService = () => resetFromClientDrawer(navigation, 'CreateRepair');
+  const goRequestService = (vehicle) => {
+    if (vehicle?.id) {
+      navigation.navigate('CreateRepair', {
+        vehicleId: vehicle.id,
+        mode: 'request',
+        returnTo: 'Home',
+        origin: 'Home',
+      });
+      return;
+    }
+    resetFromClientDrawer(navigation, 'CreateRepair');
+  };
   const goAddVehicle = () => {
     const root = navigation.getParent?.() || navigation;
     navigateToVehicleAdd(root);
@@ -204,10 +212,6 @@ export default function HomeScreen({ navigation }) {
     const root = navigation.getParent?.() || navigation;
     navigateToRepairRequests(root);
   };
-  const goPendingOffers = () => {
-    const root = navigation.getParent?.() || navigation;
-    navigateToRepairRequests(root, { tab: 'offers' });
-  };
   const goNotificationCenter = () => {
     const root = navigation.getParent?.() || navigation;
     navigateToNotifications(root);
@@ -216,66 +220,99 @@ export default function HomeScreen({ navigation }) {
     const root = navigation.getParent?.() || navigation;
     navigateToServiceHistory(root);
   };
+  const goRepairDetail = (repairId) => {
+    if (!repairId) return;
+    navigation.navigate('RepairDetail', { repairId, returnTo: 'Home' });
+  };
 
-  const summaryItems = useMemo(
-    () => [
-      { key: 'vehicles', value: vehicles.length, label: 'Vehicles', onPress: goVehicles },
-      {
-        key: 'requests',
-        value: openRequestsCount,
-        label: 'Open Requests',
-        onPress: goRepairs,
-      },
-      {
-        key: 'offers',
-        value: pendingOffersCount,
-        label: 'Pending Offers',
-        onPress: goPendingOffers,
-      },
-      {
-        key: 'alerts',
-        value: unreadNotifications,
-        label: 'Unread Alerts',
-        onPress: goNotificationCenter,
-      },
-    ],
-    [vehicles.length, openRequestsCount, pendingOffersCount, unreadNotifications]
-  );
+  const handleRecommendedAction = (item) => {
+    if (!item?.vehicleId) return;
 
-  const quickActions = useMemo(
+    switch (item.actionKey) {
+      case 'schedule_maintenance':
+      case 'book_repair':
+        navigation.navigate('CreateRepair', {
+          vehicleId: item.vehicleId,
+          mode: 'request',
+          returnTo: 'Home',
+          origin: 'Home',
+        });
+        break;
+      case 'add_service_history':
+        navigation.navigate('LogServiceRecord', {
+          vehicleId: item.vehicleId,
+          returnTo: 'Home',
+        });
+        break;
+      case 'update_km':
+      case 'configure_reminders':
+        goVehicleDetail({ id: item.vehicleId });
+        break;
+      default:
+        goVehicleDetail({ id: item.vehicleId });
+        break;
+    }
+  };
+
+  const actionTiles = useMemo(
     () => [
-      { key: 'vehicles', icon: 'car-multiple', label: 'My Vehicles', onPress: goVehicles },
       {
-        key: 'history',
-        icon: 'book-open-page-variant',
-        label: 'Service History',
-        onPress: goServiceHistory,
+        key: 'vehicles',
+        icon: 'car-multiple',
+        title: 'Vehicles',
+        subtitle: buildVehiclesTileSubtitle(vehicles, activeRepairs),
+        onPress: hasVehicles ? goVehicles : goAddVehicle,
       },
       {
         key: 'repairs',
         icon: 'wrench-outline',
-        label: 'Repair Requests',
+        title: 'Repair Requests',
+        subtitle: buildRepairRequestsSubtitle({
+          openCount: openRequestsCount,
+          offersCount: pendingOffersCount,
+          completedCount: completedRepairs.length,
+        }),
         onPress: goRepairs,
       },
       {
-        key: 'notifications',
-        icon: 'bell-outline',
-        label: 'Notifications',
-        onPress: goNotificationCenter,
-        badge: unreadNotifications,
+        key: 'history',
+        icon: 'book-open-page-variant',
+        title: 'Service History',
+        subtitle: buildServiceHistorySubtitle(completedRepairs),
+        onPress: goServiceHistory,
+      },
+      {
+        key: 'centers',
+        icon: 'map-search',
+        title: 'Find Service Centers',
+        subtitle: 'Nearby trusted centers',
+        onPress: goFindCenters,
       },
     ],
-    [unreadNotifications]
+    [
+      vehicles,
+      activeRepairs,
+      hasVehicles,
+      openRequestsCount,
+      pendingOffersCount,
+      completedRepairs,
+    ]
   );
 
-  const handlePlaceholderNotificationAction = (item) => {
-    showMessage(item.title, `${item.description}\n\nThis action will connect to live data later.`, {
-      variant: 'info',
-    });
-  };
+  const recommendedActions = useMemo(
+    () => buildRecommendedActions(vehicles, activeRepairs),
+    [vehicles, activeRepairs]
+  );
+
+  const heroContextLine = useMemo(() => {
+    if (!hasVehicles) return 'Start by adding a vehicle';
+    if (openRequestsCount > 0) return `${openRequestsCount} open request${openRequestsCount === 1 ? '' : 's'}`;
+    if (pendingOffersCount > 0) return `${pendingOffersCount} pending offer${pendingOffersCount === 1 ? '' : 's'}`;
+    return null;
+  }, [hasVehicles, openRequestsCount, pendingOffersCount]);
 
   const fabConfig = hasVehicles
-    ? { label: 'Request Service', onPress: goRequestService }
+    ? { label: 'Request Service', onPress: () => goRequestService() }
     : { label: 'Add Vehicle', onPress: goAddVehicle };
 
   if (isLoading || !sessionChecked) {
@@ -321,102 +358,45 @@ export default function HomeScreen({ navigation }) {
         contentContainerStyle={[styles.scroll, { paddingBottom: scrollBottomPadding }]}
         keyboardShouldPersistTaps="handled"
       >
-        <DashboardHero
+        <DashboardHeroCard
           title={`Welcome, ${heroName}`}
           subtitle={HERO_SUBTITLE}
-          primaryLabel="Find Service Centers"
-          primaryIcon="map-search"
-          onPrimaryPress={goFindCenters}
+          contextLine={heroContextLine}
         />
 
-        <DashboardSummaryRow items={summaryItems} />
-
-        <DashboardQuickActions actions={quickActions} />
+        {dashboardLoading ? (
+          <ActivityIndicator color="#fff" style={styles.gridLoader} />
+        ) : (
+          <DashboardActionGrid tiles={actionTiles} />
+        )}
 
         <DashboardSection
           title="Vehicle Health"
-          subtitle="Prevent problems before they happen — see status, risks and service gaps per vehicle."
+          subtitle="Status and priority issues for each vehicle."
+          actionLabel={hasVehicles ? 'All vehicles' : undefined}
+          onActionPress={hasVehicles ? goVehicles : undefined}
         >
           <VehicleHealthSection
             vehicles={vehicles}
             activeRepairs={activeRepairs}
             onVehiclePress={goVehicleDetail}
             onViewAllPress={goVehicles}
+            onRequestService={goRequestService}
+            onViewRepair={goRepairDetail}
           />
         </DashboardSection>
 
-        <DashboardSection
-          title="Reminders & Preventive Care"
-          subtitle="Stay ahead of maintenance with smart reminders, safety alerts and preventive recommendations."
-        >
-          <SmartRemindersCard hasVehicles={hasVehicles} />
-        </DashboardSection>
-
-        <DashboardSection
-          title="Recommended For You"
-          subtitle="Personalized suggestions from your vehicle history — not generic ads."
-        >
-          <RecommendedForYouSection />
-        </DashboardSection>
-
-        <DashboardSection
-          title="Recent repair requests"
-          subtitle="Open requests and offers from service centers."
-          actionLabel={recentRepairs.length > 0 ? 'View all' : undefined}
-          onActionPress={recentRepairs.length > 0 ? goRepairs : undefined}
-        >
-          {dashboardLoading ? (
-            <ActivityIndicator color="#fff" style={{ marginVertical: 12 }} />
-          ) : recentRepairs.length === 0 ? (
-            <DashboardEmptyState
-              title="No repair requests yet"
-              body="When you request service, offers from trusted service centers will appear here."
+        {recommendedActions.length > 0 ? (
+          <DashboardSection
+            title="Recommended Actions"
+            subtitle="Maintenance and updates that need your attention."
+          >
+            <RecommendedActionsSection
+              actions={recommendedActions}
+              onActionPress={handleRecommendedAction}
             />
-          ) : (
-            recentRepairs.map((item) => {
-              const title =
-                `${item.vehicle_make || ''} ${item.vehicle_model || ''}`.trim() || 'Vehicle';
-              return (
-                <FloatingCard
-                  key={String(item.id)}
-                  onPress={() => navigation.navigate('RepairDetail', { repairId: item.id })}
-                >
-                  <Text style={styles.repairTitle}>{title}</Text>
-                  {item.vehicle_license_plate ? (
-                    <Text style={styles.repairMeta}>{item.vehicle_license_plate}</Text>
-                  ) : null}
-                  {item.description ? (
-                    <Text style={styles.repairDesc} numberOfLines={2}>
-                      {item.description}
-                    </Text>
-                  ) : null}
-                </FloatingCard>
-              );
-            })
-          )}
-        </DashboardSection>
-
-        <DashboardSection
-          title="Notification Center"
-          subtitle="Alerts, maintenance, offers, bookings and documents for your vehicles."
-        >
-          <NotificationCenterPreview
-            items={NOTIFICATION_CENTER_PLACEHOLDERS}
-            limit={2}
-            onActionPress={handlePlaceholderNotificationAction}
-            onViewAllPress={goNotificationCenter}
-          />
-        </DashboardSection>
-
-        <DashboardSection
-          title="Learn with Veversal"
-          subtitle="Guides and videos about vehicle maintenance, repairs and service records will appear here."
-        >
-          <DashboardEmptyState
-            title="Coming soon"
-            body="Educational content and support videos will be available in this section."
-          />
-        </DashboardSection>
+          </DashboardSection>
+        ) : null}
       </ScrollView>
 
       <FAB
@@ -451,21 +431,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 12,
   },
-  repairTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.TEXT_DARK,
-  },
-  repairMeta: {
-    fontSize: 12,
-    color: COLORS.TEXT_MUTED,
-    marginTop: 4,
-  },
-  repairDesc: {
-    fontSize: 13,
-    color: COLORS.TEXT_MUTED,
-    marginTop: 6,
-    lineHeight: 18,
+  gridLoader: {
+    marginVertical: 24,
   },
   fab: {
     position: 'absolute',
