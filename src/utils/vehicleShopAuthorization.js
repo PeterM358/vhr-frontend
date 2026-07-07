@@ -2,6 +2,8 @@
  * Shared helpers for authorizing a service center for one vehicle.
  */
 
+import { updateVehicle } from '../api/vehicles';
+
 export function resolveAuthorizeVehicleId(routeParams = {}) {
   const raw = routeParams?.authorizeVehicleId ?? routeParams?.vehicleId;
   if (raw == null || raw === '') return null;
@@ -43,4 +45,39 @@ export function formatVehicleAuthorizeLabel(vehicle) {
   const plate = vehicle.license_plate || '—';
   const name = [vehicle.make_name, vehicle.model_name].filter(Boolean).join(' ') || 'Vehicle';
   return `${plate} · ${name}`;
+}
+
+/** Trailing numeric segment in SEO slugs, e.g. peshos-garaje-sofia-634 → 634 */
+export function extractShopIdFromSlug(slug) {
+  if (slug == null || slug === '') return null;
+  const match = /-(\d+)$/.exec(String(slug).trim());
+  if (!match) return null;
+  const id = parseInt(match[1], 10);
+  return Number.isFinite(id) ? id : null;
+}
+
+export function resolveShopIdForAuthorization({ shop, resolvedShopId, centerSlug } = {}) {
+  if (shop?.id != null) {
+    const id = Number(shop.id);
+    if (Number.isFinite(id)) return id;
+  }
+  if (resolvedShopId != null) {
+    const id = Number(resolvedShopId);
+    if (Number.isFinite(id)) return id;
+  }
+  const slug = centerSlug || shop?.public_slug || shop?.slug;
+  return extractShopIdFromSlug(slug);
+}
+
+export async function authorizeVehicleForShop(vehicle, shopId, shouldAuthorize, token) {
+  const updatedIds = buildSharedShopIdsAfterToggle(vehicle, shopId, shouldAuthorize);
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    console.log('[authorizeVehicleForShop]', {
+      vehicleId: vehicle?.id,
+      shopId,
+      shouldAuthorize,
+      shared_with_shops_ids: updatedIds,
+    });
+  }
+  return updateVehicle(vehicle.id, { shared_with_shops_ids: updatedIds }, token);
 }

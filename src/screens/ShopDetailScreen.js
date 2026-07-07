@@ -16,7 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { formatDayHoursWithLunch, parseLunchBreak } from '../utils/shopWorkingHours';
-import { getVehicles, updateVehicle } from '../api/vehicles';
+import { getVehicles } from '../api/vehicles';
 import { getShopById, deleteShopImage } from '../api/shops';
 import { applySeoPageMeta } from '../utils/seo/seoMetadata';
 import { loadShopDetailWithOptionalSeo, syncShopDetailWebUrl } from '../api/seo';
@@ -30,11 +30,13 @@ import StatusBadge from '../components/ui/StatusBadge';
 import { COLORS } from '../constants/colors';
 import { formatAuthorizeConfirmMessage, formatRevokeConfirmMessage } from '../utils/shopDataAccess';
 import {
-  buildSharedShopIdsAfterToggle,
+  authorizeVehicleForShop,
   formatVehicleAuthorizeLabel,
   isShopAuthorizedForVehicle,
   resolveAuthorizeVehicleId,
+  resolveShopIdForAuthorization,
 } from '../utils/vehicleShopAuthorization';
+import { confirmMessage, showMessage } from '../utils/crossPlatformAlert';
 import { formatShopDisplayName } from '../utils/shopDisplayName';
 import { formatMoneyAmount } from '../constants/currency';
 import { resolveRepairTypeIcon } from '../utils/repairTypeIcons';
@@ -198,13 +200,18 @@ export default function ShopDetailScreen({ route, navigation }) {
   const [requestSheetOpen, setRequestSheetOpen] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [loadErrorMessage, setLoadErrorMessage] = useState('');
+  const [authorizingVehicleId, setAuthorizingVehicleId] = useState(null);
   const skipNextVehicleFocusReload = useRef(true);
   const scrollRef = useRef(null);
   const authorizationSectionY = useRef(0);
   const vehicleRowYs = useRef({});
 
   const authorizeVehicleId = resolveAuthorizeVehicleId(route.params);
-  const effectiveShopId = shop?.id ?? resolvedShopId;
+  const effectiveShopId = resolveShopIdForAuthorization({
+    shop,
+    resolvedShopId,
+    centerSlug: resolvedCenterSlug,
+  });
   const authorizeVehicle = useMemo(() => {
     if (!authorizeVehicleId) return null;
     return vehicles.find((item) => Number(item.id) === Number(authorizeVehicleId)) || null;
@@ -382,15 +389,45 @@ export default function ShopDetailScreen({ route, navigation }) {
   }, [authorizeVehicleId, isClientAccount, loading, vehicles.length, scrollToAuthorization]);
 
   const applyAuthorizationChange = async (vehicle, isAuthorized) => {
-    const token = await AsyncStorage.getItem('@access_token');
-    const shopIdForAuth = shop?.id ?? resolvedShopId;
-    if (!shopIdForAuth) return;
+    const shopIdForAuth = resolveShopIdForAuthorization({
+      shop,
+      resolvedShopId,
+      centerSlug: resolvedCenterSlug,
+    });
+    if (!shopIdForAuth) {
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.warn('[ShopDetail] authorize skipped: missing shopId', {
+          shopId: shop?.id,
+          resolvedShopId,
+          centerSlug: resolvedCenterSlug,
+        });
+      }
+      showMessage('Error', 'Could not determine service center ID. Please refresh and try again.');
+      return;
+    }
 
-    const updatedIds = buildSharedShopIdsAfterToggle(vehicle, shopIdForAuth, !isAuthorized);
-
+    setAuthorizingVehicleId(vehicle.id);
     try {
-      const updated = await updateVehicle(vehicle.id, { shared_with_shops_ids: updatedIds }, token);
+      const token = await AsyncStorage.getItem('@access_token');
+      if (!token) {
+        showMessage('Sign in required', 'Please sign in to authorize a service center for your vehicle.');
+        return;
+      }
+
+      const updated = await authorizeVehicleForShop(
+        vehicle,
+        shopIdForAuth,
+        !isAuthorized,
+        token
+      );
       setVehicles((prev) => prev.map((v) => (v.id === vehicle.id ? updated : v)));
+
+      showMessage(
+        isAuthorized ? 'Access removed' : 'Authorized',
+        isAuthorized
+          ? 'This service center no longer has full access to your vehicle history.'
+          : 'This service center can now see your full mechanical service history for this vehicle.'
+      );
 
       const returnTo = route.params?.returnTo;
       const returnVehicleId = route.params?.vehicleId ?? authorizeVehicleId;
@@ -407,32 +444,41 @@ export default function ShopDetailScreen({ route, navigation }) {
           merge: true,
         });
       }
-    } catch (_error) {
-      Alert.alert('Error', 'Failed to update authorization.');
+    } catch (error) {
+      console.error('Failed to update authorization:', error);
+      showMessage('Error', 'Failed to update authorization. Please try again.');
+    } finally {
+      setAuthorizingVehicleId(null);
     }
   };
 
-  const toggleAuthorization = (vehicle) => {
-    const shopIdForAuth = shop?.id ?? resolvedShopId;
+  const toggleAuthorization = async (vehicle) => {
+    const shopIdForAuth = resolveShopIdForAuthorization({
+      shop,
+      resolvedShopId,
+      centerSlug: resolvedCenterSlug,
+    });
     const isAuthorized = isShopAuthorizedForVehicle(vehicle, shopIdForAuth);
     const shopName = shop?.name ?? GENERIC_TERM;
 
     if (isAuthorized) {
-      Alert.alert('Remove access?', formatRevokeConfirmMessage(shopName), [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove access',
-          style: 'destructive',
-          onPress: () => applyAuthorizationChange(vehicle, true),
-        },
-      ]);
+      const confirmed = await confirmMessage('Remove access?', formatRevokeConfirmMessage(shopName), {
+        confirmLabel: 'Remove access',
+      });
+      if (confirmed) {
+        await applyAuthorizationChange(vehicle, true);
+      }
       return;
     }
 
-    Alert.alert('Authorize service center?', formatAuthorizeConfirmMessage(shopName), [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Authorize', onPress: () => applyAuthorizationChange(vehicle, false) },
-    ]);
+    const confirmed = await confirmMessage(
+      'Authorize service center?',
+      formatAuthorizeConfirmMessage(shopName),
+      { confirmLabel: 'Authorize' }
+    );
+    if (confirmed) {
+      await applyAuthorizationChange(vehicle, false);
+    }
   };
 
   const handleDeleteImage = async (imageId) => {
@@ -905,6 +951,7 @@ export default function ShopDetailScreen({ route, navigation }) {
                   const isAuthorized = isShopAuthorizedForVehicle(item, effectiveShopId);
                   const isContextVehicle =
                     authorizeVehicleId != null && Number(item.id) === Number(authorizeVehicleId);
+                  const isAuthorizing = authorizingVehicleId === item.id;
                   return (
                     <View
                       key={item.id}
@@ -927,6 +974,8 @@ export default function ShopDetailScreen({ route, navigation }) {
                       <Button
                         mode={isAuthorized ? 'outlined' : 'contained'}
                         compact
+                        loading={isAuthorizing}
+                        disabled={isAuthorizing}
                         onPress={() => toggleAuthorization(item)}
                         style={styles.authButton}
                         buttonColor={isAuthorized ? undefined : theme.colors.primary}
