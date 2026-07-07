@@ -1,5 +1,3 @@
-import { sortRepairsByRecency } from './repairListUtils';
-import { isTerminalRepairStatus, normalizeRepairStatus } from './repairArrival';
 import {
   applyActiveRepairHealthOverride,
   mapHealthFromApi,
@@ -21,63 +19,6 @@ const REASON_ACTION_META = {
 };
 
 const SEVERITY_RANK = { needs_attention: 0, maintenance_recommended: 1, healthy: 2, in_service: 3 };
-
-function formatRelativeServiceDate(raw) {
-  if (!raw) return null;
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return null;
-
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const startOfDate = new Date(date);
-  startOfDate.setHours(0, 0, 0, 0);
-  const diffDays = Math.round((startOfToday - startOfDate) / 86400000);
-
-  if (diffDays <= 0) return 'Latest service today';
-  if (diffDays === 1) return 'Latest service yesterday';
-  if (diffDays < 7) return `Latest service ${diffDays} days ago`;
-  return `Latest service ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
-}
-
-export function buildServiceHistorySubtitle(completedRepairs = []) {
-  const doneRows = (completedRepairs || []).filter(
-    (repair) => normalizeRepairStatus(repair?.status) === 'done'
-  );
-  if (!doneRows.length) return 'No completed services yet';
-  const latest = sortRepairsByRecency(doneRows, 'done')[0];
-  return formatRelativeServiceDate(latest?.completed_at || latest?.created_at) || 'View completed services';
-}
-
-export function buildVehiclesTileSubtitle(vehicles = [], activeRepairs = []) {
-  const count = vehicles.length;
-  if (!count) return 'Add your first vehicle';
-
-  const vehicleLabel = count === 1 ? '1 vehicle' : `${count} vehicles`;
-  const maintenanceCount = vehicles.filter((vehicle) => {
-    const health = applyActiveRepairHealthOverride(
-      mapHealthFromApi(vehicle),
-      vehicle.id,
-      activeRepairs
-    );
-    return (
-      health.status === 'maintenance_recommended' ||
-      health.status === 'needs_attention'
-    );
-  }).length;
-
-  if (!maintenanceCount) return vehicleLabel;
-  const maintenanceLabel =
-    maintenanceCount === 1 ? 'Maintenance: 1' : `Maintenance: ${maintenanceCount}`;
-  return `${vehicleLabel} · ${maintenanceLabel}`;
-}
-
-export function buildRepairRequestsSubtitle({
-  openCount = 0,
-  offersCount = 0,
-  completedCount = 0,
-} = {}) {
-  return `Open: ${openCount} · Offers: ${offersCount} · Completed: ${completedCount}`;
-}
 
 export function buildRecommendedActions(vehicles = [], activeRepairs = []) {
   const actions = [];

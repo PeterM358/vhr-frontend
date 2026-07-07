@@ -22,18 +22,15 @@ import { AuthContext } from '../context/AuthManager';
 import ScreenBackground from '../components/ScreenBackground';
 import DashboardSection from '../components/dashboard/DashboardSection';
 import DashboardHeroCard from '../components/dashboard/DashboardHeroCard';
+import DashboardSummaryRow from '../components/dashboard/DashboardSummaryRow';
 import DashboardActionGrid from '../components/dashboard/DashboardActionGrid';
 import VehicleHealthSection from '../components/dashboard/VehicleHealthSection';
 import RecommendedActionsSection from '../components/dashboard/RecommendedActionsSection';
-import {
-  buildRecommendedActions,
-  buildRepairRequestsSubtitle,
-  buildServiceHistorySubtitle,
-  buildVehiclesTileSubtitle,
-} from '../utils/dashboardFormatters';
+import { buildRecommendedActions } from '../utils/dashboardFormatters';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 import { resetFromClientDrawer } from '../navigation/drawerNavigation';
 import {
+  navigateToDocuments,
   navigateToNotifications,
   navigateToRepairRequests,
   navigateToServiceHistory,
@@ -86,7 +83,6 @@ export default function HomeScreen({ navigation }) {
 
   const [vehicles, setVehicles] = useState([]);
   const [activeRepairs, setActiveRepairs] = useState([]);
-  const [completedRepairs, setCompletedRepairs] = useState([]);
   const [openRequestsCount, setOpenRequestsCount] = useState(0);
   const [pendingOffersCount, setPendingOffersCount] = useState(0);
   const [dashboardLoading, setDashboardLoading] = useState(true);
@@ -140,9 +136,6 @@ export default function HomeScreen({ navigation }) {
           const openRepairRows = nonTerminalRepairs.filter(
             (repair) => normalizeRepairStatus(repair?.status) === 'open'
           );
-          const doneRepairs = safeRepairs.filter(
-            (repair) => normalizeRepairStatus(repair?.status) === 'done'
-          );
           let offersCount = 0;
           if (offersRes?.ok) {
             const offerRows = await offersRes.json().catch(() => []);
@@ -152,7 +145,6 @@ export default function HomeScreen({ navigation }) {
           }
           setVehicles(safeVehicles);
           setActiveRepairs(nonTerminalRepairs);
-          setCompletedRepairs(doneRepairs);
           setOpenRequestsCount(openRepairRows.length);
           setPendingOffersCount(offersCount);
         } finally {
@@ -212,6 +204,14 @@ export default function HomeScreen({ navigation }) {
     const root = navigation.getParent?.() || navigation;
     navigateToRepairRequests(root);
   };
+  const goPendingOffers = () => {
+    const root = navigation.getParent?.() || navigation;
+    navigateToRepairRequests(root, { tab: 'offers' });
+  };
+  const goDocuments = () => {
+    const root = navigation.getParent?.() || navigation;
+    navigateToDocuments(root);
+  };
   const goNotificationCenter = () => {
     const root = navigation.getParent?.() || navigation;
     navigateToNotifications(root);
@@ -254,62 +254,69 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  const summaryItems = useMemo(
+    () => [
+      { key: 'vehicles', value: vehicles.length, label: 'Vehicles', onPress: goVehicles },
+      {
+        key: 'requests',
+        value: openRequestsCount,
+        label: 'Open Requests',
+        onPress: goRepairs,
+      },
+      {
+        key: 'offers',
+        value: pendingOffersCount,
+        label: 'Pending Offers',
+        onPress: goPendingOffers,
+      },
+      {
+        key: 'alerts',
+        value: unreadNotifications,
+        label: 'Unread Alerts',
+        onPress: goNotificationCenter,
+      },
+    ],
+    [vehicles.length, openRequestsCount, pendingOffersCount, unreadNotifications]
+  );
+
   const actionTiles = useMemo(
     () => [
       {
         key: 'vehicles',
         icon: 'car-multiple',
         title: 'Vehicles',
-        subtitle: buildVehiclesTileSubtitle(vehicles, activeRepairs),
-        onPress: hasVehicles ? goVehicles : goAddVehicle,
-      },
-      {
-        key: 'repairs',
-        icon: 'wrench-outline',
-        title: 'Repair Requests',
-        subtitle: buildRepairRequestsSubtitle({
-          openCount: openRequestsCount,
-          offersCount: pendingOffersCount,
-          completedCount: completedRepairs.length,
-        }),
-        onPress: goRepairs,
+        subtitle: 'Manage your garage',
+        onPress: goVehicles,
       },
       {
         key: 'history',
         icon: 'book-open-page-variant',
         title: 'Service History',
-        subtitle: buildServiceHistorySubtitle(completedRepairs),
+        subtitle: 'Repairs & maintenance',
         onPress: goServiceHistory,
       },
       {
         key: 'centers',
         icon: 'map-search',
         title: 'Find Service Centers',
-        subtitle: 'Nearby trusted centers',
+        subtitle: 'Book trusted repairs',
         onPress: goFindCenters,
       },
+      {
+        key: 'documents',
+        icon: 'file-document-outline',
+        title: 'Documents',
+        subtitle: 'Invoices, warranties & records',
+        onPress: goDocuments,
+      },
     ],
-    [
-      vehicles,
-      activeRepairs,
-      hasVehicles,
-      openRequestsCount,
-      pendingOffersCount,
-      completedRepairs,
-    ]
+    []
   );
 
   const recommendedActions = useMemo(
     () => buildRecommendedActions(vehicles, activeRepairs),
     [vehicles, activeRepairs]
   );
-
-  const heroContextLine = useMemo(() => {
-    if (!hasVehicles) return 'Start by adding a vehicle';
-    if (openRequestsCount > 0) return `${openRequestsCount} open request${openRequestsCount === 1 ? '' : 's'}`;
-    if (pendingOffersCount > 0) return `${pendingOffersCount} pending offer${pendingOffersCount === 1 ? '' : 's'}`;
-    return null;
-  }, [hasVehicles, openRequestsCount, pendingOffersCount]);
 
   const fabConfig = hasVehicles
     ? { label: 'Request Service', onPress: () => goRequestService() }
@@ -361,13 +368,15 @@ export default function HomeScreen({ navigation }) {
         <DashboardHeroCard
           title={`Welcome, ${heroName}`}
           subtitle={HERO_SUBTITLE}
-          contextLine={heroContextLine}
         />
 
         {dashboardLoading ? (
           <ActivityIndicator color="#fff" style={styles.gridLoader} />
         ) : (
-          <DashboardActionGrid tiles={actionTiles} />
+          <>
+            <DashboardSummaryRow items={summaryItems} />
+            <DashboardActionGrid tiles={actionTiles} />
+          </>
         )}
 
         <DashboardSection
