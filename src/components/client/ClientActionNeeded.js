@@ -18,30 +18,44 @@ function formatWhen(iso) {
   }
 }
 
-export default function ClientActionNeeded({ onChanged }) {
+function filterActionNeeded(repairs) {
+  return (Array.isArray(repairs) ? repairs : []).filter(
+    (r) => r?.pending_reschedule_proposal?.status === 'pending'
+  );
+}
+
+export default function ClientActionNeeded({ onChanged, repairs: repairsProp, onRescheduleResponded }) {
   const navigation = useNavigation();
   const { setNotifications } = useContext(WebSocketContext);
   const [items, setItems] = useState([]);
   const [loadingId, setLoadingId] = useState(null);
 
-  const load = useCallback(async () => {
+  const publishCount = useCallback(
+    (rows) => {
+      setItems(rows);
+      if (typeof onChanged === 'function') onChanged(rows.length);
+    },
+    [onChanged]
+  );
+
+  const loadFromApi = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('@access_token');
       const repairs = await getRepairs(token);
-      const rows = (Array.isArray(repairs) ? repairs : []).filter(
-        (r) => r?.pending_reschedule_proposal?.status === 'pending'
-      );
-      setItems(rows);
-      if (typeof onChanged === 'function') onChanged(rows.length);
+      publishCount(filterActionNeeded(repairs));
     } catch {
-      setItems([]);
-      if (typeof onChanged === 'function') onChanged(0);
+      publishCount([]);
     }
-  }, [onChanged]);
+  }, [publishCount]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (repairsProp != null) {
+      publishCount(filterActionNeeded(repairsProp));
+      return undefined;
+    }
+    loadFromApi();
+    return undefined;
+  }, [repairsProp, loadFromApi, publishCount]);
 
   const respond = async (repair, action) => {
     const proposal = repair.pending_reschedule_proposal;
@@ -54,7 +68,13 @@ export default function ClientActionNeeded({ onChanged }) {
         action,
       });
       await markRepairNotificationsRead(repair.id, { setNotifications });
-      await load();
+      if (repairsProp != null) {
+        if (typeof onRescheduleResponded === 'function') {
+          await onRescheduleResponded();
+        }
+      } else {
+        await loadFromApi();
+      }
     } catch (err) {
       Alert.alert('Error', err.message || 'Could not respond');
     } finally {

@@ -2,6 +2,19 @@ import { API_BASE_URL } from './config';
 import { formatDrfErrorMessage, messageFromApiResponseText } from '../utils/apiErrorMessage';
 import { safeWarn } from '../utils/logger';
 
+const repairsListCache = {
+  key: null,
+  data: null,
+  fetchedAt: 0,
+};
+const REPAIRS_LIST_CACHE_TTL_MS = 60_000;
+
+export function invalidateRepairsListCache() {
+  repairsListCache.key = null;
+  repairsListCache.data = null;
+  repairsListCache.fetchedAt = 0;
+}
+
 async function throwApiError(response, fallback) {
   const errorText = await response.text();
   let message = fallback;
@@ -20,8 +33,9 @@ async function throwApiError(response, fallback) {
  * List repairs with server-side filters.
  * @param {string} token
  * @param {string|{ status?: string, q?: string, makeId?: number, modelId?: number, vehicleYear?: number }} filtersOrStatus
+ * @param {{ force?: boolean }} [options]
  */
-export async function getRepairs(token, filtersOrStatus = null) {
+export async function getRepairs(token, filtersOrStatus = null, options = {}) {
   const filters =
     typeof filtersOrStatus === 'string'
       ? { status: filtersOrStatus }
@@ -58,10 +72,25 @@ export async function getRepairs(token, filtersOrStatus = null) {
   }
 
   const qs = params.toString();
+  const cacheKey = qs || '__all__';
+  const now = Date.now();
+  if (
+    !options.force &&
+    repairsListCache.key === cacheKey &&
+    repairsListCache.data &&
+    now - repairsListCache.fetchedAt < REPAIRS_LIST_CACHE_TTL_MS
+  ) {
+    return repairsListCache.data;
+  }
+
   const url = `${API_BASE_URL}/api/repairs/repair/${qs ? `?${qs}` : ''}`;
   const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!response.ok) throw new Error('Failed to fetch repairs');
-  return await response.json();
+  const data = await response.json();
+  repairsListCache.key = cacheKey;
+  repairsListCache.data = data;
+  repairsListCache.fetchedAt = now;
+  return data;
 }
 
 // ✅ Create a new repair

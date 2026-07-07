@@ -3,6 +3,15 @@ import { API_BASE_URL } from './config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { safeError } from '../utils/logger';
 
+export async function getClientOffers(token) {
+  const response = await fetch(`${API_BASE_URL}/api/offers/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch offers');
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+}
+
 export async function bookOffer(token, offerId, vehicleId) {
   const url = `${API_BASE_URL}/api/offers/${offerId}/book/`;
 

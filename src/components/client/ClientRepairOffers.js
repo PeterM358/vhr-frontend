@@ -1,12 +1,11 @@
-import React, { useEffect, useState, useContext, useMemo } from 'react';
+import React, { useCallback, useEffect, useState, useContext, useMemo, useRef } from 'react';
 import { View, Alert, RefreshControl, StyleSheet, FlatList, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, useIsFocused } from '@react-navigation/native';
-import { API_BASE_URL } from '../../api/config';
+import { useNavigation } from '@react-navigation/native';
 import { WebSocketContext } from '../../context/WebSocketManager';
 import { markNotificationRead } from '../../api/notifications';
-import { markOfferSeen } from '../../api/offers';
-import { clientReportVehicleArrival, getRepairs } from '../../api/repairs';
+import { getClientOffers, markOfferSeen } from '../../api/offers';
+import { clientReportVehicleArrival, getRepairs, invalidateRepairsListCache } from '../../api/repairs';
 import { Text, ActivityIndicator, Button } from 'react-native-paper';
 import FloatingCard from '../ui/FloatingCard';
 import EmptyStateCard from '../ui/EmptyStateCard';
@@ -24,6 +23,12 @@ import {
 
 function isTerminalStatus(status) {
   return isTerminalRepairStatus(status);
+}
+
+function offerRepairStatus(offer, repairRow) {
+  return normalizeRepairStatus(
+    repairRow?.status || offer?.repair_status || offer?.repairStatus || null
+  );
 }
 
 function ActivitySection({ title, hint, children }) {
@@ -91,115 +96,122 @@ function RepairSummaryCard({
 }
 
 export default function ClientRepairOffers({
+  isActive = true,
   onUpdateUnseenOffersCount,
   onUpdateActionNeededCount,
   activityReturnTo = 'ClientActivity',
 }) {
   const [offers, setOffers] = useState([]);
   const [repairs, setRepairs] = useState([]);
-  const [repairStatusById, setRepairStatusById] = useState({});
   const [actionNeededCount, setActionNeededCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [checkingInId, setCheckingInId] = useState(null);
   const navigation = useNavigation();
-  const isFocused = useIsFocused();
+  const hasLoadedRef = useRef(false);
   const { notifications, setNotifications } = useContext(WebSocketContext);
 
-  const openRepairDetail = (repairId) => {
-    navigation.navigate('RepairDetail', {
-      repairId,
-      returnTo: activityReturnTo,
-    });
-  };
+  const openRepairDetail = useCallback(
+    (repairId) => {
+      navigation.navigate('RepairDetail', {
+        repairId,
+        returnTo: activityReturnTo,
+      });
+    },
+    [navigation, activityReturnTo]
+  );
 
-  const handleClientCheckIn = async (repair) => {
-    setCheckingInId(repair.id);
-    try {
-      const token = await AsyncStorage.getItem('@access_token');
-      await clientReportVehicleArrival(token, repair.id);
-      await fetchRepairOffers();
-      Alert.alert(
-        'Checked in',
-        'The service center has been notified. They will confirm when your vehicle is on site.'
-      );
-    } catch (err) {
-      Alert.alert('Could not check in', err?.message || 'Please try again.');
-    } finally {
-      setCheckingInId(null);
-    }
-  };
-
-  const fetchRepairOffers = async () => {
+  const fetchRepairOffers = useCallback(async ({ force = false } = {}) => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
+      if (force) {
+        invalidateRepairsListCache();
+      }
 
-      const [offersRes, repairsData] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/offers/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        getRepairs(token).catch(() => []),
+      const [offersData, repairsData] = await Promise.all([
+        getClientOffers(token),
+        getRepairs(token, null, { force }).catch(() => []),
       ]);
-      const data = await offersRes.json();
       const repairRows = Array.isArray(repairsData) ? repairsData : [];
-      const statusMap = {};
-      repairRows.forEach((repair) => {
-        if (repair?.id != null && repair?.status) {
-          statusMap[String(repair.id)] = repair.status;
-        }
-      });
 
-      setOffers(Array.isArray(data) ? data : []);
+      setOffers(Array.isArray(offersData) ? offersData : []);
       setRepairs(repairRows);
-      setRepairStatusById(statusMap);
+      hasLoadedRef.current = true;
     } catch (err) {
       console.error('Failed to load repair offers', err);
       Alert.alert('Error', 'Could not load repair offers');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    if (isFocused) fetchRepairOffers();
-  }, [isFocused]);
+    if (!isActive) return undefined;
+    if (hasLoadedRef.current) return undefined;
+    fetchRepairOffers();
+    return undefined;
+  }, [isActive, fetchRepairOffers]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchRepairOffers();
+    await fetchRepairOffers({ force: true });
     setRefreshing(false);
-  };
+  }, [fetchRepairOffers]);
 
-  const handlePressOffer = async (item) => {
-    try {
-      const token = await AsyncStorage.getItem('@access_token');
-      const matchingNotif = notifications.find(
-        (n) => !n.is_read && n.repair === item.repair
-      );
+  const handleClientCheckIn = useCallback(
+    async (repair) => {
+      setCheckingInId(repair.id);
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        await clientReportVehicleArrival(token, repair.id);
+        invalidateRepairsListCache();
+        await fetchRepairOffers({ force: true });
+        Alert.alert(
+          'Checked in',
+          'The service center has been notified. They will confirm when your vehicle is on site.'
+        );
+      } catch (err) {
+        Alert.alert('Could not check in', err?.message || 'Please try again.');
+      } finally {
+        setCheckingInId(null);
+      }
+    },
+    [fetchRepairOffers]
+  );
 
-      if (matchingNotif) {
-        await markNotificationRead(token, matchingNotif.id);
-        setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === matchingNotif.id ? { ...n, is_read: true } : n
+  const handlePressOffer = useCallback(
+    async (item) => {
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        const matchingNotif = notifications.find(
+          (n) => !n.is_read && n.repair === item.repair
+        );
+
+        if (matchingNotif) {
+          await markNotificationRead(token, matchingNotif.id);
+          setNotifications((prev) =>
+            prev.map((n) =>
+              n.id === matchingNotif.id ? { ...n, is_read: true } : n
+            )
+          );
+        }
+
+        await markOfferSeen(token, item.id);
+
+        setOffers((prev) =>
+          prev.map((o) =>
+            o.id === item.id ? { ...o, is_seen_by_client: true } : o
           )
         );
+
+        openRepairDetail(item.repair);
+      } catch (err) {
+        Alert.alert('Error', 'Could not open detail');
       }
-
-      await markOfferSeen(token, item.id);
-
-      setOffers((prev) =>
-        prev.map((o) =>
-          o.id === item.id ? { ...o, is_seen_by_client: true } : o
-        )
-      );
-
-      openRepairDetail(item.repair);
-    } catch (err) {
-      Alert.alert('Error', 'Could not open detail');
-    }
-  };
+    },
+    [notifications, openRepairDetail, setNotifications]
+  );
 
   const { upcomingAppointments, inServiceRepairs, offersToReview } = useMemo(() => {
     const activeRepairs = repairs.filter(
@@ -215,9 +227,7 @@ export default function ClientRepairOffers({
 
     const pendingOffers = offers.filter((o) => {
       const repairRow = activeRepairs.find((r) => r.id === o.repair);
-      const status = normalizeRepairStatus(
-        repairRow?.status || repairStatusById[String(o.repair)]
-      );
+      const status = offerRepairStatus(o, repairRow);
       if (!status || isTerminalStatus(status)) return false;
       if (repairRow && isVehicleAtShop(repairRow)) return false;
       if (inServiceIds.has(o.repair)) return false;
@@ -230,7 +240,7 @@ export default function ClientRepairOffers({
       inServiceRepairs: inService,
       offersToReview: pendingOffers,
     };
-  }, [repairs, offers, repairStatusById]);
+  }, [repairs, offers]);
 
   useEffect(() => {
     if (typeof onUpdateUnseenOffersCount === 'function') {
@@ -239,12 +249,20 @@ export default function ClientRepairOffers({
     }
   }, [offersToReview, onUpdateUnseenOffersCount]);
 
-  const handleActionNeededChange = (count) => {
-    setActionNeededCount(count);
-    if (typeof onUpdateActionNeededCount === 'function') {
-      onUpdateActionNeededCount(count);
-    }
-  };
+  const handleRescheduleResponded = useCallback(async () => {
+    invalidateRepairsListCache();
+    await fetchRepairOffers({ force: true });
+  }, [fetchRepairOffers]);
+
+  const handleActionNeededChange = useCallback(
+    (count) => {
+      setActionNeededCount(count);
+      if (typeof onUpdateActionNeededCount === 'function') {
+        onUpdateActionNeededCount(count);
+      }
+    },
+    [onUpdateActionNeededCount]
+  );
 
   const showEmptyState =
     actionNeededCount === 0 &&
@@ -252,63 +270,70 @@ export default function ClientRepairOffers({
     inServiceRepairs.length === 0 &&
     offersToReview.length === 0;
 
-  const renderOfferItem = ({ item }) => {
-    const isUnread = !item.is_seen_by_client;
-    const shopName = item.shop_name || 'Service center';
-    const isBooked = item.is_booked;
+  const renderOfferItem = useCallback(
+    ({ item }) => {
+      const isUnread = !item.is_seen_by_client;
+      const shopName = item.shop_name || 'Service center';
+      const isBooked = item.is_booked;
 
-    const pricing = formatOfferPricingLines(item);
+      const pricing = formatOfferPricingLines(item);
 
-    return (
-      <FloatingCard
-        accent={isUnread}
-        onPress={() => handlePressOffer(item)}
-        style={styles.offerCard}
-      >
-        <Text style={[styles.typeTitle, isUnread && styles.typeTitleBold]} numberOfLines={2}>
-          {isBooked ? 'Repair booked' : 'New offer'}
-        </Text>
-        <Text style={styles.activityLine}>
-          {isBooked
-            ? `You booked ${shopName} — open the repair for details`
-            : `${shopName} sent a quote — tap to review and book`}
-        </Text>
-        {!!item.description && (
-          <Text style={styles.desc} numberOfLines={3}>
-            {item.description}
+      return (
+        <FloatingCard
+          accent={isUnread}
+          onPress={() => handlePressOffer(item)}
+          style={styles.offerCard}
+        >
+          <Text style={[styles.typeTitle, isUnread && styles.typeTitleBold]} numberOfLines={2}>
+            {isBooked ? 'Repair booked' : 'New offer'}
           </Text>
-        )}
-        {pricing.estimateLine ? (
-          <Text style={styles.priceLine}>
-            <Text style={styles.priceLabel}>Estimate: </Text>
-            <Text style={styles.priceValue}>
-              {pricing.estimateLine.replace(/^Estimate\s+/, '')}
+          <Text style={styles.activityLine}>
+            {isBooked
+              ? `You booked ${shopName} — open the repair for details`
+              : `${shopName} sent a quote — tap to review and book`}
+          </Text>
+          {!!item.description && (
+            <Text style={styles.desc} numberOfLines={3}>
+              {item.description}
             </Text>
-          </Text>
-        ) : null}
-        {pricing.quotedLine ? (
-          <Text style={styles.priceLine}>
-            <Text style={styles.priceLabel}>Quoted: </Text>
-            <Text style={styles.priceValue}>
-              {formatOfferPrimaryPrice(item)}
+          )}
+          {pricing.estimateLine ? (
+            <Text style={styles.priceLine}>
+              <Text style={styles.priceLabel}>Estimate: </Text>
+              <Text style={styles.priceValue}>
+                {pricing.estimateLine.replace(/^Estimate\s+/, '')}
+              </Text>
             </Text>
-          </Text>
-        ) : !pricing.estimateLine ? (
-          <Text style={styles.priceLine}>
-            <Text style={styles.priceLabel}>Price: </Text>
-            <Text style={styles.priceValue}>{formatOfferPrimaryPrice(item)}</Text>
-          </Text>
-        ) : null}
-        <View style={[styles.statusPill, isBooked ? styles.stateBooked : styles.stateNew]}>
-          <Text style={styles.statusText}>{isBooked ? 'BOOKED' : 'NEW OFFER'}</Text>
-        </View>
-      </FloatingCard>
-    );
-  };
+          ) : null}
+          {pricing.quotedLine ? (
+            <Text style={styles.priceLine}>
+              <Text style={styles.priceLabel}>Quoted: </Text>
+              <Text style={styles.priceValue}>
+                {formatOfferPrimaryPrice(item)}
+              </Text>
+            </Text>
+          ) : !pricing.estimateLine ? (
+            <Text style={styles.priceLine}>
+              <Text style={styles.priceLabel}>Price: </Text>
+              <Text style={styles.priceValue}>{formatOfferPrimaryPrice(item)}</Text>
+            </Text>
+          ) : null}
+          <View style={[styles.statusPill, isBooked ? styles.stateBooked : styles.stateNew]}>
+            <Text style={styles.statusText}>{isBooked ? 'BOOKED' : 'NEW OFFER'}</Text>
+          </View>
+        </FloatingCard>
+      );
+    },
+    [handlePressOffer]
+  );
 
   const renderListHeader = () => (
     <>
-      <ClientActionNeeded onChanged={handleActionNeededChange} />
+      <ClientActionNeeded
+        repairs={repairs}
+        onChanged={handleActionNeededChange}
+        onRescheduleResponded={handleRescheduleResponded}
+      />
 
       {upcomingAppointments.length > 0 ? (
         <ActivitySection

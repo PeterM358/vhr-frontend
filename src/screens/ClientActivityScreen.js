@@ -39,6 +39,7 @@ export default function ClientActivityScreen({ navigation }) {
   const backLabel = route.params?.backLabel || 'Dashboard';
 
   const [activeTab, setActiveTab] = useState(() => resolveInitialTab(route));
+  const [offersTabMounted, setOffersTabMounted] = useState(() => resolveInitialTab(route) === 'repairs');
   const [unseenPromoCount, setUnseenPromoCount] = useState(0);
   const [unseenOffersCount, setUnseenOffersCount] = useState(0);
   const [actionNeededCount, setActionNeededCount] = useState(0);
@@ -49,8 +50,14 @@ export default function ClientActivityScreen({ navigation }) {
     const next = route.params?.initialTab;
     if (next && TABS.some((t) => t.id === next)) {
       setActiveTab(next);
+      if (next === 'repairs') setOffersTabMounted(true);
     }
   }, [route.params?.initialTab]);
+
+  const selectTab = (tabId) => {
+    setActiveTab(tabId);
+    if (tabId === 'repairs') setOffersTabMounted(true);
+  };
 
   const handleBack = () => {
     if (returnTo === 'Home' || returnTo === 'HomeMain') {
@@ -97,7 +104,7 @@ export default function ClientActivityScreen({ navigation }) {
               return (
                 <Pressable
                   key={tab.id}
-                  onPress={() => setActiveTab(tab.id)}
+                  onPress={() => selectTab(tab.id)}
                   style={[styles.segmentCell, selected && styles.segmentCellActive]}
                 >
                   <View style={styles.segmentLabelRow}>
@@ -115,29 +122,41 @@ export default function ClientActivityScreen({ navigation }) {
         </View>
 
         <View style={styles.content}>
-          <View style={[styles.tabContent, activeTab === 'inbox' ? styles.active : styles.inactive]}>
-            <NotificationCenterPlaceholder
-              onPlaceholderAction={(item) =>
-                showMessage(item.title, `${item.description}\n\nLive routing will be added with the notification backend.`, {
-                  variant: 'info',
-                })
-              }
-            />
-          </View>
-          <View style={[styles.tabContent, activeTab === 'repairs' ? styles.active : styles.inactive]}>
-            <ClientRepairOffers
-              navigation={navigation}
-              activityReturnTo="ClientActivity"
-              onUpdateUnseenOffersCount={setUnseenOffersCount}
-              onUpdateActionNeededCount={setActionNeededCount}
-            />
-          </View>
-          <View style={[styles.tabContent, activeTab === 'promos' ? styles.active : styles.inactive]}>
-            <ClientPromotions
-              navigation={navigation}
-              onUpdateUnseenCount={setUnseenPromoCount}
-            />
-          </View>
+          {activeTab === 'inbox' ? (
+            <View style={styles.tabContent}>
+              <NotificationCenterPlaceholder
+                onPlaceholderAction={(item) =>
+                  showMessage(item.title, `${item.description}\n\nLive routing will be added with the notification backend.`, {
+                    variant: 'info',
+                  })
+                }
+              />
+            </View>
+          ) : null}
+          {offersTabMounted ? (
+            <View
+              style={[
+                styles.tabContent,
+                activeTab === 'repairs' ? styles.tabVisible : styles.tabHidden,
+              ]}
+            >
+              <ClientRepairOffers
+                isActive={activeTab === 'repairs'}
+                navigation={navigation}
+                activityReturnTo="ClientActivity"
+                onUpdateUnseenOffersCount={setUnseenOffersCount}
+                onUpdateActionNeededCount={setActionNeededCount}
+              />
+            </View>
+          ) : null}
+          {activeTab === 'promos' ? (
+            <View style={styles.tabContent}>
+              <ClientPromotions
+                navigation={navigation}
+                onUpdateUnseenCount={setUnseenPromoCount}
+              />
+            </View>
+          ) : null}
         </View>
       </View>
     </ScreenBackground>
@@ -238,6 +257,6 @@ const styles = StyleSheet.create({
   badge: { backgroundColor: '#dc2626' },
   content: { flex: 1, backgroundColor: 'transparent' },
   tabContent: { flex: 1, backgroundColor: 'transparent' },
-  active: { display: 'flex' },
-  inactive: { display: 'none' },
+  tabVisible: { display: 'flex' },
+  tabHidden: { display: 'none' },
 });
