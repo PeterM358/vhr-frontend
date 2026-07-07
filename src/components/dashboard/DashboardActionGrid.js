@@ -1,24 +1,32 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Badge, Text } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { COLORS } from '../../constants/colors';
 
-function ActionTile({ icon, title, subtitle, onPress }) {
+function ActionTile({ icon, title, subtitle, count, onPress }) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
       accessibilityRole="button"
     >
-      <View style={styles.iconWrap}>
-        <MaterialCommunityIcons name={icon} size={22} color="#93c5fd" />
+      <View style={styles.iconRow}>
+        <View style={styles.iconWrap}>
+          <MaterialCommunityIcons name={icon} size={22} color="#93c5fd" />
+        </View>
+        {count != null && count > 0 ? (
+          <Badge style={styles.badge}>{count > 99 ? '99+' : count}</Badge>
+        ) : null}
       </View>
-      <Text style={styles.title} numberOfLines={1}>
+      <Text style={styles.title} numberOfLines={2}>
         {title}
       </Text>
-      <Text style={styles.subtitle} numberOfLines={2}>
-        {subtitle}
-      </Text>
+      {subtitle ? (
+        <Text style={styles.subtitle} numberOfLines={3}>
+          {subtitle}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -59,16 +67,23 @@ const styles = StyleSheet.create({
   },
   tile: {
     flex: 1,
+    minWidth: '46%',
     minHeight: 112,
     borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    backgroundColor: 'rgba(5,15,30,0.78)',
+    backgroundColor: COLORS.CARD_DARK,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: COLORS.BORDER_SOFT,
   },
   pressed: {
     opacity: 0.9,
+  },
+  iconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
   iconWrap: {
     width: 36,
@@ -77,7 +92,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(37,99,235,0.16)',
-    marginBottom: 10,
+  },
+  badge: {
+    backgroundColor: COLORS.PRIMARY,
   },
   title: {
     fontSize: 15,

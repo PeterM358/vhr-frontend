@@ -44,7 +44,7 @@ import { AuthContext } from '../context/AuthManager';
 import ScreenBackground from '../components/ScreenBackground';
 import DashboardHero from '../components/dashboard/DashboardHero';
 import DashboardSection from '../components/dashboard/DashboardSection';
-import DashboardActionTile from '../components/dashboard/DashboardActionTile';
+import DashboardActionGrid from '../components/dashboard/DashboardActionGrid';
 import DashboardComingSoonSection from '../components/dashboard/DashboardComingSoonSection';
 import ReadyToDriveComingSoonCard from '../components/dashboard/ReadyToDriveComingSoonCard';
 import PartnerActivationBanner from '../components/dashboard/PartnerActivationBanner';
@@ -298,70 +298,64 @@ export default function ShopHomeScreen() {
 
   const operationsTiles = useMemo(
     () => [
-      [
-        {
-          key: 'pending-offers',
-          icon: 'file-send-outline',
-          title: 'Pending Offers',
-          subtitle: 'Sent, awaiting customer acceptance',
-          count: pendingOffers.length,
-          onPress: () => resetShopDrawerRepairs(navigation),
+      {
+        key: 'pending-offers',
+        icon: 'file-send-outline',
+        title: 'Pending Offers',
+        subtitle: 'Sent, awaiting customer acceptance',
+        count: pendingOffers.length,
+        onPress: () => resetShopDrawerRepairs(navigation),
+      },
+      {
+        key: 'active',
+        icon: 'car-wrench',
+        title: 'Active Repairs',
+        subtitle: 'Jobs currently in progress',
+        count: ongoingRepairs.length,
+        onPress: () => resetShopDrawerRepairs(navigation),
+      },
+      {
+        key: 'bookings-calendar',
+        icon: 'calendar-month-outline',
+        title: 'Bookings / Calendar',
+        subtitle: "Today's appointments, schedule and capacity",
+        count:
+          todayBookings.length > 0
+            ? todayBookings.length
+            : unscheduledCount > 0
+              ? unscheduledCount
+              : undefined,
+        onPress: () => {
+          if (Platform.OS === 'web') {
+            navigateToPartnerCalendar(navigation);
+            return;
+          }
+          navigation.navigate('ShopCalendar', {
+            returnTo: 'ShopDashboard',
+            backLabel: 'Home',
+          });
         },
-        {
-          key: 'active',
-          icon: 'car-wrench',
-          title: 'Active Repairs',
-          subtitle: 'Jobs currently in progress',
-          count: ongoingRepairs.length,
-          onPress: () => resetShopDrawerRepairs(navigation),
-        },
-      ],
-      [
-        {
-          key: 'bookings-calendar',
-          icon: 'calendar-month-outline',
-          title: 'Bookings / Calendar',
-          subtitle: "Today's appointments, schedule and capacity",
-          count:
-            todayBookings.length > 0
-              ? todayBookings.length
-              : unscheduledCount > 0
-                ? unscheduledCount
-                : undefined,
-          onPress: () => {
-            if (Platform.OS === 'web') {
-              navigateToPartnerCalendar(navigation);
-              return;
-            }
-            navigation.navigate('ShopCalendar', {
-              returnTo: 'ShopDashboard',
-              backLabel: 'Home',
-            });
-          },
-        },
-        {
-          key: 'profile',
-          icon: 'store-cog-outline',
-          title: 'Service Center Profile',
-          subtitle: 'Name, location, services, hours and contact',
-          onPress: () =>
-            openPartnerProfile(navigation, {
-              requireSetup: !profileComplete,
-            }),
-        },
-      ],
-      [
-        {
-          key: 'public-preview',
-          icon: 'web',
-          title: 'Public Page Preview',
-          subtitle: 'How clients see your service center on the map and in search',
-          onPress: () =>
-            openPartnerPublicPreview(navigation, {
-              requireSetup: !profileComplete,
-            }),
-        },
-      ],
+      },
+      {
+        key: 'profile',
+        icon: 'store-cog-outline',
+        title: 'Service Center Profile',
+        subtitle: 'Name, location, services, hours and contact',
+        onPress: () =>
+          openPartnerProfile(navigation, {
+            requireSetup: !profileComplete,
+          }),
+      },
+      {
+        key: 'public-preview',
+        icon: 'web',
+        title: 'Public Page Preview',
+        subtitle: 'How clients see your service center on the map and in search',
+        onPress: () =>
+          openPartnerPublicPreview(navigation, {
+            requireSetup: !profileComplete,
+          }),
+      },
     ],
     [
       navigation,
@@ -551,14 +545,7 @@ export default function ShopHomeScreen() {
           {dashboardLoading ? (
             <ActivityIndicator color="#fff" style={{ marginVertical: 8 }} />
           ) : (
-            operationsTiles.map((row, rowIndex) => (
-              <View key={`row-${rowIndex}`} style={styles.tileRow}>
-                {row.map((tile) => (
-                  <DashboardActionTile key={tile.key} {...tile} />
-                ))}
-                {row.length === 1 ? <View style={styles.tileSpacer} /> : null}
-              </View>
-            ))
+            <DashboardActionGrid tiles={operationsTiles} />
           )}
         </DashboardSection>
 
@@ -596,12 +583,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  tileRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  tileSpacer: {
-    flex: 1,
   },
 });

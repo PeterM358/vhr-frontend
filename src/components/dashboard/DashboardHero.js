@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import Logo from '../../assets/images/logo.svg';
+import { COLORS } from '../../constants/colors';
 
 export default function DashboardHero({
   title,
@@ -51,8 +52,8 @@ export default function DashboardHero({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: 'rgba(5,15,30,0.72)',
-    borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: COLORS.CARD_DARK,
+    borderColor: COLORS.BORDER_SOFT,
     borderWidth: 1,
     borderRadius: 20,
     paddingVertical: 20,

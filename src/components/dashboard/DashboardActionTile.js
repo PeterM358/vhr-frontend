@@ -26,11 +26,13 @@ export default function DashboardActionTile({
       accessibilityState={{ disabled }}
     >
       <View style={styles.iconRow}>
-        <MaterialCommunityIcons
-          name={icon}
-          size={22}
-          color={disabled ? COLORS.TEXT_MUTED : COLORS.PRIMARY}
-        />
+        <View style={styles.iconWrap}>
+          <MaterialCommunityIcons
+            name={icon}
+            size={22}
+            color={disabled ? 'rgba(255,255,255,0.4)' : '#93c5fd'}
+          />
+        </View>
         {count != null && count > 0 ? (
           <Badge style={styles.badge}>{count > 99 ? '99+' : count}</Badge>
         ) : null}
@@ -52,14 +54,16 @@ const styles = StyleSheet.create({
   tile: {
     flex: 1,
     minWidth: '46%',
-    backgroundColor: COLORS.CARD_FLOATING,
-    borderRadius: 16,
+    backgroundColor: COLORS.CARD_DARK,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER_SOFT,
     padding: 14,
     marginBottom: 10,
     minHeight: 118,
   },
   pressed: {
-    opacity: 0.92,
+    opacity: 0.9,
   },
   disabled: {
     opacity: 0.72,
@@ -67,34 +71,42 @@ const styles = StyleSheet.create({
   placeholder: {
     borderStyle: 'dashed',
     borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.12)',
-    backgroundColor: 'rgba(245,247,250,0.88)',
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(5,15,30,0.5)',
   },
   iconRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 10,
+  },
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(37,99,235,0.16)',
   },
   badge: {
     backgroundColor: COLORS.PRIMARY,
   },
   title: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    color: COLORS.TEXT_DARK,
+    color: '#fff',
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 12,
-    color: COLORS.TEXT_MUTED,
+    color: 'rgba(255,255,255,0.62)',
     lineHeight: 16,
   },
   soon: {
     marginTop: 6,
     fontSize: 11,
     fontWeight: '600',
-    color: COLORS.PRIMARY,
+    color: '#93c5fd',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
