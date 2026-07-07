@@ -162,12 +162,21 @@ export function getCanonicalWebPath(state) {
     case 'ClientProfile':
       return profile();
     case 'ShopMap':
-      return serviceCenters();
+      return serviceCenters({
+        vehicleId: params.vehicleId,
+        returnTo: params.returnTo,
+      });
     case 'ShopDetail':
       if (params.centerSlug) {
-        return serviceCenterProfile(params.centerSlug);
+        return serviceCenterProfile(params.centerSlug, {
+          vehicleId: params.vehicleId,
+          returnTo: params.returnTo,
+        });
       }
-      return serviceCenters();
+      return serviceCenters({
+        vehicleId: params.vehicleId,
+        returnTo: params.returnTo,
+      });
     case 'ShopProfile':
       if (params.expandSection === 'public_preview') {
         return partnerPublicPreview();
@@ -486,10 +495,16 @@ export function getServiceCenterNavigationStateFromPath(path) {
   const trimmed = String(path || '').replace(/^\//, '').replace(/\/$/, '');
   const [pathPart, queryPart] = trimmed.split('?');
   const query = parseRouteQuery(queryPart);
+  const vehicleContext = buildVehicleAuthorizeRouteParams(query);
 
   if (query.type === 'city' && query.citySlug) {
     return {
-      routes: [{ name: 'ShopMap', params: { citySlug: String(query.citySlug).toLowerCase() } }],
+      routes: [
+        {
+          name: 'ShopMap',
+          params: { citySlug: String(query.citySlug).toLowerCase(), ...vehicleContext },
+        },
+      ],
     };
   }
 
@@ -499,11 +514,43 @@ export function getServiceCenterNavigationStateFromPath(path) {
   }
 
   const seoState = getNavigationStateFromSeoPath(pathPart);
-  if (seoState) {
-    return seoState;
+  if (seoState?.routes) {
+    return mergeVehicleAuthorizeContext(seoState, vehicleContext);
   }
 
   return null;
+}
+
+function buildVehicleAuthorizeRouteParams(query = {}) {
+  const params = {};
+  const vehicleId = parseVehicleIdFromQuery(query);
+  if (vehicleId != null) {
+    params.vehicleId = vehicleId;
+  }
+  if (query.returnTo) {
+    params.returnTo = String(query.returnTo);
+  }
+  return params;
+}
+
+function parseVehicleIdFromQuery(query = {}) {
+  const raw = query.vehicleId || query.vehicle_id;
+  if (raw == null || raw === '') return null;
+  const id = parseInt(String(raw), 10);
+  return Number.isFinite(id) ? id : null;
+}
+
+function mergeVehicleAuthorizeContext(state, vehicleContext) {
+  if (!vehicleContext || !Object.keys(vehicleContext).length) {
+    return state;
+  }
+  return {
+    ...state,
+    routes: (state.routes || []).map((route) => ({
+      ...route,
+      params: { ...(route.params || {}), ...vehicleContext },
+    })),
+  };
 }
 
 /** Parse partner dashboard/profile paths into navigation state. */

@@ -46,8 +46,8 @@ export function openServiceCenters(navigation, params) {
   const root = getRootNavigation(navigation);
   if (Platform.OS === 'web') {
     root.navigate('ShopMap', params);
-    syncWebPath(serviceCenters());
-    requestAnimationFrame(() => syncWebPath(serviceCenters()));
+    syncWebPath(serviceCenters(params));
+    requestAnimationFrame(() => syncWebPath(serviceCenters(params)));
     return;
   }
   resetFromClientDrawer(navigation, 'ShopMap', params);

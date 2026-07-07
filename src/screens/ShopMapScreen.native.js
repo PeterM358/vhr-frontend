@@ -17,10 +17,18 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 import { getServiceCenters, VEHICLE_TYPE_FILTER_CHIPS } from '../api/serviceCenters';
 import { spreadShopMarkersForMap, regionForMapPoints } from '../utils/mapMarkerSpread';
 import { API_BASE_URL } from '../api/config';
+import { updateVehicle } from '../api/vehicles';
 import ScreenBackground from '../components/ScreenBackground';
 import BackHeaderButton from '../components/navigation/BackHeaderButton';
 import BASE_STYLES from '../styles/base';
 import { devLog } from '../utils/logger';
+import { formatAuthorizeConfirmMessage } from '../utils/shopDataAccess';
+import {
+  buildSharedShopIdsAfterToggle,
+  formatVehicleAuthorizeLabel,
+  isShopAuthorizedForVehicle,
+  resolveAuthorizeVehicleId,
+} from '../utils/vehicleShopAuthorization';
 
 const getNow = () => new Date().toISOString();
 
@@ -47,6 +55,35 @@ export default function ShopMapScreen({ navigation, route }) {
   const [repairTypes, setRepairTypes] = useState([]);
   const addressRef = useRef(addressQuery);
   addressRef.current = addressQuery;
+
+  const authorizeVehicleId = resolveAuthorizeVehicleId(route.params);
+  const authorizeMode = authorizeVehicleId != null;
+  const [authorizeVehicle, setAuthorizeVehicle] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    if (!authorizeVehicleId) {
+      setAuthorizeVehicle(null);
+      return undefined;
+    }
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+        if (!token) return;
+        const res = await fetch(`${API_BASE_URL}/api/vehicles/${authorizeVehicleId}/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (alive) setAuthorizeVehicle(data);
+      } catch (error) {
+        console.warn('ShopMap: could not load authorize vehicle', error);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [authorizeVehicleId]);
 
   const categoryOptions = useMemo(() => {
     const map = {};
@@ -160,6 +197,43 @@ export default function ShopMapScreen({ navigation, route }) {
     fetchShops();
   };
 
+  const openShopProfile = (shop) => {
+    navigation.navigate('ShopDetail', {
+      shopId: shop.id,
+      returnTo: route.params?.returnTo,
+      vehicleId: authorizeVehicleId ?? route.params?.vehicleId,
+    });
+  };
+
+  const handleAuthorizeShop = (shop) => {
+    if (!authorizeVehicle || !shop?.id) {
+      openShopProfile(shop);
+      return;
+    }
+    if (isShopAuthorizedForVehicle(authorizeVehicle, shop.id)) {
+      openShopProfile(shop);
+      return;
+    }
+    Alert.alert('Authorize service center?', formatAuthorizeConfirmMessage(shop.name), [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Authorize',
+        onPress: async () => {
+          try {
+            const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+            const nextIds = buildSharedShopIdsAfterToggle(authorizeVehicle, shop.id, true);
+            const updated = await updateVehicle(authorizeVehicle.id, { shared_with_shops_ids: nextIds }, token);
+            setAuthorizeVehicle(updated);
+            Alert.alert('Authorized', `${shop.name} can now see full mechanical history for this vehicle.`);
+          } catch (error) {
+            console.error(error);
+            Alert.alert('Error', 'Could not authorize this service center.');
+          }
+        },
+      },
+    ]);
+  };
+
   const displayShops = useMemo(() => {
     const normalized = shops
       .map((s) => ({
@@ -218,15 +292,7 @@ export default function ShopMapScreen({ navigation, route }) {
                 coordinate={{ latitude: lat, longitude: lon }}
                 pinColor={shop.isMyShop ? 'green' : isReported ? 'orange' : 'red'}
               >
-                <Callout
-                  onPress={() =>
-                    navigation.navigate('ShopDetail', {
-                      shopId: shop.id,
-                      returnTo: route.params?.returnTo,
-                      vehicleId: route.params?.vehicleId,
-                    })
-                  }
-                >
+                <Callout>
                   <View style={{ maxWidth: 220 }}>
                     <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>{shop.name}</Text>
                     {isReported ? (
@@ -240,7 +306,16 @@ export default function ShopMapScreen({ navigation, route }) {
                         {capabilityLine}
                       </Text>
                     ) : null}
-                    <Text style={{ color: theme.colors.primary, marginTop: 5 }}>Tap for details</Text>
+                    {authorizeMode ? (
+                      <Pressable onPress={() => handleAuthorizeShop(shop)} style={styles.calloutAction}>
+                        <Text style={styles.calloutActionPrimary}>
+                          {isShopAuthorizedForVehicle(authorizeVehicle, shop.id) ? 'Authorized' : 'Authorize'}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                    <Pressable onPress={() => openShopProfile(shop)} style={styles.calloutAction}>
+                      <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>View profile</Text>
+                    </Pressable>
                   </View>
                 </Callout>
               </Marker>
@@ -251,7 +326,17 @@ export default function ShopMapScreen({ navigation, route }) {
         <View style={[styles.chromeColumn, { paddingTop: insets.top + 10 }]} pointerEvents="box-none">
           <View style={styles.rowBackSearch}>
             <BackHeaderButton
-              onPress={() => navigation.navigate('Home')}
+              onPress={() => {
+                if (route.params?.returnTo === 'ManageVehicleServiceCenters' && authorizeVehicleId != null) {
+                  navigation.navigate('ManageVehicleServiceCenters', { vehicleId: authorizeVehicleId });
+                  return;
+                }
+                if (route.params?.returnTo === 'VehicleDetail' && authorizeVehicleId != null) {
+                  navigation.navigate('VehicleDetail', { vehicleId: authorizeVehicleId });
+                  return;
+                }
+                navigation.navigate('Home');
+              }}
               label="Back"
               variant="glass"
             />
@@ -276,6 +361,15 @@ export default function ShopMapScreen({ navigation, route }) {
               </Button>
             </Surface>
           </View>
+
+          {authorizeMode ? (
+            <Surface style={styles.authorizeBanner} elevation={3}>
+              <MaterialCommunityIcons name="car-info" size={18} color="#1d4ed8" />
+              <Text style={styles.authorizeBannerText}>
+                Authorizing for {formatVehicleAuthorizeLabel(authorizeVehicle)}
+              </Text>
+            </Surface>
+          ) : null}
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
             <Pressable
@@ -433,5 +527,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#0f172a',
     fontWeight: '500',
+  },
+  calloutAction: {
+    marginTop: 8,
+  },
+  calloutActionPrimary: {
+    color: '#166534',
+    fontWeight: '700',
+  },
+  authorizeBanner: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(37,99,235,0.08)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  authorizeBannerText: {
+    flex: 1,
+    color: '#1e3a8a',
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

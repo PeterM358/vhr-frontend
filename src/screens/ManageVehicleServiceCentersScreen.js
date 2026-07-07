@@ -23,6 +23,7 @@ import { API_BASE_URL } from '../api/config';
 import { updateVehicle } from '../api/vehicles';
 import ScreenBackground from '../components/ScreenBackground';
 import FloatingCard from '../components/ui/FloatingCard';
+import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import { COLORS } from '../constants/colors';
 import {
   ACCESS_AUTHORIZED_MECHANICAL,
@@ -148,7 +149,7 @@ export default function ManageVehicleServiceCentersScreen({ navigation, route })
   };
 
   const openFindCenters = () => {
-    navigation.navigate('ShopMap', {
+    openServiceCenters(navigation, {
       vehicleId: parseInt(vehicleId, 10),
       returnTo: 'ManageVehicleServiceCenters',
     });
@@ -175,6 +176,15 @@ export default function ManageVehicleServiceCentersScreen({ navigation, route })
             Service center access
           </Text>
           <Text style={styles.subtitle}>{vehicleTitle}</Text>
+          {vehicle ? (
+            <View style={styles.contextBanner}>
+              <MaterialCommunityIcons name="car-info" size={18} color={COLORS.PRIMARY} />
+              <Text style={styles.contextBannerText}>
+                Use Find & authorize to discover shops on the map. Your vehicle stays in context so you can
+                authorize with one tap from a pin or shop profile.
+              </Text>
+            </View>
+          ) : null}
           <Text style={styles.hint}>
             Choose who can see more than a single booked job. Booking a repair always grants job-only access for that
             repair; authorizing a center below shares full mechanical history.
@@ -298,6 +308,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 10,
+  },
+  contextBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(59,130,246,0.08)',
+    marginBottom: 10,
+  },
+  contextBannerText: {
+    flex: 1,
+    color: COLORS.TEXT_DARK,
+    fontSize: 13,
+    lineHeight: 18,
   },
   infoBox: {
     flexDirection: 'row',

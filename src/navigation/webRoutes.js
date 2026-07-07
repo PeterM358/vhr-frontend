@@ -390,8 +390,16 @@ export function profile(params = {}) {
   return buildPathWithQuery(`${DASHBOARD}/profile`, params);
 }
 
-export function serviceCenters() {
-  return SERVICE_CENTERS;
+export function serviceCenters(params = {}) {
+  const query = {};
+  const vehicleId = params.vehicleId ?? params.authorizeVehicleId;
+  if (vehicleId != null && vehicleId !== '') {
+    query.vehicleId = String(normalizeId(vehicleId));
+  }
+  if (params.returnTo) {
+    query.returnTo = String(params.returnTo);
+  }
+  return buildPathWithQuery(SERVICE_CENTERS, query);
 }
 
 export function serviceCentersCity(citySlug) {
@@ -422,8 +430,19 @@ export function repairFirst(repairSlug, citySlug) {
   return city ? `/${repair}/${city}` : `/${repair}`;
 }
 
-export function serviceCenterProfile(slug) {
-  return `/service-center/${String(slug || '').trim().toLowerCase()}`;
+export function serviceCenterProfile(slug, params = {}) {
+  const query = {};
+  const vehicleId = params.vehicleId ?? params.authorizeVehicleId;
+  if (vehicleId != null && vehicleId !== '') {
+    query.vehicleId = String(normalizeId(vehicleId));
+  }
+  if (params.returnTo) {
+    query.returnTo = String(params.returnTo);
+  }
+  return buildPathWithQuery(
+    `/service-center/${String(slug || '').trim().toLowerCase()}`,
+    query
+  );
 }
 
 /** @deprecated use serviceCenterProfile(slug) after resolving public_slug */

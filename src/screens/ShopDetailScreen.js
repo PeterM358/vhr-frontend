@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useLayoutEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Alert,
@@ -29,6 +29,12 @@ import EmptyStateCard from '../components/ui/EmptyStateCard';
 import StatusBadge from '../components/ui/StatusBadge';
 import { COLORS } from '../constants/colors';
 import { formatAuthorizeConfirmMessage, formatRevokeConfirmMessage } from '../utils/shopDataAccess';
+import {
+  buildSharedShopIdsAfterToggle,
+  formatVehicleAuthorizeLabel,
+  isShopAuthorizedForVehicle,
+  resolveAuthorizeVehicleId,
+} from '../utils/vehicleShopAuthorization';
 import { formatShopDisplayName } from '../utils/shopDisplayName';
 import { formatMoneyAmount } from '../constants/currency';
 import { resolveRepairTypeIcon } from '../utils/repairTypeIcons';
@@ -194,6 +200,14 @@ export default function ShopDetailScreen({ route, navigation }) {
   const [loadErrorMessage, setLoadErrorMessage] = useState('');
   const skipNextVehicleFocusReload = useRef(true);
 
+  const authorizeVehicleId = resolveAuthorizeVehicleId(route.params);
+  const effectiveShopId = shop?.id ?? resolvedShopId;
+  const authorizeVehicle = useMemo(() => {
+    if (!authorizeVehicleId) return null;
+    return vehicles.find((item) => Number(item.id) === Number(authorizeVehicleId)) || null;
+  }, [authorizeVehicleId, vehicles]);
+  const isAuthorizedForContextVehicle = isShopAuthorizedForVehicle(authorizeVehicle, effectiveShopId);
+
   const reloadClientVehicles = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('@access_token');
@@ -336,12 +350,10 @@ export default function ShopDetailScreen({ route, navigation }) {
 
   const applyAuthorizationChange = async (vehicle, isAuthorized) => {
     const token = await AsyncStorage.getItem('@access_token');
+    const shopIdForAuth = shop?.id ?? resolvedShopId;
+    if (!shopIdForAuth) return;
 
-    const updatedIds = isAuthorized
-      ? vehicle.shared_with_shops
-          .filter((s) => Number(s.id) !== Number(shopId))
-          .map((s) => s.id)
-      : [...vehicle.shared_with_shops.map((s) => s.id), Number(shopId)];
+    const updatedIds = buildSharedShopIdsAfterToggle(vehicle, shopIdForAuth, !isAuthorized);
 
     try {
       await updateVehicle(vehicle.id, { shared_with_shops_ids: updatedIds }, token);
@@ -353,15 +365,15 @@ export default function ShopDetailScreen({ route, navigation }) {
             ? {
                 ...v,
                 shared_with_shops: isAuthorized
-                  ? v.shared_with_shops.filter((s) => Number(s.id) !== Number(shopId))
-                  : [...v.shared_with_shops, { id: shopId, name: displayName }],
+                  ? v.shared_with_shops.filter((s) => Number(s.id) !== Number(shopIdForAuth))
+                  : [...v.shared_with_shops, { id: shopIdForAuth, name: displayName }],
               }
             : v
         )
       );
 
       const returnTo = route.params?.returnTo;
-      const returnVehicleId = route.params?.vehicleId;
+      const returnVehicleId = route.params?.vehicleId ?? authorizeVehicleId;
       if (returnTo === 'VehicleDetail' && returnVehicleId != null) {
         navigation.navigate({
           name: 'VehicleDetail',
@@ -381,7 +393,8 @@ export default function ShopDetailScreen({ route, navigation }) {
   };
 
   const toggleAuthorization = (vehicle) => {
-    const isAuthorized = vehicle.shared_with_shops.some((s) => Number(s.id) === Number(shopId));
+    const shopIdForAuth = shop?.id ?? resolvedShopId;
+    const isAuthorized = isShopAuthorizedForVehicle(vehicle, shopIdForAuth);
     const shopName = shop?.name ?? GENERIC_TERM;
 
     if (isAuthorized) {
@@ -400,6 +413,15 @@ export default function ShopDetailScreen({ route, navigation }) {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Authorize', onPress: () => applyAuthorizationChange(vehicle, false) },
     ]);
+  };
+
+  const handleContextAuthorizePress = () => {
+    if (!authorizeVehicle) {
+      Alert.alert('Vehicle not found', 'Could not load the vehicle for authorization.');
+      return;
+    }
+    if (isAuthorizedForContextVehicle) return;
+    toggleAuthorization(authorizeVehicle);
   };
 
   const handleDeleteImage = async (imageId) => {
@@ -656,6 +678,46 @@ export default function ShopDetailScreen({ route, navigation }) {
           </HeroIconRow>
         </AppCard>
 
+        {authorizeVehicleId && isClientAccount ? (
+          <FloatingCard style={styles.authorizeContextCard}>
+            <View style={styles.authorizeContextHeader}>
+              <MaterialCommunityIcons
+                name={isAuthorizedForContextVehicle ? 'shield-check' : 'shield-plus-outline'}
+                size={22}
+                color={isAuthorizedForContextVehicle ? '#166534' : COLORS.PRIMARY}
+              />
+              <View style={styles.authorizeContextCopy}>
+                <Text style={styles.authorizeContextTitle}>
+                  {isAuthorizedForContextVehicle ? 'Authorized for this vehicle' : 'Authorize for your vehicle'}
+                </Text>
+                <Text style={styles.authorizeContextSubtitle}>
+                  {formatVehicleAuthorizeLabel(authorizeVehicle)}
+                </Text>
+              </View>
+              {isAuthorizedForContextVehicle ? (
+                <Chip compact icon="check" style={styles.authorizedChip}>
+                  Authorized
+                </Chip>
+              ) : null}
+            </View>
+            {!isAuthorizedForContextVehicle ? (
+              <Button
+                mode="contained"
+                icon="shield-check"
+                onPress={handleContextAuthorizePress}
+                disabled={!authorizeVehicle}
+                style={styles.authorizeContextButton}
+              >
+                Authorize this center
+              </Button>
+            ) : (
+              <Text style={styles.authorizeContextHint}>
+                This center can see full mechanical history for this vehicle. Remove access below if needed.
+              </Text>
+            )}
+          </FloatingCard>
+        ) : null}
+
         {shop.is_claimed === false || shop.registration_origin === 'owner_reported' ? (
           <FloatingCard style={styles.unclaimedBanner}>
             <Text style={styles.unclaimedTitle}>Owner-reported · not claimed yet</Text>
@@ -827,9 +889,12 @@ export default function ShopDetailScreen({ route, navigation }) {
                 </>
               ) : (
                 vehicles.map((item) => {
-                  const isAuthorized = item.shared_with_shops.some(
-                    (s) => Number(s.id) === Number(shopId)
-                  );
+                  const isAuthorized = isShopAuthorizedForVehicle(item, effectiveShopId);
+                  const isContextVehicle =
+                    authorizeVehicleId != null && Number(item.id) === Number(authorizeVehicleId);
+                  if (authorizeVehicleId != null && !isContextVehicle) {
+                    return null;
+                  }
                   return (
                     <View key={item.id} style={styles.vehicleRow}>
                       <Text style={styles.vehicleMeta}>
@@ -1188,5 +1253,41 @@ const styles = StyleSheet.create({
   addFirstVehicleBtn: {
     marginTop: 12,
     alignSelf: 'stretch',
+  },
+  authorizeContextCard: {
+    marginTop: 10,
+    borderColor: 'rgba(37,99,235,0.2)',
+    backgroundColor: 'rgba(37,99,235,0.04)',
+  },
+  authorizeContextHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  authorizeContextCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  authorizeContextTitle: {
+    fontWeight: '700',
+    color: COLORS.TEXT_DARK,
+    fontSize: 16,
+  },
+  authorizeContextSubtitle: {
+    marginTop: 2,
+    color: COLORS.TEXT_MUTED,
+    fontSize: 13,
+  },
+  authorizeContextButton: {
+    alignSelf: 'stretch',
+  },
+  authorizeContextHint: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  authorizedChip: {
+    backgroundColor: 'rgba(34,197,94,0.12)',
   },
 });

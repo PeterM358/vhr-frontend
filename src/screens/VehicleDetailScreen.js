@@ -50,6 +50,7 @@ import {
 import { mapHealthFromApi } from '../utils/vehicleHealthStatus';
 import { formatBookingAccessHint, formatRevokeConfirmMessage } from '../utils/shopDataAccess';
 import { navigateToVehicleServiceRecordNew, navigateToVehicleReminderNew, navigateToVehicleManageServiceCenters, navigateToVehicleSpecs } from '../navigation/webNavigation';
+import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 
 const BASE_VEHICLE_REMINDER_SECTION_ROWS = [
   { reminder_type: 'insurance', label: 'Insurance', icon: 'shield-check-outline' },
@@ -980,11 +981,12 @@ export default function VehicleDetailScreen({ route, navigation }) {
   };
 
   const handleFindServiceCenters = () => {
-    if (navigation?.navigate) {
-      navigation.navigate('ShopMap', { vehicleId, returnTo: 'VehicleDetail' });
-      return;
-    }
-    Alert.alert('Notice', 'Service center discovery will open here.');
+    const vid = vehicle?.id ?? route.params?.vehicleId;
+    if (!vid) return;
+    openServiceCenters(navigation, {
+      vehicleId: vid,
+      returnTo: 'VehicleDetail',
+    });
   };
 
   const setCenterAuthorized = async (center, shouldAuthorize) => {

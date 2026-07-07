@@ -435,8 +435,8 @@ export function navigateToServiceCenters(navigation, params = {}) {
   const root = getRootNavigation(navigation);
   if (Platform.OS === 'web') {
     root.navigate('ShopMap', params);
-    syncWebPath(serviceCenters());
-    requestAnimationFrame(() => syncWebPath(serviceCenters()));
+    syncWebPath(serviceCenters(params));
+    requestAnimationFrame(() => syncWebPath(serviceCenters(params)));
     return;
   }
   root.navigate('ShopMap', params);
@@ -454,8 +454,8 @@ export function navigateToServiceCenterProfile(navigation, centerSlug, params = 
   const routeParams = { centerSlug: slug, ...params };
   if (Platform.OS === 'web') {
     navigation.navigate('ShopDetail', routeParams);
-    syncWebPath(serviceCenterProfile(centerSlug));
-    requestAnimationFrame(() => syncWebPath(serviceCenterProfile(centerSlug)));
+    syncWebPath(serviceCenterProfile(centerSlug, params));
+    requestAnimationFrame(() => syncWebPath(serviceCenterProfile(centerSlug, params)));
     return;
   }
   navigation.navigate('ShopDetail', routeParams);

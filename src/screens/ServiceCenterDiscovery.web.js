@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   ScrollView,
   useWindowDimensions,
+  Alert,
 } from 'react-native';
 import {
   MapContainer,
@@ -23,9 +24,11 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { COLORS } from '../styles/colors';
+import { API_BASE_URL } from '../api/config';
 import BASE_STYLES from '../styles/base';
 import BackHeaderButton from '../components/navigation/BackHeaderButton';
 import ScreenBackground from '../components/ScreenBackground';
@@ -54,6 +57,14 @@ import {
   loadServiceRecordFormDraft,
   saveServiceRecordFormDraft,
 } from '../utils/serviceRecordDraftStorage';
+import { updateVehicle } from '../api/vehicles';
+import { formatAuthorizeConfirmMessage } from '../utils/shopDataAccess';
+import {
+  buildSharedShopIdsAfterToggle,
+  formatVehicleAuthorizeLabel,
+  isShopAuthorizedForVehicle,
+  resolveAuthorizeVehicleId,
+} from '../utils/vehicleShopAuthorization';
 
 const DEFAULT_MAP_CENTER = [42.6977, 23.3219];
 function configureLeafletIcons() {
@@ -265,7 +276,37 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   };
 
   const pickForServiceRecord = Boolean(route.params?.pickShopForServiceRecord);
+  const authorizeVehicleId = resolveAuthorizeVehicleId(route.params);
   const serviceRecordVehicleId = route.params?.vehicleId;
+  const authorizeMode = authorizeVehicleId != null && !pickForServiceRecord;
+
+  const [authorizeVehicle, setAuthorizeVehicle] = useState(null);
+  const [authorizeBusyShopId, setAuthorizeBusyShopId] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    if (!authorizeVehicleId) {
+      setAuthorizeVehicle(null);
+      return undefined;
+    }
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        if (!token) return;
+        const res = await fetch(`${API_BASE_URL}/api/vehicles/${authorizeVehicleId}/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (alive) setAuthorizeVehicle(data);
+      } catch (error) {
+        console.warn('Could not load vehicle for authorize context:', error);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [authorizeVehicleId]);
 
   const selectCenterForServiceRecord = async (shop) => {
     if (!serviceRecordVehicleId || !shop?.id) return;
@@ -278,6 +319,35 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     navigateToVehicleServiceRecordNew(navigation, serviceRecordVehicleId, {
       type: route.params?.type,
     });
+  };
+
+  const handleAuthorizeShop = (shop) => {
+    if (!authorizeVehicle || !shop?.id) return;
+    if (isShopAuthorizedForVehicle(authorizeVehicle, shop.id)) {
+      openShopProfile(shop);
+      return;
+    }
+    Alert.alert('Authorize service center?', formatAuthorizeConfirmMessage(shop.name), [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Authorize',
+        onPress: async () => {
+          setAuthorizeBusyShopId(shop.id);
+          try {
+            const token = await AsyncStorage.getItem('@access_token');
+            const nextIds = buildSharedShopIdsAfterToggle(authorizeVehicle, shop.id, true);
+            const updated = await updateVehicle(authorizeVehicle.id, { shared_with_shops_ids: nextIds }, token);
+            setAuthorizeVehicle(updated);
+            Alert.alert('Authorized', `${shop.name} can now see full mechanical history for this vehicle.`);
+          } catch (error) {
+            console.error(error);
+            Alert.alert('Error', 'Could not authorize this service center.');
+          } finally {
+            setAuthorizeBusyShopId(null);
+          }
+        },
+      },
+    ]);
   };
 
   const openShopProfile = (shop) => {
@@ -394,14 +464,28 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     <View style={styles.stickyToolbar}>
       <View style={styles.header}>
         <BackHeaderButton
-          onPress={() =>
-            partnerMode ? navigateToPartnerDashboard(navigation) : goBackFromServiceCenters(navigation)
-          }
+          onPress={() => {
+            if (route.params?.returnTo === 'ManageVehicleServiceCenters' && authorizeVehicleId != null) {
+              navigation.navigate('ManageVehicleServiceCenters', { vehicleId: authorizeVehicleId });
+              return;
+            }
+            if (route.params?.returnTo === 'VehicleDetail' && authorizeVehicleId != null) {
+              navigation.navigate('VehicleDetail', { vehicleId: authorizeVehicleId });
+              return;
+            }
+            partnerMode ? navigateToPartnerDashboard(navigation) : goBackFromServiceCenters(navigation);
+          }}
           label="Back"
           variant="glass"
           iconOnly={false}
         />
-        <Text style={styles.title}>{partnerMode ? 'Explore Service Centers' : 'Find Service Centers'}</Text>
+        <Text style={styles.title}>
+          {authorizeMode
+            ? 'Authorize a service center'
+            : partnerMode
+              ? 'Explore Service Centers'
+              : 'Find Service Centers'}
+        </Text>
       </View>
 
       <View style={styles.searchRow}>
@@ -580,10 +664,28 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
                     <Text style={styles.popupButtonText}>Use for this record</Text>
                   </Pressable>
                 ) : null}
-                <Pressable style={styles.popupButton} onPress={() => openShopProfile(shop)}>
-                  <Text style={styles.popupButtonText}>View profile</Text>
+                {authorizeMode ? (
+                  <Pressable
+                    style={[
+                      styles.popupButton,
+                      isShopAuthorizedForVehicle(authorizeVehicle, shop.id) && styles.popupButtonAuthorized,
+                    ]}
+                    onPress={() => handleAuthorizeShop(shop)}
+                    disabled={authorizeBusyShopId === shop.id}
+                  >
+                    <Text style={styles.popupButtonText}>
+                      {authorizeBusyShopId === shop.id
+                        ? 'Authorizing…'
+                        : isShopAuthorizedForVehicle(authorizeVehicle, shop.id)
+                          ? 'Authorized'
+                          : 'Authorize'}
+                    </Text>
+                  </Pressable>
+                ) : null}
+                <Pressable style={styles.popupButtonSecondary} onPress={() => openShopProfile(shop)}>
+                  <Text style={styles.popupButtonSecondaryText}>View profile</Text>
                 </Pressable>
-                {!pickForServiceRecord ? (
+                {!pickForServiceRecord && !authorizeMode ? (
                   <Pressable style={styles.popupButton} onPress={() => handleRequestService(shop)}>
                     <Text style={styles.popupButtonText}>Request service</Text>
                   </Pressable>
@@ -610,7 +712,16 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     <ScreenBackground safeArea={false} contentMaxWidth={false}>
       <View style={styles.container}>
         {stickyToolbar}
-        {geoHint ? <Text style={styles.geoHint}>{geoHint}</Text> : null}
+        {authorizeMode ? (
+        <View style={styles.authorizeBanner}>
+          <MaterialCommunityIcons name="car-info" size={18} color={COLORS.primary} />
+          <Text style={styles.authorizeBannerText}>
+            Authorizing for {formatVehicleAuthorizeLabel(authorizeVehicle)}. Tap a pin to authorize or view
+            the shop profile.
+          </Text>
+        </View>
+      ) : null}
+      {geoHint ? <Text style={styles.geoHint}>{geoHint}</Text> : null}
         {userLocatedExplicitly ? (
           <Text style={styles.locationHint}>Distances shown from your current location.</Text>
         ) : (
@@ -837,5 +948,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     cursor: 'pointer',
   },
+  popupButtonAuthorized: {
+    backgroundColor: '#166534',
+  },
+  popupButtonSecondary: {
+    backgroundColor: '#fff',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#cbd5e1',
+    padding: 6,
+    borderRadius: 6,
+    marginTop: 6,
+    alignItems: 'center',
+    cursor: 'pointer',
+  },
   popupButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  popupButtonSecondaryText: { color: '#334155', fontWeight: '700', fontSize: 14 },
+  authorizeBanner: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(37,99,235,0.08)',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  authorizeBannerText: {
+    flex: 1,
+    color: '#1e3a8a',
+    fontSize: 13,
+    lineHeight: 18,
+  },
 });
