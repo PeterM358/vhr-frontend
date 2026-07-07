@@ -52,7 +52,7 @@ jobs:
             "$SSH_USER@$SSH_HOST" \
             'echo SSH OK'
 
-      - name: Deploy beta
+      - name: Deploy beta (frontend only)
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
@@ -61,7 +61,7 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          echo "Deploy triggered by ${GITHUB_EVENT_NAME:-unknown} from ${GITHUB_REPOSITORY}@${GITHUB_SHA:0:7}"
+          echo "Frontend deploy triggered by ${GITHUB_EVENT_NAME:-unknown} from ${GITHUB_REPOSITORY}@${GITHUB_SHA:0:7}"
           ssh -i ~/.ssh/deploy_key \
             -p "$SSH_PORT" \
             -o StrictHostKeyChecking=yes \
@@ -71,14 +71,14 @@ jobs:
              export GITHUB_REPOSITORY='${GITHUB_REPOSITORY}'
              export GITHUB_SHA='${GITHUB_SHA}'
              cd /opt/veversal/backend
-             echo '==> Sync deploy script from origin/main before running'
+             echo '==> Sync deploy scripts from origin/main'
              git fetch origin main
              git checkout main
              git reset --hard origin/main
-             echo \"==> Deploy script at: \$(git log -1 --oneline)\"
-             exec bash deploy/deploy_beta.sh" \
+             echo \"==> Deploy scripts at: \$(git log -1 --oneline)\"
+             exec bash deploy/deploy_frontend_beta.sh" \
             || {
-              echo "::error::Remote deploy_beta.sh failed (repo=${GITHUB_REPOSITORY} sha=${GITHUB_SHA:0:7})."
-              echo "::error::Recovery: SSH to server and run: cd /opt/veversal/backend && git pull && bash deploy/deploy_beta.sh"
+              echo "::error::Remote deploy_frontend_beta.sh failed (repo=${GITHUB_REPOSITORY} sha=${GITHUB_SHA:0:7})."
+              echo "::error::Recovery: SSH to server and run: cd /opt/veversal/backend && git pull && bash deploy/deploy_frontend_beta.sh"
               exit 1
             }
