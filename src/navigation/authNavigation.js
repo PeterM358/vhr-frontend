@@ -39,6 +39,15 @@ export function syncWebPath(pathname) {
   syncWebDocumentTitle(normalized.split('?')[0]);
 }
 
+/** Let React commit AuthContext updates before post-login navigation resets. */
+export function waitForAuthContextCommit() {
+  return new Promise((resolve) => {
+    queueMicrotask(() => {
+      queueMicrotask(resolve);
+    });
+  });
+}
+
 export const PARTNER_DASHBOARD_PATH = '/partner/dashboard';
 
 export function resetToClientDashboard(navigation) {

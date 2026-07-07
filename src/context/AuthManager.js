@@ -15,18 +15,42 @@ export default function AuthManager({ children }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+
+    const readStoredSession = async () => {
       const token = await AsyncStorage.getItem('@access_token');
       const emailOrPhone = await AsyncStorage.getItem('@user_email_or_phone');
-      setAuthToken(token);
-      setUserEmailOrPhone(emailOrPhone || '');
-      setIsAuthenticated(!!token);
-      if (token) {
-        await syncPushDeviceToken(token);
+      const hasAuth = !!(token && token !== 'null' && token !== 'undefined');
+      return {
+        token: hasAuth ? token : null,
+        emailOrPhone: emailOrPhone || '',
+        hasAuth,
+      };
+    };
+
+    (async () => {
+      let session = await readStoredSession();
+      if (cancelled) return;
+
+      // Login can finish while hydration is in flight — re-read before clearing auth.
+      if (!session.hasAuth) {
+        session = await readStoredSession();
+      }
+      if (cancelled) return;
+
+      setAuthToken(session.token);
+      setUserEmailOrPhone(session.emailOrPhone);
+      setIsAuthenticated(session.hasAuth);
+      if (session.hasAuth) {
+        await syncPushDeviceToken(session.token);
         attachPushTokenRefreshListener(async () => AsyncStorage.getItem('@access_token'));
       }
       setIsLoading(false);
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (

@@ -5,7 +5,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { login, googleLogin } from '../api/auth';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
-import { resetToClientDashboard, consumeAuthReturnUrl } from '../navigation/authNavigation';
+import {
+  resetToClientDashboard,
+  consumeAuthReturnUrl,
+  waitForAuthContextCommit,
+} from '../navigation/authNavigation';
 import { resetNavigationToCanonicalPath } from '../navigation/webLinking';
 import { AuthContext } from '../context/AuthManager';
 import Logo from '../assets/images/logo.svg';
@@ -64,6 +68,7 @@ export default function LoginScreen({ navigation, route }) {
   }, []);
 
   const finishClientLogin = useCallback(async (navigationRef) => {
+    await waitForAuthContextCommit();
     const returnPath = await consumeAuthReturnUrl();
     if (returnPath && resetNavigationToCanonicalPath(navigationRef, returnPath)) {
       return;
@@ -115,6 +120,7 @@ export default function LoginScreen({ navigation, route }) {
 
         if (data.is_shop) {
           const shopRoute = await resolveShopEntryRoute();
+          await waitForAuthContextCommit();
           navigation.reset(buildShopAuthReset(shopRoute));
         } else {
           await finishClientLogin(navigation);
@@ -158,6 +164,7 @@ export default function LoginScreen({ navigation, route }) {
 
       if (data.is_shop) {
         const shopRoute = await resolveShopEntryRoute();
+        await waitForAuthContextCommit();
         navigation.reset(buildShopAuthReset(shopRoute));
       } else {
         await finishClientLogin(navigation);

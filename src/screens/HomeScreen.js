@@ -75,6 +75,7 @@ function extractFirstName(rawValue) {
 export default function HomeScreen({ navigation }) {
   const theme = useTheme();
   const {
+    authToken,
     isAuthenticated,
     isLoading,
     setAuthToken,
@@ -82,6 +83,7 @@ export default function HomeScreen({ navigation }) {
     userEmailOrPhone,
     setUserEmailOrPhone,
   } = useContext(AuthContext);
+  const hasSession = isAuthenticated || !!authToken;
   const { notifications } = useContext(WebSocketContext);
 
   const [vehicles, setVehicles] = useState([]);
@@ -100,25 +102,27 @@ export default function HomeScreen({ navigation }) {
       };
 
       const ensureAuthOrPublicHome = async () => {
-        try {
-          if (isLoading) return;
-          const token = await AsyncStorage.getItem('@access_token');
-          const hasToken = !!(token && token !== 'null' && token !== 'undefined');
-          if (hasToken) {
-            if (!isAuthenticated) {
-              setAuthToken?.(token);
-              setIsAuthenticated?.(true);
-            }
-            return;
+        if (isLoading) return;
+
+        const token = await AsyncStorage.getItem('@access_token');
+        const hasToken = !!(token && token !== 'null' && token !== 'undefined');
+        if (hasToken) {
+          if (!isAuthenticated || !authToken) {
+            setAuthToken?.(token);
+            setIsAuthenticated?.(true);
           }
-          resetToPublicHome(navigation);
-        } finally {
           setSessionChecked(true);
+          return;
         }
+
+        if (!hasSession) {
+          resetToPublicHome(navigation);
+        }
+        setSessionChecked(true);
       };
 
       const loadDashboard = async () => {
-        if (!isAuthenticated) return;
+        if (!hasSession) return;
         setDashboardLoading(true);
         try {
           const token = await AsyncStorage.getItem('@access_token');
@@ -152,6 +156,8 @@ export default function HomeScreen({ navigation }) {
       ensureAuthOrPublicHome();
       loadDashboard();
     }, [
+      authToken,
+      hasSession,
       isAuthenticated,
       isLoading,
       navigation,
@@ -271,7 +277,7 @@ export default function HomeScreen({ navigation }) {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!hasSession) {
     return (
       <ScreenBackground>
         <View style={styles.center}>
