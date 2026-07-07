@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Text } from 'react-native-paper';
 import { requestPasswordReset } from '../api/auth';
 import ScreenBackground from '../components/ScreenBackground';
+import AuthGlassCard from '../components/auth/AuthGlassCard';
 
 export default function PasswordRequestResetScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -44,7 +45,7 @@ export default function PasswordRequestResetScreen({ navigation }) {
           },
         ]}
       >
-        <View style={styles.card}>
+        <AuthGlassCard>
           <Text style={styles.title}>Reset Your Password</Text>
           <TextInput
             style={styles.input}
@@ -58,7 +59,7 @@ export default function PasswordRequestResetScreen({ navigation }) {
           <Button mode="contained" onPress={handleRequestReset} loading={loading}>
             Send Reset Email
           </Button>
-        </View>
+        </AuthGlassCard>
       </View>
     </ScreenBackground>
   );
@@ -69,13 +70,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 20,
-  },
-  card: {
-    backgroundColor: 'rgba(5,15,30,0.72)',
-    borderColor: 'rgba(255,255,255,0.16)',
-    borderWidth: 1,
-    borderRadius: 22,
-    padding: 22,
   },
   title: {
     fontSize: 22,

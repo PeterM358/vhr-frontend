@@ -14,6 +14,7 @@ import { COLORS } from '../constants/colors';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import { resetToClientDashboard } from '../navigation/authNavigation';
 import { safeError } from '../utils/logger';
+import AuthGlassCard from '../components/auth/AuthGlassCard';
 
 export default function RegisterScreen({ navigation }) {
   const theme = useTheme();
@@ -105,7 +106,7 @@ export default function RegisterScreen({ navigation }) {
           enableOnAndroid
           extraScrollHeight={20}
         >
-          <View style={styles.sheet}>
+          <AuthGlassCard>
             <View style={BaseStyles.logoContainer}>
               <Logo width={88} height={88} />
             </View>
@@ -184,7 +185,7 @@ export default function RegisterScreen({ navigation }) {
                 Create account
               </Button>
             )}
-          </View>
+          </AuthGlassCard>
         </KeyboardAwareScrollView>
 
         <Portal>
@@ -214,31 +215,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
-  sheet: {
-    width: '100%',
-    maxWidth: 440,
-    alignSelf: 'center',
-    backgroundColor: COLORS.CARD_FLOATING,
-    borderRadius: 22,
-    paddingHorizontal: 22,
-    paddingVertical: 26,
-    alignItems: 'stretch',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.14,
-    shadowRadius: 14,
-  },
   title: {
     fontSize: 26,
     fontWeight: '700',
-    color: COLORS.TEXT_DARK,
+    color: '#ffffff',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
-    color: COLORS.TEXT_MUTED,
+    color: 'rgba(255,255,255,0.78)',
     textAlign: 'center',
     marginBottom: 22,
     lineHeight: 20,
@@ -253,7 +239,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: 'center',
     fontWeight: '600',
-    color: COLORS.TEXT_DARK,
+    color: 'rgba(255,255,255,0.92)',
     letterSpacing: 0.2,
   },
   roleContainer: {
@@ -283,7 +269,7 @@ const styles = StyleSheet.create({
   roleTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: COLORS.TEXT_DARK,
+    color: '#0F172A',
   },
   roleTitleSelected: {
     color: COLORS.PRIMARY,

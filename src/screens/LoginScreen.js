@@ -20,6 +20,7 @@ import { COLORS } from '../constants/colors';
 import { shouldEnableGoogleOAuth } from '../components/auth/googleOAuthConfig';
 import { safeError, safeWarn } from '../utils/logger';
 import LoginGoogleOAuthBridge from '../components/auth/LoginGoogleOAuthBridge';
+import AuthGlassCard from '../components/auth/AuthGlassCard';
 
 export default function LoginScreen({ navigation, route }) {
   const theme = useTheme();
@@ -204,7 +205,7 @@ export default function LoginScreen({ navigation, route }) {
           },
         ]}
       >
-        <View style={styles.card}>
+        <AuthGlassCard>
           <View style={BaseStyles.logoContainer}>
             <Logo width={112} height={112} />
           </View>
@@ -310,7 +311,7 @@ export default function LoginScreen({ navigation, route }) {
           <Button mode="text" onPress={goToRegister} textColor={COLORS.PRIMARY}>
             Create account
           </Button>
-        </View>
+        </AuthGlassCard>
       </ScrollView>
     </ScreenBackground>
   );
@@ -327,21 +328,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
-  card: {
-    width: '100%',
-    maxWidth: 440,
-    alignSelf: 'center',
-    backgroundColor: COLORS.CARD_FLOATING,
-    borderRadius: 22,
-    paddingHorizontal: 22,
-    paddingVertical: 26,
-    alignItems: 'stretch',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.14,
-    shadowRadius: 14,
-  },
   kicker: {
     fontSize: 13,
     fontWeight: '700',
@@ -354,13 +340,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '700',
-    color: COLORS.TEXT_DARK,
+    color: '#ffffff',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
-    color: COLORS.TEXT_MUTED,
+    color: 'rgba(255,255,255,0.78)',
     textAlign: 'center',
     marginBottom: 20,
     lineHeight: 20,
@@ -394,7 +380,7 @@ const styles = StyleSheet.create({
   },
   helperText: {
     fontSize: 12,
-    color: COLORS.TEXT_MUTED,
+    color: 'rgba(255,255,255,0.65)',
     marginBottom: 8,
     marginTop: -2,
   },
@@ -407,6 +393,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
     fontSize: 14,
-    color: COLORS.TEXT_MUTED,
+    color: 'rgba(255,255,255,0.72)',
   },
 });
