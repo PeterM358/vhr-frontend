@@ -15,7 +15,7 @@ import { confirmPasswordReset } from '../api/auth';
 import { AuthContext } from '../context/AuthManager';
 import BASE_STYLES from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
-import AuthGlassCard from '../components/auth/AuthGlassCard';
+import DashboardCard from '../components/dashboard/DashboardCard';
 import { showMessage } from '../utils/crossPlatformAlert';
 import {
   applyAuthSession,
@@ -104,7 +104,7 @@ export default function PasswordConfirmResetScreen({ route, navigation }) {
           ]}
           keyboardShouldPersistTaps="handled"
         >
-          <AuthGlassCard>
+          <DashboardCard style={styles.authPanel}>
             <Text style={styles.title}>Enter New Password</Text>
             <TextInput
               style={styles.input}
@@ -135,7 +135,7 @@ export default function PasswordConfirmResetScreen({ route, navigation }) {
             >
               Reset Password
             </Button>
-          </AuthGlassCard>
+          </DashboardCard>
         </ScrollView>
       </KeyboardAvoidingView>
     </ScreenBackground>
@@ -147,6 +147,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 20,
+  },
+  authPanel: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
   },
   title: {
     fontSize: 22,

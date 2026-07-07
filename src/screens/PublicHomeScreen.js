@@ -7,7 +7,7 @@ import { Button, Text } from 'react-native-paper';
 import BaseStyles from '../styles/base';
 import Logo from '../assets/images/logo.svg';
 import ScreenBackground from '../components/ScreenBackground';
-import AuthGlassCard from '../components/auth/AuthGlassCard';
+import DashboardCard from '../components/dashboard/DashboardCard';
 
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import { navigateToSignIn, resetToClientDashboard } from '../navigation/authNavigation';
@@ -43,7 +43,7 @@ export default function PublicHomeScreen({ navigation }) {
           },
         ]}
       >
-        <AuthGlassCard contentStyle={styles.cardContent}>
+        <DashboardCard style={styles.authPanel} contentStyle={styles.cardContent}>
           <Text style={styles.title}>Welcome to Veversal</Text>
           <View style={BaseStyles.logoContainer}>
             <Logo width={160} height={160} />
@@ -78,7 +78,7 @@ export default function PublicHomeScreen({ navigation }) {
           >
             Create Account
           </Button>
-        </AuthGlassCard>
+        </DashboardCard>
       </ScrollView>
     </ScreenBackground>
   );
@@ -89,6 +89,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 20,
+  },
+  authPanel: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
   },
   cardContent: {
     alignItems: 'center',

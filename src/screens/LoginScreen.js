@@ -20,7 +20,7 @@ import { COLORS } from '../constants/colors';
 import { shouldEnableGoogleOAuth } from '../components/auth/googleOAuthConfig';
 import { safeError, safeWarn } from '../utils/logger';
 import LoginGoogleOAuthBridge from '../components/auth/LoginGoogleOAuthBridge';
-import AuthGlassCard from '../components/auth/AuthGlassCard';
+import DashboardCard from '../components/dashboard/DashboardCard';
 
 export default function LoginScreen({ navigation, route }) {
   const theme = useTheme();
@@ -205,7 +205,7 @@ export default function LoginScreen({ navigation, route }) {
           },
         ]}
       >
-        <AuthGlassCard>
+        <DashboardCard style={styles.authPanel}>
           <View style={BaseStyles.logoContainer}>
             <Logo width={112} height={112} />
           </View>
@@ -311,7 +311,7 @@ export default function LoginScreen({ navigation, route }) {
           <Button mode="text" onPress={goToRegister} textColor={COLORS.PRIMARY}>
             Create account
           </Button>
-        </AuthGlassCard>
+        </DashboardCard>
       </ScrollView>
     </ScreenBackground>
   );
@@ -327,6 +327,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 20,
+  },
+  authPanel: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
   },
   kicker: {
     fontSize: 13,

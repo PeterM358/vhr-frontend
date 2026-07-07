@@ -1,25 +1,20 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
+import DashboardCard from './DashboardCard';
 
 export default function DashboardHeroCard({ title, subtitle, contextLine }) {
   return (
-    <View style={styles.card}>
+    <DashboardCard style={styles.card}>
       <Text style={styles.title}>{title}</Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       {contextLine ? <Text style={styles.context}>{contextLine}</Text> : null}
-    </View>
+    </DashboardCard>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: 'rgba(5,15,30,0.72)',
-    borderColor: 'rgba(255,255,255,0.16)',
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 18,
     marginBottom: 16,
   },
   title: {

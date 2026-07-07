@@ -34,7 +34,7 @@ export default function AppCard({
 
 const styles = StyleSheet.create({
   darkCard: {
-    backgroundColor: '#0f172a',
+    backgroundColor: COLORS.CARD_DARK,
     borderRadius: 20,
     padding: 16,
     marginBottom: 14,

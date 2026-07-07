@@ -14,7 +14,7 @@ import { COLORS } from '../constants/colors';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import { resetToClientDashboard } from '../navigation/authNavigation';
 import { safeError } from '../utils/logger';
-import AuthGlassCard from '../components/auth/AuthGlassCard';
+import DashboardCard from '../components/dashboard/DashboardCard';
 
 export default function RegisterScreen({ navigation }) {
   const theme = useTheme();
@@ -106,7 +106,7 @@ export default function RegisterScreen({ navigation }) {
           enableOnAndroid
           extraScrollHeight={20}
         >
-          <AuthGlassCard>
+          <DashboardCard style={styles.authPanel}>
             <View style={BaseStyles.logoContainer}>
               <Logo width={88} height={88} />
             </View>
@@ -185,7 +185,7 @@ export default function RegisterScreen({ navigation }) {
                 Create account
               </Button>
             )}
-          </AuthGlassCard>
+          </DashboardCard>
         </KeyboardAwareScrollView>
 
         <Portal>
@@ -214,6 +214,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 20,
+  },
+  authPanel: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
   },
   title: {
     fontSize: 26,

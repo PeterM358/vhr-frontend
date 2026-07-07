@@ -11,7 +11,7 @@ export const COLORS = {
   PRIMARY_DARK: PALETTE.primaryDark,
   PRIMARY_LIGHT: PALETTE.primaryLight,
   CARD_FLOATING: 'rgba(245,247,250,0.94)',
-  CARD_DARK: 'rgba(5,15,30,0.72)',
+  CARD_DARK: '#050f1e',
   TEXT_DARK: '#0F172A',
   TEXT_MUTED: '#64748B',
   BORDER_SOFT: 'rgba(255,255,255,0.16)',
