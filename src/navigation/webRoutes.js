@@ -226,6 +226,9 @@ export function normalizeWebPath(input) {
   if (raw === 'ChooseShop' || raw.startsWith('ChooseShop')) {
     return `${PARTNER}/switch-center${query}`;
   }
+  if (raw === 'AddPartnerServiceCenter' || raw.startsWith('AddPartnerServiceCenter')) {
+    return `${PARTNER}/switch-center/add${query}`;
+  }
   if (raw === 'partner/service-centers' || raw.endsWith('/partner/service-centers')) {
     return `${PARTNER}/service-centers${query}`;
   }
@@ -439,6 +442,10 @@ export function partnerNotifications(params = {}) {
 
 export function partnerSwitchCenter(params = {}) {
   return buildPathWithQuery(`${PARTNER}/switch-center`, params);
+}
+
+export function partnerAddServiceCenter(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/switch-center/add`, params);
 }
 
 export function partnerServiceCenters(params = {}) {

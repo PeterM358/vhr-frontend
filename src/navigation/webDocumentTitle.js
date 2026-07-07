@@ -22,6 +22,7 @@ const PATH_TITLES = {
   '/partner/services': `${BASE_TITLE} Price List`,
   '/partner/notifications': `${BASE_TITLE} Notifications`,
   '/partner/switch-center': `${BASE_TITLE} Switch Service Center`,
+  '/partner/switch-center/add': `${BASE_TITLE} Add Service Center`,
   '/service-centers': `${BASE_TITLE} Service Centers`,
   '/sign-in': BASE_TITLE,
   '/sign-up': BASE_TITLE,

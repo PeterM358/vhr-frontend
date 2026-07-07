@@ -37,6 +37,25 @@ async function fetchCitiesForCountryRaw(countryId, options = {}) {
   return res.json();
 }
 
+// 🔹 Create a new service center linked to the current shop user
+export async function createShopProfile(payload) {
+  const token = await AsyncStorage.getItem('@access_token');
+  const res = await fetch(`${API_BASE_URL}/api/profiles/shop-profiles/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    safeError('Shop profile create failed', errorData?.detail || 'validation error');
+    throw new Error(JSON.stringify(errorData));
+  }
+  return res.json();
+}
+
 // 🔹 Load *my* shop profiles (those user is linked to)
 export async function getMyShopProfiles() {
   const token = await AsyncStorage.getItem('@access_token');

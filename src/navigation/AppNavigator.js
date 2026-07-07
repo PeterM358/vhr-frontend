@@ -34,6 +34,7 @@ import {
   CreatePromotionScreen,
   ShopRegisterClientScreen,
   ChooseShopScreen,
+  AddPartnerServiceCenterScreen,
   PartnerServiceCentersScreen,
   ClientActivityScreen,
   ClientServiceHistoryScreen,
@@ -474,6 +475,16 @@ export default function AppNavigator() {
             title: '',
             headerLeft: shopHomeHeaderLeft(navigation),
             headerBackVisible: false,
+          })}
+        />
+        <Stack.Screen
+          name="AddPartnerServiceCenter"
+          component={AddPartnerServiceCenterScreen}
+          options={({ navigation }) => ({
+            title: 'Add service center',
+            headerLeft: stackBackHeaderLeft(navigation, 'Switch center'),
+            headerBackVisible: false,
+            ...transparentStackHeader,
           })}
         />
         <Stack.Screen

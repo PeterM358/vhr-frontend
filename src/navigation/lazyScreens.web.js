@@ -59,6 +59,7 @@ export const CreatePromotionScreen = lazyScreen(() => import('../screens/CreateP
 export const ShopRegisterClientScreen = lazyScreen(() => import('../screens/ShopRegisterClientScreen'));
 // Partner screens — static imports avoid Metro async chunk module ID mismatches on web
 export { default as ChooseShopScreen } from '../screens/ChooseShopScreen';
+export { default as AddPartnerServiceCenterScreen } from '../screens/AddPartnerServiceCenterScreen';
 export { default as PartnerServiceCentersScreen } from '../screens/PartnerServiceCentersScreen.web';
 export const ClientServiceHistoryScreen = lazyScreen(() => import('../screens/ClientServiceHistoryScreen'));
 export { default as ClientDashboardPlaceholderScreen } from '../screens/ClientDashboardPlaceholderScreen';

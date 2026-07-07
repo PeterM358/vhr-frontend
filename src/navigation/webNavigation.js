@@ -40,6 +40,7 @@ import {
   partnerServices,
   partnerNotifications,
   partnerSwitchCenter,
+  partnerAddServiceCenter,
   partnerServiceCenters,
 } from './webRoutes';
 
@@ -679,13 +680,33 @@ export function navigateToPartnerNotifications(navigation) {
   root.navigate('NotificationsList');
 }
 
-export function navigateToPartnerSwitchCenter(navigation) {
+export function navigateToPartnerSwitchCenter(navigation, params = {}) {
   if (Platform.OS === 'web') {
-    resetPartnerStackWebRoutes(navigation, [{ name: 'ChooseShop' }], partnerSwitchCenter());
+    resetPartnerStackWebRoutes(
+      navigation,
+      [{ name: 'ChooseShop', params }],
+      partnerSwitchCenter(params)
+    );
     return;
   }
   const root = getRootNavigation(navigation);
-  root.navigate('ChooseShop');
+  root.navigate('ChooseShop', params);
+}
+
+export function navigateToPartnerAddServiceCenter(navigation, params = {}) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(
+      navigation,
+      [
+        { name: 'ChooseShop' },
+        { name: 'AddPartnerServiceCenter', params },
+      ],
+      partnerAddServiceCenter(params)
+    );
+    return;
+  }
+  const root = getRootNavigation(navigation);
+  root.navigate('AddPartnerServiceCenter', params);
 }
 
 export function navigateToPartnerServiceCenters(navigation, params = {}) {
