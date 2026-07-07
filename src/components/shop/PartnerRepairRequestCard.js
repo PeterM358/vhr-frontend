@@ -45,6 +45,10 @@ export default function PartnerRepairRequestCard({
   onPressOffer,
   onPressPrimary,
 }) {
+  if (!repair || repair.id == null) {
+    return null;
+  }
+
   const lifecycle = resolvePartnerLifecycle(repair);
   const pill = getLifecyclePill(repair);
   const plate = String(repair?.vehicle_license_plate || '').trim();

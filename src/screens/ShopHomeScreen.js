@@ -53,10 +53,17 @@ import {
   canSendPartnerOffers,
   isPartnerSubscriptionActive,
 } from '../utils/partnerSubscription';
+import { todayCalendarRange, isScheduledToday } from '../utils/dashboardDate';
 import { showMessage } from '../utils/crossPlatformAlert';
 import { resetShopDrawerRepairs } from '../navigation/drawerNavigation';
 
 const SHOP_TOP_BAR = 'rgba(11,18,32,0.92)';
+
+function asRepairRows(data) {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.results)) return data.results;
+  return [];
+}
 
 function openPartnerProfile(navigation, params = {}) {
   if (Platform.OS === 'web') {
@@ -117,10 +124,18 @@ export default function ShopHomeScreen() {
       const shopFilter = shopId ? { shop_profile_id: shopId } : {};
 
       const [openRows, ongoingRows, doneRows, deniedRows] = await Promise.all([
-        getRepairs(token, { status: 'open', ...shopFilter }).catch(() => []),
-        getRepairs(token, { status: 'ongoing', ...shopFilter }).catch(() => []),
-        getRepairs(token, { status: 'done', ...shopFilter }).catch(() => []),
-        getRepairs(token, { status: 'denied', ...shopFilter }).catch(() => []),
+        getRepairs(token, { status: 'open', ...shopFilter })
+          .then(asRepairRows)
+          .catch(() => []),
+        getRepairs(token, { status: 'ongoing', ...shopFilter })
+          .then(asRepairRows)
+          .catch(() => []),
+        getRepairs(token, { status: 'done', ...shopFilter })
+          .then(asRepairRows)
+          .catch(() => []),
+        getRepairs(token, { status: 'denied', ...shopFilter })
+          .then(asRepairRows)
+          .catch(() => []),
       ]);
 
       const merged = new Map();
@@ -146,12 +161,12 @@ export default function ShopHomeScreen() {
       const { from, to } = todayCalendarRange();
 
       const [ongoing, offers, calendar] = await Promise.all([
-        getRepairs(token, 'ongoing').catch(() => []),
+        getRepairs(token, 'ongoing').then(asRepairRows).catch(() => []),
         getMyOffers(token).catch(() => []),
         getShopCalendar(token, { from, to, shopId }).catch(() => ({ scheduled: [] })),
       ]);
 
-      setOngoingRepairs(Array.isArray(ongoing) ? ongoing : []);
+      setOngoingRepairs(asRepairRows(ongoing));
       const offerRows = Array.isArray(offers) ? offers : [];
       setPendingOffers(offerRows.filter((o) => !o.is_booked));
       const scheduled = Array.isArray(calendar?.scheduled) ? calendar.scheduled : [];
@@ -161,17 +176,19 @@ export default function ShopHomeScreen() {
     }
   }, []);
 
+  const latestNotificationId = notifications[0]?.id ?? null;
+
   React.useEffect(() => {
-    if (!notifications.length) return;
+    if (!latestNotificationId) return;
+    if (latestNotificationId === lastRepairNotifIdRef.current) return;
     const latest = notifications[0];
-    if (!latest?.id || latest.id === lastRepairNotifIdRef.current) return;
     const eventType = String(
-      latest.data?.event_type || latest.event_type || latest.notification_type || ''
+      latest?.data?.event_type || latest?.event_type || latest?.notification_type || ''
     ).toLowerCase();
     if (!eventType.includes('repair_request')) return;
-    lastRepairNotifIdRef.current = latest.id;
+    lastRepairNotifIdRef.current = latestNotificationId;
     loadDashboardRepairs({ background: true });
-  }, [notifications, loadDashboardRepairs]);
+  }, [latestNotificationId, notifications, loadDashboardRepairs]);
 
   const refreshProfileGate = React.useCallback(async () => {
     try {

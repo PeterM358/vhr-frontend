@@ -60,12 +60,16 @@ const FALLBACK_PILL = {
 };
 
 export function resolvePartnerLifecycle(repair) {
-  const lifecycle = String(repair?.partner_lifecycle_status || '').trim();
+  if (!repair || typeof repair !== 'object') {
+    return PARTNER_LIFECYCLE.WAITING_FOR_OFFER;
+  }
+
+  const lifecycle = String(repair.partner_lifecycle_status || '').trim();
   if (lifecycle && LIFECYCLE_PILL[lifecycle]) {
     return lifecycle;
   }
 
-  const status = String(repair?.repair_status || repair?.status || '').toLowerCase();
+  const status = String(repair.repair_status || repair.status || '').toLowerCase();
   if (status === 'done') return PARTNER_LIFECYCLE.COMPLETED;
   if (status === 'ongoing') return PARTNER_LIFECYCLE.IN_PROGRESS;
   if (status === 'denied' || status === 'canceled') return PARTNER_LIFECYCLE.DECLINED;
