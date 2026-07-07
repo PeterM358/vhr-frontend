@@ -9,6 +9,7 @@ import { AppTheme } from './styles/theme';
 import { ThemeProvider } from './context/ThemeManager';
 import AuthManager from './context/AuthManager';
 import MessageDialogHost from './components/ui/MessageDialog';
+import MobileWebInsetsBridge from './components/MobileWebInsetsBridge';
 import { devLog } from './utils/logger';
 
 const handleDeepLink = ({ url }) => {
@@ -65,8 +66,10 @@ export default function App() {
           <PaperProvider theme={AppTheme}>
             <AuthManager>
               <WebSocketProvider>
-                <AppNavigator />
-                <MessageDialogHost />
+                <MobileWebInsetsBridge>
+                  <AppNavigator />
+                  <MessageDialogHost />
+                </MobileWebInsetsBridge>
               </WebSocketProvider>
             </AuthManager>
           </PaperProvider>
@@ -82,7 +85,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0b1220',
     ...(Platform.OS === 'web'
       ? {
-          minHeight: '100vh',
+          minHeight: '100dvh',
           width: '100%',
           alignSelf: 'stretch',
         }

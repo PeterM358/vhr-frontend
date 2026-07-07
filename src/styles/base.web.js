@@ -14,7 +14,7 @@ export default StyleSheet.create({
 
   background: {
     flex: 1,
-    minHeight: '100vh',
+    minHeight: '100dvh',
   },
 
   flexFill: {

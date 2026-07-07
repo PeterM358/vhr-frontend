@@ -32,6 +32,7 @@ import RecommendedForYouSection from '../components/dashboard/RecommendedForYouS
 import FloatingCard from '../components/ui/FloatingCard';
 import { NOTIFICATION_CENTER_PLACEHOLDERS } from '../constants/clientDashboardPlaceholders';
 import { COLORS } from '../constants/colors';
+import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 import { resetFromClientDrawer } from '../navigation/drawerNavigation';
 import {
   navigateToNotifications,
@@ -93,6 +94,7 @@ export default function HomeScreen({ navigation }) {
   const [pendingOffersCount, setPendingOffersCount] = useState(0);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [sessionChecked, setSessionChecked] = useState(false);
+  const scrollBottomPadding = useScrollContentBottomPadding(80);
 
   useFocusEffect(
     useCallback(() => {
@@ -306,7 +308,10 @@ export default function HomeScreen({ navigation }) {
         <Appbar.Action icon="logout" onPress={handleLogout} color="#fff" />
       </Appbar.Header>
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: scrollBottomPadding }]}
+        keyboardShouldPersistTaps="handled"
+      >
         <DashboardHero
           title={`Welcome, ${heroName}`}
           subtitle={HERO_SUBTITLE}
@@ -435,7 +440,6 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: 14,
     paddingTop: 12,
-    paddingBottom: 96,
   },
   repairTitle: {
     fontSize: 16,

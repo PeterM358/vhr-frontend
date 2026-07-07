@@ -43,6 +43,7 @@ import {
   SORT_OPTIONS,
 } from '../hooks/useServiceCenterDiscovery';
 import { applyDiscoverySeoMeta } from '../utils/seo/seoMetadata';
+import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 import {
   goBackFromServiceCenters,
   navigateToServiceCenterProfile,
@@ -98,6 +99,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   const route = useRoute();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 960;
+  const listBottomPadding = useScrollContentBottomPadding(24);
 
   const discovery = useServiceCenterDiscovery({
     initialCitySlug: route.params?.citySlug || null,
@@ -475,7 +477,10 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
           </Pressable>
         ))}
       </View>
-      <ScrollView style={styles.listScroll} contentContainerStyle={styles.listContent}>
+      <ScrollView
+        style={styles.listScroll}
+        contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPadding }]}
+      >
         {loading && shops.length === 0 ? (
           <ActivityIndicator style={{ marginTop: 24 }} color={COLORS.primary} />
         ) : null}
@@ -758,7 +763,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   listScroll: { flex: 1 },
-  listContent: { paddingBottom: 24 },
+  listContent: {},
   sortRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   sortChip: {
     paddingHorizontal: 10,

@@ -46,9 +46,13 @@ import {
   formatPreferredVisitNote,
 } from '../utils/shopVisitSlots';
 import { navigateToRepairRequestDetail } from '../navigation/webNavigation';
+import {
+  useScrollContentBottomPaddingWithFooter,
+} from '../utils/mobileWebInsets';
 
 export default function CreateRepairScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const scrollBottomPadding = useScrollContentBottomPaddingWithFooter(110);
 
   const isEditMode = route.params?.mode === 'edit_request';
   const editRepairId = route.params?.repairId ? Number(route.params.repairId) : null;
@@ -661,7 +665,7 @@ export default function CreateRepairScreen({ navigation, route }) {
         <KeyboardAwareScrollView
           contentContainerStyle={[
             styles.container,
-            { paddingBottom: 110 + Math.max(insets.bottom, 10) },
+            { paddingBottom: scrollBottomPadding },
           ]}
           keyboardShouldPersistTaps="always"
         >

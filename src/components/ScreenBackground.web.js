@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     alignSelf: 'stretch',
-    minHeight: '100vh',
+    minHeight: '100dvh',
     backgroundColor: '#0b1220',
     overflow: 'hidden',
   },
