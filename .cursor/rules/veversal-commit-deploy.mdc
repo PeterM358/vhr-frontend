@@ -3,12 +3,13 @@ description: Commit and push Veversal changes when user requests deploy
 alwaysApply: true
 ---
 
-# Veversal commit + deploy workflow
+# Veversal commit workflow
 
 When finishing a coding task the user requested with commit/deploy instructions:
 
 1. Run `git status` and `git diff` before ending — confirm what will be committed.
 2. Commit with the user's requested message if changes exist.
 3. Push to `origin main`.
-4. Remind the user to verify GitHub Actions deploy, or note if the server deploy script (`deploy/deploy_beta.sh`) needs a manual run or fix.
-5. Never leave uncommitted work when the user explicitly asked for commit+push.
+4. Never leave uncommitted work when the user explicitly asked for commit+push.
+
+For post-push beta deploy verification, completion checklist, and recovery steps, follow `.cursor/rules/veversal-deploy.mdc`.

@@ -1,0 +1,42 @@
+---
+description: Veversal beta deploy verification and completion checklist
+alwaysApply: true
+---
+
+# Veversal Beta Deploy Rule
+
+## Never mark beta task complete after git push alone
+
+Push to main ≠ live on beta. Beta updates only when Deploy Beta workflow succeeds OR manual `deploy_beta.sh` succeeds.
+
+## After every commit+push that should reach beta
+
+1. Check GitHub Actions:
+   - Frontend: `gh run list --repo PeterM358/vhr-frontend --workflow=deploy-beta.yml --limit 3`
+   - Backend (if relevant): `gh run list --repo PeterM358/vhr-backend --workflow=deploy-beta.yml --limit 3`
+2. If user asked for deploy, wait for or verify green run.
+3. If failed, report exact error from `gh run view <id> --log-failed` and give recovery:
+   `cd /opt/veversal/backend && git pull && bash deploy/deploy_beta.sh`
+4. Tell user which commits should now be on beta (`git log -1`).
+
+## Single deploy path
+
+- Full stack deploy: `deploy/deploy_beta.sh` on server (pulls BOTH backend + frontend, docker, build).
+- Both repos have Deploy Beta workflow SSHing to server.
+- Warn: pushing both repos within minutes causes race — prefer one deploy trigger or rely on flock lock in script.
+
+## Deploy script location
+
+- Backend repo: `/opt/veversal/backend/deploy/deploy_beta.sh`
+- Run: `bash deploy/deploy_beta.sh` (executable in git)
+
+## When backend AND frontend changed
+
+- Push both repos.
+- One successful deploy run updates both — do not SSH twice manually.
+
+## Agent completion checklist
+
+- [ ] git status clean, committed, pushed
+- [ ] GitHub Actions Deploy Beta green (or user notified to run manual deploy)
+- [ ] Mention both repo commits if both changed
