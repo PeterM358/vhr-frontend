@@ -27,7 +27,9 @@ import {
   getCatalogEbikeSystems,
   getCatalogTrailerTypes,
 } from '../api/vehicles';
-import { stackContentPaddingTop } from '../navigation/stackContentInset';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { useVehicleListBack } from '../navigation/appNavBarBack';
 import FloatingCard from '../components/ui/FloatingCard';
 import { COLORS } from '../constants/colors';
 import VehicleCollapsibleFormSections from '../components/vehicle/VehicleCollapsibleFormSections';
@@ -56,6 +58,8 @@ import {
 
 export default function CreateVehicleScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const handleBack = useVehicleListBack(navigation);
 
   const clientEmail = route?.params?.clientEmail || null;
   const clientPhone = route?.params?.clientPhone || null;
@@ -533,12 +537,20 @@ export default function CreateVehicleScreen({ navigation, route }) {
   return (
     <ScreenBackground safeArea={false}>
       <View style={{ flex: 1 }}>
+        <AppNavigationBar
+          title="Add vehicle"
+          backLabel="My Vehicles"
+          onBack={handleBack}
+          scrolled={scrolled}
+        />
         <KeyboardAwareScrollView
           style={{ flex: 1 }}
+          onScroll={onScroll}
+          scrollEventThrottle={scrollEventThrottle}
           contentContainerStyle={[
             styles.container,
             {
-              paddingTop: stackContentPaddingTop(insets, 8),
+              paddingTop: 12,
               paddingBottom: Math.max(insets.bottom, 16) + 80,
             },
           ]}

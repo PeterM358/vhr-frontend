@@ -22,6 +22,8 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 
 import { API_BASE_URL } from '../../api/config';
 import ScreenBackground from '../ScreenBackground';
+import AppNavigationBar from '../common/AppNavigationBar';
+import { usePartnerDashboardBack } from '../../navigation/appNavBarBack';
 import FloatingCard from '../ui/FloatingCard';
 import AppCard from '../ui/AppCard';
 import EmptyStateCard from '../ui/EmptyStateCard';
@@ -31,7 +33,6 @@ import {
   TEXT_DARK,
   TEXT_MUTED,
 } from '../../constants/colors';
-import { stackContentPaddingTop } from '../../navigation/stackContentInset';
 
 const API_URL = `${API_BASE_URL}/api/profiles/shops/authorized-clients/`;
 
@@ -41,6 +42,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 export default function AuthorizedClients({ navigation }) {
   const insets = useSafeAreaInsets();
+  const handleBack = usePartnerDashboardBack(navigation);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedClientIds, setExpandedClientIds] = useState([]);
@@ -261,7 +263,8 @@ export default function AuthorizedClients({ navigation }) {
 
   return (
     <ScreenBackground safeArea={false}>
-      <View style={[styles.container, { paddingTop: stackContentPaddingTop(insets, 12) }]}>
+      <AppNavigationBar title="Clients" backLabel="Dashboard" onBack={handleBack} />
+      <View style={styles.container}>
         <AppCard variant="dark" accent={false} style={styles.heroCard}>
           <View style={styles.heroRow}>
             <View style={styles.heroIconWrap}>

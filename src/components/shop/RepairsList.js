@@ -3,11 +3,10 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, useContext } from 'react';
 import { View, FlatList, StyleSheet, Pressable, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, DrawerActions, useFocusEffect, useRoute } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import {
   Text,
   ActivityIndicator,
-  Appbar,
   Searchbar,
   Checkbox,
 } from 'react-native-paper';
@@ -26,6 +25,9 @@ import {
   setCachedShopRepairs,
 } from '../../utils/shopRepairsPrefetch';
 import ScreenBackground from '../ScreenBackground';
+import AppNavigationBar from '../common/AppNavigationBar';
+import { useScrollShadow } from '../../hooks/useScrollShadow';
+import { usePartnerDashboardBack } from '../../navigation/appNavBarBack';
 import FloatingCard from '../ui/FloatingCard';
 import StatusBadge from '../ui/StatusBadge';
 import EmptyStateCard from '../ui/EmptyStateCard';
@@ -69,6 +71,7 @@ const PAYMENT_FILTER_OPTIONS = [
 ];
 
 export default function RepairsList() {
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState('open');
@@ -86,6 +89,15 @@ export default function RepairsList() {
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const navigation = useNavigation();
   const route = useRoute();
+  const handlePartnerBack = usePartnerDashboardBack(navigation);
+  const handleBack = useCallback(() => {
+    const returnTo = route.params?.returnTo;
+    if (returnTo) {
+      navigation.navigate(returnTo);
+      return;
+    }
+    handlePartnerBack();
+  }, [navigation, route.params?.returnTo, handlePartnerBack]);
   const profileGateChecked = useRef(false);
   const lastRepairNotifIdRef = useRef(null);
   const invoiceIntentRef = useRef(null);
@@ -572,40 +584,45 @@ export default function RepairsList() {
 
   return (
     <ScreenBackground safeArea={false}>
-      <Appbar.Header style={{ backgroundColor: SHOP_TOP_BAR }}>
-        <Appbar.BackAction
-          color="#fff"
-          onPress={() => {
-            const returnTo = route.params?.returnTo;
-            if (returnTo) {
-              navigation.navigate(returnTo);
-              return;
-            }
-            navigation.dispatch(DrawerActions.jumpTo('ShopDashboard'));
-          }}
-        />
-        <Appbar.Content title="Repairs" titleStyle={{ color: '#fff' }} />
-        {selectedTab === 'done' ? (
-          <Appbar.Action
-            icon={invoiceSelectMode ? 'close' : 'file-document-multiple-outline'}
-            color="#fff"
-            accessibilityLabel={invoiceSelectMode ? 'Cancel invoice selection' : 'Select repairs to invoice'}
-            onPress={() => {
-              if (invoiceSelectMode) {
-                exitInvoiceSelectMode();
-              } else {
-                setInvoiceSelectMode(true);
-              }
-            }}
-          />
-        ) : null}
-        <Appbar.Action
-          icon="menu"
-          color="#fff"
-          onPress={() => navigation.openDrawer()}
-        />
-      </Appbar.Header>
-      <View style={[styles.container, { paddingTop: 12 }]}>
+      <AppNavigationBar
+        title="Repairs"
+        backLabel="Dashboard"
+        onBack={handleBack}
+        scrolled={scrolled}
+        rightAction={
+          <>
+            {selectedTab === 'done' ? (
+              <Pressable
+                onPress={() => {
+                  if (invoiceSelectMode) {
+                    exitInvoiceSelectMode();
+                  } else {
+                    setInvoiceSelectMode(true);
+                  }
+                }}
+                style={styles.navIconBtn}
+                accessibilityLabel={invoiceSelectMode ? 'Cancel invoice selection' : 'Select repairs to invoice'}
+              >
+                <MaterialCommunityIcons
+                  name={invoiceSelectMode ? 'close' : 'file-document-multiple-outline'}
+                  size={22}
+                  color="#0f172a"
+                />
+              </Pressable>
+            ) : null}
+            {navigation.openDrawer ? (
+              <Pressable
+                onPress={() => navigation.openDrawer()}
+                style={styles.navIconBtn}
+                accessibilityLabel="Open menu"
+              >
+                <MaterialCommunityIcons name="menu" size={22} color="#0f172a" />
+              </Pressable>
+            ) : null}
+          </>
+        }
+      />
+      <View style={styles.container}>
         {!profileComplete ? (
           <ShopProfileSetupBanner
             missingFields={missingProfileFields}
@@ -793,7 +810,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 12,
+    paddingTop: 12,
     backgroundColor: 'transparent',
+  },
+  navIconBtn: {
+    padding: 8,
+    marginLeft: 4,
   },
   tabRow: {
     flexDirection: 'row',

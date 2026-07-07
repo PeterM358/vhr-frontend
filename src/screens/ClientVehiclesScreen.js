@@ -6,11 +6,14 @@ import { Text, FAB, useTheme, TouchableRipple } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import ScreenBackground from '../components/ScreenBackground';
-import { useStackBodyPaddingTop } from '../navigation/stackContentInset';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { useClientDashboardBack } from '../navigation/appNavBarBack';
 import { navigateToVehicleAdd, navigateToVehicleDetail } from '../navigation/webNavigation';
 
 export default function ClientVehiclesScreen({ navigation }) {
-  const bodyPadTop = useStackBodyPaddingTop(12);
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const handleBack = useClientDashboardBack(navigation);
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isShop, setIsShop] = useState(false);
@@ -95,10 +98,18 @@ export default function ClientVehiclesScreen({ navigation }) {
 
   return (
     <ScreenBackground safeArea={false}>
-      <View style={[styles.container, { paddingTop: bodyPadTop }]}>
+      <AppNavigationBar
+        title="My Vehicles"
+        backLabel="Dashboard"
+        onBack={handleBack}
+        scrolled={scrolled}
+      />
+      <View style={styles.container}>
         <FlatList
           data={vehicles}
           keyExtractor={(item) => item.id.toString()}
+          onScroll={onScroll}
+          scrollEventThrottle={scrollEventThrottle}
           contentContainerStyle={styles.listContent}
           renderItem={renderVehicle}
           ListEmptyComponent={

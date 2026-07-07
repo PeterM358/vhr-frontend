@@ -17,6 +17,8 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 
 import { deletePromotion, getPromotions } from '../../api/promotions';
 import ScreenBackground from '../ScreenBackground';
+import AppNavigationBar from '../common/AppNavigationBar';
+import { usePartnerDashboardBack } from '../../navigation/appNavBarBack';
 import FloatingCard from '../ui/FloatingCard';
 import EmptyStateCard from '../ui/EmptyStateCard';
 import {
@@ -25,14 +27,14 @@ import {
   TEXT_DARK,
   TEXT_MUTED,
 } from '../../constants/colors';
-import { stackContentPaddingTop } from '../../navigation/stackContentInset';
 import { formatMoneyAmount } from '../../constants/currency';
 
 export default function ShopPromotions() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+  const handleBack = usePartnerDashboardBack(navigation);
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const navigation = useNavigation();
   const isFocused = useIsFocused();
   const theme = useTheme();
 
@@ -148,7 +150,8 @@ export default function ShopPromotions() {
 
   return (
     <ScreenBackground safeArea={false}>
-      <View style={[styles.container, { paddingTop: stackContentPaddingTop(insets, 12) }]}>
+      <AppNavigationBar title="Promotions" backLabel="Dashboard" onBack={handleBack} />
+      <View style={styles.container}>
         <Button
           mode="contained"
           icon="plus"

@@ -1,5 +1,7 @@
 import { Platform } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { appNavBarTotalHeight } from '../components/common/AppNavigationBar';
 
 /**
  * Top padding for lists/scroll bodies when the root native stack uses a
@@ -23,4 +25,19 @@ export function stackContentPaddingTop(insets, extra = 8) {
 export function useStackBodyPaddingTop(extra = 8) {
   const headerHeight = useHeaderHeight();
   return headerHeight + extra;
+}
+
+/**
+ * Top padding for scroll content below an in-screen {@link AppNavigationBar}.
+ * @param {number} [extra=8]
+ * @param {{ largeTitle?: boolean }} [options]
+ */
+export function useAppNavContentPaddingTop(extra = 8, options = {}) {
+  const insets = useSafeAreaInsets();
+  return appNavBarTotalHeight(insets, options) + extra;
+}
+
+/** Static estimate when insets are already available. */
+export function appNavContentPaddingTop(insets, extra = 8, options = {}) {
+  return appNavBarTotalHeight(insets, options) + extra;
 }

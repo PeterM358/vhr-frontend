@@ -19,9 +19,11 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import { confirmMessage } from '../utils/crossPlatformAlert';
 import ScreenBackground from '../components/ScreenBackground';
+import AppNavigationBar from '../components/common/AppNavigationBar';
 import FloatingCard from '../components/ui/FloatingCard';
 import { COLORS } from '../constants/colors';
-import { stackContentPaddingTop } from '../navigation/stackContentInset';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { useGoBackOr } from '../navigation/appNavBarBack';
 import { navigateToVehicleReminderNew, navigateToVehicleManageServiceCenters } from '../navigation/webNavigation';
 import VehicleCatalogEbikeTrailerSection from '../components/vehicle/VehicleCatalogEbikeTrailerSection';
 import VehicleRegistrationIdentityBlock from '../components/vehicle/VehicleRegistrationIdentityBlock';
@@ -44,6 +46,8 @@ import { resolveMileageFactorAction } from '../utils/mileageConfidence';
 export default function EditVehicleDetailsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { vehicleId } = route.params || {};
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const handleBack = useGoBackOr(navigation);
 
   const [vehicleChoices, setVehicleChoices] = useState({});
   const [countriesState, setCountriesState] = useState({
@@ -439,12 +443,20 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
   return (
     <ScreenBackground safeArea={false}>
       <View style={styles.root}>
+        <AppNavigationBar
+          title="Technical details"
+          backLabel="Vehicle"
+          onBack={handleBack}
+          scrolled={scrolled}
+        />
         <KeyboardAwareScrollView
           style={{ flex: 1 }}
+          onScroll={onScroll}
+          scrollEventThrottle={scrollEventThrottle}
           contentContainerStyle={[
             styles.container,
             {
-              paddingTop: stackContentPaddingTop(insets, 8),
+              paddingTop: 12,
               paddingBottom: Math.max(insets.bottom, 16) + 132,
             },
           ]}

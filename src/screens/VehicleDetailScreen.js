@@ -23,7 +23,9 @@ import { API_BASE_URL } from '../api/config';
 import { updateVehicle, patchVehicleReminder, getVehicleForecast } from '../api/vehicles';
 import { listVehicleDocuments } from '../api/documents';
 import ScreenBackground from '../components/ScreenBackground';
-import { stackContentPaddingTop } from '../navigation/stackContentInset';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { useVehicleListBack } from '../navigation/appNavBarBack';
 import AppCard from '../components/ui/AppCard';
 import FloatingCard from '../components/ui/FloatingCard';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -115,7 +117,13 @@ function isObligationReminderType(reminderType) {
 
 export default function VehicleDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
-  const { vehicleId, mileageIntent: mileageIntentParam } = route.params || {};
+  const { vehicleId, mileageIntent: mileageIntentParam, backLabel: backLabelParam } = route.params || {};
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const handleBack = useVehicleListBack(navigation);
+  const backLabel = backLabelParam || 'My Vehicles';
+  const onBack = backLabelParam
+    ? () => navigation.goBack()
+    : handleBack;
   const [vehicle, setVehicle] = useState(null);
   const [repairs, setRepairs] = useState([]);
   const [vehicleDocuments, setVehicleDocuments] = useState([]);
@@ -1106,11 +1114,19 @@ export default function VehicleDetailScreen({ route, navigation }) {
   return (
     <ScreenBackground safeArea={false}>
       <View style={styles.container}>
+        <AppNavigationBar
+          title="Vehicle Details"
+          backLabel={backLabel}
+          onBack={onBack}
+          scrolled={scrolled}
+        />
         <ScrollView
           ref={scrollRef}
+          onScroll={onScroll}
+          scrollEventThrottle={scrollEventThrottle}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingTop: stackContentPaddingTop(insets, 12) },
+            { paddingTop: 12 },
           ]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />

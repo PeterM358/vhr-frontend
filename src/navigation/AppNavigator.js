@@ -78,6 +78,7 @@ import { syncWebDocumentTitle } from './webDocumentTitle';
 import { blurActiveElementOnWeb } from '../utils/webFocus';
 import NavigationFallback from './NavigationFallback';
 import { navigateToDashboard, navigateToVehicleDetail, navigateToVehicleList, navigateToVehicleServiceRecordNew, navigateToVehicleServiceRecordCenter, navigateToServiceCenters, navigateToPartnerDashboard } from './webNavigation';
+import { appNavBarScreenOptions } from './appNavBarOptions';
 
 const Stack = createNativeStackNavigator();
 
@@ -293,44 +294,22 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ClientVehicles"
           component={ClientVehiclesScreen}
-          options={({ navigation }) => ({
-            ...transparentStackHeader,
-            title: 'My Vehicles',
-            headerLeft: homeHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'My Vehicles' }}
         />
         <Stack.Screen
           name="VehicleDetail"
           component={VehicleDetailScreen}
-          options={({ navigation, route }) => {
-            const backLabel = route.params?.backLabel;
-            if (backLabel) {
-              return {
-                title: 'Vehicle Details',
-                headerLeft: stackBackHeaderLeft(navigation, backLabel),
-                headerBackVisible: false,
-              };
-            }
-            return {
-              title: 'Vehicle Details',
-              headerLeft: vehicleDetailsHeaderLeft(navigation),
-            };
-          }}
+          options={{ ...appNavBarScreenOptions, title: 'Vehicle Details' }}
         />
         <Stack.Screen
           name="VehicleSpecs"
           component={VehicleSpecsScreen}
-          options={({ navigation, route }) => ({
-            title: 'Vehicle specs',
-            headerLeft: vehicleSpecsHeaderLeft(navigation, route.params?.vehicleId),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Vehicle specs' }}
         />
         <Stack.Screen
           name="EditVehicleDetails"
           component={EditVehicleDetailsScreen}
-          options={{ title: 'Technical details' }}
+          options={{ ...appNavBarScreenOptions, title: 'Technical details' }}
         />
         <Stack.Screen
           name="PublicSeoPage"
@@ -340,107 +319,38 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ShopDetail"
           component={ShopDetailScreen}
-          options={({ navigation, route }) => ({
-            title: 'Service Center Details',
-            ...(Platform.OS === 'web'
-              ? {
-                  headerLeft: shopDetailHeaderLeft(navigation, route),
-                  headerBackVisible: false,
-                }
-              : {}),
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Service Center Details' }}
         />
         <Stack.Screen name="PromotionDetail" component={PromotionDetailScreen} options={{ title: 'Promotion Details' }}/>
         <Stack.Screen
           name="ClientRepairs"
           component={ClientRepairsList}
-          options={({ navigation, route }) => {
-            const fromVehicleDetail = !!route.params?.fromVehicleDetail;
-            return {
-              ...transparentStackHeader,
-              title: fromVehicleDetail ? 'Vehicle Repairs' : 'Repair Requests',
-              ...(fromVehicleDetail
-                ? {}
-                : { headerLeft: homeHeaderLeft(navigation), headerBackVisible: false }),
-            };
-          }}
+          options={{ ...appNavBarScreenOptions, title: 'Repair Requests' }}
         />
         <Stack.Screen
           name="RepairDetail"
           component={RepairDetailScreen}
-          options={({ navigation, route }) => {
-            const returnTo = route.params?.returnTo;
-            const backLabel = route.params?.backLabel;
-            if (returnTo === 'ClientActivity' || returnTo === 'ClientNotifications') {
-              return {
-                title: 'Repair',
-                headerLeft: stackBackHeaderLeft(navigation, backLabel || 'Notifications'),
-                headerBackVisible: false,
-              };
-            }
-            if (returnTo === 'ClientRepairs' || returnTo === 'ClientServiceHistory') {
-              return {
-                title: 'Repair',
-                headerLeft: stackBackHeaderLeft(navigation, backLabel || 'Dashboard'),
-                headerBackVisible: false,
-              };
-            }
-            if (returnTo === 'ShopDetail') {
-              return {
-                title: 'Repair',
-                headerLeft: stackBackHeaderLeft(navigation, backLabel || 'Service center'),
-                headerBackVisible: false,
-              };
-            }
-            if (returnTo === 'ShopCalendar') {
-              return {
-                title: 'Repair',
-                headerLeft: stackBackHeaderLeft(navigation, backLabel || 'Calendar'),
-                headerBackVisible: false,
-              };
-            }
-            return { title: 'Repair Details' };
-          }}
+          options={{ ...appNavBarScreenOptions, title: 'Repair Details' }}
         />
         <Stack.Screen
           name="CreateRepair"
           component={CreateRepairScreen}
-          options={({ navigation }) => ({
-            title: 'Request Service',
-            ...(Platform.OS === 'web'
-              ? {
-                  headerLeft: createRepairRequestHeaderLeft(navigation),
-                  headerBackVisible: false,
-                }
-              : {}),
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Request Service' }}
         />
         <Stack.Screen
           name="LogServiceRecord"
           component={LogServiceRecordScreen}
-          options={({ navigation, route }) => ({
-            title: 'Add Service Record',
-            headerLeft: logServiceRecordHeaderLeft(navigation, route.params?.vehicleId),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Add Service Record' }}
         />
         <Stack.Screen
           name="ServiceRecordServiceCenter"
           component={ServiceRecordServiceCenterScreen}
-          options={({ navigation, route }) => ({
-            title: 'Service center',
-            headerLeft: serviceRecordCenterHeaderLeft(navigation, route.params?.vehicleId),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Service center' }}
         />
         <Stack.Screen
           name="AddManualServiceCenter"
           component={AddManualServiceCenterScreen}
-          options={({ navigation, route }) => ({
-            title: 'Add service center',
-            headerLeft: serviceRecordCenterHeaderLeft(navigation, route.params?.vehicleId),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Add service center' }}
         />
         <Stack.Screen
           name="MapLocationPicker"
@@ -450,42 +360,29 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ManageVehicleServiceCenters"
           component={ManageVehicleServiceCentersScreen}
-          options={{ title: 'Service center access' }}
+          options={{ ...appNavBarScreenOptions, title: 'Service center access' }}
         />
         <Stack.Screen
           name="AddObligationPayment"
           component={AddObligationPaymentScreen}
-          options={{ title: 'Add Obligation / Payment' }}
+          options={{ ...appNavBarScreenOptions, title: 'Add Obligation / Payment' }}
         />
         <Stack.Screen
           name="CreateVehicle"
           component={CreateVehicleScreen}
-          options={({ navigation }) => ({
-            title: 'Add vehicle',
-            headerLeft: createVehicleHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Add vehicle' }}
         />
         <Stack.Screen name="CreatePromotion" component={CreatePromotionScreen} options={{ title: 'Create Promotion' }}/>
         <Stack.Screen name="ShopRegisterClient" component={ShopRegisterClientScreen} options={{ title: 'Register Client' }}/>
         <Stack.Screen
           name="ChooseShop"
           component={ChooseShopScreen}
-          options={({ navigation }) => ({
-            title: '',
-            headerLeft: shopHomeHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Choose center' }}
         />
         <Stack.Screen
           name="AddPartnerServiceCenter"
           component={AddPartnerServiceCenterScreen}
-          options={({ navigation }) => ({
-            title: 'Add service center',
-            headerLeft: stackBackHeaderLeft(navigation, 'Switch center'),
-            headerBackVisible: false,
-            ...transparentStackHeader,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Add service center' }}
         />
         <Stack.Screen
           name="PartnerServiceCenters"
@@ -510,78 +407,42 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ClientServiceHistory"
           component={ClientServiceHistoryScreen}
-          options={({ navigation }) => ({
-            ...transparentStackHeader,
-            title: 'Service History',
-            headerLeft: homeHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Service History' }}
         />
         <Stack.Screen
           name="ClientBookings"
           component={ClientDashboardPlaceholderScreen}
-          options={({ navigation }) => ({
-            ...transparentStackHeader,
-            title: 'Bookings',
-            headerLeft: homeHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Bookings' }}
         />
         <Stack.Screen
           name="ClientDocuments"
           component={ClientDashboardPlaceholderScreen}
-          options={({ navigation }) => ({
-            ...transparentStackHeader,
-            title: 'Documents',
-            headerLeft: homeHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Documents' }}
         />
         <Stack.Screen
           name="PartnerBookings"
           component={ClientDashboardPlaceholderScreen}
-          options={({ navigation }) => ({
-            ...transparentStackHeader,
-            title: 'Bookings',
-            headerLeft: shopHomeHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Bookings' }}
         />
         <Stack.Screen
           name="AuthorizedClients"
           component={AuthorizedClients}
-          options={({ navigation }) => ({
-            title: 'Clients',
-            headerLeft: shopHomeHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Clients' }}
         />
         <Stack.Screen
           name="ShopPromotions"
           component={ShopPromotions}
-          options={({ navigation }) => ({
-            title: 'Promotions',
-            headerLeft: shopHomeHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Promotions' }}
         />
         <Stack.Screen
           name="RepairsList"
           component={RepairsList}
-          options={({ navigation }) => ({
-            title: 'Repairs',
-            headerLeft: shopHomeHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Repairs' }}
         />
         <Stack.Screen
           name="NotificationsList"
           component={NotificationsList}
-          options={({ navigation }) => ({
-            title: 'Notifications',
-            headerLeft: shopHomeHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Notifications' }}
         />
         <Stack.Screen
           name="ShopNotificationsScreen"
@@ -596,38 +457,22 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ShopProfile"
           component={ShopProfileScreen}
-          options={({ navigation }) => ({
-            title: 'Profile',
-            headerLeft: shopHomeHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Profile' }}
         />
         <Stack.Screen
           name="ShopServiceMenu"
           component={ShopServiceMenuScreen}
-          options={({ navigation }) => ({
-            title: 'Price list',
-            headerLeft: shopHomeHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Price list' }}
         />
         <Stack.Screen
           name="ShopInvoicing"
           component={ShopInvoicingScreen}
-          options={({ navigation }) => ({
-            title: 'Invoicing',
-            headerLeft: shopHomeHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Invoicing' }}
         />
         <Stack.Screen
           name="ShopWarehouse"
           component={ShopWarehouseReceiveScreen}
-          options={({ navigation }) => ({
-            title: 'Warehouse',
-            headerLeft: shopHomeHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Warehouse' }}
         />
         <Stack.Screen
           name="ShopInvoiceDetail"
@@ -645,11 +490,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ClientProfile"
           component={ClientProfileScreen}
-          options={({ navigation }) => ({
-            title: 'Profile',
-            headerLeft: homeHeaderLeft(navigation),
-            headerBackVisible: false,
-          })}
+          options={{ ...appNavBarScreenOptions, title: 'Profile' }}
         />
          <Stack.Screen name="OfferChat" component={OfferChatScreen} options={{ title: 'Details' }}/>
         <Stack.Screen name="RepairChat" component={RepairChatScreen} options={{ title: 'Details' }}/>

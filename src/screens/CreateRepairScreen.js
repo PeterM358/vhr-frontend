@@ -10,6 +10,9 @@ import {
   Pressable,
 } from 'react-native';
 import ScreenBackground from '../components/ScreenBackground';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { useServiceCentersBack } from '../navigation/appNavBarBack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -53,6 +56,8 @@ import {
 export default function CreateRepairScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const scrollBottomPadding = useScrollContentBottomPaddingWithFooter(110);
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const handleBack = useServiceCentersBack(navigation);
 
   const isEditMode = route.params?.mode === 'edit_request';
   const editRepairId = route.params?.repairId ? Number(route.params.repairId) : null;
@@ -164,13 +169,6 @@ export default function CreateRepairScreen({ navigation, route }) {
       setKilometers(String(vk));
     }
   }, [selectedVehicle, isEditMode]);
-
-  useEffect(() => {
-    navigation.setOptions({
-      title: isEditMode ? 'Edit Request' : 'Request Service',
-      headerRight: () => null,
-    });
-  }, [navigation, isEditMode]);
 
   const visitDays = useMemo(() => buildVisitSlotOptions(null, { maxDays: 14 }), []);
   const selectedVisitDay = useMemo(
@@ -660,12 +658,20 @@ export default function CreateRepairScreen({ navigation, route }) {
   }
 
   return (
-    <ScreenBackground>
+    <ScreenBackground safeArea={false}>
       <View style={styles.root}>
+        <AppNavigationBar
+          title={isEditMode ? 'Edit Request' : 'Request Service'}
+          backLabel="Back"
+          onBack={handleBack}
+          scrolled={scrolled}
+        />
         <KeyboardAwareScrollView
+          onScroll={onScroll}
+          scrollEventThrottle={scrollEventThrottle}
           contentContainerStyle={[
             styles.container,
-            { paddingBottom: scrollBottomPadding },
+            { paddingTop: 12, paddingBottom: scrollBottomPadding },
           ]}
           keyboardShouldPersistTaps="always"
         >

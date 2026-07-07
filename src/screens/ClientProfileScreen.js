@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -24,7 +24,9 @@ import {
   getCitiesForCountry,
 } from '../api/profiles';
 import ScreenBackground from '../components/ScreenBackground';
-import { stackContentPaddingTop } from '../navigation/stackContentInset';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { useClientDashboardBack } from '../navigation/appNavBarBack';
 import FloatingCard from '../components/ui/FloatingCard';
 import AppCard from '../components/ui/AppCard';
 import { COLORS } from '../constants/colors';
@@ -110,6 +112,8 @@ function ProfileSkeleton() {
 
 export default function ClientProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const handleBack = useClientDashboardBack(navigation);
 
   const [profile, setProfile] = useState(null);
   const [countries, setCountries] = useState([]);
@@ -215,20 +219,6 @@ export default function ClientProfileScreen({ navigation }) {
     await loadCities(value);
   };
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <Button
-          mode="text"
-          onPress={handleSave}
-          labelStyle={{ color: '#fff', fontSize: 16 }}
-        >
-          Save
-        </Button>
-      ),
-    });
-  }, [navigation, profile, phonePrefix, phoneNational, contactPreference, displayName, cities, countries]);
-
   const handleSave = async () => {
     if (!profile) return;
 
@@ -327,9 +317,23 @@ export default function ClientProfileScreen({ navigation }) {
 
   return (
     <ScreenBackground safeArea={false}>
-      <ScrollView contentContainerStyle={[
+      <AppNavigationBar
+        title="Profile"
+        backLabel="Dashboard"
+        onBack={handleBack}
+        scrolled={scrolled}
+        rightAction={
+          <Button mode="text" onPress={handleSave} loading={saving} labelStyle={styles.saveAction}>
+            Save
+          </Button>
+        }
+      />
+      <ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={scrollEventThrottle}
+        contentContainerStyle={[
         styles.container,
-        { paddingTop: stackContentPaddingTop(insets, 8), paddingBottom: Math.max(insets.bottom, 16) },
+        { paddingTop: 12, paddingBottom: Math.max(insets.bottom, 16) },
       ]}>
         <AppCard variant="dark" contentStyle={styles.heroContent}>
           <Text style={styles.heroTitle}>Profile</Text>
@@ -479,6 +483,11 @@ export default function ClientProfileScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  saveAction: {
+    color: COLORS.PRIMARY,
+    fontSize: 16,
+    fontWeight: '600',
+  },
   container: {
     paddingHorizontal: 12,
     paddingBottom: 24,

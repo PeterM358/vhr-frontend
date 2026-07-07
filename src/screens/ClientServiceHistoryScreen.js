@@ -8,14 +8,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Text, ActivityIndicator } from 'react-native-paper';
 import { getRepairs } from '../api/repairs';
 import ScreenBackground from '../components/ScreenBackground';
+import AppNavigationBar from '../components/common/AppNavigationBar';
 import FloatingCard from '../components/ui/FloatingCard';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
 import StatusBadge from '../components/ui/StatusBadge';
 import { COLORS } from '../constants/colors';
-import { useStackBodyPaddingTop } from '../navigation/stackContentInset';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { useClientDashboardBack } from '../navigation/appNavBarBack';
 
 export default function ClientServiceHistoryScreen({ navigation }) {
-  const bodyPadTop = useStackBodyPaddingTop(12);
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const handleBack = useClientDashboardBack(navigation);
   const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -38,7 +41,8 @@ export default function ClientServiceHistoryScreen({ navigation }) {
   if (loading) {
     return (
       <ScreenBackground safeArea={false}>
-        <View style={[styles.loader, { paddingTop: bodyPadTop }]}>
+        <AppNavigationBar title="Service History" backLabel="Dashboard" onBack={handleBack} />
+        <View style={styles.loader}>
           <ActivityIndicator size="large" color="#fff" />
         </View>
       </ScreenBackground>
@@ -47,10 +51,18 @@ export default function ClientServiceHistoryScreen({ navigation }) {
 
   return (
     <ScreenBackground safeArea={false}>
+      <AppNavigationBar
+        title="Service History"
+        backLabel="Dashboard"
+        onBack={handleBack}
+        scrolled={scrolled}
+      />
       <FlatList
         data={repairs}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={[styles.list, { paddingTop: bodyPadTop }]}
+        onScroll={onScroll}
+        scrollEventThrottle={scrollEventThrottle}
+        contentContainerStyle={styles.list}
         ListEmptyComponent={
           <EmptyStateCard
             title="No service history yet"

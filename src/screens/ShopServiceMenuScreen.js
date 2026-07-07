@@ -13,10 +13,12 @@ import {
 } from 'react-native-paper';
 
 import ScreenBackground from '../components/ScreenBackground';
+import AppNavigationBar from '../components/common/AppNavigationBar';
 import FloatingCard from '../components/ui/FloatingCard';
 import AppCard from '../components/ui/AppCard';
 import { COLORS } from '../constants/colors';
-import { useStackBodyPaddingTop } from '../navigation/stackContentInset';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import { formatMoneyAmount } from '../constants/currency';
 import { API_BASE_URL } from '../api/config';
 import {
@@ -228,7 +230,8 @@ function MenuItemRow({
 
 export default function ShopServiceMenuScreen() {
   const navigation = useNavigation();
-  const bodyPadTop = useStackBodyPaddingTop(12);
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const handleBack = usePartnerDashboardBack(navigation);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [addingTypeId, setAddingTypeId] = useState(null);
@@ -461,8 +464,18 @@ export default function ShopServiceMenuScreen() {
   };
 
   return (
-    <ScreenBackground>
-      <ScrollView contentContainerStyle={[styles.content, { paddingTop: bodyPadTop }]}>
+    <ScreenBackground safeArea={false}>
+      <AppNavigationBar
+        title="Price list"
+        backLabel="Dashboard"
+        onBack={handleBack}
+        scrolled={scrolled}
+      />
+      <ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={scrollEventThrottle}
+        contentContainerStyle={[styles.content, { paddingTop: 12 }]}
+      >
         <AppCard variant="dark" style={styles.heroCard}>
           <Text style={styles.heroTitle}>Price list</Text>
           <Text style={styles.heroSubtitle}>

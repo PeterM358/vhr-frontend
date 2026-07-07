@@ -15,6 +15,8 @@ import {
 } from '../../api/notifications';
 import { WebSocketContext } from '../../context/WebSocketManager';
 import ScreenBackground from '../ScreenBackground';
+import AppNavigationBar from '../common/AppNavigationBar';
+import { usePartnerDashboardBack } from '../../navigation/appNavBarBack';
 import FloatingCard from '../ui/FloatingCard';
 import EmptyStateCard from '../ui/EmptyStateCard';
 import {
@@ -22,7 +24,6 @@ import {
   TEXT_DARK,
   TEXT_MUTED,
 } from '../../constants/colors';
-import { stackContentPaddingTop } from '../../navigation/stackContentInset';
 import {
   navigateShopNotification,
   notificationActionHint,
@@ -47,6 +48,7 @@ export default function NotificationsList() {
   const { notifications: liveNotifications = [], setNotifications } =
     useContext(WebSocketContext);
   const navigation = useNavigation();
+  const handleBack = usePartnerDashboardBack(navigation);
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
@@ -203,7 +205,8 @@ export default function NotificationsList() {
 
   return (
     <ScreenBackground safeArea={false}>
-      <View style={[styles.container, { paddingTop: stackContentPaddingTop(insets, 12) }]}>
+      <AppNavigationBar title="Notifications" backLabel="Dashboard" onBack={handleBack} />
+      <View style={styles.container}>
         <View style={styles.toolbar}>
           <Pressable
             onPress={() => setUnreadOnly((v) => !v)}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Alert,
@@ -23,6 +23,8 @@ import { loadShopDetailWithOptionalSeo, syncShopDetailWebUrl } from '../api/seo'
 
 import { Text, Button, ActivityIndicator, useTheme, Chip, Divider } from 'react-native-paper';
 import ScreenBackground from '../components/ScreenBackground';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useScrollShadow } from '../hooks/useScrollShadow';
 import AppCard from '../components/ui/AppCard';
 import FloatingCard from '../components/ui/FloatingCard';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
@@ -38,6 +40,7 @@ import {
 } from '../utils/vehicleShopAuthorization';
 import { confirmMessage, showMessage } from '../utils/crossPlatformAlert';
 import { formatShopDisplayName } from '../utils/shopDisplayName';
+import { navigateToServiceCenters } from '../navigation/webNavigation';
 import { formatMoneyAmount } from '../constants/currency';
 import { resolveRepairTypeIcon } from '../utils/repairTypeIcons';
 import { buildShopGeneratedPublicProfile } from '../utils/shopPublicProfileText';
@@ -188,7 +191,19 @@ export default function ShopDetailScreen({ route, navigation }) {
   const resolvedCenterSlug = numericCenterSlug ? undefined : centerSlug;
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const headerUnderlay = insets.top + (Platform.OS === 'ios' ? 44 : 56);
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const { returnTo } = route.params || {};
+  const handleBack = useCallback(() => {
+    if (returnTo) {
+      navigation.goBack();
+      return;
+    }
+    if (navigation.canGoBack?.()) {
+      navigation.goBack();
+      return;
+    }
+    navigateToServiceCenters(navigation);
+  }, [navigation, returnTo]);
 
   const [shop, setShop] = useState(null);
   const [vehicles, setVehicles] = useState([]);
@@ -347,16 +362,11 @@ export default function ShopDetailScreen({ route, navigation }) {
     }, [reloadClientVehicles])
   );
 
-  useLayoutEffect(() => {
-    if (!shop?.name) {
-      navigation.setOptions({ title: 'Service Center Details' });
-      return;
-    }
+  const navTitle = useMemo(() => {
+    if (!shop?.name) return 'Service Center Details';
     const displayName = formatShopDisplayName(shop.name);
-    navigation.setOptions({
-      title: displayName.length > 32 ? `${displayName.slice(0, 29)}…` : displayName,
-    });
-  }, [navigation, shop?.name]);
+    return displayName.length > 32 ? `${displayName.slice(0, 29)}…` : displayName;
+  }, [shop?.name]);
 
   const scrollToAuthorization = useCallback(
     (targetVehicleId = authorizeVehicleId) => {
@@ -664,13 +674,22 @@ export default function ShopDetailScreen({ route, navigation }) {
 
   return (
     <ScreenBackground safeArea={false}>
+      <AppNavigationBar
+        title={navTitle}
+        backLabel={returnTo ? 'Back' : 'Map'}
+        onBack={handleBack}
+        variant="transparent"
+        scrolled={scrolled}
+      />
       <ScrollView
         ref={scrollRef}
+        onScroll={onScroll}
+        scrollEventThrottle={scrollEventThrottle}
         style={styles.container}
         contentContainerStyle={[
           styles.listContent,
           {
-            paddingTop: headerUnderlay + 8,
+            paddingTop: 12,
             paddingBottom: showClientRequest ? insets.bottom + 96 : insets.bottom + 32,
           },
         ]}

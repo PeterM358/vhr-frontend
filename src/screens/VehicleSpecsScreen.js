@@ -8,9 +8,11 @@ import { Button, Text } from 'react-native-paper';
 import { API_BASE_URL } from '../api/config';
 import { getVehicleChoices } from '../api/vehicles';
 import ScreenBackground from '../components/ScreenBackground';
+import AppNavigationBar from '../components/common/AppNavigationBar';
 import FloatingCard from '../components/ui/FloatingCard';
 import { COLORS } from '../constants/colors';
-import { stackContentPaddingTop } from '../navigation/stackContentInset';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { useGoBackOr } from '../navigation/appNavBarBack';
 import {
   getRelevantVehicleFieldGroups,
   groupHasDisplayData,
@@ -62,6 +64,8 @@ function brandModelLine(vehicle) {
 export default function VehicleSpecsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { vehicleId } = route.params || {};
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const handleBack = useGoBackOr(navigation, (nav) => navigateToVehicleDetail(nav, vehicleId));
   const [vehicle, setVehicle] = useState(null);
   const [choices, setChoices] = useState({});
   const [loading, setLoading] = useState(true);
@@ -280,11 +284,19 @@ export default function VehicleSpecsScreen({ navigation, route }) {
 
   return (
     <ScreenBackground safeArea={false}>
+      <AppNavigationBar
+        title="Vehicle specs"
+        backLabel="Vehicle"
+        onBack={handleBack}
+        scrolled={scrolled}
+      />
       <ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={scrollEventThrottle}
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: stackContentPaddingTop(insets, 12),
+            paddingTop: 12,
             paddingBottom: Math.max(insets.bottom, 16) + (isShop ? 24 : 88),
           },
         ]}

@@ -45,7 +45,9 @@ import { getShopParts, prepareRepairPartsData } from '../api/parts';
 import { getOffersForRepair, bookOffer, unbookOffer, deleteOffer } from '../api/offers';
 import { RepairsList } from '../components/shop/RepairsList';
 import ScreenBackground from '../components/ScreenBackground';
-import { useStackBodyPaddingTop } from '../navigation/stackContentInset';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { useReturnToBack, useGoBackOr } from '../navigation/appNavBarBack';
 import { navigateToPartnerRepairOffer } from '../navigation/webNavigation';
 import { markRepairNotificationsRead } from '../api/notifications';
 import { WebSocketContext } from '../context/WebSocketManager';
@@ -198,8 +200,12 @@ function parseApiErrorMessage(error, fallback = 'Request failed.') {
 
 export default function RepairDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
-  const bodyPaddingTop = useStackBodyPaddingTop(12);
-  const { repairId, returnTo } = route.params;
+  const { repairId, returnTo } = route.params || {};
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const backLabel = route.params?.backLabel;
+  const handleBack = useReturnToBack(navigation, returnTo, backLabel);
+  const fallbackBack = useGoBackOr(navigation);
+  const onBack = returnTo || backLabel ? handleBack : fallbackBack;
   const { setNotifications } = useContext(WebSocketContext);
   const theme = useTheme();
 
@@ -256,19 +262,15 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [relatedServiceHistory, setRelatedServiceHistory] = useState(null);
   const [relatedHistoryLoading, setRelatedHistoryLoading] = useState(false);
 
-  useLayoutEffect(() => {
+  const navTitle = useMemo(() => {
     const st = String(repair?.status || '').toLowerCase();
     const src = String(repair?.source || '').toLowerCase();
-    let title = 'Repair';
-    if (st === 'open') title = 'Service Request';
-    else if (st === 'done' && src === 'owner_logged') title = 'Service record';
-    else if (st === 'done') title = 'Service record';
-    else if (st === 'ongoing') title = 'Repair';
-    navigation.setOptions({
-      headerBackTitleVisible: false,
-      title,
-    });
-  }, [navigation, repair?.status, repair?.source]);
+    if (st === 'open') return 'Service Request';
+    if (st === 'done' && src === 'owner_logged') return 'Service record';
+    if (st === 'done') return 'Service record';
+    if (st === 'ongoing') return 'Repair';
+    return 'Repair Details';
+  }, [repair?.status, repair?.source]);
 
   const formatSumTotal = (labor, parts) => {
     const sum = (labor ?? 0) + (parts ?? 0);
@@ -1809,12 +1811,21 @@ export default function RepairDetailScreen({ route, navigation }) {
   return (
     <>
     <ScreenBackground safeArea={false}>
+      <AppNavigationBar
+        title={navTitle}
+        backLabel={backLabel || (returnTo ? 'Back' : 'Back')}
+        onBack={onBack}
+        showBack={Boolean(returnTo || backLabel || navigation.canGoBack?.())}
+        scrolled={scrolled}
+      />
       <ScrollView
         key={`repair-${repair.id}-${repair.status}`}
+        onScroll={onScroll}
+        scrollEventThrottle={scrollEventThrottle}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.listContent,
-          { paddingTop: bodyPaddingTop },
+          { paddingTop: 12 },
         ]}
       >
           <View>

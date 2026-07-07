@@ -17,7 +17,9 @@ import AppCard from '../components/ui/AppCard';
 import StatusBadge from '../components/ui/StatusBadge';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
 import { COLORS } from '../constants/colors';
-import { useStackBodyPaddingTop } from '../navigation/stackContentInset';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import {
   createInvoiceSeries,
   draftInvoiceFromRepairs,
@@ -164,7 +166,8 @@ function SeriesEditor({ series, onSaved }) {
 
 export default function ShopInvoicingScreen() {
   const navigation = useNavigation();
-  const bodyPadTop = useStackBodyPaddingTop(12);
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const handleBack = usePartnerDashboardBack(navigation);
   const monthOptions = useMemo(() => buildRecentMonthOptions(), []);
   const [loading, setLoading] = useState(true);
   const [invoices, setInvoices] = useState([]);
@@ -309,8 +312,18 @@ export default function ShopInvoicingScreen() {
   };
 
   return (
-    <ScreenBackground>
-      <ScrollView contentContainerStyle={[styles.content, { paddingTop: bodyPadTop }]}>
+    <ScreenBackground safeArea={false}>
+      <AppNavigationBar
+        title="Invoicing"
+        backLabel="Dashboard"
+        onBack={handleBack}
+        scrolled={scrolled}
+      />
+      <ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={scrollEventThrottle}
+        contentContainerStyle={[styles.content, { paddingTop: 12 }]}
+      >
         <AppCard variant="dark" style={styles.heroCard}>
           <Text style={styles.heroSubtitle}>
             Issue numbered sales invoices from completed repairs, or attach an external PDF on the

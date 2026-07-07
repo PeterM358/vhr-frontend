@@ -6,6 +6,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View, Alert, Platform } from 'react-native';
 import ScreenBackground from '../components/ScreenBackground';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { useVehicleDetailBack } from '../navigation/appNavBarBack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import {
@@ -63,6 +66,8 @@ function resolvedIso(valueIso) {
 export default function AddObligationPaymentScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const vehicleId = route.params?.vehicleId != null ? String(route.params.vehicleId) : '';
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const handleBack = useVehicleDetailBack(navigation, vehicleId);
   const initialReminderType =
     route.params?.initialReminderType || route.params?.reminderType || route.params?.type || '';
 
@@ -82,10 +87,6 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
   const [saving, setSaving] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
-
-  useEffect(() => {
-    navigation.setOptions({ title: 'Add Obligation / Payment' });
-  }, [navigation]);
 
   useEffect(() => {
     const load = async () => {
@@ -273,12 +274,20 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
   }
 
   return (
-    <ScreenBackground>
+    <ScreenBackground safeArea={false}>
       <View style={styles.root}>
+        <AppNavigationBar
+          title="Add Obligation / Payment"
+          backLabel="Vehicle"
+          onBack={handleBack}
+          scrolled={scrolled}
+        />
         <KeyboardAwareScrollView
+          onScroll={onScroll}
+          scrollEventThrottle={scrollEventThrottle}
           contentContainerStyle={[
             styles.container,
-            { paddingBottom: 110 + Math.max(insets.bottom, 10) },
+            { paddingTop: 12, paddingBottom: 110 + Math.max(insets.bottom, 10) },
           ]}
           keyboardShouldPersistTaps="handled"
         >

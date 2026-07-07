@@ -7,6 +7,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native';
 import { StyleSheet, View, Alert, Pressable, Platform } from 'react-native';
 import ScreenBackground from '../components/ScreenBackground';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { useVehicleDetailBack } from '../navigation/appNavBarBack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import {
@@ -130,6 +133,8 @@ async function applyPostCreateReminderPatches({
 export default function LogServiceRecordScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const vehicleId = route.params?.vehicleId != null ? String(route.params.vehicleId) : '';
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const handleBack = useVehicleDetailBack(navigation, vehicleId);
 
   const todayIso = useMemo(() => localDateToIso(new Date()), []);
 
@@ -353,10 +358,6 @@ export default function LogServiceRecordScreen({ navigation, route }) {
     hasManualCenter,
     workshopSummary.title,
   ]);
-
-  useEffect(() => {
-    navigation.setOptions({ title: 'Add Service Record' });
-  }, [navigation]);
 
   const buildCurrentFormDraft = useCallback(
     () =>
@@ -1106,12 +1107,20 @@ export default function LogServiceRecordScreen({ navigation, route }) {
   }
 
   return (
-    <ScreenBackground>
+    <ScreenBackground safeArea={false}>
       <View style={styles.root}>
+        <AppNavigationBar
+          title="Add Service Record"
+          backLabel="Vehicle"
+          onBack={handleBack}
+          scrolled={scrolled}
+        />
         <KeyboardAwareScrollView
+          onScroll={onScroll}
+          scrollEventThrottle={scrollEventThrottle}
           contentContainerStyle={[
             styles.container,
-            { paddingBottom: 110 + Math.max(insets.bottom, 10) },
+            { paddingTop: 12, paddingBottom: 110 + Math.max(insets.bottom, 10) },
           ]}
           keyboardShouldPersistTaps="handled"
           enableResetScrollToCoords={false}

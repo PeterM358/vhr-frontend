@@ -3,17 +3,17 @@
  */
 
 import React, { useContext, useEffect, useState } from 'react';
-import { View, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
 import { useRoute } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Badge } from 'react-native-paper';
 import ClientPromotions from '../components/client/ClientPromotions';
 import ClientRepairOffers from '../components/client/ClientRepairOffers';
 import NotificationCenterPlaceholder from '../components/client/NotificationCenterPlaceholder';
 import { showMessage } from '../utils/crossPlatformAlert';
 import ScreenBackground from '../components/ScreenBackground';
-import BackHeaderButton from '../components/navigation/BackHeaderButton';
-import { navigateToDashboard } from '../navigation/webNavigation';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { useReturnToBack } from '../navigation/appNavBarBack';
 import { WebSocketContext } from '../context/WebSocketManager';
 
 const TABS = [
@@ -31,12 +31,13 @@ function resolveInitialTab(route) {
 }
 
 export default function ClientActivityScreen({ navigation }) {
-  const insets = useSafeAreaInsets();
   const route = useRoute();
   const { notifications } = useContext(WebSocketContext);
 
   const returnTo = route.params?.returnTo || 'Home';
   const backLabel = route.params?.backLabel || 'Dashboard';
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const handleBack = useReturnToBack(navigation, returnTo, backLabel);
 
   const [activeTab, setActiveTab] = useState(() => resolveInitialTab(route));
   const [offersTabMounted, setOffersTabMounted] = useState(() => resolveInitialTab(route) === 'repairs');
@@ -59,16 +60,6 @@ export default function ClientActivityScreen({ navigation }) {
     if (tabId === 'repairs') setOffersTabMounted(true);
   };
 
-  const handleBack = () => {
-    if (returnTo === 'Home' || returnTo === 'HomeMain') {
-      if (Platform.OS === 'web') {
-        navigateToDashboard(navigation);
-        return;
-      }
-    }
-    navigation.navigate(returnTo);
-  };
-
   const tabBadge = (tabId) => {
     if (tabId === 'inbox' && unreadInboxCount > 0) return unreadInboxCount;
     if (tabId === 'repairs' && (unseenOffersCount > 0 || actionNeededCount > 0)) {
@@ -78,23 +69,15 @@ export default function ClientActivityScreen({ navigation }) {
     return 0;
   };
 
-  const topPad = Math.max(insets.top, 10);
-
   return (
     <ScreenBackground safeArea={false}>
-      <View style={[styles.root, { paddingTop: topPad }]}>
-        <View style={styles.headerRow}>
-          <BackHeaderButton
-            onPress={handleBack}
-            label={backLabel}
-            variant="glass"
-            accessibilityLabel={`Back to ${backLabel}`}
-          />
-          <View pointerEvents="none" style={styles.titleAbsolute}>
-            <Text style={styles.screenTitle}>Notifications</Text>
-          </View>
-          <View style={styles.headerSideSpacer} />
-        </View>
+      <View style={styles.root}>
+        <AppNavigationBar
+          title="Notifications"
+          backLabel={backLabel}
+          onBack={handleBack}
+          scrolled={scrolled}
+        />
 
         <View style={styles.segmentOuter}>
           <View style={styles.segmentTrack}>

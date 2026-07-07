@@ -9,9 +9,10 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ScreenBackground from '../components/ScreenBackground';
+import AppNavigationBar from '../components/common/AppNavigationBar';
 import FloatingCard from '../components/ui/FloatingCard';
 import { COLORS } from '../constants/colors';
-import { stackContentPaddingTop } from '../navigation/stackContentInset';
+import { useServiceRecordBack } from '../navigation/appNavBarBack';
 import {
   navigateToVehicleServiceRecordCenterAdd,
   navigateToVehicleServiceRecordNew,
@@ -24,6 +25,7 @@ import {
 export default function ServiceRecordServiceCenterScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const vehicleId = route.params?.vehicleId;
+  const handleBack = useServiceRecordBack(navigation, vehicleId);
 
   const returnToServiceRecord = useCallback(
     async (providerPatch = {}) => {
@@ -87,7 +89,8 @@ export default function ServiceRecordServiceCenterScreen({ navigation, route }) 
 
   return (
     <ScreenBackground safeArea={false}>
-      <View style={[styles.container, { paddingTop: stackContentPaddingTop(12) }]}>
+      <AppNavigationBar title="Service center" backLabel="Record" onBack={handleBack} />
+      <View style={styles.container}>
         <FloatingCard>
           <Text variant="titleMedium" style={styles.title}>
             Who performed this service?

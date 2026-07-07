@@ -12,6 +12,9 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ScreenBackground from '../components/ScreenBackground';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import {
   Text,
   TextInput,
@@ -52,7 +55,6 @@ import AppCard from '../components/ui/AppCard';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
 import { COLORS } from '../constants/colors';
 import { STORAGE_KEYS } from '../constants/storageKeys';
-import { stackContentPaddingTop } from '../navigation/stackContentInset';
 import { AuthContext } from '../context/AuthManager';
 import { logout } from '../api/auth';
 import {
@@ -232,6 +234,8 @@ async function mergeRegistrationContact(profileRow) {
 export default function ShopProfileScreen({ navigation, route }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const handleBack = usePartnerDashboardBack(navigation);
   const requireSetup = Boolean(route?.params?.requireSetup);
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
 
@@ -1108,10 +1112,13 @@ export default function ShopProfileScreen({ navigation, route }) {
 
   return (
     <ScreenBackground safeArea={false}>
+      <AppNavigationBar title="Profile" backLabel="Dashboard" onBack={handleBack} scrolled={scrolled} />
       <ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={scrollEventThrottle}
         contentContainerStyle={[
           styles.container,
-          { paddingTop: stackContentPaddingTop(insets, 8), paddingBottom: insets.bottom + 96 },
+          { paddingTop: 12, paddingBottom: insets.bottom + 96 },
         ]}
       >
         <ShopProfileCompletionCard
