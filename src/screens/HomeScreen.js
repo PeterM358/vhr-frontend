@@ -17,6 +17,7 @@ import { Appbar, Badge, FAB, useTheme } from 'react-native-paper';
 import { logout } from '../api/auth';
 import { getVehicles } from '../api/vehicles';
 import { getRepairs } from '../api/repairs';
+import { isTerminalRepairStatus } from '../utils/repairArrival';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import ScreenBackground from '../components/ScreenBackground';
@@ -89,6 +90,7 @@ export default function HomeScreen({ navigation }) {
 
   const [vehicles, setVehicles] = useState([]);
   const [openRepairs, setOpenRepairs] = useState([]);
+  const [activeRepairs, setActiveRepairs] = useState([]);
   const [recentRepairs, setRecentRepairs] = useState([]);
   const [openRequestsCount, setOpenRequestsCount] = useState(0);
   const [pendingOffersCount, setPendingOffersCount] = useState(0);
@@ -130,13 +132,19 @@ export default function HomeScreen({ navigation }) {
           const token = await AsyncStorage.getItem('@access_token');
           const [vehicleRows, repairRows, offersRes] = await Promise.all([
             getVehicles().catch(() => []),
-            getRepairs(token, 'open').catch(() => []),
+            getRepairs(token).catch(() => []),
             fetch(`${API_BASE_URL}/api/offers/`, {
               headers: { Authorization: `Bearer ${token}` },
             }).catch(() => null),
           ]);
           const safeVehicles = Array.isArray(vehicleRows) ? vehicleRows : [];
           const safeRepairs = Array.isArray(repairRows) ? repairRows : [];
+          const nonTerminalRepairs = safeRepairs.filter(
+            (repair) => !isTerminalRepairStatus(repair?.status)
+          );
+          const openRepairRows = nonTerminalRepairs.filter(
+            (repair) => String(repair?.status || '').toLowerCase() === 'open'
+          );
           let offersCount = 0;
           if (offersRes?.ok) {
             const offerRows = await offersRes.json().catch(() => []);
@@ -145,10 +153,11 @@ export default function HomeScreen({ navigation }) {
               : 0;
           }
           setVehicles(safeVehicles);
-          setOpenRepairs(safeRepairs);
-          setOpenRequestsCount(safeRepairs.length);
+          setOpenRepairs(openRepairRows);
+          setActiveRepairs(nonTerminalRepairs);
+          setOpenRequestsCount(openRepairRows.length);
           setPendingOffersCount(offersCount);
-          setRecentRepairs(safeRepairs.slice(0, 4));
+          setRecentRepairs(openRepairRows.slice(0, 4));
         } finally {
           setDashboardLoading(false);
         }
@@ -330,6 +339,7 @@ export default function HomeScreen({ navigation }) {
         >
           <VehicleHealthSection
             vehicles={vehicles}
+            activeRepairs={activeRepairs}
             onVehiclePress={goVehicleDetail}
             onViewAllPress={goVehicles}
           />

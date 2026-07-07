@@ -219,6 +219,41 @@ export function notificationActionHint(item) {
   return null;
 }
 
+const BOOKING_EVENT_TYPES = new Set([
+  'promotion_booked',
+  'promotion_booking_cancelled',
+  'repair_scheduled',
+  'reschedule_proposed',
+  'reschedule_counter_proposed',
+  'reschedule_accepted',
+  'reschedule_declined',
+  'appointment_cancelled',
+]);
+
+const OFFER_EVENT_TYPES = new Set(['offer_booked', 'offer_booking_cancelled']);
+
+const REPAIR_EVENT_TYPES = new Set([
+  'new_repair_request',
+  'vehicle_arrived',
+  'client_arrival_reported',
+  'direct_request_declined',
+  'owner_service_record_confirmation_requested',
+  'owner_service_record_confirmation_confirmed',
+  'owner_service_record_confirmation_rejected',
+]);
+
+/** Inbox tab filter for partner notifications. */
+export function shopNotificationCategory(item) {
+  const eventType = notificationEventType(item);
+  if (OFFER_EVENT_TYPES.has(eventType)) return 'offers';
+  if (BOOKING_EVENT_TYPES.has(eventType)) return 'bookings';
+  if (REPAIR_EVENT_TYPES.has(eventType)) return 'repairs';
+  if (item?.offer != null) return 'offers';
+  if (item?.promotion != null) return 'bookings';
+  if (item?.repair != null) return 'repairs';
+  return 'alerts';
+}
+
 /** @deprecated use isCalendarNotification */
 export function shouldOpenShopCalendar(item) {
   return isCalendarNotification(item);

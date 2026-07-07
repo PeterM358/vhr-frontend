@@ -15,6 +15,16 @@ import {
 export default function NotificationCenterPlaceholder({ onPlaceholderAction, showLiveFeed = true }) {
   return (
     <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      {showLiveFeed ? (
+        <View style={styles.liveSection}>
+          <Text style={styles.sectionLabel}>Recent activity</Text>
+          <Text style={styles.liveHint}>
+            Live messages from your current Veversal account.
+          </Text>
+          <NotificationsList activityReturnTo="ClientActivity" embedded />
+        </View>
+      ) : null}
+
       <Text style={styles.intro}>
         Your vehicle alerts, offers, bookings and documents — organized in one place.
       </Text>
@@ -35,16 +45,6 @@ export default function NotificationCenterPlaceholder({ onPlaceholderAction, sho
           onActionPress={onPlaceholderAction}
         />
       ))}
-
-      {showLiveFeed ? (
-        <View style={styles.liveSection}>
-          <Text style={styles.sectionLabel}>Recent activity</Text>
-          <Text style={styles.liveHint}>
-            Live messages from your current Veversal account appear below.
-          </Text>
-          <NotificationsList activityReturnTo="ClientActivity" embedded />
-        </View>
-      ) : null}
     </ScrollView>
   );
 }

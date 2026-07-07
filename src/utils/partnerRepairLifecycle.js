@@ -122,6 +122,60 @@ export function formatLifecycleCounterLine(counts) {
   return segments.join(' · ');
 }
 
+/**
+ * Partner repair detail — context card title/body for shop view on open requests.
+ * Returns null when a dedicated section already covers the state (e.g. awaiting arrival).
+ */
+export function getPartnerRequestGuide(
+  repair,
+  { offers = [], shopProfileId, vehicleAtShop, isMyShopRepair } = {}
+) {
+  if (!repair) return null;
+
+  const status = String(repair.status || '').toLowerCase();
+  if (status === 'done') {
+    return {
+      title: 'Completed',
+      body: 'This repair is finished and recorded in service history.',
+    };
+  }
+  if (status === 'ongoing' || vehicleAtShop) {
+    return {
+      title: 'Repair in progress',
+      body: 'Track parts, notes, and finalize when work is complete.',
+    };
+  }
+
+  const shopId = shopProfileId != null ? Number(shopProfileId) : null;
+  const shopOffers = (offers || []).filter(
+    (o) => shopId != null && !Number.isNaN(shopId) && Number(o.shop) === shopId
+  );
+  const bookedOffer = shopOffers.some((o) => o.is_booked);
+  const sentOffer = shopOffers.length > 0;
+
+  if (bookedOffer) {
+    if (repair.scheduled_start && !vehicleAtShop && isMyShopRepair) {
+      return null;
+    }
+    return {
+      title: 'Confirmed appointment',
+      body: 'Mark vehicle arrived when it arrives at your center.',
+    };
+  }
+
+  if (sentOffer) {
+    return {
+      title: 'Offer sent',
+      body: 'Waiting for the customer to review and book your offer.',
+    };
+  }
+
+  return {
+    title: 'Request review',
+    body: 'Review the customer request, photos, and details before sending an offer.',
+  };
+}
+
 export function formatTimeSince(isoDate) {
   if (!isoDate) return '';
   const then = new Date(isoDate).getTime();

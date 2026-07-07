@@ -3,6 +3,59 @@
  * Health rules live in the API — keep icons/colors here only.
  */
 
+import { isTerminalRepairStatus, isVehicleAtShop } from './repairArrival';
+
+const IN_SERVICE_HEALTH = {
+  label: 'In service',
+  icon: 'car-wrench',
+  color: '#059669',
+  bg: 'rgba(5,150,105,0.1)',
+  border: 'rgba(5,150,105,0.35)',
+};
+
+const AT_SHOP_HEALTH = {
+  label: 'At service center',
+  icon: 'store-check',
+  color: '#059669',
+  bg: 'rgba(5,150,105,0.1)',
+  border: 'rgba(5,150,105,0.35)',
+};
+
+function repairVehicleId(repair) {
+  return repair?.vehicle ?? repair?.vehicle_id ?? null;
+}
+
+/** When a vehicle has a non-terminal repair, show in-service instead of needs-attention. */
+export function applyActiveRepairHealthOverride(health, vehicleId, activeRepairs = []) {
+  const vid = vehicleId != null ? Number(vehicleId) : null;
+  if (vid == null || Number.isNaN(vid)) return health;
+
+  const activeRepair = (activeRepairs || []).find((repair) => {
+    if (Number(repairVehicleId(repair)) !== vid) return false;
+    return !isTerminalRepairStatus(repair?.status);
+  });
+  if (!activeRepair) return health;
+
+  const atShop = isVehicleAtShop(activeRepair);
+  const cfg = atShop ? AT_SHOP_HEALTH : IN_SERVICE_HEALTH;
+  const shortReason = atShop
+    ? 'Your vehicle is currently being serviced.'
+    : activeRepair.scheduled_start
+      ? 'Scheduled service appointment in progress.'
+      : 'Active repair request in progress.';
+
+  return {
+    ...health,
+    status: 'in_service',
+    ...cfg,
+    status_label: cfg.label,
+    subtitle: shortReason,
+    shortReason,
+    reasons: [],
+    actions: [],
+  };
+}
+
 const STATUS_CONFIG = {
   healthy: {
     label: 'Healthy',

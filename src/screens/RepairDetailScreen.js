@@ -77,6 +77,7 @@ import {
 } from '../utils/serviceRecordProvider';
 import { DEFAULT_CURRENCY, formatMoneyAmount } from '../constants/currency';
 import { formatOfferPrimaryPrice, formatOfferPricingLines } from '../utils/offerPricing';
+import { getPartnerRequestGuide } from '../utils/partnerRepairLifecycle';
 import {
   analyzeFinalizeKilometers,
   hasOdometerPhotoAttachment,
@@ -2436,12 +2437,21 @@ export default function RepairDetailScreen({ route, navigation }) {
               </Text>
             </FloatingCard>
             ) : isOpenStatus && isShop ? (
-            <FloatingCard>
-              <Text style={styles.cardTitle}>Request review</Text>
-              <Text style={styles.mutedText}>
-                Review the customer request, photos, and details before sending an offer.
-              </Text>
-            </FloatingCard>
+            (() => {
+              const guide = getPartnerRequestGuide(repair, {
+                offers,
+                shopProfileId,
+                vehicleAtShop,
+                isMyShopRepair,
+              });
+              if (!guide) return null;
+              return (
+                <FloatingCard>
+                  <Text style={styles.cardTitle}>{guide.title}</Text>
+                  <Text style={styles.mutedText}>{guide.body}</Text>
+                </FloatingCard>
+              );
+            })()
             ) : isOpenStatus ? null : (
             <Card mode="outlined" style={styles.headerCard}>
               <Card.Title

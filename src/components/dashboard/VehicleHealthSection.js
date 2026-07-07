@@ -7,12 +7,14 @@ import { COLORS } from '../../constants/colors';
 import {
   mapHealthFromApi,
   vehicleDisplayTitle,
+  applyActiveRepairHealthOverride,
 } from '../../utils/vehicleHealthStatus';
 
 const MAX_VISIBLE = 3;
 
 export default function VehicleHealthSection({
   vehicles = [],
+  activeRepairs = [],
   onVehiclePress,
   onViewAllPress,
 }) {
@@ -20,9 +22,13 @@ export default function VehicleHealthSection({
     () =>
       vehicles.slice(0, MAX_VISIBLE).map((vehicle) => ({
         vehicle,
-        health: mapHealthFromApi(vehicle),
+        health: applyActiveRepairHealthOverride(
+          mapHealthFromApi(vehicle),
+          vehicle.id,
+          activeRepairs
+        ),
       })),
-    [vehicles]
+    [vehicles, activeRepairs]
   );
 
   if (!vehicles.length) {

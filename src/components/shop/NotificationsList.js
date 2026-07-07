@@ -26,14 +26,23 @@ import { stackContentPaddingTop } from '../../navigation/stackContentInset';
 import {
   navigateShopNotification,
   notificationActionHint,
+  shopNotificationCategory,
 } from '../../utils/shopNotificationRouting';
 import { normalizeNotification } from '../../utils/normalizeNotification';
+
+const TABS = [
+  { id: 'alerts', label: 'Alerts' },
+  { id: 'repairs', label: 'Repairs' },
+  { id: 'offers', label: 'Offers' },
+  { id: 'bookings', label: 'Bookings' },
+];
 
 export default function NotificationsList() {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [remoteNotifications, setRemoteNotifications] = useState([]);
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [activeTab, setActiveTab] = useState('alerts');
   const [markingAll, setMarkingAll] = useState(false);
   const { notifications: liveNotifications = [], setNotifications } =
     useContext(WebSocketContext);
@@ -124,6 +133,23 @@ export default function NotificationsList() {
     return unreadOnly ? rows.filter((n) => !n.is_read) : rows;
   }, [remoteNotifications, liveNotifications, unreadOnly]);
 
+  const tabbedNotifications = useMemo(() => {
+    if (activeTab === 'alerts') return mergedNotifications;
+    return mergedNotifications.filter((n) => shopNotificationCategory(n) === activeTab);
+  }, [mergedNotifications, activeTab]);
+
+  const tabBadge = useCallback(
+    (tabId) => {
+      if (tabId === 'alerts') {
+        return mergedNotifications.filter((n) => !n.is_read).length;
+      }
+      return mergedNotifications.filter(
+        (n) => !n.is_read && shopNotificationCategory(n) === tabId
+      ).length;
+    },
+    [mergedNotifications]
+  );
+
   const unreadCount = useMemo(
     () =>
       [...(remoteNotifications || []), ...(liveNotifications || [])].filter((n) => !n?.is_read)
@@ -200,10 +226,39 @@ export default function NotificationsList() {
           ) : null}
         </View>
 
-        {mergedNotifications.length === 0 ? (
+        <View style={styles.segmentTrack}>
+          {TABS.map((tab) => {
+            const badge = tabBadge(tab.id);
+            const selected = activeTab === tab.id;
+            return (
+              <Pressable
+                key={tab.id}
+                onPress={() => setActiveTab(tab.id)}
+                style={[styles.segmentCell, selected && styles.segmentCellActive]}
+              >
+                <View style={styles.segmentLabelRow}>
+                  <Text style={[styles.segmentLabel, selected && styles.segmentLabelActive]}>
+                    {tab.label}
+                  </Text>
+                  {badge > 0 ? (
+                    <View style={styles.tabBadge}>
+                      <Text style={styles.tabBadgeText}>{String(badge)}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {tabbedNotifications.length === 0 ? (
           <EmptyStateCard
             icon="bell-outline"
-            title={unreadOnly ? 'No unread notifications' : 'No notifications yet'}
+            title={
+              unreadOnly
+                ? 'No unread notifications'
+                : `No ${TABS.find((t) => t.id === activeTab)?.label?.toLowerCase() || 'notifications'} yet`
+            }
             subtitle={
               unreadOnly
                 ? 'You are all caught up.'
@@ -212,7 +267,7 @@ export default function NotificationsList() {
           />
         ) : (
           <FlatList
-            data={mergedNotifications}
+            data={tabbedNotifications}
             keyExtractor={(item) =>
               item.id?.toString() ?? Math.random().toString()
             }
@@ -242,6 +297,58 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
     gap: 8,
+  },
+  segmentTrack: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 14,
+    padding: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.22)',
+    marginBottom: 12,
+  },
+  segmentCell: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 2,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentCellActive: {
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+  },
+  segmentLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.92)',
+    textAlign: 'center',
+  },
+  segmentLabelActive: { color: '#0f172a' },
+  tabBadge: {
+    marginLeft: 3,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#dc2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  tabBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   filterChip: {
     borderRadius: 999,

@@ -329,12 +329,6 @@ export default function ClientRepairOffers({
 
   const renderListHeader = () => (
     <>
-      <ClientActionNeeded
-        repairs={repairs}
-        onChanged={handleActionNeededChange}
-        onRescheduleResponded={handleRescheduleResponded}
-      />
-
       {upcomingAppointments.length > 0 ? (
         <ActivitySection
           title="Upcoming appointments"
@@ -398,6 +392,11 @@ export default function ClientRepairOffers({
 
   return (
     <View style={styles.root}>
+      <ClientActionNeeded
+        repairs={repairs}
+        onChanged={handleActionNeededChange}
+        onRescheduleResponded={handleRescheduleResponded}
+      />
       {loading ? (
         <ActivityIndicator size="large" color={COLORS.PRIMARY} />
       ) : (
