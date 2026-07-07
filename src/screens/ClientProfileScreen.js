@@ -30,6 +30,7 @@ import { useClientDashboardBack } from '../navigation/appNavBarBack';
 import FloatingCard from '../components/ui/FloatingCard';
 import AppCard from '../components/ui/AppCard';
 import { COLORS } from '../constants/colors';
+import { useGarageScene } from '../context/GarageSceneContext';
 import useDebouncedValue from '../utils/useDebouncedValue';
 
 const CONTACT_PREFERENCE_STORAGE_KEY = '@client_profile_contact_preference';
@@ -114,6 +115,8 @@ export default function ClientProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useClientDashboardBack(navigation);
+  const { getSelectedScene } = useGarageScene();
+  const garageScene = getSelectedScene();
 
   const [profile, setProfile] = useState(null);
   const [countries, setCountries] = useState([]);
@@ -452,6 +455,17 @@ export default function ClientProfileScreen({ navigation }) {
             style={styles.segmented}
           />
           <Text style={styles.helper}>Saved locally for now.</Text>
+        </FloatingCard>
+
+        <FloatingCard>
+          <Text style={styles.sectionTitle}>Appearance</Text>
+          <Text variant="labelLarge" style={styles.label}>Garage Scene</Text>
+          <View style={styles.pickerWrap}>
+            <Picker selectedValue={garageScene.id} enabled={false} style={styles.picker}>
+              <Picker.Item label={garageScene.label} value={garageScene.id} />
+            </Picker>
+          </View>
+          <Text style={styles.helper}>More garage scenes coming soon.</Text>
         </FloatingCard>
 
         <FloatingCard>

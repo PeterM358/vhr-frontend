@@ -7,16 +7,89 @@
 // Children render above the gradient and are NOT blurred.
 
 import React from 'react';
-import { ImageBackground, StyleSheet, SafeAreaView, View } from 'react-native';
+import {
+  Animated,
+  ImageBackground,
+  StyleSheet,
+  SafeAreaView,
+  View,
+} from 'react-native';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 
+import { useGarageScene } from '../context/GarageSceneContext';
+import { useGarageSceneCrossfade } from '../hooks/useGarageSceneCrossfade';
 import { BACKGROUNDS } from '../constants/images';
+import { getSceneImageSource } from '../theme/garageScenes';
 
 const DEFAULT_STOPS = [
   { offset: '0', color: '#000', opacity: '0.65' },
   { offset: '0.5', color: '#000', opacity: '0.45' },
   { offset: '1', color: '#000', opacity: '0.75' },
 ];
+
+function SceneGradientOverlay({ stops }) {
+  return (
+    <Svg
+      style={StyleSheet.absoluteFill}
+      pointerEvents="none"
+      preserveAspectRatio="none"
+    >
+      <Defs>
+        <SvgLinearGradient id="screenBgOverlay" x1="0" y1="0" x2="0" y2="1">
+          {stops.map((s, i) => (
+            <Stop
+              key={i}
+              offset={s.offset}
+              stopColor={s.color}
+              stopOpacity={s.opacity}
+            />
+          ))}
+        </SvgLinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill="url(#screenBgOverlay)" />
+    </Svg>
+  );
+}
+
+function NativeSceneLayer({ scene, opacity, blurRadius, style }) {
+  const AnimatedImageBackground = Animated.createAnimatedComponent(ImageBackground);
+
+  return (
+    <AnimatedImageBackground
+      source={getSceneImageSource(scene)}
+      style={[StyleSheet.absoluteFill, style, { opacity }]}
+      resizeMode="cover"
+      blurRadius={blurRadius}
+    />
+  );
+}
+
+function GarageSceneBackgroundLayers({ blurRadius = 2 }) {
+  const { selectedSceneId, isReady } = useGarageScene();
+  const { activeScene, outgoingScene, incomingOpacity, outgoingOpacity } =
+    useGarageSceneCrossfade(selectedSceneId, { enabled: isReady });
+
+  const stops = activeScene.overlay ?? DEFAULT_STOPS;
+  const sceneBlur = activeScene.blur?.native ?? blurRadius;
+
+  return (
+    <>
+      {outgoingScene ? (
+        <NativeSceneLayer
+          scene={outgoingScene}
+          opacity={outgoingOpacity}
+          blurRadius={outgoingScene.blur?.native ?? blurRadius}
+        />
+      ) : null}
+      <NativeSceneLayer
+        scene={activeScene}
+        opacity={outgoingScene ? incomingOpacity : 1}
+        blurRadius={sceneBlur}
+      />
+      <SceneGradientOverlay stops={stops} />
+    </>
+  );
+}
 
 export default function ScreenBackground({
   source,
@@ -30,6 +103,16 @@ export default function ScreenBackground({
 }) {
   const stops = gradientStops ?? DEFAULT_STOPS;
   const Wrapper = safeArea ? SafeAreaView : View;
+  const useGarageSceneBackground = source == null;
+
+  if (useGarageSceneBackground) {
+    return (
+      <View style={[styles.image, style]}>
+        <GarageSceneBackgroundLayers blurRadius={blurRadius} />
+        <Wrapper style={[styles.content, contentStyle]}>{children}</Wrapper>
+      </View>
+    );
+  }
 
   return (
     <ImageBackground
@@ -38,26 +121,7 @@ export default function ScreenBackground({
       resizeMode={resizeMode}
       blurRadius={blurRadius}
     >
-      <Svg
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-        preserveAspectRatio="none"
-      >
-        <Defs>
-          <SvgLinearGradient id="screenBgOverlay" x1="0" y1="0" x2="0" y2="1">
-            {stops.map((s, i) => (
-              <Stop
-                key={i}
-                offset={s.offset}
-                stopColor={s.color}
-                stopOpacity={s.opacity}
-              />
-            ))}
-          </SvgLinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#screenBgOverlay)" />
-      </Svg>
-
+      <SceneGradientOverlay stops={stops} />
       <Wrapper style={[styles.content, contentStyle]}>{children}</Wrapper>
     </ImageBackground>
   );

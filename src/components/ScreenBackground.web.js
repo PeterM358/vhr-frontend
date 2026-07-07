@@ -1,10 +1,13 @@
 // Web implementation: premium blurred automotive background + dark gradient overlay.
 
 import React from 'react';
-import { ImageBackground, StyleSheet, SafeAreaView, View } from 'react-native';
+import { Animated, ImageBackground, StyleSheet, SafeAreaView, View } from 'react-native';
 
+import { useGarageScene } from '../context/GarageSceneContext';
+import { useGarageSceneCrossfade } from '../hooks/useGarageSceneCrossfade';
 import { BACKGROUNDS } from '../constants/images';
 import { WEB_BACKGROUND_URL } from '../constants/webBackground';
+import { getSceneWebUri } from '../theme/garageScenes';
 
 /** Default centered content column on web (maps use `contentMaxWidth={false}`). */
 export const WEB_CONTENT_MAX_WIDTH_DEFAULT = 720;
@@ -21,6 +24,52 @@ const WEB_OVERLAY = {
 function resolveBackgroundSource(source) {
   if (source) return source;
   return BACKGROUNDS.default ?? { uri: WEB_BACKGROUND_URL };
+}
+
+function WebSceneImage({ scene, opacity = 1 }) {
+  const uri = getSceneWebUri(scene);
+  const blurPx = scene.blur?.web ?? 2;
+  const brightness = scene.brightness?.web ?? 0.68;
+  const opacityValue = typeof opacity === 'number' ? opacity : 1;
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[styles.bgLayer, { opacity: opacityValue }]}
+    >
+      <img
+        src={uri}
+        alt=""
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          filter: `blur(${blurPx}px) brightness(${brightness})`,
+          transform: 'scale(1.04)',
+        }}
+      />
+    </Animated.View>
+  );
+}
+
+function GarageSceneBackgroundLayers() {
+  const { selectedSceneId, isReady } = useGarageScene();
+  const { activeScene, outgoingScene, incomingOpacity, outgoingOpacity } =
+    useGarageSceneCrossfade(selectedSceneId, { enabled: isReady });
+
+  return (
+    <>
+      {outgoingScene ? (
+        <WebSceneImage scene={outgoingScene} opacity={outgoingOpacity} />
+      ) : null}
+      <WebSceneImage
+        scene={activeScene}
+        opacity={outgoingScene ? incomingOpacity : 1}
+      />
+    </>
+  );
 }
 
 function WebPremiumBackground({ source }) {
@@ -69,10 +118,21 @@ export default function ScreenBackground({
         }
       : null;
 
+  const useGarageSceneBackground = source == null;
+
+  if (useGarageSceneBackground) {
+    return (
+      <View style={[styles.image, style]}>
+        <GarageSceneBackgroundLayers />
+        <View pointerEvents="none" style={WEB_OVERLAY} />
+        <Wrapper style={[styles.content, contentStyle, constrain]}>{children}</Wrapper>
+      </View>
+    );
+  }
+
   const resolvedSource = resolveBackgroundSource(source);
   const usePremiumWebBg =
-    !source &&
-    (resolvedSource?.uri === WEB_BACKGROUND_URL || BACKGROUNDS.default?.uri === WEB_BACKGROUND_URL);
+    resolvedSource?.uri === WEB_BACKGROUND_URL || BACKGROUNDS.default?.uri === WEB_BACKGROUND_URL;
 
   if (usePremiumWebBg) {
     return (
