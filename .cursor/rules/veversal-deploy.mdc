@@ -12,8 +12,8 @@ Push to main ≠ live on beta. Beta updates only when Deploy Beta workflow succe
 ## After every commit+push that should reach beta
 
 1. Check GitHub Actions:
-   - Frontend: `gh run list --repo PeterM358/vhr-frontend --workflow=deploy-beta.yml --limit 3`
-   - Backend (if relevant): `gh run list --repo PeterM358/vhr-backend --workflow=deploy-beta.yml --limit 3`
+   - Backend: `gh run list --repo PeterM358/vhr-backend --workflow=deploy-beta.yml --limit 3`
+   - Frontend (if relevant): `gh run list --repo PeterM358/vhr-frontend --workflow=deploy-beta.yml --limit 3`
 2. If user asked for deploy, wait for or verify green run.
 3. If failed, report exact error from `gh run view <id> --log-failed` and give recovery:
    `cd /opt/veversal/backend && git pull && bash deploy/deploy_beta.sh`
@@ -22,8 +22,8 @@ Push to main ≠ live on beta. Beta updates only when Deploy Beta workflow succe
 ## Single deploy path
 
 - Full stack deploy: `deploy/deploy_beta.sh` on server (pulls BOTH backend + frontend, docker, build).
-- Both repos have Deploy Beta workflow SSHing to server.
-- Warn: pushing both repos within minutes causes race — prefer one deploy trigger or rely on flock lock in script.
+- Both repos have Deploy Beta workflow SSHing to server; workflow **git syncs backend before running the script**.
+- Server `flock -w` serializes deploys across repos; `cancel-in-progress: true` cancels stale in-repo runs when commits land seconds apart.
 
 ## Deploy script location
 
