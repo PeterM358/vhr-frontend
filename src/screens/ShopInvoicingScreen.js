@@ -1,8 +1,9 @@
-import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { Picker } from '@react-native-picker/picker';
 import {
   ActivityIndicator,
   Button,
@@ -14,15 +15,18 @@ import ScreenBackground from '../components/ScreenBackground';
 import FloatingCard from '../components/ui/FloatingCard';
 import AppCard from '../components/ui/AppCard';
 import StatusBadge from '../components/ui/StatusBadge';
+import EmptyStateCard from '../components/ui/EmptyStateCard';
 import { COLORS } from '../constants/colors';
 import { useStackBodyPaddingTop } from '../navigation/stackContentInset';
 import {
   createInvoiceSeries,
+  draftInvoiceFromRepairs,
   getInvoiceSeries,
   getInvoices,
   getLegalEntitySummary,
   updateInvoiceSeries,
 } from '../api/billing';
+import { getRepairs } from '../api/repairs';
 import { getMyShopProfiles } from '../api/profiles';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { formatMoneyMinor } from '../constants/currency';
@@ -31,12 +35,61 @@ import {
   invoiceListSubtitle,
   invoiceTotalLabel,
 } from '../utils/billingInvoices';
+import { formatRepairListDate } from '../utils/repairListUtils';
+
+const SECTION_TABS = [
+  { key: 'invoices', label: 'Invoices' },
+  { key: 'uninvoiced', label: 'Uninvoiced repairs' },
+];
 
 const STATUS_FILTERS = [
   { key: '', label: 'All' },
   { key: 'draft', label: 'Draft' },
   { key: 'issued', label: 'Issued' },
 ];
+
+const MONTH_ALL = '';
+
+function buildRecentMonthOptions(count = 18) {
+  const options = [{ value: MONTH_ALL, label: 'All months' }];
+  const now = new Date();
+  for (let i = 0; i < count; i += 1) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    options.push({ value, label });
+  }
+  return options;
+}
+
+function filterInvoices(invoices, { clientSearch, monthKey }) {
+  let rows = Array.isArray(invoices) ? invoices : [];
+  const query = String(clientSearch || '').trim().toLowerCase();
+  if (query) {
+    rows = rows.filter((invoice) => {
+      const haystack = [
+        invoice?.bill_to_name,
+        invoice?.bill_to_company_name,
+        invoice?.bill_to_email,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }
+  if (monthKey) {
+    rows = rows.filter((invoice) => {
+      const raw = invoice?.issued_at || invoice?.created_at;
+      if (!raw) return false;
+      const date = new Date(raw);
+      if (Number.isNaN(date.getTime())) return false;
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      return key === monthKey;
+    });
+  }
+  return rows;
+}
 
 function SeriesEditor({ series, onSaved }) {
   const [label, setLabel] = useState(series?.label || '');
@@ -112,45 +165,70 @@ function SeriesEditor({ series, onSaved }) {
 export default function ShopInvoicingScreen() {
   const navigation = useNavigation();
   const bodyPadTop = useStackBodyPaddingTop(12);
+  const monthOptions = useMemo(() => buildRecentMonthOptions(), []);
   const [loading, setLoading] = useState(true);
   const [invoices, setInvoices] = useState([]);
+  const [uninvoicedRepairs, setUninvoicedRepairs] = useState([]);
   const [series, setSeries] = useState(null);
+  const [sectionTab, setSectionTab] = useState('invoices');
   const [statusFilter, setStatusFilter] = useState('');
+  const [clientSearch, setClientSearch] = useState('');
+  const [monthFilter, setMonthFilter] = useState(MONTH_ALL);
+  const [creatingRepairId, setCreatingRepairId] = useState(null);
   const [erpSummary, setErpSummary] = useState(null);
+
+  const loadInvoices = useCallback(async () => {
+    const token = await AsyncStorage.getItem('@access_token');
+    const [invoiceRows, seriesRows, profiles] = await Promise.all([
+      getInvoices(token, { status: statusFilter || undefined }),
+      getInvoiceSeries(token),
+      getMyShopProfiles().catch(() => []),
+    ]);
+    setInvoices(Array.isArray(invoiceRows) ? invoiceRows : []);
+    const firstSeries = Array.isArray(seriesRows) && seriesRows.length ? seriesRows[0] : null;
+    setSeries(firstSeries);
+
+    const currentId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
+    const profile =
+      (Array.isArray(profiles) ? profiles : []).find(
+        (row) => String(row.id) === String(currentId)
+      ) || profiles?.[0];
+    const entityId = profile?.legal_entity || profile?.legal_entity_detail?.id;
+    if (entityId && token) {
+      const summary = await getLegalEntitySummary(token, entityId);
+      setErpSummary(summary?.branch_count > 1 ? summary : null);
+    } else {
+      setErpSummary(null);
+    }
+  }, [statusFilter]);
+
+  const loadUninvoicedRepairs = useCallback(async () => {
+    const token = await AsyncStorage.getItem('@access_token');
+    const rows = await getRepairs(token, { status: 'done', uninvoiced: true }, { force: true });
+    setUninvoicedRepairs(Array.isArray(rows) ? rows : []);
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem('@access_token');
-      const [invoiceRows, seriesRows, profiles] = await Promise.all([
-        getInvoices(token, { status: statusFilter || undefined }),
-        getInvoiceSeries(token),
-        getMyShopProfiles().catch(() => []),
-      ]);
-      setInvoices(Array.isArray(invoiceRows) ? invoiceRows : []);
-      const firstSeries = Array.isArray(seriesRows) && seriesRows.length ? seriesRows[0] : null;
-      setSeries(firstSeries);
-
-      const currentId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
-      const profile =
-        (Array.isArray(profiles) ? profiles : []).find(
-          (row) => String(row.id) === String(currentId)
-        ) || profiles?.[0];
-      const entityId = profile?.legal_entity || profile?.legal_entity_detail?.id;
-      if (entityId && token) {
-        const summary = await getLegalEntitySummary(token, entityId);
-        setErpSummary(summary?.branch_count > 1 ? summary : null);
+      if (sectionTab === 'invoices') {
+        await loadInvoices();
+        setUninvoicedRepairs([]);
       } else {
-        setErpSummary(null);
+        await loadUninvoicedRepairs();
       }
     } catch (err) {
       console.error(err);
       Alert.alert('Error', err.message || 'Failed to load invoicing data');
-      setInvoices([]);
+      if (sectionTab === 'invoices') {
+        setInvoices([]);
+      } else {
+        setUninvoicedRepairs([]);
+      }
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [sectionTab, loadInvoices, loadUninvoicedRepairs]);
 
   useFocusEffect(
     useCallback(() => {
@@ -158,8 +236,76 @@ export default function ShopInvoicingScreen() {
     }, [loadData])
   );
 
+  const filteredInvoices = useMemo(
+    () =>
+      filterInvoices(invoices, {
+        clientSearch,
+        monthKey: monthFilter,
+      }),
+    [invoices, clientSearch, monthFilter]
+  );
+
+  const showInvoiceListFilters = sectionTab === 'invoices' && (statusFilter === '' || statusFilter === 'issued');
+
   const openInvoice = (invoiceId) => {
     navigation.navigate('ShopInvoiceDetail', { invoiceId });
+  };
+
+  const handleCreateInvoiceFromRepair = async (repairId) => {
+    setCreatingRepairId(repairId);
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      const invoice = await draftInvoiceFromRepairs(token, [repairId]);
+      navigation.navigate('ShopInvoiceDetail', { invoiceId: invoice.id });
+      loadUninvoicedRepairs().catch(() => {});
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Could not create invoice draft');
+    } finally {
+      setCreatingRepairId(null);
+    }
+  };
+
+  const renderUninvoicedRepair = (repair) => {
+    const title = `${repair.vehicle_make ?? ''} ${repair.vehicle_model ?? ''}`.trim() || 'Vehicle';
+    const plate = String(repair.vehicle_license_plate || '').trim();
+    const clientName = String(repair.client_display_name || '').trim();
+    const completed = formatRepairListDate(repair.completed_at || repair.created_at);
+    const total = formatMoneyMinor(
+      repair.total_price != null ? Math.round(Number(repair.total_price) * 100) : null,
+      repair.currency
+    );
+    const busy = creatingRepairId === repair.id;
+
+    return (
+      <FloatingCard
+        key={repair.id}
+        onPress={busy ? undefined : () => handleCreateInvoiceFromRepair(repair.id)}
+      >
+        <View style={styles.invoiceRow}>
+          <View style={styles.invoiceMain}>
+            <Text style={styles.invoiceNumber}>{title}</Text>
+            <Text style={styles.invoiceSub} numberOfLines={2}>
+              {[plate, clientName, completed].filter(Boolean).join(' · ') || 'Completed repair'}
+            </Text>
+            {total ? <Text style={styles.invoiceTotal}>{total}</Text> : null}
+          </View>
+          <View style={styles.invoiceAside}>
+            {busy ? (
+              <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+            ) : (
+              <>
+                <MaterialCommunityIcons
+                  name="file-document-plus-outline"
+                  size={20}
+                  color={COLORS.PRIMARY}
+                />
+                <MaterialCommunityIcons name="chevron-right" size={22} color={COLORS.TEXT_MUTED} />
+              </>
+            )}
+          </View>
+        </View>
+      </FloatingCard>
+    );
   };
 
   return (
@@ -192,20 +338,20 @@ export default function ShopInvoicingScreen() {
           series={series}
           onSaved={(updated) => {
             setSeries(updated);
-            loadData();
+            loadInvoices().catch(() => {});
           }}
         />
 
-        <View style={styles.filterRow}>
-          {STATUS_FILTERS.map((item) => {
-            const active = statusFilter === item.key;
+        <View style={styles.sectionTabRow}>
+          {SECTION_TABS.map((item) => {
+            const active = sectionTab === item.key;
             return (
               <Pressable
-                key={item.key || 'all'}
-                onPress={() => setStatusFilter(item.key)}
-                style={[styles.filterChip, active && styles.filterChipActive]}
+                key={item.key}
+                onPress={() => setSectionTab(item.key)}
+                style={[styles.sectionTab, active && styles.sectionTabActive]}
               >
-                <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                <Text style={[styles.sectionTabText, active && styles.sectionTabTextActive]}>
                   {item.label}
                 </Text>
               </Pressable>
@@ -213,34 +359,103 @@ export default function ShopInvoicingScreen() {
           })}
         </View>
 
-        {loading ? (
-          <ActivityIndicator style={styles.loader} color={COLORS.PRIMARY} />
-        ) : invoices.length === 0 ? (
-          <FloatingCard>
-            <Text style={styles.emptyTitle}>No invoices yet</Text>
-            <Text style={styles.emptyText}>
-            Open a completed repair and tap “Create platform invoice”, or on Repairs → Done tap
-            the multi-invoice icon to combine several jobs for the same client.
-            </Text>
-          </FloatingCard>
+        {sectionTab === 'invoices' ? (
+          <>
+            <View style={styles.filterRow}>
+              {STATUS_FILTERS.map((item) => {
+                const active = statusFilter === item.key;
+                return (
+                  <Pressable
+                    key={item.key || 'all'}
+                    onPress={() => setStatusFilter(item.key)}
+                    style={[styles.filterChip, active && styles.filterChipActive]}
+                  >
+                    <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {showInvoiceListFilters ? (
+              <FloatingCard style={styles.invoiceFiltersCard}>
+                <Text style={styles.sectionTitle}>Filter invoices</Text>
+                <TextInput
+                  mode="outlined"
+                  label="Client search"
+                  value={clientSearch}
+                  onChangeText={setClientSearch}
+                  style={styles.input}
+                  placeholder="Name or company on invoice"
+                />
+                <Text style={styles.pickerLabel}>Month (issued date)</Text>
+                <View style={styles.pickerShell}>
+                  <Picker
+                    selectedValue={monthFilter}
+                    onValueChange={setMonthFilter}
+                    style={styles.picker}
+                    dropdownIconColor={COLORS.TEXT_MUTED}
+                  >
+                    {monthOptions.map((option) => (
+                      <Picker.Item key={option.value || 'all'} label={option.label} value={option.value} />
+                    ))}
+                  </Picker>
+                </View>
+              </FloatingCard>
+            ) : null}
+
+            {loading ? (
+              <ActivityIndicator style={styles.loader} color={COLORS.PRIMARY} />
+            ) : filteredInvoices.length === 0 ? (
+              <FloatingCard>
+                <Text style={styles.emptyTitle}>
+                  {invoices.length === 0 ? 'No invoices yet' : 'No invoices match filters'}
+                </Text>
+                <Text style={styles.emptyText}>
+                  {invoices.length === 0
+                    ? 'Open a completed repair and tap “Create platform invoice”, or use the Uninvoiced repairs tab.'
+                    : 'Try another client name or month.'}
+                </Text>
+              </FloatingCard>
+            ) : (
+              filteredInvoices.map((invoice) => (
+                <FloatingCard key={invoice.id} onPress={() => openInvoice(invoice.id)}>
+                  <View style={styles.invoiceRow}>
+                    <View style={styles.invoiceMain}>
+                      <Text style={styles.invoiceNumber}>{invoiceDisplayNumber(invoice)}</Text>
+                      <Text style={styles.invoiceSub} numberOfLines={2}>
+                        {invoiceListSubtitle(invoice)}
+                      </Text>
+                      <Text style={styles.invoiceTotal}>{invoiceTotalLabel(invoice)}</Text>
+                    </View>
+                    <View style={styles.invoiceAside}>
+                      <StatusBadge status={invoice.status} />
+                      <MaterialCommunityIcons name="chevron-right" size={22} color={COLORS.TEXT_MUTED} />
+                    </View>
+                  </View>
+                </FloatingCard>
+              ))
+            )}
+          </>
         ) : (
-          invoices.map((invoice) => (
-            <FloatingCard key={invoice.id} onPress={() => openInvoice(invoice.id)}>
-              <View style={styles.invoiceRow}>
-                <View style={styles.invoiceMain}>
-                  <Text style={styles.invoiceNumber}>{invoiceDisplayNumber(invoice)}</Text>
-                  <Text style={styles.invoiceSub} numberOfLines={2}>
-                    {invoiceListSubtitle(invoice)}
-                  </Text>
-                  <Text style={styles.invoiceTotal}>{invoiceTotalLabel(invoice)}</Text>
-                </View>
-                <View style={styles.invoiceAside}>
-                  <StatusBadge status={invoice.status} />
-                  <MaterialCommunityIcons name="chevron-right" size={22} color={COLORS.TEXT_MUTED} />
-                </View>
-              </View>
-            </FloatingCard>
-          ))
+          <>
+            <Text style={styles.sectionHint}>
+              Completed repairs without an issued platform invoice. Tap a row to create a draft
+              invoice.
+            </Text>
+            {loading ? (
+              <ActivityIndicator style={styles.loader} color={COLORS.PRIMARY} />
+            ) : uninvoicedRepairs.length === 0 ? (
+              <EmptyStateCard
+                icon="file-document-check-outline"
+                title="All caught up"
+                subtitle="Every completed repair already has an issued platform invoice, or none are done yet."
+              />
+            ) : (
+              uninvoicedRepairs.map((repair) => renderUninvoicedRepair(repair))
+            )}
+          </>
         )}
       </ScrollView>
     </ScreenBackground>
@@ -291,6 +506,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 4,
   },
+  sectionTabRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sectionTab: {
+    flexGrow: 1,
+    minWidth: 140,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(15,23,42,0.06)',
+    alignItems: 'center',
+  },
+  sectionTabActive: {
+    backgroundColor: COLORS.PRIMARY,
+  },
+  sectionTabText: {
+    color: COLORS.TEXT_DARK,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  sectionTabTextActive: {
+    color: '#fff',
+  },
   filterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -312,6 +552,25 @@ const styles = StyleSheet.create({
   },
   filterChipTextActive: {
     color: '#fff',
+  },
+  invoiceFiltersCard: {
+    gap: 8,
+  },
+  pickerLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.TEXT_DARK,
+    marginTop: 2,
+  },
+  pickerShell: {
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.12)',
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+  },
+  picker: {
+    height: Platform.OS === 'ios' ? 140 : 44,
   },
   loader: {
     marginTop: 24,

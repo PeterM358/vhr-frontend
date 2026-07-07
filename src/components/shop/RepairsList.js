@@ -75,6 +75,7 @@ export default function RepairsList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [vehicleFilters, setVehicleFilters] = useState(EMPTY_VEHICLE_FILTERS);
+  const [vehicleFiltersOpen, setVehicleFiltersOpen] = useState(false);
   const [paymentFilter, setPaymentFilter] = useState('');
   const [clientFilterId, setClientFilterId] = useState('');
   const [clientFilterLabel, setClientFilterLabel] = useState('');
@@ -551,6 +552,18 @@ export default function RepairsList() {
       vehicleFilters.repairTypeId ||
       vehicleFilters.serviceYear
   );
+  const vehicleFilterCount = [
+    vehicleFilters.makeId,
+    vehicleFilters.modelId,
+    String(vehicleFilters.vehicleYear || '').trim(),
+    vehicleFilters.repairTypeId,
+    vehicleFilters.serviceYear,
+  ].filter(Boolean).length;
+  const vehicleFiltersLabel = vehicleFiltersOpen
+    ? 'Hide filters'
+    : vehicleFilterCount > 0
+      ? `Filters (${vehicleFilterCount})`
+      : 'Filters';
   const hasPaymentOrClientFilters = hasDoneClientFilters;
 
   const emptySubtitle = hasSearch || hasVehicleFilters || hasPaymentOrClientFilters
@@ -691,11 +704,38 @@ export default function RepairsList() {
           placeholderTextColor={TEXT_MUTED}
         />
 
-        <RepairVehicleFilterBar
-          value={vehicleFilters}
-          onChange={setVehicleFilters}
-          statusTab={selectedTab}
-        />
+        <Pressable
+          onPress={() => setVehicleFiltersOpen((open) => !open)}
+          style={({ pressed }) => [
+            styles.vehicleFiltersToggle,
+            vehicleFiltersOpen && styles.vehicleFiltersToggleActive,
+            pressed && { opacity: 0.88 },
+          ]}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: vehicleFiltersOpen }}
+        >
+          <MaterialCommunityIcons
+            name="tune-variant"
+            size={16}
+            color={vehicleFiltersOpen ? '#fff' : 'rgba(255,255,255,0.92)'}
+          />
+          <Text
+            style={[
+              styles.vehicleFiltersToggleText,
+              vehicleFiltersOpen && styles.vehicleFiltersToggleTextActive,
+            ]}
+          >
+            {vehicleFiltersLabel}
+          </Text>
+        </Pressable>
+
+        {vehicleFiltersOpen ? (
+          <RepairVehicleFilterBar
+            value={vehicleFilters}
+            onChange={setVehicleFilters}
+            statusTab={selectedTab}
+          />
+        ) : null}
 
         {selectedTab === 'done' && invoiceSelectMode ? (
           <View style={styles.selectBanner}>
@@ -802,6 +842,32 @@ const styles = StyleSheet.create({
   searchInput: {
     fontSize: 14,
     minHeight: 0,
+  },
+  vehicleFiltersToggle: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  vehicleFiltersToggleActive: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+  },
+  vehicleFiltersToggleText: {
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  vehicleFiltersToggleTextActive: {
+    color: '#fff',
   },
   loading: {
     marginTop: 24,

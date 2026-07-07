@@ -40,6 +40,7 @@ import {
   partnerServices,
   partnerNotifications,
   partnerSwitchCenter,
+  partnerAddServiceCenter,
   partnerServiceCenters,
   profile,
   repairRequests,
@@ -182,7 +183,9 @@ export function getCanonicalWebPath(state) {
     case 'ShopNotificationsScreen':
       return partnerNotifications();
     case 'ChooseShop':
-      return partnerSwitchCenter();
+      return partnerSwitchCenter(params);
+    case 'AddPartnerServiceCenter':
+      return partnerAddServiceCenter(params);
     case 'PartnerServiceCenters':
       return partnerServiceCenters();
     case 'PartnerBookings':
@@ -598,6 +601,16 @@ export function getPartnerNavigationStateFromPath(path) {
       index: 1,
     };
   }
+  if (pathPart === 'partner/switch-center/add') {
+    return {
+      routes: [
+        partnerHome,
+        { name: 'ChooseShop' },
+        { name: 'AddPartnerServiceCenter' },
+      ],
+      index: 2,
+    };
+  }
   if (pathPart === 'partner/service-centers') {
     return {
       routes: [partnerHome, { name: 'PartnerServiceCenters' }],
@@ -729,6 +742,12 @@ export function normalizeWebLinkingPath(path) {
   }
   if (trimmed === 'ChooseShop' || trimmed.startsWith('ChooseShop')) {
     return 'partner/switch-center';
+  }
+  if (trimmed === 'AddPartnerServiceCenter' || trimmed.startsWith('AddPartnerServiceCenter')) {
+    return 'partner/switch-center/add';
+  }
+  if (trimmed === 'PartnerServiceCenters' || trimmed.startsWith('PartnerServiceCenters')) {
+    return 'partner/service-centers';
   }
   if (trimmed === 'ShopDetail' || trimmed.startsWith('ShopDetail/')) {
     const shopId = trimmed.match(/shopId[=:](\d+)/i)?.[1];
@@ -967,6 +986,10 @@ export async function redirectLegacyWebUrl() {
     target = '/partner/notifications';
   } else if (pathname === '/ChooseShop' || pathname.startsWith('/ChooseShop')) {
     target = '/partner/switch-center';
+  } else if (pathname === '/AddPartnerServiceCenter' || pathname.startsWith('/AddPartnerServiceCenter')) {
+    target = '/partner/switch-center/add';
+  } else if (pathname === '/PartnerServiceCenters' || pathname.startsWith('/PartnerServiceCenters')) {
+    target = '/partner/service-centers';
   } else if (pathname === '/PublicSeoPage' || pathname.startsWith('/PublicSeoPage')) {
     const query = parseRouteQuery(search);
     if (query.type === 'city' && query.citySlug) {

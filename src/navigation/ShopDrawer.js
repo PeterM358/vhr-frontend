@@ -229,12 +229,8 @@ function CustomDrawerContent(props) {
         <DrawerItem
           label="Explore Service Centers"
           onPress={() => {
-            if (Platform.OS === 'web') {
-              navigateToPartnerServiceCenters(navigation);
-            } else {
-              resetFromShopDrawer(navigation, 'PartnerServiceCenters');
-            }
             props.navigation.closeDrawer();
+            navigateToPartnerServiceCenters(navigation);
           }}
           icon={({ color, size }) => <DrawerMenuIcon name="map-search-outline" color={color} size={size} />}
           labelStyle={styles.itemLabel}
