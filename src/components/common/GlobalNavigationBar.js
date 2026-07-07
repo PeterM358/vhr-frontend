@@ -5,8 +5,11 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Badge } from 'react-native-paper';
+import Logo from '../../assets/images/logo.svg';
 import AppNavigationBar from './AppNavigationBar';
 import GlassNavIconButton from '../navigation/GlassNavIconButton';
+
+const NAV_LOGO_SIZE = 26;
 
 export default function GlobalNavigationBar({
   title,
@@ -22,11 +25,19 @@ export default function GlobalNavigationBar({
       title={title}
       scrolled={scrolled}
       leftAction={
-        <GlassNavIconButton
-          icon="menu"
-          onPress={onMenuPress}
-          accessibilityLabel="Open menu"
-        />
+        <View style={styles.leftRow}>
+          <GlassNavIconButton
+            icon="menu"
+            onPress={onMenuPress}
+            accessibilityLabel="Open menu"
+          />
+          <Logo
+            width={NAV_LOGO_SIZE}
+            height={NAV_LOGO_SIZE}
+            style={styles.navLogo}
+            accessibilityLabel="Veversal"
+          />
+        </View>
       }
       rightAction={
         <View style={styles.rightRow}>
@@ -52,6 +63,14 @@ export default function GlobalNavigationBar({
 }
 
 const styles = StyleSheet.create({
+  leftRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  navLogo: {
+    opacity: 0.96,
+  },
   rightRow: {
     flexDirection: 'row',
     alignItems: 'center',
