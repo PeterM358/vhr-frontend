@@ -23,8 +23,8 @@
  * @property {string} label
  * @property {string} description
  * @property {boolean} enabled
- * @property {number | { uri: string }} nativeImage
  * @property {{ uri: string }} webImage
+ * @property {number | { uri: string }} [nativeImage]
  * @property {GarageSceneGradientStop[]} overlay
  * @property {GarageSceneBlurConfig} blur
  * @property {GarageSceneBrightnessConfig} brightness

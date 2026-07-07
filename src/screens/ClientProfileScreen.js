@@ -31,6 +31,7 @@ import FloatingCard from '../components/ui/FloatingCard';
 import AppCard from '../components/ui/AppCard';
 import { COLORS } from '../constants/colors';
 import { useGarageScene } from '../context/GarageSceneContext';
+import { getEnabledScenes } from '../theme/garageScenes';
 import useDebouncedValue from '../utils/useDebouncedValue';
 
 const CONTACT_PREFERENCE_STORAGE_KEY = '@client_profile_contact_preference';
@@ -115,8 +116,9 @@ export default function ClientProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useClientDashboardBack(navigation);
-  const { getSelectedScene } = useGarageScene();
+  const { getSelectedScene, setSelectedSceneId } = useGarageScene();
   const garageScene = getSelectedScene();
+  const garageScenes = getEnabledScenes();
 
   const [profile, setProfile] = useState(null);
   const [countries, setCountries] = useState([]);
@@ -461,11 +463,19 @@ export default function ClientProfileScreen({ navigation }) {
           <Text style={styles.sectionTitle}>Appearance</Text>
           <Text variant="labelLarge" style={styles.label}>Garage Scene</Text>
           <View style={styles.pickerWrap}>
-            <Picker selectedValue={garageScene.id} enabled={false} style={styles.picker}>
-              <Picker.Item label={garageScene.label} value={garageScene.id} />
+            <Picker
+              selectedValue={garageScene.id}
+              onValueChange={setSelectedSceneId}
+              style={styles.picker}
+            >
+              {garageScenes.map((scene) => (
+                <Picker.Item key={scene.id} label={scene.label} value={scene.id} />
+              ))}
             </Picker>
           </View>
-          <Text style={styles.helper}>More garage scenes coming soon.</Text>
+          <Text style={styles.helper}>
+            {garageScene.description || 'Choose a garage scene for your dashboard background.'}
+          </Text>
         </FloatingCard>
 
         <FloatingCard>
