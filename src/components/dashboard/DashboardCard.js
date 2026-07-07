@@ -1,4 +1,4 @@
-// Opaque dark card shell — same look as dashboard hero / summary / action tiles.
+// Semi-transparent dark glass shell — matches dashboard hero / action tiles.
 // Single source of truth for dark panels on ScreenBackground (dashboard + auth).
 
 import React from 'react';
