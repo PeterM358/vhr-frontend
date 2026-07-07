@@ -63,20 +63,20 @@ export default function App() {
             ? { translucent: false, backgroundColor: '#0b1220' }
             : {})}
         />
-        <GarageSceneProvider>
-          <ThemeProvider>
-            <PaperProvider theme={AppTheme}>
-              <AuthManager>
+        <ThemeProvider>
+          <PaperProvider theme={AppTheme}>
+            <AuthManager>
+              <GarageSceneProvider>
                 <WebSocketProvider>
                   <MobileWebInsetsBridge>
                     <AppNavigator />
                     <MessageDialogHost />
                   </MobileWebInsetsBridge>
                 </WebSocketProvider>
-              </AuthManager>
-            </PaperProvider>
-          </ThemeProvider>
-        </GarageSceneProvider>
+              </GarageSceneProvider>
+            </AuthManager>
+          </PaperProvider>
+        </ThemeProvider>
       </View>
     </SafeAreaProvider>
   );
