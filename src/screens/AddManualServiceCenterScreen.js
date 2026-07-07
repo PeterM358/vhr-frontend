@@ -13,6 +13,8 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import ScreenBackground from '../components/ScreenBackground';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useServiceRecordBack } from '../navigation/appNavBarBack';
 import FloatingCard from '../components/ui/FloatingCard';
 import { COLORS } from '../constants/colors';
 import { getCountries, getCitiesForCountry } from '../api/profiles';
@@ -71,6 +73,7 @@ function applyDraftToForm(draft, setters) {
 export default function AddManualServiceCenterScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const vehicleId = route.params?.vehicleId != null ? String(route.params.vehicleId) : '';
+  const handleBack = useServiceRecordBack(navigation, vehicleId);
   const repairTypeLabel = String(route.params?.repairTypeLabel || '').trim();
 
   const [manualName, setManualName] = useState('');
@@ -474,12 +477,13 @@ export default function AddManualServiceCenterScreen({ navigation, route }) {
   const pickedLon = parseOptionalCoordinate(manualLongitude);
 
   return (
-    <ScreenBackground>
+    <ScreenBackground safeArea={false}>
+      <AppNavigationBar title="Add service center" backLabel="Record" onBack={handleBack} />
       <View style={styles.root}>
         <KeyboardAwareScrollView
           contentContainerStyle={[
             styles.container,
-            { paddingBottom: 100 + Math.max(insets.bottom, 10) },
+            { paddingTop: 12, paddingBottom: 100 + Math.max(insets.bottom, 10) },
           ]}
           keyboardShouldPersistTaps="handled"
           enableResetScrollToCoords={false}

@@ -22,6 +22,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE_URL } from '../api/config';
 import { updateVehicle } from '../api/vehicles';
 import ScreenBackground from '../components/ScreenBackground';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useGoBackOr } from '../navigation/appNavBarBack';
 import FloatingCard from '../components/ui/FloatingCard';
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import { COLORS } from '../constants/colors';
@@ -56,6 +58,7 @@ function normalizeCenters(vehicle) {
 }
 
 export default function ManageVehicleServiceCentersScreen({ navigation, route }) {
+  const handleBack = useGoBackOr(navigation);
   const insets = useSafeAreaInsets();
   const vehicleId = route.params?.vehicleId != null ? String(route.params.vehicleId) : '';
 
@@ -166,9 +169,10 @@ export default function ManageVehicleServiceCentersScreen({ navigation, route })
   }
 
   return (
-    <ScreenBackground>
+    <ScreenBackground safeArea={false}>
+      <AppNavigationBar title="Service center access" backLabel="Vehicle" onBack={handleBack} />
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: 12, paddingBottom: insets.bottom + 24 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
       >
         <FloatingCard>

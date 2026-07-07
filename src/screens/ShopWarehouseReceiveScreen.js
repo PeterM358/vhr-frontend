@@ -11,6 +11,8 @@ import { Text, ActivityIndicator, Button, Appbar, Chip, Switch } from 'react-nat
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import ScreenBackground from '../components/ScreenBackground';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import FloatingCard from '../components/ui/FloatingCard';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
 import InvoiceHeaderCard from '../components/warehouse/InvoiceHeaderCard';
@@ -20,7 +22,6 @@ import MissingFieldsBanner from '../components/warehouse/MissingFieldsBanner';
 import ReceivingTotalsCard from '../components/warehouse/ReceivingTotalsCard';
 import { ReceivingInvoiceStartStep, ReceivingCreditNoteStartStep } from '../components/warehouse/ReceivingWizardSteps';
 import { PRIMARY, TEXT_DARK, TEXT_MUTED } from '../constants/colors';
-import { useStackBodyPaddingTop } from '../navigation/stackContentInset';
 import { getMyShopProfiles, updateShopProfile } from '../api/profiles';
 import { fetchUnits } from '../api/partCatalog';
 import { pickReceiptOrInvoiceAttachment } from '../utils/pickDocumentFile';
@@ -130,8 +131,8 @@ export default function ShopWarehouseReceiveScreen({
 }) {
   const inDrawer = typeof navigation.openDrawer === 'function';
   const insets = useSafeAreaInsets();
-  const stackPadTop = useStackBodyPaddingTop(12);
-  const bodyPadTop = inDrawer ? 8 : stackPadTop;
+  const handleBack = usePartnerDashboardBack(navigation);
+  const showAppNav = !embedded && !inDrawer;
 
   const [loading, setLoading] = useState(true);
   const [warehouseEnabled, setWarehouseEnabled] = useState(false);
@@ -541,11 +542,14 @@ export default function ShopWarehouseReceiveScreen({
   if (phase === 'start' || phase === 'credit-start') {
     return (
       <Wrapper style={embedded ? styles.embeddedRoot : undefined}>
+        {showAppNav ? (
+          <AppNavigationBar title="Warehouse" backLabel="Dashboard" onBack={handleBack} />
+        ) : null}
         <ScrollView
           style={styles.flex}
           contentContainerStyle={[
             styles.container,
-            embedded ? styles.embeddedPad : { paddingTop: bodyPadTop },
+            embedded ? styles.embeddedPad : { paddingTop: showAppNav ? 12 : 8 },
             styles.wizardContent,
           ]}
           keyboardShouldPersistTaps="handled"
@@ -579,7 +583,7 @@ export default function ShopWarehouseReceiveScreen({
   const readyToCommit = lines.length > 0 && incomplete === 0 && headerIssues.length === 0;
 
   const listHeader = (
-    <View style={[styles.container, embedded ? styles.embeddedPad : { paddingTop: bodyPadTop }]}>
+    <View style={[styles.container, embedded ? styles.embeddedPad : { paddingTop: showAppNav ? 12 : 8 }]}>
       <WarehouseStockToggle
         enabled={warehouseEnabled}
         toggling={warehouseToggling}
@@ -711,6 +715,9 @@ export default function ShopWarehouseReceiveScreen({
 
   return (
     <Wrapper style={embedded ? styles.embeddedRoot : undefined}>
+      {showAppNav ? (
+        <AppNavigationBar title="Warehouse" backLabel="Dashboard" onBack={handleBack} />
+      ) : null}
       {!embedded && inDrawer ? (
         <Appbar.Header style={{ backgroundColor: SHOP_TOP_BAR, paddingTop: insets.top }}>
           <Appbar.Action

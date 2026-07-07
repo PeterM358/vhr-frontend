@@ -11,6 +11,8 @@ import {
 import { Picker } from '@react-native-picker/picker';
 
 import ScreenBackground from '../components/ScreenBackground';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useGoBackOr } from '../navigation/appNavBarBack';
 import AppCard from '../components/ui/AppCard';
 import { COLORS } from '../constants/colors';
 import { stackContentPaddingTop } from '../navigation/stackContentInset';
@@ -29,6 +31,7 @@ function ensureSelectedCity(cityList, selectedId, selectedName) {
 }
 
 export default function AddPartnerServiceCenterScreen({ navigation }) {
+  const handleBack = useGoBackOr(navigation);
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -143,11 +146,12 @@ export default function AddPartnerServiceCenterScreen({ navigation }) {
   };
 
   return (
-    <ScreenBackground>
+    <ScreenBackground safeArea={false}>
+      <AppNavigationBar title="Add service center" backLabel="Switch center" onBack={handleBack} />
       <ScrollView
         contentContainerStyle={[
           styles.container,
-          { paddingTop: stackContentPaddingTop(insets.top) },
+          { paddingTop: 12 },
         ]}
         keyboardShouldPersistTaps="handled"
       >

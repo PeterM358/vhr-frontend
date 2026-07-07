@@ -9,11 +9,14 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { getMyShopProfiles } from '../api/profiles';
 import ScreenBackground from '../components/ScreenBackground';
+import AppNavigationBar from '../components/common/AppNavigationBar';
+import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import { COLORS } from '../styles/colors';
 import { navigateToPartnerAddServiceCenter } from '../navigation/webNavigation';
 import { Platform } from 'react-native';
 
 export default function ChooseShopScreen({ navigation }) {
+  const handleBack = usePartnerDashboardBack(navigation);
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentShopId, setCurrentShopId] = useState(null);
@@ -107,7 +110,8 @@ export default function ChooseShopScreen({ navigation }) {
       : 'Your service centers';
 
   return (
-    <ScreenBackground>
+    <ScreenBackground safeArea={false}>
+      <AppNavigationBar title="Choose center" backLabel="Dashboard" onBack={handleBack} />
       <View style={styles.container}>
         <Text variant="titleLarge" style={styles.title}>
           Switch service center
