@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View, Text } from 'react-native';
 import { useTranslation } from '../../i18n';
 import { switchLanguageInPath } from '../../navigation/localizedRoutes';
@@ -13,13 +13,29 @@ const LOCALE_ABBR = {
   es: 'ES',
 };
 
+const LOCALE_LABELS = {
+  bg: 'Български',
+  en: 'English',
+  de: 'Deutsch',
+  it: 'Italiano',
+  fr: 'Français',
+  es: 'Español',
+};
+
 function getLangAbbr(locale) {
   const key = String(locale || '').trim().toLowerCase();
   return LOCALE_ABBR[key] || key.toUpperCase();
 }
 
-export default function CompactLanguageSelector({ variant = 'dark', compact = true, style }) {
+export default function CompactLanguageSelector({
+  variant = 'dark',
+  compact = true,
+  style,
+  showFullLabel = false,
+}) {
   const { locale, setLocale } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
 
   const colors = useMemo(() => {
     if (variant === 'light') {
@@ -41,6 +57,11 @@ export default function CompactLanguageSelector({ variant = 'dark', compact = tr
     };
   }, [variant]);
 
+  const currentLocaleKey = useMemo(() => {
+    const key = String(locale || '').trim().toLowerCase();
+    return LOCALE_ORDER.includes(key) ? key : locale;
+  }, [locale]);
+
   const handleSelect = useCallback(
     async (nextLocale) => {
       if (!nextLocale || nextLocale === locale) return;
@@ -55,40 +76,113 @@ export default function CompactLanguageSelector({ variant = 'dark', compact = tr
     [locale, setLocale]
   );
 
+  const toggleOpen = useCallback(() => {
+    setOpen((prev) => !prev);
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (typeof document === 'undefined') return;
+    if (!open) return;
+
+    const handleClickOutside = (event) => {
+      if (!rootRef.current) return;
+      if (rootRef.current.contains?.(event.target)) return;
+      setOpen(false);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [open]);
+
+  const currentLabel = useMemo(() => {
+    if (!currentLocaleKey) return '';
+    if (showFullLabel) {
+      return LOCALE_LABELS[currentLocaleKey] || LOCALE_LABELS[locale] || currentLocaleKey.toUpperCase();
+    }
+    return getLangAbbr(currentLocaleKey);
+  }, [currentLocaleKey, locale, showFullLabel]);
+
   return (
-    <View style={[styles.wrap, compact && styles.wrapCompact, { borderColor: colors.wrapBorder, backgroundColor: colors.wrapBg }, style]}>
-      {LOCALE_ORDER.map((l, idx) => {
-        const active = locale === l;
-        return (
-          <React.Fragment key={l}>
-            <Pressable
-              onPress={() => handleSelect(l)}
-              accessibilityRole="button"
-              accessibilityLabel={`Switch language to ${l}`}
-              style={({ pressed }) => [
-                styles.langBtn,
-                compact && styles.langBtnCompact,
-                active && { opacity: 1 },
-                pressed && { opacity: 0.85 },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.langText,
-                  { color: active ? colors.textActive : colors.textInactive },
-                  compact && styles.langTextCompact,
-                  active && { fontWeight: '800' },
+    <View
+      ref={rootRef}
+      style={[
+        styles.wrap,
+        compact && styles.wrapCompact,
+        { borderColor: colors.wrapBorder, backgroundColor: colors.wrapBg },
+        style,
+      ]}
+    >
+      <Pressable
+        onPress={toggleOpen}
+        accessibilityRole="button"
+        accessibilityLabel="Open language selector"
+        style={({ pressed }) => [
+          styles.trigger,
+          compact && styles.triggerCompact,
+          pressed && styles.triggerPressed,
+        ]}
+      >
+        <Text
+          style={[
+            styles.triggerText,
+            compact && styles.triggerTextCompact,
+            { color: colors.textActive },
+          ]}
+          numberOfLines={1}
+        >
+          <Text style={styles.globe}>🌐 </Text>
+          {currentLabel}{' '}
+          <Text style={styles.caret}>▾</Text>
+        </Text>
+      </Pressable>
+
+      {open ? (
+        <View
+          style={[
+            styles.dropdown,
+            {
+              borderColor: colors.wrapBorder,
+              backgroundColor: colors.wrapBg,
+            },
+          ]}
+        >
+          {LOCALE_ORDER.map((l) => {
+            const active = locale === l;
+            const label = showFullLabel ? LOCALE_LABELS[l] : getLangAbbr(l);
+            return (
+              <Pressable
+                key={l}
+                onPress={() => {
+                  setOpen(false);
+                  handleSelect(l);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Switch language to ${label}`}
+                style={({ pressed }) => [
+                  styles.dropdownItem,
+                  active && styles.dropdownItemActive,
+                  pressed && styles.dropdownItemPressed,
                 ]}
               >
-                {getLangAbbr(l)}
-              </Text>
-            </Pressable>
-            {idx < LOCALE_ORDER.length - 1 ? (
-              <Text style={[styles.sepText, { color: colors.sep }, compact && styles.sepTextCompact]}>|</Text>
-            ) : null}
-          </React.Fragment>
-        );
-      })}
+                <Text
+                  style={[
+                    styles.dropdownItemText,
+                    active && styles.dropdownItemTextActive,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -97,43 +191,76 @@ const styles = StyleSheet.create({
   wrap: {
     borderWidth: 1,
     borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    rowGap: 2,
-    columnGap: 6,
-    maxWidth: 220,
-  },
-  wrapCompact: {
     paddingHorizontal: 8,
     paddingVertical: 4,
+    maxWidth: 200,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  wrapCompact: {
     borderRadius: 10,
-    maxWidth: 180,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    maxWidth: 160,
   },
-  langBtn: {
-    paddingVertical: 2,
-    paddingHorizontal: 0,
+  trigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  langBtnCompact: {
-    paddingVertical: 1,
+  triggerCompact: {},
+  triggerPressed: {
+    opacity: 0.9,
   },
-  langText: {
+  triggerText: {
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.2,
   },
-  langTextCompact: {
+  triggerTextCompact: {
     fontSize: 11,
   },
-  sepText: {
+  globe: {
+    fontSize: 11,
+  },
+  caret: {
+    fontSize: 10,
+  },
+  dropdown: {
+    position: 'absolute',
+    top: '100%',
+    right: 0,
+    marginTop: 4,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 4,
+    minWidth: 140,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 10,
+    zIndex: 100,
+  },
+  dropdownItem: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dropdownItemActive: {
+    backgroundColor: 'rgba(37, 99, 235, 0.3)',
+  },
+  dropdownItemPressed: {
+    opacity: 0.9,
+  },
+  dropdownItemText: {
     fontSize: 12,
-    marginHorizontal: 2,
-    fontWeight: '700',
+    color: 'rgba(255,255,255,0.86)',
   },
-  sepTextCompact: {
-    fontSize: 11,
+  dropdownItemTextActive: {
+    color: '#ffffff',
+    fontWeight: '700',
   },
 });
 

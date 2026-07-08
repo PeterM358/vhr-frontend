@@ -445,14 +445,18 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
           variant="glass"
           iconOnly={false}
         />
-        <Text style={styles.title}>
+          <Text style={styles.title}>
           {authorizeMode
             ? 'Authorize a service center'
             : partnerMode
               ? 'Explore Service Centers'
               : 'Find Service Centers'}
         </Text>
-        <CompactLanguageSelector variant="light" compact style={styles.serviceCentersLangSelector} />
+        <CompactLanguageSelector
+          variant="light"
+          compact
+          style={styles.serviceCentersLangSelector}
+        />
       </View>
 
       <View style={styles.searchRow}>

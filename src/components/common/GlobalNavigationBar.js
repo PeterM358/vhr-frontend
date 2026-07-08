@@ -25,7 +25,7 @@ export default function GlobalNavigationBar({
       showBack={false}
       title={title}
       scrolled={scrolled}
-        showLanguageSelector={false}
+      showLanguageSelector={false}
       leftAction={
         <View style={styles.leftRow}>
           <GlassNavIconButton
