@@ -2,6 +2,32 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from './config';
 import { fetchVehicleTypesCached } from '../utils/referenceDataCache';
 
+/** In-memory session cache so dashboard survives Home remounts after stack resets. */
+let cachedVehicles = [];
+let vehiclesFetchPromise = null;
+
+export function getCachedVehicles() {
+  return cachedVehicles;
+}
+
+export function clearVehiclesCache() {
+  cachedVehicles = [];
+  vehiclesFetchPromise = null;
+}
+
+async function fetchVehiclesRaw() {
+  const token = await AsyncStorage.getItem('@access_token');
+  const response = await fetch(`${API_BASE_URL}/api/vehicles/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch vehicles');
+  }
+  const rows = await response.json();
+  cachedVehicles = Array.isArray(rows) ? rows : [];
+  return cachedVehicles;
+}
+
 async function fetchVehicleTypesRaw() {
   const token = await AsyncStorage.getItem('@access_token');
   const res = await fetch(`${API_BASE_URL}/api/vehicles/types/`, {
@@ -13,14 +39,22 @@ async function fetchVehicleTypesRaw() {
 }
 
 export async function getVehicles() {
-  const token = await AsyncStorage.getItem('@access_token');
-  const response = await fetch(`${API_BASE_URL}/api/vehicles/`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!response.ok) {
-    throw new Error('Failed to fetch vehicles');
+  if (vehiclesFetchPromise) {
+    return vehiclesFetchPromise;
   }
-  return await response.json();
+
+  vehiclesFetchPromise = fetchVehiclesRaw()
+    .catch((err) => {
+      if (cachedVehicles.length > 0) {
+        return cachedVehicles;
+      }
+      throw err;
+    })
+    .finally(() => {
+      vehiclesFetchPromise = null;
+    });
+
+  return vehiclesFetchPromise;
 }
 
 export async function updateVehicle(vehicleId, payload, token) {

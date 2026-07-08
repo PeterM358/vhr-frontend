@@ -1,5 +1,6 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearVehiclesCache } from './vehicles';
 import { API_BASE_URL } from '../env';
 import { syncPushDeviceToken, deactivatePushDeviceToken } from '../notifications/pushDeviceSync';
 import { messageFromApiError } from '../utils/apiErrorMessage';
@@ -132,6 +133,7 @@ export const logout = async (
   }
 
   await AsyncStorage.clear();
+  clearVehiclesCache();
 
   if (setAuthToken) setAuthToken(null);
   if (setIsAuthenticated) setIsAuthenticated(false);

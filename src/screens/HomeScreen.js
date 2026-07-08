@@ -14,7 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { FAB, useTheme } from 'react-native-paper';
 import { logout } from '../api/auth';
-import { getVehicles } from '../api/vehicles';
+import { getCachedVehicles, getVehicles } from '../api/vehicles';
 import { getRepairs } from '../api/repairs';
 import { isTerminalRepairStatus, normalizeRepairStatus } from '../utils/repairArrival';
 import { WebSocketContext } from '../context/WebSocketManager';
@@ -29,7 +29,6 @@ import VehicleHealthSection from '../components/dashboard/VehicleHealthSection';
 import RecommendedActionsSection from '../components/dashboard/RecommendedActionsSection';
 import { buildRecommendedActions } from '../utils/dashboardFormatters';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
-import { resetFromClientDrawer } from '../navigation/drawerNavigation';
 import {
   navigateToDocuments,
   navigateToNotifications,
@@ -81,7 +80,7 @@ export default function HomeScreen({ navigation }) {
   const hasSession = isAuthenticated || !!authToken;
   const { notifications } = useContext(WebSocketContext);
 
-  const [vehicles, setVehicles] = useState([]);
+  const [vehicles, setVehicles] = useState(() => getCachedVehicles());
   const [activeRepairs, setActiveRepairs] = useState([]);
   const [openRequestsCount, setOpenRequestsCount] = useState(0);
   const [pendingOffersCount, setPendingOffersCount] = useState(0);
@@ -116,19 +115,26 @@ export default function HomeScreen({ navigation }) {
         setSessionChecked(true);
       };
 
+      const cachedVehicleRows = getCachedVehicles();
+      if (cachedVehicleRows.length > 0) {
+        setVehicles(cachedVehicleRows);
+      }
+
       const loadDashboard = async () => {
         if (!hasSession) return;
         setDashboardLoading(true);
         try {
           const token = await AsyncStorage.getItem('@access_token');
           const [vehicleRows, repairRows, offersRes] = await Promise.all([
-            getVehicles().catch(() => []),
+            getVehicles().catch(() => null),
             getRepairs(token).catch(() => []),
             fetch(`${API_BASE_URL}/api/offers/`, {
               headers: { Authorization: `Bearer ${token}` },
             }).catch(() => null),
           ]);
-          const safeVehicles = Array.isArray(vehicleRows) ? vehicleRows : [];
+          const safeVehicles = Array.isArray(vehicleRows)
+            ? vehicleRows
+            : getCachedVehicles();
           const safeRepairs = Array.isArray(repairRows) ? repairRows : [];
           const nonTerminalRepairs = safeRepairs.filter(
             (repair) => !isTerminalRepairStatus(repair?.status)
@@ -175,16 +181,12 @@ export default function HomeScreen({ navigation }) {
   };
 
   const goRequestService = (vehicle) => {
-    if (vehicle?.id) {
-      navigation.navigate('CreateRepair', {
-        vehicleId: vehicle.id,
-        mode: 'request',
-        returnTo: 'Home',
-        origin: 'Home',
-      });
-      return;
-    }
-    resetFromClientDrawer(navigation, 'CreateRepair');
+    navigation.navigate('CreateRepair', {
+      ...(vehicle?.id ? { vehicleId: vehicle.id } : {}),
+      mode: 'request',
+      returnTo: 'Home',
+      origin: 'Home',
+    });
   };
   const goAddVehicle = () => {
     const root = navigation.getParent?.() || navigation;
