@@ -39,8 +39,8 @@ import {
   DrawerLabelWithBadge,
   DrawerVeversalLogoFooter,
   drawerGlassStyles,
+  drawerMenuItemProps,
   drawerScreenOptions,
-  DRAWER_TINT,
 } from './DrawerBranding';
 import { useTranslation } from '../i18n';
 
@@ -71,14 +71,7 @@ function CustomDrawerContent(props) {
     await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
   };
 
-  const itemProps = {
-    labelStyle: drawerGlassStyles.itemLabel,
-    activeTintColor: DRAWER_TINT.active,
-    inactiveTintColor: DRAWER_TINT.inactive,
-    activeBackgroundColor: DRAWER_TINT.activeBackground,
-    inactiveBackgroundColor: 'transparent',
-    style: drawerGlassStyles.drawerItem,
-  };
+  const itemProps = drawerMenuItemProps;
 
   return (
     <DrawerContentScrollView
@@ -187,7 +180,7 @@ function CustomDrawerContent(props) {
             }
           }}
           icon={({ color, size }) => (
-            <DrawerMenuIcon name="receipt-text-outline" color={color} size={size} />
+            <DrawerMenuIcon name="file-document-outline" color={color} size={size} />
           )}
           {...itemProps}
         />

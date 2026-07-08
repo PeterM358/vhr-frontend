@@ -12,6 +12,10 @@ import { APP_NAV_PILL_BORDER_RADIUS } from '../components/common/appNavBarMetric
 
 export const DRAWER_ICON_SIZE = 22;
 export const DRAWER_ICON_COLUMN_WIDTH = 30;
+export const DRAWER_ICON_GAP = 14;
+/** @react-navigation/drawer DrawerItem uses marginStart: 12 between icon and label */
+const DRAWER_ITEM_ICON_LABEL_INSET = 12;
+export const DRAWER_ITEM_MIN_HEIGHT = 48;
 
 export const DRAWER_GLASS = {
   backgroundColor: 'rgba(15, 23, 42, 0.78)',
@@ -104,12 +108,13 @@ export const drawerGlassStyles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     marginLeft: 0,
+    marginVertical: 0,
     color: DRAWER_TINT.inactive,
   },
   drawerItem: {
     marginHorizontal: 10,
     borderRadius: APP_NAV_PILL_BORDER_RADIUS - 8,
-    alignItems: 'center',
+    minHeight: DRAWER_ITEM_MIN_HEIGHT,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
@@ -124,6 +129,7 @@ const styles = StyleSheet.create({
     width: DRAWER_ICON_COLUMN_WIDTH,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: DRAWER_ICON_GAP - DRAWER_ITEM_ICON_LABEL_INSET,
   },
   labelRow: {
     flexDirection: 'row',
@@ -160,3 +166,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 24,
   },
 });
+
+export const drawerMenuItemProps = {
+  labelStyle: drawerGlassStyles.itemLabel,
+  activeTintColor: DRAWER_TINT.active,
+  inactiveTintColor: DRAWER_TINT.inactive,
+  activeBackgroundColor: DRAWER_TINT.activeBackground,
+  inactiveBackgroundColor: 'transparent',
+  style: drawerGlassStyles.drawerItem,
+};
