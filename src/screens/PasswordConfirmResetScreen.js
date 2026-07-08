@@ -4,16 +4,15 @@ import React, { useContext, useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, Text } from 'react-native-paper';
+import { Button, Text, TextInput, ActivityIndicator, useTheme } from 'react-native-paper';
 import { confirmPasswordReset } from '../api/auth';
 import { AuthContext } from '../context/AuthManager';
-import BASE_STYLES from '../styles/base';
+import BaseStyles from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
 import DashboardCard from '../components/dashboard/DashboardCard';
 import { showMessage } from '../utils/crossPlatformAlert';
@@ -26,8 +25,13 @@ import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavi
 import { resetToClientDashboard } from '../navigation/authNavigation';
 import { safeError } from '../utils/logger';
 import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
+import Logo from '../assets/images/logo.svg';
+import { COLORS } from '../constants/colors';
+import { useTranslation } from '../i18n';
 
 export default function PasswordConfirmResetScreen({ route, navigation }) {
+  const theme = useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const headerReserve = insets.top + (Platform.OS === 'ios' ? 52 : 56);
   const authContext = useContext(AuthContext);
@@ -37,28 +41,42 @@ export default function PasswordConfirmResetScreen({ route, navigation }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const authInputTheme = useMemo(
+    () => ({
+      ...theme,
+      colors: {
+        ...theme.colors,
+        primary: '#60a5fa',
+        background: '#07111f',
+        placeholder: 'rgba(226,232,240,0.65)',
+        text: '#ffffff',
+      },
+    }),
+    [theme]
+  );
+
   const handleConfirmReset = async () => {
     setError('');
 
     if (!uid || !token) {
-      const message = 'This reset link is invalid or incomplete. Request a new password reset email.';
+      const message = t('auth.invalidResetLink');
       setError(message);
-      showMessage('Invalid link', message, { variant: 'error' });
+      showMessage(t('auth.invalidResetLinkTitle'), message, { variant: 'error' });
       return;
     }
 
     if (!password.trim() || !confirmPassword.trim()) {
-      setError('Please fill in both password fields.');
+      setError(t('auth.fillBothPasswords'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t('auth.passwordsDoNotMatch'));
       return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      setError(t('auth.passwordMinLength'));
       return;
     }
 
@@ -67,7 +85,7 @@ export default function PasswordConfirmResetScreen({ route, navigation }) {
       const data = await confirmPasswordReset(uid, token, password.trim());
 
       if (!data?.access) {
-        throw new Error('Password was reset but sign-in failed. Please log in manually.');
+        throw new Error(t('auth.resetSignInFailed'));
       }
 
       const identifier = authDisplayIdentifier(data);
@@ -81,9 +99,9 @@ export default function PasswordConfirmResetScreen({ route, navigation }) {
       }
     } catch (err) {
       safeError('Password reset confirm failed', err);
-      const message = err.message || 'Failed to reset password.';
+      const message = err.message || t('auth.resetFailed');
       setError(message);
-      showMessage('Error', message, { variant: 'error' });
+      showMessage(t('common.error'), message, { variant: 'error' });
     } finally {
       setLoading(false);
     }
@@ -93,49 +111,84 @@ export default function PasswordConfirmResetScreen({ route, navigation }) {
     <ScreenBackground safeArea={false}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={BASE_STYLES.flexFill}
+        style={BaseStyles.flexFill}
       >
         <ScrollView
           contentContainerStyle={[
             styles.scroll,
             {
-              paddingTop: headerReserve,
-              paddingBottom: Math.max(insets.bottom, 16) + 24,
+              paddingTop: headerReserve + 8,
+              paddingBottom: Math.max(insets.bottom, 24) + 24,
             },
           ]}
           keyboardShouldPersistTaps="handled"
         >
           <DashboardCard style={styles.authPanel}>
+            <View style={BaseStyles.logoContainer}>
+              <Logo width={112} height={112} />
+            </View>
             <AuthLanguageSelector style={styles.langSelector} />
-            <Text style={styles.title}>Enter New Password</Text>
+            <Text style={styles.kicker}>{t('auth.resetPasswordTitle')}</Text>
+            <Text style={styles.title}>{t('auth.enterNewPasswordHeading')}</Text>
+
             <TextInput
-              style={styles.input}
-              placeholder="New Password"
-              placeholderTextColor="rgba(226,232,240,0.65)"
+              label={t('auth.newPassword')}
+              mode="outlined"
+              theme={authInputTheme}
+              outlineColor="rgba(148,163,184,0.45)"
+              activeOutlineColor="#60a5fa"
+              textColor="#ffffff"
+              outlineStyle={styles.inputOutline}
               secureTextEntry
               value={password}
               onChangeText={setPassword}
               autoComplete="new-password"
               textContentType="newPassword"
+              style={styles.input}
             />
             <TextInput
-              style={styles.input}
-              placeholder="Confirm New Password"
-              placeholderTextColor="rgba(226,232,240,0.65)"
+              label={t('auth.confirmNewPassword')}
+              mode="outlined"
+              theme={authInputTheme}
+              outlineColor="rgba(148,163,184,0.45)"
+              activeOutlineColor="#60a5fa"
+              textColor="#ffffff"
+              outlineStyle={styles.inputOutline}
               secureTextEntry
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               autoComplete="new-password"
               textContentType="newPassword"
+              style={styles.input}
             />
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+            {error ? (
+              <Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text>
+            ) : null}
+
+            {loading ? (
+              <ActivityIndicator size="large" style={BaseStyles.loginLoading} color={COLORS.PRIMARY} />
+            ) : (
+              <Button
+                mode="contained"
+                onPress={handleConfirmReset}
+                disabled={loading}
+                style={[BaseStyles.loginButton, styles.fullBtn]}
+                contentStyle={BaseStyles.loginButtonContent}
+                labelStyle={BaseStyles.loginButtonLabel}
+                buttonColor={theme.colors.primary}
+              >
+                {t('auth.resetPasswordButton')}
+              </Button>
+            )}
+
             <Button
-              mode="contained"
-              onPress={handleConfirmReset}
-              loading={loading}
-              disabled={loading}
+              mode="text"
+              onPress={() => navigation.navigate('Login')}
+              textColor={COLORS.PRIMARY}
+              style={styles.backBtn}
             >
-              Reset Password
+              {t('auth.backToLogin')}
             </Button>
           </DashboardCard>
         </ScrollView>
@@ -156,28 +209,46 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   langSelector: {
-    marginBottom: 14,
+    marginBottom: 8,
+  },
+  kicker: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: COLORS.PRIMARY,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    marginBottom: 6,
   },
   title: {
-    fontSize: 22,
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#ffffff',
     marginBottom: 20,
     textAlign: 'center',
-    color: '#fff',
-    fontWeight: '700',
   },
   input: {
-    borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.45)',
-    padding: 12,
-    marginBottom: 16,
+    width: '100%',
+    marginBottom: 10,
+    backgroundColor: '#07111f',
     borderRadius: 14,
-    color: '#fff',
-    backgroundColor: 'rgba(2,6,23,0.72)',
+    color: '#ffffff',
+  },
+  inputOutline: {
+    borderRadius: 14,
+    overflow: 'visible',
   },
   errorText: {
-    color: '#fca5a5',
-    marginBottom: 12,
     textAlign: 'center',
+    marginBottom: 12,
     lineHeight: 20,
+  },
+  fullBtn: {
+    width: '100%',
+    alignSelf: 'center',
+    marginTop: 8,
+  },
+  backBtn: {
+    marginTop: 12,
   },
 });
