@@ -141,7 +141,8 @@ export default function AppNavigationBar({
               {showLanguageSelector ? (
                 <CompactLanguageSelector
                   variant="dark"
-                  compact={compact}
+                compact={compact}
+                presentation="portalDropdown"
                   style={compact ? styles.languageSelectorCompact : styles.languageSelector}
                 />
               ) : null}

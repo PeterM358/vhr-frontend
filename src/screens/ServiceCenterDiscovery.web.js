@@ -455,6 +455,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
         <CompactLanguageSelector
           variant="light"
           compact
+          presentation="portalDropdown"
           style={styles.serviceCentersLangSelector}
         />
       </View>
