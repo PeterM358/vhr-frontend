@@ -34,6 +34,12 @@
     "french": "Français",
     "spanish": "Español"
   },
+  "navigation": {
+    "back": "Назад",
+    "map": "Карта",
+    "dashboard": "Табло",
+    "backToDashboard": "Табло"
+  },
   "drawer": {
     "client": {
       "profile": "Профил",
@@ -239,10 +245,116 @@
     "brakeRepair": "Ремонт на спирачки",
     "acRefill": "Зареждане на климатик",
     "acService": "Обслужване на климатик",
-    "diagnostics": "Диагностика"
+    "diagnostics": "Диагностика",
+    "serviceHistoryTitle": "Сервизна история",
+    "serviceHistoryEmptyTitle": "Все още няма сервизна история",
+    "serviceHistoryEmptyBody": "Завършени ремонти и записи ще се показват тук."
   },
   "notifications": {
-    "title": "Известия"
+    "title": "Известия",
+    "tabs": {
+      "alerts": "Сигнали",
+      "offers": "Оферти",
+      "promos": "Промоции"
+    },
+    "recentActivity": "Последна активност",
+    "liveHint": "Съобщения на живо от текущия ви Veversal акаунт.",
+    "intro": "Сигнали за автомобила, оферти, записвания и документи — на едно място.",
+    "previewAlerts": "Примерни сигнали",
+    "openCenter": "Отвори центъра за известия",
+    "emptyEmbedded": "Все още няма активност във вашия поток.",
+    "emptyTitle": "Все още няма известия",
+    "emptySubtitle": "Оферти, промоции, записвания и промени в часа се показват тук.",
+    "defaultTitle": "Известие",
+    "loadError": "Неуспешно зареждане на известия",
+    "noLinkedDetail": "Няма свързана страница за това известие.",
+    "openError": "Неуспешно отваряне на известието.",
+    "categories": {
+      "criticalAlerts": "Критични сигнали",
+      "maintenanceDue": "Предстоящо обслужване",
+      "insuranceExpiring": "Изтичаща застраховка",
+      "inspectionDue": "Предстоящ преглед",
+      "offersReceived": "Получени оферти",
+      "bookingsConfirmed": "Потвърдени записвания",
+      "messages": "Съобщения",
+      "safetyRecalls": "Отзовавания",
+      "softwareUpdates": "Софтуерни актуализации",
+      "documentsReady": "Готови документи",
+      "serviceCompleted": "Завършен сервиз"
+    },
+    "severity": {
+      "critical": "Критично",
+      "warning": "Внимание",
+      "info": "Инфо",
+      "success": "Актуализация"
+    },
+    "placeholders": {
+      "oilChange": {
+        "title": "Препоръчва се смяна на масло",
+        "description": "Според пробега ви, насрочете смяна на масло в следващите 1 500 км.",
+        "action": "Виж автомобила"
+      },
+      "newOffer": {
+        "title": "Нова оферта от сервиз",
+        "description": "Близък сервиз изпрати оферта за вашата отворена заявка.",
+        "action": "Прегледай офертата"
+      },
+      "inspection": {
+        "title": "Приближава годишен преглед",
+        "description": "Поддържайте документите си актуални преди изтичане.",
+        "action": "Виж напомнянията"
+      },
+      "visitConfirmed": {
+        "title": "Посещението е потвърдено",
+        "description": "Сервизът потвърди часа на посещението.",
+        "action": "Отвори записването"
+      },
+      "invoice": {
+        "title": "Качена фактура",
+        "description": "Документ за ремонт беше добавен към историята на автомобила.",
+        "action": "Виж документа"
+      }
+    },
+    "hints": {
+      "reschedule_proposed": "Докоснете, за да приемете или откажете новия час",
+      "repair_scheduled": "Докоснете за детайли за записания час",
+      "repair_ready_for_pickup": "Докоснете за детайли за завършения сервиз",
+      "open_repair": "Докоснете, за да отворите ремонта"
+    },
+    "templates": {
+      "reschedule_proposed": {
+        "title": "Предложена промяна на час",
+        "body": "Сервизът предложи нов час за посещение."
+      },
+      "repair_scheduled": {
+        "title": "Насрочен час",
+        "body": "Посещението за ремонт е насрочено."
+      },
+      "repair_ready_for_pickup": {
+        "title": "Готов за вземане",
+        "body": "Автомобилът ви е готов за вземане."
+      },
+      "offer_received": {
+        "title": "Получена нова оферта",
+        "body": "Сервиз изпрати оферта за вашата заявка."
+      },
+      "offer_status": {
+        "title": "Актуализация на оферта",
+        "body": "Има актуализация по вашата оферта за ремонт."
+      },
+      "repair_completed": {
+        "title": "Ремонтът е завършен",
+        "body": "Ремонтът е маркиран като завършен."
+      },
+      "booking_confirmed": {
+        "title": "Записването е потвърдено",
+        "body": "Часът за сервиз е потвърден."
+      },
+      "document_ready": {
+        "title": "Документът е готов",
+        "body": "Нов документ е наличен в акаунта ви."
+      }
+    }
   },
   "documents": {
     "title": "Документи"
@@ -264,6 +376,140 @@
     "findNearbyTrusted": "Намери проверени сервизи наблизо",
     "serviceCenter": "Сервиз",
     "serviceCenters": "Сервизи"
+  },
+  "serviceCenters": {
+    "findTitle": "Намери сервиз",
+    "authorizeTitle": "Оторизирай сервиз",
+    "exploreTitle": "Разгледай сервизи",
+    "searchPlaceholder": "Търси сервиз, град, услуга, марка...",
+    "locateMe": "Моето местоположение",
+    "search": "Търси",
+    "filters": "Филтри",
+    "filtersExpanded": "Филтри (разгънати)",
+    "filtersCount": "Филтри ({count})",
+    "hideFilters": "Скрий филтрите",
+    "openNow": "Отворено сега",
+    "verified": "Проверен",
+    "closed": "Затворено",
+    "viewProfile": "Виж профила",
+    "directions": "Маршрут",
+    "requestService": "Заяви ремонт",
+    "useForRecord": "Използвай за този запис",
+    "distanceUnavailable": "Разстоянието не е налично",
+    "setLocationForDistance": "Задай местоположение за разстояние",
+    "allBrands": "Всички марки",
+    "brandsLabel": "Марки: {brands}",
+    "ownerReported": "Докладван от собственик",
+    "listTab": "Списък",
+    "mapTab": "Карта",
+    "geoError": "Неуспешно определяне на местоположението.",
+    "emptyTitle": "Няма сервизи, отговарящи на филтрите.",
+    "clearFilters": "Изчисти филтрите",
+    "showAllInCity": "Покажи всички в {city}",
+    "addMissingCenter": "Добави липсващ сервиз",
+    "any": "Всички",
+    "vehicleType": "Тип превозно средство",
+    "serviceCategory": "Категория услуга",
+    "repairType": "Вид ремонт",
+    "brand": "Марка",
+    "rating": "Рейтинг",
+    "distance": "Разстояние",
+    "sort": {
+      "recommended": "Препоръчани",
+      "distance": "Разстояние",
+      "rating": "Рейтинг"
+    },
+    "ratingFilter": {
+      "any": "Всякакъв рейтинг",
+      "3plus": "3+ звезди",
+      "4plus": "4+ звезди",
+      "4_5plus": "4.5+ звезди"
+    },
+    "distanceFilter": {
+      "any": "Всяко разстояние",
+      "10km": "До 10 км",
+      "25km": "До 25 км",
+      "50km": "До 50 км",
+      "100km": "До 100 км"
+    },
+    "profile": {
+      "defaultTitle": "Детайли за сервиза",
+      "offersGuarantee": "Предлага гаранция",
+      "notRated": "Все още без оценка",
+      "reviews": "{rating} · {count} отзива",
+      "completedJobs": "{count} завършени ремонта",
+      "completedJobsUnknown": "Завършени ремонти · —",
+      "chooseVehicles": "Избери автомобили за оторизация",
+      "authorizeHint": "Споделете пълната механична история с този сервиз за избраните автомобили.",
+      "alreadyAuthorized": "{vehicle} вече е оторизиран тук.",
+      "chooseForVehicle": "Изберете кои автомобили да оторизирате за {vehicle}.",
+      "authorized": "Оторизиран",
+      "unclaimedTitle": "Докладван от собственик · все още не е заявен",
+      "unclaimedBody": "Този сервиз е добавен от клиентски сервизен запис. Бизнесът може по-късно да заяви профила, за да управлява записвания и да потвърждава записи.",
+      "photos": "Снимки",
+      "noPhotosTitle": "Все още няма снимки",
+      "noPhotosSubtitle": "Този сервиз не е качил снимки.",
+      "about": "За нас",
+      "services": "Услуги",
+      "servicesNotAdded": "Услугите все още не са добавени",
+      "publishedPricing": "Публикувани цени",
+      "priceOnRequest": "Цена по запитване",
+      "priceFrom": "от {price}",
+      "vehicleTypes": "Типове превозни средства",
+      "vehicleTypesNotAdded": "Типовете все още не са добавени",
+      "brands": "Марки",
+      "workingHours": "Работно време",
+      "workingHoursNotAdded": "Работното време все още не е добавено",
+      "links": "Връзки",
+      "authorizeSection": "Оторизирай този сервиз",
+      "authorizeExplainer": "Оторизацията споделя пълната механична сервизна история за избраните автомобили. Записване на ремонт без оторизация дава достъп само до тази работа и свързана предишна в същата категория.",
+      "editCenterDetails": "Редактирай данните на сервиза",
+      "loadErrorTitle": "Неуспешно зареждане на сервиза",
+      "loadErrorNetwork": "Услугата Veversal е временно недостъпна. Опитайте отново след малко.",
+      "loadErrorInvalid": "Връзката към този сервиз е невалидна или остаряла.",
+      "loadErrorGeneric": "Проверете връзката и опитайте отново.",
+      "requestServiceA11y": "Заяви ремонт в този сервиз",
+      "addVehicleFirstTitle": "Първо добавете автомобил",
+      "addVehicleFirstBody": "Нужен е поне един автомобил, преди да заявите ремонт."
+    }
+  },
+  "footer": {
+    "copyright": "© Veversal",
+    "privacy": "Поверителност",
+    "terms": "Условия",
+    "contact": "Контакт",
+    "support": "Поддръжка",
+    "version": "Версия",
+    "versionMobile": "Версия x.x.x",
+    "privacyPolicy": "Политика за поверителност",
+    "termsOfService": "Общи условия",
+    "cookiePolicy": "Политика за бисквитки",
+    "helpCenter": "Център за помощ",
+    "faq": "ЧЗВ",
+    "careers": "Кариери",
+    "about": "За нас",
+    "twitter": "Twitter",
+    "instagram": "Instagram",
+    "linkedin": "LinkedIn",
+    "facebook": "Facebook",
+    "youtube": "YouTube",
+    "github": "GitHub",
+    "blog": "Блог",
+    "apiDocs": "API документация",
+    "languageRegion": "Език / регион"
+  },
+  "vehicleTypes": {
+    "car": "Автомобил",
+    "truck": "Камион",
+    "motorcycle": "Мотоциклет",
+    "bicycle": "Велосипед",
+    "ebike": "Електровелосипед",
+    "scooter": "Скутер",
+    "van": "Ван",
+    "trailer": "Ремарке",
+    "agricultural": "Селскостопански",
+    "construction": "Строителни",
+    "other": "Друго"
   },
   "serviceCenterProfile": {
     "aboutTemplate": "{serviceCenterName} е сервиз{vehiclePhrase}{servicesPhrase}{locationPhrase}.",

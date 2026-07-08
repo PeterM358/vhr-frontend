@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useTranslation } from '../../i18n';
 
 /**
  * Lightweight, authenticated-only app footer.
@@ -11,33 +12,53 @@ import { Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-nat
  */
 export default function AppFooter() {
   const { width } = useWindowDimensions();
+  const { t } = useTranslation();
   const isMobile = width < 768;
 
-  const desktopMain = ['© Veversal', 'Privacy', 'Terms', 'Contact', 'Support', 'Version'];
-  const mobileMain = ['Privacy', 'Terms', 'Support', 'Version x.x.x'];
+  const desktopMain = useMemo(
+    () => [
+      t('footer.copyright'),
+      t('footer.privacy'),
+      t('footer.terms'),
+      t('footer.contact'),
+      t('footer.support'),
+      t('footer.version'),
+    ],
+    [t]
+  );
 
-  // Placeholder labels only (no links / no click handlers).
-  const placeholderLinks = [
-    'Privacy Policy',
-    'Terms of Service',
-    'Cookie Policy',
-    'Contact',
-    'Help Center',
-    'FAQ',
-    'Careers',
-    'About',
-    // social icons names (placeholders)
-    'Twitter',
-    'Instagram',
-    'LinkedIn',
-    'Facebook',
-    'YouTube',
-    // other future placeholders
-    'GitHub',
-    'Blog',
-    'API Documentation',
-    'Language/Region selector',
-  ];
+  const mobileMain = useMemo(
+    () => [
+      t('footer.privacy'),
+      t('footer.terms'),
+      t('footer.support'),
+      t('footer.versionMobile'),
+    ],
+    [t]
+  );
+
+  const placeholderLinks = useMemo(
+    () => [
+      t('footer.privacyPolicy'),
+      t('footer.termsOfService'),
+      t('footer.cookiePolicy'),
+      t('footer.contact'),
+      t('footer.helpCenter'),
+      t('footer.faq'),
+      t('footer.careers'),
+      t('footer.about'),
+      t('footer.twitter'),
+      t('footer.instagram'),
+      t('footer.linkedin'),
+      t('footer.facebook'),
+      t('footer.youtube'),
+      t('footer.github'),
+      t('footer.blog'),
+      t('footer.apiDocs'),
+      t('footer.languageRegion'),
+    ],
+    [t]
+  );
 
   const mainItems = isMobile ? mobileMain : desktopMain;
 
@@ -126,4 +147,3 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
 });
-

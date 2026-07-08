@@ -60,8 +60,8 @@ export default function ServiceCenterListCard({
     ? shop.distance_km ?? distanceKmFromUser(userLocation, shop)
     : null;
   const distanceLabel = showDistance
-    ? formatDistanceAway(distanceKm) || 'Distance unavailable'
-    : 'Set location to see distance';
+    ? formatDistanceAway(distanceKm) || t('serviceCenters.distanceUnavailable')
+    : t('serviceCenters.setLocationForDistance');
   const openNow = shop.is_open_now ?? isShopOpenNow(shop.working_hours);
   const isVerified = shop.is_verified || shop.verification_status === 'verified_partner';
   const isReported = shop.source === 'owner_reported';
@@ -70,7 +70,7 @@ export default function ServiceCenterListCard({
   const vehicleTypes = vehicleTypesTranslated.length ? joinList(vehicleTypesTranslated, { t }) : '';
   const serviceNamesRaw = shop.observed_repair_type_names || shop.available_repair_names || [];
   const serviceNames = translateRepairTypeLabels(serviceNamesRaw, t);
-  const brandNames = allBrands ? ['All brands'] : shop.brand_names || [];
+  const brandNames = allBrands ? [t('serviceCenters.allBrands')] : shop.brand_names || [];
   const services = summarizeList(serviceNames, 3, { joinFn: (items) => joinList(items, { t }) });
   const brands = summarizeList(brandNames, 3);
   const locationLine = [shop.address, shop.city_name].filter(Boolean).join(' · ');
@@ -101,10 +101,10 @@ export default function ServiceCenterListCard({
         <Text style={[styles.meta, !showDistance && styles.metaMuted]}>{distanceLabel}</Text>
         {openNow === true ? (
           <Chip compact style={styles.openChip} textStyle={styles.openChipText}>
-            Open now
+            {t('serviceCenters.openNow')}
           </Chip>
         ) : null}
-        {openNow === false ? <Text style={styles.closed}>Closed</Text> : null}
+        {openNow === false ? <Text style={styles.closed}>{t('serviceCenters.closed')}</Text> : null}
       </View>
 
       {vehicleTypes ? (
@@ -120,8 +120,8 @@ export default function ServiceCenterListCard({
 
       {brands.visible ? (
         <Text style={styles.tags}>
-          Brands: {brands.visible}
-          {brands.moreCount > 0 ? ` +${brands.moreCount} more` : ''}
+          {t('serviceCenters.brandsLabel', { brands: brands.visible })}
+          {brands.moreCount > 0 ? t('serviceCenterList.moreCount', { count: brands.moreCount }) : ''}
         </Text>
       ) : null}
 
@@ -133,24 +133,24 @@ export default function ServiceCenterListCard({
         ) : null}
         {isVerified ? (
           <Chip compact icon="shield-check" style={styles.verifiedChip}>
-            Verified
+            {t('serviceCenters.verified')}
           </Chip>
         ) : null}
         {isReported ? (
           <Chip compact icon="alert-outline" style={styles.reportedChip}>
-            Owner reported
+            {t('serviceCenters.ownerReported')}
           </Chip>
         ) : null}
       </View>
 
       <View style={styles.actions}>
-        <CardActionButton label="View profile" icon="store-outline" onPress={onViewProfile} />
+        <CardActionButton label={t('serviceCenters.viewProfile')} icon="store-outline" onPress={onViewProfile} />
         {onDirections ? (
-          <CardActionButton label="Directions" icon="directions" onPress={onDirections} />
+          <CardActionButton label={t('serviceCenters.directions')} icon="directions" onPress={onDirections} />
         ) : null}
         {onRequestService ? (
           <CardActionButton
-            label="Request service"
+            label={t('serviceCenters.requestService')}
             icon="wrench-outline"
             onPress={onRequestService}
             primary

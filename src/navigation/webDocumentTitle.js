@@ -4,7 +4,7 @@
 
 import { Platform } from 'react-native';
 import { t, getLocale } from '../i18n';
-import { stripLanguagePrefix } from './localizedRoutes';
+import { stripLanguagePrefix, toCanonicalPublicPath } from './localizedRoutes';
 
 const BASE_TITLE = 'Veversal';
 
@@ -80,6 +80,8 @@ export function getWebDocumentTitle(pathname) {
   void getLocale();
 
   const normalized = normalizeWebTitlePath(pathname);
+  const canonicalPath = toCanonicalPublicPath(normalized);
+  const canonicalOnly = canonicalPath.split('?')[0].split('#')[0];
   const { segments } = stripLanguagePrefix(normalized);
   const unprefixed = segments.length ? `/${segments.join('/')}` : '/';
   const pathKey = PATH_TITLE_KEYS[unprefixed];
@@ -93,6 +95,15 @@ export function getWebDocumentTitle(pathname) {
   const vehicleKey = vehicleDetailTitleKey(unprefixed);
   if (vehicleKey) {
     return seo(vehicleKey);
+  }
+  if (canonicalOnly.startsWith('/service-centers')) {
+    return t('seo.serviceCentersMeta.title', { app: t('common.appName', null, BASE_TITLE) }, seo('serviceCenters'));
+  }
+  if (canonicalOnly.startsWith('/service-center/')) {
+    return t('seo.serviceCenterProfile.title', {
+      app: t('common.appName', null, BASE_TITLE),
+      name: t('public.serviceCenter'),
+    }, seo('serviceCenters'));
   }
   if (unprefixed.startsWith('/service-centers')) {
     return t('seo.serviceCentersMeta.title', { app: t('common.appName', null, BASE_TITLE) }, seo('serviceCenters'));

@@ -1,5 +1,7 @@
 import { API_BASE_URL } from './config';
 import { serviceCenterProfilePath } from '../utils/seo/seoPaths';
+import { getLocalizedPath } from '../navigation/localizedRoutes';
+import { getLocale } from '../i18n';
 
 function buildQuery(params = {}) {
   const qs = new URLSearchParams();
@@ -88,7 +90,7 @@ export function buildFallbackShopPath(shopId) {
 export function buildShopPublicPathFromShop(shop) {
   const slug = shop?.public_slug || shop?.slug;
   if (slug) {
-    return serviceCenterProfilePath(slug);
+    return getLocalizedPath(getLocale(), 'serviceCenter.profile', { centerSlug: slug });
   }
   if (shop?.id != null) {
     return buildFallbackShopPath(shop.id);

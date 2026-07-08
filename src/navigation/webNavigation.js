@@ -261,7 +261,7 @@ export function navigateToNotifications(navigation, params = {}) {
   const routeParams = {
     initialTab: 'inbox',
     returnTo: 'Home',
-    backLabel: 'Dashboard',
+    backLabelKey: 'navigation.dashboard',
     ...params,
   };
   if (Platform.OS === 'web') {

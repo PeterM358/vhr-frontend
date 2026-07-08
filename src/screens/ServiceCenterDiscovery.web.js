@@ -61,6 +61,7 @@ import {
   formatVehicleAuthorizeLabel,
   resolveAuthorizeVehicleId,
 } from '../utils/vehicleShopAuthorization';
+import { useTranslation } from '../i18n';
 
 const DEFAULT_MAP_CENTER = [42.6977, 23.3219];
 function configureLeafletIcons() {
@@ -104,6 +105,7 @@ function AnimatedExpandedFilters({ visible, children }) {
 export default function ServiceCenterDiscovery({ partnerMode = false }) {
   const navigation = useNavigation();
   const route = useRoute();
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 960;
   const listBottomPadding = useScrollContentBottomPadding(24);
@@ -265,7 +267,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
       setCenter(coords);
       await discovery.fetchShops();
     } catch (err) {
-      setGeoHint(err?.message || 'Could not get your location.');
+      setGeoHint(err?.message || t('serviceCenters.geoError'));
     } finally {
       setLocating(false);
     }
@@ -364,10 +366,21 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   ].filter(Boolean).length;
 
   const filtersLabel = useMemo(() => {
-    if (filtersOpen && isDesktop) return 'Filters (expanded)';
-    if (activeAdvancedFilterCount) return `Filters (${activeAdvancedFilterCount})`;
-    return 'Filters';
-  }, [filtersOpen, isDesktop, activeAdvancedFilterCount]);
+    if (filtersOpen && isDesktop) return t('serviceCenters.filtersExpanded');
+    if (activeAdvancedFilterCount) {
+      return t('serviceCenters.filtersCount', { count: activeAdvancedFilterCount });
+    }
+    return t('serviceCenters.filters');
+  }, [filtersOpen, isDesktop, activeAdvancedFilterCount, t]);
+
+  const sortOptions = useMemo(
+    () =>
+      SORT_OPTIONS.map((opt) => ({
+        ...opt,
+        label: t(`serviceCenters.sort.${opt.value}`),
+      })),
+    [t]
+  );
 
   const expandedFilterProps = {
     selectedVehicleType,
@@ -407,19 +420,19 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
         return (
           <DiscoveryFilterChip
             key={vt.code}
-            label={vt.label}
+            label={t(`vehicleTypes.${vt.code}`, null, vt.label)}
             selected={on}
             onPress={() => setSelectedVehicleType(on ? null : vt.code)}
           />
         );
       })}
       <DiscoveryFilterChip
-        label="Open now"
+        label={t('serviceCenters.openNow')}
         selected={openNowOnly}
         onPress={() => setOpenNowOnly((v) => !v)}
       />
       <DiscoveryFilterChip
-        label="Verified"
+        label={t('serviceCenters.verified')}
         selected={verifiedOnly}
         onPress={() => setVerifiedOnly((v) => !v)}
       />
@@ -441,16 +454,16 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
             }
             partnerMode ? navigateToPartnerDashboard(navigation) : goBackFromServiceCenters(navigation);
           }}
-          label="Back"
+          label={t('navigation.back')}
           variant="glass"
           iconOnly={false}
         />
           <Text style={styles.title}>
           {authorizeMode
-            ? 'Authorize a service center'
+            ? t('serviceCenters.authorizeTitle')
             : partnerMode
-              ? 'Explore Service Centers'
-              : 'Find Service Centers'}
+              ? t('serviceCenters.exploreTitle')
+              : t('serviceCenters.findTitle')}
         </Text>
         <CompactLanguageSelector
           variant="light"
@@ -462,7 +475,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
 
       <View style={styles.searchRow}>
         <TextInput
-          placeholder="Search centers, city, service, brand..."
+          placeholder={t('serviceCenters.searchPlaceholder')}
           value={addressQuery}
           onChangeText={setAddressQuery}
           onSubmitEditing={() => handleSearch().catch(() => {})}
@@ -474,10 +487,10 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
           onPress={handleLocateMe}
           disabled={locating}
         >
-          <Text style={styles.locatePillText}>{locating ? '…' : 'Locate me'}</Text>
+          <Text style={styles.locatePillText}>{locating ? '…' : t('serviceCenters.locateMe')}</Text>
         </Pressable>
         <Pressable style={styles.searchButton} onPress={() => handleSearch().catch(() => {})}>
-          <Text style={styles.searchButtonText}>Search</Text>
+          <Text style={styles.searchButtonText}>{t('serviceCenters.search')}</Text>
         </Pressable>
       </View>
 
@@ -488,7 +501,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
           <View style={styles.expandedFilters}>
             <Pressable onPress={closeFilters} style={styles.hideFiltersRow}>
               <MaterialCommunityIcons name="chevron-up" size={18} color={COLORS.primary} />
-              <Text style={styles.hideFiltersText}>Hide filters</Text>
+              <Text style={styles.hideFiltersText}>{t('serviceCenters.hideFilters')}</Text>
             </Pressable>
             <DiscoveryExpandedFiltersPanel {...expandedFilterProps} />
           </View>
@@ -499,19 +512,21 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
 
   const emptyState = (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>No service centers match these filters.</Text>
+      <Text style={styles.emptyTitle}>{t('serviceCenters.emptyTitle')}</Text>
       <View style={styles.emptyActions}>
         <Pressable style={styles.emptyButton} onPress={() => clearFilters().catch(() => {})}>
-          <Text style={styles.emptyButtonText}>Clear filters</Text>
+          <Text style={styles.emptyButtonText}>{t('serviceCenters.clearFilters')}</Text>
         </Pressable>
         <Pressable style={styles.emptyButtonSecondary} onPress={() => showAllInMatchedCity().catch(() => {})}>
-          <Text style={styles.emptyButtonSecondaryText}>Show all in {cityLabel}</Text>
+          <Text style={styles.emptyButtonSecondaryText}>
+            {t('serviceCenters.showAllInCity', { city: cityLabel })}
+          </Text>
         </Pressable>
         <Pressable
           style={styles.emptyButtonSecondary}
           onPress={() => navigation.navigate('AddManualServiceCenter', { discoveryReport: true })}
         >
-          <Text style={styles.emptyButtonSecondaryText}>Add missing service center</Text>
+          <Text style={styles.emptyButtonSecondaryText}>{t('serviceCenters.addMissingCenter')}</Text>
         </Pressable>
       </View>
     </View>
@@ -521,7 +536,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     <View style={styles.listPanel}>
       {partnerMode ? <PartnerMarketComparisonCard onCompare={() => {}} /> : null}
       <View style={styles.sortRow}>
-        {SORT_OPTIONS.map((opt) => (
+        {sortOptions.map((opt) => (
           <Pressable
             key={opt.value}
             onPress={() => setSort(opt.value)}
@@ -633,14 +648,14 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
                 <Text style={{ marginBottom: 4 }}>{shop.address || shop.city_name}</Text>
                 {pickForServiceRecord ? (
                   <Pressable style={styles.popupButton} onPress={() => selectCenterForServiceRecord(shop)}>
-                    <Text style={styles.popupButtonText}>Use for this record</Text>
+                    <Text style={styles.popupButtonText}>{t('serviceCenters.useForRecord')}</Text>
                   </Pressable>
                 ) : null}
                 <Pressable style={styles.popupButton} onPress={() => handleDirections(shop)}>
-                  <Text style={styles.popupButtonText}>Directions</Text>
+                  <Text style={styles.popupButtonText}>{t('serviceCenters.directions')}</Text>
                 </Pressable>
                 <Pressable style={styles.popupButtonSecondary} onPress={() => openShopProfile(shop)}>
-                  <Text style={styles.popupButtonSecondaryText}>View profile</Text>
+                  <Text style={styles.popupButtonSecondaryText}>{t('serviceCenters.viewProfile')}</Text>
                 </Pressable>
               </View>
             </Popup>
@@ -686,13 +701,13 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
               style={[styles.mobileTab, mobileTab === 'list' && styles.mobileTabActive]}
               onPress={() => setMobileTab('list')}
             >
-              <Text style={styles.mobileTabText}>List</Text>
+              <Text style={styles.mobileTabText}>{t('serviceCenters.listTab')}</Text>
             </Pressable>
             <Pressable
               style={[styles.mobileTab, mobileTab === 'map' && styles.mobileTabActive]}
               onPress={() => setMobileTab('map')}
             >
-              <Text style={styles.mobileTabText}>Map</Text>
+              <Text style={styles.mobileTabText}>{t('serviceCenters.mapTab')}</Text>
             </Pressable>
           </View>
         ) : null}

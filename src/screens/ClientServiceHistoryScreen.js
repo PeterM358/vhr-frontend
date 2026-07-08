@@ -13,12 +13,15 @@ import ServiceHistorySummaryCard from '../components/repair/ServiceHistorySummar
 import EmptyStateCard from '../components/ui/EmptyStateCard';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import { useClientDashboardBack } from '../navigation/appNavBarBack';
+import { useTranslation } from '../i18n';
 
 export default function ClientServiceHistoryScreen({ navigation }) {
+  const { t } = useTranslation();
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useClientDashboardBack(navigation);
   const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const screenTitle = t('repairs.serviceHistoryTitle');
 
   useEffect(() => {
     const fetchDone = async () => {
@@ -39,7 +42,11 @@ export default function ClientServiceHistoryScreen({ navigation }) {
   if (loading) {
     return (
       <ScreenBackground safeArea={false}>
-        <AppNavigationBar title="Service History" backLabel="Dashboard" onBack={handleBack} />
+        <AppNavigationBar
+          title={screenTitle}
+          backLabel={t('navigation.dashboard')}
+          onBack={handleBack}
+        />
         <View style={styles.loader}>
           <ActivityIndicator size="large" color="#fff" />
         </View>
@@ -50,8 +57,8 @@ export default function ClientServiceHistoryScreen({ navigation }) {
   return (
     <ScreenBackground safeArea={false}>
       <AppNavigationBar
-        title="Service History"
-        backLabel="Dashboard"
+        title={screenTitle}
+        backLabel={t('navigation.dashboard')}
         onBack={handleBack}
         scrolled={scrolled}
       />
@@ -63,8 +70,8 @@ export default function ClientServiceHistoryScreen({ navigation }) {
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <EmptyStateCard
-            title="No service history yet"
-            body="Completed repairs and logged service records will appear here."
+            title={t('repairs.serviceHistoryEmptyTitle')}
+            body={t('repairs.serviceHistoryEmptyBody')}
           />
         }
         renderItem={({ item }) => (
@@ -90,8 +97,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   list: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingBottom: 24,
-    gap: 10,
   },
 });

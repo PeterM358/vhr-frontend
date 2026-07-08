@@ -20,7 +20,7 @@ export const DEFAULT_LANGUAGE = 'en';
 
 const SERVICE_CENTERS_ROOT_SLUG = {
   en: 'service-centers',
-  bg: 'servizi',
+  bg: 'avtoservizi',
   de: 'kfz-werkstatt',
   it: 'centri-assistenza',
   fr: 'centres-de-service',
@@ -29,7 +29,7 @@ const SERVICE_CENTERS_ROOT_SLUG = {
 
 const SERVICE_CENTER_PROFILE_PREFIX = {
   en: 'service-center',
-  bg: 'serviz',
+  bg: 'avtoserviz',
   de: 'werkstatt',
   it: 'officina',
   fr: 'atelier',
@@ -162,6 +162,14 @@ export function toCanonicalPublicPath(localizedPath) {
   }
 
   const [first, ...rest] = segments;
+
+  // Legacy BG slugs (pre-avtoservizi rename).
+  if (lang === 'bg' && first === 'servizi') {
+    return joinSegments(['service-centers', ...rest]);
+  }
+  if (lang === 'bg' && first === 'serviz') {
+    return joinSegments(['service-center', ...rest]);
+  }
 
   if (first === SERVICE_CENTERS_ROOT_SLUG[lang]) {
     return joinSegments(['service-centers', ...rest]);

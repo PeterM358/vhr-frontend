@@ -5,9 +5,22 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import FloatingCard from '../ui/FloatingCard';
 import { NOTIFICATION_SEVERITY } from '../../constants/clientDashboardPlaceholders';
 import { COLORS } from '../../constants/colors';
+import { useTranslation } from '../../i18n';
+
+const SEVERITY_KEYS = {
+  critical: 'notifications.severity.critical',
+  warning: 'notifications.severity.warning',
+  info: 'notifications.severity.info',
+  success: 'notifications.severity.success',
+};
 
 export function NotificationPreviewCard({ item, onActionPress, compact = false }) {
-  const severity = NOTIFICATION_SEVERITY[item.severity] || NOTIFICATION_SEVERITY.info;
+  const { t } = useTranslation();
+  const severityBase = NOTIFICATION_SEVERITY[item.severity] || NOTIFICATION_SEVERITY.info;
+  const severity = {
+    ...severityBase,
+    label: t(SEVERITY_KEYS[item.severity] || SEVERITY_KEYS.info),
+  };
 
   return (
     <FloatingCard style={[styles.card, compact && styles.cardCompact]}>
@@ -34,6 +47,7 @@ export default function NotificationCenterPreview({
   onViewAllPress,
   limit = 2,
 }) {
+  const { t } = useTranslation();
   const visible = (items || []).slice(0, limit);
 
   return (
@@ -48,7 +62,7 @@ export default function NotificationCenterPreview({
       ))}
       {onViewAllPress ? (
         <Button mode="text" onPress={onViewAllPress} textColor="#fff" style={styles.viewAll}>
-          Open notification center
+          {t('notifications.openCenter')}
         </Button>
       ) : null}
     </View>

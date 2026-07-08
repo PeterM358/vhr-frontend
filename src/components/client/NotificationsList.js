@@ -21,8 +21,13 @@ import {
 } from '../../constants/colors';
 import {
   navigateForClientNotification,
-  notificationActionHint,
 } from '../../utils/clientNotificationRouting';
+import {
+  translateNotificationBody,
+  translateNotificationHint,
+  translateNotificationTitle,
+} from '../../utils/translateClientNotification';
+import { useTranslation } from '../../i18n';
 
 export default function NotificationsList({
   activityReturnTo = 'ClientActivity',
@@ -33,6 +38,7 @@ export default function NotificationsList({
   const { notifications: liveNotifications = [], setNotifications } =
     useContext(WebSocketContext);
   const navigation = useNavigation();
+  const { t } = useTranslation();
 
   useFocusEffect(
     useCallback(() => {
@@ -55,7 +61,7 @@ export default function NotificationsList({
       setRemoteNotifications(Array.isArray(data) ? data : data?.results ?? []);
     } catch (err) {
       console.error('Failed to load notifications', err);
-      Alert.alert('Error', 'Could not load notifications');
+      Alert.alert(t('common.error'), t('notifications.loadError'));
     } finally {
       setLoading(false);
     }
@@ -72,10 +78,10 @@ export default function NotificationsList({
       if (navigateForClientNotification(navigation, item, { returnTo: activityReturnTo })) {
         return;
       }
-      Alert.alert('Info', 'No linked detail for this notification.');
+      Alert.alert(t('common.notice'), t('notifications.noLinkedDetail'));
     } catch (err) {
       console.error('Error handling notification press', err);
-      Alert.alert('Error', 'Failed to open notification.');
+      Alert.alert(t('common.error'), t('notifications.openError'));
     }
   };
 
@@ -89,7 +95,9 @@ export default function NotificationsList({
 
   const renderItem = ({ item }) => {
     const unread = !item.is_read;
-    const hint = notificationActionHint(item);
+    const hint = translateNotificationHint(item, t);
+    const title = translateNotificationTitle(item, t);
+    const body = translateNotificationBody(item, t);
     return (
       <FloatingCard
         onPress={() => handlePress(item)}
@@ -102,13 +110,13 @@ export default function NotificationsList({
             style={[styles.title, unread ? styles.titleUnread : styles.titleRead]}
             numberOfLines={2}
           >
-            {item.title || 'Notification'}
+            {title}
           </Text>
         </View>
 
-        {!!item.body && (
+        {!!body && (
           <Text style={styles.body} numberOfLines={3}>
-            {item.body}
+            {body}
           </Text>
         )}
 
@@ -132,12 +140,12 @@ export default function NotificationsList({
   const listBody =
     mergedNotifications.length === 0 ? (
       embedded ? (
-        <Text style={styles.embeddedEmpty}>No recent activity in your live feed yet.</Text>
+        <Text style={styles.embeddedEmpty}>{t('notifications.emptyEmbedded')}</Text>
       ) : (
         <EmptyStateCard
           icon="bell-outline"
-          title="No notifications yet"
-          subtitle="Offers, promotions, bookings, and reschedule updates appear here."
+          title={t('notifications.emptyTitle')}
+          subtitle={t('notifications.emptySubtitle')}
         />
       )
     ) : embedded ? (

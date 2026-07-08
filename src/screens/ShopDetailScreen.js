@@ -173,13 +173,15 @@ function collectVehicleTypeNames(shop) {
     .sort((a, b) => String(a).localeCompare(String(b)));
 }
 
-function formatRatingSnippet(avg, count) {
+function formatRatingSnippet(avg, count, t) {
   if (avg == null || avg === '') return null;
   const n = Number(avg);
   if (Number.isNaN(n)) return null;
   const star = `${n.toFixed(1)}`;
   const rc = Number(count);
-  if (Number.isFinite(rc) && rc > 0) return `${star} · ${rc} reviews`;
+  if (Number.isFinite(rc) && rc > 0) {
+    return t('serviceCenters.profile.reviews', { rating: star, count: rc });
+  }
   return `${star}`;
 }
 
@@ -261,17 +263,17 @@ export default function ShopDetailScreen({ route, navigation }) {
   const handleRequestServicePress = useCallback(() => {
     if (isLoggedIn && isClientAccount && vehicles.length === 0) {
       Alert.alert(
-        'Add a vehicle first',
-        'You need at least one vehicle before requesting a repair.',
+        t('serviceCenters.profile.addVehicleFirstTitle'),
+        t('serviceCenters.profile.addVehicleFirstBody'),
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Add Vehicle', onPress: goAddVehicle },
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('vehicles.addVehicle'), onPress: goAddVehicle },
         ]
       );
       return;
     }
     setRequestSheetOpen(true);
-  }, [goAddVehicle, isClientAccount, isLoggedIn, vehicles.length]);
+  }, [goAddVehicle, isClientAccount, isLoggedIn, t, vehicles.length]);
 
   const loadData = useCallback(async () => {
     setLoadError(false);
@@ -340,14 +342,14 @@ export default function ShopDetailScreen({ route, navigation }) {
       setLoadError(true);
       const message = String(error?.message || '');
       if (/failed to fetch|network|connection refused|load failed/i.test(message)) {
-        setLoadErrorMessage('The Veversal service is temporarily unavailable. Please try again in a moment.');
+        setLoadErrorMessage(t('serviceCenters.profile.loadErrorNetwork'));
       } else if (/missing service center identifier/i.test(message)) {
-        setLoadErrorMessage('This service center link is invalid or outdated.');
+        setLoadErrorMessage(t('serviceCenters.profile.loadErrorInvalid'));
       } else {
-        setLoadErrorMessage('Check your connection and try again.');
+        setLoadErrorMessage(t('serviceCenters.profile.loadErrorGeneric'));
       }
       if (Platform.OS !== 'web') {
-        Alert.alert('Error', 'Failed to load service center details.');
+        Alert.alert(t('common.error'), t('serviceCenters.profile.loadErrorTitle'));
       }
     } finally {
       setLoading(false);
@@ -369,10 +371,10 @@ export default function ShopDetailScreen({ route, navigation }) {
   );
 
   const navTitle = useMemo(() => {
-    if (!shop?.name) return 'Service Center Details';
+    if (!shop?.name) return t('serviceCenters.profile.defaultTitle');
     const displayName = formatShopDisplayName(shop.name);
     return displayName.length > 32 ? `${displayName.slice(0, 29)}…` : displayName;
-  }, [shop?.name]);
+  }, [shop?.name, t]);
 
   const scrollToAuthorization = useCallback(
     (targetVehicleId = authorizeVehicleId) => {
@@ -540,12 +542,12 @@ export default function ShopDetailScreen({ route, navigation }) {
       <ScreenBackground safeArea={false}>
         <View style={styles.center}>
           <EmptyStateCard
-            title="Could not load service center"
-            subtitle={loadErrorMessage || 'Check your connection and try again.'}
+            title={t('serviceCenters.profile.loadErrorTitle')}
+            subtitle={loadErrorMessage || t('serviceCenters.profile.loadErrorGeneric')}
             icon="alert-circle-outline"
           />
           <Button mode="contained" onPress={loadData} style={styles.retryBtn}>
-            Retry
+            {t('common.retry')}
           </Button>
         </View>
       </ScreenBackground>
@@ -605,7 +607,7 @@ export default function ShopDetailScreen({ route, navigation }) {
   const longDescription =
     typeof shop.description === 'string' ? shop.description.trim() : '';
 
-  const ratingSnippet = formatRatingSnippet(shop.average_rating, shop.review_count);
+  const ratingSnippet = formatRatingSnippet(shop.average_rating, shop.review_count, t);
   const completedCount =
     shop.completed_repairs_count != null && shop.completed_repairs_count !== ''
       ? Number(shop.completed_repairs_count)
@@ -675,7 +677,7 @@ export default function ShopDetailScreen({ route, navigation }) {
     <ScreenBackground safeArea={false}>
       <AppNavigationBar
         title={navTitle}
-        backLabel={returnTo ? 'Back' : 'Map'}
+        backLabel={returnTo ? t('navigation.back') : t('navigation.map')}
         onBack={handleBack}
         variant="transparent"
         scrolled={scrolled}
@@ -708,7 +710,7 @@ export default function ShopDetailScreen({ route, navigation }) {
           {shop.offers_guarantee ? (
             <View style={styles.guaranteeRow}>
               <MaterialCommunityIcons name="shield-check" size={18} color="rgba(255,255,255,0.88)" />
-              <Text style={styles.guaranteeText}>Offers guarantees</Text>
+              <Text style={styles.guaranteeText}>{t('serviceCenters.profile.offersGuarantee')}</Text>
             </View>
           ) : null}
 
@@ -744,13 +746,15 @@ export default function ShopDetailScreen({ route, navigation }) {
           {ratingSnippet ? (
             <HeroIconRow icon="star-outline">{ratingSnippet}</HeroIconRow>
           ) : (
-            <HeroIconRow icon="star-outline">Not rated yet</HeroIconRow>
+            <HeroIconRow icon="star-outline">{t('serviceCenters.profile.notRated')}</HeroIconRow>
           )}
 
           <HeroIconRow icon="wrench-outline">
             {completedCount != null && !Number.isNaN(completedCount)
-              ? `${completedCount.toLocaleString()} completed jobs`
-              : 'Completed jobs · —'}
+              ? t('serviceCenters.profile.completedJobs', {
+                  count: completedCount.toLocaleString(),
+                })
+              : t('serviceCenters.profile.completedJobsUnknown')}
           </HeroIconRow>
         </AppCard>
 
@@ -765,18 +769,22 @@ export default function ShopDetailScreen({ route, navigation }) {
                 />
                 <Text style={styles.authorizeScrollSummaryText}>
                   {isAuthorizedForContextVehicle
-                    ? `${formatVehicleAuthorizeLabel(authorizeVehicle)} is already authorized here.`
-                    : `Choose which vehicles to authorize for ${formatVehicleAuthorizeLabel(authorizeVehicle)}.`}
+                    ? t('serviceCenters.profile.alreadyAuthorized', {
+                        vehicle: formatVehicleAuthorizeLabel(authorizeVehicle),
+                      })
+                    : t('serviceCenters.profile.chooseForVehicle', {
+                        vehicle: formatVehicleAuthorizeLabel(authorizeVehicle),
+                      })}
                 </Text>
                 {isAuthorizedForContextVehicle ? (
                   <Chip compact icon="check" style={styles.authorizedChip}>
-                    Authorized
+                    {t('serviceCenters.profile.authorized')}
                   </Chip>
                 ) : null}
               </View>
             ) : (
               <Text style={styles.authorizeScrollHint}>
-                Share full mechanical history with this service center for the vehicles you choose below.
+                {t('serviceCenters.profile.authorizeHint')}
               </Text>
             )}
             <Button
@@ -785,22 +793,19 @@ export default function ShopDetailScreen({ route, navigation }) {
               onPress={() => scrollToAuthorization(authorizeVehicleId)}
               style={styles.authorizeScrollButton}
             >
-              Choose vehicles to authorize
+              {t('serviceCenters.profile.chooseVehicles')}
             </Button>
           </FloatingCard>
         ) : null}
 
         {shop.is_claimed === false || shop.registration_origin === 'owner_reported' ? (
           <FloatingCard style={styles.unclaimedBanner}>
-            <Text style={styles.unclaimedTitle}>Owner-reported · not claimed yet</Text>
-            <Text style={styles.unclaimedBody}>
-              This service center was added from a customer service record. The business can claim this profile
-              later to manage bookings and confirm records.
-            </Text>
+            <Text style={styles.unclaimedTitle}>{t('serviceCenters.profile.unclaimedTitle')}</Text>
+            <Text style={styles.unclaimedBody}>{t('serviceCenters.profile.unclaimedBody')}</Text>
           </FloatingCard>
         ) : null}
 
-        <SectionHeading title="Photos" />
+        <SectionHeading title={t('serviceCenters.profile.photos')} />
         {imagesList.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoScroller}>
             {imagesList.map((img) => {
@@ -821,12 +826,12 @@ export default function ShopDetailScreen({ route, navigation }) {
         ) : (
           <EmptyStateCard
             icon="image-outline"
-            title="No photos yet"
-            subtitle="This service center has not uploaded photos."
+            title={t('serviceCenters.profile.noPhotosTitle')}
+            subtitle={t('serviceCenters.profile.noPhotosSubtitle')}
           />
         )}
 
-        <SectionHeading title="About" />
+        <SectionHeading title={t('serviceCenters.profile.about')} />
         <FloatingCard>
           <Text style={styles.aboutLead}>{aboutLead}</Text>
           {longDescription ? (
@@ -834,30 +839,30 @@ export default function ShopDetailScreen({ route, navigation }) {
           ) : null}
         </FloatingCard>
 
-        <SectionHeading title="Services" />
+        <SectionHeading title={t('serviceCenters.profile.services')} />
         <FloatingCard>
           {repairNames.length ? (
             <ChipWrap labels={repairNames} />
           ) : (
-            <Text style={styles.placeholderMuted}>Services not added yet</Text>
+            <Text style={styles.placeholderMuted}>{t('serviceCenters.profile.servicesNotAdded')}</Text>
           )}
         </FloatingCard>
 
         {Array.isArray(shop.service_menu) && shop.service_menu.length > 0 ? (
           <>
-            <SectionHeading title="Published pricing" />
+            <SectionHeading title={t('serviceCenters.profile.publishedPricing')} />
             <FloatingCard>
               {shop.service_menu.map((item) => {
                 const label = translateRepairTypeLabel(item, t) || t('common.service');
                 const from = item.price_from;
                 const to = item.price_to;
-                let priceLine = 'Price on request';
+                let priceLine = t('serviceCenters.profile.priceOnRequest');
                 if (from != null && to != null && String(from) !== String(to)) {
                   priceLine = `${formatMoneyAmount(from)} – ${formatMoneyAmount(to)}`;
                 } else if (from != null) {
-                  priceLine = `from ${formatMoneyAmount(from)}`;
+                  priceLine = t('serviceCenters.profile.priceFrom', { price: formatMoneyAmount(from) });
                 } else if (to != null) {
-                  priceLine = `from ${formatMoneyAmount(to)}`;
+                  priceLine = t('serviceCenters.profile.priceFrom', { price: formatMoneyAmount(to) });
                 }
                 return (
                   <View key={`${item.repair_type_id}-${label}`} style={styles.menuRow}>
@@ -882,18 +887,18 @@ export default function ShopDetailScreen({ route, navigation }) {
           </>
         ) : null}
 
-        <SectionHeading title="Vehicle types" />
+        <SectionHeading title={t('serviceCenters.profile.vehicleTypes')} />
         <FloatingCard>
           {vehicleNames.length ? (
             <ChipWrap labels={vehicleNames} />
           ) : (
-            <Text style={styles.placeholderMuted}>Vehicle types not added yet</Text>
+            <Text style={styles.placeholderMuted}>{t('serviceCenters.profile.vehicleTypesNotAdded')}</Text>
           )}
         </FloatingCard>
 
         {Array.isArray(shop.brand_names) && shop.brand_names.length > 0 ? (
           <>
-            <SectionHeading title="Brands" />
+            <SectionHeading title={t('serviceCenters.profile.brands')} />
             <FloatingCard>
               <ChipWrap labels={shop.brand_names} />
             </FloatingCard>
@@ -906,11 +911,11 @@ export default function ShopDetailScreen({ route, navigation }) {
             onPress={() => navigation.navigate('ShopProfile')}
             style={styles.manageProfileBtn}
           >
-            Edit center details
+            {t('serviceCenters.profile.editCenterDetails')}
           </Button>
         ) : null}
 
-        <SectionHeading title="Working hours" />
+        <SectionHeading title={t('serviceCenters.profile.workingHours')} />
         <FloatingCard>
           {hoursRows.length ? (
             hoursRows.map((row) => (
@@ -920,13 +925,13 @@ export default function ShopDetailScreen({ route, navigation }) {
               </View>
             ))
           ) : (
-            <Text style={styles.placeholderMuted}>Working hours not added yet</Text>
+            <Text style={styles.placeholderMuted}>{t('serviceCenters.profile.workingHoursNotAdded')}</Text>
           )}
         </FloatingCard>
 
         {linkRow.length > 0 ? (
           <>
-            <SectionHeading title="Links" />
+            <SectionHeading title={t('serviceCenters.profile.links')} />
             <FloatingCard>
               <View style={styles.linksRow}>
                 {linkRow.map((item) => (
@@ -951,12 +956,9 @@ export default function ShopDetailScreen({ route, navigation }) {
             }}
           >
             <Divider style={{ marginVertical: 12, opacity: 0.35 }} />
-            <SectionHeading title="Authorize this service center" />
+            <SectionHeading title={t('serviceCenters.profile.authorizeSection')} />
             <FloatingCard>
-              <Text style={styles.authExplainer}>
-                Authorization shares full mechanical service history for the vehicles you select. Booking a repair
-                without authorizing only grants access to that job and related prior work in the same category.
-              </Text>
+              <Text style={styles.authExplainer}>{t('serviceCenters.profile.authorizeExplainer')}</Text>
               {vehicles.length === 0 ? (
                 <>
                   <Text style={styles.placeholderOnCard}>You have no vehicles registered.</Text>
@@ -1019,10 +1021,10 @@ export default function ShopDetailScreen({ route, navigation }) {
             pressed && styles.requestFabPressed,
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Request service at this shop"
+          accessibilityLabel={t('serviceCenters.profile.requestServiceA11y')}
         >
           <MaterialCommunityIcons name="calendar-clock" size={22} color="#fff" />
-          <Text style={styles.requestFabLabel}>Request service</Text>
+          <Text style={styles.requestFabLabel}>{t('serviceCenters.requestService')}</Text>
         </Pressable>
       ) : null}
 

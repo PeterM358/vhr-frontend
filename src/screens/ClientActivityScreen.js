@@ -2,7 +2,7 @@
  * Unified client Activity hub — Inbox (all notifications) | Repairs | Promos.
  */
 
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { Text, Badge } from 'react-native-paper';
@@ -15,16 +15,19 @@ import AppNavigationBar from '../components/common/AppNavigationBar';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import { useReturnToBack } from '../navigation/appNavBarBack';
 import { WebSocketContext } from '../context/WebSocketManager';
+import { useTranslation } from '../i18n';
 
-const TABS = [
-  { id: 'inbox', label: 'Alerts' },
-  { id: 'repairs', label: 'Offers' },
-  { id: 'promos', label: 'Promos' },
-];
+const TAB_IDS = ['inbox', 'repairs', 'promos'];
+
+const TAB_I18N_KEYS = {
+  inbox: 'notifications.tabs.alerts',
+  repairs: 'notifications.tabs.offers',
+  promos: 'notifications.tabs.promos',
+};
 
 function resolveInitialTab(route) {
   const param = route.params?.initialTab;
-  if (param && TABS.some((t) => t.id === param)) return param;
+  if (param && TAB_IDS.includes(param)) return param;
   if (route.name === 'ClientNotifications') return 'inbox';
   if (route.name === 'OffersScreen') return 'repairs';
   return 'inbox';
@@ -32,12 +35,20 @@ function resolveInitialTab(route) {
 
 export default function ClientActivityScreen({ navigation }) {
   const route = useRoute();
+  const { t } = useTranslation();
   const { notifications } = useContext(WebSocketContext);
 
   const returnTo = route.params?.returnTo || 'Home';
-  const backLabel = route.params?.backLabel || 'Dashboard';
+  const backLabel = route.params?.backLabelKey
+    ? t(route.params.backLabelKey)
+    : route.params?.backLabel || t('navigation.dashboard');
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useReturnToBack(navigation, returnTo, backLabel);
+
+  const tabs = useMemo(
+    () => TAB_IDS.map((id) => ({ id, label: t(TAB_I18N_KEYS[id]) })),
+    [t]
+  );
 
   const [activeTab, setActiveTab] = useState(() => resolveInitialTab(route));
   const [offersTabMounted, setOffersTabMounted] = useState(() => resolveInitialTab(route) === 'repairs');
@@ -49,7 +60,7 @@ export default function ClientActivityScreen({ navigation }) {
 
   useEffect(() => {
     const next = route.params?.initialTab;
-    if (next && TABS.some((t) => t.id === next)) {
+    if (next && TAB_IDS.includes(next)) {
       setActiveTab(next);
       if (next === 'repairs') setOffersTabMounted(true);
     }
@@ -73,7 +84,7 @@ export default function ClientActivityScreen({ navigation }) {
     <ScreenBackground safeArea={false}>
       <View style={styles.root}>
         <AppNavigationBar
-          title="Notifications"
+          title={t('notifications.title')}
           backLabel={backLabel}
           onBack={handleBack}
           scrolled={scrolled}
@@ -81,7 +92,7 @@ export default function ClientActivityScreen({ navigation }) {
 
         <View style={styles.segmentOuter}>
           <View style={styles.segmentTrack}>
-            {TABS.map((tab) => {
+            {tabs.map((tab) => {
               const badge = tabBadge(tab.id);
               const selected = activeTab === tab.id;
               return (
@@ -109,7 +120,7 @@ export default function ClientActivityScreen({ navigation }) {
             <View style={styles.tabContent}>
               <NotificationCenterPlaceholder
                 onPlaceholderAction={(item) =>
-                  showMessage(item.title, `${item.description}\n\nLive routing will be added with the notification backend.`, {
+                  showMessage(item.title, `${item.description}\n\n${t('notifications.noLinkedDetail')}`, {
                     variant: 'info',
                   })
                 }

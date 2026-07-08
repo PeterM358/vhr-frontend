@@ -7,6 +7,22 @@ import {
   DISTANCE_FILTER_OPTIONS,
 } from '../../hooks/useServiceCenterDiscovery';
 import { DiscoveryFilterChip } from './DiscoveryFilterChip';
+import { useTranslation } from '../../i18n';
+
+const RATING_FILTER_KEYS = {
+  null: 'any',
+  3: '3plus',
+  4: '4plus',
+  4.5: '4_5plus',
+};
+
+const DISTANCE_FILTER_KEYS = {
+  null: 'any',
+  10: '10km',
+  25: '25km',
+  50: '50km',
+  100: '100km',
+};
 
 function FilterSection({ title, children }) {
   return (
@@ -43,98 +59,96 @@ export default function DiscoveryExpandedFiltersPanel({
   repairTypeChipOptions,
   brands,
 }) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.panel}>
-      <FilterSection title="Vehicle Type">
+      <FilterSection title={t('serviceCenters.vehicleType')}>
         <DiscoveryFilterChip
-          label="Any"
-          selected={selectedVehicleType === null}
+          label={t('serviceCenters.any')}
+          selected={!selectedVehicleType}
           onPress={() => setSelectedVehicleType(null)}
         />
         {DISCOVERY_QUICK_VEHICLE_CHIPS.map((vt) => (
           <DiscoveryFilterChip
-            key={`all-${vt.code}`}
-            label={vt.label}
+            key={vt.code}
+            label={t(`vehicleTypes.${vt.code}`, null, vt.label)}
             selected={selectedVehicleType === vt.code}
-            onPress={() =>
-              setSelectedVehicleType(selectedVehicleType === vt.code ? null : vt.code)
-            }
+            onPress={() => setSelectedVehicleType(selectedVehicleType === vt.code ? null : vt.code)}
           />
         ))}
       </FilterSection>
 
-      <FilterSection title="Service Category">
-        <DiscoveryFilterChip
-          label="Any"
-          selected={selectedCategory === null}
-          onPress={() => setSelectedCategory(null)}
-        />
-        {categoryOptions.map((c) => (
+      {categoryOptions?.length ? (
+        <FilterSection title={t('serviceCenters.serviceCategory')}>
           <DiscoveryFilterChip
-            key={c.slug}
-            label={c.name}
-            selected={selectedCategory === c.slug}
-            onPress={() =>
-              setSelectedCategory(selectedCategory === c.slug ? null : c.slug)
-            }
+            label={t('serviceCenters.any')}
+            selected={!selectedCategory}
+            onPress={() => setSelectedCategory(null)}
           />
-        ))}
-      </FilterSection>
+          {categoryOptions.map((cat) => (
+            <DiscoveryFilterChip
+              key={cat.slug}
+              label={cat.label}
+              selected={selectedCategory === cat.slug}
+              onPress={() => setSelectedCategory(selectedCategory === cat.slug ? null : cat.slug)}
+            />
+          ))}
+        </FilterSection>
+      ) : null}
 
-      <FilterSection title="Service">
-        <DiscoveryFilterChip
-          label="Any"
-          selected={!selectedRepairType}
-          onPress={() => setSelectedRepairType('')}
-        />
-        {repairTypeChipOptions.map((rt) => (
+      {repairTypeChipOptions?.length ? (
+        <FilterSection title={t('serviceCenters.repairType')}>
           <DiscoveryFilterChip
-            key={rt.id}
-            label={rt.name}
-            selected={selectedRepairType === rt.slug}
-            onPress={() =>
-              setSelectedRepairType(selectedRepairType === rt.slug ? '' : rt.slug)
-            }
+            label={t('serviceCenters.any')}
+            selected={!selectedRepairType}
+            onPress={() => setSelectedRepairType('')}
           />
-        ))}
-      </FilterSection>
+          {repairTypeChipOptions.map((rt) => (
+            <DiscoveryFilterChip
+              key={rt.slug || rt.id}
+              label={rt.label}
+              selected={selectedRepairType === rt.slug}
+              onPress={() => setSelectedRepairType(selectedRepairType === rt.slug ? '' : rt.slug)}
+            />
+          ))}
+        </FilterSection>
+      ) : null}
 
-      <FilterSection title="Brands">
-        <DiscoveryFilterChip
-          label="Any"
-          selected={!selectedBrand}
-          onPress={() => setSelectedBrand(null)}
-        />
-        {brands.slice(0, 40).map((brand) => (
+      {brands?.length ? (
+        <FilterSection title={t('serviceCenters.brand')}>
           <DiscoveryFilterChip
-            key={brand.id}
-            label={brand.name}
-            selected={selectedBrand === String(brand.id)}
-            onPress={() =>
-              setSelectedBrand(
-                selectedBrand === String(brand.id) ? null : String(brand.id)
-              )
-            }
+            label={t('serviceCenters.any')}
+            selected={!selectedBrand}
+            onPress={() => setSelectedBrand(null)}
           />
-        ))}
-      </FilterSection>
+          {brands.map((brand) => (
+            <DiscoveryFilterChip
+              key={brand.id || brand.name}
+              label={brand.name}
+              selected={selectedBrand === brand.id}
+              onPress={() => setSelectedBrand(selectedBrand === brand.id ? null : brand.id)}
+            />
+          ))}
+        </FilterSection>
+      ) : null}
 
-      <FilterSection title="Rating">
+      <FilterSection title={t('serviceCenters.rating')}>
         {RATING_FILTER_OPTIONS.map((opt) => (
           <DiscoveryFilterChip
-            key={opt.label}
-            label={opt.label}
+            key={String(opt.value)}
+            label={t(`serviceCenters.ratingFilter.${RATING_FILTER_KEYS[opt.value]}`)}
             selected={minRating === opt.value}
             onPress={() => setMinRating(opt.value)}
           />
         ))}
       </FilterSection>
 
-      <FilterSection title="Distance">
+      <FilterSection title={t('serviceCenters.distance')}>
         {DISTANCE_FILTER_OPTIONS.map((opt) => (
           <DiscoveryFilterChip
-            key={opt.label}
-            label={opt.label}
+            key={String(opt.value)}
+            label={t(`serviceCenters.distanceFilter.${DISTANCE_FILTER_KEYS[opt.value]}`)}
             selected={radiusKm === opt.value}
             onPress={() => setRadiusKm(opt.value)}
           />
@@ -146,31 +160,33 @@ export default function DiscoveryExpandedFiltersPanel({
 
 const styles = StyleSheet.create({
   panel: {
-    paddingTop: 4,
     paddingBottom: 8,
   },
   section: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   sectionHeader: {
-    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 10,
   },
   sectionTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#475569',
+    color: '#334155',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 6,
+    letterSpacing: 0.4,
   },
   sectionRule: {
+    flex: 1,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: 'rgba(15,23,42,0.12)',
   },
   sectionChips: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 2,
-    gap: 0,
+    gap: 8,
+    paddingRight: 8,
   },
 });

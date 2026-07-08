@@ -141,7 +141,7 @@ export default function ClientRepairsList({ navigation, route }) {
     <ScreenBackground safeArea={false}>
       <AppNavigationBar
         title={screenTitle}
-        backLabel={fromVehicleDetail ? 'Vehicle' : 'Dashboard'}
+        backLabel={fromVehicleDetail ? t('vehicles.vehicle') : t('navigation.dashboard')}
         onBack={handleBack}
         scrolled={scrolled}
       />

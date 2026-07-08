@@ -327,7 +327,7 @@ export default function ClientProfileScreen({ navigation }) {
     <ScreenBackground safeArea={false}>
       <AppNavigationBar
         title="Profile"
-        backLabel="Dashboard"
+        backLabel={t('navigation.dashboard')}
         onBack={handleBack}
         scrolled={scrolled}
         rightAction={

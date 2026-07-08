@@ -351,7 +351,7 @@ export function getDashboardNavigationStateFromPath(path) {
     return vehicleStackState([
       {
         name: 'ClientActivity',
-        params: { initialTab: 'inbox', returnTo: 'Home', backLabel: 'Dashboard' },
+        params: { initialTab: 'inbox', returnTo: 'Home', backLabelKey: 'navigation.dashboard' },
       },
     ]);
   }
@@ -1103,6 +1103,10 @@ export async function redirectLegacyWebUrl() {
     target = '/partner/switch-center/add';
   } else if (pathname === '/PartnerServiceCenters' || pathname.startsWith('/PartnerServiceCenters')) {
     target = '/partner/service-centers';
+  } else if (pathname === '/bg/servizi' || pathname.startsWith('/bg/servizi/')) {
+    target = pathname.replace(/^\/bg\/servizi(\/|$)/, '/bg/avtoservizi$1');
+  } else if (/^\/bg\/serviz\//.test(pathname)) {
+    target = pathname.replace(/^\/bg\/serviz\//, '/bg/avtoserviz/');
   } else if (pathname === '/PublicSeoPage' || pathname.startsWith('/PublicSeoPage')) {
     const query = parseRouteQuery(search);
     if (query.type === 'city' && query.citySlug) {
