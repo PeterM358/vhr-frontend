@@ -13,8 +13,6 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { WEB_BACKGROUND_URL } from '../constants/webBackground';
-
 export const GARAGE_SCENE_STORAGE_KEY = '@veversal/garage_scene_id';
 export const GARAGE_SCENES_PUBLIC_BASE = '/backgrounds/garage-scenes';
 
@@ -127,7 +125,7 @@ const sceneById = new Map(GARAGE_SCENES.map((scene) => [scene.id, scene]));
  */
 export function resolvePublicAssetUri(path) {
   if (!path || typeof path !== 'string') {
-    return WEB_BACKGROUND_URL;
+    return getSceneById(DEFAULT_SCENE_ID).webImage.uri;
   }
   if (Platform.OS === 'web' || !path.startsWith('/')) {
     return path;

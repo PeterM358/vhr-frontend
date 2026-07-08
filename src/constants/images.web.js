@@ -1,10 +1,4 @@
-// Web: lightweight JPEG background (~167KB) — native keeps full PNG in images.js.
-
-import { WEB_BACKGROUND_URL } from './webBackground';
-
-export const BACKGROUNDS = {
-  default: { uri: WEB_BACKGROUND_URL },
-};
+// Web platform image registry — backgrounds use garage scenes from /public.
 
 export const ICONS = {
   app: require('../assets/icons/icon.png'),

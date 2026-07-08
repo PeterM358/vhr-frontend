@@ -19,8 +19,7 @@ import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'reac
 
 import { useGarageScene } from '../context/GarageSceneContext';
 import { useGarageSceneCrossfade } from '../hooks/useGarageSceneCrossfade';
-import { BACKGROUNDS } from '../constants/images';
-import { getSceneImageSource } from '../theme/garageScenes';
+import { DEFAULT_SCENE_ID, getSceneById, getSceneImageSource } from '../theme/garageScenes';
 import { AuthContext } from '../context/AuthManager';
 import AppFooter from './common/AppFooter';
 
@@ -137,9 +136,11 @@ export default function ScreenBackground({
     );
   }
 
+  const fallbackSource = getSceneImageSource(getSceneById(DEFAULT_SCENE_ID));
+
   return (
     <ImageBackground
-      source={source ?? BACKGROUNDS.default}
+      source={source ?? fallbackSource}
       style={[styles.image, style]}
       resizeMode={resizeMode}
       blurRadius={blurRadius}

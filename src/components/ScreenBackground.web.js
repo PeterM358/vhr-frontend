@@ -6,9 +6,7 @@ import { useNavigationState } from '@react-navigation/native';
 
 import { useGarageScene } from '../context/GarageSceneContext';
 import { useGarageSceneCrossfade } from '../hooks/useGarageSceneCrossfade';
-import { BACKGROUNDS } from '../constants/images';
-import { WEB_BACKGROUND_URL } from '../constants/webBackground';
-import { getSceneWebUri } from '../theme/garageScenes';
+import { DEFAULT_SCENE_ID, getSceneById, getSceneWebUri } from '../theme/garageScenes';
 import { AuthContext } from '../context/AuthManager';
 import AppFooter from './common/AppFooter';
 
@@ -23,11 +21,6 @@ const WEB_OVERLAY = {
   backgroundImage:
     'linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.75) 100%)',
 };
-
-function resolveBackgroundSource(source) {
-  if (source) return source;
-  return BACKGROUNDS.default ?? { uri: WEB_BACKGROUND_URL };
-}
 
 function WebSceneImage({ scene, opacity = 1 }) {
   const uri = getSceneWebUri(scene);
@@ -72,29 +65,6 @@ function GarageSceneBackgroundLayers() {
         opacity={outgoingScene ? incomingOpacity : 1}
       />
     </>
-  );
-}
-
-function WebPremiumBackground({ source }) {
-  const resolved = resolveBackgroundSource(source);
-  const uri = typeof resolved === 'object' && resolved.uri ? resolved.uri : WEB_BACKGROUND_URL;
-
-  return (
-    <View pointerEvents="none" style={styles.bgLayer}>
-      <img
-        src={uri}
-        alt=""
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          filter: 'blur(2px) brightness(0.68)',
-          transform: 'scale(1.04)',
-        }}
-      />
-    </View>
   );
 }
 
@@ -153,22 +123,9 @@ export default function ScreenBackground({
     );
   }
 
-  const resolvedSource = resolveBackgroundSource(source);
-  const usePremiumWebBg =
-    resolvedSource?.uri === WEB_BACKGROUND_URL || BACKGROUNDS.default?.uri === WEB_BACKGROUND_URL;
-
-  if (usePremiumWebBg) {
-    return (
-      <View style={[styles.image, style]}>
-        <WebPremiumBackground source={source} />
-        <View pointerEvents="none" style={WEB_OVERLAY} />
-        <Wrapper style={[styles.content, contentStyle, constrain]}>
-          <View style={styles.contentWrapper}>{children}</View>
-          {showFooter ? <AppFooter /> : null}
-        </Wrapper>
-      </View>
-    );
-  }
+  const fallbackUri = getSceneWebUri(getSceneById(DEFAULT_SCENE_ID));
+  const resolvedSource =
+    typeof source === 'object' && source?.uri ? source : { uri: fallbackUri };
 
   return (
     <ImageBackground

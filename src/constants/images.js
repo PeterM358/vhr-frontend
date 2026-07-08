@@ -1,10 +1,6 @@
 // Central registry for static image assets.
 // Add new images here and import them via this module instead of hardcoding paths.
 
-export const BACKGROUNDS = {
-  default: require('../assets/backgrounds/background.png'),
-};
-
 export const ICONS = {
   app: require('../assets/icons/icon.png'),
   appCopy: require('../assets/icons/icon copy.png'),
