@@ -36,6 +36,7 @@ if (fs.existsSync(envPath)) {
     const viteToExpo = {
       VITE_ENABLE_ANALYTICS: 'EXPO_PUBLIC_ENABLE_ANALYTICS',
       VITE_GA_MEASUREMENT_ID: 'EXPO_PUBLIC_GA_MEASUREMENT_ID',
+      VITE_ENABLE_INTERNAL_ANALYTICS: 'EXPO_PUBLIC_ENABLE_INTERNAL_ANALYTICS',
     };
     if (viteToExpo[key]) {
       process.env[viteToExpo[key]] = value;

@@ -48,7 +48,7 @@ import { joinList } from '../i18n/joinLocalizedList';
 import {
   translateRepairTypeLabel,
   translateRepairTypeLabels,
-  translateVehicleTypeLabels,
+  translateVehicleTypePublicLabels,
 } from '../utils/translateShopTypeLabels';
 import { openShopInMaps, resolveShopMapsUrl } from '../utils/shopMapsLink';
 import ShopQuickRequestSheet from '../components/shop/ShopQuickRequestSheet';
@@ -557,7 +557,7 @@ export default function ShopDetailScreen({ route, navigation }) {
   const serviceName = formatShopDisplayName(shop.name || genericServiceCenter);
 
   const vehicleNamesForSubtitleRaw = collectVehicleTypeNames(shop);
-  const vehicleNamesForSubtitle = translateVehicleTypeLabels(vehicleNamesForSubtitleRaw, t);
+  const vehicleNamesForSubtitle = translateVehicleTypePublicLabels(vehicleNamesForSubtitleRaw, t);
   const subtitleType =
     vehicleNamesForSubtitle.length > 0 ? joinList(vehicleNamesForSubtitle, { t }) : genericServiceCenter;
   const addr = typeof shop.address === 'string' ? shop.address.trim() : '';

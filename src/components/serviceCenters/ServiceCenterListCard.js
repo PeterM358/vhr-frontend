@@ -9,7 +9,7 @@ import VeversalScoreBadge from './VeversalScoreBadge';
 import { COLORS } from '../../styles/colors';
 import { useTranslation } from '../../i18n';
 import { joinList } from '../../i18n/joinLocalizedList';
-import { translateRepairTypeLabels, translateVehicleTypeLabels } from '../../utils/translateShopTypeLabels';
+import { translateRepairTypeLabels, translateVehicleTypePublicLabels } from '../../utils/translateShopTypeLabels';
 
 function summarizeList(items, maxVisible = 3, { joinFn } = {}) {
   const list = (items || []).filter(Boolean);
@@ -66,7 +66,7 @@ export default function ServiceCenterListCard({
   const isVerified = shop.is_verified || shop.verification_status === 'verified_partner';
   const isReported = shop.source === 'owner_reported';
   const allBrands = shop.all_brands_serviced || (shop.brand_names || []).includes('All brands');
-  const vehicleTypesTranslated = translateVehicleTypeLabels(shop.supported_vehicle_type_names || [], t);
+  const vehicleTypesTranslated = translateVehicleTypePublicLabels(shop.supported_vehicle_type_names || [], t);
   const vehicleTypes = vehicleTypesTranslated.length ? joinList(vehicleTypesTranslated, { t }) : '';
   const serviceNamesRaw = shop.observed_repair_type_names || shop.available_repair_names || [];
   const serviceNames = translateRepairTypeLabels(serviceNamesRaw, t);

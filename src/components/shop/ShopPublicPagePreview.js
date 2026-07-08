@@ -8,7 +8,7 @@ import FloatingCard from '../ui/FloatingCard';
 import { COLORS } from '../../constants/colors';
 import { useTranslation } from '../../i18n';
 import { joinLocalizedList } from '../../i18n/joinLocalizedList';
-import { translateRepairTypeLabels, translateVehicleTypeLabels, translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
+import { translateRepairTypeLabels, translateVehicleTypePublicLabels, translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
 import { formatMoneyAmount } from '../../constants/currency';
 import { resolveRepairTypeIcon } from '../../utils/repairTypeIcons';
 import { openShopInMaps, resolveShopMapsUrl } from '../../utils/shopMapsLink';
@@ -80,7 +80,7 @@ export default function ShopPublicPagePreview({
   const rawName = String(shopName || '').trim();
   const name = rawName || genericServiceCenter;
 
-  const vehicleTypeLabels = translateVehicleTypeLabels(vehicleTypeNames, t);
+  const vehicleTypeLabels = translateVehicleTypePublicLabels(vehicleTypeNames, t);
   const repairTypeLabels = translateRepairTypeLabels(repairTypeNames, t);
 
   const subtitle = vehicleTypeLabels.length ? joinLocalizedList(vehicleTypeLabels, locale) : genericServiceCenter;

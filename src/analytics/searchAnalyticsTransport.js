@@ -6,6 +6,24 @@ const ANALYTICS_ENDPOINT = '/api/analytics/search/';
 
 let activeTransport = null;
 
+function envValue(...keys) {
+  for (const key of keys) {
+    const value = process.env[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return '';
+}
+
+/** @returns {boolean} */
+export function isInternalSearchAnalyticsEnabled() {
+  return (
+    envValue('EXPO_PUBLIC_ENABLE_INTERNAL_ANALYTICS', 'VITE_ENABLE_INTERNAL_ANALYTICS') ===
+    'true'
+  );
+}
+
 function readQueue() {
   if (typeof window === 'undefined' || !window.localStorage) return [];
   try {
@@ -94,7 +112,9 @@ function createCompositeTransport() {
       if (__DEV__) {
         await consoleTransport.send(event);
       }
-      await fetchTransport.send(event);
+      if (isInternalSearchAnalyticsEnabled()) {
+        await fetchTransport.send(event);
+      }
     },
   };
 }
@@ -116,10 +136,16 @@ export function setSearchAnalyticsTransport(transport) {
  * @param {object} event
  */
 export function sendAnalyticsEvent(event) {
+  if (!isInternalSearchAnalyticsEnabled() && !__DEV__) {
+    return;
+  }
+
   const transport = getSearchAnalyticsTransport();
   Promise.resolve()
     .then(() => transport.send(event))
     .catch(() => {
-      enqueueEvent(event);
+      if (isInternalSearchAnalyticsEnabled()) {
+        enqueueEvent(event);
+      }
     });
 }

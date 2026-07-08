@@ -117,9 +117,14 @@ Module: [`src/analytics/searchAnalytics.js`](../src/analytics/searchAnalytics.js
 
 Transport: [`src/analytics/searchAnalyticsTransport.js`](../src/analytics/searchAnalyticsTransport.js)
 
-- **Development:** `console.debug` via composite transport
-- **All environments:** `POST` to `{API_BASE_URL}/api/analytics/search/` with `keepalive`
-- **Offline / 4xx / 5xx:** events queued in `localStorage` (`veversal_search_analytics_queue`, max 100) and flushed on next successful send
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `VITE_ENABLE_INTERNAL_ANALYTICS` | `false` | Must be exactly `"true"` to `POST` events (mapped to `EXPO_PUBLIC_ENABLE_INTERNAL_ANALYTICS` via `scripts/with-env.js`) |
+
+- **Development (`__DEV__`):** `console.debug` only unless internal analytics is enabled
+- **When enabled:** `POST` to `{API_BASE_URL}/api/analytics/search/` with `keepalive`
+- **When disabled:** no network requests (avoids 404 spam when the backend endpoint is not deployed)
+- **Offline / 4xx / 5xx (when enabled):** events queued in `localStorage` (`veversal_search_analytics_queue`, max 100) and flushed on next successful send
 
 ## Integration points
 
