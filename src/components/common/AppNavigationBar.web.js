@@ -6,6 +6,7 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BackHeaderButton from '../navigation/BackHeaderButton';
+import CompactLanguageSelector from './CompactLanguageSelector';
 import {
   APP_NAV_BAR_CONTENT_HEIGHT,
   APP_NAV_BAR_LARGE_TITLE_EXTRA,
@@ -60,6 +61,7 @@ export default function AppNavigationBar({
   largeTitle = false,
   scrolled = false,
   compact = false,
+  showLanguageSelector = true,
   style,
 }) {
   const insets = useSafeAreaInsets();
@@ -135,7 +137,16 @@ export default function AppNavigationBar({
           )}
 
           <View style={[styles.sideSlot, styles.sideSlotRight, compact && styles.sideSlotCompact]}>
-            {rightAction ?? null}
+            <View style={styles.rightRow}>
+              {showLanguageSelector ? (
+                <CompactLanguageSelector
+                  variant="dark"
+                  compact={compact}
+                  style={compact ? styles.languageSelectorCompact : styles.languageSelector}
+                />
+              ) : null}
+              {rightAction ?? null}
+            </View>
           </View>
         </View>
 
@@ -220,6 +231,20 @@ const styles = StyleSheet.create({
   },
   sideSlotRight: {
     alignItems: 'flex-end',
+  },
+  rightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+    flexWrap: 'wrap',
+    maxWidth: 220,
+  },
+  languageSelector: {
+    maxWidth: 120,
+  },
+  languageSelectorCompact: {
+    maxWidth: 96,
   },
   titleWrap: {
     flex: 1,

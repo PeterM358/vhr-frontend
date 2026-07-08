@@ -3,11 +3,12 @@
  */
 
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { Badge } from 'react-native-paper';
 import Logo from '../../assets/images/logo.svg';
 import AppNavigationBar from './AppNavigationBar';
 import GlassNavIconButton from '../navigation/GlassNavIconButton';
+import CompactLanguageSelector from './CompactLanguageSelector';
 
 const NAV_LOGO_SIZE = 26;
 
@@ -24,6 +25,7 @@ export default function GlobalNavigationBar({
       showBack={false}
       title={title}
       scrolled={scrolled}
+        showLanguageSelector={false}
       leftAction={
         <View style={styles.leftRow}>
           <GlassNavIconButton
@@ -31,6 +33,13 @@ export default function GlobalNavigationBar({
             onPress={onMenuPress}
             accessibilityLabel="Open menu"
           />
+            {Platform.OS === 'web' ? (
+              <CompactLanguageSelector
+                variant="dark"
+                compact
+                style={styles.languageSelector}
+              />
+            ) : null}
           <Logo
             width={NAV_LOGO_SIZE}
             height={NAV_LOGO_SIZE}
@@ -67,6 +76,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexWrap: 'wrap',
+  },
+  languageSelector: {
+    maxWidth: 92,
   },
   navLogo: {
     opacity: 0.96,

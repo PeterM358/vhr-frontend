@@ -12,9 +12,9 @@ export default function LanguagePicker({ style }) {
   const handleChange = async (value) => {
     const nextLocale = await setLocale(value);
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const current = window.location.pathname + window.location.search;
+      const current = window.location.pathname + window.location.search + window.location.hash;
       const nextPath = switchLanguageInPath(current, nextLocale);
-      window.history.replaceState(window.history.state, '', nextPath + window.location.hash);
+      window.history.replaceState(window.history.state, '', nextPath);
     }
   };
 

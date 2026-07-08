@@ -7,6 +7,7 @@ import { Button, Text } from 'react-native-paper';
 import { requestPasswordReset } from '../api/auth';
 import ScreenBackground from '../components/ScreenBackground';
 import DashboardCard from '../components/dashboard/DashboardCard';
+import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
 
 export default function PasswordRequestResetScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -46,6 +47,7 @@ export default function PasswordRequestResetScreen({ navigation }) {
         ]}
       >
         <DashboardCard style={styles.authPanel}>
+          <AuthLanguageSelector style={styles.langSelector} />
           <Text style={styles.title}>Reset Your Password</Text>
           <TextInput
             style={styles.input}
@@ -75,6 +77,9 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 440,
     alignSelf: 'center',
+  },
+  langSelector: {
+    marginBottom: 14,
   },
   title: {
     fontSize: 22,

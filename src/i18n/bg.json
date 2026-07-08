@@ -210,7 +210,7 @@
     "preferredVisit": "Предпочитан час",
     "oilChange": "Смяна на масло",
     "brakeRepair": "Ремонт на спирачки",
-    "acRefill": "Запълване на климатик",
+    "acRefill": "Зареждане на климатик",
     "acService": "Обслужване на климатик",
     "diagnostics": "Диагностика"
   },
@@ -239,13 +239,13 @@
     "serviceCenters": "Сервизи"
   },
   "serviceCenterProfile": {
-    "aboutTemplate": "{serviceCenterName} е сервизен център{vehiclePhrase}{servicesPhrase}{locationPhrase}.",
-    "vehiclePhrase": " обслужва {vehicleTypes}",
-    "servicesPhrase": " предлага услуги {services}",
-    "locationPhrase": " в {locationLine}"
+    "aboutTemplate": "{serviceCenterName} е сервиз{vehiclePhrase}{servicesPhrase}{locationPhrase}.",
+    "vehiclePhrase": ", който обслужва {vehicleTypes}",
+    "servicesPhrase": " и предлага {services}",
+    "locationPhrase": ". Намира се на {locationLine}"
   },
   "serviceCenterList": {
-    "vehiclesLabel": "Превозни средства: {vehicles}",
+    "vehiclesLabel": "Обслужва: {vehicles}",
     "servicesLabel": "Услуги: {services}",
     "moreCount": " +{count} още"
   },
@@ -286,42 +286,42 @@
     "sendProposal": "{app} — Изпрати оферта",
     "serviceCentersMeta": {
       "title": "{app} — Сервизи",
-      "description": "Открийте сервизни центрове, сравнете услуги и намерете надежден сервиз във Veversal.",
+      "description": "Открийте сервизи, сравнете услуги и намерете надежден сервиз във Veversal.",
       "discovery": {
         "root": {
-          "title": "{app} — Сервизни центрове",
-          "h1": "Сервизни центрове",
-          "description": "Открийте сервизни центрове, сравнете услуги и намерете надеждна грижа за автомобила във {app}."
+          "title": "{app} — Сервизи",
+          "h1": "Сервизи",
+          "description": "Открийте сервизи, сравнете услуги и намерете надеждна грижа за автомобила във {app}."
         },
         "vehicleCityRepair": {
           "title": "{vehicle} {repair} в {city} | {app}",
           "h1": "{vehicle} {repair} в {city}",
-          "description": "Намерете сервизни центрове за {vehicle} {repair} в {city} във {app}."
+          "description": "Намерете сервизи за {vehicle} {repair} в {city} във {app}."
         },
         "vehicleCity": {
-          "title": "Сервизни центрове за {vehicle} в {city} | {app}",
-          "h1": "Сервизни центрове за {vehicle} в {city}",
-          "description": "Намерете сервизни центрове за {vehicle} в {city} във {app}."
+          "title": "Сервизи за {vehicle} в {city} | {app}",
+          "h1": "Сервизи за {vehicle} в {city}",
+          "description": "Намерете сервизи за {vehicle} в {city} във {app}."
         },
         "vehicle": {
-          "title": "Сервизни центрове за {vehicle} | {app}",
-          "h1": "Сервизни центрове за {vehicle}",
-          "description": "Разгледайте сервизни центрове за {vehicle} във {app}."
+          "title": "Сервизи за {vehicle} | {app}",
+          "h1": "Сервизи за {vehicle}",
+          "description": "Разгледайте сервизи за {vehicle} във {app}."
         },
         "repairCity": {
           "title": "{repair} в {city} | {app}",
           "h1": "{repair} в {city}",
-          "description": "Намерете сервизни центрове за {repair} в {city} във {app}."
+          "description": "Намерете сервизи за {repair} в {city} във {app}."
         },
         "repair": {
           "title": "{repair} | {app}",
           "h1": "{repair}",
-          "description": "Намерете сервизни центрове за {repair} във {app}."
+          "description": "Намерете сервизи за {repair} във {app}."
         },
         "city": {
-          "title": "Сервизни центрове в {city} | {app}",
-          "h1": "Сервизни центрове в {city}",
-          "description": "Намерете сервизни центрове в {city} за ремонти, поддръжка и надеждна грижа за автомобила във {app}."
+          "title": "Сервизи в {city} | {app}",
+          "h1": "Сервизи в {city}",
+          "description": "Намерете сервизи в {city} за ремонти, поддръжка и надеждна грижа за автомобила във {app}."
         }
       }
     },

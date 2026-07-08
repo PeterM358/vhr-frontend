@@ -299,10 +299,14 @@ export async function navigateToRepairRequestNew(navigation, params = {}) {
   if (!authed) {
     await storeAuthReturnUrl(path);
     const root = getRootNavigation(navigation);
-    root.navigate('Login');
+    if (typeof root.replace === 'function') {
+      root.replace('Login');
+    } else {
+      root.navigate('Login');
+    }
     if (Platform.OS === 'web') {
-      syncWebPath('/sign-in');
-      requestAnimationFrame(() => syncWebPath('/sign-in'));
+      syncWebPath('/login');
+      requestAnimationFrame(() => syncWebPath('/login'));
     }
     return;
   }

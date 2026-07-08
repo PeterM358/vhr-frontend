@@ -5,7 +5,6 @@ import ScreenBackground from '../components/ScreenBackground';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import {
   resetToClientDashboard,
-  resetToPublicHome,
   resetToSignIn,
   storeAuthReturnUrl,
 } from '../navigation/authNavigation';
@@ -46,7 +45,8 @@ export default function AuthLoadingScreen({ navigation }) {
           resetToClientDashboard(navigation);
         }
       } else {
-        resetToPublicHome(navigation);
+        // Unauthenticated web root should go to localized sign-in.
+        resetToSignIn(navigation);
       }
     };
 

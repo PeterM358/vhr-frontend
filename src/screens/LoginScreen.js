@@ -22,6 +22,7 @@ import { safeError, safeWarn } from '../utils/logger';
 import LoginGoogleOAuthBridge from '../components/auth/LoginGoogleOAuthBridge';
 import DashboardCard from '../components/dashboard/DashboardCard';
 import { useTranslation } from '../i18n';
+import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
 
 export default function LoginScreen({ navigation, route }) {
   const theme = useTheme();
@@ -211,6 +212,7 @@ export default function LoginScreen({ navigation, route }) {
           <View style={BaseStyles.logoContainer}>
             <Logo width={112} height={112} />
           </View>
+          <AuthLanguageSelector style={styles.langSelector} />
           <Text style={styles.kicker}>{t('auth.signIn')}</Text>
           <Text style={styles.title}>{t('auth.welcomeBack')}</Text>
           <Text style={styles.subtitle}>
@@ -350,6 +352,9 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginBottom: 8,
     textAlign: 'center',
+  },
+  langSelector: {
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,

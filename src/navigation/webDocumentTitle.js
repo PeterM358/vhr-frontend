@@ -30,6 +30,7 @@ const PATH_TITLE_KEYS = {
   '/partner/switch-center': 'switchCenter',
   '/partner/switch-center/add': 'addServiceCenter',
   '/service-centers': 'serviceCenters',
+  '/login': null,
   '/sign-in': null,
   '/sign-up': null,
   '/forgot-password': null,

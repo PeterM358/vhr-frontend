@@ -735,6 +735,12 @@ export function normalizeWebLinkingPath(path) {
   if (!path) return '';
 
   const absolute = normalizeWebPath(path);
+  // Root (`/`) should not be treated as a public SEO "service-centers" page.
+  // Mapping it to service-centers breaks unauthenticated landing.
+  const absolutePathOnly = String(absolute || '/').split('?')[0].split('#')[0];
+  if (absolutePathOnly === '/') {
+    return '';
+  }
   const canonical = toCanonicalPublicPath(absolute);
   const trimmed = absolute.replace(/^\//, '').replace(/\/$/, '');
   const canonicalTrimmed = canonical.replace(/^\//, '').replace(/\/$/, '');
@@ -1030,7 +1036,7 @@ export async function redirectLegacyWebUrl() {
     const authed = await hasStoredAuthToken();
     if (!authed) {
       await storeAuthReturnUrl(`${pathname}${search}`);
-      target = '/sign-in';
+      target = '/login';
     }
   } else if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) {
     const authed = await hasStoredAuthToken();

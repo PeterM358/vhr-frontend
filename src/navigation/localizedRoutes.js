@@ -114,6 +114,17 @@ export function getCurrentLanguageFromPath(pathname) {
   return DEFAULT_LANGUAGE;
 }
 
+/**
+ * Returns the supported language prefix from a pathname, or `null` if the URL
+ * does not start with a supported `/{lang}/...` segment.
+ */
+export function getSupportedLanguagePrefixFromPathname(pathname) {
+  const segments = splitPath(pathname);
+  if (!segments.length) return null;
+  const [first] = segments;
+  return SUPPORTED_LANGUAGES.includes(first) ? first : null;
+}
+
 export function stripLanguagePrefix(pathname) {
   const segments = splitPath(pathname);
   if (!segments.length) {
@@ -281,7 +292,19 @@ export function getRouteKeyFromLocalizedPath(pathname) {
 }
 
 export function switchLanguageInPath(currentPath, targetLang) {
-  const canonical = toCanonicalPublicPath(currentPath);
-  return localizeCanonicalPath(canonical, targetLang);
+  const str = String(currentPath || '');
+
+  // Preserve query + hash when switching languages (important for tabs like ?tab=offers).
+  const hashIndex = str.indexOf('#');
+  const hash = hashIndex >= 0 ? str.slice(hashIndex) : '';
+  const withoutHash = hashIndex >= 0 ? str.slice(0, hashIndex) : str;
+
+  const qIndex = withoutHash.indexOf('?');
+  const search = qIndex >= 0 ? withoutHash.slice(qIndex) : '';
+  const pathname = qIndex >= 0 ? withoutHash.slice(0, qIndex) : withoutHash;
+
+  const canonical = toCanonicalPublicPath(pathname);
+  const localized = localizeCanonicalPath(canonical, targetLang);
+  return `${localized}${search}${hash}`;
 }
 

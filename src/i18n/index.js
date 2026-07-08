@@ -22,7 +22,9 @@ import it from './it.json';
 import fr from './fr.json';
 import es from './es.json';
 
-import { getCurrentLanguageFromPath } from '../navigation/localizedRoutes';
+import {
+  getSupportedLanguagePrefixFromPathname,
+} from '../navigation/localizedRoutes';
 
 export const STORAGE_KEY_LOCALE = '@veversal_locale';
 export const DEFAULT_LOCALE = 'en';
@@ -60,13 +62,46 @@ function setModuleLocale(locale) {
 function readWebLocale() {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
   try {
-    const fromPath = getCurrentLanguageFromPath(window.location.pathname);
-    if (SUPPORTED_LOCALES.includes(fromPath)) {
-      return fromPath;
+    const pathname = window.location.pathname || '/';
+
+    // URL prefix wins over stored language.
+    const fromPrefix = getSupportedLanguagePrefixFromPathname(pathname);
+    if (fromPrefix && SUPPORTED_LOCALES.includes(fromPrefix)) {
+      return fromPrefix;
     }
-    return window.localStorage.getItem(STORAGE_KEY_LOCALE);
+
+    // Otherwise use stored language (localStorage for web), then browser language.
+    try {
+      const stored = window.localStorage.getItem(STORAGE_KEY_LOCALE);
+      if (stored && SUPPORTED_LOCALES.includes(stored)) {
+        return stored;
+      }
+    } catch {
+      // ignore localStorage errors
+    }
+
+    // Browser/device language fallback.
+    const candidates =
+      typeof navigator !== 'undefined' && Array.isArray(navigator.languages) && navigator.languages.length
+        ? navigator.languages
+        : [typeof navigator !== 'undefined' ? navigator.language : ''];
+
+    for (const candidate of candidates) {
+      const base = String(candidate || '').trim().toLowerCase().split('-')[0];
+      if (SUPPORTED_LOCALES.includes(base)) return base;
+    }
+
+    return DEFAULT_LOCALE;
   } catch {
     return null;
+  }
+}
+
+// Initialize moduleLocale early on web so URL sync code doesn't race.
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  const initial = readWebLocale();
+  if (initial && SUPPORTED_LOCALES.includes(initial)) {
+    moduleLocale = initial;
   }
 }
 
@@ -76,6 +111,27 @@ function writeWebLocale(locale) {
     window.localStorage.setItem(STORAGE_KEY_LOCALE, locale);
   } catch {
     // ignore quota / privacy errors
+  }
+}
+
+/**
+ * Keeps i18n in sync with a URL language prefix on web.
+ * Only updates when the URL contains a supported `/{lang}/...` prefix.
+ */
+export function syncLocaleFromWebPathname() {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  try {
+    const prefix = getSupportedLanguagePrefixFromPathname(window.location.pathname || '/');
+    if (!prefix || !SUPPORTED_LOCALES.includes(prefix)) return null;
+
+    if (prefix === moduleLocale) return prefix;
+
+    setModuleLocale(prefix);
+    writeWebLocale(prefix);
+    AsyncStorage.setItem(STORAGE_KEY_LOCALE, prefix).catch(() => {});
+    return prefix;
+  } catch {
+    return null;
   }
 }
 
@@ -123,16 +179,45 @@ export function getLocale() {
 export async function loadPersistedLocale() {
   try {
     const fromWeb = readWebLocale();
-    if (fromWeb && SUPPORTED_LOCALES.includes(fromWeb)) {
-      setModuleLocale(fromWeb);
-      return fromWeb;
+    if (!fromWeb || !SUPPORTED_LOCALES.includes(fromWeb)) {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY_LOCALE);
+      if (stored && SUPPORTED_LOCALES.includes(stored)) {
+        setModuleLocale(stored);
+        writeWebLocale(stored);
+        return stored;
+      }
+      setModuleLocale(DEFAULT_LOCALE);
+      return DEFAULT_LOCALE;
     }
-    const stored = await AsyncStorage.getItem(STORAGE_KEY_LOCALE);
-    if (stored && SUPPORTED_LOCALES.includes(stored)) {
-      setModuleLocale(stored);
-      writeWebLocale(stored);
-      return stored;
+
+    // If URL has a prefix, immediately sync persisted storage to URL language.
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const prefix = getSupportedLanguagePrefixFromPathname(window.location.pathname || '/');
+      if (prefix && prefix !== fromWeb) {
+        // Defensive: keep fromWeb in sync with prefix.
+        setModuleLocale(prefix);
+        writeWebLocale(prefix);
+        AsyncStorage.setItem(STORAGE_KEY_LOCALE, prefix).catch(() => {});
+        return prefix;
+      }
+      if (prefix && prefix === fromWeb) {
+        setModuleLocale(prefix);
+        writeWebLocale(prefix);
+        AsyncStorage.setItem(STORAGE_KEY_LOCALE, prefix).catch(() => {});
+        return prefix;
+      }
     }
+
+    setModuleLocale(fromWeb);
+    // Ensure localStorage exists even if AsyncStorage was the original source.
+    writeWebLocale(fromWeb);
+    if (Platform.OS === 'web') {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY_LOCALE);
+      if (!stored && SUPPORTED_LOCALES.includes(fromWeb)) {
+        AsyncStorage.setItem(STORAGE_KEY_LOCALE, fromWeb).catch(() => {});
+      }
+    }
+    return fromWeb;
   } catch {
     // keep default
   }

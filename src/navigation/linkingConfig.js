@@ -5,7 +5,7 @@
 
 export const linkingScreens = {
   PublicHome: '',
-  Login: 'sign-in',
+  Login: 'login',
   Register: 'sign-up',
   PasswordRequestReset: 'forgot-password',
   Home: {

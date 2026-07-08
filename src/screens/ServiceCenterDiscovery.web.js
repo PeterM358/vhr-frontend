@@ -33,6 +33,7 @@ import BackHeaderButton from '../components/navigation/BackHeaderButton';
 import ScreenBackground from '../components/ScreenBackground';
 import ServiceCenterListCard from '../components/serviceCenters/ServiceCenterListCard';
 import PartnerMarketComparisonCard from '../components/partner/PartnerMarketComparisonCard';
+import CompactLanguageSelector from '../components/common/CompactLanguageSelector';
 import { DiscoveryFilterChip } from '../components/serviceCenters/DiscoveryFilterChip';
 import DiscoveryExpandedFiltersPanel from '../components/serviceCenters/DiscoveryExpandedFiltersPanel';
 import DiscoveryFiltersBottomSheet from '../components/serviceCenters/DiscoveryFiltersBottomSheet.web';
@@ -451,6 +452,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
               ? 'Explore Service Centers'
               : 'Find Service Centers'}
         </Text>
+        <CompactLanguageSelector variant="light" compact style={styles.serviceCentersLangSelector} />
       </View>
 
       <View style={styles.searchRow}>
@@ -734,6 +736,9 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   title: { flex: 1, fontSize: 18, fontWeight: '700', color: '#0f172a' },
+  serviceCentersLangSelector: {
+    maxWidth: 220,
+  },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',

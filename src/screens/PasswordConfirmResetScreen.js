@@ -25,6 +25,7 @@ import {
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import { resetToClientDashboard } from '../navigation/authNavigation';
 import { safeError } from '../utils/logger';
+import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
 
 export default function PasswordConfirmResetScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
@@ -105,6 +106,7 @@ export default function PasswordConfirmResetScreen({ route, navigation }) {
           keyboardShouldPersistTaps="handled"
         >
           <DashboardCard style={styles.authPanel}>
+            <AuthLanguageSelector style={styles.langSelector} />
             <Text style={styles.title}>Enter New Password</Text>
             <TextInput
               style={styles.input}
@@ -152,6 +154,9 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 440,
     alignSelf: 'center',
+  },
+  langSelector: {
+    marginBottom: 14,
   },
   title: {
     fontSize: 22,

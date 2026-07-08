@@ -15,6 +15,7 @@ import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavi
 import { resetToClientDashboard } from '../navigation/authNavigation';
 import { safeError } from '../utils/logger';
 import DashboardCard from '../components/dashboard/DashboardCard';
+import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
 
 export default function RegisterScreen({ navigation }) {
   const theme = useTheme();
@@ -110,6 +111,7 @@ export default function RegisterScreen({ navigation }) {
             <View style={BaseStyles.logoContainer}>
               <Logo width={88} height={88} />
             </View>
+            <AuthLanguageSelector style={styles.langSelector} />
 
             <Text style={styles.title}>Create your account</Text>
             <Text style={styles.subtitle}>
@@ -226,6 +228,9 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginBottom: 8,
     textAlign: 'center',
+  },
+  langSelector: {
+    marginBottom: 12,
   },
   subtitle: {
     fontSize: 14,

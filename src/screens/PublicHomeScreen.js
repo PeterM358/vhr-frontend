@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { ScrollView, View, StyleSheet } from 'react-native';
+import { ScrollView, View, StyleSheet, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,8 +10,9 @@ import ScreenBackground from '../components/ScreenBackground';
 import DashboardCard from '../components/dashboard/DashboardCard';
 
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
-import { navigateToSignIn, resetToClientDashboard } from '../navigation/authNavigation';
+import { navigateToSignIn, resetToClientDashboard, resetToSignIn } from '../navigation/authNavigation';
 import { useTranslation } from '../i18n';
+import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
 
 export default function PublicHomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -26,6 +27,16 @@ export default function PublicHomeScreen({ navigation }) {
         if (cancelled) return;
         if (token && token !== 'null' && token !== 'undefined') {
           resetToClientDashboard(navigation);
+          return;
+        }
+
+        // Root (`/`) for unauthenticated web visitors should land on localized sign-in.
+        if (
+          Platform.OS === 'web' &&
+          typeof window !== 'undefined' &&
+          (window.location.pathname || '') === '/'
+        ) {
+          resetToSignIn(navigation);
         }
       })();
       return () => {
@@ -50,6 +61,7 @@ export default function PublicHomeScreen({ navigation }) {
           <View style={BaseStyles.logoContainer}>
             <Logo width={160} height={160} />
           </View>
+          <AuthLanguageSelector style={styles.langSelector} />
           <Text style={styles.subtitle}>{t('auth.publicSubtitle')}</Text>
 
           <Button
@@ -116,5 +128,8 @@ const styles = StyleSheet.create({
   },
   outlinedBtn: {
     borderColor: 'rgba(255,255,255,0.5)',
+  },
+  langSelector: {
+    marginBottom: 10,
   },
 });
