@@ -62,6 +62,7 @@ import {
   resolveAuthorizeVehicleId,
 } from '../utils/vehicleShopAuthorization';
 import { useTranslation } from '../i18n';
+import { trackDiscoverySearchClick } from '../analytics/searchAnalytics';
 
 const DEFAULT_MAP_CENTER = [42.6977, 23.3219];
 function configureLeafletIcons() {
@@ -139,6 +140,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     loading,
     addressQuery,
     setAddressQuery,
+    activeSearchTerm,
     selectedVehicleType,
     setSelectedVehicleType,
     selectedCategory,
@@ -155,6 +157,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     setMinRating,
     radiusKm,
     setRadiusKm,
+    citySlug,
     sort,
     setSort,
     brands,
@@ -319,6 +322,24 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   };
 
   const openShopProfile = (shop) => {
+    trackDiscoverySearchClick(
+      {
+        activeSearchTerm,
+        citySlug,
+        selectedBrand,
+        selectedVehicleType,
+        selectedRepairType,
+        selectedCategory,
+        verifiedOnly,
+        openNowOnly,
+        minRating,
+        radiusKm,
+        sort,
+        resultCount: shops.length,
+      },
+      shop
+    );
+
     const slug = shop.public_slug || shop.slug;
     const profileParams = {
       returnTo: route.params?.returnTo,

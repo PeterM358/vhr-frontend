@@ -16,6 +16,7 @@ import {
   fetchRepairTypesCached,
   fetchVehicleMakesCached,
 } from '../utils/referenceDataCache';
+import { trackDiscoverySearch } from '../analytics/searchAnalytics';
 
 export const SORT_OPTIONS = [
   { value: 'recommended', label: 'Recommended' },
@@ -68,6 +69,7 @@ export function useServiceCenterDiscovery({
   const matchedCityRef = useRef(null);
   const citySlugRef = useRef(initialCitySlug);
   const userLocRef = useRef(null);
+  const lastAnalyticsFingerprintRef = useRef('');
 
   activeSearchRef.current = activeSearchTerm;
   matchedCityRef.current = matchedCity;
@@ -312,6 +314,56 @@ export function useServiceCenterDiscovery({
     sort,
     userLocatedExplicitly,
     fetchShops,
+  ]);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const fingerprint = JSON.stringify({
+      q: activeSearchTerm,
+      city: citySlug,
+      brand: selectedBrand,
+      vehicle: selectedVehicleType,
+      service: selectedRepairType,
+      category: selectedCategory,
+      verified: verifiedOnly,
+      openNow: openNowOnly,
+      rating: minRating,
+      radius: radiusKm,
+      sort,
+      count: shops.length,
+    });
+    if (fingerprint === lastAnalyticsFingerprintRef.current) return;
+    lastAnalyticsFingerprintRef.current = fingerprint;
+
+    trackDiscoverySearch({
+      activeSearchTerm,
+      citySlug,
+      selectedBrand,
+      selectedVehicleType,
+      selectedRepairType,
+      selectedCategory,
+      verifiedOnly,
+      openNowOnly,
+      minRating,
+      radiusKm,
+      sort,
+      resultCount: shops.length,
+    });
+  }, [
+    loading,
+    activeSearchTerm,
+    citySlug,
+    selectedBrand,
+    selectedVehicleType,
+    selectedRepairType,
+    selectedCategory,
+    verifiedOnly,
+    openNowOnly,
+    minRating,
+    radiusKm,
+    sort,
+    shops.length,
   ]);
 
   return {
