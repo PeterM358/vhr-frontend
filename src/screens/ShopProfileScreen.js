@@ -93,6 +93,8 @@ import {
 import { getServiceMenu } from '../api/serviceMenu';
 import { resolveRepairTypeIcon } from '../utils/repairTypeIcons';
 import ShopInvoiceSettingsSection from '../components/shop/ShopInvoiceSettingsSection';
+import LanguagePicker from '../components/profile/LanguagePicker';
+import { useTranslation } from '../i18n';
 import { pickVehiclePhotoAttachment, pickInvoiceLogoAttachment } from '../utils/pickDocumentFile';
 import { emptyLegalEntityDraft } from '../utils/invoiceTaxLabels';
 import { attachLunchBreak, parseLunchBreak } from '../utils/shopWorkingHours';
@@ -233,6 +235,7 @@ async function mergeRegistrationContact(profileRow) {
 
 export default function ShopProfileScreen({ navigation, route }) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = usePartnerDashboardBack(navigation);
@@ -1598,6 +1601,14 @@ export default function ShopProfileScreen({ navigation, route }) {
               }
             />
           </View>
+        </ShopProfileAccordionSection>
+
+        <ShopProfileAccordionSection
+          title={t('profile.appearance')}
+          expanded={!!expandedSections.appearance}
+          onToggle={() => toggleSection('appearance')}
+        >
+          <LanguagePicker />
         </ShopProfileAccordionSection>
 
         <ShopProfileAccordionSection

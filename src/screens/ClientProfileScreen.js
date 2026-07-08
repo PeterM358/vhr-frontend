@@ -32,7 +32,9 @@ import AppCard from '../components/ui/AppCard';
 import { COLORS } from '../constants/colors';
 import { useGarageScene } from '../context/GarageSceneContext';
 import { getEnabledScenes } from '../theme/garageScenes';
+import LanguagePicker from '../components/profile/LanguagePicker';
 import useDebouncedValue from '../utils/useDebouncedValue';
+import { useTranslation } from '../i18n';
 
 const CONTACT_PREFERENCE_STORAGE_KEY = '@client_profile_contact_preference';
 const INITIAL_CITY_LIMIT = 120;
@@ -114,6 +116,7 @@ function ProfileSkeleton() {
 
 export default function ClientProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useClientDashboardBack(navigation);
   const { getSelectedScene, setSelectedSceneId } = useGarageScene();
@@ -460,8 +463,9 @@ export default function ClientProfileScreen({ navigation }) {
         </FloatingCard>
 
         <FloatingCard>
-          <Text style={styles.sectionTitle}>Appearance</Text>
-          <Text variant="labelLarge" style={styles.label}>Garage Scene</Text>
+          <Text style={styles.sectionTitle}>{t('profile.appearance')}</Text>
+          <LanguagePicker />
+          <Text variant="labelLarge" style={[styles.label, styles.languageSpacer]}>{t('profile.garageScene')}</Text>
           <View style={styles.pickerWrap}>
             <Picker
               selectedValue={garageScene.id}
@@ -474,14 +478,14 @@ export default function ClientProfileScreen({ navigation }) {
             </Picker>
           </View>
           <Text style={styles.helper}>
-            {garageScene.description || 'Choose a garage scene for your dashboard background.'}
+            {garageScene.description || t('profile.garageSceneHelper')}
           </Text>
         </FloatingCard>
 
         <FloatingCard>
-          <Text style={styles.sectionTitle}>Vehicle access & sharing</Text>
+          <Text style={styles.sectionTitle}>{t('profile.vehicleAccess')}</Text>
           <Text style={styles.helper}>
-            You’ll later be able to share vehicle access with family members, drivers, or fleet managers.
+            {t('profile.vehicleAccessHelper')}
           </Text>
         </FloatingCard>
 
@@ -493,12 +497,12 @@ export default function ClientProfileScreen({ navigation }) {
           visible={dialogVisible}
           onDismiss={() => setDialogVisible(false)}
         >
-          <Dialog.Title>Notice</Dialog.Title>
+          <Dialog.Title>{t('common.notice')}</Dialog.Title>
           <Dialog.Content>
             <Text>{dialogMessage}</Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setDialogVisible(false)}>OK</Button>
+            <Button onPress={() => setDialogVisible(false)}>{t('common.ok')}</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -557,6 +561,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 4,
     fontWeight: '700',
+  },
+  languageSpacer: {
+    marginTop: 16,
   },
   helper: {
     color: COLORS.TEXT_MUTED,

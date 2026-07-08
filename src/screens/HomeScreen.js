@@ -42,8 +42,8 @@ import {
 import { API_BASE_URL } from '../api/config';
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import { resetToPublicHome } from '../navigation/authNavigation';
+import { useTranslation } from '../i18n';
 
-const HERO_SUBTITLE = 'Your vehicles, service history, and repairs — in one control center.';
 
 function toDisplayName(rawValue) {
   const raw = String(rawValue || '').trim();
@@ -68,6 +68,7 @@ function extractFirstName(rawValue) {
 
 export default function HomeScreen({ navigation }) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const {
     authToken,
     isAuthenticated,
@@ -255,27 +256,27 @@ export default function HomeScreen({ navigation }) {
 
   const summaryItems = useMemo(
     () => [
-      { key: 'vehicles', value: vehicles.length, label: 'Vehicles', onPress: goVehicles },
+      { key: 'vehicles', value: vehicles.length, label: t('dashboard.summary.vehicles'), onPress: goVehicles },
       {
         key: 'requests',
         value: openRequestsCount,
-        label: 'Open Requests',
+        label: t('dashboard.summary.openRequests'),
         onPress: goRepairs,
       },
       {
         key: 'offers',
         value: pendingOffersCount,
-        label: 'Pending Offers',
+        label: t('dashboard.summary.pendingOffers'),
         onPress: goPendingOffers,
       },
       {
         key: 'alerts',
         value: unreadNotifications,
-        label: 'Unread Alerts',
+        label: t('dashboard.summary.unreadAlerts'),
         onPress: goNotificationCenter,
       },
     ],
-    [vehicles.length, openRequestsCount, pendingOffersCount, unreadNotifications]
+    [vehicles.length, openRequestsCount, pendingOffersCount, unreadNotifications, t]
   );
 
   const actionTiles = useMemo(
@@ -283,33 +284,33 @@ export default function HomeScreen({ navigation }) {
       {
         key: 'vehicles',
         icon: 'car-multiple',
-        title: 'Vehicles',
-        subtitle: 'Manage your garage',
+        title: t('dashboard.actions.vehiclesTitle'),
+        subtitle: t('dashboard.actions.vehiclesSubtitle'),
         onPress: goVehicles,
       },
       {
         key: 'history',
         icon: 'book-open-page-variant',
-        title: 'Service History',
-        subtitle: 'Repairs & maintenance',
+        title: t('dashboard.actions.serviceHistoryTitle'),
+        subtitle: t('dashboard.actions.serviceHistorySubtitle'),
         onPress: goServiceHistory,
       },
       {
         key: 'centers',
         icon: 'map-search',
-        title: 'Find Service Centers',
-        subtitle: 'Book trusted repairs',
+        title: t('dashboard.actions.findCentersTitle'),
+        subtitle: t('dashboard.actions.findCentersSubtitle'),
         onPress: goFindCenters,
       },
       {
         key: 'documents',
         icon: 'file-document-outline',
-        title: 'Documents',
-        subtitle: 'Invoices, warranties & records',
+        title: t('dashboard.actions.documentsTitle'),
+        subtitle: t('dashboard.actions.documentsSubtitle'),
         onPress: goDocuments,
       },
     ],
-    []
+    [t]
   );
 
   const recommendedActions = useMemo(
@@ -318,8 +319,8 @@ export default function HomeScreen({ navigation }) {
   );
 
   const fabConfig = hasVehicles
-    ? { label: 'Request Service', onPress: () => goRequestService() }
-    : { label: 'Add Vehicle', onPress: goAddVehicle };
+    ? { label: t('dashboard.fab.requestService'), onPress: () => goRequestService() }
+    : { label: t('dashboard.fab.addVehicle'), onPress: goAddVehicle };
 
   if (isLoading || !sessionChecked) {
     return (
@@ -361,8 +362,8 @@ export default function HomeScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
       >
         <DashboardHeroCard
-          title={`Welcome, ${heroName}`}
-          subtitle={HERO_SUBTITLE}
+          title={t('dashboard.greeting', { name: heroName })}
+          subtitle={t('dashboard.heroSubtitle')}
         />
 
         {dashboardLoading ? (
@@ -375,9 +376,9 @@ export default function HomeScreen({ navigation }) {
         )}
 
         <DashboardSection
-          title="Vehicle Health"
-          subtitle="Status and priority issues for each vehicle."
-          actionLabel={hasVehicles ? 'All vehicles' : undefined}
+          title={t('dashboard.health.sectionTitle')}
+          subtitle={t('dashboard.health.noVehiclesBody')}
+          actionLabel={hasVehicles ? t('vehicles.title') : undefined}
           onActionPress={hasVehicles ? goVehicles : undefined}
         >
           <VehicleHealthSection

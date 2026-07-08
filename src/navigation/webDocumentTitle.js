@@ -3,61 +3,66 @@
  */
 
 import { Platform } from 'react-native';
+import { t, getLocale } from '../i18n';
 
 const BASE_TITLE = 'Veversal';
 
-const PATH_TITLES = {
-  '/': BASE_TITLE,
-  '/dashboard': `${BASE_TITLE} Dashboard`,
-  '/partner/dashboard': `${BASE_TITLE} Partner Dashboard`,
-  '/partner/profile': `${BASE_TITLE} Partner Profile`,
-  '/partner/public-preview': `${BASE_TITLE} Public Page Preview`,
-  '/partner/repairs': `${BASE_TITLE} Repairs`,
-  '/partner/bookings': `${BASE_TITLE} Bookings`,
-  '/partner/calendar': `${BASE_TITLE} Calendar`,
-  '/partner/clients': `${BASE_TITLE} Clients`,
-  '/partner/promotions': `${BASE_TITLE} Promotions`,
-  '/partner/warehouse': `${BASE_TITLE} Warehouse`,
-  '/partner/invoicing': `${BASE_TITLE} Invoicing`,
-  '/partner/services': `${BASE_TITLE} Price List`,
-  '/partner/notifications': `${BASE_TITLE} Notifications`,
-  '/partner/switch-center': `${BASE_TITLE} Switch Service Center`,
-  '/partner/switch-center/add': `${BASE_TITLE} Add Service Center`,
-  '/service-centers': `${BASE_TITLE} Service Centers`,
-  '/sign-in': BASE_TITLE,
-  '/sign-up': BASE_TITLE,
-  '/forgot-password': BASE_TITLE,
-  '/dashboard/vehicles': `${BASE_TITLE} My Vehicles`,
-  '/dashboard/vehicles/add': `${BASE_TITLE} Add Vehicle`,
-  '/dashboard/notifications': `${BASE_TITLE} Notifications`,
-  '/dashboard/repair-requests': `${BASE_TITLE} Repairs`,
-  '/dashboard/service-history': `${BASE_TITLE} Service History`,
-  '/dashboard/bookings': `${BASE_TITLE} Bookings`,
-  '/dashboard/documents': `${BASE_TITLE} Documents`,
-  '/dashboard/profile': `${BASE_TITLE} Profile`,
+function seo(key) {
+  return t(`seo.${key}`, { app: t('common.appName', null, BASE_TITLE) }, `${BASE_TITLE}`);
+}
+
+const PATH_TITLE_KEYS = {
+  '/': null,
+  '/dashboard': 'dashboard',
+  '/partner/dashboard': 'partnerDashboard',
+  '/partner/profile': 'partnerProfile',
+  '/partner/public-preview': 'publicPreview',
+  '/partner/repairs': 'repairs',
+  '/partner/bookings': 'bookings',
+  '/partner/calendar': 'calendar',
+  '/partner/clients': 'clients',
+  '/partner/promotions': 'promotions',
+  '/partner/warehouse': 'warehouse',
+  '/partner/invoicing': 'invoicing',
+  '/partner/services': 'priceList',
+  '/partner/notifications': 'notifications',
+  '/partner/switch-center': 'switchCenter',
+  '/partner/switch-center/add': 'addServiceCenter',
+  '/service-centers': 'serviceCenters',
+  '/sign-in': null,
+  '/sign-up': null,
+  '/forgot-password': null,
+  '/dashboard/vehicles': 'myVehicles',
+  '/dashboard/vehicles/add': 'addVehicle',
+  '/dashboard/notifications': 'notifications',
+  '/dashboard/repair-requests': 'repairs',
+  '/dashboard/service-history': 'serviceHistory',
+  '/dashboard/bookings': 'bookings',
+  '/dashboard/documents': 'documents',
+  '/dashboard/profile': 'profile',
 };
 
-function vehicleDetailTitle(pathname) {
+function vehicleDetailTitleKey(pathname) {
   if (/^\/dashboard\/vehicles\/\d+$/.test(pathname)) {
-    return `${BASE_TITLE} Vehicle Details`;
+    return 'vehicleDetails';
   }
   if (/^\/dashboard\/vehicles\/\d+\/specs$/.test(pathname)) {
-    return `${BASE_TITLE} Vehicle Specs`;
+    return 'vehicleSpecs';
   }
   if (/^\/dashboard\/vehicles\/\d+\/service-record\/service-center\/add$/.test(pathname)) {
-    return `${BASE_TITLE} Add Service Center`;
+    return 'addServiceCenter';
   }
   if (/^\/dashboard\/vehicles\/\d+\/service-record\/service-center$/.test(pathname)) {
-    return `${BASE_TITLE} Choose Service Center`;
+    return 'chooseServiceCenter';
   }
   if (/^\/dashboard\/vehicles\/\d+\/service-record\/new$/.test(pathname)) {
-    return `${BASE_TITLE} Add Service Record`;
+    return 'addServiceRecord';
   }
   if (/^\/dashboard\/vehicles\/\d+\/reminders\/new$/.test(pathname)) {
-    return `${BASE_TITLE} Add Obligation / Payment`;
+    return 'addObligation';
   }
   if (/^\/dashboard\/vehicles\/\d+\/service-centers$/.test(pathname)) {
-    return `${BASE_TITLE} Service Center Access`;
+    return 'serviceCenterAccess';
   }
   return null;
 }
@@ -69,30 +74,38 @@ export function normalizeWebTitlePath(pathname) {
 }
 
 export function getWebDocumentTitle(pathname) {
+  // Re-read locale on each title sync (module-level t() uses current locale).
+  void getLocale();
+
   const normalized = normalizeWebTitlePath(pathname);
-  if (PATH_TITLES[normalized]) {
-    return PATH_TITLES[normalized];
+  const pathKey = PATH_TITLE_KEYS[normalized];
+  if (pathKey) {
+    return seo(pathKey);
   }
-  const vehicleTitle = vehicleDetailTitle(normalized);
-  if (vehicleTitle) {
-    return vehicleTitle;
+  if (PATH_TITLE_KEYS[normalized] === null && normalized in PATH_TITLE_KEYS) {
+    return t('common.appName', null, BASE_TITLE);
+  }
+
+  const vehicleKey = vehicleDetailTitleKey(normalized);
+  if (vehicleKey) {
+    return seo(vehicleKey);
   }
   if (normalized.startsWith('/service-centers')) {
-    return `${BASE_TITLE} Service Centers`;
+    return seo('serviceCenters');
   }
   if (normalized.startsWith('/service-center/')) {
-    return `${BASE_TITLE} Service Center`;
+    return seo('serviceCenters');
   }
   if (/^\/partner\/repairs\/\d+\/offer$/.test(normalized)) {
-    return `${BASE_TITLE} Send Proposal`;
+    return seo('sendProposal');
   }
   if (/^\/(car|truck|motorcycle|bike|ebike|scooter)-service-centers/.test(normalized)) {
-    return `${BASE_TITLE} Service Centers`;
+    return seo('serviceCenters');
   }
   if (/^\/(oil-change|brake-repair|clutch-repair|timing-belt-replacement|diagnostics)(\/|$)/.test(normalized)) {
-    return `${BASE_TITLE} Service Centers`;
+    return seo('serviceCenters');
   }
-  return PATH_TITLES[normalized] ?? BASE_TITLE;
+  return t('common.appName', null, BASE_TITLE);
 }
 
 export function syncWebDocumentTitle(pathname) {

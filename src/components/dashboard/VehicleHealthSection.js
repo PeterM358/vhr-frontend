@@ -9,6 +9,7 @@ import {
   vehicleDisplayTitle,
   applyActiveRepairHealthOverride,
 } from '../../utils/vehicleHealthStatus';
+import { useTranslation } from '../../i18n';
 
 const MAX_VISIBLE = 3;
 
@@ -16,20 +17,18 @@ function repairVehicleId(repair) {
   return repair?.vehicle ?? repair?.vehicle_id ?? null;
 }
 
-function primaryIssueLabel(health) {
+function primaryIssueLabel(health, t) {
   const firstReason = (health?.reasons || [])[0];
   if (firstReason?.label) return firstReason.label;
   if (health?.shortReason && health.shortReason !== health.status_label) {
     return health.shortReason;
   }
-  return health?.status_label || health?.label || 'All clear';
+  return health?.status_label || health?.label || t('common.allClear');
 }
 
-function primaryCtaLabel(health, hasActiveRepair) {
-  if (hasActiveRepair) return 'View request';
-  if (health.status === 'needs_attention') return 'Request Service';
-  if (health.status === 'maintenance_recommended') return 'Request Service';
-  return 'Request Service';
+function primaryCtaLabel(health, hasActiveRepair, t) {
+  if (hasActiveRepair) return t('dashboard.health.viewRequest');
+  return t('dashboard.health.requestService');
 }
 
 export default function VehicleHealthSection({
@@ -40,11 +39,13 @@ export default function VehicleHealthSection({
   onRequestService,
   onViewRepair,
 }) {
+  const { t } = useTranslation();
+
   const rows = useMemo(
     () =>
       vehicles.slice(0, MAX_VISIBLE).map((vehicle) => {
         const health = applyActiveRepairHealthOverride(
-          mapHealthFromApi(vehicle),
+          mapHealthFromApi(vehicle, t),
           vehicle.id,
           activeRepairs
         );
@@ -53,16 +54,14 @@ export default function VehicleHealthSection({
         );
         return { vehicle, health, activeRepair };
       }),
-    [vehicles, activeRepairs]
+    [vehicles, activeRepairs, t]
   );
 
   if (!vehicles.length) {
     return (
       <FloatingCard accent={false}>
-        <Text style={styles.emptyTitle}>No vehicles yet</Text>
-        <Text style={styles.emptyBody}>
-          Add a vehicle to see health status, maintenance gaps, and service recommendations.
-        </Text>
+        <Text style={styles.emptyTitle}>{t('dashboard.health.noVehiclesTitle')}</Text>
+        <Text style={styles.emptyBody}>{t('dashboard.health.noVehiclesBody')}</Text>
       </FloatingCard>
     );
   }
@@ -70,9 +69,9 @@ export default function VehicleHealthSection({
   return (
     <View style={styles.list}>
       {rows.map(({ vehicle, health, activeRepair }) => {
-        const title = vehicleDisplayTitle(vehicle);
-        const issue = primaryIssueLabel(health);
-        const ctaLabel = primaryCtaLabel(health, Boolean(activeRepair));
+        const title = vehicleDisplayTitle(vehicle, t);
+        const issue = primaryIssueLabel(health, t);
+        const ctaLabel = primaryCtaLabel(health, Boolean(activeRepair), t);
 
         const handlePrimaryPress = () => {
           if (activeRepair?.id) {
@@ -95,7 +94,7 @@ export default function VehicleHealthSection({
                 </View>
               </View>
               <Button mode="text" compact onPress={() => onVehiclePress?.(vehicle)} labelStyle={styles.linkLabel}>
-                Details
+                {t('common.view')}
               </Button>
             </View>
 
@@ -117,7 +116,7 @@ export default function VehicleHealthSection({
       })}
       {vehicles.length > MAX_VISIBLE ? (
         <Button mode="text" onPress={onViewAllPress} style={styles.viewAllBtn} labelStyle={styles.viewAllLabel}>
-          View all vehicles
+          {t('dashboard.health.viewAll')}
         </Button>
       ) : null}
     </View>

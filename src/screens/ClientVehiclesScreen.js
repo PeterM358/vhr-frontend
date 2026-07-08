@@ -10,8 +10,10 @@ import AppNavigationBar from '../components/common/AppNavigationBar';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import { useClientDashboardBack } from '../navigation/appNavBarBack';
 import { navigateToVehicleAdd, navigateToVehicleDetail } from '../navigation/webNavigation';
+import { useTranslation } from '../i18n';
 
 export default function ClientVehiclesScreen({ navigation }) {
+  const { t } = useTranslation();
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useClientDashboardBack(navigation);
   const [vehicles, setVehicles] = useState([]);
@@ -70,7 +72,7 @@ export default function ClientVehiclesScreen({ navigation }) {
           </View>
 
           <Text style={styles.makeModel} numberOfLines={1}>
-            {[item.make_name, item.model_name].filter(Boolean).join(' ') || 'Unknown vehicle'}
+            {[item.make_name, item.model_name].filter(Boolean).join(' ') || t('vehicles.unknownVehicle')}
           </Text>
 
           {item.kilometers != null && item.kilometers !== '' ? (
@@ -99,8 +101,8 @@ export default function ClientVehiclesScreen({ navigation }) {
   return (
     <ScreenBackground safeArea={false}>
       <AppNavigationBar
-        title="My Vehicles"
-        backLabel="Dashboard"
+        title={t('vehicles.myVehicles')}
+        backLabel={t('common.home')}
         onBack={handleBack}
         scrolled={scrolled}
       />
@@ -113,7 +115,7 @@ export default function ClientVehiclesScreen({ navigation }) {
           contentContainerStyle={styles.listContent}
           renderItem={renderVehicle}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No vehicles found. Add one!</Text>
+            <Text style={styles.emptyText}>{t('vehicles.emptyList')}</Text>
           }
         />
 
@@ -121,7 +123,7 @@ export default function ClientVehiclesScreen({ navigation }) {
           icon="plus"
           style={[styles.fab, { backgroundColor: theme.colors.primary }]}
           onPress={() => navigateToVehicleAdd(navigation)}
-          label="Add Vehicle"
+          label={t('vehicles.addVehicle')}
           color={theme.colors.onPrimary}
         />
       </View>

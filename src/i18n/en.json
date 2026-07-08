@@ -1,0 +1,264 @@
+{
+  "common": {
+    "appName": "Veversal",
+    "back": "Back",
+    "save": "Save",
+    "cancel": "Cancel",
+    "ok": "OK",
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Try again",
+    "logout": "Logout",
+    "home": "Home",
+    "menu": "Menu",
+    "notice": "Notice",
+    "add": "Add",
+    "update": "Update",
+    "configure": "Configure",
+    "setup": "Setup",
+    "book": "Book",
+    "view": "View",
+    "send": "Send",
+    "phone": "Phone",
+    "email": "Email",
+    "number": "Number",
+    "allClear": "All clear"
+  },
+  "language": {
+    "label": "Language",
+    "english": "English",
+    "bulgarian": "Български"
+  },
+  "drawer": {
+    "client": {
+      "profile": "Profile",
+      "repairs": "Repairs",
+      "vehicles": "Vehicles",
+      "notifications": "Notifications",
+      "findServiceCenters": "Find Service Centers"
+    },
+    "partner": {
+      "title": "Partner menu",
+      "centerDetails": "Center details",
+      "calendar": "Calendar",
+      "repairs": "Repairs",
+      "clients": "Clients",
+      "promotions": "Promotions",
+      "warehouse": "Warehouse",
+      "invoicing": "Invoicing",
+      "priceList": "Price list",
+      "notifications": "Notifications",
+      "switchCenter": "Switch service center",
+      "explore": "Explore"
+    }
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "welcomeBack": "Welcome back",
+    "welcomeToVeversal": "Welcome to Veversal",
+    "createAccount": "Create Account",
+    "password": "Password",
+    "forgotPassword": "Forgot password?",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "loginSubtitleOAuth": "Choose your login method and enter your password.",
+    "loginSubtitle": "Enter your email or phone and password to continue.",
+    "publicSubtitle": "Your vehicle service universe — explore service centers before signing in.",
+    "loginFailed": "Login failed. Please check your credentials.",
+    "googleLoginFailed": "Google login failed. Try again.",
+    "googleNoCode": "Google login failed: No authorization code received.",
+    "googleNoToken": "Google login failed: No ID token received."
+  },
+  "dashboard": {
+    "heroSubtitle": "Your vehicles, service history, and repairs — in one control center.",
+    "greeting": "Hi, {name}",
+    "summary": {
+      "vehicles": "Vehicles",
+      "openRequests": "Open Requests",
+      "pendingOffers": "Pending Offers",
+      "unreadAlerts": "Unread Alerts"
+    },
+    "actions": {
+      "vehiclesTitle": "Vehicles",
+      "vehiclesSubtitle": "Manage your garage",
+      "serviceHistoryTitle": "Service History",
+      "serviceHistorySubtitle": "Repairs & maintenance",
+      "findCentersTitle": "Find Service Centers",
+      "findCentersSubtitle": "Book trusted repairs",
+      "documentsTitle": "Documents",
+      "documentsSubtitle": "Invoices, warranties & records"
+    },
+    "fab": {
+      "requestService": "Request Service",
+      "addVehicle": "Add Vehicle"
+    },
+    "health": {
+      "sectionTitle": "Vehicle Health",
+      "viewAll": "View all",
+      "noVehiclesTitle": "No vehicles yet",
+      "noVehiclesBody": "Add a vehicle to see health status, maintenance gaps, and service recommendations.",
+      "viewRequest": "View request",
+      "requestService": "Request Service"
+    },
+    "partner": {
+      "title": "Partner dashboard",
+      "openWork": "Open work",
+      "viewAllRepairs": "View all repairs",
+      "noRequestsTitle": "No open requests yet",
+      "scheduledToday": "Scheduled today",
+      "modules": "Modules"
+    }
+  },
+  "vehicles": {
+    "title": "Vehicles",
+    "addVehicle": "Add Vehicle",
+    "addFirstVehicle": "Add your first vehicle",
+    "vehicle": "Vehicle",
+    "vehicleDetails": "Vehicle Details",
+    "yourVehicle": "Your vehicle",
+    "emptyTitle": "No vehicles yet",
+    "emptyBody": "Add your first vehicle to track service history, health, and repairs.",
+    "emptyList": "No vehicles found. Add one!",
+    "myVehicles": "My Vehicles",
+    "unknownVehicle": "Unknown vehicle",
+    "serviceHistory": "Service History",
+    "health": "Vehicle Health"
+  },
+  "health": {
+    "status": {
+      "healthy": "Healthy",
+      "maintenance_recommended": "Maintenance recommended",
+      "needs_attention": "Needs attention",
+      "in_service": "In service",
+      "at_service_center": "At service center"
+    },
+    "subtitle": {
+      "healthy": "No urgent issues found.",
+      "maintenance_recommended": "Add service history or reminders to improve insights.",
+      "needs_attention": "There are active items that may need review.",
+      "in_service": "Active repair request in progress.",
+      "in_service_scheduled": "Scheduled service appointment in progress.",
+      "at_service_center": "Your vehicle is currently being serviced."
+    },
+    "reasons": {
+      "active_repairs": "Vehicle currently has active repair requests.",
+      "denied_repairs": "Rejected repair request needs review.",
+      "mileage_missing": "Mileage not recorded",
+      "mileage_stale": "Mileage not updated recently",
+      "no_oil_service_history": "No oil service history",
+      "oil_service_overdue": "Oil service overdue",
+      "oil_service_due_soon": "Oil change approaching",
+      "no_brake_check_history": "No brake service history",
+      "brake_check_overdue": "Brake service overdue",
+      "brake_check_due_soon": "Brake check approaching",
+      "no_reminders": "No reminders configured",
+      "obligation_overdue": "{type} overdue"
+    },
+    "domains": {
+      "oil": "Oil service",
+      "brake": "Brake service",
+      "reminders": "Reminders",
+      "mileage": "Mileage",
+      "active_repairs": "Active repairs"
+    },
+    "actions": {
+      "update_km": "Update kilometers",
+      "add_service_history": "Add service history",
+      "configure_reminders": "Configure reminders",
+      "schedule_maintenance": "Schedule maintenance",
+      "book_repair": "Book repair"
+    }
+  },
+  "reminders": {
+    "uiStatus": {
+      "pending_setup": "Pending setup",
+      "overdue": "Overdue",
+      "due_soon": "Due soon",
+      "done": "Done",
+      "active_until_due": "Active until due",
+      "prediction_only": "Estimated — confirm date"
+    },
+    "cta": {
+      "set_reminder": "Set reminder"
+    },
+    "types": {
+      "insurance": "Insurance",
+      "technical_inspection": "Technical inspection",
+      "road_tax": "Road tax",
+      "vignette": "Vignette",
+      "oil_service": "Oil change",
+      "tire_change": "Tire change",
+      "battery_check": "Battery check",
+      "suspension_service": "Suspension service",
+      "brake_check": "Brake check",
+      "custom": "Custom reminder"
+    }
+  },
+  "repairs": {
+    "title": "Repairs",
+    "repairRequests": "Repair Requests",
+    "openRequests": "Open Requests",
+    "pendingOffers": "Pending Offers",
+    "requestService": "Request Service",
+    "sendRequest": "Send request",
+    "preferredVisit": "Preferred visit",
+    "oilChange": "Oil Change",
+    "brakeRepair": "Brake Repair",
+    "diagnostics": "Diagnostics"
+  },
+  "notifications": {
+    "title": "Notifications"
+  },
+  "documents": {
+    "title": "Documents"
+  },
+  "profile": {
+    "title": "Profile",
+    "appearance": "Appearance",
+    "garageScene": "Garage Scene",
+    "garageSceneHelper": "Choose a garage scene for your dashboard background.",
+    "preferredContact": "Preferred contact",
+    "contactHelperSavedLocally": "Saved locally for now.",
+    "vehicleAccess": "Vehicle access & sharing",
+    "vehicleAccessHelper": "You'll later be able to share vehicle access with family members, drivers, or fleet managers.",
+    "phonePrefixHelperWithCountry": "Prefix is set from your country when available — you can edit it if needed.",
+    "phonePrefixHelperNoCountry": "No country selected: enter your international prefix (e.g. +359) so we can store a callable number."
+  },
+  "public": {
+    "findServiceCenters": "Find Service Centers",
+    "findNearbyTrusted": "Find nearby trusted centers",
+    "serviceCenter": "Service Center",
+    "serviceCenters": "Service Centers"
+  },
+  "seo": {
+    "dashboard": "{app} Dashboard",
+    "partnerDashboard": "{app} Partner Dashboard",
+    "partnerProfile": "{app} Partner Profile",
+    "publicPreview": "{app} Public Page Preview",
+    "repairs": "{app} Repairs",
+    "bookings": "{app} Bookings",
+    "calendar": "{app} Calendar",
+    "clients": "{app} Clients",
+    "promotions": "{app} Promotions",
+    "warehouse": "{app} Warehouse",
+    "invoicing": "{app} Invoicing",
+    "priceList": "{app} Price List",
+    "notifications": "{app} Notifications",
+    "switchCenter": "{app} Switch Service Center",
+    "addServiceCenter": "{app} Add Service Center",
+    "serviceCenters": "{app} Service Centers",
+    "myVehicles": "{app} My Vehicles",
+    "addVehicle": "{app} Add Vehicle",
+    "serviceHistory": "{app} Service History",
+    "documents": "{app} Documents",
+    "profile": "{app} Profile",
+    "vehicleDetails": "{app} Vehicle Details",
+    "vehicleSpecs": "{app} Vehicle Specs",
+    "chooseServiceCenter": "{app} Choose Service Center",
+    "addServiceRecord": "{app} Add Service Record",
+    "addObligation": "{app} Add Obligation / Payment",
+    "serviceCenterAccess": "{app} Service Center Access",
+    "sendProposal": "{app} Send Proposal"
+  }
+}

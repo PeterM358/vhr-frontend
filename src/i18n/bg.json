@@ -1,0 +1,264 @@
+{
+  "common": {
+    "appName": "Veversal",
+    "back": "Назад",
+    "save": "Запази",
+    "cancel": "Отказ",
+    "ok": "ОК",
+    "loading": "Зареждане…",
+    "error": "Възникна грешка",
+    "retry": "Опитай отново",
+    "logout": "Изход",
+    "home": "Начало",
+    "menu": "Меню",
+    "notice": "Съобщение",
+    "add": "Добави",
+    "update": "Обнови",
+    "configure": "Настрой",
+    "setup": "Настрой",
+    "book": "Запиши",
+    "view": "Виж",
+    "send": "Изпрати",
+    "phone": "Телефон",
+    "email": "Имейл",
+    "number": "Номер",
+    "allClear": "Всичко е наред"
+  },
+  "language": {
+    "label": "Език",
+    "english": "English",
+    "bulgarian": "Български"
+  },
+  "drawer": {
+    "client": {
+      "profile": "Профил",
+      "repairs": "Ремонти",
+      "vehicles": "Автомобили",
+      "notifications": "Известия",
+      "findServiceCenters": "Намери сервиз"
+    },
+    "partner": {
+      "title": "Партньорско меню",
+      "centerDetails": "Данни за сервиза",
+      "calendar": "Календар",
+      "repairs": "Ремонти",
+      "clients": "Клиенти",
+      "promotions": "Промоции",
+      "warehouse": "Склад",
+      "invoicing": "Фактуриране",
+      "priceList": "Ценоразпис",
+      "notifications": "Известия",
+      "switchCenter": "Смени сервиз",
+      "explore": "Разгледай"
+    }
+  },
+  "auth": {
+    "signIn": "Вход",
+    "signUp": "Регистрация",
+    "welcomeBack": "Добре дошли отново",
+    "welcomeToVeversal": "Добре дошли в Veversal",
+    "createAccount": "Създай акаунт",
+    "password": "Парола",
+    "forgotPassword": "Забравена парола?",
+    "noAccount": "Нямате акаунт?",
+    "hasAccount": "Вече имате акаунт?",
+    "loginSubtitleOAuth": "Изберете начин за вход и въведете паролата си.",
+    "loginSubtitle": "Въведете имейл или телефон и парола, за да продължите.",
+    "publicSubtitle": "Всичко за сервиза на автомобила ви — разгледайте сервизи преди да влезете.",
+    "loginFailed": "Входът неуспешен. Проверете данните си.",
+    "googleLoginFailed": "Входът с Google неуспешен. Опитайте отново.",
+    "googleNoCode": "Входът с Google неуспешен: липсва код за оторизация.",
+    "googleNoToken": "Входът с Google неуспешен: липсва ID токен."
+  },
+  "dashboard": {
+    "heroSubtitle": "Автомобили, сервизна история и ремонти — на едно място.",
+    "greeting": "Здравей, {name}",
+    "summary": {
+      "vehicles": "Автомобили",
+      "openRequests": "Активни заявки",
+      "pendingOffers": "Чакащи оферти",
+      "unreadAlerts": "Непрочетени"
+    },
+    "actions": {
+      "vehiclesTitle": "Автомобили",
+      "vehiclesSubtitle": "Управлявай гаража си",
+      "serviceHistoryTitle": "Сервизна история",
+      "serviceHistorySubtitle": "Ремонти и обслужване",
+      "findCentersTitle": "Намери сервиз",
+      "findCentersSubtitle": "Запиши се при проверен сервиз",
+      "documentsTitle": "Документи",
+      "documentsSubtitle": "Фактури, гаранции и записи"
+    },
+    "fab": {
+      "requestService": "Заяви ремонт",
+      "addVehicle": "Добави автомобил"
+    },
+    "health": {
+      "sectionTitle": "Състояние на автомобила",
+      "viewAll": "Виж всички",
+      "noVehiclesTitle": "Все още няма автомобили",
+      "noVehiclesBody": "Добави автомобил, за да виждаш състоянието, пропуски в обслужването и препоръки.",
+      "viewRequest": "Виж заявката",
+      "requestService": "Заяви ремонт"
+    },
+    "partner": {
+      "title": "Партньорско табло",
+      "openWork": "Активна работа",
+      "viewAllRepairs": "Всички ремонти",
+      "noRequestsTitle": "Все още няма отворени заявки",
+      "scheduledToday": "Насрочени днес",
+      "modules": "Модули"
+    }
+  },
+  "vehicles": {
+    "title": "Автомобили",
+    "addVehicle": "Добави автомобил",
+    "addFirstVehicle": "Добави първия си автомобил",
+    "vehicle": "Автомобил",
+    "vehicleDetails": "Детайли за автомобила",
+    "yourVehicle": "Вашият автомобил",
+    "emptyTitle": "Все още няма автомобили",
+    "emptyBody": "Добави първия си автомобил, за да следиш история, състояние и ремонти.",
+    "emptyList": "Няма автомобили. Добави първия си!",
+    "myVehicles": "Моите автомобили",
+    "unknownVehicle": "Неизвестен автомобил",
+    "serviceHistory": "Сервизна история",
+    "health": "Състояние на автомобила"
+  },
+  "health": {
+    "status": {
+      "healthy": "В добро състояние",
+      "maintenance_recommended": "Препоръчва се обслужване",
+      "needs_attention": "Нуждае се от внимание",
+      "in_service": "В сервиз",
+      "at_service_center": "В сервиз"
+    },
+    "subtitle": {
+      "healthy": "Няма спешни проблеми.",
+      "maintenance_recommended": "Добави сервизна история или напомняния за по-точни препоръки.",
+      "needs_attention": "Има елементи, които изискват внимание.",
+      "in_service": "Има активна заявка за ремонт.",
+      "in_service_scheduled": "Насрочен сервиз в ход.",
+      "at_service_center": "Автомобилът ви в момента е в сервиз."
+    },
+    "reasons": {
+      "active_repairs": "Има активни заявки за ремонт.",
+      "denied_repairs": "Отхвърлена заявка изисква преглед.",
+      "mileage_missing": "Няма въведен пробег",
+      "mileage_stale": "Пробегът не е обновяван наскоро",
+      "no_oil_service_history": "Няма запис за смяна на масло",
+      "oil_service_overdue": "Просрочена смяна на масло",
+      "oil_service_due_soon": "Приближава се смяна на масло",
+      "no_brake_check_history": "Няма запис за обслужване на спирачки",
+      "brake_check_overdue": "Просрочено обслужване на спирачки",
+      "brake_check_due_soon": "Приближава се проверка на спирачки",
+      "no_reminders": "Няма настроени напомняния",
+      "obligation_overdue": "Просрочено: {type}"
+    },
+    "domains": {
+      "oil": "Смяна на масло",
+      "brake": "Спирачки",
+      "reminders": "Напомняния",
+      "mileage": "Пробег",
+      "active_repairs": "Активни ремонти"
+    },
+    "actions": {
+      "update_km": "Обнови пробега",
+      "add_service_history": "Добави сервизна история",
+      "configure_reminders": "Настрой напомняния",
+      "schedule_maintenance": "Насрочи обслужване",
+      "book_repair": "Заяви ремонт"
+    }
+  },
+  "reminders": {
+    "uiStatus": {
+      "pending_setup": "Чака настройка",
+      "overdue": "Просрочено",
+      "due_soon": "Скоро",
+      "done": "Готово",
+      "active_until_due": "Активно до падеж",
+      "prediction_only": "Очаквано — потвърди дата"
+    },
+    "cta": {
+      "set_reminder": "Задай напомняне"
+    },
+    "types": {
+      "insurance": "Застраховка",
+      "technical_inspection": "Годишен технически преглед",
+      "road_tax": "Данък МПС",
+      "vignette": "Винетка",
+      "oil_service": "Смяна на масло",
+      "tire_change": "Смяна на гуми",
+      "battery_check": "Проверка на акумулатор",
+      "suspension_service": "Окачване",
+      "brake_check": "Спирачки",
+      "custom": "Персонално напомняне"
+    }
+  },
+  "repairs": {
+    "title": "Ремонти",
+    "repairRequests": "Ремонти",
+    "openRequests": "Активни заявки",
+    "pendingOffers": "Чакащи оферти",
+    "requestService": "Заяви ремонт",
+    "sendRequest": "Изпрати заявка",
+    "preferredVisit": "Предпочитан час",
+    "oilChange": "Смяна на масло",
+    "brakeRepair": "Ремонт на спирачки",
+    "diagnostics": "Диагностика"
+  },
+  "notifications": {
+    "title": "Известия"
+  },
+  "documents": {
+    "title": "Документи"
+  },
+  "profile": {
+    "title": "Профил",
+    "appearance": "Изглед",
+    "garageScene": "Фон на гаража",
+    "garageSceneHelper": "Избери фон за таблото си.",
+    "preferredContact": "Предпочитан контакт",
+    "contactHelperSavedLocally": "Засега се пази само на устройството.",
+    "vehicleAccess": "Достъп и споделяне на автомобили",
+    "vehicleAccessHelper": "Скоро ще можеш да споделяш достъп с близки, шофьори или флот мениджъри.",
+    "phonePrefixHelperWithCountry": "Префиксът се попълва от държавата, ако е налична — можеш да го редактираш.",
+    "phonePrefixHelperNoCountry": "Няма избрана държава: въведи международен префикс (напр. +359)."
+  },
+  "public": {
+    "findServiceCenters": "Намери сервиз",
+    "findNearbyTrusted": "Намери проверени сервизи наблизо",
+    "serviceCenter": "Сервиз",
+    "serviceCenters": "Сервизи"
+  },
+  "seo": {
+    "dashboard": "{app} — Табло",
+    "partnerDashboard": "{app} — Партньорско табло",
+    "partnerProfile": "{app} — Профил на сервиза",
+    "publicPreview": "{app} — Преглед на публичната страница",
+    "repairs": "{app} — Ремонти",
+    "bookings": "{app} — Записвания",
+    "calendar": "{app} — Календар",
+    "clients": "{app} — Клиенти",
+    "promotions": "{app} — Промоции",
+    "warehouse": "{app} — Склад",
+    "invoicing": "{app} — Фактуриране",
+    "priceList": "{app} — Ценоразпис",
+    "notifications": "{app} — Известия",
+    "switchCenter": "{app} — Смени сервиз",
+    "addServiceCenter": "{app} — Добави сервиз",
+    "serviceCenters": "{app} — Сервизи",
+    "myVehicles": "{app} — Моите автомобили",
+    "addVehicle": "{app} — Добави автомобил",
+    "serviceHistory": "{app} — Сервизна история",
+    "documents": "{app} — Документи",
+    "profile": "{app} — Профил",
+    "vehicleDetails": "{app} — Детайли за автомобила",
+    "vehicleSpecs": "{app} — Спецификации",
+    "chooseServiceCenter": "{app} — Избери сервиз",
+    "addServiceRecord": "{app} — Добави сервизен запис",
+    "addObligation": "{app} — Задължение / плащане",
+    "serviceCenterAccess": "{app} — Достъп до сервиз",
+    "sendProposal": "{app} — Изпрати оферта"
+  }
+}

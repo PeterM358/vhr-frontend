@@ -42,11 +42,13 @@ import {
   drawerScreenOptions,
   DRAWER_TINT,
 } from './DrawerBranding';
+import { useTranslation } from '../i18n';
 
 const Drawer = createDrawerNavigator();
 
 function CustomDrawerContent(props) {
   const navigation = useNavigation();
+  const { t } = useTranslation();
   const { notifications } = useContext(WebSocketContext);
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
   const unreadCount = notifications.filter((n) => !n.is_read).length;
@@ -85,17 +87,17 @@ function CustomDrawerContent(props) {
       contentContainerStyle={drawerGlassStyles.container}
     >
       <View style={drawerGlassStyles.menuContainer}>
-        <Text style={drawerGlassStyles.drawerTitle}>Partner menu</Text>
+        <Text style={drawerGlassStyles.drawerTitle}>{t('drawer.partner.title')}</Text>
 
         <DrawerItem
-          label="Home"
+          label={t('common.home')}
           onPress={() => props.navigation.closeDrawer()}
           icon={({ color, size }) => <DrawerMenuIcon name="home-outline" color={color} size={size} />}
           {...itemProps}
         />
 
         <DrawerItem
-          label="Center details"
+          label={t('drawer.partner.centerDetails')}
           onPress={() => {
             if (Platform.OS === 'web') {
               navigateToPartnerProfile(navigation);
@@ -108,14 +110,14 @@ function CustomDrawerContent(props) {
         />
 
         <DrawerItem
-          label={() => <DrawerLabelWithBadge label="Calendar" badge={unscheduledCount} />}
+          label={() => <DrawerLabelWithBadge label={t('drawer.partner.calendar')} badge={unscheduledCount} />}
           onPress={() => {
             if (Platform.OS === 'web') {
               navigateToPartnerCalendar(navigation);
             } else {
               props.navigation.navigate('ShopCalendar', {
                 returnTo: 'ShopDashboard',
-                backLabel: 'Home',
+                backLabel: t('common.home'),
               });
             }
             props.navigation.closeDrawer();
@@ -127,14 +129,14 @@ function CustomDrawerContent(props) {
         />
 
         <DrawerItem
-          label="Repairs"
+          label={t('drawer.partner.repairs')}
           onPress={() => resetShopDrawerRepairs(navigation)}
           icon={({ color, size }) => <DrawerMenuIcon name="car-wrench" color={color} size={size} />}
           {...itemProps}
         />
 
         <DrawerItem
-          label="Clients"
+          label={t('drawer.partner.clients')}
           onPress={() => {
             if (Platform.OS === 'web') {
               navigateToPartnerClients(navigation);
@@ -149,7 +151,7 @@ function CustomDrawerContent(props) {
         />
 
         <DrawerItem
-          label="Promotions"
+          label={t('drawer.partner.promotions')}
           onPress={() => {
             if (Platform.OS === 'web') {
               navigateToPartnerPromotions(navigation);
@@ -162,7 +164,7 @@ function CustomDrawerContent(props) {
         />
 
         <DrawerItem
-          label="Warehouse"
+          label={t('drawer.partner.warehouse')}
           onPress={() => {
             if (Platform.OS === 'web') {
               navigateToPartnerWarehouse(navigation);
@@ -176,7 +178,7 @@ function CustomDrawerContent(props) {
         />
 
         <DrawerItem
-          label="Invoicing"
+          label={t('drawer.partner.invoicing')}
           onPress={() => {
             if (Platform.OS === 'web') {
               navigateToPartnerInvoicing(navigation);
@@ -191,7 +193,7 @@ function CustomDrawerContent(props) {
         />
 
         <DrawerItem
-          label="Price list"
+          label={t('drawer.partner.priceList')}
           onPress={() => {
             if (Platform.OS === 'web') {
               navigateToPartnerServices(navigation);
@@ -206,7 +208,7 @@ function CustomDrawerContent(props) {
         />
 
         <DrawerItem
-          label={() => <DrawerLabelWithBadge label="Notifications" badge={unreadCount} />}
+          label={() => <DrawerLabelWithBadge label={t('drawer.partner.notifications')} badge={unreadCount} />}
           onPress={() => {
             if (Platform.OS === 'web') {
               navigateToPartnerNotifications(navigation);
@@ -219,7 +221,7 @@ function CustomDrawerContent(props) {
         />
 
         <DrawerItem
-          label="Explore Service Centers"
+          label={t('drawer.partner.explore')}
           onPress={() => {
             props.navigation.closeDrawer();
             navigateToPartnerServiceCenters(navigation);
@@ -229,7 +231,7 @@ function CustomDrawerContent(props) {
         />
 
         <DrawerItem
-          label="Switch Service Center"
+          label={t('drawer.partner.switchCenter')}
           onPress={() => {
             if (Platform.OS === 'web') {
               navigateToPartnerSwitchCenter(navigation);
@@ -244,7 +246,7 @@ function CustomDrawerContent(props) {
         <View style={drawerGlassStyles.divider} />
 
         <DrawerItem
-          label="Logout"
+          label={t('common.logout')}
           onPress={handleLogout}
           icon={({ color, size }) => <DrawerMenuIcon name="logout" color={color} size={size} />}
           {...itemProps}

@@ -11,9 +11,11 @@ import DashboardCard from '../components/dashboard/DashboardCard';
 
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import { navigateToSignIn, resetToClientDashboard } from '../navigation/authNavigation';
+import { useTranslation } from '../i18n';
 
 export default function PublicHomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const topPad = insets.top + 16;
 
   useFocusEffect(
@@ -44,13 +46,11 @@ export default function PublicHomeScreen({ navigation }) {
         ]}
       >
         <DashboardCard style={styles.authPanel} contentStyle={styles.cardContent}>
-          <Text style={styles.title}>Welcome to Veversal</Text>
+          <Text style={styles.title}>{t('auth.welcomeToVeversal')}</Text>
           <View style={BaseStyles.logoContainer}>
             <Logo width={160} height={160} />
           </View>
-          <Text style={styles.subtitle}>
-            Your vehicle service universe — explore service centers before signing in.
-          </Text>
+          <Text style={styles.subtitle}>{t('auth.publicSubtitle')}</Text>
 
           <Button
             mode="contained"
@@ -59,7 +59,7 @@ export default function PublicHomeScreen({ navigation }) {
             contentStyle={BaseStyles.loginButtonContent}
             labelStyle={BaseStyles.loginButtonLabel}
           >
-            Find Service Centers
+            {t('public.findServiceCenters')}
           </Button>
 
           <Button
@@ -68,7 +68,7 @@ export default function PublicHomeScreen({ navigation }) {
             style={[BaseStyles.loginButton, styles.outlinedBtn]}
             textColor="#fff"
           >
-            Sign In
+            {t('auth.signIn')}
           </Button>
 
           <Button
@@ -76,7 +76,7 @@ export default function PublicHomeScreen({ navigation }) {
             onPress={() => navigation.navigate('Register')}
             textColor="#fff"
           >
-            Create Account
+            {t('auth.createAccount')}
           </Button>
         </DashboardCard>
       </ScrollView>
@@ -88,28 +88,31 @@ const styles = StyleSheet.create({
   scroll: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
   authPanel: {
+    maxWidth: 480,
     width: '100%',
-    maxWidth: 440,
     alignSelf: 'center',
   },
   cardContent: {
     alignItems: 'center',
+    gap: 8,
   },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '700',
     color: '#fff',
-    marginBottom: 12,
     textAlign: 'center',
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 15,
-    color: 'rgba(255,255,255,0.78)',
+    color: 'rgba(255,255,255,0.88)',
     textAlign: 'center',
-    marginBottom: 18,
+    lineHeight: 22,
+    marginBottom: 16,
+    paddingHorizontal: 8,
   },
   outlinedBtn: {
     borderColor: 'rgba(255,255,255,0.5)',

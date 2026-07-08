@@ -4,22 +4,58 @@
  */
 
 import { isTerminalRepairStatus, isVehicleAtShop } from './repairArrival';
+import {
+  t,
+  translateHealthAction,
+  translateHealthReason,
+  translateHealthStatus,
+} from '../i18n';
 
-const IN_SERVICE_HEALTH = {
-  label: 'In service',
-  icon: 'car-wrench',
-  color: '#059669',
-  bg: 'rgba(5,150,105,0.1)',
-  border: 'rgba(5,150,105,0.35)',
-};
+function statusConfig(translateFn = t) {
+  return {
+    healthy: {
+      label: translateFn('health.status.healthy'),
+      icon: 'check-circle-outline',
+      color: '#059669',
+      bg: 'rgba(5,150,105,0.1)',
+      border: 'rgba(5,150,105,0.35)',
+    },
+    maintenance_recommended: {
+      label: translateFn('health.status.maintenance_recommended'),
+      icon: 'wrench-clock',
+      color: '#d97706',
+      bg: 'rgba(217,119,6,0.1)',
+      border: 'rgba(217,119,6,0.35)',
+    },
+    needs_attention: {
+      label: translateFn('health.status.needs_attention'),
+      icon: 'alert-circle-outline',
+      color: '#dc2626',
+      bg: 'rgba(220,38,38,0.1)',
+      border: 'rgba(220,38,38,0.35)',
+    },
+    in_service: {
+      label: translateFn('health.status.in_service'),
+      icon: 'car-wrench',
+      color: '#059669',
+      bg: 'rgba(5,150,105,0.1)',
+      border: 'rgba(5,150,105,0.35)',
+    },
+  };
+}
 
-const AT_SHOP_HEALTH = {
-  label: 'At service center',
-  icon: 'store-check',
-  color: '#059669',
-  bg: 'rgba(5,150,105,0.1)',
-  border: 'rgba(5,150,105,0.35)',
-};
+function inServiceHealth(atShop, translateFn = t) {
+  const label = atShop
+    ? translateFn('health.status.at_service_center')
+    : translateFn('health.status.in_service');
+  return {
+    label,
+    icon: atShop ? 'store-check' : 'car-wrench',
+    color: '#059669',
+    bg: 'rgba(5,150,105,0.1)',
+    border: 'rgba(5,150,105,0.35)',
+  };
+}
 
 function repairVehicleId(repair) {
   return repair?.vehicle ?? repair?.vehicle_id ?? null;
@@ -37,12 +73,12 @@ export function applyActiveRepairHealthOverride(health, vehicleId, activeRepairs
   if (!activeRepair) return health;
 
   const atShop = isVehicleAtShop(activeRepair);
-  const cfg = atShop ? AT_SHOP_HEALTH : IN_SERVICE_HEALTH;
+  const cfg = inServiceHealth(atShop);
   const shortReason = atShop
-    ? 'Your vehicle is currently being serviced.'
+    ? t('health.subtitle.at_service_center')
     : activeRepair.scheduled_start
-      ? 'Scheduled service appointment in progress.'
-      : 'Active repair request in progress.';
+      ? t('health.subtitle.in_service_scheduled')
+      : t('health.subtitle.in_service');
 
   return {
     ...health,
@@ -56,40 +92,9 @@ export function applyActiveRepairHealthOverride(health, vehicleId, activeRepairs
   };
 }
 
-const STATUS_CONFIG = {
-  healthy: {
-    label: 'Healthy',
-    icon: 'check-circle-outline',
-    color: '#059669',
-    bg: 'rgba(5,150,105,0.1)',
-    border: 'rgba(5,150,105,0.35)',
-  },
-  maintenance_recommended: {
-    label: 'Maintenance recommended',
-    icon: 'wrench-clock',
-    color: '#d97706',
-    bg: 'rgba(217,119,6,0.1)',
-    border: 'rgba(217,119,6,0.35)',
-  },
-  needs_attention: {
-    label: 'Needs attention',
-    icon: 'alert-circle-outline',
-    color: '#dc2626',
-    bg: 'rgba(220,38,38,0.1)',
-    border: 'rgba(220,38,38,0.35)',
-  },
-  in_service: {
-    label: 'In service',
-    icon: 'car-wrench',
-    color: '#059669',
-    bg: 'rgba(5,150,105,0.1)',
-    border: 'rgba(5,150,105,0.35)',
-  },
-};
-
 /** Accent tokens for white health cards — left border + icon tint. */
 export function getHealthStatusAccent(status) {
-  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.healthy;
+  const cfg = statusConfig()[status] || statusConfig().healthy;
   return {
     color: cfg.color,
     borderColor: cfg.border,
@@ -97,24 +102,24 @@ export function getHealthStatusAccent(status) {
   };
 }
 
-const ACTION_LABELS = {
-  update_km: { label: 'Update kilometers', icon: 'speedometer' },
-  add_service_history: { label: 'Add service history', icon: 'book-plus-outline' },
-  log_service: { label: 'Add service history', icon: 'book-plus-outline' },
-  configure_reminders: { label: 'Configure reminders', icon: 'bell-outline' },
-  reminders: { label: 'Configure reminders', icon: 'bell-outline' },
-  schedule_maintenance: { label: 'Schedule maintenance', icon: 'calendar-clock' },
-  schedule: { label: 'Schedule maintenance', icon: 'calendar-clock' },
-  book_repair: { label: 'Book repair', icon: 'wrench' },
+const ACTION_ICONS = {
+  update_km: 'speedometer',
+  add_service_history: 'book-plus-outline',
+  log_service: 'book-plus-outline',
+  configure_reminders: 'bell-outline',
+  reminders: 'bell-outline',
+  schedule_maintenance: 'calendar-clock',
+  schedule: 'calendar-clock',
+  book_repair: 'wrench',
 };
 
-export function vehicleDisplayTitle(vehicle) {
+export function vehicleDisplayTitle(vehicle, translateFn = t) {
   const catalog = [vehicle?.catalog_brand_name, vehicle?.catalog_model_name].filter(Boolean).join(' ');
   if (catalog) return catalog;
   const legacy = [vehicle?.make_name || vehicle?.make, vehicle?.model_name || vehicle?.model]
     .filter(Boolean)
     .join(' ');
-  return legacy || 'Your vehicle';
+  return legacy || translateFn('vehicles.yourVehicle');
 }
 
 function normalizeHealthRaw(vehicle) {
@@ -124,55 +129,73 @@ function normalizeHealthRaw(vehicle) {
   if (vehicle?.health_status) {
     return {
       status: vehicle.health_status,
-      status_label: STATUS_CONFIG[vehicle.health_status]?.label,
+      status_label: translateHealthStatus(vehicle.health_status),
       short_reason: vehicle.short_reason,
-      reasons: [],
+      short_reason_key: vehicle.short_reason_key,
+      reasons: vehicle.short_reason_key
+        ? [{ key: vehicle.short_reason_key, label: vehicle.short_reason }]
+        : [],
       suggested_actions: [],
     };
   }
   return null;
 }
 
-export function mapHealthFromApi(vehicle) {
+export function mapHealthFromApi(vehicle, translateFn = t) {
   const raw = normalizeHealthRaw(vehicle);
   if (!raw) {
-    return fallbackHealth();
+    return fallbackHealth(translateFn);
   }
 
   const status = raw.status || 'healthy';
-  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.healthy;
+  const cfg = statusConfig(translateFn)[status] || statusConfig(translateFn).healthy;
   const reasons = Array.isArray(raw.reasons) ? raw.reasons : Array.isArray(raw.issues) ? raw.issues : [];
+  const subtitleKey = `health.subtitle.${status}`;
+  const defaultSubtitle = translateFn(subtitleKey, null, raw.subtitle || cfg.label);
 
   return {
     status,
     ...cfg,
-    status_label: raw.status_label || cfg.label,
-    subtitle: raw.subtitle || raw.short_reason || cfg.label,
-    shortReason: raw.short_reason || raw.dashboard_summary || raw.subtitle || cfg.label,
+    status_label: raw.status_label
+      ? translateHealthStatus(status, translateFn)
+      : cfg.label,
+    subtitle: raw.subtitle || raw.short_reason || defaultSubtitle,
+    shortReason: raw.short_reason
+      ? translateHealthReason(
+          {
+            key: reasons[0]?.key || raw.short_reason_key,
+            label: raw.short_reason,
+          },
+          translateFn
+        )
+      : defaultSubtitle,
     reasons: reasons.map((row) => ({
       key: row.key,
-      label: row.label,
+      label: translateHealthReason(row, translateFn),
       severity: row.level || row.severity || 'maintenance',
       icon: row.icon || 'alert-circle-outline',
     })),
-    actions: healthActionButtonsFromApi(raw),
+    actions: healthActionButtonsFromApi(raw, translateFn),
   };
 }
 
-function fallbackHealth() {
-  const cfg = STATUS_CONFIG.healthy;
+function fallbackHealth(translateFn = t) {
+  const cfg = statusConfig(translateFn).healthy;
   return {
     status: 'healthy',
     ...cfg,
     status_label: cfg.label,
-    subtitle: 'No urgent issues found.',
-    shortReason: 'No urgent issues found.',
+    subtitle: translateFn('health.subtitle.healthy'),
+    shortReason: translateFn('health.subtitle.healthy'),
     reasons: [],
-    actions: healthActionButtonsFromApi({ status: 'healthy', suggested_actions: ['add_service_history'] }),
+    actions: healthActionButtonsFromApi(
+      { status: 'healthy', suggested_actions: ['add_service_history'] },
+      translateFn
+    ),
   };
 }
 
-export function healthActionButtonsFromApi(health) {
+export function healthActionButtonsFromApi(health, translateFn = t) {
   const keys = Array.isArray(health?.suggested_actions)
     ? health.suggested_actions
     : Array.isArray(health?.actions)
@@ -180,9 +203,10 @@ export function healthActionButtonsFromApi(health) {
       : [];
   return keys
     .map((key) => {
-      const meta = ACTION_LABELS[key];
-      if (!meta) return null;
-      return { key, ...meta };
+      const label = translateHealthAction(key, translateFn);
+      const icon = ACTION_ICONS[key];
+      if (!icon) return null;
+      return { key, label, icon };
     })
     .filter(Boolean);
 }

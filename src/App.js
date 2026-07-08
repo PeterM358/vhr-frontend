@@ -8,6 +8,7 @@ import { Provider as PaperProvider } from 'react-native-paper';
 import { AppTheme } from './styles/theme';
 import { ThemeProvider } from './context/ThemeManager';
 import AuthManager from './context/AuthManager';
+import { I18nProvider } from './i18n';
 import { GarageSceneProvider } from './context/GarageSceneContext';
 import MessageDialogHost from './components/ui/MessageDialog';
 import MobileWebInsetsBridge from './components/MobileWebInsetsBridge';
@@ -65,6 +66,7 @@ export default function App() {
         />
         <ThemeProvider>
           <PaperProvider theme={AppTheme}>
+            <I18nProvider>
             <AuthManager>
               <GarageSceneProvider>
                 <WebSocketProvider>
@@ -75,6 +77,7 @@ export default function App() {
                 </WebSocketProvider>
               </GarageSceneProvider>
             </AuthManager>
+            </I18nProvider>
           </PaperProvider>
         </ThemeProvider>
       </View>

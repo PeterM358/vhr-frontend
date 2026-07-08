@@ -26,11 +26,13 @@ import {
   drawerScreenOptions,
   DRAWER_TINT,
 } from './DrawerBranding';
+import { useTranslation } from '../i18n';
 
 const Drawer = createDrawerNavigator();
 
 function CustomDrawerContent(props) {
   const navigation = useNavigation();
+  const { t } = useTranslation();
   const { notifications } = useContext(WebSocketContext);
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
 
@@ -56,17 +58,17 @@ function CustomDrawerContent(props) {
       contentContainerStyle={drawerGlassStyles.container}
     >
       <View style={drawerGlassStyles.menuContainer}>
-        <Text style={drawerGlassStyles.drawerTitle}>Menu</Text>
+        <Text style={drawerGlassStyles.drawerTitle}>{t('common.menu')}</Text>
 
         <DrawerItem
-          label="Home"
+          label={t('common.home')}
           onPress={() => props.navigation.closeDrawer()}
           icon={({ color, size }) => <DrawerMenuIcon name="home-outline" color={color} size={size} />}
           {...itemProps}
         />
 
         <DrawerItem
-          label="Profile"
+          label={t('drawer.client.profile')}
           onPress={() => {
             const root = navigation.getParent?.() || navigation;
             navigateToProfile(root);
@@ -78,7 +80,7 @@ function CustomDrawerContent(props) {
         />
 
         <DrawerItem
-          label="Repairs"
+          label={t('drawer.client.repairs')}
           onPress={() => {
             const root = navigation.getParent?.() || navigation;
             navigateToRepairRequests(root);
@@ -88,7 +90,7 @@ function CustomDrawerContent(props) {
         />
 
         <DrawerItem
-          label="Vehicles"
+          label={t('drawer.client.vehicles')}
           onPress={() => {
             const root = navigation.getParent?.() || navigation;
             navigateToVehicleList(root);
@@ -99,7 +101,7 @@ function CustomDrawerContent(props) {
 
         <DrawerItem
           label={() => (
-            <DrawerLabelWithBadge label="Notifications" badge={unreadNotifications} />
+            <DrawerLabelWithBadge label={t('drawer.client.notifications')} badge={unreadNotifications} />
           )}
           onPress={() => {
             const root = navigation.getParent?.() || navigation;
@@ -110,7 +112,7 @@ function CustomDrawerContent(props) {
         />
 
         <DrawerItem
-          label="Find Service Centers"
+          label={t('drawer.client.findServiceCenters')}
           onPress={() => openServiceCenters(navigation)}
           icon={({ color, size }) => (
             <DrawerMenuIcon name="map-marker-radius" color={color} size={size} />
@@ -121,7 +123,7 @@ function CustomDrawerContent(props) {
         <View style={drawerGlassStyles.divider} />
 
         <DrawerItem
-          label="Logout"
+          label={t('common.logout')}
           onPress={handleLogout}
           icon={({ color, size }) => <DrawerMenuIcon name="logout" color={color} size={size} />}
           {...itemProps}

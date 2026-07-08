@@ -21,9 +21,11 @@ import { shouldEnableGoogleOAuth } from '../components/auth/googleOAuthConfig';
 import { safeError, safeWarn } from '../utils/logger';
 import LoginGoogleOAuthBridge from '../components/auth/LoginGoogleOAuthBridge';
 import DashboardCard from '../components/dashboard/DashboardCard';
+import { useTranslation } from '../i18n';
 
 export default function LoginScreen({ navigation, route }) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { setIsAuthenticated, setAuthToken, setUserEmailOrPhone } = useContext(AuthContext);
 
@@ -86,7 +88,7 @@ export default function LoginScreen({ navigation, route }) {
       try {
         const { code } = googleResponse.params || {};
         if (!code) {
-          setError('Google login failed: No authorization code received.');
+          setError(t('auth.googleNoCode'));
           return;
         }
 
@@ -104,7 +106,7 @@ export default function LoginScreen({ navigation, route }) {
 
         const tokenData = await tokenResponse.json();
         if (!tokenData.id_token) {
-          setError('Google login failed: No ID token received.');
+          setError(t('auth.googleNoToken'));
           return;
         }
 
@@ -128,7 +130,7 @@ export default function LoginScreen({ navigation, route }) {
         }
       } catch (oauthError) {
         safeError('Google login failed', oauthError);
-        setError('Google login failed. Try again.');
+        setError(t('auth.googleLoginFailed'));
       }
     },
     [navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone, finishClientLogin]
@@ -172,7 +174,7 @@ export default function LoginScreen({ navigation, route }) {
       }
     } catch (err) {
       safeError('Login failed', err);
-      setError('Login failed. Please check your credentials.');
+      setError(t('auth.loginFailed'));
     } finally {
       setLoading(false);
     }
@@ -209,12 +211,12 @@ export default function LoginScreen({ navigation, route }) {
           <View style={BaseStyles.logoContainer}>
             <Logo width={112} height={112} />
           </View>
-          <Text style={styles.kicker}>Sign in</Text>
-          <Text style={styles.title}>Welcome back</Text>
+          <Text style={styles.kicker}>{t('auth.signIn')}</Text>
+          <Text style={styles.title}>{t('auth.welcomeBack')}</Text>
           <Text style={styles.subtitle}>
             {googleOAuthEnabled
-              ? 'Choose your login method and enter your password.'
-              : 'Enter your email or phone and password to continue.'}
+              ? t('auth.loginSubtitleOAuth')
+              : t('auth.loginSubtitle')}
           </Text>
 
           {error ? (
@@ -228,7 +230,7 @@ export default function LoginScreen({ navigation, route }) {
               onPress={() => setLoginMethod('email')}
               style={styles.methodBtn}
             >
-              Email
+              {t('common.email')}
             </Button>
             <Button
               mode={loginMethod === 'phone' ? 'contained' : 'outlined'}
@@ -236,13 +238,13 @@ export default function LoginScreen({ navigation, route }) {
               onPress={() => setLoginMethod('phone')}
               style={styles.methodBtn}
             >
-              Phone
+              {t('common.phone')}
             </Button>
           </View>
 
           {loginMethod === 'email' ? (
             <TextInput
-              label="Email"
+              label={t('common.email')}
               mode="outlined"
               value={email}
               onChangeText={setEmail}
@@ -275,7 +277,7 @@ export default function LoginScreen({ navigation, route }) {
           )}
 
           <TextInput
-            label="Password"
+            label={t('auth.password')}
             mode="outlined"
             secureTextEntry
             value={password}
@@ -289,7 +291,7 @@ export default function LoginScreen({ navigation, route }) {
             textColor={COLORS.PRIMARY}
             compact
           >
-            Forgot password?
+            {t('auth.forgotPassword')}
           </Button>
 
           {loading ? (
@@ -303,13 +305,13 @@ export default function LoginScreen({ navigation, route }) {
               labelStyle={BaseStyles.loginButtonLabel}
               buttonColor={theme.colors.primary}
             >
-              Sign In
+              {t('auth.signIn')}
             </Button>
           )}
 
-          <Text style={styles.subText}>{"Don't have an account?"}</Text>
+          <Text style={styles.subText}>{t('auth.noAccount')}</Text>
           <Button mode="text" onPress={goToRegister} textColor={COLORS.PRIMARY}>
-            Create account
+            {t('auth.createAccount')}
           </Button>
         </DashboardCard>
       </ScrollView>
