@@ -1,13 +1,16 @@
 // Web implementation: premium blurred automotive background + dark gradient overlay.
 
-import React from 'react';
+import React, { useContext } from 'react';
 import { Animated, ImageBackground, StyleSheet, SafeAreaView, View } from 'react-native';
+import { useRoute } from '@react-navigation/native';
 
 import { useGarageScene } from '../context/GarageSceneContext';
 import { useGarageSceneCrossfade } from '../hooks/useGarageSceneCrossfade';
 import { BACKGROUNDS } from '../constants/images';
 import { WEB_BACKGROUND_URL } from '../constants/webBackground';
 import { getSceneWebUri } from '../theme/garageScenes';
+import { AuthContext } from '../context/AuthManager';
+import AppFooter from './common/AppFooter';
 
 /** Default centered content column on web (maps use `contentMaxWidth={false}`). */
 export const WEB_CONTENT_MAX_WIDTH_DEFAULT = 720;
@@ -120,12 +123,33 @@ export default function ScreenBackground({
 
   const useGarageSceneBackground = source == null;
 
+  const route = useRoute();
+  const routeName = route?.name;
+  const authContext = useContext(AuthContext);
+  const isAuthenticated = !!authContext?.isAuthenticated;
+
+  const isPublicRoute =
+    !routeName ||
+    routeName === 'AuthLoading' ||
+    routeName === 'PublicHome' ||
+    routeName === 'PublicSeoPage' ||
+    routeName === 'Login' ||
+    routeName === 'Register' ||
+    routeName === 'PasswordRequestReset' ||
+    routeName === 'PasswordConfirmReset' ||
+    String(routeName).startsWith('Public');
+
+  const showFooter = isAuthenticated && !isPublicRoute;
+
   if (useGarageSceneBackground) {
     return (
       <View style={[styles.image, style]}>
         <GarageSceneBackgroundLayers />
         <View pointerEvents="none" style={WEB_OVERLAY} />
-        <Wrapper style={[styles.content, contentStyle, constrain]}>{children}</Wrapper>
+        <Wrapper style={[styles.content, contentStyle, constrain]}>
+          <View style={styles.contentWrapper}>{children}</View>
+          {showFooter ? <AppFooter /> : null}
+        </Wrapper>
       </View>
     );
   }
@@ -139,7 +163,10 @@ export default function ScreenBackground({
       <View style={[styles.image, style]}>
         <WebPremiumBackground source={source} />
         <View pointerEvents="none" style={WEB_OVERLAY} />
-        <Wrapper style={[styles.content, contentStyle, constrain]}>{children}</Wrapper>
+        <Wrapper style={[styles.content, contentStyle, constrain]}>
+          <View style={styles.contentWrapper}>{children}</View>
+          {showFooter ? <AppFooter /> : null}
+        </Wrapper>
       </View>
     );
   }
@@ -151,7 +178,10 @@ export default function ScreenBackground({
       resizeMode={resizeMode}
     >
       <View pointerEvents="none" style={WEB_OVERLAY} />
-      <Wrapper style={[styles.content, contentStyle, constrain]}>{children}</Wrapper>
+      <Wrapper style={[styles.content, contentStyle, constrain]}>
+        <View style={styles.contentWrapper}>{children}</View>
+        {showFooter ? <AppFooter /> : null}
+      </Wrapper>
     </ImageBackground>
   );
 }
@@ -172,5 +202,8 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     backgroundColor: 'transparent',
+  },
+  contentWrapper: {
+    flex: 1,
   },
 });

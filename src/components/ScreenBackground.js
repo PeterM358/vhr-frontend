@@ -6,7 +6,7 @@
 // NOT need a native dev-client rebuild to render correctly on iOS or Android.
 // Children render above the gradient and are NOT blurred.
 
-import React from 'react';
+import React, { useContext } from 'react';
 import {
   Animated,
   ImageBackground,
@@ -14,12 +14,15 @@ import {
   SafeAreaView,
   View,
 } from 'react-native';
+import { useRoute } from '@react-navigation/native';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 
 import { useGarageScene } from '../context/GarageSceneContext';
 import { useGarageSceneCrossfade } from '../hooks/useGarageSceneCrossfade';
 import { BACKGROUNDS } from '../constants/images';
 import { getSceneImageSource } from '../theme/garageScenes';
+import { AuthContext } from '../context/AuthManager';
+import AppFooter from './common/AppFooter';
 
 const DEFAULT_STOPS = [
   { offset: '0', color: '#000', opacity: '0.65' },
@@ -105,11 +108,32 @@ export default function ScreenBackground({
   const Wrapper = safeArea ? SafeAreaView : View;
   const useGarageSceneBackground = source == null;
 
+  const route = useRoute();
+  const routeName = route?.name;
+  const authContext = useContext(AuthContext);
+  const isAuthenticated = !!authContext?.isAuthenticated;
+
+  const isPublicRoute =
+    !routeName ||
+    routeName === 'AuthLoading' ||
+    routeName === 'PublicHome' ||
+    routeName === 'PublicSeoPage' ||
+    routeName === 'Login' ||
+    routeName === 'Register' ||
+    routeName === 'PasswordRequestReset' ||
+    routeName === 'PasswordConfirmReset' ||
+    String(routeName).startsWith('Public');
+
+  const showFooter = isAuthenticated && !isPublicRoute;
+
   if (useGarageSceneBackground) {
     return (
       <View style={[styles.image, style]}>
         <GarageSceneBackgroundLayers blurRadius={blurRadius} />
-        <Wrapper style={[styles.content, contentStyle]}>{children}</Wrapper>
+        <Wrapper style={[styles.content, contentStyle]}>
+          <View style={styles.contentWrapper}>{children}</View>
+          {showFooter ? <AppFooter /> : null}
+        </Wrapper>
       </View>
     );
   }
@@ -122,7 +146,10 @@ export default function ScreenBackground({
       blurRadius={blurRadius}
     >
       <SceneGradientOverlay stops={stops} />
-      <Wrapper style={[styles.content, contentStyle]}>{children}</Wrapper>
+      <Wrapper style={[styles.content, contentStyle]}>
+        <View style={styles.contentWrapper}>{children}</View>
+        {showFooter ? <AppFooter /> : null}
+      </Wrapper>
     </ImageBackground>
   );
 }
@@ -134,5 +161,8 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     backgroundColor: 'transparent',
+  },
+  contentWrapper: {
+    flex: 1,
   },
 });

@@ -5,12 +5,9 @@
 import React from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { Badge } from 'react-native-paper';
-import Logo from '../../assets/images/logo.svg';
 import AppNavigationBar from './AppNavigationBar';
 import GlassNavIconButton from '../navigation/GlassNavIconButton';
 import CompactLanguageSelector from './CompactLanguageSelector';
-
-const NAV_LOGO_SIZE = 26;
 
 export default function GlobalNavigationBar({
   title,
@@ -40,12 +37,6 @@ export default function GlobalNavigationBar({
                 style={styles.languageSelector}
               />
             ) : null}
-          <Logo
-            width={NAV_LOGO_SIZE}
-            height={NAV_LOGO_SIZE}
-            style={styles.navLogo}
-            accessibilityLabel="Veversal"
-          />
         </View>
       }
       rightAction={
@@ -80,9 +71,6 @@ const styles = StyleSheet.create({
   },
   languageSelector: {
     maxWidth: 92,
-  },
-  navLogo: {
-    opacity: 0.96,
   },
   rightRow: {
     flexDirection: 'row',
