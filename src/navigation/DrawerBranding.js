@@ -11,6 +11,7 @@ import { COLORS } from '../constants/colors';
 import { APP_NAV_PILL_BORDER_RADIUS } from '../components/common/appNavBarMetrics';
 
 export const DRAWER_ICON_SIZE = 22;
+export const DRAWER_ICON_COLUMN_WIDTH = 30;
 
 export const DRAWER_GLASS = {
   backgroundColor: 'rgba(15, 23, 42, 0.78)',
@@ -38,7 +39,11 @@ export const drawerScreenOptions = {
 };
 
 export function DrawerMenuIcon({ name, color, size = DRAWER_ICON_SIZE }) {
-  return <MaterialCommunityIcons name={name} size={size} color={color} />;
+  return (
+    <View style={styles.iconColumn}>
+      <MaterialCommunityIcons name={name} size={size} color={color} />
+    </View>
+  );
 }
 
 export function DrawerLabelWithBadge({ label, badge, color }) {
@@ -98,12 +103,13 @@ export const drawerGlassStyles = StyleSheet.create({
   itemLabel: {
     fontSize: 15,
     fontWeight: '500',
-    marginLeft: -8,
+    marginLeft: 0,
     color: DRAWER_TINT.inactive,
   },
   drawerItem: {
     marginHorizontal: 10,
     borderRadius: APP_NAV_PILL_BORDER_RADIUS - 8,
+    alignItems: 'center',
   },
   divider: {
     height: StyleSheet.hairlineWidth,
@@ -114,6 +120,11 @@ export const drawerGlassStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  iconColumn: {
+    width: DRAWER_ICON_COLUMN_WIDTH,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   labelRow: {
     flexDirection: 'row',
     alignItems: 'center',
