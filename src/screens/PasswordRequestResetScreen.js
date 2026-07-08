@@ -52,7 +52,7 @@ export default function PasswordRequestResetScreen({ navigation }) {
           <TextInput
             style={styles.input}
             placeholder="Enter your email"
-            placeholderTextColor="rgba(255,255,255,0.6)"
+            placeholderTextColor="rgba(226,232,240,0.65)"
             autoCapitalize="none"
             keyboardType="email-address"
             value={email}
@@ -90,11 +90,11 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(148,163,184,0.45)',
     padding: 12,
     marginBottom: 20,
-    borderRadius: 10,
+    borderRadius: 14,
     color: '#fff',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(2,6,23,0.72)',
   },
 });

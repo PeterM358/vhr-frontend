@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useMemo } from 'react';
 import { StyleSheet, View, Pressable, Platform } from 'react-native';
 import { Text, TextInput, Button, Portal, Dialog, ActivityIndicator, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +22,20 @@ export default function RegisterScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const headerReserve = insets.top + (Platform.OS === 'ios' ? 52 : 56);
   const { setIsAuthenticated, setAuthToken, setUserEmailOrPhone } = useContext(AuthContext);
+
+  const authInputTheme = useMemo(
+    () => ({
+      ...theme,
+      colors: {
+        ...theme.colors,
+        primary: '#60a5fa',
+        background: '#07111f',
+        placeholder: 'rgba(226,232,240,0.65)',
+        text: '#ffffff',
+      },
+    }),
+    [theme]
+  );
 
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -157,6 +171,11 @@ export default function RegisterScreen({ navigation }) {
             <TextInput
               label="Email or Phone"
               mode="outlined"
+              theme={authInputTheme}
+              outlineColor="rgba(148,163,184,0.45)"
+              activeOutlineColor="#60a5fa"
+              textColor="#ffffff"
+              outlineStyle={styles.inputOutline}
               value={emailOrPhone}
               onChangeText={setEmailOrPhone}
               keyboardType="email-address"
@@ -167,6 +186,11 @@ export default function RegisterScreen({ navigation }) {
             <TextInput
               label="Password"
               mode="outlined"
+              theme={authInputTheme}
+              outlineColor="rgba(148,163,184,0.45)"
+              activeOutlineColor="#60a5fa"
+              textColor="#ffffff"
+              outlineStyle={styles.inputOutline}
               secureTextEntry
               value={password}
               onChangeText={setPassword}
@@ -242,7 +266,13 @@ const styles = StyleSheet.create({
   input: {
     width: '100%',
     marginBottom: 12,
-    backgroundColor: '#fff',
+    backgroundColor: '#07111f',
+    borderRadius: 14,
+    color: '#ffffff',
+  },
+  inputOutline: {
+    borderRadius: 14,
+    overflow: 'visible',
   },
   rolePrompt: {
     fontSize: 14,

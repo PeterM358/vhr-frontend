@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useState, useEffect } from 'react';
+import React, { useCallback, useContext, useState, useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, View, Platform } from 'react-native';
 import { Text, TextInput, Button, ActivityIndicator, useTheme } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -41,6 +41,20 @@ export default function LoginScreen({ navigation, route }) {
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
   const googleOAuthEnabled = shouldEnableGoogleOAuth();
+
+  const authInputTheme = useMemo(
+    () => ({
+      ...theme,
+      colors: {
+        ...theme.colors,
+        primary: '#60a5fa',
+        background: '#07111f',
+        placeholder: 'rgba(226,232,240,0.65)',
+        text: '#ffffff',
+      },
+    }),
+    [theme]
+  );
 
   // route is optional on web deep links — never assume params exist
   void route;
@@ -248,6 +262,11 @@ export default function LoginScreen({ navigation, route }) {
             <TextInput
               label={t('common.email')}
               mode="outlined"
+              theme={authInputTheme}
+              outlineColor="rgba(148,163,184,0.45)"
+              activeOutlineColor="#60a5fa"
+              textColor="#ffffff"
+              outlineStyle={styles.inputOutline}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -260,6 +279,11 @@ export default function LoginScreen({ navigation, route }) {
                 <TextInput
                   label="Prefix"
                   mode="outlined"
+                  theme={authInputTheme}
+                  outlineColor="rgba(148,163,184,0.45)"
+                  activeOutlineColor="#60a5fa"
+                  textColor="#ffffff"
+                  outlineStyle={styles.inputOutline}
                   value={phonePrefix}
                   onChangeText={setPhonePrefix}
                   keyboardType="phone-pad"
@@ -268,6 +292,11 @@ export default function LoginScreen({ navigation, route }) {
                 <TextInput
                   label="Phone number"
                   mode="outlined"
+                  theme={authInputTheme}
+                  outlineColor="rgba(148,163,184,0.45)"
+                  activeOutlineColor="#60a5fa"
+                  textColor="#ffffff"
+                  outlineStyle={styles.inputOutline}
                   value={phoneNational}
                   onChangeText={setPhoneNational}
                   keyboardType="phone-pad"
@@ -281,6 +310,11 @@ export default function LoginScreen({ navigation, route }) {
           <TextInput
             label={t('auth.password')}
             mode="outlined"
+            theme={authInputTheme}
+            outlineColor="rgba(148,163,184,0.45)"
+            activeOutlineColor="#60a5fa"
+            textColor="#ffffff"
+            outlineStyle={styles.inputOutline}
             secureTextEntry
             value={password}
             onChangeText={setPassword}
@@ -370,7 +404,13 @@ const styles = StyleSheet.create({
   input: {
     width: '100%',
     marginBottom: 10,
-    backgroundColor: '#fff',
+    backgroundColor: '#07111f',
+    borderRadius: 14,
+    color: '#ffffff',
+  },
+  inputOutline: {
+    borderRadius: 14,
+    overflow: 'visible',
   },
   methodSwitchRow: {
     flexDirection: 'row',

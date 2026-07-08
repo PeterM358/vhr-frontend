@@ -13,6 +13,15 @@ const LOCALE_ABBR = {
   es: 'ES',
 };
 
+const LOCALE_FLAGS = {
+  bg: '🇧🇬',
+  en: '🇬🇧',
+  de: '🇩🇪',
+  it: '🇮🇹',
+  fr: '🇫🇷',
+  es: '🇪🇸',
+};
+
 const LOCALE_LABELS = {
   bg: 'Български',
   en: 'English',
@@ -37,6 +46,11 @@ export default function CompactLanguageSelector({
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
 
+  // Auth screens use `showFullLabel` (full names) in our app.
+  // That lets us tune dropdown width + alignment without changing routing/i18n logic.
+  const isAuthScreen = Boolean(showFullLabel);
+  const dropdownWidth = isAuthScreen ? 220 : 180;
+
   const colors = useMemo(() => {
     if (variant === 'light') {
       return {
@@ -49,11 +63,11 @@ export default function CompactLanguageSelector({
     }
 
     return {
-      wrapBg: 'rgba(15, 23, 42, 0.42)',
-      wrapBorder: 'rgba(148, 163, 184, 0.35)',
-      textInactive: 'rgba(255,255,255,0.72)',
+      // Solid dark background to keep text readable over headers/titles.
+      wrapBg: '#07111f',
+      wrapBorder: 'rgba(148,163,184,0.35)',
+      textInactive: 'rgba(226,232,240,0.65)',
       textActive: '#ffffff',
-      sep: 'rgba(148, 163, 184, 0.9)',
     };
   }, [variant]);
 
@@ -102,10 +116,13 @@ export default function CompactLanguageSelector({
 
   const currentLabel = useMemo(() => {
     if (!currentLocaleKey) return '';
+    const flag = LOCALE_FLAGS[currentLocaleKey] || '';
     if (showFullLabel) {
-      return LOCALE_LABELS[currentLocaleKey] || LOCALE_LABELS[locale] || currentLocaleKey.toUpperCase();
+      const label = LOCALE_LABELS[currentLocaleKey] || LOCALE_LABELS[locale] || currentLocaleKey.toUpperCase();
+      return flag ? `${flag} ${label}` : label;
     }
-    return getLangAbbr(currentLocaleKey);
+    const abbr = getLangAbbr(currentLocaleKey);
+    return flag ? `${flag} ${abbr}` : abbr;
   }, [currentLocaleKey, locale, showFullLabel]);
 
   return (
@@ -136,9 +153,7 @@ export default function CompactLanguageSelector({
           ]}
           numberOfLines={1}
         >
-          <Text style={styles.globe}>🌐 </Text>
-          {currentLabel}{' '}
-          <Text style={styles.caret}>▾</Text>
+          {currentLabel} <Text style={styles.caret}>▾</Text>
         </Text>
       </Pressable>
 
@@ -147,14 +162,20 @@ export default function CompactLanguageSelector({
           style={[
             styles.dropdown,
             {
+              width: dropdownWidth,
               borderColor: colors.wrapBorder,
               backgroundColor: colors.wrapBg,
+              // Auth: center under the selector. Header: align to the left.
+              left: isAuthScreen ? '50%' : 0,
+              transform: isAuthScreen ? [{ translateX: -dropdownWidth / 2 }] : undefined,
+              marginTop: isAuthScreen ? 10 : 6,
             },
           ]}
         >
           {LOCALE_ORDER.map((l) => {
             const active = locale === l;
-            const label = showFullLabel ? LOCALE_LABELS[l] : getLangAbbr(l);
+            const flag = LOCALE_FLAGS[l] || '';
+            const label = LOCALE_LABELS[l] || l;
             return (
               <Pressable
                 key={l}
@@ -170,13 +191,11 @@ export default function CompactLanguageSelector({
                   pressed && styles.dropdownItemPressed,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.dropdownItemText,
-                    active && styles.dropdownItemTextActive,
-                  ]}
-                >
-                  {label}
+                <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>
+                  {flag} {label}
+                </Text>
+                <Text style={[styles.checkmark, !active && styles.checkmarkHidden]}>
+                  ✓
                 </Text>
               </Pressable>
             );
@@ -190,18 +209,18 @@ export default function CompactLanguageSelector({
 const styles = StyleSheet.create({
   wrap: {
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    maxWidth: 200,
     position: 'relative',
     justifyContent: 'center',
   },
   wrapCompact: {
-    borderRadius: 10,
+    borderRadius: 14,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    maxWidth: 160,
+    // Auth screens need the full language name (not truncated).
+    maxWidth: 220,
   },
   trigger: {
     flexDirection: 'row',
@@ -220,47 +239,54 @@ const styles = StyleSheet.create({
   triggerTextCompact: {
     fontSize: 11,
   },
-  globe: {
-    fontSize: 11,
-  },
   caret: {
     fontSize: 10,
   },
   dropdown: {
     position: 'absolute',
     top: '100%',
-    right: 0,
-    marginTop: 4,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 14,
     paddingVertical: 4,
-    minWidth: 140,
     shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
-    zIndex: 100,
+    shadowOpacity: 0.45,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: 18 },
+    elevation: 25,
+    zIndex: 9999,
+    // RN web supports boxShadow; RN native uses shadow* + elevation.
+    boxShadow: '0 18px 40px rgba(0,0,0,0.45)',
   },
   dropdownItem: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   dropdownItemActive: {
-    backgroundColor: 'rgba(37, 99, 235, 0.3)',
+    backgroundColor: 'rgba(37, 99, 235, 0.55)',
   },
   dropdownItemPressed: {
     opacity: 0.9,
   },
   dropdownItemText: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.86)',
+    color: 'rgba(255,255,255,0.92)',
+    flex: 1,
+    paddingRight: 8,
   },
   dropdownItemTextActive: {
     color: '#ffffff',
     fontWeight: '700',
+  },
+  checkmark: {
+    fontSize: 13,
+    color: '#ffffff',
+    marginLeft: 10,
+  },
+  checkmarkHidden: {
+    opacity: 0,
   },
 });
 
