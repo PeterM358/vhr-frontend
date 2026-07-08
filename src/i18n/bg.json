@@ -249,6 +249,12 @@
     "servicesLabel": "Услуги: {services}",
     "moreCount": " +{count} още"
   },
+  "listJoin": {
+    "two": "{a} и {b}",
+    "three": "{a}, {b} и {c}",
+    "conjunction": "и",
+    "serialComma": ""
+  },
   "seo": {
     "dashboard": "{app} — Табло",
     "partnerDashboard": "{app} — Партньорско табло",
@@ -335,7 +341,12 @@
       "motorcycle": "Мотоциклет",
       "bicycle": "Велосипед",
       "ebike": "Електровелосипед",
-      "scooter": "Скутер"
+      "scooter": "Скутер",
+      "van": "Ван",
+      "trailer": "Ремарке",
+      "agricultural": "Селскостопански",
+      "construction": "Строителни",
+      "other": "Друго"
     }
   }
 }

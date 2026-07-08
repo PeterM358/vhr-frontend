@@ -69,7 +69,15 @@ export function translateRepairTypeLabel(value, t) {
 
   if (camel) {
     const key = `repairs.${camel}`;
-    return t(key, null, String(rawName || rawSlug || value));
+    const fallbackSentinel = '__MISSING_REPAIR_TRANSLATION__';
+    const translated = t(key, null, fallbackSentinel);
+    if (translated !== fallbackSentinel) return translated;
+
+    // Backward-compatible aliases:
+    // Older catalogs use `repairs.acService` to represent both AC repair and AC diagnostics.
+    if (camel === 'acRepair' || camel === 'acDiagnostics') {
+      return t('repairs.acService', null, String(rawName || rawSlug || value));
+    }
   }
 
   return String(rawName || rawSlug || value).trim();

@@ -249,6 +249,12 @@
     "servicesLabel": "Servicios: {services}",
     "moreCount": " +{count} más"
   },
+  "listJoin": {
+    "two": "{a} y {b}",
+    "three": "{a}, {b} y {c}",
+    "conjunction": "y",
+    "serialComma": ""
+  },
   "seo": {
     "dashboard": "{app} Dashboard",
     "partnerDashboard": "{app} Partner Dashboard",
@@ -335,7 +341,12 @@
       "motorcycle": "Moto",
       "bicycle": "Bicicleta",
       "ebike": "Bici eléctrica",
-      "scooter": "Scooter"
+      "scooter": "Scooter",
+      "van": "Furgoneta",
+      "trailer": "Remolque",
+      "agricultural": "Agrícola",
+      "construction": "Construcción",
+      "other": "Otro"
     }
   }
 }
