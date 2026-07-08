@@ -20,9 +20,8 @@ import ShopWarehouseHubScreen from '../screens/ShopWarehouseHubScreen';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import { logout } from '../api/auth';
-import { resetFromShopDrawer, resetShopDrawerRepairs } from './drawerNavigation';
+import { resetFromShopDrawer, resetShopDrawerRepairs, resetShopDrawerCalendar } from './drawerNavigation';
 import {
-  navigateToPartnerCalendar,
   navigateToPartnerClients,
   navigateToPartnerInvoicing,
   navigateToPartnerNotifications,
@@ -105,15 +104,10 @@ function CustomDrawerContent(props) {
         <DrawerItem
           label={() => <DrawerLabelWithBadge label={t('drawer.partner.calendar')} badge={unscheduledCount} />}
           onPress={() => {
-            if (Platform.OS === 'web') {
-              navigateToPartnerCalendar(navigation);
-            } else {
-              props.navigation.navigate('ShopCalendar', {
-                returnTo: 'ShopDashboard',
-                backLabel: t('common.home'),
-              });
-            }
             props.navigation.closeDrawer();
+            resetShopDrawerCalendar(props.navigation, {
+              backLabel: t('common.home'),
+            });
           }}
           icon={({ color, size }) => (
             <DrawerMenuIcon name="calendar-month-outline" color={color} size={size} />

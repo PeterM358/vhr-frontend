@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -33,8 +33,10 @@ import { COLORS } from '../constants/colors';
 import { useGarageScene } from '../context/GarageSceneContext';
 import { getEnabledScenes } from '../theme/garageScenes';
 import LanguagePicker from '../components/profile/LanguagePicker';
+import ProfileHeaderSaveButton from '../components/profile/ProfileHeaderSaveButton';
 import useDebouncedValue from '../utils/useDebouncedValue';
 import { useTranslation } from '../i18n';
+import { buildClientProfileSaveSnapshot } from '../utils/clientProfileSaveSnapshot';
 
 const CONTACT_PREFERENCE_STORAGE_KEY = '@client_profile_contact_preference';
 const INITIAL_CITY_LIMIT = 120;
@@ -139,6 +141,7 @@ export default function ClientProfileScreen({ navigation }) {
 
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
+  const [savedSnapshot, setSavedSnapshot] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -201,9 +204,17 @@ export default function ClientProfileScreen({ navigation }) {
       }
       setPhonePrefix(initialPrefix);
       setPhoneNational(initialNational);
+      const initialPreference = storedContactPreference === 'chat' ? 'phone' : storedContactPreference || 'phone';
+      setSavedSnapshot(
+        buildClientProfileSaveSnapshot({
+          profile: clientData,
+          phoneE164: buildE164Phone(initialPrefix, initialNational) || clientData?.phone || '',
+          contactPreference: initialPreference,
+        })
+      );
     } catch (err) {
       console.error(err);
-      setDialogMessage('Error loading profile data');
+      setDialogMessage(t('profile.loadError'));
       setDialogVisible(true);
     } finally {
       setLoading(false);
@@ -227,6 +238,27 @@ export default function ClientProfileScreen({ navigation }) {
     await loadCities(value);
   };
 
+  const mergedPhonePreview = useMemo(() => {
+    let effectivePrefix = String(phonePrefix || '').trim();
+    if (!effectivePrefix && profile?.country) {
+      const c = countries.find((x) => Number(x.id) === Number(profile.country));
+      effectivePrefix = dialPrefixForCountry(c);
+    }
+    return buildE164Phone(effectivePrefix, phoneNational);
+  }, [phonePrefix, phoneNational, profile?.country, countries]);
+
+  const currentSnapshot = useMemo(
+    () =>
+      buildClientProfileSaveSnapshot({
+        profile,
+        phoneE164: mergedPhonePreview || '',
+        contactPreference,
+      }),
+    [profile, mergedPhonePreview, contactPreference]
+  );
+
+  const isDirty = Boolean(savedSnapshot && currentSnapshot && savedSnapshot !== currentSnapshot);
+
   const handleSave = async () => {
     if (!profile) return;
 
@@ -241,21 +273,21 @@ export default function ClientProfileScreen({ navigation }) {
 
     if (contactPreference === 'phone' || nationalDigits.length > 0) {
       if (!nationalDigits) {
-        setDialogMessage('Enter your phone number (digits after the country prefix).');
+        setDialogMessage(t('profile.phoneRequired'));
         setDialogVisible(true);
         return;
       }
       if (!effectivePrefix || !effectivePrefix.replace(/\s/g, '').startsWith('+')) {
         setDialogMessage(
           !profile.country
-            ? 'Select a country to set the prefix automatically, or enter a country code (e.g. +359) in the prefix field.'
-            : 'Enter a country prefix (e.g. +359). Your selected country did not provide one — fill the prefix field manually.'
+            ? t('profile.phonePrefixMissingNoCountry')
+            : t('profile.phonePrefixMissing')
         );
         setDialogVisible(true);
         return;
       }
       if (!mergedPhone) {
-        setDialogMessage('Check the country prefix and number — the full phone could not be built.');
+        setDialogMessage(t('profile.phoneInvalid'));
         setDialogVisible(true);
         return;
       }
@@ -272,13 +304,21 @@ export default function ClientProfileScreen({ navigation }) {
     try {
       await updateClientProfile(payload);
       await AsyncStorage.setItem(CONTACT_PREFERENCE_STORAGE_KEY, contactPreference);
-      setDialogMessage('Profile updated successfully!');
+      setDialogMessage(t('profile.savedSuccess'));
       setDialogVisible(true);
-      setProfile((prev) => ({
-        ...prev,
-        town: selectedCity?.name || prev?.town || '',
-        phone: mergedPhone || prev?.phone || '',
-      }));
+      const nextProfile = {
+        ...profile,
+        town: selectedCity?.name || profile?.town || '',
+        phone: mergedPhone || profile?.phone || '',
+      };
+      setProfile(nextProfile);
+      setSavedSnapshot(
+        buildClientProfileSaveSnapshot({
+          profile: nextProfile,
+          phoneE164: mergedPhone || '',
+          contactPreference,
+        })
+      );
       if (mergedPhone) {
         const split = parseStoredPhone(mergedPhone);
         setPhonePrefix(split.prefix || effectivePrefix);
@@ -286,7 +326,7 @@ export default function ClientProfileScreen({ navigation }) {
       }
     } catch (err) {
       console.error(err);
-      setDialogMessage('Error saving profile');
+      setDialogMessage(t('profile.saveError'));
       setDialogVisible(true);
     } finally {
       setSaving(false);
@@ -301,7 +341,7 @@ export default function ClientProfileScreen({ navigation }) {
     return (
       <ScreenBackground safeArea={false}>
         <View style={styles.emptyContainer}>
-          <Text style={{ color: '#fff' }}>No client profile found.</Text>
+          <Text style={{ color: '#fff' }}>{t('profile.noProfile')}</Text>
         </View>
       </ScreenBackground>
     );
@@ -326,14 +366,12 @@ export default function ClientProfileScreen({ navigation }) {
   return (
     <ScreenBackground safeArea={false}>
       <AppNavigationBar
-        title="Profile"
+        title={t('profile.title')}
         backLabel={t('navigation.dashboard')}
         onBack={handleBack}
         scrolled={scrolled}
         rightAction={
-          <Button mode="text" onPress={handleSave} loading={saving} labelStyle={styles.saveAction}>
-            Save
-          </Button>
+          <ProfileHeaderSaveButton onPress={handleSave} saving={saving} dirty={isDirty} />
         }
       />
       <ScrollView
@@ -344,51 +382,47 @@ export default function ClientProfileScreen({ navigation }) {
         { paddingTop: 12, paddingBottom: Math.max(insets.bottom, 16) },
       ]}>
         <AppCard variant="dark" contentStyle={styles.heroContent}>
-          <Text style={styles.heroTitle}>Profile</Text>
-          <Text style={styles.heroSubtitle}>
-            Use any display name you prefer. Real/legal names are not required.
-          </Text>
+          <Text style={styles.heroTitle}>{t('profile.title')}</Text>
+          <Text style={styles.heroSubtitle}>{t('profile.heroSubtitle')}</Text>
         </AppCard>
 
         <FloatingCard>
-          <Text style={styles.sectionTitle}>Basic profile</Text>
+          <Text style={styles.sectionTitle}>{t('profile.basicProfile')}</Text>
           <TextInput
-            label="Display name / nickname"
+            label={t('profile.displayNameLabel')}
             mode="outlined"
             value={displayName}
             onChangeText={setDisplayName}
-            placeholder="How should service centers address you?"
+            placeholder={t('profile.displayNamePlaceholder')}
             style={styles.input}
           />
-          <Text style={styles.helper}>
-            Privacy-first: choose a friendly name you are comfortable sharing.
-          </Text>
+          <Text style={styles.helper}>{t('profile.displayNameHelper')}</Text>
         </FloatingCard>
 
         <FloatingCard>
-          <Text style={styles.sectionTitle}>Location</Text>
-          <Text variant="labelLarge" style={styles.label}>Country</Text>
+          <Text style={styles.sectionTitle}>{t('profile.location')}</Text>
+          <Text variant="labelLarge" style={styles.label}>{t('profile.country')}</Text>
           <View style={styles.pickerWrap}>
             <Picker
               selectedValue={profile.country}
               onValueChange={handleCountryChange}
               style={styles.picker}
             >
-              <Picker.Item label="Select country..." value={null} />
+              <Picker.Item label={t('profile.selectCountry')} value={null} />
               {countries.map((c) => (
                 <Picker.Item key={c.id} label={c.name} value={c.id} />
               ))}
             </Picker>
           </View>
 
-          <Text variant="labelLarge" style={styles.label}>City (selectable)</Text>
+          <Text variant="labelLarge" style={styles.label}>{t('profile.city')}</Text>
           {!!profile.country ? (
             <TextInput
-              label="Search city"
+              label={t('profile.searchCity')}
               mode="outlined"
               value={citySearch}
               onChangeText={setCitySearch}
-              placeholder="Type at least 2 letters to search"
+              placeholder={t('profile.searchCityPlaceholder')}
               style={styles.input}
             />
           ) : null}
@@ -402,10 +436,10 @@ export default function ClientProfileScreen({ navigation }) {
               <Picker.Item
                 label={
                   !profile.country
-                    ? 'Select country first...'
+                    ? t('profile.selectCountryFirst')
                     : loadingCities
-                      ? 'Loading cities...'
-                      : 'Select city...'
+                      ? t('profile.loadingCities')
+                      : t('profile.selectCity')
                 }
                 value={null}
               />
@@ -417,14 +451,12 @@ export default function ClientProfileScreen({ navigation }) {
         </FloatingCard>
 
         <FloatingCard>
-          <Text style={styles.sectionTitle}>Contact preferences</Text>
-          <Text style={styles.helper}>
-            This information helps service centers contact you about repairs and service updates.
-          </Text>
-          <Text variant="labelLarge" style={styles.label}>Phone</Text>
+          <Text style={styles.sectionTitle}>{t('profile.contactPreferences')}</Text>
+          <Text style={styles.helper}>{t('profile.contactHelper')}</Text>
+          <Text variant="labelLarge" style={styles.label}>{t('common.phone')}</Text>
           <View style={styles.phoneRow}>
             <TextInput
-              label="Prefix"
+              label={t('profile.prefix')}
               mode="outlined"
               dense
               placeholder={dialPrefixForCountry(countries.find((c) => Number(c.id) === Number(profile.country))) || '+359'}
@@ -434,10 +466,10 @@ export default function ClientProfileScreen({ navigation }) {
               keyboardType="phone-pad"
             />
             <TextInput
-              label="Number"
+              label={t('profile.number')}
               mode="outlined"
               dense
-              placeholder="e.g. 888123456"
+              placeholder={t('profile.numberPlaceholder')}
               value={phoneNational}
               onChangeText={setPhoneNational}
               style={[styles.input, styles.phoneNationalInput]}
@@ -446,20 +478,20 @@ export default function ClientProfileScreen({ navigation }) {
           </View>
           <Text style={styles.helper}>
             {profile.country
-              ? 'Prefix is set from your country when available — you can edit it if needed.'
-              : 'No country selected: enter your international prefix (e.g. +359) so we can store a callable number.'}
+              ? t('profile.phonePrefixHelperWithCountry')
+              : t('profile.phonePrefixHelperNoCountry')}
           </Text>
-          <Text variant="labelLarge" style={styles.label}>Preferred contact</Text>
+          <Text variant="labelLarge" style={styles.label}>{t('profile.preferredContact')}</Text>
           <SegmentedButtons
             value={contactPreference}
             onValueChange={setContactPreference}
             buttons={[
-              { value: 'phone', label: 'Phone' },
-              { value: 'email', label: 'Email' },
+              { value: 'phone', label: t('common.phone') },
+              { value: 'email', label: t('common.email') },
             ]}
             style={styles.segmented}
           />
-          <Text style={styles.helper}>Saved locally for now.</Text>
+          <Text style={styles.helper}>{t('profile.contactHelperSavedLocally')}</Text>
         </FloatingCard>
 
         <FloatingCard>
@@ -511,11 +543,6 @@ export default function ClientProfileScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  saveAction: {
-    color: COLORS.PRIMARY,
-    fontSize: 16,
-    fontWeight: '600',
-  },
   container: {
     paddingHorizontal: 12,
     paddingBottom: 24,

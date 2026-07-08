@@ -5,11 +5,13 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 
 import AppCard from '../ui/AppCard';
 import { COLORS } from '../../constants/colors';
+import { useTranslation } from '../../i18n';
 
 export default function ShopProfileCompletionCard({
   percent = 0,
   strengthHints = [],
 }) {
+  const { t } = useTranslation();
   const complete = percent >= 100;
 
   return (
@@ -21,7 +23,7 @@ export default function ShopProfileCompletionCard({
           color={complete ? '#4ade80' : COLORS.PRIMARY}
         />
         <Text style={styles.title}>
-          {complete ? 'Profile ready for clients' : 'Profile completion'}
+          {complete ? t('partnerProfile.profileReady') : t('partnerProfile.profileCompletion')}
         </Text>
         <Text style={[styles.percent, complete && styles.percentComplete]}>{percent}%</Text>
       </View>
@@ -32,10 +34,10 @@ export default function ShopProfileCompletionCard({
       />
       {complete ? (
         <Text style={styles.readyText}>
-          Clients can find you on the map and open repair requests.
+          {t('partnerProfile.profileReadyBody')}
           {strengthHints.length
-            ? ` Optional polish: ${strengthHints.join(', ')}.`
-            : ' Add photos and services to strengthen your page.'}
+            ? t('partnerProfile.profileReadyPolish', { hints: strengthHints.join(', ') })
+            : t('partnerProfile.profileReadyAddMore')}
         </Text>
       ) : null}
     </AppCard>

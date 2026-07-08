@@ -30,6 +30,7 @@ import {
 } from '../api/serviceMenu';
 import { resetFromShopDrawer } from '../navigation/drawerNavigation';
 import { resolveRepairTypeIcon } from '../utils/repairTypeIcons';
+import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 import {
   formatDurationHoursInput,
   formatDurationMinutes,
@@ -97,6 +98,7 @@ function MenuItemRow({
   saving,
   togglingPublish,
 }) {
+  const { t } = useTranslation();
   const iconName = resolveRepairTypeIcon(item);
   const rangeLabel = formatMenuSummary(item);
   const totalLabel =
@@ -114,7 +116,9 @@ function MenuItemRow({
             <MaterialCommunityIcons name={iconName} size={22} color={COLORS.PRIMARY} />
           </View>
           <View style={styles.menuRowBody}>
-            <Text style={styles.menuRowTitle}>{item.repair_type_name || 'Service'}</Text>
+            <Text style={styles.menuRowTitle}>
+              {translateRepairTypeLabel(item, t) || t('common.service')}
+            </Text>
             {item.category_name ? (
               <Text style={styles.menuRowCategory}>{item.category_name}</Text>
             ) : null}

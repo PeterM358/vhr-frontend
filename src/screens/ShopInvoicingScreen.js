@@ -81,7 +81,7 @@ function filterInvoices(invoices, { clientSearch, monthKey }) {
   return rows;
 }
 
-function SeriesEditor({ series, onSaved }) {
+function SeriesEditor({ series, onSaved, t }) {
   const [label, setLabel] = useState(series?.label || '');
   const [prefix, setPrefix] = useState(series?.prefix || '01');
   const [width, setWidth] = useState(String(series?.sequence_width ?? 6));
@@ -101,9 +101,9 @@ function SeriesEditor({ series, onSaved }) {
         ? await updateInvoiceSeries(token, series.id, payload)
         : await createInvoiceSeries(token, payload);
       onSaved(updated);
-      Alert.alert('Saved', 'Invoice numbering updated.');
+      Alert.alert(t('common.save'), t('partnerDashboard.invoicing.savedNumbering'));
     } catch (err) {
-      Alert.alert('Error', err.message || 'Could not save series');
+      Alert.alert(t('common.error'), err.message || t('partnerDashboard.invoicing.seriesSaveError'));
     } finally {
       setSaving(false);
     }
@@ -111,15 +111,15 @@ function SeriesEditor({ series, onSaved }) {
 
   return (
     <FloatingCard style={styles.seriesCard}>
-      <Text style={styles.sectionTitle}>Numbering series</Text>
+      <Text style={styles.sectionTitle}>{t('partnerDashboard.invoicing.numberingSeries')}</Text>
       <Text style={styles.sectionHint}>
         {locked
-          ? 'Prefix and width are locked after your first issued invoice. Next number advances automatically on issue.'
-          : 'Set prefix and zero-pad width before the first issued invoice — e.g. prefix 01 → 01000001.'}
+          ? t('partnerDashboard.invoicing.numberingLocked')
+          : t('partnerDashboard.invoicing.numberingOpen')}
       </Text>
       <TextInput
         mode="outlined"
-        label="Label (optional)"
+        label={t('partnerDashboard.invoicing.labelOptional')}
         value={label}
         onChangeText={setLabel}
         style={styles.input}
@@ -127,7 +127,7 @@ function SeriesEditor({ series, onSaved }) {
       />
       <TextInput
         mode="outlined"
-        label="Prefix"
+        label={t('partnerDashboard.invoicing.prefix')}
         value={prefix}
         onChangeText={setPrefix}
         style={styles.input}
@@ -135,7 +135,7 @@ function SeriesEditor({ series, onSaved }) {
       />
       <TextInput
         mode="outlined"
-        label="Sequence width"
+        label={t('partnerDashboard.invoicing.sequenceWidth')}
         keyboardType="number-pad"
         value={width}
         onChangeText={setWidth}
@@ -143,10 +143,12 @@ function SeriesEditor({ series, onSaved }) {
         disabled={locked || saving}
       />
       {series?.next_sequence != null ? (
-        <Text style={styles.metaLine}>Next sequence: {series.next_sequence}</Text>
+        <Text style={styles.metaLine}>
+          {t('partnerDashboard.invoicing.nextSequence', { value: series.next_sequence })}
+        </Text>
       ) : null}
       <Button mode="contained" onPress={handleSave} loading={saving} disabled={saving}>
-        Save numbering
+        {t('partnerDashboard.invoicing.saveNumbering')}
       </Button>
     </FloatingCard>
   );
@@ -225,7 +227,7 @@ export default function ShopInvoicingScreen() {
       }
     } catch (err) {
       console.error(err);
-      Alert.alert('Error', err.message || 'Failed to load invoicing data');
+      Alert.alert(t('common.error'), err.message || t('partnerDashboard.invoicing.loadError'));
       if (sectionTab === 'invoices') {
         setInvoices([]);
       } else {
@@ -265,14 +267,14 @@ export default function ShopInvoicingScreen() {
       navigation.navigate('ShopInvoiceDetail', { invoiceId: invoice.id });
       loadUninvoicedRepairs().catch(() => {});
     } catch (err) {
-      Alert.alert('Error', err.message || 'Could not create invoice draft');
+      Alert.alert(t('common.error'), err.message || t('partnerDashboard.invoicing.createDraftError'));
     } finally {
       setCreatingRepairId(null);
     }
   };
 
   const renderUninvoicedRepair = (repair) => {
-    const title = `${repair.vehicle_make ?? ''} ${repair.vehicle_model ?? ''}`.trim() || 'Vehicle';
+    const title = `${repair.vehicle_make ?? ''} ${repair.vehicle_model ?? ''}`.trim() || t('partnerDashboard.card.vehicleFallback');
     const plate = String(repair.vehicle_license_plate || '').trim();
     const clientName = String(repair.client_display_name || '').trim();
     const completed = formatRepairListDate(repair.completed_at || repair.created_at);
@@ -291,7 +293,7 @@ export default function ShopInvoicingScreen() {
           <View style={styles.invoiceMain}>
             <Text style={styles.invoiceNumber}>{title}</Text>
             <Text style={styles.invoiceSub} numberOfLines={2}>
-              {[plate, clientName, completed].filter(Boolean).join(' · ') || 'Completed repair'}
+              {[plate, clientName, completed].filter(Boolean).join(' · ') || t('partnerDashboard.invoicing.completedRepair')}
             </Text>
             {total ? <Text style={styles.invoiceTotal}>{total}</Text> : null}
           </View>
@@ -328,23 +330,25 @@ export default function ShopInvoicingScreen() {
         contentContainerStyle={[styles.content, { paddingTop: 12 }]}
       >
         <AppCard variant="dark" style={styles.heroCard}>
-          <Text style={styles.heroSubtitle}>
-            Issue numbered sales invoices from completed repairs, or attach an external PDF on the
-            repair when you use another accounting app.
-          </Text>
+          <Text style={styles.heroSubtitle}>{t('partnerDashboard.invoicing.heroSubtitle')}</Text>
         </AppCard>
 
         {erpSummary ? (
           <FloatingCard style={styles.erpCard}>
-            <Text style={styles.sectionTitle}>Company overview</Text>
+            <Text style={styles.sectionTitle}>{t('partnerDashboard.invoicing.companyOverview')}</Text>
             <Text style={styles.sectionHint}>
-              {erpSummary.legal_name || 'Your company'} — {erpSummary.branch_count} centers linked.
-              Invoices below are for the active center; unpaid issued total across branches:{' '}
-              {formatMoneyMinor(erpSummary.totals?.unpaid_issued_minor || 0, 'EUR')}.
+              {t('partnerDashboard.invoicing.companyOverviewBody', {
+                legalName: erpSummary.legal_name || t('partnerDashboard.invoicing.yourCompany'),
+                branchCount: erpSummary.branch_count,
+                total: formatMoneyMinor(erpSummary.totals?.unpaid_issued_minor || 0, 'EUR'),
+              })}
             </Text>
             {(erpSummary.branches || []).map((branch) => (
               <Text key={branch.shop_id} style={styles.branchLine}>
-                • {branch.shop_name}: {branch.unpaid_issued_count} unpaid issued
+                {t('partnerDashboard.invoicing.branchUnpaid', {
+                  shopName: branch.shop_name,
+                  count: branch.unpaid_issued_count,
+                })}
               </Text>
             ))}
           </FloatingCard>
@@ -352,6 +356,7 @@ export default function ShopInvoicingScreen() {
 
         <SeriesEditor
           series={series}
+          t={t}
           onSaved={(updated) => {
             setSeries(updated);
             loadInvoices().catch(() => {});
@@ -396,16 +401,16 @@ export default function ShopInvoicingScreen() {
 
             {showInvoiceListFilters ? (
               <FloatingCard style={styles.invoiceFiltersCard}>
-                <Text style={styles.sectionTitle}>Filter invoices</Text>
+                <Text style={styles.sectionTitle}>{t('partnerDashboard.invoicing.filterInvoices')}</Text>
                 <TextInput
                   mode="outlined"
-                  label="Client search"
+                  label={t('partnerDashboard.invoicing.clientSearch')}
                   value={clientSearch}
                   onChangeText={setClientSearch}
                   style={styles.input}
-                  placeholder="Name or company on invoice"
+                  placeholder={t('partnerDashboard.invoicing.clientSearchPlaceholder')}
                 />
-                <Text style={styles.pickerLabel}>Month (issued date)</Text>
+                <Text style={styles.pickerLabel}>{t('partnerDashboard.invoicing.monthIssued')}</Text>
                 <View style={styles.pickerShell}>
                   <Picker
                     selectedValue={monthFilter}
@@ -426,12 +431,14 @@ export default function ShopInvoicingScreen() {
             ) : filteredInvoices.length === 0 ? (
               <FloatingCard>
                 <Text style={styles.emptyTitle}>
-                  {invoices.length === 0 ? 'No invoices yet' : 'No invoices match filters'}
+                  {invoices.length === 0
+                    ? t('partnerDashboard.invoicing.noInvoices')
+                    : t('partnerDashboard.invoicing.noInvoicesFiltered')}
                 </Text>
                 <Text style={styles.emptyText}>
                   {invoices.length === 0
-                    ? 'Open a completed repair and tap “Create platform invoice”, or use the Uninvoiced repairs tab.'
-                    : 'Try another client name or month.'}
+                    ? t('partnerDashboard.invoicing.noInvoicesHint')
+                    : t('partnerDashboard.invoicing.noInvoicesFilterHint')}
                 </Text>
               </FloatingCard>
             ) : (
@@ -456,10 +463,7 @@ export default function ShopInvoicingScreen() {
           </>
         ) : (
           <>
-            <Text style={styles.sectionHint}>
-              Completed repairs without an issued platform invoice. Tap a row to create a draft
-              invoice.
-            </Text>
+            <Text style={styles.sectionHint}>{t('partnerDashboard.invoicing.uninvoicedHint')}</Text>
             {loading ? (
               <ActivityIndicator style={styles.loader} color={COLORS.PRIMARY} />
             ) : uninvoicedRepairs.length === 0 ? (

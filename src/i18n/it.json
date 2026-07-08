@@ -23,7 +23,7 @@
     "email": "Email",
     "number": "Number",
     "allClear": "All clear",
-    "service": "Servizio"
+    "service": "Service"
   },
   "language": {
     "label": "Language",
@@ -80,25 +80,25 @@
     "googleLoginFailed": "Google login failed. Try again.",
     "googleNoCode": "Google login failed: No authorization code received.",
     "googleNoToken": "Google login failed: No ID token received.",
-    "resetPasswordTitle": "Reimposta password",
-    "resetPasswordHeading": "Reimposta la password",
-    "resetPasswordSubtitle": "Inserisci la tua email e ti invieremo un link per reimpostare la password.",
-    "emailPlaceholder": "Inserisci email",
-    "sendResetEmail": "Invia link di reset",
-    "resetEmailSent": "Abbiamo inviato un link di reset se esiste un account con questa email.",
-    "backToLogin": "Torna al login",
-    "enterNewPasswordHeading": "Inserisci nuova password",
-    "newPassword": "Nuova password",
-    "confirmNewPassword": "Conferma password",
-    "resetPasswordButton": "Reimposta password",
-    "enterEmailRequired": "Inserisci la tua email.",
-    "invalidResetLinkTitle": "Link non valido",
-    "invalidResetLink": "Questo link di reset non è valido o incompleto. Richiedi una nuova email di reset.",
-    "fillBothPasswords": "Compila entrambi i campi password.",
-    "passwordsDoNotMatch": "Le password non corrispondono.",
-    "passwordMinLength": "La password deve contenere almeno 6 caratteri.",
-    "resetFailed": "Impossibile reimpostare la password.",
-    "resetSignInFailed": "Password reimpostata ma accesso fallito. Accedi manualmente."
+    "resetPasswordTitle": "Reset password",
+    "resetPasswordHeading": "Reset your password",
+    "resetPasswordSubtitle": "Enter your email and we'll send you a link to reset your password.",
+    "emailPlaceholder": "Enter email",
+    "sendResetEmail": "Send reset link",
+    "resetEmailSent": "We've sent a reset link if an account exists for that email.",
+    "backToLogin": "Back to sign in",
+    "enterNewPasswordHeading": "Enter new password",
+    "newPassword": "New password",
+    "confirmNewPassword": "Confirm password",
+    "resetPasswordButton": "Reset password",
+    "enterEmailRequired": "Please enter your email.",
+    "invalidResetLinkTitle": "Invalid link",
+    "invalidResetLink": "This reset link is invalid or incomplete. Request a new password reset email.",
+    "fillBothPasswords": "Please fill in both password fields.",
+    "passwordsDoNotMatch": "Passwords do not match.",
+    "passwordMinLength": "Password must be at least 6 characters.",
+    "resetFailed": "Failed to reset password.",
+    "resetSignInFailed": "Password was reset but sign-in failed. Please log in manually."
   },
   "dashboard": {
     "heroSubtitle": "Your vehicles, service history, and repairs — in one control center.",
@@ -138,489 +138,6 @@
       "noRequestsTitle": "No open requests yet",
       "scheduledToday": "Scheduled today",
       "modules": "Modules"
-    }
-  },
-  "vehicles": {
-    "title": "Vehicles",
-    "addVehicle": "Add Vehicle",
-    "addFirstVehicle": "Add your first vehicle",
-    "vehicle": "Vehicle",
-    "vehicleDetails": "Vehicle Details",
-    "yourVehicle": "Your vehicle",
-    "emptyTitle": "No vehicles yet",
-    "emptyBody": "Add your first vehicle to track service history, health, and repairs.",
-    "emptyList": "No vehicles found. Add one!",
-    "myVehicles": "My Vehicles",
-    "unknownVehicle": "Unknown vehicle",
-    "serviceHistory": "Service History",
-    "health": "Vehicle Health"
-  },
-  "health": {
-    "status": {
-      "healthy": "Healthy",
-      "maintenance_recommended": "Maintenance recommended",
-      "needs_attention": "Needs attention",
-      "in_service": "In service",
-      "at_service_center": "At service center"
-    },
-    "subtitle": {
-      "healthy": "No urgent issues found.",
-      "maintenance_recommended": "Add service history or reminders to improve insights.",
-      "needs_attention": "There are active items that may need review.",
-      "in_service": "Active repair request in progress.",
-      "in_service_scheduled": "Scheduled service appointment in progress.",
-      "at_service_center": "Your vehicle is currently being serviced."
-    },
-    "reasons": {
-      "active_repairs": "Vehicle currently has active repair requests.",
-      "denied_repairs": "Rejected repair request needs review.",
-      "mileage_missing": "Mileage not recorded",
-      "mileage_stale": "Mileage not updated recently",
-      "no_oil_service_history": "No oil service history",
-      "oil_service_overdue": "Oil service overdue",
-      "oil_service_due_soon": "Oil change approaching",
-      "no_brake_check_history": "No brake service history",
-      "brake_check_overdue": "Brake service overdue",
-      "brake_check_due_soon": "Brake check approaching",
-      "no_reminders": "No reminders configured",
-      "obligation_overdue": "{type} overdue"
-    },
-    "domains": {
-      "oil": "Oil service",
-      "brake": "Brake service",
-      "reminders": "Reminders",
-      "mileage": "Mileage",
-      "active_repairs": "Active repairs"
-    },
-    "actions": {
-      "update_km": "Update kilometers",
-      "add_service_history": "Add service history",
-      "configure_reminders": "Configure reminders",
-      "schedule_maintenance": "Schedule maintenance",
-      "book_repair": "Book repair"
-    }
-  },
-  "reminders": {
-    "uiStatus": {
-      "pending_setup": "Pending setup",
-      "overdue": "Overdue",
-      "due_soon": "Due soon",
-      "done": "Done",
-      "active_until_due": "Active until due",
-      "prediction_only": "Estimated — confirm date"
-    },
-    "cta": {
-      "set_reminder": "Set reminder"
-    },
-    "types": {
-      "insurance": "Insurance",
-      "technical_inspection": "Technical inspection",
-      "road_tax": "Road tax",
-      "vignette": "Vignette",
-      "oil_service": "Oil change",
-      "tire_change": "Tire change",
-      "battery_check": "Battery check",
-      "suspension_service": "Suspension service",
-      "brake_check": "Brake check",
-      "custom": "Custom reminder"
-    }
-  },
-  "repairs": {
-    "title": "Riparazioni",
-    "tabs": {
-      "requests": "Richieste",
-      "offers": "Offerte",
-      "active": "Riparazioni attive",
-      "completed": "Riparazioni completate"
-    },
-    "emptyTitle": "Nessuna riparazione trovata",
-    "emptySubtitle": "Niente in \"{status}\" al momento.",
-    "repairRequests": "Repair Requests",
-    "openRequests": "Open Requests",
-    "pendingOffers": "Pending Offers",
-    "requestService": "Request Service",
-    "sendRequest": "Send request",
-    "preferredVisit": "Preferred visit",
-    "oilChange": "Cambio olio",
-    "brakeRepair": "Riparazione freni",
-    "acRefill": "Ricarica AC",
-    "acService": "Servizio AC",
-    "diagnostics": "Diagnostica",
-    "serviceHistoryTitle": "Service History",
-    "serviceHistoryEmptyTitle": "No service history yet",
-    "serviceHistoryEmptyBody": "Completed repairs and logged service records will appear here."
-  },
-  "notifications": {
-    "title": "Notifications",
-    "tabs": {
-      "alerts": "Alerts",
-      "offers": "Offers",
-      "promos": "Promos"
-    },
-    "recentActivity": "Recent activity",
-    "liveHint": "Live messages from your current Veversal account.",
-    "intro": "Your vehicle alerts, offers, bookings and documents — organized in one place.",
-    "previewAlerts": "Preview alerts",
-    "openCenter": "Open notification center",
-    "emptyEmbedded": "No recent activity in your live feed yet.",
-    "emptyTitle": "No notifications yet",
-    "emptySubtitle": "Offers, promotions, bookings, and reschedule updates appear here.",
-    "defaultTitle": "Notification",
-    "loadError": "Could not load notifications",
-    "noLinkedDetail": "No linked detail for this notification.",
-    "openError": "Failed to open notification.",
-    "categories": {
-      "criticalAlerts": "Critical Alerts",
-      "maintenanceDue": "Maintenance Due",
-      "insuranceExpiring": "Insurance Expiring",
-      "inspectionDue": "Inspection Due",
-      "offersReceived": "Offers Received",
-      "bookingsConfirmed": "Bookings Confirmed",
-      "messages": "Messages",
-      "safetyRecalls": "Safety Recalls",
-      "softwareUpdates": "Software Updates",
-      "documentsReady": "Documents Ready",
-      "serviceCompleted": "Service Completed"
-    },
-    "severity": {
-      "critical": "Critical",
-      "warning": "Attention",
-      "info": "Info",
-      "success": "Update"
-    },
-    "placeholders": {
-      "oilChange": {
-        "title": "Oil change recommended",
-        "description": "Based on your mileage trend, schedule an oil change in the next 1,500 km.",
-        "action": "View vehicle"
-      },
-      "newOffer": {
-        "title": "New offer from a service center",
-        "description": "A nearby center sent a quote for your open repair request.",
-        "action": "Review offer"
-      },
-      "inspection": {
-        "title": "Annual inspection approaching",
-        "description": "Keep your roadworthiness documents up to date before expiry.",
-        "action": "See reminders"
-      },
-      "visitConfirmed": {
-        "title": "Visit confirmed",
-        "description": "Your service center confirmed the appointment time.",
-        "action": "Open booking"
-      },
-      "invoice": {
-        "title": "Invoice uploaded",
-        "description": "A repair document was added to your vehicle history.",
-        "action": "View document"
-      }
-    },
-    "hints": {
-      "reschedule_proposed": "Tap to accept or decline the new time",
-      "repair_scheduled": "Tap to view appointment details",
-      "repair_ready_for_pickup": "Tap to view completed service details",
-      "open_repair": "Tap to open repair"
-    },
-    "templates": {
-      "reschedule_proposed": {
-        "title": "Reschedule proposed",
-        "body": "A service center proposed a new appointment time."
-      },
-      "repair_scheduled": {
-        "title": "Appointment scheduled",
-        "body": "Your repair visit has been scheduled."
-      },
-      "repair_ready_for_pickup": {
-        "title": "Ready for pickup",
-        "body": "Your vehicle is ready for pickup."
-      },
-      "offer_received": {
-        "title": "New offer received",
-        "body": "A service center sent a quote for your request."
-      },
-      "offer_status": {
-        "title": "Offer update",
-        "body": "There is an update on your repair offer."
-      },
-      "repair_completed": {
-        "title": "Repair completed",
-        "body": "Your repair has been marked as completed."
-      },
-      "booking_confirmed": {
-        "title": "Booking confirmed",
-        "body": "Your service appointment has been confirmed."
-      },
-      "document_ready": {
-        "title": "Document ready",
-        "body": "A new document is available in your account."
-      }
-    }
-  },
-  "documents": {
-    "title": "Documents"
-  },
-  "profile": {
-    "title": "Profile",
-    "appearance": "Appearance",
-    "garageScene": "Garage Scene",
-    "garageSceneHelper": "Choose a garage scene for your dashboard background.",
-    "preferredContact": "Preferred contact",
-    "contactHelperSavedLocally": "Saved locally for now.",
-    "vehicleAccess": "Vehicle access & sharing",
-    "vehicleAccessHelper": "You'll later be able to share vehicle access with family members, drivers, or fleet managers.",
-    "phonePrefixHelperWithCountry": "Prefix is set from your country when available — you can edit it if needed.",
-    "phonePrefixHelperNoCountry": "No country selected: enter your international prefix (e.g. +359) so we can store a callable number."
-  },
-  "public": {
-    "findServiceCenters": "Find Service Centers",
-    "findNearbyTrusted": "Find nearby trusted centers",
-    "serviceCenter": "Centro assistenza",
-    "serviceCenters": "Centri di assistenza"
-  },
-  "serviceCenters": {
-    "findTitle": "Find Service Centers",
-    "authorizeTitle": "Authorize a service center",
-    "exploreTitle": "Explore Service Centers",
-    "searchPlaceholder": "Search centers, city, service, brand...",
-    "locateMe": "Locate me",
-    "search": "Search",
-    "filters": "Filters",
-    "filtersExpanded": "Filters (expanded)",
-    "filtersCount": "Filters ({count})",
-    "hideFilters": "Hide filters",
-    "openNow": "Open now",
-    "verified": "Verified",
-    "closed": "Closed",
-    "viewProfile": "View profile",
-    "directions": "Directions",
-    "requestService": "Request service",
-    "useForRecord": "Use for this record",
-    "distanceUnavailable": "Distance unavailable",
-    "setLocationForDistance": "Set location to see distance",
-    "allBrands": "All brands",
-    "brandsLabel": "Brands: {brands}",
-    "ownerReported": "Owner reported",
-    "listTab": "List",
-    "mapTab": "Map",
-    "geoError": "Could not get your location.",
-    "emptyTitle": "No service centers match these filters.",
-    "clearFilters": "Clear filters",
-    "showAllInCity": "Show all in {city}",
-    "addMissingCenter": "Add missing service center",
-    "any": "Any",
-    "vehicleType": "Vehicle Type",
-    "serviceCategory": "Service category",
-    "repairType": "Repair type",
-    "brand": "Brand",
-    "rating": "Rating",
-    "distance": "Distance",
-    "sort": {
-      "recommended": "Recommended",
-      "distance": "Distance",
-      "rating": "Rating"
-    },
-    "ratingFilter": {
-      "any": "Any rating",
-      "3plus": "3+ stars",
-      "4plus": "4+ stars",
-      "4_5plus": "4.5+ stars"
-    },
-    "distanceFilter": {
-      "any": "Any distance",
-      "10km": "Within 10 km",
-      "25km": "Within 25 km",
-      "50km": "Within 50 km",
-      "100km": "Within 100 km"
-    },
-    "profile": {
-      "defaultTitle": "Service Center Details",
-      "offersGuarantee": "Offers guarantees",
-      "notRated": "Not rated yet",
-      "reviews": "{rating} · {count} reviews",
-      "completedJobs": "{count} completed jobs",
-      "completedJobsUnknown": "Completed jobs · —",
-      "chooseVehicles": "Choose vehicles to authorize",
-      "authorizeHint": "Share full mechanical history with this service center for the vehicles you choose below.",
-      "alreadyAuthorized": "{vehicle} is already authorized here.",
-      "chooseForVehicle": "Choose which vehicles to authorize for {vehicle}.",
-      "authorized": "Authorized",
-      "unclaimedTitle": "Owner-reported · not claimed yet",
-      "unclaimedBody": "This service center was added from a customer service record. The business can claim this profile later to manage bookings and confirm records.",
-      "photos": "Photos",
-      "noPhotosTitle": "No photos yet",
-      "noPhotosSubtitle": "This service center has not uploaded photos.",
-      "about": "About",
-      "services": "Services",
-      "servicesNotAdded": "Services not added yet",
-      "publishedPricing": "Published pricing",
-      "priceOnRequest": "Price on request",
-      "priceFrom": "from {price}",
-      "vehicleTypes": "Vehicle types",
-      "vehicleTypesNotAdded": "Vehicle types not added yet",
-      "brands": "Brands",
-      "workingHours": "Working hours",
-      "workingHoursNotAdded": "Working hours not added yet",
-      "links": "Links",
-      "authorizeSection": "Authorize this service center",
-      "authorizeExplainer": "Authorization shares full mechanical service history for the vehicles you select. Booking a repair without authorizing only grants access to that job and related prior work in the same category.",
-      "editCenterDetails": "Edit center details",
-      "loadErrorTitle": "Could not load service center",
-      "loadErrorNetwork": "The Veversal service is temporarily unavailable. Please try again in a moment.",
-      "loadErrorInvalid": "This service center link is invalid or outdated.",
-      "loadErrorGeneric": "Check your connection and try again.",
-      "requestServiceA11y": "Request service at this shop",
-      "addVehicleFirstTitle": "Add a vehicle first",
-      "addVehicleFirstBody": "You need at least one vehicle before requesting a repair."
-    }
-  },
-  "footer": {
-    "copyright": "© Veversal",
-    "privacy": "Privacy",
-    "terms": "Terms",
-    "contact": "Contact",
-    "support": "Support",
-    "version": "Version",
-    "versionMobile": "Version x.x.x",
-    "privacyPolicy": "Privacy Policy",
-    "termsOfService": "Terms of Service",
-    "cookiePolicy": "Cookie Policy",
-    "helpCenter": "Help Center",
-    "faq": "FAQ",
-    "careers": "Careers",
-    "about": "About",
-    "twitter": "Twitter",
-    "instagram": "Instagram",
-    "linkedin": "LinkedIn",
-    "facebook": "Facebook",
-    "youtube": "YouTube",
-    "github": "GitHub",
-    "blog": "Blog",
-    "apiDocs": "API Documentation",
-    "languageRegion": "Language/Region selector"
-  },
-  "vehicleTypes": {
-    "car": "Car",
-    "truck": "Truck",
-    "motorcycle": "Motorcycle",
-    "bicycle": "Bike",
-    "ebike": "E-bike",
-    "scooter": "Scooter",
-    "van": "Van",
-    "trailer": "Trailer",
-    "agricultural": "Agricultural",
-    "construction": "Construction",
-    "other": "Other"
-  },
-  "serviceCenterProfile": {
-    "aboutTemplate": "{serviceCenterName} è un centro di assistenza{vehiclePhrase}{servicesPhrase}{locationPhrase}.",
-    "vehiclePhrase": " per {vehicleTypes}",
-    "servicesPhrase": " offre {services}",
-    "locationPhrase": " in {locationLine}"
-  },
-  "serviceCenterList": {
-    "vehiclesLabel": "Veicoli: {vehicles}",
-    "servicesLabel": "Servizi: {services}",
-    "moreCount": " +{count} altri"
-  },
-  "listJoin": {
-    "two": "{a} e {b}",
-    "three": "{a}, {b} e {c}",
-    "conjunction": "e",
-    "serialComma": ""
-  },
-  "seo": {
-    "dashboard": "{app} Dashboard",
-    "partnerDashboard": "{app} Partner Dashboard",
-    "partnerProfile": "{app} Partner Profile",
-    "publicPreview": "{app} Public Page Preview",
-    "repairs": "{app} — Riparazioni",
-    "forgotPassword": "{app} — Reimposta password",
-    "bookings": "{app} Bookings",
-    "calendar": "{app} Calendar",
-    "clients": "{app} Clients",
-    "promotions": "{app} Promotions",
-    "warehouse": "{app} Warehouse",
-    "invoicing": "{app} Invoicing",
-    "priceList": "{app} Price List",
-    "notifications": "{app} Notifications",
-    "switchCenter": "{app} Switch Service Center",
-    "addServiceCenter": "{app} Add Service Center",
-    "serviceCenters": "{app} Service Centers",
-    "myVehicles": "{app} My Vehicles",
-    "addVehicle": "{app} Add Vehicle",
-    "serviceHistory": "{app} Service History",
-    "documents": "{app} Documents",
-    "profile": "{app} Profile",
-    "vehicleDetails": "{app} Vehicle Details",
-    "vehicleSpecs": "{app} Vehicle Specs",
-    "chooseServiceCenter": "{app} Choose Service Center",
-    "addServiceRecord": "{app} Add Service Record",
-    "addObligation": "{app} Add Obligation / Payment",
-    "serviceCenterAccess": "{app} Service Center Access",
-    "sendProposal": "{app} Send Proposal",
-    "serviceCentersMeta": {
-      "title": "{app} Service Centers",
-      "description": "Discover service centers, compare services, and find trusted vehicle care on Veversal.",
-      "discovery": {
-        "root": {
-          "title": "Centri assistenza | {app}",
-          "h1": "Centri assistenza",
-          "description": "Scopri i centri assistenza, confronta i servizi e trova assistenza affidabile per il tuo veicolo su {app}."
-        },
-        "vehicleCityRepair": {
-          "title": "{vehicle} {repair} a {city} | {app}",
-          "h1": "{vehicle} {repair} a {city}",
-          "description": "Trova centri assistenza per {vehicle} {repair} a {city} su {app}."
-        },
-        "vehicleCity": {
-          "title": "Centri assistenza {vehicle} a {city} | {app}",
-          "h1": "Centri assistenza {vehicle} a {city}",
-          "description": "Trova centri assistenza {vehicle} a {city} su {app}."
-        },
-        "vehicle": {
-          "title": "Centri assistenza {vehicle} | {app}",
-          "h1": "Centri assistenza {vehicle}",
-          "description": "Esplora i centri assistenza {vehicle} su {app}."
-        },
-        "repairCity": {
-          "title": "{repair} a {city} | {app}",
-          "h1": "{repair} a {city}",
-          "description": "Trova centri assistenza per {repair} a {city} su {app}."
-        },
-        "repair": {
-          "title": "{repair} | {app}",
-          "h1": "{repair}",
-          "description": "Trova centri assistenza per {repair} su {app}."
-        },
-        "city": {
-          "title": "Centri assistenza a {city} | {app}",
-          "h1": "Centri assistenza a {city}",
-          "description": "Trova centri assistenza a {city} per riparazioni, manutenzione e assistenza affidabile su {app}."
-        }
-      }
-    },
-    "serviceCenterProfile": {
-      "title": "{name} | {app}",
-      "description": "{name} service center profile in {city} on Veversal."
-    },
-    "vehicles": {
-      "title": "{app} Vehicles"
-    },
-    "repairsPage": {
-      "title": "{app} Repairs"
-    },
-    "vehicleTypes": {
-      "car": "Auto",
-      "truck": "Camion",
-      "motorcycle": "Moto",
-      "bicycle": "Bici",
-      "ebike": "E-bike",
-      "scooter": "Scooter",
-      "van": "Furgone",
-      "trailer": "Rimorchio",
-      "agricultural": "Agricolo",
-      "construction": "Costruzione",
-      "other": "Altro"
     }
   },
   "partnerDashboard": {
@@ -765,6 +282,108 @@
         "repairs": "Repairs",
         "offers": "Offers",
         "bookings": "Bookings"
+      },
+      "defaultTitle": "Notification",
+      "all": "All",
+      "unreadOnly": "Unread only",
+      "markAllRead": "Mark all read",
+      "markingAll": "Marking…",
+      "markAllError": "Could not mark all as read",
+      "emptySubtitle": "Offers, promotions, bookings, and reschedule updates appear here.",
+      "emptyUnreadTitle": "No unread notifications",
+      "emptyUnreadSubtitle": "You are all caught up.",
+      "hints": {
+        "new_repair_request": "Tap to review request",
+        "new_repair_request_calendar": "Tap to confirm on calendar",
+        "promotion_booked": "Tap to open promotion",
+        "promotion_booking_cancelled": "Tap to open promotion",
+        "offer_booked": "Tap to open booked repair",
+        "offer_booking_cancelled": "Tap to open repair",
+        "repair_scheduled": "Tap to view on calendar",
+        "reschedule_proposed": "Tap to review on calendar",
+        "reschedule_counter_proposed": "Tap to review on calendar",
+        "reschedule_accepted": "Tap to open calendar",
+        "reschedule_declined": "Tap to open calendar",
+        "appointment_cancelled": "Tap to open calendar",
+        "vehicle_arrived": "Tap to open repair",
+        "client_arrival_reported": "Tap to open repair",
+        "owner_service_record_confirmation_requested": "Tap to confirm service record",
+        "open_repair": "Tap to open repair",
+        "open_promotion": "Tap to open promotion"
+      },
+      "templates": {
+        "new_repair_request": {
+          "title": "New repair request",
+          "body": "A customer sent a new repair request to your service center."
+        },
+        "appointment_request": {
+          "title": "Appointment request",
+          "body": "A customer requested an appointment at your service center."
+        },
+        "repair_scheduled": {
+          "title": "Appointment scheduled",
+          "body": "A repair visit has been scheduled on your calendar."
+        },
+        "reschedule_proposed": {
+          "title": "Reschedule proposed",
+          "body": "A new appointment time was proposed."
+        },
+        "reschedule_counter_proposed": {
+          "title": "Counter-proposal received",
+          "body": "Review the proposed appointment time on your calendar."
+        },
+        "reschedule_accepted": {
+          "title": "Reschedule accepted",
+          "body": "The appointment time change was accepted."
+        },
+        "reschedule_declined": {
+          "title": "Reschedule declined",
+          "body": "The appointment time change was declined."
+        },
+        "appointment_cancelled": {
+          "title": "Appointment cancelled",
+          "body": "An appointment was cancelled."
+        },
+        "offer_booked": {
+          "title": "Offer booked",
+          "body": "A customer booked your offer."
+        },
+        "offer_booking_cancelled": {
+          "title": "Booking cancelled",
+          "body": "A customer cancelled a booked offer."
+        },
+        "promotion_booked": {
+          "title": "Promotion booked",
+          "body": "A customer booked your promotion."
+        },
+        "promotion_booking_cancelled": {
+          "title": "Promotion booking cancelled",
+          "body": "A promotion booking was cancelled."
+        },
+        "vehicle_arrived": {
+          "title": "Vehicle arrived",
+          "body": "The customer's vehicle has arrived at your center."
+        },
+        "client_arrival_reported": {
+          "title": "Arrival reported",
+          "body": "The customer reported their vehicle arrival."
+        },
+        "direct_request_declined": {
+          "title": "Request declined",
+          "body": "A direct appointment request was declined."
+        },
+        "owner_service_record_confirmation_requested": {
+          "title": "Service record confirmation",
+          "body": "Please confirm a service record for the customer."
+        },
+        "owner_service_record_confirmation_confirmed": {
+          "title": "Service record confirmed",
+          "body": "The customer confirmed the service record."
+        },
+        "owner_service_record_confirmation_rejected": {
+          "title": "Service record rejected",
+          "body": "The customer rejected the service record."
+        }
       }
     },
     "clients": {
@@ -793,7 +412,34 @@
       },
       "allMonths": "All months",
       "allCaughtUpTitle": "All caught up",
-      "allCaughtUpSubtitle": "Every completed repair already has an issued platform invoice, or none are done yet."
+      "allCaughtUpSubtitle": "Every completed repair already has an issued platform invoice, or none are done yet.",
+      "heroSubtitle": "Issue numbered sales invoices from completed repairs, or attach an external PDF on the repair when you use another accounting app.",
+      "companyOverview": "Company overview",
+      "companyOverviewBody": "{legalName} — {branchCount} centers linked. Invoices below are for the active center; unpaid issued total across branches: {total}.",
+      "branchUnpaid": "• {shopName}: {count} unpaid issued",
+      "numberingSeries": "Numbering series",
+      "numberingLocked": "Prefix and width are locked after your first issued invoice. Next number advances automatically on issue.",
+      "numberingOpen": "Set prefix and zero-pad width before the first issued invoice — e.g. prefix 01 → 01000001.",
+      "labelOptional": "Label (optional)",
+      "prefix": "Prefix",
+      "sequenceWidth": "Sequence width",
+      "nextSequence": "Next sequence: {value}",
+      "saveNumbering": "Save numbering",
+      "savedNumbering": "Invoice numbering updated.",
+      "seriesSaveError": "Could not save series",
+      "filterInvoices": "Filter invoices",
+      "clientSearch": "Client search",
+      "clientSearchPlaceholder": "Name or company on invoice",
+      "monthIssued": "Month (issued date)",
+      "noInvoices": "No invoices yet",
+      "noInvoicesFiltered": "No invoices match filters",
+      "noInvoicesHint": "Open a completed repair and tap “Create platform invoice”, or use the Uninvoiced repairs tab.",
+      "noInvoicesFilterHint": "Try another client name or month.",
+      "uninvoicedHint": "Completed repairs without an issued platform invoice. Tap a row to create a draft invoice.",
+      "completedRepair": "Completed repair",
+      "loadError": "Failed to load invoicing data",
+      "createDraftError": "Could not create invoice draft",
+      "yourCompany": "Your company"
     },
     "warehouse": {
       "addDocument": "Add document",
@@ -819,7 +465,713 @@
       "button": "Compare (soon)"
     },
     "calendar": {
-      "today": "Today"
+      "today": "Today",
+      "closed": "Closed",
+      "noTimeSet": "No time set",
+      "pickTime": "Pick a time",
+      "vehicleFallback": "Vehicle",
+      "repairTypeMissing": "Repair type: not selected",
+      "vehicleTypeMissing": "Vehicle type: not selected",
+      "noDateYet": "No date yet",
+      "noDateYetHint": "Open requests waiting for you to pick a day and time",
+      "schedule": "Schedule",
+      "notNow": "Not now",
+      "vehicleAtCenter": "Vehicle at center",
+      "arrivalOnVisitDay": "Arrived available on visit day",
+      "scheduleVisit": "Schedule visit",
+      "decline": "Decline",
+      "arrived": "Arrived",
+      "reschedule": "Reschedule",
+      "changeTime": "Change time",
+      "loadError": "Could not load calendar",
+      "invalidDate": "Use DD.MM.YYYY",
+      "invalidDateTitle": "Invalid date",
+      "sentToClientTitle": "Sent to client",
+      "sentToClientBody": "The owner must accept or decline the new time before it is confirmed.",
+      "scheduledTitle": "Scheduled",
+      "scheduledBody": "Appointment time saved.",
+      "scheduleError": "Could not update schedule",
+      "vehicleArrivedTitle": "Vehicle arrived",
+      "vehicleArrivedBody": "Repair is now in service. The owner has been notified.",
+      "arrivalError": "Could not confirm arrival",
+      "declineToast": "Appointment declined — owner notified.",
+      "declineError": "Could not decline request",
+      "declineTitle": "Decline appointment?",
+      "declineMessage": "The owner will be notified that you cannot take this visit. The request will be removed from your calendar.",
+      "removeTitle": "Remove from queue?",
+      "removeMessage": "This job will leave the calendar queue. You can still find it under Repairs.",
+      "remove": "Remove",
+      "removeError": "Could not remove from queue",
+      "moveTitle": "Move appointment",
+      "scheduleTitle": "Schedule appointment",
+      "serviceFallback": "Service",
+      "customDateLabel": "Custom date (DD.MM.YYYY)",
+      "noteLabel": "Note for client (optional)",
+      "sendToClient": "Send to client",
+      "notSignedIn": "Not signed in",
+      "jobKinds": {
+        "client_request": "Client request",
+        "booked": "Booked",
+        "needs_date": "Needs date"
+      },
+      "load": {
+        "free": "{duration} free",
+        "freeForJob": "No labor booked · {duration} free for this job",
+        "workdayAvailable": "No labor booked · {duration} workday available",
+        "dayFull": "{booked} labor booked · day full",
+        "tightForJob": "{booked} booked · tight for a {jobDuration} job",
+        "stillFree": "{booked} labor booked · {remaining} still free",
+        "bookedToday": "{booked} labor booked this day",
+        "left": "{booked} · {remaining} left"
+      }
+    }
+  },
+  "vehicles": {
+    "title": "Vehicles",
+    "addVehicle": "Add Vehicle",
+    "addFirstVehicle": "Add your first vehicle",
+    "vehicle": "Vehicle",
+    "vehicleDetails": "Vehicle Details",
+    "yourVehicle": "Your vehicle",
+    "emptyTitle": "No vehicles yet",
+    "emptyBody": "Add your first vehicle to track service history, health, and repairs.",
+    "emptyList": "No vehicles found. Add one!",
+    "myVehicles": "My Vehicles",
+    "unknownVehicle": "Unknown vehicle",
+    "serviceHistory": "Service History",
+    "health": "Vehicle Health"
+  },
+  "health": {
+    "status": {
+      "healthy": "Healthy",
+      "maintenance_recommended": "Maintenance recommended",
+      "needs_attention": "Needs attention",
+      "in_service": "In service",
+      "at_service_center": "At service center"
+    },
+    "subtitle": {
+      "healthy": "No urgent issues found.",
+      "maintenance_recommended": "Add service history or reminders to improve insights.",
+      "needs_attention": "There are active items that may need review.",
+      "in_service": "Active repair request in progress.",
+      "in_service_scheduled": "Scheduled service appointment in progress.",
+      "at_service_center": "Your vehicle is currently being serviced."
+    },
+    "reasons": {
+      "active_repairs": "Vehicle currently has active repair requests.",
+      "denied_repairs": "Rejected repair request needs review.",
+      "mileage_missing": "Mileage not recorded",
+      "mileage_stale": "Mileage not updated recently",
+      "no_oil_service_history": "No oil service history",
+      "oil_service_overdue": "Oil service overdue",
+      "oil_service_due_soon": "Oil change approaching",
+      "no_brake_check_history": "No brake service history",
+      "brake_check_overdue": "Brake service overdue",
+      "brake_check_due_soon": "Brake check approaching",
+      "no_reminders": "No reminders configured",
+      "obligation_overdue": "{type} overdue"
+    },
+    "domains": {
+      "oil": "Oil service",
+      "brake": "Brake service",
+      "reminders": "Reminders",
+      "mileage": "Mileage",
+      "active_repairs": "Active repairs"
+    },
+    "actions": {
+      "update_km": "Update kilometers",
+      "add_service_history": "Add service history",
+      "configure_reminders": "Configure reminders",
+      "schedule_maintenance": "Schedule maintenance",
+      "book_repair": "Book repair"
+    }
+  },
+  "reminders": {
+    "uiStatus": {
+      "pending_setup": "Pending setup",
+      "overdue": "Overdue",
+      "due_soon": "Due soon",
+      "done": "Done",
+      "active_until_due": "Active until due",
+      "prediction_only": "Estimated — confirm date"
+    },
+    "cta": {
+      "set_reminder": "Set reminder"
+    },
+    "types": {
+      "insurance": "Insurance",
+      "technical_inspection": "Technical inspection",
+      "road_tax": "Road tax",
+      "vignette": "Vignette",
+      "oil_service": "Oil change",
+      "tire_change": "Tire change",
+      "battery_check": "Battery check",
+      "suspension_service": "Suspension service",
+      "brake_check": "Brake check",
+      "custom": "Custom reminder"
+    }
+  },
+  "repairs": {
+    "title": "Repairs",
+    "tabs": {
+      "requests": "Requests",
+      "offers": "Offers",
+      "active": "Active Repairs",
+      "completed": "Completed Repairs"
+    },
+    "emptyTitle": "No repairs found",
+    "emptySubtitle": "Nothing in \"{status}\" right now.",
+    "repairRequests": "Repair Requests",
+    "openRequests": "Open Requests",
+    "pendingOffers": "Pending Offers",
+    "requestService": "Request Service",
+    "sendRequest": "Send request",
+    "preferredVisit": "Preferred visit",
+    "oilChange": "Oil Change",
+    "brakeRepair": "Brake Repair",
+    "acRefill": "AC Refill",
+    "acService": "AC Service",
+    "diagnostics": "Diagnostics",
+    "serviceHistoryTitle": "Service History",
+    "serviceHistoryEmptyTitle": "No service history yet",
+    "serviceHistoryEmptyBody": "Completed repairs and logged service records will appear here."
+  },
+  "requestService": {
+    "editTitle": "Edit Request",
+    "saveChanges": "Save changes",
+    "requestingFrom": "Requesting service from:",
+    "change": "Change",
+    "changeVehicle": "Change vehicle",
+    "hideList": "Hide list",
+    "vehicleRequired": "Vehicle *",
+    "whatIsProblem": "What is the problem?",
+    "problemPlaceholder": "e.g. oil change, brake noise, AC not cooling, warning light...",
+    "suggestedServices": "Suggested services",
+    "quickPopularServices": "Quick popular services",
+    "browseAllServices": "Browse all services",
+    "hideServices": "Hide services",
+    "selected": "Selected",
+    "inferredMatched": "Based on your description, this looks like \"{name}\".",
+    "inferredDefault": "If you don't pick a type, we'll send this as \"{name}\".",
+    "addPhotosOrVideo": "Add photos or video",
+    "photosHelp": "Photos help the service center understand the issue faster.",
+    "addPhoto": "Add photo",
+    "addVideo": "Add video",
+    "video": "Video",
+    "noMediaTitle": "No media added yet",
+    "noMediaSubtitle": "Optional — you can send your request without photos or video.",
+    "existingMediaLabel": "Existing media (read-only)",
+    "existingMediaFallback": "Existing media",
+    "preferredVisitHint": "Preferred visit — the service center must confirm before it is booked.",
+    "preferredVisitSummary": "Preferred visit: {date} (pending service center confirmation)",
+    "preferredVisitSummaryWithTime": "Preferred visit: {date}, {time} (pending service center confirmation)",
+    "extraTimingNotes": "Extra timing notes (optional)",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "routingPreferences": "Routing preferences",
+    "showAdvanced": "Show advanced options",
+    "hideAdvanced": "Hide advanced options",
+    "routingHint": "Choose how your request is routed to service centers.",
+    "routingDefaultsHint": "Defaults route your request to nearby qualified service centers.",
+    "whoReceives": "Who should receive request?",
+    "targetingAllQualified": "Nearby qualified service centers",
+    "targetingSelected": "Selected service centers",
+    "targetingVerified": "Verified service centers only",
+    "targetingOperator": "Ask platform to help choose",
+    "preferredCenters": "Preferred service centers",
+    "serviceCenterFallback": "Service Center #{id}",
+    "noMatchingCenters": "No matching service centers available for current vehicle/service filters.",
+    "guaranteeTitle": "Request guaranteed service centers",
+    "guaranteeHelper": "Only service centers offering guarantee will receive this request.",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "turnOn": "Turn on",
+    "turnOff": "Turn off",
+    "preferredRadius": "Preferred radius (km)",
+    "radiusPlaceholder": "Optional, e.g. 15",
+    "kilometersOptional": "Kilometers (optional)",
+    "kilometersPlaceholder": "e.g. 95000",
+    "kilometersHint": "Optional current-km hint for this request.",
+    "kilometersShownOnVehicle": "Shown on vehicle: {km}",
+    "kilometersCurrentOdometer": "Current odometer if you know it",
+    "permissionRequired": "Permission required",
+    "permissionMedia": "Allow access to photos/videos to attach media.",
+    "pickPhotoFailed": "Failed to pick photo.",
+    "pickVideoFailed": "Failed to pick video.",
+    "vehicleRequiredError": "Vehicle is required.",
+    "describeOrPickType": "Describe the problem or pick a service type so the service center can understand your request.",
+    "selectCenterOrMode": "Select at least one service center or choose another targeting mode.",
+    "classifyAs": "We'll classify this as \"{name}\" based on your description.",
+    "noTypeSelected": "No service type selected — we'll send this as \"{name}\" so the service center can review it.",
+    "onlyOpenEditable": "Only open requests can be edited.",
+    "loadFormError": "Error loading form data",
+    "requestUpdatedMediaFailed": "Request updated, but some media failed to upload.",
+    "repairCreatedMediaFailed": "Repair was created, but some media failed to upload.",
+    "requestUpdated": "Request updated!",
+    "repairCreated": "Repair created!",
+    "submissionFailed": "Submission failed",
+    "backRequests": "Requests",
+    "backServiceCenter": "Service center",
+    "backDashboard": "Dashboard",
+    "requestFrom": "Request from {label}",
+    "description": "Description",
+    "selectRepairType": "Select repair type",
+    "submitRequest": "Submit request",
+    "repairCreatedOpen": "Repair request created as OPEN.",
+    "createFailed": "Failed to create repair request.",
+    "autoServiceCenter": "Auto service center",
+    "motorcycleServiceCenter": "Motorcycle service center",
+    "bicycleServiceCenter": "Bicycle service center",
+    "ebikeServiceCenter": "E-bike service center",
+    "trailerServiceCenter": "Trailer service center",
+    "namedServiceCenter": "{name} service center"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "tabs": {
+      "alerts": "Alerts",
+      "offers": "Offers",
+      "promos": "Promos"
+    },
+    "recentActivity": "Recent activity",
+    "liveHint": "Live messages from your current Veversal account.",
+    "intro": "Your vehicle alerts, offers, bookings and documents — organized in one place.",
+    "previewAlerts": "Preview alerts",
+    "openCenter": "Open notification center",
+    "emptyEmbedded": "No recent activity in your live feed yet.",
+    "emptyTitle": "No notifications yet",
+    "emptySubtitle": "Offers, promotions, bookings, and reschedule updates appear here.",
+    "defaultTitle": "Notification",
+    "loadError": "Could not load notifications",
+    "noLinkedDetail": "No linked detail for this notification.",
+    "openError": "Failed to open notification.",
+    "categories": {
+      "criticalAlerts": "Critical Alerts",
+      "maintenanceDue": "Maintenance Due",
+      "insuranceExpiring": "Insurance Expiring",
+      "inspectionDue": "Inspection Due",
+      "offersReceived": "Offers Received",
+      "bookingsConfirmed": "Bookings Confirmed",
+      "messages": "Messages",
+      "safetyRecalls": "Safety Recalls",
+      "softwareUpdates": "Software Updates",
+      "documentsReady": "Documents Ready",
+      "serviceCompleted": "Service Completed"
+    },
+    "severity": {
+      "critical": "Critical",
+      "warning": "Attention",
+      "info": "Info",
+      "success": "Update"
+    },
+    "placeholders": {
+      "oilChange": {
+        "title": "Oil change recommended",
+        "description": "Based on your mileage trend, schedule an oil change in the next 1,500 km.",
+        "action": "View vehicle"
+      },
+      "newOffer": {
+        "title": "New offer from a service center",
+        "description": "A nearby center sent a quote for your open repair request.",
+        "action": "Review offer"
+      },
+      "inspection": {
+        "title": "Annual inspection approaching",
+        "description": "Keep your roadworthiness documents up to date before expiry.",
+        "action": "See reminders"
+      },
+      "visitConfirmed": {
+        "title": "Visit confirmed",
+        "description": "Your service center confirmed the appointment time.",
+        "action": "Open booking"
+      },
+      "invoice": {
+        "title": "Invoice uploaded",
+        "description": "A repair document was added to your vehicle history.",
+        "action": "View document"
+      }
+    },
+    "hints": {
+      "reschedule_proposed": "Tap to accept or decline the new time",
+      "repair_scheduled": "Tap to view appointment details",
+      "repair_ready_for_pickup": "Tap to view completed service details",
+      "open_repair": "Tap to open repair"
+    },
+    "templates": {
+      "reschedule_proposed": {
+        "title": "Reschedule proposed",
+        "body": "A service center proposed a new appointment time."
+      },
+      "repair_scheduled": {
+        "title": "Appointment scheduled",
+        "body": "Your repair visit has been scheduled."
+      },
+      "repair_ready_for_pickup": {
+        "title": "Ready for pickup",
+        "body": "Your vehicle is ready for pickup."
+      },
+      "offer_received": {
+        "title": "New offer received",
+        "body": "A service center sent a quote for your request."
+      },
+      "offer_status": {
+        "title": "Offer update",
+        "body": "There is an update on your repair offer."
+      },
+      "repair_completed": {
+        "title": "Repair completed",
+        "body": "Your repair has been marked as completed."
+      },
+      "booking_confirmed": {
+        "title": "Booking confirmed",
+        "body": "Your service appointment has been confirmed."
+      },
+      "document_ready": {
+        "title": "Document ready",
+        "body": "A new document is available in your account."
+      }
+    }
+  },
+  "documents": {
+    "title": "Documents"
+  },
+  "profile": {
+    "title": "Profile",
+    "appearance": "Appearance",
+    "garageScene": "Garage Scene",
+    "garageSceneHelper": "Choose a garage scene for your dashboard background.",
+    "preferredContact": "Preferred contact",
+    "contactHelperSavedLocally": "Saved locally for now.",
+    "vehicleAccess": "Vehicle access & sharing",
+    "vehicleAccessHelper": "You'll later be able to share vehicle access with family members, drivers, or fleet managers.",
+    "phonePrefixHelperWithCountry": "Prefix is set from your country when available — you can edit it if needed.",
+    "phonePrefixHelperNoCountry": "No country selected: enter your international prefix (e.g. +359) so we can store a callable number.",
+    "basicProfile": "Basic profile",
+    "heroSubtitle": "Use any display name you prefer. Real/legal names are not required.",
+    "displayNameLabel": "Display name / nickname",
+    "displayNamePlaceholder": "How should service centers address you?",
+    "displayNameHelper": "Privacy-first: choose a friendly name you are comfortable sharing.",
+    "location": "Location",
+    "country": "Country",
+    "selectCountry": "Select country...",
+    "city": "City (selectable)",
+    "searchCity": "Search city",
+    "searchCityPlaceholder": "Type at least 2 letters to search",
+    "selectCountryFirst": "Select country first...",
+    "loadingCities": "Loading cities...",
+    "selectCity": "Select city...",
+    "contactPreferences": "Contact preferences",
+    "contactHelper": "This information helps service centers contact you about repairs and service updates.",
+    "prefix": "Prefix",
+    "number": "Number",
+    "numberPlaceholder": "e.g. 888123456",
+    "noProfile": "No client profile found.",
+    "savedSuccess": "Profile updated successfully!",
+    "loadError": "Error loading profile data",
+    "saveError": "Error saving profile",
+    "phoneRequired": "Enter your phone number (digits after the country prefix).",
+    "phonePrefixMissingNoCountry": "Select a country to set the prefix automatically, or enter a country code (e.g. +359) in the prefix field.",
+    "phonePrefixMissing": "Enter a country prefix (e.g. +359). Your selected country did not provide one — fill the prefix field manually.",
+    "phoneInvalid": "Check the country prefix and number — the full phone could not be built."
+  },
+  "partnerProfile": {
+    "title": "Profile",
+    "backLabel": "Dashboard",
+    "completeCenterDetails": "Complete center details",
+    "centerDetails": "Center details",
+    "saveCenterDetails": "Save center details",
+    "saveAndContinue": "Save and continue",
+    "profileReady": "Profile ready for clients",
+    "profileCompletion": "Profile completion",
+    "profileReadyBody": "Clients can find you on the map and open repair requests.",
+    "profileReadyPolish": " Optional polish: {hints}.",
+    "profileReadyAddMore": " Add photos and services to strengthen your page.",
+    "publicPreviewTitle": "Public page preview",
+    "publicPreviewReady": "How clients see your shop on the map and in search.",
+    "publicPreviewDraft": "Live preview — finish required fields above to go live.",
+    "previewHowClientsSee": "How clients will see your shop",
+    "photos": "Photos",
+    "addPhoto": "Add photo",
+    "noPhotosTitle": "No photos uploaded",
+    "noPhotosSubtitle": "Add photos to build trust and improve profile quality.",
+    "noProfile": "No service center profile found.",
+    "savedSuccess": "Profile updated successfully!",
+    "savedSetupPartial": "Profile saved. Please finish the required fields to start serving jobs.",
+    "loadError": "Error loading profile data",
+    "saveError": "Error saving profile",
+    "missingFields": "Please add {fields} before continuing."
+  },
+  "public": {
+    "findServiceCenters": "Find Service Centers",
+    "findNearbyTrusted": "Find nearby trusted centers",
+    "serviceCenter": "Service Center",
+    "serviceCenters": "Service Centers"
+  },
+  "serviceCenters": {
+    "findTitle": "Find Service Centers",
+    "authorizeTitle": "Authorize a service center",
+    "exploreTitle": "Explore Service Centers",
+    "searchPlaceholder": "Search centers, city, service, brand...",
+    "locateMe": "Locate me",
+    "search": "Search",
+    "filters": "Filters",
+    "filtersExpanded": "Filters (expanded)",
+    "filtersCount": "Filters ({count})",
+    "hideFilters": "Hide filters",
+    "openNow": "Open now",
+    "verified": "Verified",
+    "closed": "Closed",
+    "viewProfile": "View profile",
+    "directions": "Directions",
+    "requestService": "Request service",
+    "useForRecord": "Use for this record",
+    "distanceUnavailable": "Distance unavailable",
+    "setLocationForDistance": "Set location to see distance",
+    "allBrands": "All brands",
+    "brandsLabel": "Brands: {brands}",
+    "ownerReported": "Owner reported",
+    "listTab": "List",
+    "mapTab": "Map",
+    "geoError": "Could not get your location.",
+    "emptyTitle": "No service centers match these filters.",
+    "clearFilters": "Clear filters",
+    "showAllInCity": "Show all in {city}",
+    "addMissingCenter": "Add missing service center",
+    "any": "Any",
+    "vehicleType": "Vehicle Type",
+    "serviceCategory": "Service category",
+    "repairType": "Repair type",
+    "brand": "Brand",
+    "rating": "Rating",
+    "distance": "Distance",
+    "sort": {
+      "recommended": "Recommended",
+      "distance": "Distance",
+      "rating": "Rating"
+    },
+    "ratingFilter": {
+      "any": "Any rating",
+      "3plus": "3+ stars",
+      "4plus": "4+ stars",
+      "4_5plus": "4.5+ stars"
+    },
+    "distanceFilter": {
+      "any": "Any distance",
+      "10km": "Within 10 km",
+      "25km": "Within 25 km",
+      "50km": "Within 50 km",
+      "100km": "Within 100 km"
+    },
+    "profile": {
+      "defaultTitle": "Service Center Details",
+      "offersGuarantee": "Offers guarantees",
+      "notRated": "Not rated yet",
+      "reviews": "{rating} · {count} reviews",
+      "completedJobs": "{count} completed jobs",
+      "completedJobsUnknown": "Completed jobs · —",
+      "chooseVehicles": "Choose vehicles to authorize",
+      "authorizeHint": "Share full mechanical history with this service center for the vehicles you choose below.",
+      "alreadyAuthorized": "{vehicle} is already authorized here.",
+      "chooseForVehicle": "Choose which vehicles to authorize for {vehicle}.",
+      "authorized": "Authorized",
+      "unclaimedTitle": "Owner-reported · not claimed yet",
+      "unclaimedBody": "This service center was added from a customer service record. The business can claim this profile later to manage bookings and confirm records.",
+      "photos": "Photos",
+      "noPhotosTitle": "No photos yet",
+      "noPhotosSubtitle": "This service center has not uploaded photos.",
+      "about": "About",
+      "services": "Services",
+      "servicesNotAdded": "Services not added yet",
+      "publishedPricing": "Published pricing",
+      "priceOnRequest": "Price on request",
+      "priceFrom": "from {price}",
+      "vehicleTypes": "Vehicle types",
+      "vehicleTypesNotAdded": "Vehicle types not added yet",
+      "brands": "Brands",
+      "workingHours": "Working hours",
+      "workingHoursNotAdded": "Working hours not added yet",
+      "links": "Links",
+      "authorizeSection": "Authorize this service center",
+      "authorizeExplainer": "Authorization shares full mechanical service history for the vehicles you select. Booking a repair without authorizing only grants access to that job and related prior work in the same category.",
+      "editCenterDetails": "Edit center details",
+      "loadErrorTitle": "Could not load service center",
+      "loadErrorNetwork": "The Veversal service is temporarily unavailable. Please try again in a moment.",
+      "loadErrorInvalid": "This service center link is invalid or outdated.",
+      "loadErrorGeneric": "Check your connection and try again.",
+      "requestServiceA11y": "Request service at this shop",
+      "addVehicleFirstTitle": "Add a vehicle first",
+      "addVehicleFirstBody": "You need at least one vehicle before requesting a repair."
+    }
+  },
+  "footer": {
+    "copyright": "© Veversal",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "contact": "Contact",
+    "support": "Support",
+    "version": "Version",
+    "versionMobile": "Version x.x.x",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service",
+    "cookiePolicy": "Cookie Policy",
+    "helpCenter": "Help Center",
+    "faq": "FAQ",
+    "careers": "Careers",
+    "about": "About",
+    "twitter": "Twitter",
+    "instagram": "Instagram",
+    "linkedin": "LinkedIn",
+    "facebook": "Facebook",
+    "youtube": "YouTube",
+    "github": "GitHub",
+    "blog": "Blog",
+    "apiDocs": "API Documentation",
+    "languageRegion": "Language/Region selector"
+  },
+  "vehicleTypes": {
+    "car": "Car",
+    "truck": "Truck",
+    "motorcycle": "Motorcycle",
+    "bicycle": "Bike",
+    "ebike": "E-bike",
+    "scooter": "Scooter",
+    "van": "Van",
+    "trailer": "Trailer",
+    "agricultural": "Agricultural",
+    "construction": "Construction",
+    "other": "Other"
+  },
+  "serviceCenterProfile": {
+    "aboutTemplate": "{serviceCenterName} is a service center{vehiclePhrase}{servicesPhrase}{locationPhrase}.",
+    "vehiclePhrase": " servicing {vehicleTypes}",
+    "servicesPhrase": " offering {services}",
+    "locationPhrase": " in {locationLine}"
+  },
+  "serviceCenterList": {
+    "vehiclesLabel": "Vehicles: {vehicles}",
+    "servicesLabel": "Services: {services}",
+    "moreCount": " +{count} more"
+  },
+  "listJoin": {
+    "two": "{a} and {b}",
+    "three": "{a}, {b}, and {c}",
+    "conjunction": "and",
+    "serialComma": ","
+  },
+  "seo": {
+    "dashboard": "{app} Dashboard",
+    "partnerDashboard": "{app} Partner Dashboard",
+    "partnerProfile": "{app} Partner Profile",
+    "publicPreview": "{app} Public Page Preview",
+    "repairs": "{app} Repairs",
+    "requestService": "{app} — Request Service",
+    "forgotPassword": "{app} — Reset Password",
+    "bookings": "{app} Bookings",
+    "calendar": "{app} Calendar",
+    "clients": "{app} Clients",
+    "promotions": "{app} Promotions",
+    "warehouse": "{app} Warehouse",
+    "invoicing": "{app} Invoicing",
+    "priceList": "{app} Price List",
+    "notifications": "{app} Notifications",
+    "switchCenter": "{app} Switch Service Center",
+    "addServiceCenter": "{app} Add Service Center",
+    "serviceCenters": "{app} Service Centers",
+    "myVehicles": "{app} My Vehicles",
+    "addVehicle": "{app} Add Vehicle",
+    "serviceHistory": "{app} Service History",
+    "documents": "{app} Documents",
+    "profile": "{app} Profile",
+    "vehicleDetails": "{app} Vehicle Details",
+    "vehicleSpecs": "{app} Vehicle Specs",
+    "chooseServiceCenter": "{app} Choose Service Center",
+    "addServiceRecord": "{app} Add Service Record",
+    "addObligation": "{app} Add Obligation / Payment",
+    "serviceCenterAccess": "{app} Service Center Access",
+    "sendProposal": "{app} Send Proposal",
+    "serviceCentersMeta": {
+      "title": "{app} Service Centers",
+      "description": "Discover service centers, compare services, and find trusted vehicle care on Veversal.",
+      "discovery": {
+        "root": {
+          "title": "{app} Service Centers",
+          "h1": "Service Centers",
+          "description": "Discover service centers, compare services, and find trusted vehicle care on Veversal."
+        },
+        "vehicleCityRepair": {
+          "title": "{vehicle} {repair} in {city} | {app}",
+          "h1": "{vehicle} {repair} in {city}",
+          "description": "Find service centers for {vehicle} {repair} in {city} on {app}."
+        },
+        "vehicleCity": {
+          "title": "{vehicle} service centers in {city} | {app}",
+          "h1": "{vehicle} service centers in {city}",
+          "description": "Find {vehicle} service centers in {city} on {app}."
+        },
+        "vehicle": {
+          "title": "{vehicle} service centers | {app}",
+          "h1": "{vehicle} service centers",
+          "description": "Browse {vehicle} service centers on {app}."
+        },
+        "repairCity": {
+          "title": "{repair} in {city} | {app}",
+          "h1": "{repair} in {city}",
+          "description": "Find service centers for {repair} in {city} on {app}."
+        },
+        "repair": {
+          "title": "{repair} | {app}",
+          "h1": "{repair}",
+          "description": "Find service centers for {repair} on {app}."
+        },
+        "city": {
+          "title": "Service centers in {city} | {app}",
+          "h1": "Service centers in {city}",
+          "description": "Find service centers in {city} for repairs, maintenance, and trusted vehicle care on {app}."
+        },
+        "brand": {
+          "title": "{brand} service centers | {app}",
+          "h1": "{brand} service centers",
+          "description": "Find service centers specializing in {brand} vehicles on {app}."
+        },
+        "brandCity": {
+          "title": "{brand} service centers in {city} | {app}",
+          "h1": "{brand} service centers in {city}",
+          "description": "Find {brand} service centers in {city} on {app}."
+        },
+        "brandCityRepair": {
+          "title": "{brand} {repair} in {city} | {app}",
+          "h1": "{brand} {repair} in {city}",
+          "description": "Find {brand} service centers for {repair} in {city} on {app}."
+        },
+        "brandRepair": {
+          "title": "{brand} {repair} | {app}",
+          "h1": "{brand} {repair}",
+          "description": "Find {brand} service centers for {repair} on {app}."
+        }
+      }
+    },
+    "serviceCenterProfile": {
+      "title": "{name} | {app}",
+      "description": "{name} service center profile in {city} on Veversal."
+    },
+    "vehicles": {
+      "title": "{app} Vehicles"
+    },
+    "repairsPage": {
+      "title": "{app} Repairs"
+    },
+    "vehicleTypes": {
+      "car": "Car",
+      "truck": "Truck",
+      "motorcycle": "Motorcycle",
+      "bicycle": "Bike",
+      "ebike": "E-bike",
+      "scooter": "Scooter",
+      "van": "Van",
+      "trailer": "Trailer",
+      "agricultural": "Agricultural",
+      "construction": "Construction",
+      "other": "Other"
     }
   }
 }

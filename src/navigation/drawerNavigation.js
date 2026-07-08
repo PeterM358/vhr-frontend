@@ -130,3 +130,31 @@ export function resetShopDrawerRepairs(navigation) {
     requestAnimationFrame(() => syncWebPath(partnerRepairs()));
   }
 }
+
+/** Shop Calendar lives inside ShopDrawer — reset stack + select calendar with localized web path. */
+export function resetShopDrawerCalendar(navigation, params = {}) {
+  const routeParams = {
+    returnTo: 'ShopDashboard',
+    backLabel: 'Home',
+    ...params,
+  };
+  const root = getRootNavigation(navigation);
+  root.dispatch(
+    CommonActions.reset({
+      index: 0,
+      routes: [
+        {
+          name: 'ShopHome',
+          state: {
+            index: 1,
+            routes: [{ name: 'ShopDashboard' }, { name: 'ShopCalendar', params: routeParams }],
+          },
+        },
+      ],
+    })
+  );
+  if (Platform.OS === 'web') {
+    syncWebPath(partnerCalendar());
+    requestAnimationFrame(() => syncWebPath(partnerCalendar()));
+  }
+}

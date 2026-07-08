@@ -47,7 +47,6 @@ import {
 import { API_BASE_URL } from '../api/config';
 import { uploadShopImage, deleteShopImage } from '../api/shops';
 import { getMakes } from '../api/vehicles';
-import FloatingSaveBar from '../components/ui/FloatingSaveBar';
 import SearchableChipSelector from '../components/ui/SearchableChipSelector';
 import { vehicleTypeEmoji } from '../utils/vehicleTypeIcons';
 
@@ -94,10 +93,13 @@ import { getServiceMenu } from '../api/serviceMenu';
 import { resolveRepairTypeIcon } from '../utils/repairTypeIcons';
 import ShopInvoiceSettingsSection from '../components/shop/ShopInvoiceSettingsSection';
 import LanguagePicker from '../components/profile/LanguagePicker';
+import ProfileHeaderSaveButton from '../components/profile/ProfileHeaderSaveButton';
 import { useTranslation } from '../i18n';
 import { pickVehiclePhotoAttachment, pickInvoiceLogoAttachment } from '../utils/pickDocumentFile';
 import { emptyLegalEntityDraft } from '../utils/invoiceTaxLabels';
 import { attachLunchBreak, parseLunchBreak } from '../utils/shopWorkingHours';
+import { buildShopProfileSaveSnapshot } from '../utils/shopProfileSaveSnapshot';
+import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const DAY_KEY = {
@@ -270,6 +272,7 @@ export default function ShopProfileScreen({ navigation, route }) {
   const [legalEntityOptions, setLegalEntityOptions] = useState([]);
   const sectionsInitialized = useRef(false);
   const mapPickHandledRef = useRef(null);
+  const [savedSnapshot, setSavedSnapshot] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -437,6 +440,37 @@ export default function ShopProfileScreen({ navigation, route }) {
     []
   );
 
+  const workingHoursPayload = useMemo(
+    () => buildWorkingHoursPayload(hoursRows, lunchBreakHours, lunchStart),
+    [hoursRows, lunchBreakHours, lunchStart]
+  );
+
+  const currentSnapshot = useMemo(
+    () =>
+      buildShopProfileSaveSnapshot({
+        profile,
+        selectedServices,
+        selectedVehicleTypes,
+        selectedBrandIds,
+        allBrandsServiced,
+        workingHoursPayload,
+        preferredContactMethods,
+        legalEntity,
+      }),
+    [
+      profile,
+      selectedServices,
+      selectedVehicleTypes,
+      selectedBrandIds,
+      allBrandsServiced,
+      workingHoursPayload,
+      preferredContactMethods,
+      legalEntity,
+    ]
+  );
+
+  const isDirty = Boolean(savedSnapshot && currentSnapshot && savedSnapshot !== currentSnapshot);
+
   const openMapPicker = useCallback(() => {
     const lat = parseOptionalCoordinate(profile?.latitude);
     const lon = parseOptionalCoordinate(profile?.longitude);
@@ -526,7 +560,7 @@ export default function ShopProfileScreen({ navigation, route }) {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      title: requireSetup ? 'Complete center details' : 'Center details',
+      title: requireSetup ? t('partnerProfile.completeCenterDetails') : t('partnerProfile.centerDetails'),
       headerBackVisible: !requireSetup,
       headerLeft: requireSetup ? () => null : undefined,
       headerRight: requireSetup
@@ -546,6 +580,7 @@ export default function ShopProfileScreen({ navigation, route }) {
   }, [
     navigation,
     requireSetup,
+    t,
     setAuthToken,
     setIsAuthenticated,
     setUserEmailOrPhone,
@@ -627,25 +662,46 @@ export default function ShopProfileScreen({ navigation, route }) {
         const p0 =
           shopProfiles.find((row) => String(row.id) === String(currentShopId)) || shopProfiles[0];
         const p = await mergeRegistrationContact(p0);
-        setProfile(p);
-        setLegalEntity(
-          p.legal_entity_detail
-            ? { ...p.legal_entity_detail }
-            : emptyLegalEntityDraft(p)
-        );
-        setSelectedServices(sanitizeArray(p.available_repairs));
-        setSelectedVehicleTypes(sanitizeArray(p.supported_vehicle_types));
-        setSelectedBrandIds(sanitizeArray(p.brands));
-        setAllBrandsServiced(!!p.all_brands_serviced);
-        setHoursRows(
+        const loadedServices = sanitizeArray(p.available_repairs);
+        const loadedVehicleTypes = sanitizeArray(p.supported_vehicle_types);
+        const loadedBrandIds = sanitizeArray(p.brands);
+        const loadedAllBrands = !!p.all_brands_serviced;
+        const loadedHours =
           p.working_hours != null && p.working_hours !== ''
             ? parseWorkingHours(p.working_hours)
-            : DEFAULT_HOURS
+            : DEFAULT_HOURS;
+        const loadedLunch = parseLunchBreak(p.working_hours);
+        const loadedContact = parsePreferredContactMethods(p);
+        const loadedLegal = p.legal_entity_detail
+          ? { ...p.legal_entity_detail }
+          : emptyLegalEntityDraft(p);
+
+        setProfile(p);
+        setLegalEntity(loadedLegal);
+        setSelectedServices(loadedServices);
+        setSelectedVehicleTypes(loadedVehicleTypes);
+        setSelectedBrandIds(loadedBrandIds);
+        setAllBrandsServiced(loadedAllBrands);
+        setHoursRows(loadedHours);
+        setLunchBreakHours(loadedLunch.hours);
+        setLunchStart(loadedLunch.start);
+        setPreferredContactMethods(loadedContact);
+        setSavedSnapshot(
+          buildShopProfileSaveSnapshot({
+            profile: p,
+            selectedServices: loadedServices,
+            selectedVehicleTypes: loadedVehicleTypes,
+            selectedBrandIds: loadedBrandIds,
+            allBrandsServiced: loadedAllBrands,
+            workingHoursPayload: buildWorkingHoursPayload(
+              loadedHours,
+              loadedLunch.hours,
+              loadedLunch.start
+            ),
+            preferredContactMethods: loadedContact,
+            legalEntity: loadedLegal,
+          })
         );
-        const lunch = parseLunchBreak(p.working_hours);
-        setLunchBreakHours(lunch.hours);
-        setLunchStart(lunch.start);
-        setPreferredContactMethods(parsePreferredContactMethods(p));
 
         if (p.country) {
           const cityList = await getCitiesForCountry(p.country);
@@ -670,7 +726,7 @@ export default function ShopProfileScreen({ navigation, route }) {
       }
     } catch (err) {
       console.error(err);
-      setDialogMessage('Error loading profile data');
+      setDialogMessage(t('partnerProfile.loadError'));
       setDialogVisible(true);
     } finally {
       setLoading(false);
@@ -710,7 +766,7 @@ export default function ShopProfileScreen({ navigation, route }) {
     };
     const missing = getShopProfileIncompleteFields(draftProfile);
     if (missing.length) {
-      setDialogMessage(`Please add ${missing.join(', ')} before continuing.`);
+      setDialogMessage(t('partnerProfile.missingFields', { fields: missing.join(', ') }));
       setDialogVisible(true);
       return;
     }
@@ -833,30 +889,43 @@ export default function ShopProfileScreen({ navigation, route }) {
       };
 
       const updated = await updateShopProfile(profile.id, payload);
-      setProfile({
+      const nextProfile = {
         ...updated,
         generated_public_summary: generated.summary,
         working_hours: workingHoursPayload,
-      });
+      };
+      setProfile(nextProfile);
       if (updated.legal_entity_detail) {
         setLegalEntity({ ...updated.legal_entity_detail });
       }
       setPublishedMenuItems(menuForSummary);
       setHoursRows(parseWorkingHours(workingHoursPayload));
+      setSavedSnapshot(
+        buildShopProfileSaveSnapshot({
+          profile: nextProfile,
+          selectedServices,
+          selectedVehicleTypes,
+          selectedBrandIds,
+          allBrandsServiced,
+          workingHoursPayload,
+          preferredContactMethods,
+          legalEntity: updated.legal_entity_detail || legalEntity,
+        })
+      );
       if (requireSetup || !isShopProfileEssentialsComplete(updated)) {
         if (isShopProfileEssentialsComplete(updated)) {
           navigation.reset({ index: 0, routes: [{ name: 'ShopHome' }] });
         } else {
-          setDialogMessage('Profile saved. Please finish the required fields to start serving jobs.');
+          setDialogMessage(t('partnerProfile.savedSetupPartial'));
           setDialogVisible(true);
         }
         return;
       }
-      setDialogMessage('Profile updated successfully!');
+      setDialogMessage(t('partnerProfile.savedSuccess'));
       setDialogVisible(true);
     } catch (err) {
       console.error(err);
-      let message = 'Error saving profile';
+      let message = t('partnerProfile.saveError');
       try {
         const data = JSON.parse(err.message);
         const fieldError =
@@ -1045,7 +1114,7 @@ export default function ShopProfileScreen({ navigation, route }) {
     return (
       <ScreenBackground safeArea={false}>
         <View style={styles.loadingCenter}>
-          <Text style={{ color: '#fff' }}>No service center profile found.</Text>
+          <Text style={{ color: '#fff' }}>{t('partnerProfile.noProfile')}</Text>
         </View>
       </ScreenBackground>
     );
@@ -1082,14 +1151,14 @@ export default function ShopProfileScreen({ navigation, route }) {
 
   const publicPagePreviewSection = (
     <ShopProfileAccordionSection
-      title="Public page preview"
+      title={t('partnerProfile.publicPreviewTitle')}
       expanded={!!expandedSections.public_preview}
       onToggle={() => toggleSection('public_preview')}
     >
       <Text style={styles.helperText}>
         {isEssentialsComplete
-          ? 'How clients see your shop on the map and in search.'
-          : 'Live preview — finish required fields above to go live.'}
+          ? t('partnerProfile.publicPreviewReady')
+          : t('partnerProfile.publicPreviewDraft')}
       </Text>
       <ShopPublicPagePreview
         shopName={formatShopDisplayName(profile.name)}
@@ -1115,7 +1184,20 @@ export default function ShopProfileScreen({ navigation, route }) {
 
   return (
     <ScreenBackground safeArea={false}>
-      <AppNavigationBar title="Profile" backLabel="Dashboard" onBack={handleBack} scrolled={scrolled} />
+      <AppNavigationBar
+        title={t('partnerProfile.title')}
+        backLabel={t('partnerProfile.backLabel')}
+        onBack={handleBack}
+        scrolled={scrolled}
+        rightAction={
+          <ProfileHeaderSaveButton
+            onPress={handleSave}
+            saving={saving}
+            dirty={isDirty}
+            label={requireSetup ? t('partnerProfile.saveAndContinue') : t('partnerProfile.saveCenterDetails')}
+          />
+        }
+      />
       <ScrollView
         onScroll={onScroll}
         scrollEventThrottle={scrollEventThrottle}
@@ -1270,7 +1352,7 @@ export default function ShopProfileScreen({ navigation, route }) {
                           color={selected ? COLORS.PRIMARY : COLORS.TEXT_MUTED}
                         />
                         <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                          {row.name}
+                          {translateRepairTypeLabel(row, t)}
                         </Text>
                       </View>
                     </Pressable>
@@ -1730,7 +1812,7 @@ export default function ShopProfileScreen({ navigation, route }) {
         </ShopProfileAccordionSection>
 
         <ShopProfileAccordionSection
-          title="Photos"
+          title={t('partnerProfile.photos')}
           expanded={!!expandedSections.photos}
           onToggle={() => toggleSection('photos')}
         >
@@ -1746,8 +1828,8 @@ export default function ShopProfileScreen({ navigation, route }) {
           ) : (
             <EmptyStateCard
               icon="image-outline"
-              title="No photos uploaded"
-              subtitle="Add photos to build trust and improve profile quality."
+              title={t('partnerProfile.noPhotosTitle')}
+              subtitle={t('partnerProfile.noPhotosSubtitle')}
             />
           )}
 
@@ -1758,27 +1840,20 @@ export default function ShopProfileScreen({ navigation, route }) {
             style={styles.uploadButton}
             disabled={toSafeArray(profile.images).length >= MAX_SHOP_PHOTOS}
           >
-            Add photo
+            {t('partnerProfile.addPhoto')}
           </Button>
         </ShopProfileAccordionSection>
 
       </ScrollView>
 
-      <FloatingSaveBar
-        onPress={handleSave}
-        loading={saving}
-        disabled={saving}
-        label={requireSetup ? 'Save and continue' : 'Save center details'}
-      />
-
       <Portal>
         <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)}>
-          <Dialog.Title>Notice</Dialog.Title>
+          <Dialog.Title>{t('common.notice')}</Dialog.Title>
           <Dialog.Content>
             <Text>{dialogMessage}</Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setDialogVisible(false)}>OK</Button>
+            <Button onPress={() => setDialogVisible(false)}>{t('common.ok')}</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

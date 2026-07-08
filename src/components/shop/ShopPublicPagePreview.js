@@ -28,9 +28,9 @@ function SectionHeading({ title }) {
   return <Text style={styles.sectionHeading}>{title}</Text>;
 }
 
-function ChipWrap({ labels }) {
+function ChipWrap({ labels, emptyLabel }) {
   if (!labels?.length) {
-    return <Text style={styles.placeholderMuted}>Not added yet</Text>;
+    return <Text style={styles.placeholderMuted}>{emptyLabel}</Text>;
   }
   return (
     <View style={styles.chipWrap}>
@@ -115,7 +115,7 @@ export default function ShopPublicPagePreview({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.previewLabel}>How clients will see your shop</Text>
+      <Text style={styles.previewLabel}>{t('partnerProfile.previewHowClientsSee')}</Text>
 
       <AppCard variant="dark" contentStyle={styles.heroInner}>
         <Text style={styles.heroTitle}>{name}</Text>
@@ -123,7 +123,7 @@ export default function ShopPublicPagePreview({
         {offersGuarantee ? (
           <View style={styles.guaranteeRow}>
             <MaterialCommunityIcons name="shield-check" size={18} color="rgba(255,255,255,0.88)" />
-            <Text style={styles.guaranteeText}>Offers guarantees</Text>
+            <Text style={styles.guaranteeText}>{t('serviceCenters.profile.offersGuarantee')}</Text>
           </View>
         ) : null}
 
@@ -162,7 +162,7 @@ export default function ShopPublicPagePreview({
 
       {photoList.length > 0 ? (
         <>
-          <SectionHeading title="Photos" />
+          <SectionHeading title={t('serviceCenters.profile.photos')} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoRow}>
             {photoList.map((img) => (
               <Image
@@ -175,7 +175,7 @@ export default function ShopPublicPagePreview({
         </>
       ) : null}
 
-      <SectionHeading title="About" />
+      <SectionHeading title={t('serviceCenters.profile.about')} />
       <FloatingCard>
         <Text style={styles.aboutLead}>
           {aboutLead}
@@ -183,26 +183,26 @@ export default function ShopPublicPagePreview({
         {userDescription ? <Text style={styles.aboutBody}>{userDescription}</Text> : null}
       </FloatingCard>
 
-      <SectionHeading title="Services" />
+      <SectionHeading title={t('serviceCenters.profile.services')} />
       <FloatingCard>
-        <ChipWrap labels={repairTypeLabels} />
+        <ChipWrap labels={repairTypeLabels} emptyLabel={t('serviceCenters.profile.servicesNotAdded')} />
       </FloatingCard>
 
       {publishedMenuItems.length > 0 ? (
         <>
-          <SectionHeading title="Published pricing" />
+          <SectionHeading title={t('serviceCenters.profile.publishedPricing')} />
           <FloatingCard>
             {publishedMenuItems.map((item) => {
               const label = translateRepairTypeLabel(item, t) || t('common.service');
               const from = item.price_from;
               const to = item.price_to;
-              let priceLine = 'Price on request';
+              let priceLine = t('serviceCenters.profile.priceOnRequest');
               if (from != null && to != null && String(from) !== String(to)) {
                 priceLine = `${formatMoneyAmount(from)} – ${formatMoneyAmount(to)}`;
               } else if (from != null) {
-                priceLine = `from ${formatMoneyAmount(from)}`;
+                priceLine = t('serviceCenters.profile.priceFrom', { price: formatMoneyAmount(from) });
               } else if (to != null) {
-                priceLine = `from ${formatMoneyAmount(to)}`;
+                priceLine = t('serviceCenters.profile.priceFrom', { price: formatMoneyAmount(to) });
               }
               return (
                 <View key={`${item.id || label}-${label}`} style={styles.menuRow}>
@@ -224,21 +224,21 @@ export default function ShopPublicPagePreview({
         </>
       ) : null}
 
-      <SectionHeading title="Vehicle types" />
+      <SectionHeading title={t('serviceCenters.profile.vehicleTypes')} />
       <FloatingCard>
-        <ChipWrap labels={vehicleTypeLabels} />
+        <ChipWrap labels={vehicleTypeLabels} emptyLabel={t('serviceCenters.profile.vehicleTypesNotAdded')} />
       </FloatingCard>
 
       {brandNames.length > 0 ? (
         <>
-          <SectionHeading title="Brands" />
+          <SectionHeading title={t('serviceCenters.profile.brands')} />
           <FloatingCard>
-            <ChipWrap labels={brandNames} />
+            <ChipWrap labels={brandNames} emptyLabel={t('serviceCenters.profile.servicesNotAdded')} />
           </FloatingCard>
         </>
       ) : null}
 
-      <SectionHeading title="Working hours" />
+      <SectionHeading title={t('serviceCenters.profile.workingHours')} />
       <FloatingCard>
         {hoursRows.length ? (
           hoursRows.map((row) => (
