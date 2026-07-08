@@ -17,6 +17,7 @@ import {
   deleteReceivingSession,
   LINE_ISSUE_LABELS,
 } from '../../api/warehouse';
+import { useTranslation } from '../../i18n';
 import { showMessage, confirmMessage } from '../../utils/crossPlatformAlert';
 
 const DOC_TYPE_LABELS = {
@@ -158,6 +159,7 @@ function DocumentDetail({ doc, onBack }) {
 }
 
 export default function ShopWarehouseDocumentsPanel({ onEditDraft }) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState([]);
   const [documents, setDocuments] = useState([]);
@@ -266,8 +268,8 @@ export default function ShopWarehouseDocumentsPanel({ onEditDraft }) {
       ListEmptyComponent={
         <EmptyStateCard
           icon="file-document-multiple-outline"
-          title="No documents yet"
-          subtitle="Complete a receiving draft to see it here."
+          title={t('partnerDashboard.warehouse.noDocumentsTitle')}
+          subtitle={t('partnerDashboard.warehouse.noDocumentsSubtitle')}
         />
       }
       renderItem={({ item }) => {

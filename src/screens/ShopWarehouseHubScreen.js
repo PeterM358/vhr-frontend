@@ -8,16 +8,17 @@ import ProTabBar from '../components/ui/ProTabBar';
 import ShopWarehouseReceiveScreen from './ShopWarehouseReceiveScreen';
 import ShopWarehouseDocumentsPanel from '../components/warehouse/ShopWarehouseDocumentsPanel';
 import ShopWarehouseStockPanel from '../components/warehouse/ShopWarehouseStockPanel';
+import { useTranslation } from '../i18n';
 
 const SHOP_TOP_BAR = 'rgba(11,18,32,0.92)';
 
-const HUB_TABS = [
-  { value: 'add', label: 'Add document', icon: 'plus' },
-  { value: 'documents', label: 'Documents', icon: 'file-document-multiple-outline' },
-  { value: 'stock', label: 'Stock', icon: 'warehouse' },
-];
-
 export default function ShopWarehouseHubScreen({ navigation }) {
+  const { t } = useTranslation();
+  const hubTabs = [
+    { value: 'add', label: t('partnerDashboard.warehouse.addDocument'), icon: 'plus' },
+    { value: 'documents', label: t('partnerDashboard.warehouse.documents'), icon: 'file-document-multiple-outline' },
+    { value: 'stock', label: t('partnerDashboard.warehouse.stock'), icon: 'warehouse' },
+  ];
   const insets = useSafeAreaInsets();
   const inDrawer = typeof navigation.openDrawer === 'function';
   const [tab, setTab] = useState('add');
@@ -45,10 +46,10 @@ export default function ShopWarehouseHubScreen({ navigation }) {
               onPress={() => navigation.navigate('ShopDashboard')}
             />
             <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color="#fff" />
-            <Appbar.Content title="Warehouse" titleStyle={{ color: '#fff' }} />
+            <Appbar.Content title={t('drawer.partner.warehouse')} titleStyle={{ color: '#fff' }} />
           </Appbar.Header>
           <ProTabBar
-            tabs={HUB_TABS}
+            tabs={hubTabs}
             value={tab}
             onChange={(value) => {
               if (value === 'add' && !resumeBatchId) {
@@ -61,7 +62,7 @@ export default function ShopWarehouseHubScreen({ navigation }) {
       ) : (
         <View style={styles.tabsOnly}>
           <ProTabBar
-            tabs={HUB_TABS}
+            tabs={hubTabs}
             value={tab}
             onChange={(value) => {
               if (value === 'add' && !resumeBatchId) {

@@ -56,6 +56,7 @@ import {
 import { todayCalendarRange, isScheduledToday } from '../utils/dashboardDate';
 import { showMessage } from '../utils/crossPlatformAlert';
 import { resetShopDrawerRepairs } from '../navigation/drawerNavigation';
+import { useTranslation } from '../i18n';
 
 const SHOP_TOP_BAR = 'rgba(11,18,32,0.92)';
 
@@ -83,12 +84,13 @@ function openPartnerPublicPreview(navigation, params = {}) {
 
 export default function ShopHomeScreen() {
   const navigation = useNavigation();
+  const { t } = useTranslation();
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
   const { notifications } = useContext(WebSocketContext);
 
   const [loading, setLoading] = useState(true);
   const [shopProfile, setShopProfile] = useState(null);
-  const [shopDisplayName, setShopDisplayName] = useState('Service center');
+  const [shopDisplayName, setShopDisplayName] = useState(() => t('partnerDashboard.serviceCenterDefault'));
   const [dashboardRepairs, setDashboardRepairs] = useState([]);
   const [ongoingRepairs, setOngoingRepairs] = useState([]);
   const [pendingOffers, setPendingOffers] = useState([]);
@@ -105,8 +107,8 @@ export default function ShopHomeScreen() {
   const openRepairs = dashboardRepairs;
   const lifecycleCounts = useMemo(() => countByLifecycle(dashboardRepairs), [dashboardRepairs]);
   const lifecycleCounterLine = useMemo(
-    () => formatLifecycleCounterLine(lifecycleCounts),
-    [lifecycleCounts]
+    () => formatLifecycleCounterLine(lifecycleCounts, t),
+    [lifecycleCounts, t]
   );
   const partnerActive = isPartnerSubscriptionActive(shopProfile);
   const canSendOffers = canSendPartnerOffers(shopProfile);
@@ -212,7 +214,7 @@ export default function ShopHomeScreen() {
             setShopDisplayName(formatShopDisplayName(shopName));
           } else {
             const stored = await AsyncStorage.getItem('@user_email_or_phone');
-            let display = 'Service center';
+            let display = t('partnerDashboard.serviceCenterDefault');
             if (stored?.trim()) {
               display = stored.includes('@') ? stored.split('@')[0] : stored;
             }
@@ -220,7 +222,7 @@ export default function ShopHomeScreen() {
           }
         } catch {
           setShopProfile(null);
-          setShopDisplayName('Service center');
+          setShopDisplayName(t('partnerDashboard.serviceCenterDefault'));
         } finally {
           setLoading(false);
         }
@@ -259,7 +261,10 @@ export default function ShopHomeScreen() {
     ) {
       return;
     }
-    navigateToPartnerRepairDetail(navigation, repairId, { returnTo: 'ShopDashboard', backLabel: 'Home' });
+    navigateToPartnerRepairDetail(navigation, repairId, {
+      returnTo: 'ShopDashboard',
+      backLabel: t('common.home'),
+    });
   };
 
   const handleRepairOffer = (repair) => {
@@ -267,8 +272,8 @@ export default function ShopHomeScreen() {
     if (!repairId) return;
     if (!canSendOffers) {
       showMessage(
-        'Partner activation required',
-        'Activate your Veversal partner account to send offers to customers.',
+        t('partnerDashboard.activation.requiredTitle'),
+        t('partnerDashboard.activation.requiredBody'),
         { variant: 'info' }
       );
       openPartnerProfile(navigation, { requireSetup: true });
@@ -301,24 +306,24 @@ export default function ShopHomeScreen() {
       {
         key: 'pending-offers',
         icon: 'file-send-outline',
-        title: 'Pending Offers',
-        subtitle: 'Sent, awaiting customer acceptance',
+        title: t('partnerDashboard.pendingOffersTitle'),
+        subtitle: t('partnerDashboard.pendingOffersSubtitle'),
         count: pendingOffers.length,
         onPress: () => resetShopDrawerRepairs(navigation),
       },
       {
         key: 'active',
         icon: 'car-wrench',
-        title: 'Active Repairs',
-        subtitle: 'Jobs currently in progress',
+        title: t('partnerDashboard.activeRepairsTitle'),
+        subtitle: t('partnerDashboard.activeRepairsSubtitle'),
         count: ongoingRepairs.length,
         onPress: () => resetShopDrawerRepairs(navigation),
       },
       {
         key: 'bookings-calendar',
         icon: 'calendar-month-outline',
-        title: 'Bookings / Calendar',
-        subtitle: "Today's appointments, schedule and capacity",
+        title: t('partnerDashboard.bookingsCalendarTitle'),
+        subtitle: t('partnerDashboard.bookingsCalendarSubtitle'),
         count:
           todayBookings.length > 0
             ? todayBookings.length
@@ -332,15 +337,15 @@ export default function ShopHomeScreen() {
           }
           navigation.navigate('ShopCalendar', {
             returnTo: 'ShopDashboard',
-            backLabel: 'Home',
+            backLabel: t('common.home'),
           });
         },
       },
       {
         key: 'profile',
         icon: 'store-cog-outline',
-        title: 'Service Center Profile',
-        subtitle: 'Name, location, services, hours and contact',
+        title: t('partnerDashboard.serviceCenterProfileTitle'),
+        subtitle: t('partnerDashboard.serviceCenterProfileSubtitle'),
         onPress: () =>
           openPartnerProfile(navigation, {
             requireSetup: !profileComplete,
@@ -349,8 +354,8 @@ export default function ShopHomeScreen() {
       {
         key: 'public-preview',
         icon: 'web',
-        title: 'Public Page Preview',
-        subtitle: 'How clients see your service center on the map and in search',
+        title: t('partnerDashboard.publicPagePreviewTitle'),
+        subtitle: t('partnerDashboard.publicPagePreviewSubtitle'),
         onPress: () =>
           openPartnerPublicPreview(navigation, {
             requireSetup: !profileComplete,
@@ -364,6 +369,7 @@ export default function ShopHomeScreen() {
       ongoingRepairs.length,
       unscheduledCount,
       profileComplete,
+      t,
     ]
   );
 
@@ -372,62 +378,65 @@ export default function ShopHomeScreen() {
       {
         key: 'documents',
         icon: 'file-document-outline',
-        title: 'Documents',
-        subtitle: 'Invoices, repair docs and warranty evidence in one place',
+        title: t('partnerDashboard.modules.documents.title'),
+        subtitle: t('partnerDashboard.modules.documents.subtitle'),
         onPress: () =>
-          showMessage('Coming soon', 'Central document import is on the Veversal partner roadmap.', {
+          showMessage(t('partnerDashboard.comingSoonDialog.title'), t('partnerDashboard.comingSoonDialog.documentsBody'), {
             variant: 'info',
           }),
       },
       {
         key: 'inventory',
         icon: 'warehouse',
-        title: 'Inventory',
-        subtitle: 'Parts, warehouse stock and receiving workflows',
+        title: t('partnerDashboard.modules.inventory.title'),
+        subtitle: t('partnerDashboard.modules.inventory.subtitle'),
         onPress: () =>
-          showMessage('Coming soon', 'Inventory management is planned for a future release.', {
+          showMessage(t('partnerDashboard.comingSoonDialog.title'), t('partnerDashboard.comingSoonDialog.inventoryBody'), {
             variant: 'info',
           }),
       },
       {
         key: 'reports',
         icon: 'chart-line',
-        title: 'Reports',
-        subtitle: 'Revenue, throughput and customer growth snapshots',
+        title: t('partnerDashboard.modules.reports.title'),
+        subtitle: t('partnerDashboard.modules.reports.subtitle'),
         onPress: () =>
           showMessage(
-            'Coming soon',
-            `Reports are planned for a future release. Snapshot today: ${openRepairs.length} open · ${ongoingRepairs.length} active · ${pendingOffers.length} pending offers.`,
+            t('partnerDashboard.comingSoonDialog.title'),
+            t('partnerDashboard.comingSoonDialog.reportsBody', {
+              open: openRepairs.length,
+              active: ongoingRepairs.length,
+              pending: pendingOffers.length,
+            }),
             { variant: 'info' }
           ),
       },
       {
         key: 'customers',
         icon: 'account-group-outline',
-        title: 'Customers & Vehicles',
-        subtitle: 'Authorized clients and fleet records',
+        title: t('partnerDashboard.modules.customers.title'),
+        subtitle: t('partnerDashboard.modules.customers.subtitle'),
         onPress: () =>
           showMessage(
-            'Coming soon',
-            'Customer and vehicle CRM tools are planned for a future partner release.',
+            t('partnerDashboard.comingSoonDialog.title'),
+            t('partnerDashboard.comingSoonDialog.customersBody'),
             { variant: 'info' }
           ),
       },
       {
         key: 'market-intelligence',
         icon: 'chart-timeline-variant',
-        title: 'Market Intelligence',
-        subtitle:
-          'Compare your prices with city averages and understand what services customers are requesting most.',
+        title: t('partnerDashboard.modules.marketIntelligence.title'),
+        subtitle: t('partnerDashboard.modules.marketIntelligence.subtitle'),
         onPress: () =>
           showMessage(
-            'Market Intelligence',
-            'Compare your prices with city averages and understand what services customers are requesting most.',
+            t('partnerDashboard.comingSoonDialog.marketIntelligenceTitle'),
+            t('partnerDashboard.comingSoonDialog.marketIntelligenceBody'),
             { variant: 'info' }
           ),
       },
     ],
-    [openRepairs.length, ongoingRepairs.length, pendingOffers.length]
+    [openRepairs.length, ongoingRepairs.length, pendingOffers.length, t]
   );
 
   const renderDashboardRepair = (item) => (
@@ -459,7 +468,7 @@ export default function ShopHomeScreen() {
           onPress={() => openPartnerProfile(navigation, { requireSetup: !profileComplete })}
           style={styles.titlePressable}
           accessibilityRole="button"
-          accessibilityLabel="Open center details"
+          accessibilityLabel={t('partnerDashboard.openCenterDetails')}
         >
           <Appbar.Content title={shopDisplayName} titleStyle={{ color: '#fff' }} />
         </Pressable>
@@ -473,7 +482,7 @@ export default function ShopHomeScreen() {
               }
               navigation.navigate('ShopCalendar', {
                 returnTo: 'ShopDashboard',
-                backLabel: 'Home',
+                backLabel: t('common.home'),
               });
             }}
             color="#fff"
@@ -516,17 +525,16 @@ export default function ShopHomeScreen() {
 
         <DashboardHero
           compact
-          title="Veversal Partner Platform"
-          subtitle="Open repair requests, send offers, manage bookings, and keep your public service center page up to date."
+          title={t('partnerDashboard.heroTitle')}
+          subtitle={t('partnerDashboard.heroSubtitle')}
         />
 
         <DashboardSection
-          title="Open Repair Requests"
+          title={t('partnerDashboard.openRepairRequests')}
           subtitle={
-            lifecycleCounterLine ||
-            'New customer repair requests are waiting for your offer.'
+            lifecycleCounterLine || t('partnerDashboard.openRequestsEmptySubtitle')
           }
-          actionLabel="View Requests"
+          actionLabel={t('partnerDashboard.viewRequests')}
           onActionPress={() => resetShopDrawerRepairs(navigation)}
         >
           {repairsLoading ? (
@@ -539,8 +547,8 @@ export default function ShopHomeScreen() {
         </DashboardSection>
 
         <DashboardSection
-          title="Operations"
-          subtitle="Daily partner workflows — requests, offers, schedule and your public presence."
+          title={t('partnerDashboard.operationsTitle')}
+          subtitle={t('partnerDashboard.operationsSubtitle')}
         >
           {dashboardLoading ? (
             <ActivityIndicator color="#fff" style={{ marginVertical: 8 }} />

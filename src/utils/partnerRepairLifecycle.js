@@ -2,6 +2,8 @@
  * Partner dashboard repair request lifecycle labels, sort order, and pill styling.
  */
 
+import { t as defaultT } from '../i18n';
+
 export const PARTNER_LIFECYCLE = {
   WAITING_FOR_OFFER: 'WAITING_FOR_OFFER',
   OFFER_SENT: 'OFFER_SENT',
@@ -20,44 +22,53 @@ export const LIFECYCLE_SORT_ORDER = {
   [PARTNER_LIFECYCLE.DECLINED]: 5,
 };
 
-export const LIFECYCLE_PILL = {
+const LIFECYCLE_PILL_STYLE = {
   [PARTNER_LIFECYCLE.WAITING_FOR_OFFER]: {
-    label: 'Waiting for your offer',
     bg: 'rgba(234,179,8,0.18)',
     fg: '#A16207',
+    labelKey: 'partnerDashboard.status.waitingForOffer',
   },
   [PARTNER_LIFECYCLE.OFFER_SENT]: {
-    label: 'Offer sent',
     bg: 'rgba(37,99,235,0.16)',
     fg: '#1D4ED8',
+    labelKey: 'partnerDashboard.status.offerSent',
   },
   [PARTNER_LIFECYCLE.OFFER_ACCEPTED]: {
-    label: 'Offer accepted',
     bg: 'rgba(22,163,74,0.18)',
     fg: '#15803D',
+    labelKey: 'partnerDashboard.status.offerAccepted',
   },
   [PARTNER_LIFECYCLE.IN_PROGRESS]: {
-    label: 'Repair in progress',
     bg: 'rgba(245,158,11,0.18)',
     fg: '#B45309',
+    labelKey: 'partnerDashboard.status.inProgress',
   },
   [PARTNER_LIFECYCLE.COMPLETED]: {
-    label: 'Completed',
     bg: 'rgba(22,163,74,0.18)',
     fg: '#15803D',
+    labelKey: 'partnerDashboard.status.completed',
   },
   [PARTNER_LIFECYCLE.DECLINED]: {
-    label: 'Offer declined',
     bg: 'rgba(220,38,38,0.18)',
     fg: '#B91C1C',
+    labelKey: 'partnerDashboard.status.declined',
   },
 };
 
-const FALLBACK_PILL = {
-  label: 'Request',
+const FALLBACK_PILL_STYLE = {
   bg: 'rgba(100,116,139,0.18)',
   fg: '#334155',
+  labelKey: 'partnerDashboard.status.request',
 };
+
+const LIFECYCLE_COUNTER_KEYS = [
+  ['partnerDashboard.lifecycleCounter.waitingForOffer', PARTNER_LIFECYCLE.WAITING_FOR_OFFER],
+  ['partnerDashboard.lifecycleCounter.offerSent', PARTNER_LIFECYCLE.OFFER_SENT],
+  ['partnerDashboard.lifecycleCounter.accepted', PARTNER_LIFECYCLE.OFFER_ACCEPTED],
+  ['partnerDashboard.lifecycleCounter.inProgress', PARTNER_LIFECYCLE.IN_PROGRESS],
+  ['partnerDashboard.lifecycleCounter.completed', PARTNER_LIFECYCLE.COMPLETED],
+  ['partnerDashboard.lifecycleCounter.declined', PARTNER_LIFECYCLE.DECLINED],
+];
 
 export function resolvePartnerLifecycle(repair) {
   if (!repair || typeof repair !== 'object') {
@@ -65,7 +76,7 @@ export function resolvePartnerLifecycle(repair) {
   }
 
   const lifecycle = String(repair.partner_lifecycle_status || '').trim();
-  if (lifecycle && LIFECYCLE_PILL[lifecycle]) {
+  if (lifecycle && LIFECYCLE_PILL_STYLE[lifecycle]) {
     return lifecycle;
   }
 
@@ -79,9 +90,14 @@ export function resolvePartnerLifecycle(repair) {
   return PARTNER_LIFECYCLE.WAITING_FOR_OFFER;
 }
 
-export function getLifecyclePill(repair) {
+export function getLifecyclePill(repair, translateFn = defaultT) {
   const key = resolvePartnerLifecycle(repair);
-  return LIFECYCLE_PILL[key] || FALLBACK_PILL;
+  const style = LIFECYCLE_PILL_STYLE[key] || FALLBACK_PILL_STYLE;
+  return {
+    label: translateFn(style.labelKey),
+    bg: style.bg,
+    fg: style.fg,
+  };
 }
 
 export function comparePartnerLifecycle(a, b) {
@@ -107,17 +123,11 @@ export function countByLifecycle(repairs) {
   return counts;
 }
 
-export function formatLifecycleCounterLine(counts) {
-  const segments = [
-  ['Waiting for offer', counts[PARTNER_LIFECYCLE.WAITING_FOR_OFFER]],
-  ['Offer sent', counts[PARTNER_LIFECYCLE.OFFER_SENT]],
-  ['Accepted', counts[PARTNER_LIFECYCLE.OFFER_ACCEPTED]],
-  ['In progress', counts[PARTNER_LIFECYCLE.IN_PROGRESS]],
-  ['Completed', counts[PARTNER_LIFECYCLE.COMPLETED]],
-  ['Declined', counts[PARTNER_LIFECYCLE.DECLINED]],
-  ]
-    .filter(([, count]) => count > 0)
-    .map(([label, count]) => `${label} (${count})`);
+export function formatLifecycleCounterLine(counts, translateFn = defaultT) {
+  const segments = LIFECYCLE_COUNTER_KEYS.filter(([, lifecycleKey]) => counts[lifecycleKey] > 0).map(
+    ([labelKey, lifecycleKey]) =>
+      `${translateFn(labelKey)} (${counts[lifecycleKey]})`
+  );
 
   return segments.join(' · ');
 }
@@ -128,21 +138,22 @@ export function formatLifecycleCounterLine(counts) {
  */
 export function getPartnerRequestGuide(
   repair,
-  { offers = [], shopProfileId, vehicleAtShop, isMyShopRepair } = {}
+  { offers = [], shopProfileId, vehicleAtShop, isMyShopRepair } = {},
+  translateFn = defaultT
 ) {
   if (!repair) return null;
 
   const status = String(repair.status || '').toLowerCase();
   if (status === 'done') {
     return {
-      title: 'Completed',
-      body: 'This repair is finished and recorded in service history.',
+      title: translateFn('partnerDashboard.guide.completedTitle'),
+      body: translateFn('partnerDashboard.guide.completedBody'),
     };
   }
   if (status === 'ongoing' || vehicleAtShop) {
     return {
-      title: 'Repair in progress',
-      body: 'Track parts, notes, and finalize when work is complete.',
+      title: translateFn('partnerDashboard.guide.inProgressTitle'),
+      body: translateFn('partnerDashboard.guide.inProgressBody'),
     };
   }
 
@@ -158,35 +169,35 @@ export function getPartnerRequestGuide(
       return null;
     }
     return {
-      title: 'Confirmed appointment',
-      body: 'Mark vehicle arrived when it arrives at your center.',
+      title: translateFn('partnerDashboard.guide.confirmedTitle'),
+      body: translateFn('partnerDashboard.guide.confirmedBody'),
     };
   }
 
   if (sentOffer) {
     return {
-      title: 'Offer sent',
-      body: 'Waiting for the customer to review and book your offer.',
+      title: translateFn('partnerDashboard.guide.offerSentTitle'),
+      body: translateFn('partnerDashboard.guide.offerSentBody'),
     };
   }
 
   return {
-    title: 'Request review',
-    body: 'Review the customer request, photos, and details before sending an offer.',
+    title: translateFn('partnerDashboard.guide.reviewTitle'),
+    body: translateFn('partnerDashboard.guide.reviewBody'),
   };
 }
 
-export function formatTimeSince(isoDate) {
+export function formatTimeSince(isoDate, translateFn = defaultT) {
   if (!isoDate) return '';
   const then = new Date(isoDate).getTime();
   if (Number.isNaN(then)) return '';
   const diffMs = Date.now() - then;
   const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return translateFn('partnerDashboard.timeSince.justNow');
+  if (minutes < 60) return translateFn('partnerDashboard.timeSince.minutesAgo', { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return translateFn('partnerDashboard.timeSince.hoursAgo', { count: hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) return translateFn('partnerDashboard.timeSince.daysAgo', { count: days });
   return new Date(isoDate).toLocaleDateString();
 }

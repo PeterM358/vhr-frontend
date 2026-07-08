@@ -30,15 +30,19 @@ import {
   shopNotificationCategory,
 } from '../../utils/shopNotificationRouting';
 import { normalizeNotification } from '../../utils/normalizeNotification';
-
-const TABS = [
-  { id: 'alerts', label: 'Alerts' },
-  { id: 'repairs', label: 'Repairs' },
-  { id: 'offers', label: 'Offers' },
-  { id: 'bookings', label: 'Bookings' },
-];
+import { useTranslation } from '../../i18n';
 
 export default function NotificationsList() {
+  const { t } = useTranslation();
+  const tabs = useMemo(
+    () => [
+      { id: 'alerts', label: t('partnerDashboard.notifications.tabs.alerts') },
+      { id: 'repairs', label: t('partnerDashboard.notifications.tabs.repairs') },
+      { id: 'offers', label: t('partnerDashboard.notifications.tabs.offers') },
+      { id: 'bookings', label: t('partnerDashboard.notifications.tabs.bookings') },
+    ],
+    [t]
+  );
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [remoteNotifications, setRemoteNotifications] = useState([]);
@@ -205,7 +209,11 @@ export default function NotificationsList() {
 
   return (
     <ScreenBackground safeArea={false}>
-      <AppNavigationBar title="Notifications" backLabel="Dashboard" onBack={handleBack} />
+      <AppNavigationBar
+        title={t('drawer.partner.notifications')}
+        backLabel={t('navigation.backToDashboard')}
+        onBack={handleBack}
+      />
       <View style={styles.container}>
         <View style={styles.toolbar}>
           <Pressable
@@ -230,7 +238,7 @@ export default function NotificationsList() {
         </View>
 
         <View style={styles.segmentTrack}>
-          {TABS.map((tab) => {
+          {tabs.map((tab) => {
             const badge = tabBadge(tab.id);
             const selected = activeTab === tab.id;
             return (
@@ -260,7 +268,7 @@ export default function NotificationsList() {
             title={
               unreadOnly
                 ? 'No unread notifications'
-                : `No ${TABS.find((t) => t.id === activeTab)?.label?.toLowerCase() || 'notifications'} yet`
+                : `${t('notifications.emptyTitle')} — ${tabs.find((tabItem) => tabItem.id === activeTab)?.label?.toLowerCase() || ''}`
             }
             subtitle={
               unreadOnly

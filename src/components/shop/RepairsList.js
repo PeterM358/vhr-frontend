@@ -1,6 +1,6 @@
 // PATH: src/components/shop/RepairsList.js
 
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, useContext } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useContext } from 'react';
 import { View, FlatList, StyleSheet, Pressable, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
@@ -47,14 +47,9 @@ import {
   applyDoneTabClientFilters,
 } from '../../utils/repairListUtils';
 import { WebSocketContext } from '../../context/WebSocketManager';
+import { useTranslation } from '../../i18n';
 
 const SHOP_TOP_BAR = 'rgba(11,18,32,0.92)';
-
-const TAB_OPTIONS = [
-  { key: 'open', label: 'Open' },
-  { key: 'ongoing', label: 'Ongoing' },
-  { key: 'done', label: 'Done' },
-];
 
 const EMPTY_VEHICLE_FILTERS = {
   makeId: '',
@@ -64,13 +59,24 @@ const EMPTY_VEHICLE_FILTERS = {
   repairTypeId: '',
 };
 
-const PAYMENT_FILTER_OPTIONS = [
-  { key: '', label: 'All payments' },
-  { key: 'unpaid', label: 'Unpaid' },
-  { key: 'paid', label: 'Paid' },
-];
-
 export default function RepairsList() {
+  const { t } = useTranslation();
+  const tabOptions = useMemo(
+    () => [
+      { key: 'open', label: t('partnerDashboard.repairsList.tabs.open') },
+      { key: 'ongoing', label: t('partnerDashboard.repairsList.tabs.ongoing') },
+      { key: 'done', label: t('partnerDashboard.repairsList.tabs.done') },
+    ],
+    [t]
+  );
+  const paymentFilterOptions = useMemo(
+    () => [
+      { key: '', label: t('partnerDashboard.repairsList.paymentFilters.all') },
+      { key: 'unpaid', label: t('partnerDashboard.repairsList.paymentFilters.unpaid') },
+      { key: 'paid', label: t('partnerDashboard.repairsList.paymentFilters.paid') },
+    ],
+    [t]
+  );
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -585,7 +591,7 @@ export default function RepairsList() {
   return (
     <ScreenBackground safeArea={false}>
       <AppNavigationBar
-        title="Repairs"
+        title={t('drawer.partner.repairs')}
         backLabel="Dashboard"
         onBack={handleBack}
         scrolled={scrolled}
@@ -633,7 +639,7 @@ export default function RepairsList() {
         ) : null}
 
         <View style={styles.tabRow}>
-          {TAB_OPTIONS.map((tab) => {
+          {tabOptions.map((tab) => {
             const active = tab.key === selectedTab;
             return (
               <Pressable
@@ -668,7 +674,7 @@ export default function RepairsList() {
 
         {selectedTab === 'done' ? (
           <View style={styles.paymentFilterRow}>
-            {PAYMENT_FILTER_OPTIONS.map((option) => {
+            {paymentFilterOptions.map((option) => {
               const active = option.key === paymentFilter;
               return (
                 <Pressable

@@ -4,9 +4,11 @@ import { Text } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import FloatingCard from '../ui/FloatingCard';
 import { COLORS } from '../../constants/colors';
+import { useTranslation } from '../../i18n';
 
 export default function DashboardComingSoonSection({ items = [], featured = null }) {
   const [expanded, setExpanded] = useState(false);
+  const { t } = useTranslation();
 
   if (!items.length && !featured) return null;
 
@@ -21,8 +23,8 @@ export default function DashboardComingSoonSection({ items = [], featured = null
         >
           <MaterialCommunityIcons name="progress-clock" size={22} color={COLORS.PRIMARY} />
           <View style={styles.headerText}>
-            <Text style={styles.title}>Coming soon</Text>
-            <Text style={styles.hint}>Future partner modules — not active yet</Text>
+            <Text style={styles.title}>{t('partnerDashboard.comingSoonTitle')}</Text>
+            <Text style={styles.hint}>{t('partnerDashboard.comingSoonSubtitle')}</Text>
           </View>
           <MaterialCommunityIcons
             name={expanded ? 'chevron-up' : 'chevron-down'}
@@ -48,7 +50,7 @@ export default function DashboardComingSoonSection({ items = [], featured = null
                     <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
                   ) : null}
                 </View>
-                <Text style={styles.soonBadge}>Soon</Text>
+                <Text style={styles.soonBadge}>{t('partnerDashboard.soonBadge')}</Text>
               </Pressable>
             ))}
           </>

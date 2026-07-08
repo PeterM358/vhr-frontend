@@ -1,27 +1,30 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
+import { useTranslation } from '../../i18n';
 
 export default function PartnerActivationBanner({
   openRequestCount = 0,
   onActivatePress,
 }) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.banner}>
-      <Text style={styles.title}>Activate your Veversal partner account</Text>
+      <Text style={styles.title}>{t('partnerDashboard.activation.title')}</Text>
       <Text style={styles.body}>
         {openRequestCount > 0
-          ? `You have ${openRequestCount} open customer request${openRequestCount === 1 ? '' : 's'} waiting for offers.`
-          : 'New customer repair requests are waiting for your offer.'}
+          ? openRequestCount === 1
+            ? t('partnerDashboard.activation.openRequestsBodyOne')
+            : t('partnerDashboard.activation.openRequestsBodyMany', { count: openRequestCount })
+          : t('partnerDashboard.activation.waitingBody')}
       </Text>
-      <Text style={styles.hint}>
-        Send offers, manage bookings and build your online service history from one place.
-      </Text>
+      <Text style={styles.hint}>{t('partnerDashboard.activation.hint')}</Text>
       <Button mode="contained" onPress={onActivatePress} style={styles.button}>
-        Activate Partner Account
+        {t('partnerDashboard.activation.activateButton')}
       </Button>
       <Button mode="text" onPress={onActivatePress} textColor="#bfdbfe" compact>
-        Subscribe to Send Offers
+        {t('partnerDashboard.activation.subscribeButton')}
       </Button>
     </View>
   );

@@ -38,22 +38,10 @@ import {
   invoiceTotalLabel,
 } from '../utils/billingInvoices';
 import { formatRepairListDate } from '../utils/repairListUtils';
+import { useTranslation } from '../i18n';
 
-const SECTION_TABS = [
-  { key: 'invoices', label: 'Invoices' },
-  { key: 'uninvoiced', label: 'Uninvoiced repairs' },
-];
-
-const STATUS_FILTERS = [
-  { key: '', label: 'All' },
-  { key: 'draft', label: 'Draft' },
-  { key: 'issued', label: 'Issued' },
-];
-
-const MONTH_ALL = '';
-
-function buildRecentMonthOptions(count = 18) {
-  const options = [{ value: MONTH_ALL, label: 'All months' }];
+function buildRecentMonthOptions(count = 18, allMonthsLabel = 'All months') {
+  const options = [{ value: MONTH_ALL, label: allMonthsLabel }];
   const now = new Date();
   for (let i = 0; i < count; i += 1) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -164,11 +152,26 @@ function SeriesEditor({ series, onSaved }) {
   );
 }
 
+const MONTH_ALL = '';
+
 export default function ShopInvoicingScreen() {
+  const { t } = useTranslation();
+  const sectionTabs = [
+    { key: 'invoices', label: t('partnerDashboard.invoicing.tabs.invoices') },
+    { key: 'uninvoiced', label: t('partnerDashboard.invoicing.tabs.uninvoiced') },
+  ];
+  const statusFilters = [
+    { key: '', label: t('partnerDashboard.invoicing.statusFilters.all') },
+    { key: 'draft', label: t('partnerDashboard.invoicing.statusFilters.draft') },
+    { key: 'issued', label: t('partnerDashboard.invoicing.statusFilters.issued') },
+  ];
+  const monthOptions = useMemo(
+    () => buildRecentMonthOptions(18, t('partnerDashboard.invoicing.allMonths')),
+    [t]
+  );
   const navigation = useNavigation();
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = usePartnerDashboardBack(navigation);
-  const monthOptions = useMemo(() => buildRecentMonthOptions(), []);
   const [loading, setLoading] = useState(true);
   const [invoices, setInvoices] = useState([]);
   const [uninvoicedRepairs, setUninvoicedRepairs] = useState([]);
@@ -314,8 +317,8 @@ export default function ShopInvoicingScreen() {
   return (
     <ScreenBackground safeArea={false}>
       <AppNavigationBar
-        title="Invoicing"
-        backLabel="Dashboard"
+        title={t('drawer.partner.invoicing')}
+        backLabel={t('navigation.backToDashboard')}
         onBack={handleBack}
         scrolled={scrolled}
       />
@@ -356,7 +359,7 @@ export default function ShopInvoicingScreen() {
         />
 
         <View style={styles.sectionTabRow}>
-          {SECTION_TABS.map((item) => {
+          {sectionTabs.map((item) => {
             const active = sectionTab === item.key;
             return (
               <Pressable
@@ -375,7 +378,7 @@ export default function ShopInvoicingScreen() {
         {sectionTab === 'invoices' ? (
           <>
             <View style={styles.filterRow}>
-              {STATUS_FILTERS.map((item) => {
+              {statusFilters.map((item) => {
                 const active = statusFilter === item.key;
                 return (
                   <Pressable
@@ -462,8 +465,8 @@ export default function ShopInvoicingScreen() {
             ) : uninvoicedRepairs.length === 0 ? (
               <EmptyStateCard
                 icon="file-document-check-outline"
-                title="All caught up"
-                subtitle="Every completed repair already has an issued platform invoice, or none are done yet."
+                title={t('partnerDashboard.invoicing.allCaughtUpTitle')}
+                subtitle={t('partnerDashboard.invoicing.allCaughtUpSubtitle')}
               />
             ) : (
               uninvoicedRepairs.map((repair) => renderUninvoicedRepair(repair))

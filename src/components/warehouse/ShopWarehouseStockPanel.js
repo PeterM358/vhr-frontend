@@ -11,38 +11,21 @@ import ProTabBar from '../ui/ProTabBar';
 import { PRIMARY, TEXT_DARK, TEXT_MUTED } from '../../constants/colors';
 import { listStockInventory, listStockMovements } from '../../api/warehouse';
 import { showMessage } from '../../utils/crossPlatformAlert';
+import { useTranslation } from '../../i18n';
 
-const STOCK_VIEW_TABS = [
-  { value: 'stock', label: 'Inventory', icon: 'package-variant-closed' },
-  { value: 'movements', label: 'Movements', icon: 'swap-horizontal' },
-];
-
-const MOVEMENT_LABELS = {
-  purchase: 'Goods in',
-  repair_usage: 'Used on repair',
-  adjustment: 'Adjustment',
-  supplier_return: 'Return to supplier',
-};
-
-const SORT_OPTIONS = [
-  { value: 'name', label: 'Name' },
-  { value: 'qty', label: 'Qty' },
-  { value: 'part_number', label: 'Part #' },
-  { value: 'brand', label: 'Brand' },
-];
-
-function StockStatusBadge({ status, qty }) {
+function StockStatusBadge({ status, qty, inStockLabel, outOfStockLabel }) {
   const inStock = status === 'in_stock' || Number(qty) > 0;
   return (
     <View style={[styles.badge, inStock ? styles.badgeIn : styles.badgeOut]}>
       <Text style={[styles.badgeText, inStock ? styles.badgeTextIn : styles.badgeTextOut]}>
-        {inStock ? 'In stock' : 'Out of stock'}
+        {inStock ? inStockLabel : outOfStockLabel}
       </Text>
     </View>
   );
 }
 
 function StockRow({ row, onSelect }) {
+  const { t } = useTranslation();
   const qty = Number(row.stock_quantity);
   return (
     <Pressable onPress={() => onSelect(row)}>
@@ -65,7 +48,12 @@ function StockRow({ row, onSelect }) {
             {row.part_type ? <Text style={styles.meta}>{row.part_type}</Text> : null}
           </View>
           <View style={styles.qtyCol}>
-            <StockStatusBadge status={row.stock_status} qty={qty} />
+            <StockStatusBadge
+              status={row.stock_status}
+              qty={qty}
+              inStockLabel={t('partnerDashboard.warehouse.inStock', null, 'In stock')}
+              outOfStockLabel={t('partnerDashboard.warehouse.outOfStock', null, 'Out of stock')}
+            />
             <Text style={[styles.qty, qty <= 0 && styles.qtyLow]}>
               {row.stock_quantity}
               {row.stock_unit ? ` ${row.stock_unit}` : ''}
@@ -77,10 +65,10 @@ function StockRow({ row, onSelect }) {
   );
 }
 
-function MovementRow({ mv }) {
+function MovementRow({ mv, movementLabels }) {
   const delta = Number(mv.quantity_delta);
   const positive = delta > 0;
-  const typeLabel = MOVEMENT_LABELS[mv.movement_type] || mv.movement_type;
+  const typeLabel = movementLabels[mv.movement_type] || mv.movement_type;
   const ref = mv.reference || mv.invoice_number || '';
 
   return (
@@ -117,6 +105,32 @@ function MovementRow({ mv }) {
 }
 
 export default function ShopWarehouseStockPanel() {
+  const { t } = useTranslation();
+  const stockViewTabs = useMemo(
+    () => [
+      { value: 'stock', label: t('partnerDashboard.warehouse.stockTab'), icon: 'package-variant-closed' },
+      { value: 'movements', label: t('partnerDashboard.warehouse.movementsTab'), icon: 'swap-horizontal' },
+    ],
+    [t]
+  );
+  const sortOptions = useMemo(
+    () => [
+      { value: 'name', label: t('partnerDashboard.warehouse.sortName') },
+      { value: 'qty', label: t('partnerDashboard.warehouse.sortQty') },
+      { value: 'part_number', label: t('partnerDashboard.warehouse.sortPartNumber') },
+      { value: 'brand', label: t('partnerDashboard.warehouse.sortBrand') },
+    ],
+    [t]
+  );
+  const movementLabels = useMemo(
+    () => ({
+      purchase: t('partnerDashboard.warehouse.movementPurchase', null, 'Goods in'),
+      repair_usage: t('partnerDashboard.warehouse.movementRepairUsage', null, 'Used on repair'),
+      adjustment: t('partnerDashboard.warehouse.movementAdjustment', null, 'Adjustment'),
+      supplier_return: t('partnerDashboard.warehouse.movementSupplierReturn', null, 'Return to supplier'),
+    }),
+    [t]
+  );
   const [view, setView] = useState('stock');
   const [loading, setLoading] = useState(true);
   const [inventory, setInventory] = useState([]);
@@ -184,7 +198,7 @@ export default function ShopWarehouseStockPanel() {
 
   return (
     <View style={styles.panelRoot}>
-      <ProTabBar tabs={STOCK_VIEW_TABS} value={view} onChange={setView} style={styles.viewTabs} />
+      <ProTabBar tabs={stockViewTabs} value={view} onChange={setView} style={styles.viewTabs} />
 
       {view === 'stock' ? (
         <>
@@ -199,7 +213,7 @@ export default function ShopWarehouseStockPanel() {
               inputStyle={{ fontSize: 14 }}
             />
             <View style={styles.sortRow}>
-              {SORT_OPTIONS.map((opt) => (
+              {sortOptions.map((opt) => (
                 <Chip
                   key={opt.value}
                   compact
@@ -237,8 +251,8 @@ export default function ShopWarehouseStockPanel() {
             ListEmptyComponent={
               <EmptyStateCard
                 icon="package-variant"
-                title="Nothing in inventory"
-                subtitle="Parts appear here after you complete a receiving document. Turn on “Show 0-qty catalog” to see parts added but never stocked."
+                title={t('partnerDashboard.warehouse.inventoryEmptyTitle')}
+                subtitle={t('partnerDashboard.warehouse.inventoryEmptySubtitle')}
               />
             }
             renderItem={({ item }) => <StockRow row={item} onSelect={handleSelectPart} />}
@@ -281,7 +295,7 @@ export default function ShopWarehouseStockPanel() {
           ListEmptyComponent={
             <EmptyStateCard
               icon="swap-horizontal"
-              title="No movements"
+              title={t('partnerDashboard.warehouse.noMovementsTitle')}
               subtitle={
                 selectedPart
                   ? 'No ledger entries for this part — if you deleted documents from the database, movements may have been removed too.'
@@ -289,7 +303,7 @@ export default function ShopWarehouseStockPanel() {
               }
             />
           }
-          renderItem={({ item }) => <MovementRow mv={item} />}
+          renderItem={({ item }) => <MovementRow mv={item} movementLabels={movementLabels} />}
         />
       )}
     </View>

@@ -19,6 +19,7 @@ import AppCard from '../components/ui/AppCard';
 import { COLORS } from '../constants/colors';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
+import { useTranslation } from '../i18n';
 import { formatMoneyAmount } from '../constants/currency';
 import { API_BASE_URL } from '../api/config';
 import {
@@ -229,6 +230,7 @@ function MenuItemRow({
 }
 
 export default function ShopServiceMenuScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = usePartnerDashboardBack(navigation);
@@ -466,8 +468,8 @@ export default function ShopServiceMenuScreen() {
   return (
     <ScreenBackground safeArea={false}>
       <AppNavigationBar
-        title="Price list"
-        backLabel="Dashboard"
+        title={t('drawer.partner.priceList')}
+        backLabel={t('navigation.backToDashboard')}
         onBack={handleBack}
         scrolled={scrolled}
       />
@@ -477,7 +479,7 @@ export default function ShopServiceMenuScreen() {
         contentContainerStyle={[styles.content, { paddingTop: 12 }]}
       >
         <AppCard variant="dark" style={styles.heroCard}>
-          <Text style={styles.heroTitle}>Price list</Text>
+          <Text style={styles.heroTitle}>{t('drawer.partner.priceList')}</Text>
           <Text style={styles.heroSubtitle}>
             All your services are listed here. Toggle Published to show prices on your public profile
             — expand a row to edit parts and labor.

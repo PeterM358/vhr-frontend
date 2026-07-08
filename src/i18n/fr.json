@@ -622,5 +622,204 @@
       "construction": "Construction",
       "other": "Autre"
     }
+  },
+  "partnerDashboard": {
+    "heroTitle": "Veversal Partner Platform",
+    "heroSubtitle": "Open repair requests, send offers, manage bookings, and keep your public service center page up to date.",
+    "openRepairRequests": "Open Repair Requests",
+    "openRequestsEmptySubtitle": "New customer repair requests are waiting for your offer.",
+    "completedCount": "Completed ({count})",
+    "viewRequests": "View Requests",
+    "viewRepair": "View Repair",
+    "operationsTitle": "Operations",
+    "operationsSubtitle": "Daily partner workflows — requests, offers, schedule and your public presence.",
+    "pendingOffersTitle": "Pending Offers",
+    "pendingOffersSubtitle": "Sent, awaiting customer acceptance",
+    "activeRepairsTitle": "Active Repairs",
+    "activeRepairsSubtitle": "Jobs currently in progress",
+    "bookingsCalendarTitle": "Bookings / Calendar",
+    "bookingsCalendarSubtitle": "Today's appointments, schedule and capacity",
+    "serviceCenterProfileTitle": "Service Center Profile",
+    "serviceCenterProfileSubtitle": "Name, location, services, hours and contact",
+    "publicPagePreviewTitle": "Public Page Preview",
+    "publicPagePreviewSubtitle": "How clients see your service center on the map and in search",
+    "comingSoonTitle": "Coming soon",
+    "comingSoonSubtitle": "Future partner modules — not active yet",
+    "soonBadge": "Soon",
+    "serviceCenterDefault": "Service center",
+    "openCenterDetails": "Open center details",
+    "status": {
+      "waitingForOffer": "Waiting for your offer",
+      "offerSent": "Offer sent",
+      "offerAccepted": "Offer accepted",
+      "inProgress": "Repair in progress",
+      "completed": "Completed",
+      "declined": "Offer declined",
+      "request": "Request"
+    },
+    "lifecycleCounter": {
+      "waitingForOffer": "Waiting for offer",
+      "offerSent": "Offer sent",
+      "accepted": "Accepted",
+      "inProgress": "In progress",
+      "completed": "Completed",
+      "declined": "Declined"
+    },
+    "actions": {
+      "sendOffer": "Send Offer",
+      "editOffer": "Edit Offer",
+      "openRepair": "Open Repair",
+      "continueRepair": "Continue Repair",
+      "details": "Details"
+    },
+    "card": {
+      "vehicleFallback": "Vehicle",
+      "plateHidden": "Plate hidden until booking",
+      "visit": "Visit {time}",
+      "appointment": "Appointment {time}"
+    },
+    "timeSince": {
+      "justNow": "Just now",
+      "minutesAgo": "{count}m ago",
+      "hoursAgo": "{count}h ago",
+      "daysAgo": "{count}d ago"
+    },
+    "activation": {
+      "title": "Activate your Veversal partner account",
+      "openRequestsBodyOne": "You have 1 open customer request waiting for offers.",
+      "openRequestsBodyMany": "You have {count} open customer requests waiting for offers.",
+      "waitingBody": "New customer repair requests are waiting for your offer.",
+      "hint": "Send offers, manage bookings and build your online service history from one place.",
+      "activateButton": "Activate Partner Account",
+      "subscribeButton": "Subscribe to Send Offers",
+      "requiredTitle": "Partner activation required",
+      "requiredBody": "Activate your Veversal partner account to send offers to customers."
+    },
+    "emptyRequests": {
+      "title": "No open requests from customers yet",
+      "body": "Your Veversal public page helps customers find your service center in every supported language. Complete your profile, publish services and opening hours to start receiving requests."
+    },
+    "profileSetup": {
+      "title": "Complete your service center profile to open repair requests from clients near you",
+      "missing": "Still needed: {fields}",
+      "completeButton": "Complete profile"
+    },
+    "comingSoonDialog": {
+      "title": "Coming soon",
+      "documentsBody": "Central document import is on the Veversal partner roadmap.",
+      "inventoryBody": "Inventory management is planned for a future release.",
+      "reportsBody": "Reports are planned for a future release. Snapshot today: {open} open · {active} active · {pending} pending offers.",
+      "customersBody": "Customer and vehicle CRM tools are planned for a future partner release.",
+      "marketIntelligenceTitle": "Market Intelligence",
+      "marketIntelligenceBody": "Compare your prices with city averages and understand what services customers are requesting most."
+    },
+    "modules": {
+      "documents": {
+        "title": "Documents",
+        "subtitle": "Invoices, repair docs and warranty evidence in one place"
+      },
+      "inventory": {
+        "title": "Inventory",
+        "subtitle": "Parts, warehouse stock and receiving workflows"
+      },
+      "reports": {
+        "title": "Reports",
+        "subtitle": "Revenue, throughput and customer growth snapshots"
+      },
+      "customers": {
+        "title": "Customers & Vehicles",
+        "subtitle": "Authorized clients and fleet records"
+      },
+      "marketIntelligence": {
+        "title": "Market Intelligence",
+        "subtitle": "Compare your prices with city averages and understand what services customers are requesting most."
+      }
+    },
+    "guide": {
+      "completedTitle": "Completed",
+      "completedBody": "This repair is finished and recorded in service history.",
+      "inProgressTitle": "Repair in progress",
+      "inProgressBody": "Track parts, notes, and finalize when work is complete.",
+      "confirmedTitle": "Confirmed appointment",
+      "confirmedBody": "Mark vehicle arrived when it arrives at your center.",
+      "offerSentTitle": "Offer sent",
+      "offerSentBody": "Waiting for the customer to review and book your offer.",
+      "reviewTitle": "Request review",
+      "reviewBody": "Review the customer request, photos, and details before sending an offer."
+    },
+    "repairsList": {
+      "tabs": {
+        "open": "Open",
+        "ongoing": "Ongoing",
+        "done": "Done"
+      },
+      "paymentFilters": {
+        "all": "All payments",
+        "unpaid": "Unpaid",
+        "paid": "Paid"
+      }
+    },
+    "notifications": {
+      "tabs": {
+        "alerts": "Alerts",
+        "repairs": "Repairs",
+        "offers": "Offers",
+        "bookings": "Bookings"
+      }
+    },
+    "clients": {
+      "authorizedTitle": "Authorized Clients",
+      "clientCountOne": "1 client authorized",
+      "clientCountMany": "{count} clients authorized",
+      "addClient": "Add Client",
+      "emptyTitle": "No authorized clients yet",
+      "emptySubtitle": "Add a client or authorize a vehicle to start managing repairs."
+    },
+    "promotions": {
+      "createButton": "Create Promotion",
+      "deleteButton": "Delete",
+      "emptyTitle": "No promotions yet",
+      "emptySubtitle": "Create your first promotion to attract clients."
+    },
+    "invoicing": {
+      "tabs": {
+        "invoices": "Invoices",
+        "uninvoiced": "Uninvoiced repairs"
+      },
+      "statusFilters": {
+        "all": "All",
+        "draft": "Draft",
+        "issued": "Issued"
+      },
+      "allMonths": "All months",
+      "allCaughtUpTitle": "All caught up",
+      "allCaughtUpSubtitle": "Every completed repair already has an issued platform invoice, or none are done yet."
+    },
+    "warehouse": {
+      "addDocument": "Add document",
+      "documents": "Documents",
+      "stock": "Stock",
+      "noPartsTitle": "No parts yet",
+      "noPartsSubtitle": "Upload a supplier invoice above or tap Add part.",
+      "noDocumentsTitle": "No documents yet",
+      "noDocumentsSubtitle": "Complete a receiving draft to see it here.",
+      "inventoryEmptyTitle": "Nothing in inventory",
+      "inventoryEmptySubtitle": "Parts appear here after you complete a receiving document. Turn on “Show 0-qty catalog” to see parts added but never stocked.",
+      "noMovementsTitle": "No movements",
+      "stockTab": "Inventory",
+      "movementsTab": "Movements",
+      "sortName": "Name",
+      "sortQty": "Qty",
+      "sortPartNumber": "Part #",
+      "sortBrand": "Brand"
+    },
+    "marketComparison": {
+      "title": "Compare with mine",
+      "body": "Market comparison is coming soon. You will see how your service center ranks against nearby competitors on services, ratings, and availability.",
+      "button": "Compare (soon)"
+    },
+    "calendar": {
+      "today": "Today"
+    }
   }
 }

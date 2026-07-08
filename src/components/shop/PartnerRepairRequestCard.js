@@ -8,6 +8,7 @@ import { Button } from 'react-native-paper';
 import FloatingCard from '../ui/FloatingCard';
 import { COLORS } from '../../constants/colors';
 import { DEFAULT_CURRENCY, formatMoneyAmount } from '../../constants/currency';
+import { useTranslation } from '../../i18n';
 import {
   PARTNER_LIFECYCLE,
   getLifecyclePill,
@@ -45,17 +46,20 @@ export default function PartnerRepairRequestCard({
   onPressOffer,
   onPressPrimary,
 }) {
+  const { t } = useTranslation();
+
   if (!repair || repair.id == null) {
     return null;
   }
 
   const lifecycle = resolvePartnerLifecycle(repair);
-  const pill = getLifecyclePill(repair);
+  const pill = getLifecyclePill(repair, t);
   const plate = String(repair?.vehicle_license_plate || '').trim();
   const title =
-    `${repair?.vehicle_make || ''} ${repair?.vehicle_model || ''}`.trim() || 'Vehicle';
+    `${repair?.vehicle_make || ''} ${repair?.vehicle_model || ''}`.trim() ||
+    t('partnerDashboard.card.vehicleFallback');
   const description = String(repair?.description || '').trim();
-  const timeSince = formatTimeSince(repair?.created_at);
+  const timeSince = formatTimeSince(repair?.created_at, t);
   const offerAmount = formatOfferAmount(repair);
   const visitTime = formatVisitTime(repair);
 
@@ -64,28 +68,28 @@ export default function PartnerRepairRequestCard({
 
   let primaryLabel = null;
   let primaryAction = null;
-  let secondaryLabel = 'Details';
+  let secondaryLabel = t('partnerDashboard.actions.details');
   let showSecondary = true;
 
   switch (lifecycle) {
     case PARTNER_LIFECYCLE.WAITING_FOR_OFFER:
-      primaryLabel = 'Send Offer';
+      primaryLabel = t('partnerDashboard.actions.sendOffer');
       primaryAction = () => onPressOffer?.(repair);
       break;
     case PARTNER_LIFECYCLE.OFFER_SENT:
-      primaryLabel = 'Edit Offer';
+      primaryLabel = t('partnerDashboard.actions.editOffer');
       primaryAction = () => onPressOffer?.(repair);
       break;
     case PARTNER_LIFECYCLE.OFFER_ACCEPTED:
-      primaryLabel = 'Open Repair';
+      primaryLabel = t('partnerDashboard.actions.openRepair');
       primaryAction = () => (onPressPrimary || onPressDetails)?.(repair);
       break;
     case PARTNER_LIFECYCLE.IN_PROGRESS:
-      primaryLabel = 'Continue Repair';
+      primaryLabel = t('partnerDashboard.actions.continueRepair');
       primaryAction = () => (onPressPrimary || onPressDetails)?.(repair);
       break;
     case PARTNER_LIFECYCLE.COMPLETED:
-      primaryLabel = 'View Repair';
+      primaryLabel = t('partnerDashboard.viewRepair');
       primaryAction = () => (onPressPrimary || onPressDetails)?.(repair);
       secondaryLabel = null;
       showSecondary = false;
@@ -94,7 +98,7 @@ export default function PartnerRepairRequestCard({
       primaryLabel = null;
       break;
     default:
-      primaryLabel = 'Details';
+      primaryLabel = t('partnerDashboard.actions.details');
       primaryAction = () => onPressDetails?.(repair);
       showSecondary = false;
       break;
@@ -114,7 +118,7 @@ export default function PartnerRepairRequestCard({
               {title}
             </Text>
             <Text style={styles.meta} numberOfLines={1}>
-              {plate || 'Plate hidden until booking'}
+              {plate || t('partnerDashboard.card.plateHidden')}
               {timeSince ? ` · ${timeSince}` : ''}
             </Text>
           </View>
@@ -133,13 +137,15 @@ export default function PartnerRepairRequestCard({
 
         {showOfferSummary && (offerAmount || visitTime) ? (
           <Text style={styles.offerSummary} numberOfLines={2}>
-            {[offerAmount, visitTime ? `Visit ${visitTime}` : null].filter(Boolean).join(' · ')}
+            {[offerAmount, visitTime ? t('partnerDashboard.card.visit', { time: visitTime }) : null]
+              .filter(Boolean)
+              .join(' · ')}
           </Text>
         ) : null}
 
         {lifecycle === PARTNER_LIFECYCLE.OFFER_ACCEPTED && visitTime ? (
           <Text style={styles.offerSummary} numberOfLines={1}>
-            Appointment {visitTime}
+            {t('partnerDashboard.card.appointment', { time: visitTime })}
           </Text>
         ) : null}
       </Pressable>

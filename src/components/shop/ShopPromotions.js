@@ -19,6 +19,7 @@ import { deletePromotion, getPromotions } from '../../api/promotions';
 import ScreenBackground from '../ScreenBackground';
 import AppNavigationBar from '../common/AppNavigationBar';
 import { usePartnerDashboardBack } from '../../navigation/appNavBarBack';
+import { useTranslation } from '../../i18n';
 import FloatingCard from '../ui/FloatingCard';
 import EmptyStateCard from '../ui/EmptyStateCard';
 import {
@@ -30,6 +31,7 @@ import {
 import { formatMoneyAmount } from '../../constants/currency';
 
 export default function ShopPromotions() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const handleBack = usePartnerDashboardBack(navigation);
@@ -142,7 +144,7 @@ export default function ShopPromotions() {
           compact
           style={styles.deleteButton}
         >
-          Delete
+          {t('partnerDashboard.promotions.deleteButton')}
         </Button>
       </View>
     </FloatingCard>
@@ -150,7 +152,11 @@ export default function ShopPromotions() {
 
   return (
     <ScreenBackground safeArea={false}>
-      <AppNavigationBar title="Promotions" backLabel="Dashboard" onBack={handleBack} />
+      <AppNavigationBar
+        title={t('drawer.partner.promotions')}
+        backLabel={t('navigation.backToDashboard')}
+        onBack={handleBack}
+      />
       <View style={styles.container}>
         <Button
           mode="contained"
@@ -161,7 +167,7 @@ export default function ShopPromotions() {
           buttonColor={PRIMARY}
           textColor="#fff"
         >
-          Create Promotion
+          {t('partnerDashboard.promotions.createButton')}
         </Button>
 
         {loading ? (
@@ -182,8 +188,8 @@ export default function ShopPromotions() {
             ListEmptyComponent={
               <EmptyStateCard
                 icon="tag-multiple-outline"
-                title="No promotions yet"
-                subtitle="Create your first promotion to attract clients."
+                title={t('partnerDashboard.promotions.emptyTitle')}
+                subtitle={t('partnerDashboard.promotions.emptySubtitle')}
               />
             }
           />

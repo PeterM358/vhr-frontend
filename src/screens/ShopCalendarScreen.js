@@ -49,6 +49,7 @@ import { formatDurationMinutes } from '../utils/laborDuration';
 import { isPendingAppointmentRequest, getCalendarJobKind, calendarJobKindLabel } from '../utils/shopCalendarJob';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { useTranslation } from '../i18n';
 
 const SHOP_TOP_BAR = 'rgba(11,18,32,0.92)';
 const CALENDAR_DAY_COUNT = 14;
@@ -302,6 +303,7 @@ function DayJobCard({
 }
 
 export default function ShopCalendarScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const route = useRoute();
   const { refreshNotifications, setNotifications } = useContext(WebSocketContext);
@@ -658,7 +660,7 @@ export default function ShopCalendarScreen() {
           accessibilityLabel={`Back to ${backLabel}`}
         />
         <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color="#fff" />
-        <Appbar.Content title="Calendar" titleStyle={{ color: '#fff' }} />
+        <Appbar.Content title={t('drawer.partner.calendar')} titleStyle={{ color: '#fff' }} />
         <Appbar.Action
           icon="chevron-left"
           onPress={() => setWeekStart((w) => addCalendarDays(w, -CALENDAR_DAY_COUNT))}
@@ -676,7 +678,7 @@ export default function ShopCalendarScreen() {
           {formatDayLabel(weekStart)} – {formatDayLabel(addCalendarDays(weekStart, CALENDAR_DAY_COUNT - 1))}
         </Text>
         <Button compact mode="text" textColor="#fff" onPress={() => setWeekStart(startOfWeek(new Date()))}>
-          Today
+          {t('partnerDashboard.calendar.today')}
         </Button>
       </View>
 

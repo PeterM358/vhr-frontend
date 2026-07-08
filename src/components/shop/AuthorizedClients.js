@@ -24,6 +24,7 @@ import { API_BASE_URL } from '../../api/config';
 import ScreenBackground from '../ScreenBackground';
 import AppNavigationBar from '../common/AppNavigationBar';
 import { usePartnerDashboardBack } from '../../navigation/appNavBarBack';
+import { useTranslation } from '../../i18n';
 import FloatingCard from '../ui/FloatingCard';
 import AppCard from '../ui/AppCard';
 import EmptyStateCard from '../ui/EmptyStateCard';
@@ -41,6 +42,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 export default function AuthorizedClients({ navigation }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const handleBack = usePartnerDashboardBack(navigation);
   const [clients, setClients] = useState([]);
@@ -263,7 +265,11 @@ export default function AuthorizedClients({ navigation }) {
 
   return (
     <ScreenBackground safeArea={false}>
-      <AppNavigationBar title="Clients" backLabel="Dashboard" onBack={handleBack} />
+      <AppNavigationBar
+        title={t('drawer.partner.clients')}
+        backLabel={t('navigation.backToDashboard')}
+        onBack={handleBack}
+      />
       <View style={styles.container}>
         <AppCard variant="dark" accent={false} style={styles.heroCard}>
           <View style={styles.heroRow}>
@@ -275,9 +281,11 @@ export default function AuthorizedClients({ navigation }) {
               />
             </View>
             <View style={styles.heroTextWrap}>
-              <Text style={styles.heroTitle}>Authorized Clients</Text>
+              <Text style={styles.heroTitle}>{t('partnerDashboard.clients.authorizedTitle')}</Text>
               <Text style={styles.heroSubtitle}>
-                {clients.length} {clients.length === 1 ? 'client' : 'clients'} authorized
+                {clients.length === 1
+                  ? t('partnerDashboard.clients.clientCountOne')
+                  : t('partnerDashboard.clients.clientCountMany', { count: clients.length })}
               </Text>
             </View>
           </View>
@@ -289,7 +297,7 @@ export default function AuthorizedClients({ navigation }) {
             buttonColor={PRIMARY}
             textColor="#fff"
           >
-            Add Client
+            {t('partnerDashboard.clients.addClient')}
           </Button>
         </AppCard>
 
@@ -303,8 +311,8 @@ export default function AuthorizedClients({ navigation }) {
           ListEmptyComponent={
             <EmptyStateCard
               icon="account-multiple-outline"
-              title="No authorized clients yet"
-              subtitle="Add a client or authorize a vehicle to start managing repairs."
+                title={t('partnerDashboard.clients.emptyTitle')}
+                subtitle={t('partnerDashboard.clients.emptySubtitle')}
             />
           }
         />

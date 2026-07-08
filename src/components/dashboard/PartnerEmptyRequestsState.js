@@ -3,16 +3,16 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import FloatingCard from '../ui/FloatingCard';
 import { COLORS } from '../../constants/colors';
+import { useTranslation } from '../../i18n';
 
 /** Partner empty state — explanatory copy only (no duplicate primary CTAs). */
 export default function PartnerEmptyRequestsState() {
+  const { t } = useTranslation();
+
   return (
     <FloatingCard accent={false}>
-      <Text style={styles.title}>No open requests from customers yet</Text>
-      <Text style={styles.body}>
-        Your Veversal public page helps customers find your service center in every supported language.
-        Complete your profile, publish services and opening hours to start receiving requests.
-      </Text>
+      <Text style={styles.title}>{t('partnerDashboard.emptyRequests.title')}</Text>
+      <Text style={styles.body}>{t('partnerDashboard.emptyRequests.body')}</Text>
     </FloatingCard>
   );
 }

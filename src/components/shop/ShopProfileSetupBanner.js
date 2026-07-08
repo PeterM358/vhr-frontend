@@ -2,15 +2,18 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import AppCard from '../ui/AppCard';
+import { useTranslation } from '../../i18n';
 
 export default function ShopProfileSetupBanner({ missingFields, onCompletePress }) {
+  const { t } = useTranslation();
+
   return (
     <AppCard variant="dark" contentStyle={styles.inner}>
-      <Text style={styles.title}>
-        Complete your service center profile to open repair requests from clients near you
-      </Text>
+      <Text style={styles.title}>{t('partnerDashboard.profileSetup.title')}</Text>
       {missingFields.length > 0 ? (
-        <Text style={styles.missing}>Still needed: {missingFields.join(', ')}</Text>
+        <Text style={styles.missing}>
+          {t('partnerDashboard.profileSetup.missing', { fields: missingFields.join(', ') })}
+        </Text>
       ) : null}
       <Button
         mode="contained"
@@ -20,7 +23,7 @@ export default function ShopProfileSetupBanner({ missingFields, onCompletePress 
         contentStyle={styles.ctaContent}
         labelStyle={styles.ctaLabel}
       >
-        Complete profile
+        {t('partnerDashboard.profileSetup.completeButton')}
       </Button>
     </AppCard>
   );

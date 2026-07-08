@@ -13,6 +13,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import ScreenBackground from '../components/ScreenBackground';
 import AppNavigationBar from '../components/common/AppNavigationBar';
 import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
+import { useTranslation } from '../i18n';
 import FloatingCard from '../components/ui/FloatingCard';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
 import InvoiceHeaderCard from '../components/warehouse/InvoiceHeaderCard';
@@ -129,6 +130,7 @@ export default function ShopWarehouseReceiveScreen({
   onCommitted,
   onResumeConsumed,
 }) {
+  const { t } = useTranslation();
   const inDrawer = typeof navigation.openDrawer === 'function';
   const insets = useSafeAreaInsets();
   const handleBack = usePartnerDashboardBack(navigation);
@@ -543,7 +545,11 @@ export default function ShopWarehouseReceiveScreen({
     return (
       <Wrapper style={embedded ? styles.embeddedRoot : undefined}>
         {showAppNav ? (
-          <AppNavigationBar title="Warehouse" backLabel="Dashboard" onBack={handleBack} />
+          <AppNavigationBar
+            title={t('drawer.partner.warehouse')}
+            backLabel={t('navigation.backToDashboard')}
+            onBack={handleBack}
+          />
         ) : null}
         <ScrollView
           style={styles.flex}
@@ -716,7 +722,11 @@ export default function ShopWarehouseReceiveScreen({
   return (
     <Wrapper style={embedded ? styles.embeddedRoot : undefined}>
       {showAppNav ? (
-        <AppNavigationBar title="Warehouse" backLabel="Dashboard" onBack={handleBack} />
+        <AppNavigationBar
+          title={t('drawer.partner.warehouse')}
+          backLabel={t('navigation.backToDashboard')}
+          onBack={handleBack}
+        />
       ) : null}
       {!embedded && inDrawer ? (
         <Appbar.Header style={{ backgroundColor: SHOP_TOP_BAR, paddingTop: insets.top }}>
@@ -726,7 +736,7 @@ export default function ShopWarehouseReceiveScreen({
             onPress={() => navigation.navigate('ShopDashboard')}
           />
           <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color="#fff" />
-          <Appbar.Content title="Warehouse" titleStyle={{ color: '#fff' }} />
+          <Appbar.Content title={t('drawer.partner.warehouse')} titleStyle={{ color: '#fff' }} />
         </Appbar.Header>
       ) : null}
 
@@ -746,8 +756,8 @@ export default function ShopWarehouseReceiveScreen({
         ListEmptyComponent={
           <EmptyStateCard
             icon="package-variant"
-            title="No parts yet"
-            subtitle="Upload a supplier invoice above or tap Add part."
+            title={t('partnerDashboard.warehouse.noPartsTitle')}
+            subtitle={t('partnerDashboard.warehouse.noPartsSubtitle')}
           />
         }
       />
