@@ -57,6 +57,7 @@ import { todayCalendarRange, isScheduledToday } from '../utils/dashboardDate';
 import { showMessage } from '../utils/crossPlatformAlert';
 import { resetShopDrawerRepairs } from '../navigation/drawerNavigation';
 import { useTranslation } from '../i18n';
+import CompactLanguageSelector from '../components/common/CompactLanguageSelector';
 
 const SHOP_TOP_BAR = 'rgba(11,18,32,0.92)';
 
@@ -464,6 +465,16 @@ export default function ShopHomeScreen() {
     <ScreenBackground safeArea={false}>
       <Appbar.Header style={{ backgroundColor: SHOP_TOP_BAR }}>
         <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color="#fff" />
+        {Platform.OS === 'web' ? (
+          <View style={styles.languageSelectorWrap}>
+            <CompactLanguageSelector
+              variant="dark"
+              compact
+              presentation="portalDropdown"
+              style={styles.languageSelector}
+            />
+          </View>
+        ) : null}
         <Pressable
           onPress={() => openPartnerProfile(navigation, { requireSetup: !profileComplete })}
           style={styles.titlePressable}
@@ -567,6 +578,14 @@ export default function ShopHomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  languageSelectorWrap: {
+    justifyContent: 'center',
+    marginLeft: 2,
+    marginRight: 4,
+  },
+  languageSelector: {
+    maxWidth: 92,
+  },
   titlePressable: {
     flex: 1,
     justifyContent: 'center',

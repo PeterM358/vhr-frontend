@@ -59,7 +59,8 @@ import {
   vehicleSpecs,
   vehicles,
 } from './webRoutes';
-import { toCanonicalPublicPath } from './localizedRoutes';
+import { toCanonicalPublicPath, toCanonicalAppPath, localizeCanonicalPath, getSupportedLanguagePrefixFromPathname } from './localizedRoutes';
+import { STORAGE_KEY_LOCALE, SUPPORTED_LOCALES, getLocale, syncLocaleFromWebPathname } from '../i18n';
 
 function findFocusedRoute(state) {
   if (!state?.routes?.length) return null;
@@ -867,6 +868,94 @@ async function hasStoredAuthToken() {
   return !!(token && token !== 'null' && token !== 'undefined');
 }
 
+function readStoredWebLocale() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY_LOCALE);
+    if (stored && SUPPORTED_LOCALES.includes(stored)) {
+      return stored;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+/** Prefix a canonical app path with the stored or active locale (replace, not push). */
+function localizePathForRedirect(canonicalPath) {
+  const pathOnly = String(canonicalPath || '/').split('?')[0].split('#')[0];
+  if (!pathOnly || pathOnly === '/') {
+    return pathOnly || '/';
+  }
+  const lang = readStoredWebLocale() || getLocale() || 'en';
+  return localizeCanonicalPath(pathOnly, lang);
+}
+
+async function resolveDashboardRedirectTarget(pathname) {
+  const authed = await hasStoredAuthToken();
+  if (!authed) {
+    return '/';
+  }
+  if (getSupportedLanguagePrefixFromPathname(pathname)) {
+    return null;
+  }
+  const isShop = (await AsyncStorage.getItem('@is_shop')) === 'true';
+  if (isShop && (pathname === '/dashboard' || pathname === '/dashboard/')) {
+    return localizePathForRedirect('/partner/dashboard');
+  }
+  return localizePathForRedirect(pathname);
+}
+
+async function resolvePartnerRedirectTarget(pathname) {
+  if (getSupportedLanguagePrefixFromPathname(pathname)) {
+    return null;
+  }
+  const authed = await hasStoredAuthToken();
+  if (!authed) {
+    return '/';
+  }
+  return localizePathForRedirect(pathname);
+}
+
+async function localizeAppTargetIfNeeded(rawTarget) {
+  if (!rawTarget) return rawTarget;
+  const qIndex = rawTarget.indexOf('?');
+  const queryPart = qIndex >= 0 ? rawTarget.slice(qIndex) : '';
+  const pathPart = qIndex >= 0 ? rawTarget.slice(0, qIndex) : rawTarget;
+
+  if (getSupportedLanguagePrefixFromPathname(pathPart)) {
+    return rawTarget;
+  }
+
+  const appCanonical = toCanonicalAppPath(pathPart);
+  if (!appCanonical) {
+    return rawTarget;
+  }
+
+  const root = appCanonical.replace(/^\//, '').split('/')[0];
+  if (root !== 'dashboard' && root !== 'partner') {
+    return rawTarget;
+  }
+
+  const authed = await hasStoredAuthToken();
+  if (!authed) {
+    return rawTarget;
+  }
+
+  if (root === 'dashboard') {
+    const isShop = (await AsyncStorage.getItem('@is_shop')) === 'true';
+    if (isShop && (pathPart === '/dashboard' || pathPart === '/dashboard/')) {
+      return `${localizePathForRedirect('/partner/dashboard')}${queryPart}`;
+    }
+  }
+
+  const localized = localizePathForRedirect(appCanonical);
+  if (localized === pathPart) {
+    return rawTarget;
+  }
+  return `${localized}${queryPart}`;
+}
+
 function parseRepairIdFromSearch(search) {
   if (!search) return null;
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
@@ -1042,6 +1131,16 @@ export async function redirectLegacyWebUrl() {
     const authed = await hasStoredAuthToken();
     if (!authed) {
       target = '/';
+    } else {
+      const dashboardTarget = await resolveDashboardRedirectTarget(pathname);
+      if (dashboardTarget && dashboardTarget !== pathname) {
+        target = `${dashboardTarget}${search}`;
+      }
+    }
+  } else if (pathname === '/partner' || pathname.startsWith('/partner/')) {
+    const partnerTarget = await resolvePartnerRedirectTarget(pathname);
+    if (partnerTarget && partnerTarget !== pathname) {
+      target = `${partnerTarget}${search}`;
     }
   } else if (pathname === '/ClientVehicles' || pathname.startsWith('/ClientVehicles/')) {
     target = pathname.replace(/^\/ClientVehicles/, '/dashboard/vehicles');
@@ -1145,8 +1244,20 @@ export async function redirectLegacyWebUrl() {
     }
   }
 
+  if (target) {
+    target = await localizeAppTargetIfNeeded(target);
+  } else if (!getSupportedLanguagePrefixFromPathname(pathname)) {
+    const directLocalized = await localizeAppTargetIfNeeded(pathname);
+    if (directLocalized && directLocalized !== pathname) {
+      target = `${directLocalized}${search}`;
+    }
+  }
+
   if (target && target !== current) {
     window.history.replaceState(window.history.state, '', `${target}${hash}`);
+    syncLocaleFromWebPathname();
+  } else if (!target) {
+    syncLocaleFromWebPathname();
   }
 
   syncWebDocumentTitle(target || pathname);

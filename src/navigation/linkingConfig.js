@@ -1,6 +1,9 @@
 /**
  * User-facing web URL paths for React Navigation.
  * Screen/component names are unchanged — only URL segments differ on web.
+ *
+ * Language prefixes (`/{lang}/...`) are stripped in webLinking before path parsing;
+ * syncWebPath re-applies the active locale prefix for dashboard and partner routes.
  */
 
 export const linkingScreens = {

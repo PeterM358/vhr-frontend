@@ -19,6 +19,42 @@ import {
 export const SUPPORTED_LANGUAGES = ['bg', 'en', 'de', 'it', 'fr', 'es'];
 export const DEFAULT_LANGUAGE = 'en';
 
+/** Authenticated app areas — canonical paths without `/{lang}` prefix. */
+const APP_ROUTE_ROOTS = new Set([
+  'dashboard',
+  'partner',
+  'login',
+  'sign-up',
+  'sign-in',
+  'forgot-password',
+  'reset-password',
+]);
+
+const PARTNER_ROUTE_SEGMENTS = new Set([
+  'dashboard',
+  'notifications',
+  'calendar',
+  'repairs',
+  'bookings',
+  'clients',
+  'promotions',
+  'warehouse',
+  'invoicing',
+  'services',
+  'profile',
+  'public-preview',
+  'switch-center',
+  'service-centers',
+]);
+
+function isAppCanonicalSegments(segments) {
+  return segments.length > 0 && APP_ROUTE_ROOTS.has(segments[0]);
+}
+
+function isPartnerCanonicalSegments(segments) {
+  return segments[0] === 'partner' && segments.length >= 2 && PARTNER_ROUTE_SEGMENTS.has(segments[1]);
+}
+
 const SERVICE_CENTERS_ROOT_SLUG = {
   en: 'service-centers',
   bg: 'avtoservizi',
@@ -156,7 +192,27 @@ function localizedPrefixForVehicleCode(lang, code) {
   return entry[langNorm] || entry[DEFAULT_LANGUAGE];
 }
 
+/**
+ * Strip an optional `/{lang}` prefix and return the canonical authenticated app path.
+ * Examples: `/bg/partner/dashboard` → `/partner/dashboard`, `/en/dashboard/vehicles` → `/dashboard/vehicles`.
+ */
+export function toCanonicalAppPath(localizedPath) {
+  const { segments } = stripLanguagePrefix(localizedPath);
+  if (!segments.length) {
+    return '/';
+  }
+  if (isAppCanonicalSegments(segments)) {
+    return joinSegments(segments);
+  }
+  return null;
+}
+
 export function toCanonicalPublicPath(localizedPath) {
+  const appPath = toCanonicalAppPath(localizedPath);
+  if (appPath) {
+    return appPath;
+  }
+
   const { lang, segments } = stripLanguagePrefix(localizedPath);
   if (!segments.length) {
     return serviceCentersPath();
@@ -206,6 +262,10 @@ export function localizeCanonicalPath(canonicalPath, langInput) {
   }
 
   const [first, ...rest] = segments;
+
+  if (isAppCanonicalSegments(segments)) {
+    return joinSegments([lang, ...segments]);
+  }
 
   if (first === 'service-centers') {
     const root = SERVICE_CENTERS_ROOT_SLUG[lang] || SERVICE_CENTERS_ROOT_SLUG[DEFAULT_LANGUAGE];
@@ -348,8 +408,27 @@ export function switchLanguageInPath(currentPath, targetLang) {
   const search = qIndex >= 0 ? withoutHash.slice(qIndex) : '';
   const pathname = qIndex >= 0 ? withoutHash.slice(0, qIndex) : withoutHash;
 
-  const canonical = toCanonicalPublicPath(pathname);
+  const appCanonical = toCanonicalAppPath(pathname);
+  const canonical = appCanonical || toCanonicalPublicPath(pathname);
   const localized = localizeCanonicalPath(canonical, targetLang);
   return `${localized}${search}${hash}`;
+}
+
+/** Whether a pathname (with or without lang prefix) is a partner dashboard route. */
+export function isPartnerAppPath(pathname) {
+  const appCanonical = toCanonicalAppPath(pathname);
+  if (appCanonical) {
+    const segments = splitPath(appCanonical);
+    return isPartnerCanonicalSegments(segments);
+  }
+  const { segments } = stripLanguagePrefix(pathname);
+  return isPartnerCanonicalSegments(segments);
+}
+
+/** Whether a pathname (with or without lang prefix) is a client dashboard route. */
+export function isClientDashboardAppPath(pathname) {
+  const appCanonical = toCanonicalAppPath(pathname);
+  const segments = splitPath(appCanonical || pathname);
+  return segments[0] === 'dashboard';
 }
 

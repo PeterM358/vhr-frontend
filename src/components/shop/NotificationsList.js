@@ -26,11 +26,15 @@ import {
 } from '../../constants/colors';
 import {
   navigateShopNotification,
-  notificationActionHint,
   shopNotificationCategory,
 } from '../../utils/shopNotificationRouting';
 import { normalizeNotification } from '../../utils/normalizeNotification';
 import { useTranslation } from '../../i18n';
+import {
+  translateShopNotificationBody,
+  translateShopNotificationHint,
+  translateShopNotificationTitle,
+} from '../../utils/translateShopNotification';
 
 export default function NotificationsList() {
   const { t } = useTranslation();
@@ -63,7 +67,7 @@ export default function NotificationsList() {
       setRemoteNotifications(rows.map(normalizeNotification));
     } catch (err) {
       console.error('Failed to load notifications', err);
-      Alert.alert('Error', 'Could not load notifications');
+      Alert.alert(t('common.error'), t('notifications.loadError'));
     } finally {
       setLoading(false);
     }
@@ -96,7 +100,7 @@ export default function NotificationsList() {
       }
     } catch (err) {
       console.error('Failed to mark all read', err);
-      Alert.alert('Error', 'Could not mark all as read');
+      Alert.alert(t('common.error'), t('partnerDashboard.notifications.markAllError'));
     } finally {
       setMarkingAll(false);
     }
@@ -114,11 +118,11 @@ export default function NotificationsList() {
       const opened = navigateShopNotification(navigation, item);
       if (!opened) {
         console.warn('Notification missing repairId', item);
-        Alert.alert('Info', 'No linked detail for this notification.');
+        Alert.alert(t('common.notice'), t('notifications.noLinkedDetail'));
       }
     } catch (err) {
       console.error('Error marking as read or navigating', err);
-      Alert.alert('Error', 'Failed to open notification.');
+      Alert.alert(t('common.error'), t('notifications.openError'));
     }
   };
 
@@ -165,7 +169,9 @@ export default function NotificationsList() {
 
   const renderItem = ({ item }) => {
     const unread = !item.is_read;
-    const hint = notificationActionHint(item);
+    const hint = translateShopNotificationHint(item, t);
+    const title = translateShopNotificationTitle(item, t);
+    const body = translateShopNotificationBody(item, t);
     return (
       <FloatingCard
         onPress={() => handlePress(item)}
@@ -178,13 +184,13 @@ export default function NotificationsList() {
             style={[styles.title, unread ? styles.titleUnread : styles.titleRead]}
             numberOfLines={2}
           >
-            {item.title || 'Notification'}
+            {title}
           </Text>
         </View>
 
-        {!!item.body && (
+        {!!body && (
           <Text style={styles.body} numberOfLines={3}>
-            {item.body}
+            {body}
           </Text>
         )}
 
@@ -221,7 +227,9 @@ export default function NotificationsList() {
             style={[styles.filterChip, unreadOnly && styles.filterChipActive]}
           >
             <Text style={[styles.filterChipText, unreadOnly && styles.filterChipTextActive]}>
-              {unreadOnly ? 'Unread only' : 'All'}
+              {unreadOnly
+                ? t('partnerDashboard.notifications.unreadOnly')
+                : t('partnerDashboard.notifications.all')}
             </Text>
           </Pressable>
           {unreadCount > 0 ? (
@@ -231,7 +239,9 @@ export default function NotificationsList() {
               style={styles.markAllBtn}
             >
               <Text style={styles.markAllText}>
-                {markingAll ? 'Marking…' : 'Mark all read'}
+                {markingAll
+                  ? t('partnerDashboard.notifications.markingAll')
+                  : t('partnerDashboard.notifications.markAllRead')}
               </Text>
             </Pressable>
           ) : null}
@@ -267,13 +277,13 @@ export default function NotificationsList() {
             icon="bell-outline"
             title={
               unreadOnly
-                ? 'No unread notifications'
+                ? t('partnerDashboard.notifications.emptyUnreadTitle')
                 : `${t('notifications.emptyTitle')} — ${tabs.find((tabItem) => tabItem.id === activeTab)?.label?.toLowerCase() || ''}`
             }
             subtitle={
               unreadOnly
-                ? 'You are all caught up.'
-                : "Offers, promotions, bookings, and reschedule updates appear here."
+                ? t('partnerDashboard.notifications.emptyUnreadSubtitle')
+                : t('partnerDashboard.notifications.emptySubtitle')
             }
           />
         ) : (

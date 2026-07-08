@@ -282,6 +282,108 @@
         "repairs": "Repairs",
         "offers": "Offers",
         "bookings": "Bookings"
+      },
+      "defaultTitle": "Notification",
+      "all": "All",
+      "unreadOnly": "Unread only",
+      "markAllRead": "Mark all read",
+      "markingAll": "Marking…",
+      "markAllError": "Could not mark all as read",
+      "emptySubtitle": "Offers, promotions, bookings, and reschedule updates appear here.",
+      "emptyUnreadTitle": "No unread notifications",
+      "emptyUnreadSubtitle": "You are all caught up.",
+      "hints": {
+        "new_repair_request": "Tap to review request",
+        "new_repair_request_calendar": "Tap to confirm on calendar",
+        "promotion_booked": "Tap to open promotion",
+        "promotion_booking_cancelled": "Tap to open promotion",
+        "offer_booked": "Tap to open booked repair",
+        "offer_booking_cancelled": "Tap to open repair",
+        "repair_scheduled": "Tap to view on calendar",
+        "reschedule_proposed": "Tap to review on calendar",
+        "reschedule_counter_proposed": "Tap to review on calendar",
+        "reschedule_accepted": "Tap to open calendar",
+        "reschedule_declined": "Tap to open calendar",
+        "appointment_cancelled": "Tap to open calendar",
+        "vehicle_arrived": "Tap to open repair",
+        "client_arrival_reported": "Tap to open repair",
+        "owner_service_record_confirmation_requested": "Tap to confirm service record",
+        "open_repair": "Tap to open repair",
+        "open_promotion": "Tap to open promotion"
+      },
+      "templates": {
+        "new_repair_request": {
+          "title": "New repair request",
+          "body": "A customer sent a new repair request to your service center."
+        },
+        "appointment_request": {
+          "title": "Appointment request",
+          "body": "A customer requested an appointment at your service center."
+        },
+        "repair_scheduled": {
+          "title": "Appointment scheduled",
+          "body": "A repair visit has been scheduled on your calendar."
+        },
+        "reschedule_proposed": {
+          "title": "Reschedule proposed",
+          "body": "A new appointment time was proposed."
+        },
+        "reschedule_counter_proposed": {
+          "title": "Counter-proposal received",
+          "body": "Review the proposed appointment time on your calendar."
+        },
+        "reschedule_accepted": {
+          "title": "Reschedule accepted",
+          "body": "The appointment time change was accepted."
+        },
+        "reschedule_declined": {
+          "title": "Reschedule declined",
+          "body": "The appointment time change was declined."
+        },
+        "appointment_cancelled": {
+          "title": "Appointment cancelled",
+          "body": "An appointment was cancelled."
+        },
+        "offer_booked": {
+          "title": "Offer booked",
+          "body": "A customer booked your offer."
+        },
+        "offer_booking_cancelled": {
+          "title": "Booking cancelled",
+          "body": "A customer cancelled a booked offer."
+        },
+        "promotion_booked": {
+          "title": "Promotion booked",
+          "body": "A customer booked your promotion."
+        },
+        "promotion_booking_cancelled": {
+          "title": "Promotion booking cancelled",
+          "body": "A promotion booking was cancelled."
+        },
+        "vehicle_arrived": {
+          "title": "Vehicle arrived",
+          "body": "The customer's vehicle has arrived at your center."
+        },
+        "client_arrival_reported": {
+          "title": "Arrival reported",
+          "body": "The customer reported their vehicle arrival."
+        },
+        "direct_request_declined": {
+          "title": "Request declined",
+          "body": "A direct appointment request was declined."
+        },
+        "owner_service_record_confirmation_requested": {
+          "title": "Service record confirmation",
+          "body": "Please confirm a service record for the customer."
+        },
+        "owner_service_record_confirmation_confirmed": {
+          "title": "Service record confirmed",
+          "body": "The customer confirmed the service record."
+        },
+        "owner_service_record_confirmation_rejected": {
+          "title": "Service record rejected",
+          "body": "The customer rejected the service record."
+        }
       }
     },
     "clients": {
@@ -336,7 +438,65 @@
       "button": "Compare (soon)"
     },
     "calendar": {
-      "today": "Today"
+      "today": "Today",
+      "closed": "Closed",
+      "noTimeSet": "No time set",
+      "pickTime": "Pick a time",
+      "vehicleFallback": "Vehicle",
+      "repairTypeMissing": "Repair type: not selected",
+      "vehicleTypeMissing": "Vehicle type: not selected",
+      "noDateYet": "No date yet",
+      "noDateYetHint": "Open requests waiting for you to pick a day and time",
+      "schedule": "Schedule",
+      "notNow": "Not now",
+      "vehicleAtCenter": "Vehicle at center",
+      "arrivalOnVisitDay": "Arrived available on visit day",
+      "scheduleVisit": "Schedule visit",
+      "decline": "Decline",
+      "arrived": "Arrived",
+      "reschedule": "Reschedule",
+      "changeTime": "Change time",
+      "loadError": "Could not load calendar",
+      "invalidDate": "Use DD.MM.YYYY",
+      "invalidDateTitle": "Invalid date",
+      "sentToClientTitle": "Sent to client",
+      "sentToClientBody": "The owner must accept or decline the new time before it is confirmed.",
+      "scheduledTitle": "Scheduled",
+      "scheduledBody": "Appointment time saved.",
+      "scheduleError": "Could not update schedule",
+      "vehicleArrivedTitle": "Vehicle arrived",
+      "vehicleArrivedBody": "Repair is now in service. The owner has been notified.",
+      "arrivalError": "Could not confirm arrival",
+      "declineToast": "Appointment declined — owner notified.",
+      "declineError": "Could not decline request",
+      "declineTitle": "Decline appointment?",
+      "declineMessage": "The owner will be notified that you cannot take this visit. The request will be removed from your calendar.",
+      "removeTitle": "Remove from queue?",
+      "removeMessage": "This job will leave the calendar queue. You can still find it under Repairs.",
+      "remove": "Remove",
+      "removeError": "Could not remove from queue",
+      "moveTitle": "Move appointment",
+      "scheduleTitle": "Schedule appointment",
+      "serviceFallback": "Service",
+      "customDateLabel": "Custom date (DD.MM.YYYY)",
+      "noteLabel": "Note for client (optional)",
+      "sendToClient": "Send to client",
+      "notSignedIn": "Not signed in",
+      "jobKinds": {
+        "client_request": "Client request",
+        "booked": "Booked",
+        "needs_date": "Needs date"
+      },
+      "load": {
+        "free": "{duration} free",
+        "freeForJob": "No labor booked · {duration} free for this job",
+        "workdayAvailable": "No labor booked · {duration} workday available",
+        "dayFull": "{booked} labor booked · day full",
+        "tightForJob": "{booked} booked · tight for a {jobDuration} job",
+        "stillFree": "{booked} labor booked · {remaining} still free",
+        "bookedToday": "{booked} labor booked this day",
+        "left": "{booked} · {remaining} left"
+      }
     }
   },
   "vehicles": {

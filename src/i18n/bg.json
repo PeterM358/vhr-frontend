@@ -282,6 +282,108 @@
         "repairs": "Ремонти",
         "offers": "Оферти",
         "bookings": "Записвания"
+      },
+      "defaultTitle": "Известие",
+      "all": "Всички",
+      "unreadOnly": "Само непрочетени",
+      "markAllRead": "Маркирай всички като прочетени",
+      "markingAll": "Маркиране…",
+      "markAllError": "Неуспешно маркиране на всички като прочетени",
+      "emptySubtitle": "Оферти, промоции, записвания и промени в графика се показват тук.",
+      "emptyUnreadTitle": "Няма непрочетени известия",
+      "emptyUnreadSubtitle": "Всичко е прегледано.",
+      "hints": {
+        "new_repair_request": "Докоснете, за да прегледате заявката",
+        "new_repair_request_calendar": "Докоснете, за да потвърдите в календара",
+        "promotion_booked": "Докоснете, за да отворите промоцията",
+        "promotion_booking_cancelled": "Докоснете, за да отворите промоцията",
+        "offer_booked": "Докоснете, за да отворите записания ремонт",
+        "offer_booking_cancelled": "Докоснете, за да отворите ремонта",
+        "repair_scheduled": "Докоснете, за да видите в календара",
+        "reschedule_proposed": "Докоснете, за да прегледате в календара",
+        "reschedule_counter_proposed": "Докоснете, за да прегледате в календара",
+        "reschedule_accepted": "Докоснете, за да отворите календара",
+        "reschedule_declined": "Докоснете, за да отворите календара",
+        "appointment_cancelled": "Докоснете, за да отворите календара",
+        "vehicle_arrived": "Докоснете, за да отворите ремонта",
+        "client_arrival_reported": "Докоснете, за да отворите ремонта",
+        "owner_service_record_confirmation_requested": "Докоснете, за да потвърдите сервизния запис",
+        "open_repair": "Докоснете, за да отворите ремонта",
+        "open_promotion": "Докоснете, за да отворите промоцията"
+      },
+      "templates": {
+        "new_repair_request": {
+          "title": "Нова заявка за ремонт",
+          "body": "Клиент изпрати нова заявка за ремонт до вашия сервиз."
+        },
+        "appointment_request": {
+          "title": "Заявка за час",
+          "body": "Клиент поиска час във вашия сервиз."
+        },
+        "repair_scheduled": {
+          "title": "Насрочен час",
+          "body": "Посещение за ремонт е добавено в календара ви."
+        },
+        "reschedule_proposed": {
+          "title": "Предложено пренасрочване",
+          "body": "Беше предложен нов час за посещение."
+        },
+        "reschedule_counter_proposed": {
+          "title": "Получено контрапредложение",
+          "body": "Прегледайте предложения час в календара."
+        },
+        "reschedule_accepted": {
+          "title": "Пренасрочването е прието",
+          "body": "Промяната на часа беше приета."
+        },
+        "reschedule_declined": {
+          "title": "Пренасрочването е отхвърлено",
+          "body": "Промяната на часа беше отхвърлена."
+        },
+        "appointment_cancelled": {
+          "title": "Часът е отменен",
+          "body": "Час за посещение беше отменен."
+        },
+        "offer_booked": {
+          "title": "Офертата е записана",
+          "body": "Клиент записа вашата оферта."
+        },
+        "offer_booking_cancelled": {
+          "title": "Записването е отменено",
+          "body": "Клиент отмени записана оферта."
+        },
+        "promotion_booked": {
+          "title": "Промоцията е записана",
+          "body": "Клиент записа вашата промоция."
+        },
+        "promotion_booking_cancelled": {
+          "title": "Записването на промоция е отменено",
+          "body": "Записване на промоция беше отменено."
+        },
+        "vehicle_arrived": {
+          "title": "Автомобилът пристигна",
+          "body": "Автомобилът на клиента пристигна в сервиза."
+        },
+        "client_arrival_reported": {
+          "title": "Докладвано пристигане",
+          "body": "Клиентът докладва пристигането на автомобила."
+        },
+        "direct_request_declined": {
+          "title": "Заявката е отхвърлена",
+          "body": "Директна заявка за час беше отхвърлена."
+        },
+        "owner_service_record_confirmation_requested": {
+          "title": "Потвърждение на сервизен запис",
+          "body": "Моля, потвърдете сервизен запис за клиента."
+        },
+        "owner_service_record_confirmation_confirmed": {
+          "title": "Сервизният запис е потвърден",
+          "body": "Клиентът потвърди сервизния запис."
+        },
+        "owner_service_record_confirmation_rejected": {
+          "title": "Сервизният запис е отхвърлен",
+          "body": "Клиентът отхвърли сервизния запис."
+        }
       }
     },
     "clients": {
@@ -336,7 +438,65 @@
       "button": "Сравни (скоро)"
     },
     "calendar": {
-      "today": "Днес"
+      "today": "Днес",
+      "closed": "Затворено",
+      "noTimeSet": "Няма зададен час",
+      "pickTime": "Избери час",
+      "vehicleFallback": "Автомобил",
+      "repairTypeMissing": "Вид ремонт: не е избран",
+      "vehicleTypeMissing": "Вид превозно средство: не е избран",
+      "noDateYet": "Без дата",
+      "noDateYetHint": "Отворени заявки, чакащи да изберете ден и час",
+      "schedule": "Насрочи",
+      "notNow": "Не сега",
+      "vehicleAtCenter": "Автомобилът е в сервиза",
+      "arrivalOnVisitDay": "Пристигане възможно в деня на посещението",
+      "scheduleVisit": "Насрочи посещение",
+      "decline": "Отхвърли",
+      "arrived": "Пристигнал",
+      "reschedule": "Пренасрочи",
+      "changeTime": "Смени часа",
+      "loadError": "Неуспешно зареждане на календара",
+      "invalidDate": "Използвайте ДД.ММ.ГГГГ",
+      "invalidDateTitle": "Невалидна дата",
+      "sentToClientTitle": "Изпратено до клиента",
+      "sentToClientBody": "Собственикът трябва да приеме или отхвърли новия час, преди да бъде потвърден.",
+      "scheduledTitle": "Насрочено",
+      "scheduledBody": "Часът е запазен.",
+      "scheduleError": "Неуспешна актуализация на графика",
+      "vehicleArrivedTitle": "Автомобилът пристигна",
+      "vehicleArrivedBody": "Ремонтът е в процес. Собственикът е уведомен.",
+      "arrivalError": "Неуспешно потвърждение на пристигане",
+      "declineToast": "Часът е отхвърлен — собственикът е уведомен.",
+      "declineError": "Неуспешно отхвърляне на заявката",
+      "declineTitle": "Отхвърляне на час?",
+      "declineMessage": "Собственикът ще бъде уведомен, че не можете да приемете това посещение. Заявката ще бъде премахната от календара.",
+      "removeTitle": "Премахване от опашката?",
+      "removeMessage": "Тази задача ще излезе от опашката на календара. Все още можете да я намерите в Ремонти.",
+      "remove": "Премахни",
+      "removeError": "Неуспешно премахване от опашката",
+      "moveTitle": "Премести час",
+      "scheduleTitle": "Насрочи час",
+      "serviceFallback": "Услуга",
+      "customDateLabel": "Произволна дата (ДД.ММ.ГГГГ)",
+      "noteLabel": "Бележка за клиента (по избор)",
+      "sendToClient": "Изпрати до клиента",
+      "notSignedIn": "Не сте влезли",
+      "jobKinds": {
+        "client_request": "Заявка от клиент",
+        "booked": "Записан",
+        "needs_date": "Нужна дата"
+      },
+      "load": {
+        "free": "{duration} свободни",
+        "freeForJob": "Няма резервиран труд · {duration} свободни за тази задача",
+        "workdayAvailable": "Няма резервиран труд · {duration} работен ден наличен",
+        "dayFull": "{booked} резервиран труд · денят е пълен",
+        "tightForJob": "{booked} резервирани · стегнато за задача от {jobDuration}",
+        "stillFree": "{booked} резервиран труд · още {remaining} свободни",
+        "bookedToday": "{booked} резервиран труд за деня",
+        "left": "{booked} · остават {remaining}"
+      }
     }
   },
   "vehicles": {

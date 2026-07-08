@@ -41,18 +41,63 @@ import { fetchShopCalendarCached, invalidateShopCalendarCache } from '../utils/s
 import {
   buildDailyLoadMap,
   dayLoadUsesLaborCapacity,
-  formatLaborLoadChipHint,
   getDayLoadRow,
   getLaborLoadLevel,
 } from '../utils/shopDayLoad';
 import { formatDurationMinutes } from '../utils/laborDuration';
-import { isPendingAppointmentRequest, getCalendarJobKind, calendarJobKindLabel } from '../utils/shopCalendarJob';
+import { isPendingAppointmentRequest, getCalendarJobKind } from '../utils/shopCalendarJob';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useTranslation } from '../i18n';
 
 const SHOP_TOP_BAR = 'rgba(11,18,32,0.92)';
 const CALENDAR_DAY_COUNT = 14;
+
+function localeTag(locale) {
+  const key = String(locale || '').trim().toLowerCase();
+  if (!key) return undefined;
+  if (key === 'bg') return 'bg-BG';
+  if (key === 'en') return 'en-GB';
+  return key;
+}
+
+function formatDayLabel(date, locale) {
+  return date.toLocaleDateString(localeTag(locale), { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function formatTimeRange(startIso, endIso, locale, t) {
+  if (!startIso) return t('partnerDashboard.calendar.noTimeSet');
+  const start = new Date(startIso);
+  const end = endIso ? new Date(endIso) : null;
+  const timeLocale = localeTag(locale);
+  const t1 = start.toLocaleTimeString(timeLocale, { hour: '2-digit', minute: '2-digit' });
+  if (!end) return t1;
+  const t2 = end.toLocaleTimeString(timeLocale, { hour: '2-digit', minute: '2-digit' });
+  return `${t1} – ${t2}`;
+}
+
+function localizedLaborLoadChipHint(row, t) {
+  if (!dayLoadUsesLaborCapacity(row)) return null;
+  const booked = row.bookedLaborMinutes || 0;
+  const remaining = row.remainingLaborMinutes;
+  if (booked <= 0 && remaining != null) {
+    return t('partnerDashboard.calendar.load.free', {
+      duration: formatDurationMinutes(remaining),
+    });
+  }
+  if (remaining != null) {
+    return t('partnerDashboard.calendar.load.left', {
+      booked: formatDurationMinutes(booked),
+      remaining: formatDurationMinutes(remaining),
+    });
+  }
+  if (booked > 0) return formatDurationMinutes(booked);
+  return null;
+}
+
+function jobKindLabel(kind, t) {
+  return t(`partnerDashboard.calendar.jobKinds.${kind}`, null, kind);
+}
 
 function startOfWeek(date) {
   const d = new Date(date);
@@ -65,20 +110,6 @@ function startOfWeek(date) {
 
 function toApiIso(date) {
   return date.toISOString();
-}
-
-function formatDayLabel(date) {
-  return date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-}
-
-function formatTimeRange(startIso, endIso) {
-  if (!startIso) return 'No time set';
-  const start = new Date(startIso);
-  const end = endIso ? new Date(endIso) : null;
-  const t1 = start.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-  if (!end) return t1;
-  const t2 = end.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-  return `${t1} – ${t2}`;
 }
 
 function dayStartLocal(d) {
@@ -94,17 +125,17 @@ function isVisitDayOrLater(startIso) {
   return dayStartLocal(start).getTime() <= dayStartLocal(new Date()).getTime();
 }
 
-function DayLaborSummary({ loadRow }) {
+function DayLaborSummary({ loadRow, t }) {
   if (!dayLoadUsesLaborCapacity(loadRow)) return null;
   const booked = loadRow.bookedLaborMinutes || 0;
   const available = loadRow.availableLaborMinutes || 0;
   if (available <= 0) {
-    return <Text style={styles.closedDay}>Closed</Text>;
+    return <Text style={styles.closedDay}>{t('partnerDashboard.calendar.closed')}</Text>;
   }
   const pct = Math.min(100, Math.round((booked / available) * 100));
   const level = getLaborLoadLevel(booked, available);
   const hint =
-    formatLaborLoadChipHint(loadRow) ||
+    localizedLaborLoadChipHint(loadRow, t) ||
     `${formatDurationMinutes(booked)} / ${formatDurationMinutes(available)}`;
   return (
     <View style={styles.laborBarWrap}>
@@ -164,14 +195,18 @@ function CompactJobCard({
   loadingSecondary,
   secondaryDestructive,
   statusHint,
+  t,
+  locale,
 }) {
   const kind = getCalendarJobKind(item);
-  const vehicle = [item.vehicle_make, item.vehicle_model].filter(Boolean).join(' ') || 'Vehicle';
+  const vehicle = [item.vehicle_make, item.vehicle_model].filter(Boolean).join(' ') || t('partnerDashboard.calendar.vehicleFallback');
   const plate = item.vehicle_license_plate;
   const timeStart = item.display_start || item.scheduled_start || item.client_preferred_start;
   const timeEnd = item.display_end || item.scheduled_end || item.client_preferred_end;
   const timeLabel =
-    kind === 'needs_date' ? 'Pick a time' : formatTimeRange(timeStart, timeEnd);
+    kind === 'needs_date'
+      ? t('partnerDashboard.calendar.pickTime')
+      : formatTimeRange(timeStart, timeEnd, locale, t);
   const isRequest = kind === 'client_request';
 
   return (
@@ -187,7 +222,7 @@ function CompactJobCard({
         <Text style={[styles.compactTime, isRequest && styles.compactTimeRequest]}>{timeLabel}</Text>
         <View style={[styles.kindPill, isRequest ? styles.kindPillRequest : styles.kindPillBooked]}>
           <Text style={[styles.kindPillText, isRequest && styles.kindPillTextRequest]}>
-            {calendarJobKindLabel(kind)}
+            {jobKindLabel(kind, t)}
           </Text>
         </View>
       </View>
@@ -195,8 +230,8 @@ function CompactJobCard({
         {plate ? `${plate} · ${vehicle}` : vehicle}
       </Text>
       <Text style={styles.compactService} numberOfLines={2}>
-        {item.repair_type_name || 'Repair type: not selected'}
-        {item.vehicle_type_name ? ` · ${item.vehicle_type_name}` : ' · Vehicle type: not selected'}
+        {item.repair_type_name || t('partnerDashboard.calendar.repairTypeMissing')}
+        {item.vehicle_type_name ? ` · ${item.vehicle_type_name}` : ` · ${t('partnerDashboard.calendar.vehicleTypeMissing')}`}
       </Text>
       {statusHint ? <Text style={styles.compactHint}>{statusHint}</Text> : null}
       {primaryLabel || secondaryLabel ? (
@@ -232,16 +267,18 @@ function CompactJobCard({
   );
 }
 
-function QueueJobRow({ item, onSchedule, onDismiss, dismissing }) {
+function QueueJobRow({ item, onSchedule, onDismiss, dismissing, t, locale }) {
   return (
     <CompactJobCard
       item={item}
-      primaryLabel="Schedule"
+      primaryLabel={t('partnerDashboard.calendar.schedule')}
       onPrimary={onSchedule}
-      secondaryLabel="Not now"
+      secondaryLabel={t('partnerDashboard.calendar.notNow')}
       onSecondary={onDismiss}
       loadingSecondary={dismissing}
       secondaryDestructive={false}
+      t={t}
+      locale={locale}
     />
   );
 }
@@ -254,6 +291,8 @@ function DayJobCard({
   onDecline,
   confirming,
   declining,
+  t,
+  locale,
 }) {
   const kind = getCalendarJobKind(item);
   const pending = item.pending_reschedule?.status === 'pending';
@@ -267,9 +306,9 @@ function DayJobCard({
     && item.schedule_confirmed !== false
     && visitDayOrLater;
   const statusHint = atShop
-    ? 'Vehicle at center'
+    ? t('partnerDashboard.calendar.vehicleAtCenter')
     : kind === 'booked' && !pending && !visitDayOrLater
-      ? 'Arrived available on visit day'
+      ? t('partnerDashboard.calendar.arrivalOnVisitDay')
       : null;
 
   if (kind === 'client_request') {
@@ -277,13 +316,15 @@ function DayJobCard({
       <CompactJobCard
         item={item}
         onOpen={onOpen}
-        primaryLabel="Schedule visit"
+        primaryLabel={t('partnerDashboard.calendar.scheduleVisit')}
         onPrimary={onReschedule}
-        secondaryLabel="Decline"
+        secondaryLabel={t('partnerDashboard.calendar.decline')}
         onSecondary={onDecline}
         loadingSecondary={declining === item.id}
         secondaryDestructive
         statusHint={statusHint}
+        t={t}
+        locale={locale}
       />
     );
   }
@@ -292,22 +333,24 @@ function DayJobCard({
     <CompactJobCard
       item={item}
       onOpen={onOpen}
-      primaryLabel={canConfirmArrival ? 'Arrived' : null}
+      primaryLabel={canConfirmArrival ? t('partnerDashboard.calendar.arrived') : null}
       onPrimary={canConfirmArrival ? onConfirmArrival : null}
       loadingPrimary={confirming === item.id}
-      secondaryLabel={pending ? 'Reschedule' : 'Change time'}
+      secondaryLabel={pending ? t('partnerDashboard.calendar.reschedule') : t('partnerDashboard.calendar.changeTime')}
       onSecondary={onReschedule}
       statusHint={statusHint}
+      t={t}
+      locale={locale}
     />
   );
 }
 
 export default function ShopCalendarScreen() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const navigation = useNavigation();
   const route = useRoute();
   const { refreshNotifications, setNotifications } = useContext(WebSocketContext);
-  const backLabel = route.params?.backLabel || 'Home';
+  const backLabel = route.params?.backLabel || t('common.home');
   const returnTo = route.params?.returnTo || 'ShopDashboard';
 
   const handleBackHome = () => {
@@ -369,7 +412,7 @@ export default function ShopCalendarScreen() {
     } catch (err) {
       if (generation !== loadGenerationRef.current) return;
       console.error('Shop calendar load failed', err);
-      Alert.alert('Error', err.message || 'Could not load calendar');
+      Alert.alert(t('common.error'), err.message || t('partnerDashboard.calendar.loadError'));
     } finally {
       if (generation === loadGenerationRef.current) {
         setLoading(false);
@@ -467,7 +510,7 @@ export default function ShopCalendarScreen() {
   const applyWebCustomDate = () => {
     const parsed = parseDdMmYyyy(webCustomDateStr);
     if (!parsed) {
-      Alert.alert('Invalid date', 'Use DD.MM.YYYY');
+      Alert.alert(t('partnerDashboard.calendar.invalidDateTitle'), t('partnerDashboard.calendar.invalidDate'));
       return;
     }
     setMoveDate(mergeDateWithTime(parsed, moveDate));
@@ -508,14 +551,14 @@ export default function ShopCalendarScreen() {
       await loadCalendar({ force: true });
       if (result.mode === 'proposal') {
         Alert.alert(
-          'Sent to client',
-          'The owner must accept or decline the new time before it is confirmed.'
+          t('partnerDashboard.calendar.sentToClientTitle'),
+          t('partnerDashboard.calendar.sentToClientBody')
         );
       } else {
-        Alert.alert('Scheduled', 'Appointment time saved.');
+        Alert.alert(t('partnerDashboard.calendar.scheduledTitle'), t('partnerDashboard.calendar.scheduledBody'));
       }
     } catch (err) {
-      Alert.alert('Error', err.message || 'Could not update schedule');
+      Alert.alert(t('common.error'), err.message || t('partnerDashboard.calendar.scheduleError'));
     } finally {
       setSaving(false);
     }
@@ -528,9 +571,12 @@ export default function ShopCalendarScreen() {
       await shopConfirmVehicleArrival(token, job.id);
       invalidateShopCalendarCache();
       await loadCalendar({ force: true });
-      Alert.alert('Vehicle arrived', 'Repair is now in service. The owner has been notified.');
+      Alert.alert(
+        t('partnerDashboard.calendar.vehicleArrivedTitle'),
+        t('partnerDashboard.calendar.vehicleArrivedBody')
+      );
     } catch (err) {
-      Alert.alert('Error', err.message || 'Could not confirm arrival');
+      Alert.alert(t('common.error'), err.message || t('partnerDashboard.calendar.arrivalError'));
     } finally {
       setConfirmingArrivalId(null);
     }
@@ -540,7 +586,7 @@ export default function ShopCalendarScreen() {
     navigation.navigate('RepairDetail', {
       repairId: job.id,
       returnTo: 'ShopCalendar',
-      backLabel: 'Calendar',
+      backLabel: t('drawer.partner.calendar'),
     });
   };
 
@@ -577,7 +623,7 @@ export default function ShopCalendarScreen() {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       if (!token) {
-        throw new Error('Not signed in');
+        throw new Error(t('partnerDashboard.calendar.notSignedIn'));
       }
       await declineDirectRepairRequest(token, job.id);
       removeJobFromCalendarState(job.id);
@@ -586,10 +632,10 @@ export default function ShopCalendarScreen() {
       invalidateShopCalendarCache();
       await loadCalendar({ force: true });
       closeConfirmDialog();
-      showToast('Appointment declined — owner notified.');
+      showToast(t('partnerDashboard.calendar.declineToast'));
     } catch (err) {
       closeConfirmDialog();
-      showToast(err.message || 'Could not decline request');
+      showToast(err.message || t('partnerDashboard.calendar.declineError'));
     } finally {
       setDismissingId(null);
     }
@@ -597,10 +643,9 @@ export default function ShopCalendarScreen() {
 
   const promptDecline = (job) => {
     setConfirmDialog({
-      title: 'Decline appointment?',
-      message:
-        'The owner will be notified that you cannot take this visit. The request will be removed from your calendar.',
-      confirmLabel: 'Decline',
+      title: t('partnerDashboard.calendar.declineTitle'),
+      message: t('partnerDashboard.calendar.declineMessage'),
+      confirmLabel: t('partnerDashboard.calendar.decline'),
       destructive: true,
       loading: false,
       onConfirm: () => executeDecline(job),
@@ -613,7 +658,7 @@ export default function ShopCalendarScreen() {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       if (!token) {
-        throw new Error('Not signed in');
+        throw new Error(t('partnerDashboard.calendar.notSignedIn'));
       }
       await dismissRepairFromScheduleQueue(token, job.id);
       removeJobFromCalendarState(job.id);
@@ -622,7 +667,7 @@ export default function ShopCalendarScreen() {
       closeConfirmDialog();
     } catch (err) {
       closeConfirmDialog();
-      showToast(err.message || 'Could not remove from queue');
+      showToast(err.message || t('partnerDashboard.calendar.removeError'));
     } finally {
       setDismissingId(null);
     }
@@ -630,9 +675,9 @@ export default function ShopCalendarScreen() {
 
   const promptDismiss = (job) => {
     setConfirmDialog({
-      title: 'Remove from queue?',
-      message: 'This job will leave the calendar queue. You can still find it under Repairs.',
-      confirmLabel: 'Remove',
+      title: t('partnerDashboard.calendar.removeTitle'),
+      message: t('partnerDashboard.calendar.removeMessage'),
+      confirmLabel: t('partnerDashboard.calendar.remove'),
       destructive: false,
       loading: false,
       onConfirm: () => executeDismiss(job),
@@ -648,7 +693,9 @@ export default function ShopCalendarScreen() {
   };
 
   const isReschedule = Boolean(selectedJob?.scheduled_start);
-  const modalTitle = isReschedule ? 'Move appointment' : 'Schedule appointment';
+  const modalTitle = isReschedule
+    ? t('partnerDashboard.calendar.moveTitle')
+    : t('partnerDashboard.calendar.scheduleTitle');
 
   return (
     <ScreenBackground safeArea={false}>
@@ -675,7 +722,7 @@ export default function ShopCalendarScreen() {
 
       <View style={styles.weekLabelWrap}>
         <Text style={styles.weekLabel}>
-          {formatDayLabel(weekStart)} – {formatDayLabel(addCalendarDays(weekStart, CALENDAR_DAY_COUNT - 1))}
+          {formatDayLabel(weekStart, locale)} – {formatDayLabel(addCalendarDays(weekStart, CALENDAR_DAY_COUNT - 1), locale)}
         </Text>
         <Button compact mode="text" textColor="#fff" onPress={() => setWeekStart(startOfWeek(new Date()))}>
           {t('partnerDashboard.calendar.today')}
@@ -689,11 +736,11 @@ export default function ShopCalendarScreen() {
           {unscheduledCount > 0 ? (
             <View style={styles.section}>
               <View style={styles.sectionTitleRow}>
-                <Text style={styles.sectionTitle}>No date yet</Text>
+                <Text style={styles.sectionTitle}>{t('partnerDashboard.calendar.noDateYet')}</Text>
                 <Badge style={styles.countBadge}>{unscheduledCount}</Badge>
               </View>
               <Text style={styles.sectionHint}>
-                Open requests waiting for you to pick a day and time
+                {t('partnerDashboard.calendar.noDateYetHint')}
               </Text>
               {calendar.unscheduled.map((job) => (
                 <QueueJobRow
@@ -702,6 +749,8 @@ export default function ShopCalendarScreen() {
                   onSchedule={openMoveModal}
                   onDismiss={dismissUnscheduled}
                   dismissing={dismissingId === job.id}
+                  t={t}
+                  locale={locale}
                 />
               ))}
             </View>
@@ -711,8 +760,8 @@ export default function ShopCalendarScreen() {
             const loadRow = getDayLoadRow(dailyLoadMap, bucket.date);
             return (
             <View key={bucket.date.toISOString()} style={styles.section}>
-              <Text style={styles.sectionTitle}>{formatDayLabel(bucket.date)}</Text>
-              <DayLaborSummary loadRow={loadRow} />
+              <Text style={styles.sectionTitle}>{formatDayLabel(bucket.date, locale)}</Text>
+              <DayLaborSummary loadRow={loadRow} t={t} />
               {bucket.items.length === 0 ? (
                 <Text style={styles.emptyDay}>—</Text>
               ) : (
@@ -726,6 +775,8 @@ export default function ShopCalendarScreen() {
                     onDecline={promptDecline}
                     confirming={confirmingArrivalId}
                     declining={dismissingId}
+                    t={t}
+                    locale={locale}
                   />
                 ))
               )}
@@ -741,9 +792,9 @@ export default function ShopCalendarScreen() {
             <Text style={styles.modalTitle}>{modalTitle}</Text>
             {selectedJob ? (
               <Text style={styles.modalSub}>
-                {(selectedJob.vehicle_license_plate || 'Vehicle') +
+                {(selectedJob.vehicle_license_plate || t('partnerDashboard.calendar.vehicleFallback')) +
                   ' · ' +
-                  (selectedJob.repair_type_name || 'Service')}
+                  (selectedJob.repair_type_name || t('partnerDashboard.calendar.serviceFallback'))}
               </Text>
             ) : null}
 
@@ -793,7 +844,7 @@ export default function ShopCalendarScreen() {
               <View style={styles.webCustomBlock}>
                 <TextInput
                   mode="outlined"
-                  label="Custom date (DD.MM.YYYY)"
+                  label={t('partnerDashboard.calendar.customDateLabel')}
                   value={webCustomDateStr}
                   onChangeText={setWebCustomDateStr}
                   placeholder="12.06.2026"
@@ -830,7 +881,7 @@ export default function ShopCalendarScreen() {
 
             <TextInput
               mode="outlined"
-              label="Note for client (optional)"
+              label={t('partnerDashboard.calendar.noteLabel')}
               value={moveNote}
               onChangeText={setMoveNote}
               style={styles.noteInput}
@@ -840,10 +891,10 @@ export default function ShopCalendarScreen() {
 
             <View style={styles.modalActions}>
               <Button mode="text" onPress={closeMoveModal} disabled={saving}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button mode="contained" onPress={submitMove} loading={saving} disabled={saving}>
-                {isReschedule ? 'Send to client' : 'Schedule'}
+                {isReschedule ? t('partnerDashboard.calendar.sendToClient') : t('partnerDashboard.calendar.schedule')}
               </Button>
             </View>
           </ScrollView>
