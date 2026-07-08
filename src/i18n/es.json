@@ -22,7 +22,8 @@
     "phone": "Phone",
     "email": "Email",
     "number": "Number",
-    "allClear": "All clear"
+    "allClear": "All clear",
+    "service": "Servicio"
   },
   "language": {
     "label": "Language",
@@ -207,9 +208,11 @@
     "requestService": "Request Service",
     "sendRequest": "Send request",
     "preferredVisit": "Preferred visit",
-    "oilChange": "Oil Change",
-    "brakeRepair": "Brake Repair",
-    "diagnostics": "Diagnostics"
+    "oilChange": "Cambio de aceite",
+    "brakeRepair": "Reparación de frenos",
+    "acRefill": "Recarga de aire acondicionado",
+    "acService": "Servicio de aire acondicionado",
+    "diagnostics": "Diagnóstico"
   },
   "notifications": {
     "title": "Notifications"
@@ -232,8 +235,19 @@
   "public": {
     "findServiceCenters": "Find Service Centers",
     "findNearbyTrusted": "Find nearby trusted centers",
-    "serviceCenter": "Service Center",
-    "serviceCenters": "Service Centers"
+    "serviceCenter": "Centro de servicios",
+    "serviceCenters": "Centros de servicios"
+  },
+  "serviceCenterProfile": {
+    "aboutTemplate": "{serviceCenterName} es un centro de servicios{vehiclePhrase}{servicesPhrase}{locationPhrase}.",
+    "vehiclePhrase": " para {vehicleTypes}",
+    "servicesPhrase": " que ofrece {services}",
+    "locationPhrase": " en {locationLine}"
+  },
+  "serviceCenterList": {
+    "vehiclesLabel": "Vehículos: {vehicles}",
+    "servicesLabel": "Servicios: {services}",
+    "moreCount": " +{count} más"
   },
   "seo": {
     "dashboard": "{app} Dashboard",

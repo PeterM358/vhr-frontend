@@ -22,7 +22,8 @@
     "phone": "Телефон",
     "email": "Имейл",
     "number": "Номер",
-    "allClear": "Всичко е наред"
+    "allClear": "Всичко е наред",
+    "service": "Услуга"
   },
   "language": {
     "label": "Език",
@@ -209,6 +210,8 @@
     "preferredVisit": "Предпочитан час",
     "oilChange": "Смяна на масло",
     "brakeRepair": "Ремонт на спирачки",
+    "acRefill": "Запълване на климатик",
+    "acService": "Обслужване на климатик",
     "diagnostics": "Диагностика"
   },
   "notifications": {
@@ -234,6 +237,17 @@
     "findNearbyTrusted": "Намери проверени сервизи наблизо",
     "serviceCenter": "Сервиз",
     "serviceCenters": "Сервизи"
+  },
+  "serviceCenterProfile": {
+    "aboutTemplate": "{serviceCenterName} е сервизен център{vehiclePhrase}{servicesPhrase}{locationPhrase}.",
+    "vehiclePhrase": " обслужва {vehicleTypes}",
+    "servicesPhrase": " предлага услуги {services}",
+    "locationPhrase": " в {locationLine}"
+  },
+  "serviceCenterList": {
+    "vehiclesLabel": "Превозни средства: {vehicles}",
+    "servicesLabel": "Услуги: {services}",
+    "moreCount": " +{count} още"
   },
   "seo": {
     "dashboard": "{app} — Табло",

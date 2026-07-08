@@ -22,7 +22,8 @@
     "phone": "Phone",
     "email": "Email",
     "number": "Number",
-    "allClear": "All clear"
+    "allClear": "All clear",
+    "service": "Service"
   },
   "language": {
     "label": "Language",
@@ -207,9 +208,11 @@
     "requestService": "Request Service",
     "sendRequest": "Send request",
     "preferredVisit": "Preferred visit",
-    "oilChange": "Oil Change",
-    "brakeRepair": "Brake Repair",
-    "diagnostics": "Diagnostics"
+    "oilChange": "Ölwechsel",
+    "brakeRepair": "Bremsenreparatur",
+    "acRefill": "Klimaanlagen-Nachfüllung",
+    "acService": "Klimaanlagen-Service",
+    "diagnostics": "Diagnose"
   },
   "notifications": {
     "title": "Notifications"
@@ -232,8 +235,19 @@
   "public": {
     "findServiceCenters": "Find Service Centers",
     "findNearbyTrusted": "Find nearby trusted centers",
-    "serviceCenter": "Service Center",
-    "serviceCenters": "Service Centers"
+    "serviceCenter": "Servicezentrum",
+    "serviceCenters": "Servicezentren"
+  },
+  "serviceCenterProfile": {
+    "aboutTemplate": "{serviceCenterName} ist ein Servicezentrum{vehiclePhrase}{servicesPhrase}{locationPhrase}.",
+    "vehiclePhrase": " für {vehicleTypes}",
+    "servicesPhrase": " bietet {services} an",
+    "locationPhrase": " in {locationLine}"
+  },
+  "serviceCenterList": {
+    "vehiclesLabel": "Fahrzeuge: {vehicles}",
+    "servicesLabel": "Services: {services}",
+    "moreCount": " +{count} weitere"
   },
   "seo": {
     "dashboard": "{app} Dashboard",

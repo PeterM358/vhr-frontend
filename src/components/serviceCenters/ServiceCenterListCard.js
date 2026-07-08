@@ -7,11 +7,15 @@ import { formatDistanceAway, distanceKmFromUser } from '../../utils/distance';
 import { isShopOpenNow } from '../../utils/shopOpenNow';
 import VeversalScoreBadge from './VeversalScoreBadge';
 import { COLORS } from '../../styles/colors';
+import { useTranslation } from '../../i18n';
+import { joinList } from '../../i18n/joinLocalizedList';
+import { translateRepairTypeLabels, translateVehicleTypeLabels } from '../../utils/translateShopTypeLabels';
 
-function summarizeList(items, maxVisible = 3) {
+function summarizeList(items, maxVisible = 3, { joinFn } = {}) {
   const list = (items || []).filter(Boolean);
   if (!list.length) return { visible: '', moreCount: 0 };
-  const visible = list.slice(0, maxVisible).join(', ');
+  const visibleItems = list.slice(0, maxVisible);
+  const visible = typeof joinFn === 'function' ? joinFn(visibleItems) : visibleItems.join(', ');
   const moreCount = Math.max(0, list.length - maxVisible);
   return { visible, moreCount };
 }
@@ -50,6 +54,8 @@ export default function ServiceCenterListCard({
   onDirections,
   onRequestService,
 }) {
+  const { t } = useTranslation();
+
   const distanceKm = showDistance
     ? shop.distance_km ?? distanceKmFromUser(userLocation, shop)
     : null;
@@ -60,10 +66,12 @@ export default function ServiceCenterListCard({
   const isVerified = shop.is_verified || shop.verification_status === 'verified_partner';
   const isReported = shop.source === 'owner_reported';
   const allBrands = shop.all_brands_serviced || (shop.brand_names || []).includes('All brands');
-  const vehicleTypes = (shop.supported_vehicle_type_names || []).join(', ');
-  const serviceNames = shop.observed_repair_type_names || shop.available_repair_names || [];
+  const vehicleTypesTranslated = translateVehicleTypeLabels(shop.supported_vehicle_type_names || [], t);
+  const vehicleTypes = vehicleTypesTranslated.length ? joinList(vehicleTypesTranslated, { t }) : '';
+  const serviceNamesRaw = shop.observed_repair_type_names || shop.available_repair_names || [];
+  const serviceNames = translateRepairTypeLabels(serviceNamesRaw, t);
   const brandNames = allBrands ? ['All brands'] : shop.brand_names || [];
-  const services = summarizeList(serviceNames, 3);
+  const services = summarizeList(serviceNames, 3, { joinFn: (items) => joinList(items, { t }) });
   const brands = summarizeList(brandNames, 3);
   const locationLine = [shop.address, shop.city_name].filter(Boolean).join(' · ');
 
@@ -99,12 +107,14 @@ export default function ServiceCenterListCard({
         {openNow === false ? <Text style={styles.closed}>Closed</Text> : null}
       </View>
 
-      {vehicleTypes ? <Text style={styles.tags}>Vehicles: {vehicleTypes}</Text> : null}
+      {vehicleTypes ? (
+        <Text style={styles.tags}>{t('serviceCenterList.vehiclesLabel', { vehicles: vehicleTypes })}</Text>
+      ) : null}
 
       {services.visible ? (
         <Text style={styles.tags}>
-          Services: {services.visible}
-          {services.moreCount > 0 ? ` +${services.moreCount} more` : ''}
+          {t('serviceCenterList.servicesLabel', { services: services.visible })}
+          {services.moreCount > 0 ? t('serviceCenterList.moreCount', { count: services.moreCount }) : ''}
         </Text>
       ) : null}
 

@@ -43,11 +43,15 @@ import { formatShopDisplayName } from '../utils/shopDisplayName';
 import { navigateToServiceCenters } from '../navigation/webNavigation';
 import { formatMoneyAmount } from '../constants/currency';
 import { resolveRepairTypeIcon } from '../utils/repairTypeIcons';
-import { buildShopGeneratedPublicProfile } from '../utils/shopPublicProfileText';
+import { useTranslation } from '../i18n';
+import { joinList } from '../i18n/joinLocalizedList';
+import {
+  translateRepairTypeLabel,
+  translateRepairTypeLabels,
+  translateVehicleTypeLabels,
+} from '../utils/translateShopTypeLabels';
 import { openShopInMaps, resolveShopMapsUrl } from '../utils/shopMapsLink';
 import ShopQuickRequestSheet from '../components/shop/ShopQuickRequestSheet';
-
-const GENERIC_TERM = 'Service Center';
 
 const WEEKDAYS_MON_FIRST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -184,11 +188,13 @@ function isNumericCenterSegment(value) {
 }
 
 export default function ShopDetailScreen({ route, navigation }) {
-  const { shopId, locale, citySlug, centerSlug } = route.params || {};
+  const { shopId, locale: routeLocale, citySlug, centerSlug } = route.params || {};
   const numericCenterSlug = centerSlug && isNumericCenterSegment(centerSlug);
   const resolvedShopId =
     shopId != null ? shopId : numericCenterSlug ? parseInt(String(centerSlug).trim(), 10) : null;
   const resolvedCenterSlug = numericCenterSlug ? undefined : centerSlug;
+  const { t, locale } = useTranslation();
+  const genericServiceCenter = t('public.serviceCenter');
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
@@ -469,7 +475,7 @@ export default function ShopDetailScreen({ route, navigation }) {
       centerSlug: resolvedCenterSlug,
     });
     const isAuthorized = isShopAuthorizedForVehicle(vehicle, shopIdForAuth);
-    const shopName = shop?.name ?? GENERIC_TERM;
+    const shopName = shop?.name ?? genericServiceCenter;
 
     if (isAuthorized) {
       const confirmed = await confirmMessage('Remove access?', formatRevokeConfirmMessage(shopName), {
@@ -546,11 +552,12 @@ export default function ShopDetailScreen({ route, navigation }) {
     );
   }
 
-  const serviceName = formatShopDisplayName(shop.name || GENERIC_TERM);
-  const vehicleNamesForSubtitle = collectVehicleTypeNames(shop);
-  const subtitleType = vehicleNamesForSubtitle.length
-    ? vehicleNamesForSubtitle.join(' · ')
-    : presentationServiceCenterType(shop.service_center_type) ?? GENERIC_TERM;
+  const serviceName = formatShopDisplayName(shop.name || genericServiceCenter);
+
+  const vehicleNamesForSubtitleRaw = collectVehicleTypeNames(shop);
+  const vehicleNamesForSubtitle = translateVehicleTypeLabels(vehicleNamesForSubtitleRaw, t);
+  const subtitleType =
+    vehicleNamesForSubtitle.length > 0 ? joinList(vehicleNamesForSubtitle, { t }) : genericServiceCenter;
   const addr = typeof shop.address === 'string' ? shop.address.trim() : '';
   const phone =
     (typeof shop.display_phone === 'string' && shop.display_phone.trim()) ||
@@ -576,32 +583,24 @@ export default function ShopDetailScreen({ route, navigation }) {
     countryName,
   });
 
-  const generatedSummary =
-    typeof shop.generated_public_summary === 'string'
-      ? shop.generated_public_summary.trim()
-      : '';
+  const repairNamesRaw = collectRepairNames(shop);
+  const repairNames = translateRepairTypeLabels(repairNamesRaw, t);
 
-  const repairNames = collectRepairNames(shop);
-  const liveAboutSummary = buildShopGeneratedPublicProfile({
-    shopName: serviceName,
-    vehicleTypeNames: vehicleNamesForSubtitle,
-    repairTypeNames: repairNames,
-    publishedMenuItems: Array.isArray(shop.service_menu) ? shop.service_menu : [],
-    cityName,
-    countryName,
-    address: addr,
-    workingHours: shop.working_hours,
-    offersGuarantee: shop.offers_guarantee === true,
-    brands: Array.isArray(shop.brand_names) ? shop.brand_names : [],
-    allBrandsServiced: shop.all_brands_serviced === true,
-  }).summary;
+  const vehicleList = vehicleNamesForSubtitle.length
+    ? joinList(vehicleNamesForSubtitle, { t })
+    : '';
+  const servicesList = repairNames.length ? joinList(repairNames, { t }) : '';
 
-  const aboutLead =
-    liveAboutSummary ||
-    generatedSummary ||
-    (locationLine
-      ? `${serviceName} is a ${subtitleType} located in ${locationLine}.`
-      : `${serviceName} is a ${subtitleType}.`);
+  const vehiclePhrase = vehicleList ? t('serviceCenterProfile.vehiclePhrase', { vehicleTypes: vehicleList }) : '';
+  const servicesPhrase = servicesList ? t('serviceCenterProfile.servicesPhrase', { services: servicesList }) : '';
+  const locationPhrase = locationLine ? t('serviceCenterProfile.locationPhrase', { locationLine }) : '';
+
+  const aboutLead = t('serviceCenterProfile.aboutTemplate', {
+    serviceCenterName: serviceName,
+    vehiclePhrase,
+    servicesPhrase,
+    locationPhrase,
+  });
 
   const longDescription =
     typeof shop.description === 'string' ? shop.description.trim() : '';
@@ -849,7 +848,7 @@ export default function ShopDetailScreen({ route, navigation }) {
             <SectionHeading title="Published pricing" />
             <FloatingCard>
               {shop.service_menu.map((item) => {
-                const label = item.repair_type_name || 'Service';
+                const label = translateRepairTypeLabel(item, t) || t('common.service');
                 const from = item.price_from;
                 const to = item.price_to;
                 let priceLine = 'Price on request';

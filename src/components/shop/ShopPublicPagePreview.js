@@ -6,7 +6,9 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import AppCard from '../ui/AppCard';
 import FloatingCard from '../ui/FloatingCard';
 import { COLORS } from '../../constants/colors';
-import { buildVehicleTypesSubtitle } from '../../utils/shopPublicProfileText';
+import { useTranslation } from '../../i18n';
+import { joinLocalizedList } from '../../i18n/joinLocalizedList';
+import { translateRepairTypeLabels, translateVehicleTypeLabels, translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
 import { formatMoneyAmount } from '../../constants/currency';
 import { resolveRepairTypeIcon } from '../../utils/repairTypeIcons';
 import { openShopInMaps, resolveShopMapsUrl } from '../../utils/shopMapsLink';
@@ -72,10 +74,34 @@ export default function ShopPublicPagePreview({
   images = [],
   brandNames = [],
 }) {
+  const { t, locale } = useTranslation();
+  const genericServiceCenter = t('public.serviceCenter');
+
   const rawName = String(shopName || '').trim();
-  const name = rawName || 'Your service center';
-  const subtitle = buildVehicleTypesSubtitle(vehicleTypeNames);
+  const name = rawName || genericServiceCenter;
+
+  const vehicleTypeLabels = translateVehicleTypeLabels(vehicleTypeNames, t);
+  const repairTypeLabels = translateRepairTypeLabels(repairTypeNames, t);
+
+  const subtitle = vehicleTypeLabels.length ? joinLocalizedList(vehicleTypeLabels, locale) : genericServiceCenter;
   const locationLine = [address, cityName, countryName].filter(Boolean).join(', ');
+  const vehicleListText = vehicleTypeLabels.length ? joinLocalizedList(vehicleTypeLabels, locale) : '';
+  const servicesListText = repairTypeLabels.length ? joinLocalizedList(repairTypeLabels, locale) : '';
+  const vehiclePhrase = vehicleListText
+    ? t('serviceCenterProfile.vehiclePhrase', { vehicleTypes: vehicleListText })
+    : '';
+  const servicesPhrase = servicesListText
+    ? t('serviceCenterProfile.servicesPhrase', { services: servicesListText })
+    : '';
+  const locationPhrase = locationLine ? t('serviceCenterProfile.locationPhrase', { locationLine }) : '';
+
+  const aboutLead = t('serviceCenterProfile.aboutTemplate', {
+    serviceCenterName: name,
+    vehiclePhrase,
+    servicesPhrase,
+    locationPhrase,
+  });
+
   const mapsUrl = resolveShopMapsUrl({
     googleMapsUrl,
     latitude,
@@ -152,14 +178,14 @@ export default function ShopPublicPagePreview({
       <SectionHeading title="About" />
       <FloatingCard>
         <Text style={styles.aboutLead}>
-          {generatedSummary || 'Your public summary appears here as you complete your profile.'}
+          {aboutLead}
         </Text>
         {userDescription ? <Text style={styles.aboutBody}>{userDescription}</Text> : null}
       </FloatingCard>
 
       <SectionHeading title="Services" />
       <FloatingCard>
-        <ChipWrap labels={repairTypeNames} />
+        <ChipWrap labels={repairTypeLabels} />
       </FloatingCard>
 
       {publishedMenuItems.length > 0 ? (
@@ -167,7 +193,7 @@ export default function ShopPublicPagePreview({
           <SectionHeading title="Published pricing" />
           <FloatingCard>
             {publishedMenuItems.map((item) => {
-              const label = item.repair_type_name || 'Service';
+              const label = translateRepairTypeLabel(item, t) || t('common.service');
               const from = item.price_from;
               const to = item.price_to;
               let priceLine = 'Price on request';
@@ -200,7 +226,7 @@ export default function ShopPublicPagePreview({
 
       <SectionHeading title="Vehicle types" />
       <FloatingCard>
-        <ChipWrap labels={vehicleTypeNames} />
+        <ChipWrap labels={vehicleTypeLabels} />
       </FloatingCard>
 
       {brandNames.length > 0 ? (

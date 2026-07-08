@@ -22,7 +22,8 @@
     "phone": "Phone",
     "email": "Email",
     "number": "Number",
-    "allClear": "All clear"
+    "allClear": "All clear",
+    "service": "Service"
   },
   "language": {
     "label": "Language",
@@ -209,6 +210,8 @@
     "preferredVisit": "Preferred visit",
     "oilChange": "Oil Change",
     "brakeRepair": "Brake Repair",
+    "acRefill": "AC Refill",
+    "acService": "AC Service",
     "diagnostics": "Diagnostics"
   },
   "notifications": {
@@ -234,6 +237,17 @@
     "findNearbyTrusted": "Find nearby trusted centers",
     "serviceCenter": "Service Center",
     "serviceCenters": "Service Centers"
+  },
+  "serviceCenterProfile": {
+    "aboutTemplate": "{serviceCenterName} is a service center{vehiclePhrase}{servicesPhrase}{locationPhrase}.",
+    "vehiclePhrase": " servicing {vehicleTypes}",
+    "servicesPhrase": " offering {services}",
+    "locationPhrase": " in {locationLine}"
+  },
+  "serviceCenterList": {
+    "vehiclesLabel": "Vehicles: {vehicles}",
+    "servicesLabel": "Services: {services}",
+    "moreCount": " +{count} more"
   },
   "seo": {
     "dashboard": "{app} Dashboard",
