@@ -16,6 +16,7 @@ import {
   getLocale,
   syncLocaleFromWebPathname,
 } from '../i18n';
+import { trackPageView } from '../services/analytics';
 
 function getRootNavigation(navigation) {
   let current = navigation;
@@ -86,6 +87,7 @@ export function syncWebPath(pathname) {
   syncLocaleFromWebPathname();
 
   syncWebDocumentTitle(target);
+  trackPageView(target);
 }
 
 /** Let React commit AuthContext updates before post-login navigation resets. */

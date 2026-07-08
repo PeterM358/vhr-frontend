@@ -31,6 +31,15 @@ if (fs.existsSync(envPath)) {
       value = value.slice(1, -1);
     }
     process.env[key] = value;
+
+    // Map VITE_* analytics vars to EXPO_PUBLIC_* so Expo embeds them in the web bundle.
+    const viteToExpo = {
+      VITE_ENABLE_ANALYTICS: 'EXPO_PUBLIC_ENABLE_ANALYTICS',
+      VITE_GA_MEASUREMENT_ID: 'EXPO_PUBLIC_GA_MEASUREMENT_ID',
+    };
+    if (viteToExpo[key]) {
+      process.env[viteToExpo[key]] = value;
+    }
   }
 } else {
   console.warn(`[with-env] ${envFile} not found — using existing environment only`);

@@ -13,6 +13,7 @@ import { GarageSceneProvider } from './context/GarageSceneContext';
 import MessageDialogHost from './components/ui/MessageDialog';
 import MobileWebInsetsBridge from './components/MobileWebInsetsBridge';
 import { devLog } from './utils/logger';
+import { initializeAnalytics } from './services/analytics';
 
 const handleDeepLink = ({ url }) => {
   if (!url) return;
@@ -25,6 +26,10 @@ const handleDeepLink = ({ url }) => {
 };
 
 export default function App() {
+
+  useEffect(() => {
+    initializeAnalytics();
+  }, []);
 
   useEffect(() => {
     let unsubscribeOnMessage = () => {};
