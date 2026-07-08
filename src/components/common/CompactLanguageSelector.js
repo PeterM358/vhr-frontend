@@ -2,54 +2,26 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, Pressable, StyleSheet, View, Text } from 'react-native';
 import { useTranslation } from '../../i18n';
 import { switchLanguageInPath } from '../../navigation/localizedRoutes';
-
-const LOCALE_ORDER = ['bg', 'en', 'de', 'it', 'fr', 'es'];
-const LOCALE_ABBR = {
-  bg: 'BG',
-  en: 'EN',
-  de: 'DE',
-  it: 'IT',
-  fr: 'FR',
-  es: 'ES',
-};
-
-const LOCALE_FLAGS = {
-  bg: '🇧🇬',
-  en: '🇬🇧',
-  de: '🇩🇪',
-  it: '🇮🇹',
-  fr: '🇫🇷',
-  es: '🇪🇸',
-};
-
-const LOCALE_LABELS = {
-  bg: 'Български',
-  en: 'English',
-  de: 'Deutsch',
-  it: 'Italiano',
-  fr: 'Français',
-  es: 'Español',
-};
-
-function getLangAbbr(locale) {
-  const key = String(locale || '').trim().toLowerCase();
-  return LOCALE_ABBR[key] || key.toUpperCase();
-}
+import LanguageSelectorModal from './LanguageSelectorModal';
+import {
+  LOCALE_FLAGS,
+  LOCALE_LABELS,
+  LOCALE_ORDER,
+  getLangAbbr,
+} from './languageSelectorConstants';
 
 export default function CompactLanguageSelector({
   variant = 'dark',
   compact = true,
+  presentation = 'dropdown',
   style,
   showFullLabel = false,
 }) {
-  const { locale, setLocale } = useTranslation();
+  const { locale, setLocale, t } = useTranslation();
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
-
-  // Auth screens use `showFullLabel` (full names) in our app.
-  // That lets us tune dropdown width + alignment without changing routing/i18n logic.
-  const isAuthScreen = Boolean(showFullLabel);
-  const dropdownWidth = isAuthScreen ? 220 : 180;
+  const isModal = presentation === 'modal';
+  const dropdownWidth = showFullLabel ? 220 : 180;
 
   const colors = useMemo(() => {
     if (variant === 'light') {
@@ -63,7 +35,6 @@ export default function CompactLanguageSelector({
     }
 
     return {
-      // Solid dark background to keep text readable over headers/titles.
       wrapBg: '#07111f',
       wrapBorder: 'rgba(148,163,184,0.35)',
       textInactive: 'rgba(226,232,240,0.65)',
@@ -78,14 +49,17 @@ export default function CompactLanguageSelector({
 
   const handleSelect = useCallback(
     async (nextLocale) => {
-      if (!nextLocale || nextLocale === locale) return;
+      if (!nextLocale || nextLocale === locale) {
+        setOpen(false);
+        return;
+      }
       const savedLocale = await setLocale(nextLocale);
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         const current = window.location.pathname + window.location.search + window.location.hash;
         const nextPath = switchLanguageInPath(current, savedLocale || nextLocale);
-        // Replace URL (no history push) so browser back doesn’t jump.
         window.history.replaceState(window.history.state, '', nextPath);
       }
+      setOpen(false);
     },
     [locale, setLocale]
   );
@@ -94,7 +68,12 @@ export default function CompactLanguageSelector({
     setOpen((prev) => !prev);
   }, []);
 
+  const closeModal = useCallback(() => {
+    setOpen(false);
+  }, []);
+
   useEffect(() => {
+    if (isModal) return;
     if (Platform.OS !== 'web') return;
     if (typeof document === 'undefined') return;
     if (!open) return;
@@ -112,7 +91,7 @@ export default function CompactLanguageSelector({
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [open]);
+  }, [open, isModal]);
 
   const currentLabel = useMemo(() => {
     if (!currentLocaleKey) return '';
@@ -125,84 +104,95 @@ export default function CompactLanguageSelector({
     return flag ? `${flag} ${abbr}` : abbr;
   }, [currentLocaleKey, locale, showFullLabel]);
 
+  const modalTitle = t('language.label');
+
   return (
-    <View
-      ref={rootRef}
-      style={[
-        styles.wrap,
-        compact && styles.wrapCompact,
-        { borderColor: colors.wrapBorder, backgroundColor: colors.wrapBg },
-        style,
-      ]}
-    >
-      <Pressable
-        onPress={toggleOpen}
-        accessibilityRole="button"
-        accessibilityLabel="Open language selector"
-        style={({ pressed }) => [
-          styles.trigger,
-          compact && styles.triggerCompact,
-          pressed && styles.triggerPressed,
+    <>
+      <View
+        ref={rootRef}
+        style={[
+          styles.wrap,
+          compact && styles.wrapCompact,
+          { borderColor: colors.wrapBorder, backgroundColor: colors.wrapBg },
+          style,
         ]}
       >
-        <Text
-          style={[
-            styles.triggerText,
-            compact && styles.triggerTextCompact,
-            { color: colors.textActive },
+        <Pressable
+          onPress={toggleOpen}
+          accessibilityRole="button"
+          accessibilityLabel="Open language selector"
+          style={({ pressed }) => [
+            styles.trigger,
+            compact && styles.triggerCompact,
+            pressed && styles.triggerPressed,
           ]}
-          numberOfLines={1}
         >
-          {currentLabel} <Text style={styles.caret}>▾</Text>
-        </Text>
-      </Pressable>
+          <Text
+            style={[
+              styles.triggerText,
+              compact && styles.triggerTextCompact,
+              { color: colors.textActive },
+            ]}
+            numberOfLines={1}
+          >
+            {currentLabel} <Text style={styles.caret}>▾</Text>
+          </Text>
+        </Pressable>
 
-      {open ? (
-        <View
-          style={[
-            styles.dropdown,
-            {
-              width: dropdownWidth,
-              borderColor: colors.wrapBorder,
-              backgroundColor: colors.wrapBg,
-              // Auth: center under the selector. Header: align to the left.
-              left: isAuthScreen ? '50%' : 0,
-              transform: isAuthScreen ? [{ translateX: -dropdownWidth / 2 }] : undefined,
-              marginTop: isAuthScreen ? 10 : 6,
-            },
-          ]}
-        >
-          {LOCALE_ORDER.map((l) => {
-            const active = locale === l;
-            const flag = LOCALE_FLAGS[l] || '';
-            const label = LOCALE_LABELS[l] || l;
-            return (
-              <Pressable
-                key={l}
-                onPress={() => {
-                  setOpen(false);
-                  handleSelect(l);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={`Switch language to ${label}`}
-                style={({ pressed }) => [
-                  styles.dropdownItem,
-                  active && styles.dropdownItemActive,
-                  pressed && styles.dropdownItemPressed,
-                ]}
-              >
-                <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>
-                  {flag} {label}
-                </Text>
-                <Text style={[styles.checkmark, !active && styles.checkmarkHidden]}>
-                  ✓
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        {!isModal && open ? (
+          <View
+            style={[
+              styles.dropdown,
+              {
+                width: dropdownWidth,
+                borderColor: colors.wrapBorder,
+                backgroundColor: colors.wrapBg,
+                left: showFullLabel ? '50%' : 0,
+                transform: showFullLabel ? [{ translateX: -dropdownWidth / 2 }] : undefined,
+                marginTop: showFullLabel ? 10 : 6,
+              },
+            ]}
+          >
+            {LOCALE_ORDER.map((l) => {
+              const active = locale === l;
+              const flag = LOCALE_FLAGS[l] || '';
+              const label = LOCALE_LABELS[l] || l;
+              return (
+                <Pressable
+                  key={l}
+                  onPress={() => {
+                    setOpen(false);
+                    handleSelect(l);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Switch language to ${label}`}
+                  style={({ pressed }) => [
+                    styles.dropdownItem,
+                    active && styles.dropdownItemActive,
+                    pressed && styles.dropdownItemPressed,
+                  ]}
+                >
+                  <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>
+                    {flag} {label}
+                  </Text>
+                  <Text style={[styles.checkmark, !active && styles.checkmarkHidden]}>✓</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+      </View>
+
+      {isModal ? (
+        <LanguageSelectorModal
+          visible={open}
+          onClose={closeModal}
+          locale={locale}
+          onSelect={handleSelect}
+          title={modalTitle}
+        />
       ) : null}
-    </View>
+    </>
   );
 }
 
@@ -219,7 +209,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    // Auth screens need the full language name (not truncated).
     maxWidth: 220,
   },
   trigger: {
@@ -254,7 +243,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 18 },
     elevation: 25,
     zIndex: 9999,
-    // RN web supports boxShadow; RN native uses shadow* + elevation.
     boxShadow: '0 18px 40px rgba(0,0,0,0.45)',
   },
   dropdownItem: {
@@ -289,4 +277,3 @@ const styles = StyleSheet.create({
     opacity: 0,
   },
 });
-

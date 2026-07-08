@@ -6,9 +6,9 @@ export default function AuthLanguageSelector({ style }) {
     <CompactLanguageSelector
       variant="dark"
       compact
+      presentation="modal"
       showFullLabel
       style={[{ alignSelf: 'center' }, style]}
     />
   );
 }
-
