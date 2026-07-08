@@ -221,6 +221,14 @@
   },
   "repairs": {
     "title": "Ремонти",
+    "tabs": {
+      "requests": "Заявки",
+      "offers": "Оферти",
+      "active": "Активни ремонти",
+      "completed": "Завършени ремонти"
+    },
+    "emptyTitle": "Няма намерени ремонти",
+    "emptySubtitle": "Няма нищо в \"{status}\" в момента.",
     "repairRequests": "Ремонти",
     "openRequests": "Активни заявки",
     "pendingOffers": "Чакащи оферти",
@@ -280,6 +288,7 @@
     "partnerProfile": "{app} — Профил на сервиза",
     "publicPreview": "{app} — Преглед на публичната страница",
     "repairs": "{app} — Ремонти",
+    "forgotPassword": "{app} — Нулиране на парола",
     "bookings": "{app} — Записвания",
     "calendar": "{app} — Календар",
     "clients": "{app} — Клиенти",

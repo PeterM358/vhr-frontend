@@ -33,7 +33,7 @@ const PATH_TITLE_KEYS = {
   '/login': null,
   '/sign-in': null,
   '/sign-up': null,
-  '/forgot-password': null,
+  '/forgot-password': 'forgotPassword',
   '/dashboard/vehicles': 'myVehicles',
   '/dashboard/vehicles/add': 'addVehicle',
   '/dashboard/notifications': 'notifications',

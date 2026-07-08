@@ -221,6 +221,14 @@
   },
   "repairs": {
     "title": "Repairs",
+    "tabs": {
+      "requests": "Requests",
+      "offers": "Offers",
+      "active": "Active Repairs",
+      "completed": "Completed Repairs"
+    },
+    "emptyTitle": "No repairs found",
+    "emptySubtitle": "Nothing in \"{status}\" right now.",
     "repairRequests": "Repair Requests",
     "openRequests": "Open Requests",
     "pendingOffers": "Pending Offers",
@@ -280,6 +288,7 @@
     "partnerProfile": "{app} Partner Profile",
     "publicPreview": "{app} Public Page Preview",
     "repairs": "{app} Repairs",
+    "forgotPassword": "{app} — Reset Password",
     "bookings": "{app} Bookings",
     "calendar": "{app} Calendar",
     "clients": "{app} Clients",

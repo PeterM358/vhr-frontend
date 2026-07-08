@@ -110,6 +110,12 @@ const transparentStackHeader = {
   headerTitleAlign: 'center',
 };
 
+/** Auth cards render their own logo + headings — hide stack header title everywhere. */
+const authScreenOptions = {
+  ...transparentStackHeader,
+  headerShown: false,
+};
+
 /** Pop one screen — use when returning to the screen below (avoids duplicate stack entries). */
 function stackBackHeaderLeft(navigation, label = 'Back') {
   return createBackHeaderLeft({
@@ -278,16 +284,8 @@ export default function AppNavigator() {
       >
         <Stack.Screen name="AuthLoading" component={AuthLoadingScreen} options={{ headerShown: false }} />
         <Stack.Screen name="PublicHome" component={PublicHomeScreen} options={{ headerShown: false }} />
-        <Stack.Screen
-          name="Login"
-          component={LoginScreenRoute}
-          options={{ ...transparentStackHeader, title: 'Sign in', headerShown: Platform.OS === 'web' ? false : true }}
-        />
-        <Stack.Screen
-          name="Register"
-          component={RegisterScreen}
-          options={{ ...transparentStackHeader, title: 'Create account' }}
-        />
+        <Stack.Screen name="Login" component={LoginScreenRoute} options={authScreenOptions} />
+        <Stack.Screen name="Register" component={RegisterScreen} options={authScreenOptions} />
         <Stack.Screen name="Home" component={HomeDrawer} options={{ headerShown: false }} />
         <Stack.Screen name="ShopHome" component={ShopDrawer} options={{ headerShown: false, title: 'Home' }} />
 
@@ -515,12 +513,12 @@ export default function AppNavigator() {
         <Stack.Screen
           name="PasswordRequestReset"
           component={PasswordRequestResetScreen}
-          options={{ ...transparentStackHeader, title: 'Reset Password' }}
+          options={authScreenOptions}
         />
         <Stack.Screen
           name="PasswordConfirmReset"
           component={PasswordConfirmResetScreen}
-          options={{ ...transparentStackHeader, title: 'New Password' }}
+          options={authScreenOptions}
         />
 
         <Stack.Screen

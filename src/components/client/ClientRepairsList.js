@@ -17,29 +17,33 @@ import { useScrollShadow } from '../../hooks/useScrollShadow';
 import { useClientDashboardBack, useGoBackOr } from '../../navigation/appNavBarBack';
 import { syncWebPath } from '../../navigation/authNavigation';
 import { repairRequests } from '../../navigation/webRoutes';
+import { useTranslation } from '../../i18n';
 
-const TAB_OPTIONS = [
-  { key: 'open', label: 'Requests' },
-  { key: 'offers', label: 'Offers' },
-  { key: 'ongoing', label: 'Active Repairs' },
-  { key: 'done', label: 'Completed Repairs' },
-];
+const TAB_KEYS = ['open', 'offers', 'ongoing', 'done'];
+
+const TAB_I18N_KEYS = {
+  open: 'repairs.tabs.requests',
+  offers: 'repairs.tabs.offers',
+  ongoing: 'repairs.tabs.active',
+  done: 'repairs.tabs.completed',
+};
 
 function resolveInitialTab(route) {
   const tab = route.params?.initialTab || route.params?.tab;
-  if (tab && TAB_OPTIONS.some((item) => item.key === tab)) {
+  if (tab && TAB_KEYS.includes(tab)) {
     return tab;
   }
   return 'open';
 }
 
 export default function ClientRepairsList({ navigation, route }) {
+  const { t } = useTranslation();
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const fromVehicleDetail = !!route.params?.fromVehicleDetail;
   const goBackDefault = useGoBackOr(navigation);
   const goBackDashboard = useClientDashboardBack(navigation);
   const handleBack = fromVehicleDetail ? goBackDefault : goBackDashboard;
-  const screenTitle = fromVehicleDetail ? 'Vehicle Repairs' : 'Repairs';
+  const screenTitle = t('repairs.title');
   const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState(() => resolveInitialTab(route));
@@ -47,7 +51,7 @@ export default function ClientRepairsList({ navigation, route }) {
 
   useEffect(() => {
     const tab = route.params?.initialTab || route.params?.tab;
-    if (tab && TAB_OPTIONS.some((item) => item.key === tab)) {
+    if (tab && TAB_KEYS.includes(tab)) {
       setStatusFilter(tab);
     }
   }, [route.params?.initialTab, route.params?.tab]);
@@ -143,12 +147,12 @@ export default function ClientRepairsList({ navigation, route }) {
       />
       <View style={styles.container}>
         <View style={styles.tabRow}>
-          {TAB_OPTIONS.map((tab) => {
-            const active = tab.key === statusFilter;
+          {TAB_KEYS.map((tabKey) => {
+            const active = tabKey === statusFilter;
             return (
               <Pressable
-                key={tab.key}
-                onPress={() => selectTab(tab.key)}
+                key={tabKey}
+                onPress={() => selectTab(tabKey)}
                 style={({ pressed }) => [
                   styles.tab,
                   active ? styles.tabActive : styles.tabInactive,
@@ -161,7 +165,7 @@ export default function ClientRepairsList({ navigation, route }) {
                     active ? styles.tabLabelActive : styles.tabLabelInactive,
                   ]}
                 >
-                  {tab.label}
+                  {t(TAB_I18N_KEYS[tabKey])}
                 </Text>
               </Pressable>
             );
@@ -187,8 +191,8 @@ export default function ClientRepairsList({ navigation, route }) {
             ListEmptyComponent={
               <EmptyStateCard
                 icon="wrench-outline"
-                title={scopedVehicleId ? 'No repairs for this vehicle' : 'No repairs found'}
-                subtitle={`Nothing in "${statusFilter}" right now.`}
+                title={t('repairs.emptyTitle')}
+                subtitle={t('repairs.emptySubtitle', { status: t(TAB_I18N_KEYS[statusFilter]) })}
               />
             }
           />

@@ -220,7 +220,15 @@
     }
   },
   "repairs": {
-    "title": "Repairs",
+    "title": "Réparations",
+    "tabs": {
+      "requests": "Demandes",
+      "offers": "Offres",
+      "active": "Réparations actives",
+      "completed": "Réparations terminées"
+    },
+    "emptyTitle": "Aucune réparation trouvée",
+    "emptySubtitle": "Rien dans « {status} » pour le moment.",
     "repairRequests": "Repair Requests",
     "openRequests": "Open Requests",
     "pendingOffers": "Pending Offers",
@@ -279,7 +287,8 @@
     "partnerDashboard": "{app} Partner Dashboard",
     "partnerProfile": "{app} Partner Profile",
     "publicPreview": "{app} Public Page Preview",
-    "repairs": "{app} Repairs",
+    "repairs": "{app} — Réparations",
+    "forgotPassword": "{app} — Réinitialiser le mot de passe",
     "bookings": "{app} Bookings",
     "calendar": "{app} Calendar",
     "clients": "{app} Clients",
