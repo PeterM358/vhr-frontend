@@ -266,7 +266,44 @@
     "sendProposal": "{app} Send Proposal",
     "serviceCentersMeta": {
       "title": "{app} Service Centers",
-      "description": "Discover service centers, compare services, and find trusted vehicle care on Veversal."
+      "description": "Discover service centers, compare services, and find trusted vehicle care on Veversal.",
+      "discovery": {
+        "root": {
+          "title": "{app} Service Centers",
+          "h1": "Service Centers",
+          "description": "Discover service centers, compare services, and find trusted vehicle care on Veversal."
+        },
+        "vehicleCityRepair": {
+          "title": "{vehicle} {repair} in {city} | {app}",
+          "h1": "{vehicle} {repair} in {city}",
+          "description": "Find service centers for {vehicle} {repair} in {city} on {app}."
+        },
+        "vehicleCity": {
+          "title": "{vehicle} service centers in {city} | {app}",
+          "h1": "{vehicle} service centers in {city}",
+          "description": "Find {vehicle} service centers in {city} on {app}."
+        },
+        "vehicle": {
+          "title": "{vehicle} service centers | {app}",
+          "h1": "{vehicle} service centers",
+          "description": "Browse {vehicle} service centers on {app}."
+        },
+        "repairCity": {
+          "title": "{repair} in {city} | {app}",
+          "h1": "{repair} in {city}",
+          "description": "Find service centers for {repair} in {city} on {app}."
+        },
+        "repair": {
+          "title": "{repair} | {app}",
+          "h1": "{repair}",
+          "description": "Find service centers for {repair} on {app}."
+        },
+        "city": {
+          "title": "Service centers in {city} | {app}",
+          "h1": "Service centers in {city}",
+          "description": "Find service centers in {city} for repairs, maintenance, and trusted vehicle care on {app}."
+        }
+      }
     },
     "serviceCenterProfile": {
       "title": "{name} | {app}",
@@ -277,6 +314,14 @@
     },
     "repairsPage": {
       "title": "{app} Repairs"
+    },
+    "vehicleTypes": {
+      "car": "Car",
+      "truck": "Truck",
+      "motorcycle": "Motorcycle",
+      "bicycle": "Bike",
+      "ebike": "E-bike",
+      "scooter": "Scooter"
     }
   }
 }

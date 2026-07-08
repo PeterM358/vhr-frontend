@@ -266,7 +266,44 @@
     "sendProposal": "{app} — Изпрати оферта",
     "serviceCentersMeta": {
       "title": "{app} — Сервизи",
-      "description": "Открийте сервизни центрове, сравнете услуги и намерете надежден сервиз във Veversal."
+      "description": "Открийте сервизни центрове, сравнете услуги и намерете надежден сервиз във Veversal.",
+      "discovery": {
+        "root": {
+          "title": "{app} — Сервизни центрове",
+          "h1": "Сервизни центрове",
+          "description": "Открийте сервизни центрове, сравнете услуги и намерете надеждна грижа за автомобила във {app}."
+        },
+        "vehicleCityRepair": {
+          "title": "{vehicle} {repair} в {city} | {app}",
+          "h1": "{vehicle} {repair} в {city}",
+          "description": "Намерете сервизни центрове за {vehicle} {repair} в {city} във {app}."
+        },
+        "vehicleCity": {
+          "title": "Сервизни центрове за {vehicle} в {city} | {app}",
+          "h1": "Сервизни центрове за {vehicle} в {city}",
+          "description": "Намерете сервизни центрове за {vehicle} в {city} във {app}."
+        },
+        "vehicle": {
+          "title": "Сервизни центрове за {vehicle} | {app}",
+          "h1": "Сервизни центрове за {vehicle}",
+          "description": "Разгледайте сервизни центрове за {vehicle} във {app}."
+        },
+        "repairCity": {
+          "title": "{repair} в {city} | {app}",
+          "h1": "{repair} в {city}",
+          "description": "Намерете сервизни центрове за {repair} в {city} във {app}."
+        },
+        "repair": {
+          "title": "{repair} | {app}",
+          "h1": "{repair}",
+          "description": "Намерете сервизни центрове за {repair} във {app}."
+        },
+        "city": {
+          "title": "Сервизни центрове в {city} | {app}",
+          "h1": "Сервизни центрове в {city}",
+          "description": "Намерете сервизни центрове в {city} за ремонти, поддръжка и надеждна грижа за автомобила във {app}."
+        }
+      }
     },
     "serviceCenterProfile": {
       "title": "{name} | {app}",
@@ -277,6 +314,14 @@
     },
     "repairsPage": {
       "title": "{app} — Ремонти"
+    },
+    "vehicleTypes": {
+      "car": "Автомобил",
+      "truck": "Камион",
+      "motorcycle": "Мотоциклет",
+      "bicycle": "Велосипед",
+      "ebike": "Електровелосипед",
+      "scooter": "Скутер"
     }
   }
 }

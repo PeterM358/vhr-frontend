@@ -266,7 +266,44 @@
     "sendProposal": "{app} Send Proposal",
     "serviceCentersMeta": {
       "title": "{app} Service Centers",
-      "description": "Discover service centers, compare services, and find trusted vehicle care on Veversal."
+      "description": "Discover service centers, compare services, and find trusted vehicle care on Veversal.",
+      "discovery": {
+        "root": {
+          "title": "Centros de servicio | {app}",
+          "h1": "Centros de servicio",
+          "description": "Descubre centros de servicio, compara servicios y encuentra atención confiable para tu vehículo en {app}."
+        },
+        "vehicleCityRepair": {
+          "title": "{vehicle} {repair} en {city} | {app}",
+          "h1": "{vehicle} {repair} en {city}",
+          "description": "Encuentra centros de servicio para {vehicle} {repair} en {city} en {app}."
+        },
+        "vehicleCity": {
+          "title": "Centros de servicio de {vehicle} en {city} | {app}",
+          "h1": "Centros de servicio de {vehicle} en {city}",
+          "description": "Encuentra centros de servicio de {vehicle} en {city} en {app}."
+        },
+        "vehicle": {
+          "title": "Centros de servicio de {vehicle} | {app}",
+          "h1": "Centros de servicio de {vehicle}",
+          "description": "Explora centros de servicio de {vehicle} en {app}."
+        },
+        "repairCity": {
+          "title": "{repair} en {city} | {app}",
+          "h1": "{repair} en {city}",
+          "description": "Encuentra centros de servicio para {repair} en {city} en {app}."
+        },
+        "repair": {
+          "title": "{repair} | {app}",
+          "h1": "{repair}",
+          "description": "Encuentra centros de servicio para {repair} en {app}."
+        },
+        "city": {
+          "title": "Centros de servicio en {city} | {app}",
+          "h1": "Centros de servicio en {city}",
+          "description": "Encuentra centros de servicio en {city} para reparaciones, mantenimiento y cuidado confiable del vehículo en {app}."
+        }
+      }
     },
     "serviceCenterProfile": {
       "title": "{name} | {app}",
@@ -277,7 +314,14 @@
     },
     "repairsPage": {
       "title": "{app} Repairs"
+    },
+    "vehicleTypes": {
+      "car": "Coche",
+      "truck": "Camión",
+      "motorcycle": "Moto",
+      "bicycle": "Bicicleta",
+      "ebike": "Bici eléctrica",
+      "scooter": "Scooter"
     }
   }
 }
-
