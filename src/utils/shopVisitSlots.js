@@ -60,19 +60,21 @@ function hoursForDate(workingHours, date) {
   return { start, end };
 }
 
-function formatDayLabel(date, offset) {
-  if (offset === 0) return 'Today';
-  if (offset === 1) return 'Tomorrow';
-  const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
+function formatDayLabel(date, offset, { t, locale } = {}) {
+  if (offset === 0) return t ? t('requestService.today') : 'Today';
+  if (offset === 1) return t ? t('requestService.tomorrow') : 'Tomorrow';
+  const loc = locale || undefined;
+  const weekday = date.toLocaleDateString(loc, { weekday: 'short' });
   const day = date.getDate();
-  const month = date.toLocaleDateString(undefined, { month: 'short' });
+  const month = date.toLocaleDateString(loc, { month: 'short' });
   return `${weekday} ${day} ${month}`;
 }
 
 /**
  * Next open days with time slots that fit the shop working hours.
  */
-export function buildVisitSlotOptions(workingHours, { maxDays = 14, horizon = 21 } = {}) {
+export function buildVisitSlotOptions(workingHours, { maxDays = 14, horizon = 21, t, locale } = {}) {
+  const labelOpts = { t, locale };
   const options = [];
   const today = dayStart(new Date());
   const lunchBreak = parseLunchBreak(workingHours);
@@ -90,7 +92,7 @@ export function buildVisitSlotOptions(workingHours, { maxDays = 14, horizon = 21
     options.push({
       offset,
       date,
-      label: formatDayLabel(date, offset),
+      label: formatDayLabel(date, offset, labelOpts),
       slots,
       hoursLabel,
     });
@@ -103,7 +105,7 @@ export function buildVisitSlotOptions(workingHours, { maxDays = 14, horizon = 21
       options.push({
         offset,
         date,
-        label: formatDayLabel(date, offset),
+        label: formatDayLabel(date, offset, labelOpts),
         slots: fallbackSlots,
         hoursLabel: 'Suggested',
       });
@@ -113,9 +115,18 @@ export function buildVisitSlotOptions(workingHours, { maxDays = 14, horizon = 21
   return options;
 }
 
-export function formatPreferredVisitNote(dayOption, timeSlot) {
+export function formatPreferredVisitNote(dayOption, timeSlot, translateFn) {
   if (!dayOption) return '';
   const dateLabel = dayOption.label;
+  if (translateFn) {
+    if (!timeSlot) {
+      return translateFn('requestService.preferredVisitSummary', { date: dateLabel });
+    }
+    return translateFn('requestService.preferredVisitSummaryWithTime', {
+      date: dateLabel,
+      time: timeSlot,
+    });
+  }
   if (!timeSlot) return `Preferred visit: ${dateLabel} (pending service center confirmation)`;
   return `Preferred visit: ${dateLabel}, ${timeSlot} (pending service center confirmation)`;
 }

@@ -38,6 +38,7 @@ const PATH_TITLE_KEYS = {
   '/dashboard/vehicles/add': 'addVehicle',
   '/dashboard/notifications': 'notifications',
   '/dashboard/repair-requests': 'repairs',
+  '/dashboard/repair-requests/new': 'requestService',
   '/dashboard/service-history': 'serviceHistory',
   '/dashboard/bookings': 'bookings',
   '/dashboard/documents': 'documents',

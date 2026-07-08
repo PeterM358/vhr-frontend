@@ -4,8 +4,10 @@ import { Text, Button } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { COLORS } from '../../constants/colors';
 import { resolveRepairTypeIcon } from '../../utils/repairTypeIcons';
+import { useTranslation } from '../../i18n';
 
 export default function SelectedServicePill({ repairType, onChange }) {
+  const { t } = useTranslation();
   if (!repairType) return null;
 
   const icon = resolveRepairTypeIcon(repairType);
@@ -15,12 +17,12 @@ export default function SelectedServicePill({ repairType, onChange }) {
       <View style={styles.pill}>
         <MaterialCommunityIcons name={icon} size={18} color={COLORS.PRIMARY} style={styles.icon} />
         <View style={styles.textCol}>
-          <Text style={styles.label}>Selected</Text>
+          <Text style={styles.label}>{t('requestService.selected')}</Text>
           <Text style={styles.name}>{repairType.name}</Text>
         </View>
         {onChange ? (
           <Button mode="text" compact onPress={onChange}>
-            Change
+            {t('requestService.change')}
           </Button>
         ) : null}
       </View>

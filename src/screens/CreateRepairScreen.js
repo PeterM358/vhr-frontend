@@ -52,8 +52,10 @@ import { navigateToRepairRequestDetail } from '../navigation/webNavigation';
 import {
   useScrollContentBottomPaddingWithFooter,
 } from '../utils/mobileWebInsets';
+import { useTranslation } from '../i18n';
 
 export default function CreateRepairScreen({ navigation, route }) {
+  const { t, locale } = useTranslation();
   const insets = useSafeAreaInsets();
   const scrollBottomPadding = useScrollContentBottomPaddingWithFooter(110);
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
@@ -170,7 +172,10 @@ export default function CreateRepairScreen({ navigation, route }) {
     }
   }, [selectedVehicle, isEditMode]);
 
-  const visitDays = useMemo(() => buildVisitSlotOptions(null, { maxDays: 14 }), []);
+  const visitDays = useMemo(
+    () => buildVisitSlotOptions(null, { maxDays: 14, t, locale }),
+    [t, locale]
+  );
   const selectedVisitDay = useMemo(
     () => visitDays.find((row) => row.offset === visitDayOffset) || visitDays[0] || null,
     [visitDays, visitDayOffset]
@@ -240,7 +245,7 @@ export default function CreateRepairScreen({ navigation, route }) {
         setRepairTypes(await typeRes.json());
         if (isEditMode && editRepair) {
           if (editRepair.status !== 'open') {
-            setDialogMessage('Only open requests can be edited.');
+            setDialogMessage(t('requestService.onlyOpenEditable'));
             setDialogVisible(true);
             navigation.goBack();
             return;
@@ -293,7 +298,7 @@ export default function CreateRepairScreen({ navigation, route }) {
         }
       } catch (err) {
         console.error('? Error:', err);
-        setDialogMessage('Error loading form data');
+        setDialogMessage(t('requestService.loadFormError'));
         setDialogVisible(true);
       } finally {
         setLoading(false);
@@ -338,7 +343,7 @@ export default function CreateRepairScreen({ navigation, route }) {
   const requestMediaPermission = async () => {
     const { status: perm } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (perm !== 'granted') {
-      Alert.alert('Permission required', 'Allow access to photos/videos to attach media.');
+      Alert.alert(t('requestService.permissionRequired'), t('requestService.permissionMedia'));
       return false;
     }
     return true;
@@ -371,7 +376,7 @@ export default function CreateRepairScreen({ navigation, route }) {
       }
     } catch (err) {
       console.error(err);
-      Alert.alert('Error', 'Failed to pick photo.');
+      Alert.alert(t('common.error'), t('requestService.pickPhotoFailed'));
     }
   };
 
@@ -389,7 +394,7 @@ export default function CreateRepairScreen({ navigation, route }) {
       }
     } catch (err) {
       console.error(err);
-      Alert.alert('Error', 'Failed to pick video.');
+      Alert.alert(t('common.error'), t('requestService.pickVideoFailed'));
     }
   };
 
@@ -448,20 +453,18 @@ export default function CreateRepairScreen({ navigation, route }) {
 
   const handleSubmitRequest = () => {
     if (!vehicleId) {
-      setDialogMessage('Vehicle is required.');
+      setDialogMessage(t('requestService.vehicleRequiredError'));
       setDialogVisible(true);
       return;
     }
     const hasWrittenDetails = Boolean(String(symptoms || '').trim());
     if (!repairTypeId && !hasWrittenDetails) {
-      setDialogMessage(
-        'Describe the problem or pick a service type so the service center can understand your request.'
-      );
+      setDialogMessage(t('requestService.describeOrPickType'));
       setDialogVisible(true);
       return;
     }
     if (targetingMode === 'selected_centers' && selectedCenterIds.length === 0) {
-      setDialogMessage('Select at least one service center or choose another targeting mode.');
+      setDialogMessage(t('requestService.selectCenterOrMode'));
       setDialogVisible(true);
       return;
     }
@@ -469,10 +472,10 @@ export default function CreateRepairScreen({ navigation, route }) {
     const resolved = resolveRepairTypeForSubmit(repairTypes, repairTypeId, symptoms);
     if (!repairTypeId && resolved.type) {
       if (resolved.source === 'matched') {
-        setSubmitTypeNotice(`We'll classify this as "${resolved.type.name}" based on your description.`);
+        setSubmitTypeNotice(t('requestService.classifyAs', { name: resolved.type.name }));
       } else if (resolved.source === 'default') {
         setSubmitTypeNotice(
-          `No service type selected — we'll send this as "${resolved.type.name}" so the service center can review it.`
+          t('requestService.noTypeSelected', { name: resolved.type.name })
         );
       }
     } else {
@@ -496,7 +499,7 @@ export default function CreateRepairScreen({ navigation, route }) {
       const shopProfileId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
       const kmForApi = resolveKilometersForApi();
       const preferredTimes = buildPreferredVisitTimes(selectedVisitDay, visitTimeSlot);
-      const preferredNote = formatPreferredVisitNote(selectedVisitDay, visitTimeSlot);
+      const preferredNote = formatPreferredVisitNote(selectedVisitDay, visitTimeSlot, t);
       const extraNotes = String(visitExtraNotes || availabilityNotes || '').trim();
       const availabilityText = [preferredNote, extraNotes && extraNotes !== preferredNote ? extraNotes : '']
         .filter(Boolean)
@@ -505,7 +508,7 @@ export default function CreateRepairScreen({ navigation, route }) {
       const typeIdForApi = resolvedTypeId || repairTypeId || selectedRepairType?.id;
       const parsedVehicleId = parseInt(vehicleId, 10);
       if (!Number.isFinite(parsedVehicleId)) {
-        throw new Error('Vehicle is required.');
+        throw new Error(t('requestService.vehicleRequiredError'));
       }
 
       const symptomText = String(symptoms || '').trim();
@@ -577,8 +580,8 @@ export default function CreateRepairScreen({ navigation, route }) {
 
       setDialogMessage(
         mediaUploadFailed
-          ? (isEditMode ? 'Request updated, but some media failed to upload.' : 'Repair was created, but some media failed to upload.')
-          : (isEditMode ? 'Request updated!' : 'Repair created!')
+          ? (isEditMode ? t('requestService.requestUpdatedMediaFailed') : t('requestService.repairCreatedMediaFailed'))
+          : (isEditMode ? t('requestService.requestUpdated') : t('requestService.repairCreated'))
       );
       setDialogVisible(true);
 
@@ -591,7 +594,7 @@ export default function CreateRepairScreen({ navigation, route }) {
         if (isEditMode && savedRepairId) {
           navigateToRepairRequestDetail(navigation, savedRepairId, {
             returnTo: 'ClientRepairs',
-            backLabel: 'Requests',
+            backLabel: t('requestService.backRequests'),
           });
           return;
         }
@@ -619,12 +622,12 @@ export default function CreateRepairScreen({ navigation, route }) {
             navigateToRepairRequestDetail(navigation, savedRepairId, {
               returnTo: 'ShopDetail',
               shopId,
-              backLabel: 'Service center',
+              backLabel: t('requestService.backServiceCenter'),
             });
           } else {
             navigateToRepairRequestDetail(navigation, savedRepairId, {
               returnTo: 'ClientRepairs',
-              backLabel: 'Dashboard',
+              backLabel: t('requestService.backDashboard'),
             });
           }
           return;
@@ -646,7 +649,7 @@ export default function CreateRepairScreen({ navigation, route }) {
           responseText: err?.responseText,
         });
       }
-      setDialogMessage(err.message || 'Submission failed');
+      setDialogMessage(err.message || t('requestService.submissionFailed'));
       setDialogVisible(true);
     } finally {
       setSaving(false);
@@ -661,8 +664,8 @@ export default function CreateRepairScreen({ navigation, route }) {
     <ScreenBackground safeArea={false}>
       <View style={styles.root}>
         <AppNavigationBar
-          title={isEditMode ? 'Edit Request' : 'Request Service'}
-          backLabel="Back"
+          title={isEditMode ? t('requestService.editTitle') : t('repairs.requestService')}
+          backLabel={t('common.back')}
           onBack={handleBack}
           scrolled={scrolled}
         />
@@ -686,7 +689,7 @@ export default function CreateRepairScreen({ navigation, route }) {
 
           {!isEditMode && (!selectedVehicle || showVehiclePicker) ? (
             <FloatingCard>
-              <Text variant="labelLarge" style={styles.label}>Vehicle *</Text>
+              <Text variant="labelLarge" style={styles.label}>{t('requestService.vehicleRequired')}</Text>
               <View style={styles.pickerContainer}>
                 <Picker selectedValue={vehicleId} onValueChange={setVehicleId} style={styles.picker}>
                   {vehicles.map((v) => (
@@ -728,8 +731,8 @@ export default function CreateRepairScreen({ navigation, route }) {
             {inferredTypePreview && !selectedRepairType ? (
               <Text style={styles.inferredTypeNotice}>
                 {inferredTypePreview.source === 'matched'
-                  ? `Based on your description, this looks like "${inferredTypePreview.type.name}".`
-                  : `If you don't pick a type, we'll send this as "${inferredTypePreview.type.name}".`}
+                  ? t('requestService.inferredMatched', { name: inferredTypePreview.type.name })
+                  : t('requestService.inferredDefault', { name: inferredTypePreview.type.name })}
               </Text>
             ) : null}
           </FloatingCard>
@@ -759,7 +762,7 @@ export default function CreateRepairScreen({ navigation, route }) {
               mode="outlined"
               value={visitExtraNotes}
               onChangeText={setVisitExtraNotes}
-              placeholder="Extra timing notes (optional)"
+              placeholder={t('requestService.extraTimingNotes')}
               style={styles.input}
               multiline
             />
@@ -769,15 +772,17 @@ export default function CreateRepairScreen({ navigation, route }) {
 
             {fromVehicleDetail && selectedVehicle ? (
               <View style={styles.optionalKmInline}>
-                <Text variant="labelLarge" style={styles.label}>Kilometers (optional)</Text>
+                <Text variant="labelLarge" style={styles.label}>{t('requestService.kilometersOptional')}</Text>
                 <TextInput
                   mode="outlined"
                   value={kilometers}
                   onChangeText={setKilometers}
                   placeholder={
                     selectedVehicle.kilometers != null && selectedVehicle.kilometers !== ''
-                      ? `Shown on vehicle: ${Number(selectedVehicle.kilometers).toLocaleString()}`
-                      : 'Current odometer if you know it'
+                      ? t('requestService.kilometersShownOnVehicle', {
+                          km: Number(selectedVehicle.kilometers).toLocaleString(),
+                        })
+                      : t('requestService.kilometersCurrentOdometer')
                   }
                   keyboardType="numeric"
                   style={styles.input}
@@ -792,25 +797,25 @@ export default function CreateRepairScreen({ navigation, route }) {
               style={styles.preferencesToggle}
             >
               <Text variant="titleMedium" style={styles.sectionTitle}>
-                Routing preferences
+                {t('requestService.routingPreferences')}
               </Text>
               <Text style={styles.preferencesToggleHint}>
-                {showAdvancedPreferences ? 'Hide' : 'Show'} advanced options
+                {showAdvancedPreferences ? t('requestService.hideAdvanced') : t('requestService.showAdvanced')}
               </Text>
             </Pressable>
 
             {showAdvancedPreferences || centerPickerUnlocked ? (
               <>
                 <Text style={styles.sectionHint}>
-                  Choose how your request is routed to service centers.
+                  {t('requestService.routingHint')}
                 </Text>
-                <Text variant="labelLarge" style={styles.label}>Who should receive request?</Text>
+                <Text variant="labelLarge" style={styles.label}>{t('requestService.whoReceives')}</Text>
                 <View style={styles.targetingList}>
                   {[
-                    { value: 'all_qualified', label: 'Nearby qualified service centers' },
-                    { value: 'selected_centers', label: 'Selected service centers' },
-                    { value: 'verified_only', label: 'Verified service centers only' },
-                    { value: 'operator_assisted', label: 'Ask platform to help choose' },
+                    { value: 'all_qualified', label: t('requestService.targetingAllQualified') },
+                    { value: 'selected_centers', label: t('requestService.targetingSelected') },
+                    { value: 'verified_only', label: t('requestService.targetingVerified') },
+                    { value: 'operator_assisted', label: t('requestService.targetingOperator') },
                   ].map((opt) => {
                     const selected = targetingMode === opt.value;
                     return (
@@ -829,7 +834,7 @@ export default function CreateRepairScreen({ navigation, route }) {
 
                 {targetingMode === 'selected_centers' ? (
                   <View style={styles.centerBlock}>
-                    <Text style={styles.centerLabel}>Preferred service centers</Text>
+                    <Text style={styles.centerLabel}>{t('requestService.preferredCenters')}</Text>
                     {loadingCenters ? (
                       <ActivityIndicator size="small" />
                     ) : serviceCenters.length ? (
@@ -843,7 +848,7 @@ export default function CreateRepairScreen({ navigation, route }) {
                               style={[styles.centerChip, selected && styles.centerChipSelected]}
                             >
                               <Text style={[styles.centerChipText, selected && styles.centerChipTextSelected]}>
-                                {c.name || `Service Center #${c.id}`}
+                                {c.name || t('requestService.serviceCenterFallback', { id: c.id })}
                               </Text>
                             </Pressable>
                           );
@@ -851,7 +856,7 @@ export default function CreateRepairScreen({ navigation, route }) {
                       </View>
                     ) : (
                       <Text style={styles.emptySmall}>
-                        No matching service centers available for current vehicle/service filters.
+                        {t('requestService.noMatchingCenters')}
                       </Text>
                     )}
                   </View>
@@ -862,55 +867,55 @@ export default function CreateRepairScreen({ navigation, route }) {
                   style={[styles.guaranteeCard, requiresGuarantee && styles.guaranteeCardSelected]}
                 >
                   <Text style={[styles.guaranteeTitle, requiresGuarantee && styles.guaranteeTitleSelected]}>
-                    Request guaranteed service centers
+                    {t('requestService.guaranteeTitle')}
                   </Text>
                   <Text style={[styles.guaranteeHelper, requiresGuarantee && styles.guaranteeHelperSelected]}>
-                    Only service centers offering guarantee will receive this request.
+                    {t('requestService.guaranteeHelper')}
                   </Text>
                   <View style={styles.guaranteeStateRow}>
                     <Text style={[styles.guaranteeStateText, requiresGuarantee && styles.guaranteeStateTextSelected]}>
-                      {requiresGuarantee ? 'Enabled' : 'Disabled'}
+                      {requiresGuarantee ? t('requestService.enabled') : t('requestService.disabled')}
                     </Text>
                     <Button
                       mode={requiresGuarantee ? 'contained-tonal' : 'outlined'}
                       compact
                       onPress={() => setRequiresGuarantee((prev) => !prev)}
                     >
-                      {requiresGuarantee ? 'Turn off' : 'Turn on'}
+                      {requiresGuarantee ? t('requestService.turnOff') : t('requestService.turnOn')}
                     </Button>
                   </View>
                 </Pressable>
-                <Text variant="labelLarge" style={styles.label}>Preferred radius (km)</Text>
+                <Text variant="labelLarge" style={styles.label}>{t('requestService.preferredRadius')}</Text>
                 <TextInput
                   mode="outlined"
                   value={preferredRadiusKm}
                   onChangeText={setPreferredRadiusKm}
                   keyboardType="numeric"
-                  placeholder="Optional, e.g. 15"
+                  placeholder={t('requestService.radiusPlaceholder')}
                   style={styles.input}
                 />
               </>
             ) : (
               <Text style={styles.sectionHint}>
-                Defaults route your request to nearby qualified service centers.
+                {t('requestService.routingDefaultsHint')}
               </Text>
             )}
           </FloatingCard>
 
           {!(fromVehicleDetail && selectedVehicle) ? (
             <FloatingCard>
-              <Text variant="titleMedium" style={styles.sectionTitle}>Vehicle details</Text>
-              <Text variant="labelLarge" style={styles.label}>Kilometers (optional)</Text>
+              <Text variant="titleMedium" style={styles.sectionTitle}>{t('vehicles.vehicleDetails')}</Text>
+              <Text variant="labelLarge" style={styles.label}>{t('requestService.kilometersOptional')}</Text>
               <TextInput
                 mode="outlined"
                 value={kilometers}
                 onChangeText={setKilometers}
-                placeholder="e.g. 95000"
+                placeholder={t('requestService.kilometersPlaceholder')}
                 keyboardType="numeric"
                 style={styles.input}
               />
               <Text style={styles.sectionHint}>
-                Optional current-km hint for this request.
+                {t('requestService.kilometersHint')}
               </Text>
             </FloatingCard>
           ) : null}
@@ -925,7 +930,7 @@ export default function CreateRepairScreen({ navigation, route }) {
             style={styles.sendButton}
             contentStyle={styles.sendButtonContent}
           >
-            {isEditMode ? 'Save changes' : 'Send request'}
+            {isEditMode ? t('requestService.saveChanges') : t('repairs.sendRequest')}
           </Button>
         </View>
       </View>
@@ -935,13 +940,13 @@ export default function CreateRepairScreen({ navigation, route }) {
           visible={dialogVisible}
           onDismiss={() => setDialogVisible(false)}
         >
-          <Dialog.Title>Notice</Dialog.Title>
+          <Dialog.Title>{t('common.notice')}</Dialog.Title>
           <Dialog.Content>
             <Text>{dialogMessage}</Text>
           </Dialog.Content>
           <Dialog.Actions>
             <Button mode="text" onPress={() => setDialogVisible(false)}>
-              OK
+              {t('common.ok')}
             </Button>
           </Dialog.Actions>
         </Dialog>

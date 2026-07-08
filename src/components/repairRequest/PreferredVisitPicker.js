@@ -3,6 +3,7 @@ import { View, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import { COLORS } from '../../constants/colors';
 import { formatPreferredVisitNote } from '../../utils/shopVisitSlots';
+import { useTranslation } from '../../i18n';
 
 export default function PreferredVisitPicker({
   visitDays,
@@ -13,13 +14,15 @@ export default function PreferredVisitPicker({
   onTimeChange,
   selectedVisitDay,
 }) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.wrap}>
       <Text variant="labelLarge" style={styles.label}>
-        Preferred visit
+        {t('repairs.preferredVisit')}
       </Text>
       <Text style={styles.hint}>
-        Preferred visit — the service center must confirm before it is booked.
+        {t('requestService.preferredVisitHint')}
       </Text>
 
       <ScrollView
@@ -68,7 +71,7 @@ export default function PreferredVisitPicker({
 
       {selectedVisitDay ? (
         <Text style={styles.summary}>
-          {formatPreferredVisitNote(selectedVisitDay, visitTimeSlot)}
+          {formatPreferredVisitNote(selectedVisitDay, visitTimeSlot, t)}
         </Text>
       ) : null}
     </View>

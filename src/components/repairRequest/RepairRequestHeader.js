@@ -4,6 +4,7 @@ import { Text, Button } from 'react-native-paper';
 import FloatingCard from '../ui/FloatingCard';
 import { COLORS } from '../../constants/colors';
 import { formatShopDisplayName } from '../../utils/shopDisplayName';
+import { useTranslation } from '../../i18n';
 
 export default function RepairRequestHeader({
   serviceCenter,
@@ -13,6 +14,7 @@ export default function RepairRequestHeader({
   showVehiclePicker,
   isEditMode,
 }) {
+  const { t } = useTranslation();
   const centerName = serviceCenter?.name
     ? formatShopDisplayName(serviceCenter.name)
     : null;
@@ -30,11 +32,11 @@ export default function RepairRequestHeader({
     <FloatingCard>
       {centerName ? (
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Requesting service from:</Text>
+          <Text style={styles.summaryLabel}>{t('requestService.requestingFrom')}</Text>
           <Text style={styles.summaryValue}>{centerName}</Text>
           {onChangeServiceCenter ? (
             <Button mode="text" compact onPress={onChangeServiceCenter} style={styles.changeBtn}>
-              Change
+              {t('requestService.change')}
             </Button>
           ) : null}
         </View>
@@ -42,11 +44,11 @@ export default function RepairRequestHeader({
 
       {vehicleLine ? (
         <View style={[styles.summaryRow, centerName && styles.summaryRowSpaced]}>
-          <Text style={styles.summaryLabel}>Vehicle:</Text>
+          <Text style={styles.summaryLabel}>{t('vehicles.vehicle')}:</Text>
           <Text style={styles.summaryValue}>{vehicleLine}</Text>
           {!isEditMode && onChangeVehicle ? (
             <Button mode="text" compact onPress={onChangeVehicle} style={styles.changeBtn}>
-              {showVehiclePicker ? 'Hide list' : 'Change vehicle'}
+              {showVehiclePicker ? t('requestService.hideList') : t('requestService.changeVehicle')}
             </Button>
           ) : null}
         </View>

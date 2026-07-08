@@ -3,12 +3,14 @@ import { View, Pressable, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import { COLORS } from '../../constants/colors';
 import { resolvePopularRepairTypes } from '../../utils/repairTypeSearch';
+import { useTranslation } from '../../i18n';
 
 export default function RepairPopularServices({
   repairTypes,
   selectedTypeId,
   onSelectType,
 }) {
+  const { t } = useTranslation();
   const popularTypes = useMemo(
     () => resolvePopularRepairTypes(repairTypes),
     [repairTypes]
@@ -18,7 +20,7 @@ export default function RepairPopularServices({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>Quick popular services</Text>
+      <Text style={styles.label}>{t('requestService.quickPopularServices')}</Text>
       <View style={styles.chipWrap}>
         {popularTypes.map((type) => {
           const selected = String(type.id) === String(selectedTypeId);

@@ -3,6 +3,7 @@ import { View, Image, StyleSheet } from 'react-native';
 import { Text, Button, IconButton } from 'react-native-paper';
 import EmptyStateCard from '../ui/EmptyStateCard';
 import { COLORS } from '../../constants/colors';
+import { useTranslation } from '../../i18n';
 
 export default function RepairMediaSection({
   selectedMedia,
@@ -12,23 +13,24 @@ export default function RepairMediaSection({
   existingMedia,
   isEditMode,
 }) {
+  const { t } = useTranslation();
   const hasVideo = selectedMedia.some((m) => m.mediaType === 'video');
 
   return (
     <View style={styles.wrap}>
       <Text variant="titleMedium" style={styles.title}>
-        Add photos or video
+        {t('requestService.addPhotosOrVideo')}
       </Text>
       <Text style={styles.hint}>
-        Photos help the service center understand the issue faster.
+        {t('requestService.photosHelp')}
       </Text>
       <View style={styles.actionsRow}>
         <Button mode="outlined" icon="camera" onPress={onPickPhoto}>
-          Add photo
+          {t('requestService.addPhoto')}
         </Button>
         {!hasVideo ? (
           <Button mode="outlined" icon="video" onPress={onPickVideo}>
-            Add video
+            {t('requestService.addVideo')}
           </Button>
         ) : null}
       </View>
@@ -41,7 +43,7 @@ export default function RepairMediaSection({
                 <Image source={{ uri: item.uri }} style={styles.previewImage} />
               ) : (
                 <View style={styles.previewVideo}>
-                  <Text style={styles.previewVideoText}>Video</Text>
+                  <Text style={styles.previewVideoText}>{t('requestService.video')}</Text>
                 </View>
               )}
               <Text numberOfLines={1} style={styles.previewName}>
@@ -59,18 +61,18 @@ export default function RepairMediaSection({
       ) : (
         <EmptyStateCard
           icon="camera-outline"
-          title="No media added yet"
-          subtitle="Optional — you can send your request without photos or video."
+          title={t('requestService.noMediaTitle')}
+          subtitle={t('requestService.noMediaSubtitle')}
         />
       )}
 
       {isEditMode && existingMedia?.length > 0 ? (
         <View style={styles.existingWrap}>
-          <Text style={styles.existingLabel}>Existing media (read-only)</Text>
+          <Text style={styles.existingLabel}>{t('requestService.existingMediaLabel')}</Text>
           {existingMedia.map((item, idx) => (
             <View key={`existing-${item.id || item.file || idx}`} style={styles.existingItem}>
               <Text style={styles.previewName}>
-                {(item.description || item.file || item.url || 'Existing media').toString()}
+                {(item.description || item.file || item.url || t('requestService.existingMediaFallback')).toString()}
               </Text>
             </View>
           ))}

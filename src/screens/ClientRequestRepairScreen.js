@@ -12,9 +12,11 @@ import { API_BASE_URL } from '../api/config';
 import BASE_STYLES from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
 import { safeError } from '../utils/logger';
+import { useTranslation } from '../i18n';
 
 export default function ClientRequestRepairScreen({ route, navigation }) {
   const theme = useTheme();
+  const { t } = useTranslation();
 
   const vehicleId = route.params?.vehicleId;
   const [description, setDescription] = useState('');
@@ -22,18 +24,18 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
   const [repairType, setRepairType] = useState('');
   const [repairTypes, setRepairTypes] = useState([]);
   const [loadingTypes, setLoadingTypes] = useState(false);
-  const [serviceCenterLabel, setServiceCenterLabel] = useState('Service Center');
+  const [serviceCenterLabel, setServiceCenterLabel] = useState(t('public.serviceCenter'));
 
   const centerLabelForVehicleType = (vehicleTypeCode, vehicleTypeName) => {
     const code = String(vehicleTypeCode || '').toLowerCase();
-    if (['car', 'van', 'truck'].includes(code)) return 'Auto Service Center';
-    if (['motorcycle', 'scooter'].includes(code)) return 'Motorcycle Service Center';
-    if (code === 'bicycle') return 'Bicycle Service Center';
-    if (code === 'ebike') return 'E-bike Service Center';
-    if (code === 'trailer') return 'Trailer Service Center';
+    if (['car', 'van', 'truck'].includes(code)) return t('requestService.autoServiceCenter');
+    if (['motorcycle', 'scooter'].includes(code)) return t('requestService.motorcycleServiceCenter');
+    if (code === 'bicycle') return t('requestService.bicycleServiceCenter');
+    if (code === 'ebike') return t('requestService.ebikeServiceCenter');
+    if (code === 'trailer') return t('requestService.trailerServiceCenter');
     const n = String(vehicleTypeName || '').trim();
-    if (n) return `${n} Service Center`;
-    return 'Service Center';
+    if (n) return t('requestService.namedServiceCenter', { name: n });
+    return t('public.serviceCenter');
   };
 
   useEffect(() => {
@@ -63,22 +65,22 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
         }
       } catch (err) {
         console.error('❌ Error loading request context:', err);
-        Alert.alert('Error', 'Could not load repair data. Please try again.');
+        Alert.alert(t('common.error'), t('requestService.loadFormError'));
       } finally {
         setLoadingTypes(false);
       }
     };
 
     loadFormContext();
-  }, [vehicleId]);
+  }, [vehicleId, t]);
 
   const handleSubmit = async () => {
     if (!vehicleId) {
-      Alert.alert('Error', 'Missing vehicle ID.');
+      Alert.alert(t('common.error'), t('requestService.vehicleRequiredError'));
       return;
     }
     if (!repairType) {
-      Alert.alert('Error', 'Please select repair type.');
+      Alert.alert(t('common.error'), t('requestService.selectRepairType'));
       return;
     }
 
@@ -102,15 +104,15 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
       });
 
       if (response.ok) {
-        Alert.alert('Success', 'Repair request created as OPEN.');
+        Alert.alert(t('common.notice'), t('requestService.repairCreatedOpen'));
         navigation.goBack();
       } else {
         await response.text();
-        Alert.alert('Error', 'Failed to create repair request.');
+        Alert.alert(t('common.error'), t('requestService.createFailed'));
       }
     } catch (err) {
       safeError('Create repair request failed', err);
-      Alert.alert('Error', 'An unexpected error occurred.');
+      Alert.alert(t('common.error'), t('common.error'));
     }
   };
 
@@ -118,12 +120,12 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
     <ScreenBackground>
     <ScrollView contentContainerStyle={BASE_STYLES.formScreen}>
       <Text variant="titleMedium" style={styles.contextTitle}>
-        Request from {serviceCenterLabel}
+        {t('requestService.requestFrom', { label: serviceCenterLabel })}
       </Text>
       
       <TextInput
         mode="outlined"
-        label="Description"
+        label={t('requestService.description')}
         value={description}
         onChangeText={setDescription}
         style={styles.input}
@@ -131,14 +133,14 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
       
       <TextInput
         mode="outlined"
-        label="Kilometers"
+        label={t('requestService.kilometersOptional')}
         keyboardType="numeric"
         value={kilometers}
         onChangeText={setKilometers}
         style={styles.input}
       />
 
-      <Text variant="labelLarge" style={styles.pickerLabel}>Select Repair Type *</Text>
+      <Text variant="labelLarge" style={styles.pickerLabel}>{t('requestService.selectRepairType')}</Text>
 
       {loadingTypes ? (
         <ActivityIndicator animating size="small" style={{ marginVertical: 8 }} />
@@ -150,7 +152,7 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
             style={styles.picker}
             dropdownIconColor="#0f172a"
           >
-            <Picker.Item label="Select Repair Type" value="" />
+            <Picker.Item label={t('requestService.selectRepairType')} value="" />
             {repairTypes.map((type) => (
               <Picker.Item key={type.id} label={type.name} value={type.id} />
             ))}
@@ -163,7 +165,7 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
         onPress={handleSubmit}
         style={{ marginTop: 20 }}
       >
-        Submit Request
+        {t('requestService.submitRequest')}
       </Button>
     </ScrollView>
     </ScreenBackground>

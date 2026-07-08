@@ -4,6 +4,7 @@ import { Text, Button } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { COLORS } from '../../constants/colors';
 import { groupRepairTypesByCategory } from '../../utils/repairTypeSearch';
+import { useTranslation } from '../../i18n';
 
 const ACCORDION_MAX_HEIGHT = 320;
 
@@ -14,6 +15,7 @@ export default function RepairServicePicker({
   expanded,
   onToggleExpanded,
 }) {
+  const { t } = useTranslation();
   const categories = groupRepairTypesByCategory(repairTypes);
   const [openSlug, setOpenSlug] = useState(null);
 
@@ -31,7 +33,7 @@ export default function RepairServicePicker({
           style={styles.browseBtn}
           contentStyle={styles.browseBtnContent}
         >
-          Browse all services
+          {t('requestService.browseAllServices')}
         </Button>
       ) : (
         <View style={styles.expandedPanel}>
@@ -43,7 +45,7 @@ export default function RepairServicePicker({
             contentStyle={styles.hideBtnContent}
             compact
           >
-            Hide services
+            {t('requestService.hideServices')}
           </Button>
 
           <ScrollView

@@ -3,6 +3,7 @@ import { View, Pressable, StyleSheet } from 'react-native';
 import { Text, TextInput } from 'react-native-paper';
 import { COLORS } from '../../constants/colors';
 import { searchRepairTypes } from '../../utils/repairTypeSearch';
+import { useTranslation } from '../../i18n';
 
 export default function RepairProblemInput({
   value,
@@ -11,6 +12,7 @@ export default function RepairProblemInput({
   selectedTypeId,
   onSelectType,
 }) {
+  const { t } = useTranslation();
   const suggestions = useMemo(
     () => searchRepairTypes(repairTypes, value, { limit: 6 }),
     [repairTypes, value]
@@ -21,13 +23,13 @@ export default function RepairProblemInput({
   return (
     <View style={styles.wrap}>
       <Text variant="titleMedium" style={styles.title}>
-        What is the problem?
+        {t('requestService.whatIsProblem')}
       </Text>
       <TextInput
         mode="outlined"
         value={value}
         onChangeText={onChangeText}
-        placeholder="e.g. oil change, brake noise, AC not cooling, warning light..."
+        placeholder={t('requestService.problemPlaceholder')}
         multiline
         numberOfLines={3}
         style={styles.input}
@@ -35,7 +37,7 @@ export default function RepairProblemInput({
 
       {showSuggestions ? (
         <View style={styles.suggestionsWrap}>
-          <Text style={styles.suggestionsLabel}>Suggested services</Text>
+          <Text style={styles.suggestionsLabel}>{t('requestService.suggestedServices')}</Text>
           <View style={styles.chipWrap}>
             {suggestions.map((type) => {
               const selected = String(type.id) === String(selectedTypeId);
