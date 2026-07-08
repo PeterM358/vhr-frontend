@@ -687,6 +687,26 @@
           "title": "Service centers in {city} | {app}",
           "h1": "Service centers in {city}",
           "description": "Find service centers in {city} for repairs, maintenance, and trusted vehicle care on {app}."
+        },
+        "brand": {
+          "title": "{brand} service centers | {app}",
+          "h1": "{brand} service centers",
+          "description": "Find service centers specializing in {brand} vehicles on {app}."
+        },
+        "brandCity": {
+          "title": "{brand} service centers in {city} | {app}",
+          "h1": "{brand} service centers in {city}",
+          "description": "Find {brand} service centers in {city} on {app}."
+        },
+        "brandCityRepair": {
+          "title": "{brand} {repair} in {city} | {app}",
+          "h1": "{brand} {repair} in {city}",
+          "description": "Find {brand} service centers for {repair} in {city} on {app}."
+        },
+        "brandRepair": {
+          "title": "{brand} {repair} | {app}",
+          "h1": "{brand} {repair}",
+          "description": "Find {brand} service centers for {repair} on {app}."
         }
       }
     },

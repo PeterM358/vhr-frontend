@@ -17,6 +17,10 @@ import {
   fetchVehicleMakesCached,
 } from '../utils/referenceDataCache';
 import { trackDiscoverySearch } from '../analytics/searchAnalytics';
+import {
+  brandIdFromSlug,
+  hydrateSeoSlugCatalog,
+} from '../utils/seo/seoSlugCatalog';
 
 export const SORT_OPTIONS = [
   { value: 'recommended', label: 'Recommended' },
@@ -43,6 +47,7 @@ export function useServiceCenterDiscovery({
   initialCitySlug = null,
   initialRepairType = null,
   initialVehicleType = null,
+  initialBrandSlug = null,
 } = {}) {
   const [allShops, setAllShops] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +57,7 @@ export function useServiceCenterDiscovery({
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedRepairType, setSelectedRepairType] = useState(initialRepairType || '');
   const [selectedBrand, setSelectedBrand] = useState(null);
+  const [brandSlug, setBrandSlug] = useState(initialBrandSlug);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [openNowOnly, setOpenNowOnly] = useState(false);
   const [minRating, setMinRating] = useState(null);
@@ -129,11 +135,25 @@ export function useServiceCenterDiscovery({
       ]);
       setRepairTypes(typesData);
       setBrands(brandsData);
+      hydrateSeoSlugCatalog({ repairTypes: typesData, brands: brandsData });
       setTaxonomyLoaded(true);
     } catch (e) {
       console.warn('Discovery: could not load filter taxonomy', e);
     }
   }, [taxonomyLoaded]);
+
+  useEffect(() => {
+    if (!initialBrandSlug || !brands.length) return;
+    const brandId = brandIdFromSlug(initialBrandSlug, brands);
+    if (brandId != null) {
+      setSelectedBrand(brandId);
+      setBrandSlug(initialBrandSlug);
+    }
+  }, [initialBrandSlug, brands]);
+
+  useEffect(() => {
+    loadFilterTaxonomy().catch(() => {});
+  }, [loadFilterTaxonomy]);
 
   useEffect(() => {
     if (!selectedRepairType) return;
@@ -265,6 +285,7 @@ export function useServiceCenterDiscovery({
       setSelectedCategory(null);
       setSelectedRepairType('');
       setSelectedBrand(null);
+      setBrandSlug(null);
       setVerifiedOnly(false);
       setOpenNowOnly(false);
       setMinRating(null);
@@ -380,6 +401,8 @@ export function useServiceCenterDiscovery({
     setSelectedRepairType,
     selectedBrand,
     setSelectedBrand,
+    brandSlug,
+    setBrandSlug,
     verifiedOnly,
     setVerifiedOnly,
     openNowOnly,

@@ -13,6 +13,7 @@ import {
   repairFirstPath,
   serviceCenterProfilePath,
   parsePublicSeoPath,
+  serviceCentersDiscoveryPath,
 } from '../utils/seo/seoPaths';
 
 export const SUPPORTED_LANGUAGES = ['bg', 'en', 'de', 'it', 'fr', 'es'];
@@ -242,6 +243,37 @@ export function localizeCanonicalPath(canonicalPath, langInput) {
   return joinSegments([lang, ...segments]);
 }
 
+export function buildLocalizedDiscoveryPath({
+  lang: langInput = DEFAULT_LANGUAGE,
+  brandSlug,
+  citySlug,
+  repairType,
+  vehicleType,
+} = {}) {
+  const lang = normalizeLang(langInput);
+  let canonical = serviceCentersPath();
+  if (vehicleType && citySlug && repairType) {
+    canonical = vehicleServiceCentersPath(vehicleType, citySlug, repairType);
+  } else if (vehicleType && citySlug) {
+    canonical = vehicleServiceCentersPath(vehicleType, citySlug);
+  } else if (vehicleType) {
+    canonical = vehicleServiceCentersPath(vehicleType);
+  } else if (brandSlug) {
+    canonical = serviceCentersDiscoveryPath({
+      brandSlug,
+      citySlug,
+      repairSlug: repairType,
+    });
+  } else if (repairType && citySlug) {
+    canonical = repairFirstPath(repairType, citySlug);
+  } else if (repairType) {
+    canonical = repairFirstPath(repairType);
+  } else if (citySlug) {
+    canonical = serviceCentersCityPath(citySlug);
+  }
+  return localizeCanonicalPath(canonical, lang);
+}
+
 export function getLocalizedPath(langInput, routeKey, params = {}) {
   const lang = normalizeLang(langInput);
   let canonical = null;
@@ -284,6 +316,11 @@ export function getRouteKeyFromLocalizedPath(pathname) {
     case 'discovery_root':
       return 'serviceCenters.root';
     case 'city':
+    case 'discovery_brand':
+    case 'discovery_brand_city':
+    case 'discovery_brand_city_repair':
+    case 'discovery_brand_repair':
+    case 'discovery_repair':
       return 'serviceCenters.city';
     case 'vehicle_discovery':
     case 'vehicle_city':

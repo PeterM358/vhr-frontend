@@ -687,6 +687,26 @@
           "title": "Сервизи в {city} | {app}",
           "h1": "Сервизи в {city}",
           "description": "Намерете сервизи в {city} за ремонти, поддръжка и надеждна грижа за автомобила във {app}."
+        },
+        "brand": {
+          "title": "Сервизи за {brand} | {app}",
+          "h1": "Сервизи за {brand}",
+          "description": "Намерете сервизи, специализирани в {brand}, във {app}."
+        },
+        "brandCity": {
+          "title": "Сервизи за {brand} в {city} | {app}",
+          "h1": "Сервизи за {brand} в {city}",
+          "description": "Намерете сервизи за {brand} в {city} във {app}."
+        },
+        "brandCityRepair": {
+          "title": "{brand} {repair} в {city} | {app}",
+          "h1": "{brand} {repair} в {city}",
+          "description": "Намерете сервизи за {brand} с услуга {repair} в {city} във {app}."
+        },
+        "brandRepair": {
+          "title": "{brand} {repair} | {app}",
+          "h1": "{brand} {repair}",
+          "description": "Намерете сервизи за {brand} с услуга {repair} във {app}."
         }
       }
     },

@@ -2,6 +2,8 @@
  * Locale-free public SEO URL paths for service center discovery and profiles.
  */
 
+import { classifySegment } from './seoSlugCatalog';
+
 export const VEHICLE_TYPE_ROUTE_PREFIXES = {
   'car-service-centers': 'car',
   'truck-service-centers': 'truck',
@@ -59,6 +61,37 @@ export function serviceCentersCityPath(citySlug) {
   return `/service-centers/${String(citySlug || '').trim().toLowerCase()}`;
 }
 
+export function serviceCentersBrandPath(brandSlug) {
+  const brand = String(brandSlug || '').trim().toLowerCase();
+  return brand ? `/service-centers/${brand}` : serviceCentersPath();
+}
+
+export function serviceCentersDiscoveryPath({ brandSlug, citySlug, repairSlug } = {}) {
+  const brand = String(brandSlug || '').trim().toLowerCase();
+  const city = String(citySlug || '').trim().toLowerCase();
+  const repair = String(repairSlug || '').trim().toLowerCase();
+
+  if (brand && city && repair) {
+    return `/service-centers/${brand}/${city}/${repair}`;
+  }
+  if (brand && city) {
+    return `/service-centers/${brand}/${city}`;
+  }
+  if (brand && repair) {
+    return `/service-centers/${brand}/${repair}`;
+  }
+  if (brand) {
+    return serviceCentersBrandPath(brand);
+  }
+  if (city && repair) {
+    return `/service-centers/${city}/${repair}`;
+  }
+  if (city) {
+    return serviceCentersCityPath(city);
+  }
+  return serviceCentersPath();
+}
+
 export function vehicleServiceCentersPath(vehicleCode, citySlug, repairSlug) {
   const prefix = vehicleRoutePrefixForCode(vehicleCode);
   if (!prefix) return serviceCentersPath();
@@ -86,6 +119,86 @@ function normalizePathParts(path) {
   return trimmed.split('/').filter(Boolean).map((part) => part.trim().toLowerCase());
 }
 
+function parseServiceCentersSegments(parts) {
+  if (!parts.length || parts[0] !== 'service-centers') {
+    return null;
+  }
+
+  if (parts.length === 1) {
+    return { type: 'discovery_root' };
+  }
+
+  if (parts.length === 2) {
+    const segment = parts[1];
+    if (/^\d+$/.test(segment)) {
+      return { type: 'legacy_numeric_profile', shopId: parseInt(segment, 10) };
+    }
+
+    const kind = classifySegment(segment);
+    if (kind === 'brand') {
+      return { type: 'discovery_brand', brandSlug: segment };
+    }
+    if (kind === 'repair') {
+      return { type: 'discovery_repair', repairSlug: segment };
+    }
+    return { type: 'city', citySlug: segment };
+  }
+
+  if (parts.length === 3) {
+    const [first, second] = [parts[1], parts[2]];
+    if (LEGACY_CITY_VEHICLE_SEGMENTS[second]) {
+      return {
+        type: 'legacy_city_vehicle',
+        citySlug: first,
+        vehicleType: LEGACY_CITY_VEHICLE_SEGMENTS[second],
+      };
+    }
+
+    const firstKind = classifySegment(first);
+    const secondKind = classifySegment(second);
+
+    if (firstKind === 'brand' && secondKind === 'city') {
+      return { type: 'discovery_brand_city', brandSlug: first, citySlug: second };
+    }
+    if (firstKind === 'city' && secondKind === 'brand') {
+      return { type: 'discovery_brand_city', brandSlug: second, citySlug: first };
+    }
+    if (firstKind === 'city' && secondKind === 'repair') {
+      return { type: 'legacy_city_repair', citySlug: first, repairSlug: second };
+    }
+    if (firstKind === 'brand' && secondKind === 'repair') {
+      return { type: 'discovery_brand_repair', brandSlug: first, repairSlug: second };
+    }
+
+    if (secondKind !== 'repair') {
+      return { type: 'discovery_brand_city', brandSlug: first, citySlug: second };
+    }
+    return null;
+  }
+
+  if (parts.length === 4) {
+    const [first, second, third] = [parts[1], parts[2], parts[3]];
+    if (second === 'c') {
+      return {
+        type: 'legacy_explicit_center',
+        citySlug: first,
+        centerSlug: third,
+      };
+    }
+    if (LEGACY_CITY_VEHICLE_SEGMENTS[second]) {
+      return {
+        type: 'legacy_city_vehicle_repair',
+        citySlug: first,
+        vehicleType: LEGACY_CITY_VEHICLE_SEGMENTS[second],
+        repairSlug: third,
+      };
+    }
+    return { type: 'discovery_brand_city_repair', brandSlug: first, citySlug: second, repairSlug: third };
+  }
+
+  return null;
+}
+
 /**
  * Parse a normalized web path (no leading slash) into discovery/profile params.
  */
@@ -101,46 +214,11 @@ export function parsePublicSeoPath(path) {
     return null;
   }
 
+  const serviceCentersParsed = parseServiceCentersSegments(parts);
+  if (serviceCentersParsed) {
+    return serviceCentersParsed;
+  }
   if (parts[0] === 'service-centers') {
-    if (parts.length === 1) {
-      return { type: 'discovery_root' };
-    }
-    if (parts.length === 2) {
-      if (/^\d+$/.test(parts[1])) {
-        return { type: 'legacy_numeric_profile', shopId: parseInt(parts[1], 10) };
-      }
-      return { type: 'city', citySlug: parts[1] };
-    }
-    if (parts.length === 4 && parts[2] === 'c') {
-      return {
-        type: 'legacy_explicit_center',
-        citySlug: parts[1],
-        centerSlug: parts[3],
-      };
-    }
-    if (parts.length === 3) {
-      const [citySlug, segment] = [parts[1], parts[2]];
-      if (LEGACY_CITY_VEHICLE_SEGMENTS[segment]) {
-        return {
-          type: 'legacy_city_vehicle',
-          citySlug,
-          vehicleType: LEGACY_CITY_VEHICLE_SEGMENTS[segment],
-        };
-      }
-      return {
-        type: 'legacy_city_repair',
-        citySlug,
-        repairSlug: segment,
-      };
-    }
-    if (parts.length === 4 && LEGACY_CITY_VEHICLE_SEGMENTS[parts[2]]) {
-      return {
-        type: 'legacy_city_vehicle_repair',
-        citySlug: parts[1],
-        vehicleType: LEGACY_CITY_VEHICLE_SEGMENTS[parts[2]],
-        repairSlug: parts[3],
-      };
-    }
     return null;
   }
 
@@ -189,6 +267,36 @@ export function buildPathFromSeoParams(params = {}) {
   const { type } = params;
   if (type === 'discovery_root') return serviceCentersPath();
   if (type === 'city' && params.citySlug) return serviceCentersCityPath(params.citySlug);
+  if (type === 'discovery_brand' && params.brandSlug) {
+    return serviceCentersBrandPath(params.brandSlug);
+  }
+  if (type === 'discovery_repair' && params.repairSlug) {
+    return repairFirstPath(params.repairSlug);
+  }
+  if (type === 'discovery_brand_city' && params.brandSlug && params.citySlug) {
+    return serviceCentersDiscoveryPath({
+      brandSlug: params.brandSlug,
+      citySlug: params.citySlug,
+    });
+  }
+  if (type === 'discovery_brand_repair' && params.brandSlug && params.repairSlug) {
+    return serviceCentersDiscoveryPath({
+      brandSlug: params.brandSlug,
+      repairSlug: params.repairSlug,
+    });
+  }
+  if (
+    type === 'discovery_brand_city_repair'
+    && params.brandSlug
+    && params.citySlug
+    && params.repairSlug
+  ) {
+    return serviceCentersDiscoveryPath({
+      brandSlug: params.brandSlug,
+      citySlug: params.citySlug,
+      repairSlug: params.repairSlug,
+    });
+  }
   if (type === 'vehicle_discovery' && params.vehicleType) {
     return vehicleServiceCentersPath(params.vehicleType);
   }
@@ -237,6 +345,7 @@ function discoveryParamsFromParsed(parsed) {
     citySlug: parsed.citySlug || null,
     vehicleType: parsed.vehicleType || null,
     repairType: parsed.repairSlug || null,
+    brandSlug: parsed.brandSlug || null,
   };
 }
 
@@ -272,6 +381,11 @@ export function getNavigationStateFromSeoPath(path) {
   if (
     parsed.type === 'discovery_root' ||
     parsed.type === 'city' ||
+    parsed.type === 'discovery_brand' ||
+    parsed.type === 'discovery_repair' ||
+    parsed.type === 'discovery_brand_city' ||
+    parsed.type === 'discovery_brand_repair' ||
+    parsed.type === 'discovery_brand_city_repair' ||
     parsed.type === 'vehicle_discovery' ||
     parsed.type === 'vehicle_city' ||
     parsed.type === 'vehicle_repair_city' ||
@@ -309,7 +423,7 @@ export function getSeoPathFromNavigationState(state) {
   }
 
   if (route.name === 'ShopMap') {
-    const { citySlug, vehicleType, repairType } = route.params || {};
+    const { citySlug, vehicleType, repairType, brandSlug } = route.params || {};
     if (vehicleType && citySlug && repairType) {
       return vehicleServiceCentersPath(vehicleType, citySlug, repairType);
     }
@@ -318,6 +432,13 @@ export function getSeoPathFromNavigationState(state) {
     }
     if (vehicleType) {
       return vehicleServiceCentersPath(vehicleType);
+    }
+    if (brandSlug) {
+      return serviceCentersDiscoveryPath({
+        brandSlug,
+        citySlug,
+        repairSlug: repairType,
+      });
     }
     if (repairType && citySlug) {
       return repairFirstPath(repairType, citySlug);

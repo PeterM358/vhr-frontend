@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   ScrollView,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
 import {
   MapContainer,
@@ -45,7 +46,11 @@ import {
   useServiceCenterDiscovery,
   SORT_OPTIONS,
 } from '../hooks/useServiceCenterDiscovery';
-import { applyDiscoverySeoMeta } from '../utils/seo/seoMetadata';
+import { applyDiscoverySeoMeta, buildDiscoverySeoMeta } from '../utils/seo/seoMetadata';
+import { brandSlugFromId } from '../utils/seo/seoSlugCatalog';
+import { buildLocalizedDiscoveryPath } from '../navigation/localizedRoutes';
+import DiscoverySeoBreadcrumbs from '../components/serviceCenters/DiscoverySeoBreadcrumbs.web';
+import { getLocale } from '../i18n';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 import {
   goBackFromServiceCenters,
@@ -115,15 +120,39 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     initialCitySlug: route.params?.citySlug || null,
     initialRepairType: route.params?.repairType || null,
     initialVehicleType: route.params?.vehicleType || null,
+    initialBrandSlug: route.params?.brandSlug || null,
   });
 
+  const seoContext = useMemo(
+    () => ({
+      citySlug: discovery.citySlug || route.params?.citySlug || null,
+      vehicleType: discovery.selectedVehicleType || route.params?.vehicleType || null,
+      repairType: discovery.selectedRepairType || route.params?.repairType || null,
+      brandSlug:
+        discovery.brandSlug
+        || route.params?.brandSlug
+        || brandSlugFromId(discovery.selectedBrand, discovery.brands),
+      lang: getLocale(),
+    }),
+    [
+      discovery.citySlug,
+      discovery.selectedVehicleType,
+      discovery.selectedRepairType,
+      discovery.brandSlug,
+      discovery.selectedBrand,
+      discovery.brands,
+      route.params?.citySlug,
+      route.params?.vehicleType,
+      route.params?.repairType,
+      route.params?.brandSlug,
+    ]
+  );
+
+  const seoMeta = useMemo(() => buildDiscoverySeoMeta(seoContext), [seoContext]);
+
   useEffect(() => {
-    applyDiscoverySeoMeta({
-      citySlug: route.params?.citySlug || null,
-      vehicleType: route.params?.vehicleType || null,
-      repairType: route.params?.repairType || null,
-    });
-  }, [route.params?.citySlug, route.params?.vehicleType, route.params?.repairType]);
+    applyDiscoverySeoMeta(seoContext);
+  }, [seoContext]);
 
   const [mapReady, setMapReady] = useState(false);
   const [center, setCenter] = useState(DEFAULT_MAP_CENTER);
@@ -149,6 +178,8 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     setSelectedRepairType,
     selectedBrand,
     setSelectedBrand,
+    brandSlug,
+    setBrandSlug,
     verifiedOnly,
     setVerifiedOnly,
     openNowOnly,
@@ -173,6 +204,29 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     showAllInMatchedCity,
     loadFilterTaxonomy,
   } = discovery;
+
+  const handleBrandChange = useCallback(
+    (value) => {
+      setSelectedBrand(value);
+      setBrandSlug(brandSlugFromId(value, brands));
+    },
+    [brands, setBrandSlug, setSelectedBrand]
+  );
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined' || partnerMode) return;
+    const nextPath = buildLocalizedDiscoveryPath({
+      lang: getLocale(),
+      brandSlug: seoContext.brandSlug,
+      citySlug: seoContext.citySlug,
+      repairType: seoContext.repairType,
+      vehicleType: seoContext.vehicleType,
+    });
+    const currentPath = `${window.location.pathname}${window.location.search}`;
+    if (nextPath !== currentPath.split('?')[0]) {
+      window.history.replaceState(window.history.state, '', nextPath);
+    }
+  }, [seoContext, partnerMode]);
 
   const closeFilters = useCallback(() => setFiltersOpen(false), []);
 
@@ -411,7 +465,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     selectedRepairType,
     setSelectedRepairType,
     selectedBrand,
-    setSelectedBrand,
+    setSelectedBrand: handleBrandChange,
     minRating,
     setMinRating,
     radiusKm,
@@ -484,7 +538,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
             ? t('serviceCenters.authorizeTitle')
             : partnerMode
               ? t('serviceCenters.exploreTitle')
-              : t('serviceCenters.findTitle')}
+              : seoMeta?.h1 || t('serviceCenters.findTitle')}
         </Text>
         <CompactLanguageSelector
           variant="light"
@@ -699,6 +753,9 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   return (
     <ScreenBackground safeArea={false} contentMaxWidth={false}>
       <View style={styles.container}>
+        {!partnerMode && !authorizeMode ? (
+          <DiscoverySeoBreadcrumbs trail={seoMeta?.breadcrumb_trail} />
+        ) : null}
         {stickyToolbar}
         {authorizeMode ? (
         <View style={styles.authorizeBanner}>
