@@ -25,14 +25,15 @@ const PALETTE = {
 
 const FALLBACK = { bg: 'rgba(100,116,139,0.18)', fg: '#334155' };
 
-export default function StatusBadge({ status, style, textStyle }) {
+export default function StatusBadge({ status, label, style, textStyle }) {
   const key = String(status ?? '').toLowerCase().trim();
   const tone = PALETTE[key] ?? FALLBACK;
+  const display = label ?? (String(status ?? '').toUpperCase() || '—');
 
   return (
     <View style={[styles.badge, { backgroundColor: tone.bg }, style]}>
       <Text style={[styles.text, { color: tone.fg }, textStyle]}>
-        {String(status ?? '').toUpperCase() || '—'}
+        {display}
       </Text>
     </View>
   );

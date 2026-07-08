@@ -5,6 +5,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { COLORS } from '../../constants/colors';
 import MileageEvidenceCard from './MileageEvidenceCard';
 import { mileageConfidenceCategoryPill } from '../../utils/mileageConfidence';
+import { useTranslation, translateMileageConfidenceCategory } from '../../i18n';
 
 export default function MileageConfidenceSheet({
   visible,
@@ -13,8 +14,10 @@ export default function MileageConfidenceSheet({
   onFactorPress,
   bottomInset = 0,
 }) {
+  const { t } = useTranslation();
   const conf = mileageConfidence && typeof mileageConfidence === 'object' ? mileageConfidence : null;
   const pill = mileageConfidenceCategoryPill(conf?.category);
+  const categoryLabel = translateMileageConfidenceCategory(conf?.category, t);
 
   return (
     <Portal>
@@ -26,20 +29,17 @@ export default function MileageConfidenceSheet({
         <View style={styles.handle} />
         <View style={styles.headerRow}>
           <View style={styles.headerText}>
-            <Text style={styles.sheetTitle}>Mileage confidence</Text>
+            <Text style={styles.sheetTitle}>{t('mileageConfidence.title')}</Text>
             <View style={[styles.categoryPill, { backgroundColor: pill.bg, borderColor: pill.border }]}>
               <MaterialCommunityIcons name="shield-check-outline" size={16} color={pill.fg} />
               <Text style={[styles.categoryPillText, { color: pill.fg }]}>
-                {conf?.category_label || 'Low confidence'}
+                {categoryLabel}
               </Text>
             </View>
           </View>
           <IconButton icon="close" size={22} onPress={onDismiss} />
         </View>
-        <Text style={styles.sheetLead}>
-          Tap any row to jump to service history, add proof, or manage access. Lower mileage on old records is
-          always allowed.
-        </Text>
+        <Text style={styles.sheetLead}>{t('mileageConfidence.sheetLead')}</Text>
         <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
           <MileageEvidenceCard
             mileageConfidence={mileageConfidence}
@@ -49,7 +49,7 @@ export default function MileageConfidenceSheet({
             onFactorPress={onFactorPress}
           />
           <Pressable onPress={onDismiss} style={styles.doneBtn}>
-            <Text style={styles.doneBtnText}>Done</Text>
+            <Text style={styles.doneBtnText}>{t('mileageConfidence.done')}</Text>
           </Pressable>
         </ScrollView>
       </Modal>

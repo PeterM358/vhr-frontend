@@ -53,20 +53,27 @@ import { mapHealthFromApi } from '../utils/vehicleHealthStatus';
 import { formatBookingAccessHint, formatRevokeConfirmMessage } from '../utils/shopDataAccess';
 import { navigateToVehicleServiceRecordNew, navigateToVehicleReminderNew, navigateToVehicleManageServiceCenters, navigateToVehicleSpecs } from '../navigation/webNavigation';
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
+import {
+  useTranslation,
+  translateReminderType,
+  translateReminderUiStatus,
+  translateRepairStatus,
+  translateMileageConfidenceCategory,
+} from '../i18n';
+import { translateVehicleTypeLabel, translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 
 const BASE_VEHICLE_REMINDER_SECTION_ROWS = [
-  { reminder_type: 'insurance', label: 'Insurance', icon: 'shield-check-outline' },
-  { reminder_type: 'technical_inspection', label: 'Technical inspection', icon: 'clipboard-check-outline' },
-  { reminder_type: 'road_tax', label: 'Road tax / annual fees', icon: 'receipt-text-outline' },
-  { reminder_type: 'vignette', label: 'Vignette', icon: 'ticket-confirmation-outline' },
-  { reminder_type: 'oil_service', label: 'Oil service', icon: 'engine-oil' },
-  { reminder_type: 'tire_change', label: 'Tire change', icon: 'tire' },
-  { reminder_type: 'battery_check', label: 'Battery check', icon: 'car-battery' },
+  { reminder_type: 'insurance', icon: 'shield-check-outline' },
+  { reminder_type: 'technical_inspection', icon: 'clipboard-check-outline' },
+  { reminder_type: 'road_tax', icon: 'receipt-text-outline' },
+  { reminder_type: 'vignette', icon: 'ticket-confirmation-outline' },
+  { reminder_type: 'oil_service', icon: 'engine-oil' },
+  { reminder_type: 'tire_change', icon: 'tire' },
+  { reminder_type: 'battery_check', icon: 'car-battery' },
 ];
 
 const SUSPENSION_REMINDER_ROW = {
   reminder_type: 'suspension_service',
-  label: 'Suspension service',
   icon: 'shock-absorber',
 };
 
@@ -116,11 +123,12 @@ function isObligationReminderType(reminderType) {
 }
 
 export default function VehicleDetailScreen({ route, navigation }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { vehicleId, mileageIntent: mileageIntentParam, backLabel: backLabelParam } = route.params || {};
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useVehicleListBack(navigation);
-  const backLabel = backLabelParam || 'My Vehicles';
+  const backLabel = backLabelParam || t('vehicles.myVehicles');
   const onBack = backLabelParam
     ? () => navigation.goBack()
     : handleBack;
@@ -143,6 +151,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
 
   const [mileageSheetVisible, setMileageSheetVisible] = useState(false);
   const [kmModalVisible, setKmModalVisible] = useState(false);
+  const [addActivityModalVisible, setAddActivityModalVisible] = useState(false);
   const [kmDraft, setKmDraft] = useState('');
   const [kmSaving, setKmSaving] = useState(false);
 
@@ -312,7 +321,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
     setReminderDraft({
       id: r.id,
       reminder_type: rowTemplate.reminder_type,
-      label: rowTemplate.label,
+      label: translateReminderType(rowTemplate.reminder_type, t),
       due_date: r.due_date != null ? String(r.due_date).slice(0, 10) : '',
       due_kilometers: r.due_kilometers != null && r.due_kilometers !== '' ? String(r.due_kilometers) : '',
       advance_notice_days:
@@ -663,15 +672,26 @@ export default function VehicleDetailScreen({ route, navigation }) {
   }, [vehicle]);
 
   const repairTypeLine = (r) => {
-    const name =
-      r.final_repair_type_name ||
-      r.effective_repair_type_name ||
-      r.repair_type_name ||
-      null;
-    if (name) return name;
+    const translated = translateRepairTypeLabel(
+      {
+        slug: r.final_repair_type_slug || r.effective_repair_type_slug || r.repair_type_slug,
+        repair_type_name:
+          r.final_repair_type_name ||
+          r.effective_repair_type_name ||
+          r.repair_type_name ||
+          null,
+        name:
+          r.final_repair_type_name ||
+          r.effective_repair_type_name ||
+          r.repair_type_name ||
+          null,
+      },
+      t
+    );
+    if (translated) return translated;
     const desc = String(r.description || '').trim();
     if (desc) return desc.length > 56 ? `${desc.slice(0, 53)}…` : desc;
-    return 'Needs classification';
+    return t('vehicles.detail.needsClassification');
   };
   const mediaIndicatorLabel = (r) => {
     const mediaItems = Array.isArray(r.repair_media)
@@ -819,11 +839,11 @@ export default function VehicleDetailScreen({ route, navigation }) {
   }, [vehicle]);
 
   const heroTypeLabel = useMemo(() => {
-    const raw = String(vehicle?.vehicle_type_name ?? '').trim();
-    if (!raw) return null;
-    if (raw.toLowerCase() === 'vehicle') return null;
-    return raw;
-  }, [vehicle?.vehicle_type_name]);
+    if (!vehicle) return null;
+    const label = translateVehicleTypeLabel(vehicle, t);
+    if (!label || label.toLowerCase() === 'vehicle') return null;
+    return label;
+  }, [vehicle, t]);
 
   /** ISO2 • Registered DD.MM.YYYY (legacy year-only → ~YYYY). */
   const heroRegistrationSubtitle = useMemo(() => {
@@ -840,12 +860,12 @@ export default function VehicleDetailScreen({ route, navigation }) {
     const parts = [];
     if (iso.length === 2) parts.push(iso);
     if (dateDisp) {
-      parts.push(`Registered ${dateDisp}`);
+      parts.push(`${t('vehicles.detail.registered')} ${dateDisp}`);
     } else if (yr != null && Number.isFinite(yr) && !dateRaw) {
-      parts.push(`Registered ~${yr}`);
+      parts.push(t('vehicles.detail.registeredApprox', { year: yr }));
     }
     return parts.length ? parts.join(' • ') : null;
-  }, [vehicle]);
+  }, [vehicle, t]);
 
   const remindersByType = useMemo(
     () => remindersByTypeMap(vehicle?.reminders),
@@ -869,10 +889,10 @@ export default function VehicleDetailScreen({ route, navigation }) {
           <Text style={styles.repairTitle} numberOfLines={1}>
             {repairTypeLine(item)}
           </Text>
-          <StatusBadge status={item.status} />
+          <StatusBadge status={item.status} label={translateRepairStatus(item.status, t)} />
         </View>
         <Text style={styles.repairMeta} numberOfLines={2}>
-          Service provider: {formatServiceRecordProvider(item)}
+          {t('vehicles.detail.serviceProvider')}: {formatServiceRecordProvider(item)}
         </Text>
         {item.final_kilometers != null || (item.kilometers != null && item.kilometers !== '') ? (
           <Text style={styles.repairMeta}>
@@ -907,7 +927,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
               {repairTypeLine(item)}
             </Text>
             <View style={styles.completedStamp}>
-              <Text style={styles.completedStampText}>Completed</Text>
+              <Text style={styles.completedStampText}>{t('vehicles.detail.completed')}</Text>
             </View>
           </View>
           <Text style={styles.repairMeta} numberOfLines={2}>
@@ -957,31 +977,32 @@ export default function VehicleDetailScreen({ route, navigation }) {
 
   const handleAddActivity = () => {
     if (isShop) {
-      Alert.alert('Add activity', 'Owners log activity from the client app.');
+      Alert.alert(t('vehicles.detail.addActivityTitle'), t('vehicles.detail.addActivityBody'));
       return;
     }
-    Alert.alert('Add activity', 'Choose what you want to add for this vehicle.', [
-      {
-        text: 'Request service',
-        onPress: () =>
-          navigation.navigate('CreateRepair', {
-            vehicleId,
-            mode: 'request',
-            returnTo: 'VehicleDetail',
-            origin: 'VehicleDetail',
-          }),
-      },
-      {
-        text: 'Add service record',
-        onPress: () =>
-          navigateLogServiceRecord(),
-      },
-      {
-        text: 'Add obligation / payment',
-        onPress: () => navigateObligationPayment(),
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    setAddActivityModalVisible(true);
+  };
+
+  const closeAddActivityModal = () => setAddActivityModalVisible(false);
+
+  const handleAddActivityRequestService = () => {
+    closeAddActivityModal();
+    navigation.navigate('CreateRepair', {
+      vehicleId,
+      mode: 'request',
+      returnTo: 'VehicleDetail',
+      origin: 'VehicleDetail',
+    });
+  };
+
+  const handleAddActivityServiceRecord = () => {
+    closeAddActivityModal();
+    navigateLogServiceRecord();
+  };
+
+  const handleAddActivityObligation = () => {
+    closeAddActivityModal();
+    navigateObligationPayment();
   };
 
   const toggleSection = (key) => {
@@ -1115,7 +1136,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
     <ScreenBackground safeArea={false}>
       <View style={styles.container}>
         <AppNavigationBar
-          title="Vehicle Details"
+          title={t('vehicles.vehicleDetails')}
           backLabel={backLabel}
           onBack={onBack}
           scrolled={scrolled}
@@ -1168,7 +1189,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
                 <Text style={styles.heroKm}>
                   {vehicle.kilometers != null && vehicle.kilometers !== ''
                     ? `${Number(vehicle.kilometers).toLocaleString()} km`
-                    : 'Kilometers not set'}
+                    : t('vehicles.detail.kilometersNotSet')}
                 </Text>
                 {!isShop ? (
                   <Pressable
@@ -1195,12 +1216,12 @@ export default function VehicleDetailScreen({ route, navigation }) {
                         color={confidencePillStyle.fg}
                       />
                       <Text style={[styles.heroConfidencePillText, { color: confidencePillStyle.fg }]}>
-                        {mileageConfidence?.category_label || 'Mileage confidence'}
+                        {translateMileageConfidenceCategory(mileageConfidence?.category, t)}
                       </Text>
                       <MaterialCommunityIcons name="chevron-down" size={16} color={confidencePillStyle.fg} />
                     </View>
                     <Text style={styles.heroConfidenceSub} numberOfLines={2}>
-                      {heroConfidenceSubtitle(mileageConfidence)}
+                      {heroConfidenceSubtitle(mileageConfidence, t)}
                     </Text>
                   </Pressable>
                 ) : null}
@@ -1213,7 +1234,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
               hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
               style={({ pressed }) => [styles.heroViewSpecsRow, pressed ? styles.heroViewSpecsPressed : null]}
             >
-              <Text style={styles.heroViewSpecsText}>View specs</Text>
+              <Text style={styles.heroViewSpecsText}>{t('vehicles.detail.viewSpecs')}</Text>
               <MaterialCommunityIcons name="chevron-right" size={18} color="rgba(255,255,255,0.85)" />
             </Pressable>
             {!isShop ? (
@@ -1226,7 +1247,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
                   labelStyle={styles.heroActionBtnLabel}
                   textColor="#fff"
                 >
-                  Update kilometers
+                  {t('vehicles.detail.updateKilometers')}
                 </Button>
                 <Button
                   mode="contained-tonal"
@@ -1234,7 +1255,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
                   onPress={openTechnicalDetails}
                   style={styles.heroActionBtn}
                 >
-                  Edit technical details
+                  {t('vehicles.detail.editTechnicalDetails')}
                 </Button>
               </View>
             ) : null}
@@ -1245,32 +1266,32 @@ export default function VehicleDetailScreen({ route, navigation }) {
           ) : null}
 
           <FloatingCard>
-            <Text style={styles.sectionTitle}>Vehicle info</Text>
+            <Text style={styles.sectionTitle}>{t('vehicles.detail.vehicleInfo')}</Text>
             <View style={styles.infoGrid}>
               {!isShop
                 ? heroTypeLabel
-                  ? infoTile('Vehicle type', heroTypeLabel, {
+                  ? infoTile(t('vehicles.detail.vehicleType'), heroTypeLabel, {
                       onPress: openTechnicalDetails,
                       showChevron: true,
                     })
-                  : infoTile('Vehicle type', 'Not set — tap to choose', {
+                  : infoTile(t('vehicles.detail.vehicleType'), t('vehicles.detail.vehicleTypeNotSet'), {
                       onPress: openTechnicalDetails,
                       showChevron: true,
                     })
                 : null}
               {String(vehicle.vin || '').trim()
                 ? infoTile('VIN', vehicle.vin, {})
-                : infoTile('VIN', 'Add VIN for better parts and service matching.', {})}
-              {infoTile('Completed', String(lifetimeSummary.completedCount), {
+                : infoTile('VIN', t('vehicles.detail.vinHint'), {})}
+              {infoTile(t('vehicles.detail.completed'), String(lifetimeSummary.completedCount), {
                 onPress: scrollToServiceHistorySection,
                 showChevron: true,
               })}
-              {infoTile('Active', String(lifetimeSummary.activeCount), {
+              {infoTile(t('vehicles.detail.active'), String(lifetimeSummary.activeCount), {
                 onPress: scrollToActiveRepairsSection,
                 showChevron: true,
               })}
               {infoTile(
-                'Last completed',
+                t('vehicles.detail.lastCompleted'),
                 lifetimeSummary.lastCompletedDate
                   ? new Date(lifetimeSummary.lastCompletedDate).toLocaleDateString()
                   : '—',
@@ -1280,18 +1301,18 @@ export default function VehicleDetailScreen({ route, navigation }) {
                 }
               )}
             </View>
-            <Text style={[styles.sectionTitle, { marginTop: 14, fontSize: 15 }]}>Lifetime summary</Text>
+            <Text style={[styles.sectionTitle, { marginTop: 14, fontSize: 15 }]}>{t('vehicles.detail.lifetimeSummary')}</Text>
             <View style={styles.infoGrid}>
               <View style={styles.infoCell}>
-                <Text style={styles.infoLabel}>Total spent</Text>
+                <Text style={styles.infoLabel}>{t('vehicles.detail.totalSpent')}</Text>
                 <Text style={styles.infoValue}>{formattedLifetimeMoney.totalSpent}</Text>
               </View>
               <View style={styles.infoCell}>
-                <Text style={styles.infoLabel}>Labor</Text>
+                <Text style={styles.infoLabel}>{t('vehicles.detail.labor')}</Text>
                 <Text style={styles.infoValue}>{formattedLifetimeMoney.totalLabor}</Text>
               </View>
               <View style={styles.infoCell}>
-                <Text style={styles.infoLabel}>Parts</Text>
+                <Text style={styles.infoLabel}>{t('vehicles.detail.parts')}</Text>
                 <Text style={styles.infoValue}>{formattedLifetimeMoney.totalParts}</Text>
               </View>
             </View>
@@ -1318,7 +1339,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
                 sectionScrollYs.current.reminders = e.nativeEvent.layout.y;
               }}
             >
-            <SectionHeader title="Reminders & obligations" sectionKey="remindersObligations" />
+            <SectionHeader title={t('vehicles.detail.remindersObligations')} sectionKey="remindersObligations" />
             {sectionsExpanded.remindersObligations ? (
               <>
                 <Text style={styles.sectionHint}>
@@ -1331,7 +1352,6 @@ export default function VehicleDetailScreen({ route, navigation }) {
                   const r = remindersByType[row.reminder_type];
                   const dueLine = formatVehicleReminderDueLine(r);
                   const uiStatus = r?.ui_status || 'pending_setup';
-                  const uiLabel = r?.ui_status_label || 'Pending setup';
                   const tone = reminderUiTone(uiStatus);
                   const ctaText = r?.cta_label || (!dueLine && !isShop ? 'Add date · Set reminder' : null);
                   return (
@@ -1353,9 +1373,11 @@ export default function VehicleDetailScreen({ route, navigation }) {
                     >
                       <MaterialCommunityIcons name={row.icon} size={22} color={COLORS.PRIMARY} />
                       <View style={styles.reminderUnifiedBody}>
-                        <Text style={styles.reminderUnifiedTitle}>{row.label}</Text>
+                        <Text style={styles.reminderUnifiedTitle}>
+                          {translateReminderType(row.reminder_type, t)}
+                        </Text>
                         <Text style={styles.reminderUnifiedMeta} numberOfLines={2}>
-                          {dueLine || 'No date or mileage set yet.'}
+                          {dueLine || t('vehicles.detail.noDateOrMileage')}
                         </Text>
                         {ctaText ? <Text style={styles.reminderUnifiedCta}>{ctaText}</Text> : null}
                         {!isShop && isObligationReminderType(row.reminder_type) ? (
@@ -1377,7 +1399,9 @@ export default function VehicleDetailScreen({ route, navigation }) {
                       </View>
                       <View style={styles.reminderUnifiedRight}>
                         <View style={[styles.reminderUnifiedPill, { backgroundColor: tone.bg }]}>
-                          <Text style={[styles.reminderUnifiedPillText, { color: tone.fg }]}>{uiLabel}</Text>
+                          <Text style={[styles.reminderUnifiedPillText, { color: tone.fg }]}>
+                            {translateReminderUiStatus(uiStatus, t)}
+                          </Text>
                         </View>
                       </View>
                     </Pressable>
@@ -1395,7 +1419,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
             }}
           >
             <FloatingCard>
-              <Text style={styles.sectionTitle}>Active repairs</Text>
+              <Text style={styles.sectionTitle}>{t('vehicles.detail.activeRepairs')}</Text>
               <Text style={styles.sectionHint}>
                 Active repairs are kept separate from permanent service history.
               </Text>
@@ -1416,7 +1440,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
             }}
           >
             <FloatingCard>
-              <SectionHeader title="Service history" sectionKey="serviceHistory" />
+              <SectionHeader title={t('vehicles.serviceHistory')} sectionKey="serviceHistory" />
             {sectionsExpanded.serviceHistory ? (
               serviceHistorySorted.length ? (
                 serviceHistorySorted.map((item) => (
@@ -1443,7 +1467,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
             }}
           >
           <FloatingCard>
-            <SectionHeader title="Authorized service centers" sectionKey="authorizedCenters" />
+            <SectionHeader title={t('vehicles.detail.authorizedCenters')} sectionKey="authorizedCenters" />
             {sectionsExpanded.authorizedCenters ? (
               <>
                 <Text style={styles.sectionHint}>
@@ -1539,7 +1563,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
       {!isShop ? (
         <FAB
           icon="plus"
-          label="Add activity"
+          label={t('vehicles.detail.addActivity')}
           style={[styles.fab, { backgroundColor: theme.colors.primary }]}
           color={theme.colors.onPrimary}
           onPress={handleAddActivity}
@@ -1563,25 +1587,25 @@ export default function VehicleDetailScreen({ route, navigation }) {
           contentContainerStyle={styles.sheetModal}
         >
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <Text style={styles.modalTitle}>Current kilometers</Text>
+            <Text style={styles.modalTitle}>{t('vehicles.detail.currentKilometers')}</Text>
             <Text style={styles.modalMuted}>
-              Enter your current odometer reading. It will be saved as today&apos;s reading — no date picker needed.
+              {t('vehicles.detail.currentKilometersHint')}
             </Text>
             <TextInput
               mode="outlined"
-              label="Kilometers"
+              label={t('vehicles.detail.kilometersLabel')}
               value={kmDraft}
               onChangeText={setKmDraft}
               keyboardType="number-pad"
               style={styles.modalInput}
-              placeholder="e.g. 125000"
+              placeholder={t('vehicles.detail.kilometersPlaceholder')}
             />
             <View style={styles.modalActions}>
               <Button mode="text" onPress={() => !kmSaving && setKmModalVisible(false)} disabled={kmSaving}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button mode="contained" onPress={saveKmOnly} loading={kmSaving} disabled={kmSaving}>
-                Save
+                {t('common.save')}
               </Button>
             </View>
           </KeyboardAvoidingView>
@@ -1639,13 +1663,36 @@ export default function VehicleDetailScreen({ route, navigation }) {
             />
             <View style={styles.modalActions}>
               <Button mode="text" onPress={() => !reminderSaving && setReminderModalVisible(false)} disabled={reminderSaving}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button mode="contained" onPress={saveReminderPatch} loading={reminderSaving} disabled={reminderSaving}>
-                Save
+                {t('common.save')}
               </Button>
             </View>
           </KeyboardAvoidingView>
+        </Modal>
+
+        <Modal
+          visible={addActivityModalVisible}
+          onDismiss={closeAddActivityModal}
+          contentContainerStyle={styles.sheetModal}
+        >
+          <Text style={styles.modalTitle}>{t('vehicles.detail.addActivityTitle')}</Text>
+          <Text style={styles.modalMuted}>{t('vehicles.detail.addActivityBody')}</Text>
+          <Button mode="contained-tonal" onPress={handleAddActivityRequestService} style={styles.addActivityBtn}>
+            {t('vehicles.detail.requestService')}
+          </Button>
+          <Button mode="contained-tonal" onPress={handleAddActivityServiceRecord} style={styles.addActivityBtn}>
+            {t('vehicles.detail.addServiceRecord')}
+          </Button>
+          <Button mode="contained-tonal" onPress={handleAddActivityObligation} style={styles.addActivityBtn}>
+            {t('vehicles.detail.addObligationPayment')}
+          </Button>
+          <View style={styles.modalActions}>
+            <Button mode="text" onPress={closeAddActivityModal}>
+              {t('common.cancel')}
+            </Button>
+          </View>
         </Modal>
       </Portal>
     </ScreenBackground>
@@ -1711,6 +1758,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginTop: 8,
+  },
+  addActivityBtn: {
+    marginBottom: 8,
   },
   heroCard: {
     flexDirection: 'row',

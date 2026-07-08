@@ -326,3 +326,65 @@ export function translateReminderType(type, translateFn = t) {
 export function translateReminderUiStatus(status, translateFn = t) {
   return translateFn(`reminders.uiStatus.${status}`, null, status);
 }
+
+export function translateRepairStatus(status, translateFn = t) {
+  const key = String(status ?? '').toLowerCase().trim();
+  if (!key) return '—';
+  return translateFn(`repairStatuses.${key}`, null, String(status));
+}
+
+export function translateMileageConfidenceCategory(category, translateFn = t) {
+  const key = String(category ?? '').toLowerCase().trim();
+  if (!key) return translateFn('mileageConfidence.category.low', null, 'Low confidence');
+  return translateFn(`mileageConfidence.category.${key}`, null, category);
+}
+
+const MILEAGE_ACTION_LABEL_KEYS = {
+  service_history: 'mileageConfidence.actions.viewServiceHistory',
+  repair_detail: 'mileageConfidence.actions.viewRecord',
+  log_service: 'mileageConfidence.actions.addServiceRecord',
+  log_service_receipt: 'mileageConfidence.actions.addServiceRecord',
+  log_service_odometer: 'mileageConfidence.actions.addServiceRecord',
+  add_obligation_inspection: 'mileageConfidence.actions.open',
+  manage_authorized_centers: 'mileageConfidence.actions.open',
+  vehicle_specs: 'mileageConfidence.actions.open',
+};
+
+const MILEAGE_ACTION_LABEL_BY_TEXT = {
+  'view service history': 'mileageConfidence.actions.viewServiceHistory',
+  'view timeline': 'mileageConfidence.actions.viewTimeline',
+  'view record': 'mileageConfidence.actions.viewRecord',
+  'add service record': 'mileageConfidence.actions.addServiceRecord',
+  'log service with provider': 'mileageConfidence.actions.logServiceWithProvider',
+};
+
+export function translateMileageFactorActionLabel(factor, translateFn = t) {
+  const action = String(factor?.action || '').toLowerCase().trim();
+  const byAction = MILEAGE_ACTION_LABEL_KEYS[action];
+  if (byAction) return translateFn(byAction, null, factor?.action_label || action);
+
+  const raw = String(factor?.action_label || '').trim();
+  const byText = MILEAGE_ACTION_LABEL_BY_TEXT[raw.toLowerCase()];
+  if (byText) return translateFn(byText, null, raw);
+
+  return raw || translateFn('mileageConfidence.actions.open', null, 'Open');
+}
+
+const VEHICLE_FIELD_LABEL_KEYS = {
+  fuel_type: 'vehicles.detail.fuelType',
+  power_hp: 'vehicles.detail.powerHp',
+};
+
+const VEHICLE_GROUP_TITLE_KEYS = {
+  technical: 'vehicles.detail.technicalDetails',
+};
+
+export function translateVehicleFieldLabel(fieldKey, fallback, translateFn = t) {
+  const key = VEHICLE_FIELD_LABEL_KEYS[fieldKey];
+  return key ? translateFn(key, null, fallback) : fallback;
+}
+
+export function translateVehicleGroupTitle(groupKey, fallback, translateFn = t) {
+  const key = VEHICLE_GROUP_TITLE_KEYS[groupKey];
+  return key ? translateFn(key, null, fallback) : fallback;
+}

@@ -37,6 +37,7 @@ import {
   navigateToVehicleAdd,
   navigateToVehicleDetail,
   navigateToVehicleList,
+  navigateToVehicleServiceRecordNew,
 } from '../navigation/webNavigation';
 import { API_BASE_URL } from '../api/config';
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
@@ -241,9 +242,9 @@ export default function HomeScreen({ navigation }) {
         });
         break;
       case 'add_service_history':
-        navigation.navigate('LogServiceRecord', {
-          vehicleId: item.vehicleId,
+        navigateToVehicleServiceRecordNew(navigation, item.vehicleId, {
           returnTo: 'Home',
+          origin: 'Home',
         });
         break;
       case 'update_km':
@@ -316,8 +317,8 @@ export default function HomeScreen({ navigation }) {
   );
 
   const recommendedActions = useMemo(
-    () => buildRecommendedActions(vehicles, activeRepairs),
-    [vehicles, activeRepairs]
+    () => buildRecommendedActions(vehicles, activeRepairs, t),
+    [vehicles, activeRepairs, t]
   );
 
   const fabConfig = hasVehicles
@@ -395,8 +396,8 @@ export default function HomeScreen({ navigation }) {
 
         {recommendedActions.length > 0 ? (
           <DashboardSection
-            title="Recommended Actions"
-            subtitle="Maintenance and updates that need your attention."
+            title={t('dashboard.recommendedActions.title')}
+            subtitle={t('dashboard.recommendedActions.subtitle')}
           >
             <RecommendedActionsSection
               actions={recommendedActions}

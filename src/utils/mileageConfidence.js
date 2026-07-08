@@ -1,10 +1,10 @@
 /** Maps backend `mileage_confidence` payload to display helpers. */
 
-const CATEGORY_HINT = {
-  low: 'Add service records, receipts, or optional odometer photos over time.',
-  medium: 'History is building — shop confirmations and documents raise confidence.',
-  high: 'Solid history — keep attaching proof when you have it.',
-  verified_history: 'Strong corroborated history for this vehicle.',
+const CATEGORY_HINT_KEYS = {
+  low: 'mileageConfidence.hints.low',
+  medium: 'mileageConfidence.hints.medium',
+  high: 'mileageConfidence.hints.high',
+  verified_history: 'mileageConfidence.hints.verified_history',
 };
 
 const CATEGORY_PILL = {
@@ -14,8 +14,18 @@ const CATEGORY_PILL = {
   verified_history: { bg: 'rgba(37,99,235,0.38)', fg: '#DBEAFE', border: 'rgba(96,165,250,0.5)' },
 };
 
-export function mileageConfidenceCategoryHint(category) {
-  return CATEGORY_HINT[category] || '';
+export function mileageConfidenceCategoryHint(category, translateFn) {
+  if (!translateFn) {
+    const legacy = {
+      low: 'Add service records, receipts, or optional odometer photos over time.',
+      medium: 'History is building — shop confirmations and documents raise confidence.',
+      high: 'Solid history — keep attaching proof when you have it.',
+      verified_history: 'Strong corroborated history for this vehicle.',
+    };
+    return legacy[category] || '';
+  }
+  const key = CATEGORY_HINT_KEYS[category];
+  return key ? translateFn(key, null, '') : '';
 }
 
 export function mileageConfidenceCategoryPill(category) {
@@ -44,19 +54,34 @@ export function factorIsActionable(factor) {
   return Boolean(factor?.action);
 }
 
-export function heroConfidenceSubtitle(conf) {
+export function heroConfidenceSubtitle(conf, translateFn) {
   if (!conf || typeof conf !== 'object') return null;
   const done = conf.done_service_records ?? 0;
   const workshop = conf.workshop_attributed_records ?? 0;
   const parts = [];
   if (done) {
-    parts.push(`${done} service record${done === 1 ? '' : 's'}`);
+    const recordLabel =
+      done === 1
+        ? translateFn?.('mileageConfidence.serviceRecords', { count: done }, `${done} service record`)
+        : translateFn?.(
+            'mileageConfidence.serviceRecords_plural',
+            { count: done },
+            `${done} service records`
+          ) || `${done} service record${done === 1 ? '' : 's'}`;
+    parts.push(recordLabel);
   }
   if (workshop) {
-    parts.push(`${workshop} with workshop`);
+    parts.push(
+      translateFn?.('mileageConfidence.withWorkshop', { count: workshop }, `${workshop} with workshop`) ||
+        `${workshop} with workshop`
+    );
   }
-  if (!parts.length) return 'Tap to improve mileage confidence';
-  return `${parts.join(' · ')} · tap for details`;
+  if (!parts.length) {
+    return translateFn?.('mileageConfidence.tapToImprove', null, 'Tap to improve mileage confidence') || null;
+  }
+  const tapHint =
+    translateFn?.('mileageConfidence.tapForDetails', null, 'tap for details') || 'tap for details';
+  return `${parts.join(' · ')} · ${tapHint}`;
 }
 
 /**

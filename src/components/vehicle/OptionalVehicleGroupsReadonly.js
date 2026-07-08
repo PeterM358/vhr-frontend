@@ -8,6 +8,11 @@ import {
   groupHasDisplayData,
   ODOMETER_SOURCE_OPTIONS,
 } from './vehicleFormConfig';
+import {
+  useTranslation,
+  translateVehicleFieldLabel,
+  translateVehicleGroupTitle,
+} from '../../i18n';
 
 function labelForOdometerSource(value) {
   const o = ODOMETER_SOURCE_OPTIONS.find((x) => x.value === value);
@@ -15,6 +20,7 @@ function labelForOdometerSource(value) {
 }
 
 export default function OptionalVehicleGroupsReadonly({ vehicle }) {
+  const { t } = useTranslation();
   if (!vehicle) return null;
 
   return (
@@ -25,7 +31,11 @@ export default function OptionalVehicleGroupsReadonly({ vehicle }) {
 
         (group.boolFields || []).forEach((bf) => {
           if (vehicle[bf.key]) {
-            rows.push({ key: bf.key, label: bf.label, value: 'Yes' });
+            rows.push({
+              key: bf.key,
+              label: translateVehicleFieldLabel(bf.key, bf.label, t),
+              value: 'Yes',
+            });
           }
         });
 
@@ -41,14 +51,18 @@ export default function OptionalVehicleGroupsReadonly({ vehicle }) {
                 ? String(vehicle.registration_country_name)
                 : String(v);
           }
-          rows.push({ key: f.key, label: f.label, value: display });
+          rows.push({
+            key: f.key,
+            label: translateVehicleFieldLabel(f.key, f.label, t),
+            value: display,
+          });
         });
 
         if (!rows.length) return null;
 
         return (
           <FloatingCard key={group.key}>
-            <Text style={styles.title}>{group.title}</Text>
+            <Text style={styles.title}>{translateVehicleGroupTitle(group.key, group.title, t)}</Text>
             {rows.map((r) => (
               <View key={r.key} style={styles.row}>
                 <Text style={styles.label}>{r.label}</Text>

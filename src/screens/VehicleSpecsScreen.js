@@ -27,6 +27,8 @@ import {
   navigateToVehicleManageServiceCenters,
   navigateToVehicleServiceRecordNew,
 } from '../navigation/webNavigation';
+import { useTranslation, translateMileageConfidenceCategory, translateVehicleFieldLabel, translateVehicleGroupTitle } from '../i18n';
+import { translateVehicleTypeLabel } from '../utils/translateShopTypeLabels';
 
 function isoToDisplayDate(isoDate) {
   const raw = String(isoDate || '').trim();
@@ -62,6 +64,7 @@ function brandModelLine(vehicle) {
 }
 
 export default function VehicleSpecsScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { vehicleId } = route.params || {};
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
@@ -189,8 +192,8 @@ export default function VehicleSpecsScreen({ navigation, route }) {
     if (plate) rows.push({ key: 'plate', label: 'License plate', value: plate });
     const vin = String(vehicle.vin || '').trim();
     if (vin) rows.push({ key: 'vin', label: 'VIN', value: vin });
-    const vt = String(vehicle.vehicle_type_name || '').trim();
-    if (vt) rows.push({ key: 'type', label: 'Vehicle type', value: vt });
+    const vt = translateVehicleTypeLabel(vehicle, t);
+    if (vt) rows.push({ key: 'type', label: t('vehicles.detail.vehicleType'), value: vt });
     const bm = brandModelLine(vehicle);
     if (bm) rows.push({ key: 'brand', label: 'Brand / model', value: bm });
     const regName = String(vehicle.registration_country_name || '').trim();
@@ -198,17 +201,17 @@ export default function VehicleSpecsScreen({ navigation, route }) {
     if (regName || regIso) {
       const display =
         regName && regIso && regIso.length === 2 ? `${regName} (${regIso})` : regName || regIso;
-      rows.push({ key: 'regCountry', label: 'Registration country', value: display });
+      rows.push({ key: 'regCountry', label: t('vehicles.detail.registration'), value: display });
     }
     if (vehicle.first_registration_date) {
       rows.push({
         key: 'firstReg',
-        label: 'First registration',
+        label: t('vehicles.detail.registration'),
         value: isoToDisplayDate(vehicle.first_registration_date),
       });
     }
     return rows;
-  }, [vehicle]);
+  }, [vehicle, t]);
 
   const renderOptionalGroup = (group) => {
     if (!vehicle || !groupHasDisplayData(group.key, vehicle)) return null;
@@ -216,7 +219,11 @@ export default function VehicleSpecsScreen({ navigation, route }) {
 
     (group.boolFields || []).forEach((bf) => {
       if (vehicle[bf.key]) {
-        rows.push({ key: bf.key, label: bf.label, value: 'Yes' });
+        rows.push({
+          key: bf.key,
+          label: translateVehicleFieldLabel(bf.key, bf.label, t),
+          value: 'Yes',
+        });
       }
     });
 
@@ -234,14 +241,18 @@ export default function VehicleSpecsScreen({ navigation, route }) {
       } else if (f.kind === 'decimal' || f.kind === 'int') {
         display = String(v);
       }
-      rows.push({ key: f.key, label: f.label, value: display });
+      rows.push({
+        key: f.key,
+        label: translateVehicleFieldLabel(f.key, f.label, t),
+        value: display,
+      });
     });
 
     if (!rows.length) return null;
 
     return (
       <FloatingCard key={group.key} style={styles.card}>
-        <Text style={styles.cardTitle}>{group.title}</Text>
+        <Text style={styles.cardTitle}>{translateVehicleGroupTitle(group.key, group.title, t)}</Text>
         {group.helperText && group.key === 'odometer' ? (
           <Text style={styles.cardHint}>{group.helperText}</Text>
         ) : null}
@@ -285,8 +296,8 @@ export default function VehicleSpecsScreen({ navigation, route }) {
   return (
     <ScreenBackground safeArea={false}>
       <AppNavigationBar
-        title="Vehicle specs"
-        backLabel="Vehicle"
+        title={t('vehicles.detail.vehicleSpecs')}
+        backLabel={t('vehicles.vehicle')}
         onBack={handleBack}
         scrolled={scrolled}
       />
@@ -319,7 +330,7 @@ export default function VehicleSpecsScreen({ navigation, route }) {
             style={styles.mileageHeaderRow}
             accessibilityRole="button"
           >
-            <Text style={styles.cardTitle}>Mileage evidence</Text>
+            <Text style={styles.cardTitle}>{t('vehicles.detail.mileageEvidence')}</Text>
             <View
               style={[
                 styles.confidenceMiniPill,
@@ -327,7 +338,7 @@ export default function VehicleSpecsScreen({ navigation, route }) {
               ]}
             >
               <Text style={styles.confidenceMiniPillText}>
-                {vehicle.mileage_confidence?.category_label || 'Low confidence'}
+                {translateMileageConfidenceCategory(vehicle.mileage_confidence?.category, t)}
               </Text>
               <MaterialCommunityIcons name="chevron-down" size={18} color={COLORS.PRIMARY} />
             </View>
@@ -336,7 +347,7 @@ export default function VehicleSpecsScreen({ navigation, route }) {
             mileageConfidence={vehicle.mileage_confidence}
             compact
             showCategoryTitle={false}
-            helperText="Tap for details and shortcuts."
+            helperText={t('mileageConfidence.tapDetailsHint')}
             interactive
             onFactorPress={openFromMileageIntent}
           />
@@ -359,7 +370,7 @@ export default function VehicleSpecsScreen({ navigation, route }) {
       {!isShop ? (
         <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
           <Button mode="contained" icon="wrench" onPress={openEditTechnical} style={styles.editBtn}>
-            Edit technical details
+            {t('vehicles.detail.editTechnicalDetails')}
           </Button>
         </View>
       ) : null}

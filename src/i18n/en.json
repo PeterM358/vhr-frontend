@@ -123,6 +123,31 @@
       "requestService": "Request Service",
       "addVehicle": "Add Vehicle"
     },
+    "recommendedActions": {
+      "title": "Recommended Actions",
+      "subtitle": "Maintenance and updates that need your attention.",
+      "titles": {
+        "oilServiceDue": "Oil service due",
+        "oilServiceDueSoon": "Oil service due soon",
+        "addOilServiceHistory": "Add oil service history",
+        "brakeInspectionDue": "Brake inspection due",
+        "brakeInspectionDueSoon": "Brake inspection due soon",
+        "addBrakeServiceHistory": "Add brake service history",
+        "updateMileage": "Update mileage",
+        "mileageStale": "Mileage may be outdated",
+        "setupReminders": "Set up reminders",
+        "activeRepair": "Active repair in progress",
+        "repairNeedsAttention": "Repair request needs attention",
+        "obligationDue": "Obligation due"
+      },
+      "cta": {
+        "requestService": "Request Service",
+        "addRecord": "Add record",
+        "updateKm": "Update km",
+        "configure": "Configure",
+        "viewRequest": "View request"
+      }
+    },
     "health": {
       "sectionTitle": "Vehicle Health",
       "viewAll": "View all",
@@ -539,7 +564,100 @@
     "myVehicles": "My Vehicles",
     "unknownVehicle": "Unknown vehicle",
     "serviceHistory": "Service History",
-    "health": "Vehicle Health"
+    "health": "Vehicle Health",
+    "detail": {
+      "viewSpecs": "View specs",
+      "updateKilometers": "Update kilometers",
+      "editTechnicalDetails": "Edit technical details",
+      "vehicleInfo": "Vehicle info",
+      "vehicleType": "Vehicle type",
+      "vehicleTypeNotSet": "Not set — tap to choose",
+      "completed": "Completed",
+      "active": "Active",
+      "lastCompleted": "Last completed",
+      "lifetimeSummary": "Lifetime summary",
+      "totalSpent": "Total spent",
+      "labor": "Labor",
+      "parts": "Parts",
+      "technicalDetails": "Technical details",
+      "fuelType": "Fuel type",
+      "powerHp": "Power (hp)",
+      "remindersObligations": "Reminders & obligations",
+      "activeRepairs": "Active repairs",
+      "authorizedCenters": "Authorized service centers",
+      "currentKilometers": "Current kilometers",
+      "currentKilometersHint": "Enter your current odometer reading. It will be saved as today's reading — no date picker needed.",
+      "kilometersLabel": "Kilometers",
+      "kilometersPlaceholder": "e.g. 125000",
+      "kilometersNotSet": "Kilometers not set",
+      "vehicleIdentity": "Vehicle identity",
+      "registration": "Registration",
+      "hideRegistrationEditor": "Hide registration editor",
+      "editRegistration": "Edit registration",
+      "addRegistrationOptional": "Add registration (optional)",
+      "saveChanges": "Save changes",
+      "mileageEvidence": "Mileage evidence",
+      "vehicleSpecs": "Vehicle specs",
+      "notSpecified": "Not specified",
+      "notSet": "Not set",
+      "registered": "Registered",
+      "registeredApprox": "Registered ~{year}",
+      "addActivity": "Add activity",
+      "addActivityTitle": "Add activity",
+      "addActivityBody": "Choose what you want to add for this vehicle.",
+      "requestService": "Request service",
+      "addServiceRecord": "Add service record",
+      "addObligationPayment": "Add obligation / payment",
+      "serviceProvider": "Service provider",
+      "needsClassification": "Needs classification",
+      "noDateOrMileage": "No date or mileage set yet.",
+      "vinHint": "Add VIN for better parts and service matching."
+    }
+  },
+  "mileageConfidence": {
+    "title": "Mileage confidence",
+    "tapToImprove": "Tap to improve mileage confidence",
+    "tapForDetails": "tap for details",
+    "serviceRecords": "{count} service record",
+    "serviceRecords_plural": "{count} service records",
+    "withWorkshop": "{count} with workshop",
+    "sheetLead": "Tap any row to jump to service history, add proof, or manage access. Lower mileage on old records is always allowed.",
+    "tapRowHint": "Tap a row below or the title for actions. Lower mileage on old records is allowed.",
+    "tapDetailsHint": "Tap for details and shortcuts.",
+    "done": "Done",
+    "category": {
+      "low": "Low confidence",
+      "medium": "Medium confidence",
+      "high": "High confidence",
+      "verified_history": "Verified history"
+    },
+    "hints": {
+      "low": "Add service records, receipts, or optional odometer photos over time.",
+      "medium": "History is building — shop confirmations and documents raise confidence.",
+      "high": "Solid history — keep attaching proof when you have it.",
+      "verified_history": "Strong corroborated history for this vehicle."
+    },
+    "actions": {
+      "viewServiceHistory": "View service history",
+      "viewTimeline": "View timeline",
+      "viewRecord": "View record",
+      "addServiceRecord": "Add service record",
+      "logServiceWithProvider": "Log service with provider",
+      "open": "Open"
+    }
+  },
+  "repairStatuses": {
+    "done": "Completed",
+    "completed": "Completed",
+    "open": "Open",
+    "ongoing": "Active",
+    "in_progress": "Active",
+    "requested": "Requested",
+    "pending": "Pending",
+    "cancelled": "Cancelled",
+    "canceled": "Cancelled",
+    "denied": "Denied",
+    "rejected": "Rejected"
   },
   "health": {
     "status": {

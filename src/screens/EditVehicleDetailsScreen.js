@@ -42,8 +42,11 @@ import { isoToDisplayDate } from '../components/vehicle/dateFieldUtils';
 import MileageEvidenceCard from '../components/vehicle/MileageEvidenceCard';
 import MileageConfidenceSheet from '../components/vehicle/MileageConfidenceSheet';
 import { resolveMileageFactorAction } from '../utils/mileageConfidence';
+import { useTranslation, translateMileageConfidenceCategory } from '../i18n';
+import { translateVehicleTypeLabel } from '../utils/translateShopTypeLabels';
 
 export default function EditVehicleDetailsScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { vehicleId } = route.params || {};
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
@@ -444,8 +447,8 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
     <ScreenBackground safeArea={false}>
       <View style={styles.root}>
         <AppNavigationBar
-          title="Technical details"
-          backLabel="Vehicle"
+          title={t('vehicles.detail.technicalDetails')}
+          backLabel={t('vehicles.vehicle')}
           onBack={handleBack}
           scrolled={scrolled}
         />
@@ -466,8 +469,8 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
         >
           {hasVehicleTypePicker ? (
             <FloatingCard style={{ marginBottom: 10 }}>
-              <Text style={styles.cardTitle}>Vehicle identity</Text>
-              <Text style={styles.fieldLabel}>Vehicle type</Text>
+              <Text style={styles.cardTitle}>{t('vehicles.detail.vehicleIdentity')}</Text>
+              <Text style={styles.fieldLabel}>{t('vehicles.detail.vehicleType')}</Text>
               <Text style={styles.hintMuted}>
                 Car, truck, motorcycle, bicycle, trailer, etc. Workshops and service matching use this on bookings.
               </Text>
@@ -477,7 +480,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
                   onValueChange={applyVehicleTypeChange}
                   style={styles.picker}
                 >
-                  <Picker.Item label="Not set" value="" />
+                  <Picker.Item label={t('vehicles.detail.notSet')} value="" />
                   {vehicleTypes.map((vt) => (
                     <Picker.Item key={vt.id} label={vt.name} value={String(vt.id)} />
                   ))}
@@ -526,10 +529,10 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
               >
                 <Text style={styles.registrationToggleText}>
                   {registrationExpanded
-                    ? 'Hide registration editor'
+                    ? t('vehicles.detail.hideRegistrationEditor')
                     : regFirstIso || regCountryIso
-                      ? 'Edit registration'
-                      : 'Add registration (optional)'}
+                      ? t('vehicles.detail.editRegistration')
+                      : t('vehicles.detail.addRegistrationOptional')}
                 </Text>
                 <MaterialCommunityIcons
                   name={registrationExpanded ? 'chevron-up' : 'chevron-down'}
@@ -596,10 +599,10 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
               >
                 <Text style={styles.registrationToggleText}>
                   {registrationExpanded
-                    ? 'Hide registration editor'
+                    ? t('vehicles.detail.hideRegistrationEditor')
                     : regFirstIso || regCountryIso
-                      ? 'Edit registration'
-                      : 'Add registration (optional)'}
+                      ? t('vehicles.detail.editRegistration')
+                      : t('vehicles.detail.addRegistrationOptional')}
                 </Text>
                 <MaterialCommunityIcons
                   name={registrationExpanded ? 'chevron-up' : 'chevron-down'}
@@ -672,13 +675,13 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
               accessibilityRole="button"
               style={styles.mileageEvidenceHeader}
             >
-              <Text style={styles.cardTitle}>Mileage evidence</Text>
+              <Text style={styles.cardTitle}>{t('vehicles.detail.mileageEvidence')}</Text>
               <MaterialCommunityIcons name="chevron-right" size={22} color={COLORS.PRIMARY} />
             </Pressable>
             <MileageEvidenceCard
               mileageConfidence={mileageConfidence}
               compact
-              helperText="Tap a row below or the title for actions. Lower mileage on old records is allowed."
+              helperText={t('mileageConfidence.tapRowHint')}
               interactive
               onFactorPress={openFromMileageIntent}
             />
@@ -693,7 +696,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
               style={styles.cancelButton}
               labelStyle={styles.cancelButtonLabel}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               mode="contained"
@@ -703,7 +706,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
               style={styles.saveButton}
               contentStyle={styles.saveButtonContent}
             >
-              Save changes
+              {t('vehicles.detail.saveChanges')}
             </Button>
           </View>
         </View>
