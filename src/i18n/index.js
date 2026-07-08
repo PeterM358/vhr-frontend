@@ -17,16 +17,27 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import en from './en.json';
 import bg from './bg.json';
 
+import de from './de.json';
+import it from './it.json';
+import fr from './fr.json';
+import es from './es.json';
+
+import { getCurrentLanguageFromPath } from '../navigation/localizedRoutes';
+
 export const STORAGE_KEY_LOCALE = '@veversal_locale';
 export const DEFAULT_LOCALE = 'en';
-export const SUPPORTED_LOCALES = ['en', 'bg'];
+export const SUPPORTED_LOCALES = ['en', 'bg', 'de', 'it', 'fr', 'es'];
 
 export const LOCALE_OPTIONS = [
   { value: 'en', labelKey: 'language.english' },
   { value: 'bg', labelKey: 'language.bulgarian' },
+  { value: 'de', labelKey: 'language.german' },
+  { value: 'it', labelKey: 'language.italian' },
+  { value: 'fr', labelKey: 'language.french' },
+  { value: 'es', labelKey: 'language.spanish' },
 ];
 
-const catalogs = { en, bg };
+const catalogs = { en, bg, de, it, fr, es };
 
 let moduleLocale = DEFAULT_LOCALE;
 const localeListeners = new Set();
@@ -49,6 +60,10 @@ function setModuleLocale(locale) {
 function readWebLocale() {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
   try {
+    const fromPath = getCurrentLanguageFromPath(window.location.pathname);
+    if (SUPPORTED_LOCALES.includes(fromPath)) {
+      return fromPath;
+    }
     return window.localStorage.getItem(STORAGE_KEY_LOCALE);
   } catch {
     return null;

@@ -34,6 +34,10 @@ const RESERVED_ROOT_SEGMENTS = new Set([
   'ShopDetail',
   'en',
   'bg',
+  'de',
+  'it',
+  'fr',
+  'es',
 ]);
 
 export function vehicleRoutePrefixForCode(code) {

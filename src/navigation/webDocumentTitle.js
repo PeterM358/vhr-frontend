@@ -4,6 +4,7 @@
 
 import { Platform } from 'react-native';
 import { t, getLocale } from '../i18n';
+import { stripLanguagePrefix } from './localizedRoutes';
 
 const BASE_TITLE = 'Veversal';
 
@@ -78,32 +79,38 @@ export function getWebDocumentTitle(pathname) {
   void getLocale();
 
   const normalized = normalizeWebTitlePath(pathname);
-  const pathKey = PATH_TITLE_KEYS[normalized];
+  const { segments } = stripLanguagePrefix(normalized);
+  const unprefixed = segments.length ? `/${segments.join('/')}` : '/';
+  const pathKey = PATH_TITLE_KEYS[unprefixed];
   if (pathKey) {
     return seo(pathKey);
   }
-  if (PATH_TITLE_KEYS[normalized] === null && normalized in PATH_TITLE_KEYS) {
+  if (PATH_TITLE_KEYS[unprefixed] === null && unprefixed in PATH_TITLE_KEYS) {
     return t('common.appName', null, BASE_TITLE);
   }
 
-  const vehicleKey = vehicleDetailTitleKey(normalized);
+  const vehicleKey = vehicleDetailTitleKey(unprefixed);
   if (vehicleKey) {
     return seo(vehicleKey);
   }
-  if (normalized.startsWith('/service-centers')) {
-    return seo('serviceCenters');
+  if (unprefixed.startsWith('/service-centers')) {
+    return t('seo.serviceCentersMeta.title', { app: t('common.appName', null, BASE_TITLE) }, seo('serviceCenters'));
   }
-  if (normalized.startsWith('/service-center/')) {
-    return seo('serviceCenters');
+  if (unprefixed.startsWith('/service-center/')) {
+    return t('seo.serviceCentersMeta.title', { app: t('common.appName', null, BASE_TITLE) }, seo('serviceCenters'));
   }
-  if (/^\/partner\/repairs\/\d+\/offer$/.test(normalized)) {
+  if (/^\/partner\/repairs\/\d+\/offer$/.test(unprefixed)) {
     return seo('sendProposal');
   }
-  if (/^\/(car|truck|motorcycle|bike|ebike|scooter)-service-centers/.test(normalized)) {
-    return seo('serviceCenters');
+  if (/^\/(car|truck|motorcycle|bike|ebike|scooter)-service-centers/.test(unprefixed)) {
+    return t('seo.serviceCentersMeta.title', { app: t('common.appName', null, BASE_TITLE) }, seo('serviceCenters'));
   }
-  if (/^\/(oil-change|brake-repair|clutch-repair|timing-belt-replacement|diagnostics)(\/|$)/.test(normalized)) {
-    return seo('serviceCenters');
+  if (
+    /^\/(oil-change|brake-repair|clutch-repair|timing-belt-replacement|diagnostics)(\/|$)/.test(
+      unprefixed
+    )
+  ) {
+    return t('seo.serviceCentersMeta.title', { app: t('common.appName', null, BASE_TITLE) }, seo('serviceCenters'));
   }
   return t('common.appName', null, BASE_TITLE);
 }

@@ -8,6 +8,7 @@ import { CommonActions } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { syncWebDocumentTitle } from './webDocumentTitle';
 import { normalizeWebPath } from './webRoutes';
+import { localizeCanonicalPath } from './localizedRoutes';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 
 function getRootNavigation(navigation) {
@@ -30,13 +31,14 @@ export function syncWebPath(pathname) {
   if (Platform.OS !== 'web' || typeof window === 'undefined') {
     return;
   }
-  const normalized = normalizeWebPath(pathname);
+  const canonical = normalizeWebPath(pathname);
+  const localized = localizeCanonicalPath(canonical, null);
   const { hash } = window.location;
-  const target = `${normalized}${hash}`;
-  if (`${window.location.pathname}${window.location.search}` !== normalized) {
+  const target = `${localized}${hash}`;
+  if (`${window.location.pathname}${window.location.search}` !== localized) {
     window.history.replaceState(window.history.state, '', target);
   }
-  syncWebDocumentTitle(normalized.split('?')[0]);
+  syncWebDocumentTitle(localized.split('?')[0]);
 }
 
 /** Let React commit AuthContext updates before post-login navigation resets. */

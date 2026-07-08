@@ -27,7 +27,11 @@
   "language": {
     "label": "Език",
     "english": "English",
-    "bulgarian": "Български"
+    "bulgarian": "Български",
+    "german": "Deutsch",
+    "italian": "Italiano",
+    "french": "Français",
+    "spanish": "Español"
   },
   "drawer": {
     "client": {
@@ -259,6 +263,20 @@
     "addServiceRecord": "{app} — Добави сервизен запис",
     "addObligation": "{app} — Задължение / плащане",
     "serviceCenterAccess": "{app} — Достъп до сервиз",
-    "sendProposal": "{app} — Изпрати оферта"
+    "sendProposal": "{app} — Изпрати оферта",
+    "serviceCentersMeta": {
+      "title": "{app} — Сервизи",
+      "description": "Открийте сервизни центрове, сравнете услуги и намерете надежден сервиз във Veversal."
+    },
+    "serviceCenterProfile": {
+      "title": "{name} | {app}",
+      "description": "Профил на сервиз {name} в {city} във Veversal."
+    },
+    "vehicles": {
+      "title": "{app} — Автомобили"
+    },
+    "repairsPage": {
+      "title": "{app} — Ремонти"
+    }
   }
 }

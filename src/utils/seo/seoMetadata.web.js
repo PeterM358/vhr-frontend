@@ -10,6 +10,7 @@ import {
   vehicleRoutePrefixForCode,
   vehicleServiceCentersPath,
 } from './seoPaths';
+import { t } from '../../i18n';
 
 function upsertMeta(attrName, attrValue, content) {
   if (typeof document === 'undefined') return;
@@ -72,40 +73,92 @@ export function buildDiscoverySeoMeta({ citySlug, vehicleType, repairType } = {}
   const vehicle = vehicleType ? VEHICLE_LABELS[vehicleType] || titleCaseSlug(vehicleType) : null;
 
   let canonicalPath = serviceCentersPath();
-  let title = 'Service Centers | Veversal';
-  let h1 = 'Service Centers';
-  let description = 'Discover service centers, compare services, and find trusted vehicle care on Veversal.';
+  let title = t('seo.serviceCentersMeta.title', { app: t('common.appName') }, 'Service Centers | Veversal');
+  let h1 = t('public.serviceCenters', null, 'Service Centers');
+  let description = t(
+    'seo.serviceCentersMeta.description',
+    null,
+    'Discover service centers, compare services, and find trusted vehicle care on Veversal.'
+  );
 
   if (vehicle && city && repair) {
     canonicalPath = vehicleServiceCentersPath(vehicleType, citySlug, repairType);
-    title = `${vehicle} ${repair} in ${city} | Veversal`;
+    title = t(
+      'seo.serviceCentersMeta.title',
+      { app: t('common.appName'), name: `${vehicle} ${repair}`, city },
+      `${vehicle} ${repair} in ${city} | Veversal`
+    );
     h1 = `${vehicle} ${repair} in ${city}`;
-    description = `Find ${vehicle.toLowerCase()} service centers for ${repair.toLowerCase()} in ${city} on Veversal.`;
+    description = t(
+      'seo.serviceCentersMeta.description',
+      null,
+      `Find ${vehicle.toLowerCase()} service centers for ${repair.toLowerCase()} in ${city} on Veversal.`
+    );
   } else if (vehicle && city) {
     canonicalPath = vehicleServiceCentersPath(vehicleType, citySlug);
-    title = `${vehicle} Service Centers in ${city} | Veversal`;
+    title = t(
+      'seo.serviceCentersMeta.title',
+      { app: t('common.appName'), name: `${vehicle}`, city },
+      `${vehicle} Service Centers in ${city} | Veversal`
+    );
     h1 = `${vehicle} Service Centers in ${city}`;
-    description = `Find ${vehicle.toLowerCase()} service centers in ${city} on Veversal.`;
+    description = t(
+      'seo.serviceCentersMeta.description',
+      null,
+      `Find ${vehicle.toLowerCase()} service centers in ${city} on Veversal.`
+    );
   } else if (vehicle) {
     canonicalPath = vehicleServiceCentersPath(vehicleType);
-    title = `${vehicle} Service Centers | Veversal`;
+    title = t(
+      'seo.serviceCentersMeta.title',
+      { app: t('common.appName'), name: `${vehicle}` },
+      `${vehicle} Service Centers | Veversal`
+    );
     h1 = `${vehicle} Service Centers`;
-    description = `Browse ${vehicle.toLowerCase()} service centers on Veversal.`;
+    description = t(
+      'seo.serviceCentersMeta.description',
+      null,
+      `Browse ${vehicle.toLowerCase()} service centers on Veversal.`
+    );
   } else if (repair && city) {
     canonicalPath = repairFirstPath(repairType, citySlug);
-    title = `${repair} in ${city} | Veversal`;
+    title = t(
+      'seo.serviceCentersMeta.title',
+      { app: t('common.appName'), name: `${repair}`, city },
+      `${repair} in ${city} | Veversal`
+    );
     h1 = `${repair} in ${city}`;
-    description = `Find service centers for ${repair.toLowerCase()} in ${city} on Veversal.`;
+    description = t(
+      'seo.serviceCentersMeta.description',
+      null,
+      `Find service centers for ${repair.toLowerCase()} in ${city} on Veversal.`
+    );
   } else if (repair) {
     canonicalPath = repairFirstPath(repairType);
-    title = `${repair} | Veversal`;
+    title = t(
+      'seo.serviceCentersMeta.title',
+      { app: t('common.appName'), name: `${repair}` },
+      `${repair} | Veversal`
+    );
     h1 = repair;
-    description = `Find service centers for ${repair.toLowerCase()} on Veversal.`;
+    description = t(
+      'seo.serviceCentersMeta.description',
+      null,
+      `Find service centers for ${repair.toLowerCase()} on Veversal.`
+    );
   } else if (city) {
     canonicalPath = serviceCentersCityPath(citySlug);
-    title = `Service Centers in ${city} | Veversal`;
+    title = t(
+      'seo.serviceCentersMeta.title',
+      { app: t('common.appName'), city },
+      `Service Centers in ${city} | Veversal`
+    );
     h1 = `Service Centers in ${city}`;
-    description = `Find service centers in ${city} for repairs, maintenance, and verified vehicle care on Veversal.`;
+    description = t(
+      'seo.serviceCentersMeta.description',
+      null,
+      `Find service centers in ${city} for repairs, maintenance, and verified vehicle care on Veversal.`
+    );
   }
 
   const breadcrumb = {

@@ -70,7 +70,12 @@ import { resetToPublicHome } from './authNavigation';
 import ShopDrawer from './ShopDrawer';
 import HomeDrawer from './HomeDrawer';
 
-import { buildAppLinking, redirectLegacyWebUrl, collapseDuplicateVehiclePath, getCanonicalWebPath } from './webLinking';
+import {
+  buildAppLinking,
+  redirectLegacyWebUrl,
+  collapseDuplicateVehiclePath,
+  getCanonicalWebPath,
+} from './webLinking';
 import { linkingConfig } from './linkingConfig';
 import { syncWebPath } from './authNavigation';
 import { normalizeWebPath } from './webRoutes';

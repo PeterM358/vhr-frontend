@@ -59,6 +59,7 @@ import {
   vehicleSpecs,
   vehicles,
 } from './webRoutes';
+import { toCanonicalPublicPath } from './localizedRoutes';
 
 function findFocusedRoute(state) {
   if (!state?.routes?.length) return null;
@@ -734,123 +735,125 @@ export function normalizeWebLinkingPath(path) {
   if (!path) return '';
 
   const absolute = normalizeWebPath(path);
+  const canonical = toCanonicalPublicPath(absolute);
   const trimmed = absolute.replace(/^\//, '').replace(/\/$/, '');
+  const canonicalTrimmed = canonical.replace(/^\//, '').replace(/\/$/, '');
 
-  if (!trimmed || trimmed === 'PublicHome') {
+  if (!canonicalTrimmed || canonicalTrimmed === 'PublicHome') {
     return '';
   }
-  if (trimmed === 'AuthLoading') {
+  if (canonicalTrimmed === 'AuthLoading') {
     return '';
   }
-  if (trimmed === 'ShopMap') {
+  if (canonicalTrimmed === 'ShopMap') {
     return 'service-centers';
   }
-  if (trimmed.startsWith('ShopMap/')) {
-    return `service-centers${trimmed.slice('ShopMap'.length)}`;
+  if (canonicalTrimmed.startsWith('ShopMap/')) {
+    return `service-centers${canonicalTrimmed.slice('ShopMap'.length)}`;
   }
-  if (trimmed === 'Home/HomeMain') {
+  if (canonicalTrimmed === 'Home/HomeMain') {
     return 'dashboard';
   }
-  if (trimmed.startsWith('Home/HomeMain/')) {
-    return `dashboard${trimmed.slice('Home/HomeMain'.length)}`;
+  if (canonicalTrimmed.startsWith('Home/HomeMain/')) {
+    return `dashboard${canonicalTrimmed.slice('Home/HomeMain'.length)}`;
   }
-  if (trimmed === 'ShopHome/ShopDashboard' || trimmed === 'ShopHome') {
+  if (canonicalTrimmed === 'ShopHome/ShopDashboard' || canonicalTrimmed === 'ShopHome') {
     return 'partner/dashboard';
   }
-  if (trimmed.startsWith('ShopHome/')) {
+  if (canonicalTrimmed.startsWith('ShopHome/')) {
     return 'partner/dashboard';
   }
-  if (trimmed === 'ClientVehicles' || trimmed.startsWith('ClientVehicles/')) {
-    return trimmed.replace(/^ClientVehicles/, 'dashboard/vehicles');
+  if (canonicalTrimmed === 'ClientVehicles' || canonicalTrimmed.startsWith('ClientVehicles/')) {
+    return canonicalTrimmed.replace(/^ClientVehicles/, 'dashboard/vehicles');
   }
-  if (trimmed === 'CreateVehicle' || trimmed.startsWith('CreateVehicle/')) {
+  if (canonicalTrimmed === 'CreateVehicle' || canonicalTrimmed.startsWith('CreateVehicle/')) {
     return 'dashboard/vehicles/add';
   }
-  if (trimmed === 'LogServiceRecord' || trimmed.startsWith('LogServiceRecord')) {
-    const vid = trimmed.match(/vehicleId[=:](\d+)/i)?.[1];
+  if (canonicalTrimmed === 'LogServiceRecord' || canonicalTrimmed.startsWith('LogServiceRecord')) {
+    const vid = canonicalTrimmed.match(/vehicleId[=:](\d+)/i)?.[1];
     return vid ? `dashboard/vehicles/${vid}/service-record/new` : 'dashboard/vehicles';
   }
-  if (trimmed === 'AddObligationPayment' || trimmed.startsWith('AddObligationPayment')) {
-    const vid = trimmed.match(/vehicleId[=:](\d+)/i)?.[1];
-    const reminderType = trimmed.match(/initialReminderType[=:]([^&/]+)/i)?.[1];
+  if (canonicalTrimmed === 'AddObligationPayment' || canonicalTrimmed.startsWith('AddObligationPayment')) {
+    const vid = canonicalTrimmed.match(/vehicleId[=:](\d+)/i)?.[1];
+    const reminderType = canonicalTrimmed.match(/initialReminderType[=:]([^&/]+)/i)?.[1];
     return vid ? vehicleReminderNew({ vehicleId: vid, reminderType }) : 'dashboard/vehicles';
   }
-  if (trimmed === 'ManageVehicleServiceCenters' || trimmed.startsWith('ManageVehicleServiceCenters')) {
-    const vid = trimmed.match(/vehicleId[=:](\d+)/i)?.[1];
+  if (canonicalTrimmed === 'ManageVehicleServiceCenters' || canonicalTrimmed.startsWith('ManageVehicleServiceCenters')) {
+    const vid = canonicalTrimmed.match(/vehicleId[=:](\d+)/i)?.[1];
     return vid ? vehicleManageServiceCenters(vid) : 'dashboard/vehicles';
   }
-  if (trimmed === 'AddManualServiceCenter' || trimmed.startsWith('AddManualServiceCenter')) {
-    const vid = trimmed.match(/vehicleId[=:](\d+)/i)?.[1];
+  if (canonicalTrimmed === 'AddManualServiceCenter' || canonicalTrimmed.startsWith('AddManualServiceCenter')) {
+    const vid = canonicalTrimmed.match(/vehicleId[=:](\d+)/i)?.[1];
     return vid ? `dashboard/vehicles/${vid}/service-record/service-center/add` : 'dashboard/vehicles';
   }
-  if (trimmed === 'add' || trimmed.startsWith('add/')) {
+  if (canonicalTrimmed === 'add' || canonicalTrimmed.startsWith('add/')) {
     return 'dashboard/vehicles/add';
   }
-  if (trimmed.startsWith('VehicleDetail/')) {
-    return trimmed.replace(/^VehicleDetail/, 'dashboard/vehicles');
+  if (canonicalTrimmed.startsWith('VehicleDetail/')) {
+    return canonicalTrimmed.replace(/^VehicleDetail/, 'dashboard/vehicles');
   }
-  if (trimmed === 'ClientActivity' || trimmed.startsWith('ClientActivity/')) {
+  if (canonicalTrimmed === 'ClientActivity' || canonicalTrimmed.startsWith('ClientActivity/')) {
     return 'dashboard/notifications';
   }
-  if (trimmed === 'ClientRepairs' || trimmed.startsWith('ClientRepairs/')) {
+  if (canonicalTrimmed === 'ClientRepairs' || canonicalTrimmed.startsWith('ClientRepairs/')) {
     return 'dashboard/repair-requests';
   }
-  if (trimmed === 'CreateRepair' || trimmed.startsWith('CreateRepair')) {
+  if (canonicalTrimmed === 'CreateRepair' || canonicalTrimmed.startsWith('CreateRepair')) {
     return 'dashboard/repair-requests/new';
   }
-  if (trimmed === 'RepairDetail' || trimmed.startsWith('RepairDetail')) {
-    const repairId = trimmed.match(/repairId[=:](\d+)/i)?.[1];
+  if (canonicalTrimmed === 'RepairDetail' || canonicalTrimmed.startsWith('RepairDetail')) {
+    const repairId = canonicalTrimmed.match(/repairId[=:](\d+)/i)?.[1];
     return repairId ? `dashboard/repair-requests/${repairId}` : 'dashboard/repair-requests';
   }
-  if (trimmed === 'CreateOrUpdateOffer' || trimmed.startsWith('CreateOrUpdateOffer')) {
-    const repairId = trimmed.match(/repairId[=:](\d+)/i)?.[1];
+  if (canonicalTrimmed === 'CreateOrUpdateOffer' || canonicalTrimmed.startsWith('CreateOrUpdateOffer')) {
+    const repairId = canonicalTrimmed.match(/repairId[=:](\d+)/i)?.[1];
     return repairId ? `partner/repairs/${repairId}/offer` : 'partner/repairs';
   }
-  if (trimmed === 'ClientProfile' || trimmed.startsWith('ClientProfile/')) {
+  if (canonicalTrimmed === 'ClientProfile' || canonicalTrimmed.startsWith('ClientProfile/')) {
     return 'dashboard/profile';
   }
-  if (trimmed === 'ShopProfile' || trimmed.startsWith('ShopProfile/')) {
+  if (canonicalTrimmed === 'ShopProfile' || canonicalTrimmed.startsWith('ShopProfile/')) {
     return 'partner/profile';
   }
-  if (trimmed === 'partner/RepairsList' || trimmed.startsWith('partner/RepairsList')) {
+  if (canonicalTrimmed === 'partner/RepairsList' || canonicalTrimmed.startsWith('partner/RepairsList')) {
     return 'partner/repairs';
   }
-  if (trimmed === 'partner/ShopCalendar' || trimmed.startsWith('partner/ShopCalendar')) {
+  if (canonicalTrimmed === 'partner/ShopCalendar' || canonicalTrimmed.startsWith('partner/ShopCalendar')) {
     return 'partner/calendar';
   }
-  if (trimmed === 'partner/ShopWarehouse' || trimmed.startsWith('partner/ShopWarehouse')) {
+  if (canonicalTrimmed === 'partner/ShopWarehouse' || canonicalTrimmed.startsWith('partner/ShopWarehouse')) {
     return 'partner/warehouse';
   }
-  if (trimmed === 'AuthorizedClients' || trimmed.startsWith('AuthorizedClients')) {
+  if (canonicalTrimmed === 'AuthorizedClients' || canonicalTrimmed.startsWith('AuthorizedClients')) {
     return 'partner/clients';
   }
-  if (trimmed === 'ShopPromotions' || trimmed.startsWith('ShopPromotions')) {
+  if (canonicalTrimmed === 'ShopPromotions' || canonicalTrimmed.startsWith('ShopPromotions')) {
     return 'partner/promotions';
   }
-  if (trimmed === 'ShopInvoicing' || trimmed.startsWith('ShopInvoicing')) {
+  if (canonicalTrimmed === 'ShopInvoicing' || canonicalTrimmed.startsWith('ShopInvoicing')) {
     return 'partner/invoicing';
   }
-  if (trimmed === 'ShopServiceMenu' || trimmed.startsWith('ShopServiceMenu')) {
+  if (canonicalTrimmed === 'ShopServiceMenu' || canonicalTrimmed.startsWith('ShopServiceMenu')) {
     return 'partner/services';
   }
-  if (trimmed === 'NotificationsList' || trimmed.startsWith('NotificationsList')) {
+  if (canonicalTrimmed === 'NotificationsList' || canonicalTrimmed.startsWith('NotificationsList')) {
     return 'partner/notifications';
   }
-  if (trimmed === 'ChooseShop' || trimmed.startsWith('ChooseShop')) {
+  if (canonicalTrimmed === 'ChooseShop' || canonicalTrimmed.startsWith('ChooseShop')) {
     return 'partner/switch-center';
   }
-  if (trimmed === 'AddPartnerServiceCenter' || trimmed.startsWith('AddPartnerServiceCenter')) {
+  if (canonicalTrimmed === 'AddPartnerServiceCenter' || canonicalTrimmed.startsWith('AddPartnerServiceCenter')) {
     return 'partner/switch-center/add';
   }
-  if (trimmed === 'PartnerServiceCenters' || trimmed.startsWith('PartnerServiceCenters')) {
+  if (canonicalTrimmed === 'PartnerServiceCenters' || canonicalTrimmed.startsWith('PartnerServiceCenters')) {
     return 'partner/service-centers';
   }
-  if (trimmed === 'ShopDetail' || trimmed.startsWith('ShopDetail/')) {
-    const shopId = trimmed.match(/shopId[=:](\d+)/i)?.[1];
+  if (canonicalTrimmed === 'ShopDetail' || canonicalTrimmed.startsWith('ShopDetail/')) {
+    const shopId = canonicalTrimmed.match(/shopId[=:](\d+)/i)?.[1];
     return shopId ? `service-centers/${shopId}` : 'service-centers';
   }
 
-  return trimmed;
+  return canonicalTrimmed;
 }
 
 async function hasStoredAuthToken() {

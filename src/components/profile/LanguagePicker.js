@@ -2,10 +2,21 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
+import { Platform } from 'react-native';
 import { LOCALE_OPTIONS, useTranslation } from '../../i18n';
+import { switchLanguageInPath } from '../../navigation/localizedRoutes';
 
 export default function LanguagePicker({ style }) {
   const { t, locale, setLocale } = useTranslation();
+
+  const handleChange = async (value) => {
+    const nextLocale = await setLocale(value);
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const current = window.location.pathname + window.location.search;
+      const nextPath = switchLanguageInPath(current, nextLocale);
+      window.history.replaceState(window.history.state, '', nextPath + window.location.hash);
+    }
+  };
 
   return (
     <View style={[styles.wrap, style]}>
@@ -15,7 +26,7 @@ export default function LanguagePicker({ style }) {
       <View style={styles.pickerWrap}>
         <Picker
           selectedValue={locale}
-          onValueChange={(value) => setLocale(value)}
+          onValueChange={handleChange}
           style={styles.picker}
         >
           {LOCALE_OPTIONS.map((option) => (
