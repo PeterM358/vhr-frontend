@@ -18,28 +18,118 @@ Expo only embeds `EXPO_PUBLIC_*` into the browser bundle. Web build scripts (`bu
 
 You may set either naming style in `.env.staging` / `.env.production` / `.env.local`; `with-env.js` keeps them in sync for exports.
 
-### Enable on production
+### Production vs beta / local
 
-In `.env.production` on the build machine:
+| Environment | `VITE_ENABLE_ANALYTICS` | `VITE_GA_MEASUREMENT_ID` |
+|-------------|-------------------------|--------------------------|
+| **Production** (`app.veversal.com`) | `true` | `G-MP75X85E34` |
+| **Beta / staging** (`beta.veversal.com`) | `false` | `G-MP75X85E34` (ignored when disabled) |
+| **Local** | `false` | optional |
+
+No requests are sent to Google when disabled, regardless of hostname or measurement ID.
+
+## VPS deployment (Docker + Nginx)
+
+The Expo web app is a **static export** — there is **no frontend Dockerfile**. GA4 vars are **build-time only**: they are read when `npm run build:web:*` runs, embedded into `dist/_expo/static/js/*`, and served as plain files by Nginx.
+
+### Where to set variables on the server
+
+| File | Purpose |
+|------|---------|
+| **`/opt/veversal/frontend/.env.staging`** | Beta build — analytics **off** |
+| **`/opt/veversal/frontend/.env.production`** | Production build — analytics **on** |
+| `/opt/veversal/backend/.env.staging` | Backend + Nginx compose only (`FRONTEND_WEB_ROOT`, API secrets) — **not** GA4 |
+
+Create env files from repo examples (never commit real copies):
 
 ```bash
-VITE_ENABLE_ANALYTICS=true
-VITE_GA_MEASUREMENT_ID=G-MP75X85E34
+cd /opt/veversal/frontend
+cp .env.staging.example .env.staging      # beta server
+cp .env.production.example .env.production  # production server (when live)
 ```
 
-Then rebuild and deploy:
+### Beta (current automated deploy)
+
+**Paths**
+
+- Frontend repo: `/opt/veversal/frontend`
+- Backend repo + compose: `/opt/veversal/backend`
+- Static output: `/opt/veversal/frontend/dist/` → Nginx `/var/www/frontend` (bind mount)
+
+**Nginx mount** is controlled in backend `.env.staging`:
 
 ```bash
-npm run build:web:production
+FRONTEND_WEB_ROOT=/opt/veversal/frontend/dist
 ```
 
-### Keep disabled (recommended for beta / local)
+**Deploy scripts** (backend repo) build with staging env:
+
+| Script | Command |
+|--------|---------|
+| `deploy/deploy_beta.sh` | `npm run build:web:staging` (full stack) |
+| `deploy/deploy_frontend_beta.sh` | `npm run build:web:staging` (frontend only; used by GitHub Actions) |
+
+`build:web:staging` runs `node scripts/with-env.js .env.staging npx expo export --platform web`, which loads **`/opt/veversal/frontend/.env.staging`**.
+
+**Required beta values** in `/opt/veversal/frontend/.env.staging`:
 
 ```bash
 VITE_ENABLE_ANALYTICS=false
+VITE_GA_MEASUREMENT_ID=G-MP75X85E34
 ```
 
-No requests are sent to Google when disabled, regardless of hostname.
+Deploy scripts fail the build if analytics is enabled on beta.
+
+**After editing `.env.staging`**, redeploy frontend (rebuild + recreate nginx):
+
+```bash
+cd /opt/veversal/backend && bash deploy/deploy_frontend_beta.sh
+```
+
+### Production (manual until `deploy_production.sh` exists)
+
+Production compose lives in `/opt/veversal/backend` (`docker-compose.production.yml`). When the production VPS is provisioned:
+
+1. Create **`/opt/veversal/frontend/.env.production`**:
+
+   ```bash
+   VITE_ENABLE_ANALYTICS=true
+   VITE_GA_MEASUREMENT_ID=G-MP75X85E34
+   EXPO_PUBLIC_API_BASE_URL=https://api.veversal.com
+   EXPO_PUBLIC_WS_BASE_URL=wss://api.veversal.com
+   # …OAuth / maps keys from .env.production.example
+   ```
+
+2. Build on the production server (or CI with the same env file):
+
+   ```bash
+   cd /opt/veversal/frontend
+   npm install
+   npm run build:web:production
+   ```
+
+3. Point Nginx at `dist/` (add `FRONTEND_WEB_ROOT` + frontend volume to production compose/nginx when `app.veversal.com` is wired — mirror staging `docker-compose.staging.yml` nginx mount).
+
+4. Recreate nginx after each frontend rebuild so the volume bind picks up new `dist/`.
+
+### Verify analytics in a build
+
+```bash
+# Production bundle should contain the measurement ID and enabled flag
+grep -r "G-MP75X85E34" /opt/veversal/frontend/dist/_expo/static/js/ | head -1
+
+# Beta bundle should NOT initialize GA when disabled (no collect requests in Network tab)
+```
+
+### Local / CI
+
+```bash
+cp .env.production.example .env.production   # VITE_ENABLE_ANALYTICS=true
+npm run build:web:production
+
+cp .env.staging.example .env.staging         # VITE_ENABLE_ANALYTICS=false
+npm run build:web:staging
+```
 
 ## Architecture
 
