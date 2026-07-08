@@ -14,7 +14,7 @@ import {
   SafeAreaView,
   View,
 } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useNavigationState } from '@react-navigation/native';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 
 import { useGarageScene } from '../context/GarageSceneContext';
@@ -108,8 +108,7 @@ export default function ScreenBackground({
   const Wrapper = safeArea ? SafeAreaView : View;
   const useGarageSceneBackground = source == null;
 
-  const route = useRoute();
-  const routeName = route?.name;
+  const routeName = useNavigationState((state) => state?.routes?.[state.index]?.name);
   const authContext = useContext(AuthContext);
   const isAuthenticated = !!authContext?.isAuthenticated;
 

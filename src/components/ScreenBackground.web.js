@@ -2,7 +2,7 @@
 
 import React, { useContext } from 'react';
 import { Animated, ImageBackground, StyleSheet, SafeAreaView, View } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useNavigationState } from '@react-navigation/native';
 
 import { useGarageScene } from '../context/GarageSceneContext';
 import { useGarageSceneCrossfade } from '../hooks/useGarageSceneCrossfade';
@@ -123,8 +123,7 @@ export default function ScreenBackground({
 
   const useGarageSceneBackground = source == null;
 
-  const route = useRoute();
-  const routeName = route?.name;
+  const routeName = useNavigationState((state) => state?.routes?.[state.index]?.name);
   const authContext = useContext(AuthContext);
   const isAuthenticated = !!authContext?.isAuthenticated;
 
