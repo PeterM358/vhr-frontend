@@ -1,12 +1,11 @@
 import React, { useContext, useState, useMemo } from 'react';
-import { StyleSheet, View, Pressable, Platform } from 'react-native';
+import { ScrollView, StyleSheet, View, Pressable, Platform } from 'react-native';
 import { Text, TextInput, Button, Portal, Dialog, ActivityIndicator, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { register } from '../api/auth';
 import { AuthContext } from '../context/AuthManager';
 import { STORAGE_KEYS } from '../constants/storageKeys';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import BaseStyles from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
 import Logo from '../assets/images/logo.svg';
@@ -16,9 +15,11 @@ import { resetToClientDashboard } from '../navigation/authNavigation';
 import { safeError } from '../utils/logger';
 import DashboardCard from '../components/dashboard/DashboardCard';
 import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
+import { useTranslation } from '../i18n';
 
 export default function RegisterScreen({ navigation }) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const headerReserve = insets.top + (Platform.OS === 'ios' ? 52 : 56);
   const { setIsAuthenticated, setAuthToken, setUserEmailOrPhone } = useContext(AuthContext);
@@ -69,7 +70,7 @@ export default function RegisterScreen({ navigation }) {
 
   const saveRegistration = async () => {
     if (!emailOrPhone.trim()) {
-      setDialogMessage('Email or phone is required.');
+      setDialogMessage(t('auth.emailOrPhoneRequired'));
       setDialogVisible(true);
       return;
     }
@@ -99,7 +100,7 @@ export default function RegisterScreen({ navigation }) {
       }
     } catch (err) {
       safeError('Registration failed', err);
-      setDialogMessage(err.message || 'Failed to register');
+      setDialogMessage(err.message || t('auth.registerFailed'));
       setDialogVisible(true);
     } finally {
       setSaving(false);
@@ -108,129 +109,130 @@ export default function RegisterScreen({ navigation }) {
 
   return (
     <ScreenBackground safeArea={false}>
-      <View style={{ flex: 1 }}>
-        <KeyboardAwareScrollView
-          contentContainerStyle={[
-            styles.scroll,
-            {
-              paddingTop: headerReserve,
-              paddingBottom: Math.max(insets.bottom, 16) + 24,
-            },
-          ]}
-          keyboardShouldPersistTaps="always"
-          enableOnAndroid
-          extraScrollHeight={20}
-        >
-          <DashboardCard style={styles.authPanel}>
-            <View style={BaseStyles.logoContainer}>
-              <Logo width={88} height={88} />
-            </View>
-            <AuthLanguageSelector style={styles.langSelector} />
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[
+          styles.scroll,
+          {
+            paddingTop: headerReserve + 8,
+            paddingBottom: Math.max(insets.bottom, 24) + 24,
+          },
+        ]}
+      >
+        <DashboardCard style={styles.authPanel}>
+          <View style={BaseStyles.logoContainer}>
+            <Logo width={112} height={112} />
+          </View>
+          <AuthLanguageSelector style={styles.langSelector} />
 
-            <Text style={styles.title}>Create your account</Text>
-            <Text style={styles.subtitle}>
-              Choose client or service center, then add your sign-in details.
-            </Text>
+          <Text style={styles.kicker}>{t('auth.signUp')}</Text>
+          <Text style={styles.title}>{t('auth.signUpTitle')}</Text>
+          <Text style={styles.subtitle}>{t('auth.signUpSubtitle')}</Text>
 
-            <Text style={styles.rolePrompt}>Account type</Text>
+          <Text style={styles.rolePrompt}>{t('auth.accountType')}</Text>
 
-            <View style={styles.roleContainer}>
-              <Pressable
-                onPress={() => setRole('client')}
-                style={({ pressed }) => [
-                  styles.roleButton,
-                  role === 'client' && styles.roleButtonSelected,
-                  pressed && styles.roleButtonPressed,
-                ]}
+          <View style={styles.roleContainer}>
+            <Pressable
+              onPress={() => setRole('client')}
+              style={({ pressed }) => [
+                styles.roleButton,
+                role === 'client' && styles.roleButtonSelected,
+                pressed && styles.roleButtonPressed,
+              ]}
+            >
+              <Text
+                style={[styles.roleTitle, role === 'client' && styles.roleTitleSelected]}
               >
-                <Text
-                  style={[styles.roleTitle, role === 'client' && styles.roleTitleSelected]}
-                >
-                  Client
-                </Text>
-                <Text style={styles.roleSub}>Vehicles & repair history</Text>
-              </Pressable>
+                {t('auth.clientRole')}
+              </Text>
+              <Text style={styles.roleSub}>{t('auth.clientRoleDescription')}</Text>
+            </Pressable>
 
-              <Pressable
-                onPress={() => setRole('shop')}
-                style={({ pressed }) => [
-                  styles.roleButton,
-                  role === 'shop' && styles.roleButtonSelected,
-                  pressed && styles.roleButtonPressed,
-                ]}
+            <Pressable
+              onPress={() => setRole('shop')}
+              style={({ pressed }) => [
+                styles.roleButton,
+                role === 'shop' && styles.roleButtonSelected,
+                pressed && styles.roleButtonPressed,
+              ]}
+            >
+              <Text
+                style={[styles.roleTitle, role === 'shop' && styles.roleTitleSelected]}
               >
-                <Text
-                  style={[styles.roleTitle, role === 'shop' && styles.roleTitleSelected]}
-                >
-                  Service center
-                </Text>
-                <Text style={styles.roleSub}>Serve clients & manage jobs</Text>
-              </Pressable>
-            </View>
+                {t('auth.serviceCenterRole')}
+              </Text>
+              <Text style={styles.roleSub}>{t('auth.serviceCenterRoleDescription')}</Text>
+            </Pressable>
+          </View>
 
-            <TextInput
-              label="Email or Phone"
-              mode="outlined"
-              theme={authInputTheme}
-              outlineColor="rgba(148,163,184,0.45)"
-              activeOutlineColor="#60a5fa"
-              textColor="#ffffff"
-              outlineStyle={styles.inputOutline}
-              value={emailOrPhone}
-              onChangeText={setEmailOrPhone}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              style={styles.input}
-            />
+          <TextInput
+            label={t('auth.emailOrPhone')}
+            mode="outlined"
+            theme={authInputTheme}
+            outlineColor="rgba(148,163,184,0.45)"
+            activeOutlineColor="#60a5fa"
+            textColor="#ffffff"
+            outlineStyle={styles.inputOutline}
+            value={emailOrPhone}
+            onChangeText={setEmailOrPhone}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            style={styles.input}
+          />
 
-            <TextInput
-              label="Password"
-              mode="outlined"
-              theme={authInputTheme}
-              outlineColor="rgba(148,163,184,0.45)"
-              activeOutlineColor="#60a5fa"
-              textColor="#ffffff"
-              outlineStyle={styles.inputOutline}
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              style={styles.input}
-            />
+          <TextInput
+            label={t('auth.password')}
+            mode="outlined"
+            theme={authInputTheme}
+            outlineColor="rgba(148,163,184,0.45)"
+            activeOutlineColor="#60a5fa"
+            textColor="#ffffff"
+            outlineStyle={styles.inputOutline}
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+            style={styles.input}
+          />
 
-            {saving ? (
-              <ActivityIndicator animating size="small" color={COLORS.PRIMARY} style={{ marginTop: 8 }} />
-            ) : (
-              <Button
-                mode="contained"
-                onPress={saveRegistration}
-                style={styles.createButton}
-                contentStyle={styles.createButtonContent}
-                labelStyle={styles.createButtonLabel}
-                buttonColor={theme.colors.primary}
-              >
-                Create account
-              </Button>
-            )}
-          </DashboardCard>
-        </KeyboardAwareScrollView>
+          {saving ? (
+            <ActivityIndicator animating size="large" color={COLORS.PRIMARY} style={styles.loading} />
+          ) : (
+            <Button
+              mode="contained"
+              onPress={saveRegistration}
+              style={[BaseStyles.loginButton, styles.createButton]}
+              contentStyle={BaseStyles.loginButtonContent}
+              labelStyle={BaseStyles.loginButtonLabel}
+              buttonColor={theme.colors.primary}
+            >
+              {t('auth.registerSubmit')}
+            </Button>
+          )}
 
-        <Portal>
-          <Dialog
-            visible={dialogVisible}
-            onDismiss={() => setDialogVisible(false)}
+          <Button
+            mode="text"
+            onPress={() => navigation.navigate('Login')}
+            textColor={COLORS.PRIMARY}
+            style={styles.backBtn}
           >
-            <Dialog.Title>Notice</Dialog.Title>
-            <Dialog.Content>
-              <Text>{dialogMessage}</Text>
-            </Dialog.Content>
-            <Dialog.Actions>
-              <Button mode="text" onPress={() => setDialogVisible(false)}>
-                OK
-              </Button>
-            </Dialog.Actions>
-          </Dialog>
-        </Portal>
-      </View>
+            {t('auth.backToLogin')}
+          </Button>
+        </DashboardCard>
+      </ScrollView>
+
+      <Portal>
+        <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)}>
+          <Dialog.Title>{t('common.notice')}</Dialog.Title>
+          <Dialog.Content>
+            <Text>{dialogMessage}</Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button mode="text" onPress={() => setDialogVisible(false)}>
+              {t('common.ok')}
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </ScreenBackground>
   );
 }
@@ -246,6 +248,15 @@ const styles = StyleSheet.create({
     maxWidth: 440,
     alignSelf: 'center',
   },
+  kicker: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: COLORS.PRIMARY,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
   title: {
     fontSize: 26,
     fontWeight: '700',
@@ -254,7 +265,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   langSelector: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
@@ -322,17 +333,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 16,
   },
+  loading: {
+    marginTop: 8,
+  },
   createButton: {
     marginTop: 4,
-    borderRadius: 12,
     alignSelf: 'stretch',
   },
-  createButtonContent: {
-    height: 48,
-  },
-  createButtonLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
+  backBtn: {
+    marginTop: 12,
   },
 });

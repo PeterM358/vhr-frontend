@@ -98,7 +98,21 @@
     "passwordsDoNotMatch": "Passwords do not match.",
     "passwordMinLength": "Password must be at least 6 characters.",
     "resetFailed": "Failed to reset password.",
-    "resetSignInFailed": "Password was reset but sign-in failed. Please log in manually."
+    "resetSignInFailed": "Password was reset but sign-in failed. Please log in manually.",
+    "phonePrefix": "Prefix",
+    "phoneNumber": "Phone number",
+    "phoneLoginHelper": "Use the phone number linked to your account.",
+    "signUpTitle": "Create your account",
+    "signUpSubtitle": "Choose client or service center, then add your sign-in details.",
+    "accountType": "Account type",
+    "clientRole": "Client",
+    "clientRoleDescription": "Vehicles & repair history",
+    "serviceCenterRole": "Service center",
+    "serviceCenterRoleDescription": "Serve clients & manage jobs",
+    "emailOrPhone": "Email or Phone",
+    "emailOrPhoneRequired": "Email or phone is required.",
+    "registerFailed": "Failed to register",
+    "registerSubmit": "Create account"
   },
   "dashboard": {
     "heroSubtitle": "Your vehicles, service history, and repairs — in one control center.",
