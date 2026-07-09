@@ -1,13 +1,14 @@
 /**
  * Garage scene registry — single source of truth for dashboard backgrounds.
  *
- * Assets live in `public/backgrounds/garage-scenes/` and are referenced by URL only
- * (never imported into JS bundles).
+ * Web assets live in `public/backgrounds/garage-scenes/` (URL references).
+ * Native bundles the same files from `src/assets/backgrounds/garage-scenes/` via require().
  *
  * ## Add a new scene
  * 1. Add optimized WebP to `public/backgrounds/garage-scenes/<id>.webp`
- * 2. Append an entry below with matching `id` and `webImage.uri`
- * 3. No dashboard or ScreenBackground changes required
+ * 2. Copy the same file to `src/assets/backgrounds/garage-scenes/<id>.webp`
+ * 3. Append an entry below with matching `id`, `webImage.uri`, and `nativeImage`
+ * 4. No dashboard or ScreenBackground changes required
  */
 
 import { Platform } from 'react-native';
@@ -48,6 +49,7 @@ export const GARAGE_SCENES = [
     description: 'Warm evening light in a premium garage.',
     enabled: true,
     webImage: sceneWebImage('premium_garage_evening.webp'),
+    nativeImage: require('../assets/backgrounds/garage-scenes/premium_garage_evening.webp'),
     overlay: DASHBOARD_BACKGROUND_OVERLAY,
     blur: DASHBOARD_BACKGROUND_BLUR,
     brightness: DASHBOARD_BACKGROUND_BRIGHTNESS,
@@ -58,6 +60,7 @@ export const GARAGE_SCENES = [
     description: 'Soft morning light in a premium garage.',
     enabled: true,
     webImage: sceneWebImage('premium_garage_morning.webp'),
+    nativeImage: require('../assets/backgrounds/garage-scenes/premium_garage_morning.webp'),
     overlay: DASHBOARD_BACKGROUND_OVERLAY,
     blur: DASHBOARD_BACKGROUND_BLUR,
     brightness: DASHBOARD_BACKGROUND_BRIGHTNESS,
@@ -68,6 +71,7 @@ export const GARAGE_SCENES = [
     description: 'High-performance garage under night lighting.',
     enabled: true,
     webImage: sceneWebImage('performance_garage_night.webp'),
+    nativeImage: require('../assets/backgrounds/garage-scenes/performance_garage_night.webp'),
     overlay: DASHBOARD_BACKGROUND_OVERLAY,
     blur: DASHBOARD_BACKGROUND_BLUR,
     brightness: DASHBOARD_BACKGROUND_BRIGHTNESS,
@@ -78,6 +82,7 @@ export const GARAGE_SCENES = [
     description: 'Bright, modern service center during the day.',
     enabled: true,
     webImage: sceneWebImage('modern_service_center_day.webp'),
+    nativeImage: require('../assets/backgrounds/garage-scenes/modern_service_center_day.webp'),
     overlay: DASHBOARD_BACKGROUND_OVERLAY,
     blur: DASHBOARD_BACKGROUND_BLUR,
     brightness: DASHBOARD_BACKGROUND_BRIGHTNESS,
@@ -88,6 +93,7 @@ export const GARAGE_SCENES = [
     description: 'Urban garage with city lights at night.',
     enabled: true,
     webImage: sceneWebImage('night_city_garage.webp'),
+    nativeImage: require('../assets/backgrounds/garage-scenes/night_city_garage.webp'),
     overlay: DASHBOARD_BACKGROUND_OVERLAY,
     blur: DASHBOARD_BACKGROUND_BLUR,
     brightness: DASHBOARD_BACKGROUND_BRIGHTNESS,
@@ -98,6 +104,7 @@ export const GARAGE_SCENES = [
     description: 'Workshop tuned for bicycles and two-wheelers.',
     enabled: true,
     webImage: sceneWebImage('bike_garage.webp'),
+    nativeImage: require('../assets/backgrounds/garage-scenes/bike_garage.webp'),
     overlay: DASHBOARD_BACKGROUND_OVERLAY,
     blur: DASHBOARD_BACKGROUND_BLUR,
     brightness: DASHBOARD_BACKGROUND_BRIGHTNESS,
@@ -108,6 +115,7 @@ export const GARAGE_SCENES = [
     description: 'Stylish garage with a refined atmosphere.',
     enabled: true,
     webImage: sceneWebImage('ladies_garage.webp'),
+    nativeImage: require('../assets/backgrounds/garage-scenes/ladies_garage.webp'),
     overlay: DASHBOARD_BACKGROUND_OVERLAY,
     blur: DASHBOARD_BACKGROUND_BLUR,
     brightness: DASHBOARD_BACKGROUND_BRIGHTNESS,
@@ -172,6 +180,9 @@ export function getEnabledScenes() {
  * @returns {number | { uri: string }}
  */
 export function getSceneImageSource(scene) {
+  if (Platform.OS !== 'web' && scene?.nativeImage != null) {
+    return scene.nativeImage;
+  }
   return { uri: resolvePublicAssetUri(getSceneWebUri(scene)) };
 }
 
