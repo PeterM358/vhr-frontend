@@ -101,7 +101,7 @@ export default function ClientVehiclesScreen({ navigation }) {
   return (
     <ScreenBackground safeArea={false}>
       <AppNavigationBar
-        title={t('vehicles.myVehicles')}
+        title={t('vehicles.title')}
         backLabel={t('common.home')}
         onBack={handleBack}
         scrolled={scrolled}

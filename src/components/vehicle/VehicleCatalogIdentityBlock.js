@@ -3,6 +3,7 @@ import { View, Pressable, StyleSheet } from 'react-native';
 import { Text, TextInput, Button } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
 import { COLORS } from '../../constants/colors';
+import { useTranslation } from '../../i18n';
 
 /**
  * Catalog drill-down (brand → model → generation → engine → trim) with legacy make/model manual fallback.
@@ -40,6 +41,8 @@ export default function VehicleCatalogIdentityBlock({
   manualEngineCodeText,
   onManualEngineCodeTextChange,
 }) {
+  const { t } = useTranslation();
+
   return (
     <>
       <Pressable
@@ -48,8 +51,8 @@ export default function VehicleCatalogIdentityBlock({
       >
         <Text style={styles.manualToggleText}>
           {manualMode
-            ? 'Use catalog selection instead'
-            : "Can't find your vehicle? Enter details manually."}
+            ? t('createVehicle.useCatalogInstead')
+            : t('createVehicle.manualEntryHint')}
         </Text>
       </Pressable>
 

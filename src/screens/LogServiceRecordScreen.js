@@ -899,7 +899,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
     if (providerMode === 'authorized') {
       const shopId = parseInt(selectedShopProfileId, 10);
       if (!Number.isFinite(shopId)) {
-        setDialogMessage('Select an authorized service center or choose another provider option.');
+        setDialogMessage(t('logServiceRecord.errors.selectCenter'));
         setDialogVisible(true);
         return;
       }
@@ -958,7 +958,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
       const created = await createRepair(token, body);
       const newId = created?.id;
       if (!newId) {
-        setDialogMessage('Saved, but no repair id returned.');
+        setDialogMessage(t('logServiceRecord.errors.noRepairId'));
         setDialogVisible(true);
         return;
       }
@@ -994,8 +994,8 @@ export default function LogServiceRecordScreen({ navigation, route }) {
 
       if (uploadFailed) {
         Alert.alert(
-          'Documents',
-          'Service record saved, but some documents failed to upload.'
+          t('addObligationPayment.documents'),
+          t('logServiceRecord.documentsSavedPartial')
         );
       }
       const linkedShopSelected =
@@ -1067,7 +1067,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
       {showLaborParts ? (
         <>
           <Text variant="labelLarge" style={styles.label}>
-            Labor
+            {t('logServiceRecord.labor')}
           </Text>
           <TextInput
             mode="outlined"
@@ -1077,7 +1077,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
             style={styles.input}
           />
           <Text variant="labelLarge" style={styles.label}>
-            Parts
+            {t('logServiceRecord.parts')}
           </Text>
           <TextInput
             mode="outlined"
@@ -1089,7 +1089,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
         </>
       ) : null}
       <Text variant="labelLarge" style={styles.label}>
-        {showLaborParts ? 'Total' : 'Total paid'}
+        {showLaborParts ? t('logServiceRecord.total') : t('logServiceRecord.totalPaid')}
       </Text>
       <TextInput
         mode="outlined"
@@ -1099,8 +1099,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
         style={styles.input}
       />
       <Text style={styles.sectionHint}>
-        Amounts use major units (EUR). Total updates when labor or parts change; you can still edit it.
-        If only total is filled, labor is stored as 0 and parts as the total.
+        {t('logServiceRecord.costsHint')}
       </Text>
     </>
   );
@@ -1113,7 +1112,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
     <ScreenBackground safeArea={false}>
       <View style={styles.root}>
         <AppNavigationBar
-          title={t('logServiceRecord.title')}
+          title={t('vehicles.nav.serviceRecord')}
           backLabel={t('vehicles.vehicle')}
           onBack={handleBack}
           scrolled={scrolled}
@@ -1132,7 +1131,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
         >
           <FloatingCard>
             <Text variant="titleMedium" style={styles.sectionTitle}>
-              {t('logServiceRecord.title')}
+              {t('vehicles.nav.serviceRecord')}
             </Text>
             <Text style={styles.subtitle}>
               {t('logServiceRecord.subtitle')}
@@ -1175,10 +1174,10 @@ export default function LogServiceRecordScreen({ navigation, route }) {
 
           <FloatingCard>
             <Text variant="titleMedium" style={styles.sectionTitle}>
-              Service date & mileage
+              {t('logServiceRecord.sections.serviceDateMileage')}
             </Text>
             <ServiceRecordDatePicker
-              label="Completed date *"
+              label={t('logServiceRecord.completedDate')}
               valueIso={completedAtIso}
               onChangeIso={setCompletedAtIso}
               optional={false}
@@ -1186,26 +1185,26 @@ export default function LogServiceRecordScreen({ navigation, route }) {
               minIso="1950-01-01"
             />
             <Text style={styles.sectionHint}>
-              Shown as DD.MM.YYYY. You can pick today or any past date.
+              {t('logServiceRecord.completedDateHint')}
             </Text>
 
             {(variant === 'oil' || variant === 'brake_service' || variant === 'generic') && (
               <>
                 <Text variant="labelLarge" style={styles.label}>
-                  Kilometers at service{variant === 'generic' ? '' : ' *'}
+                  {variant === 'generic'
+                    ? t('logServiceRecord.kilometersAtService')
+                    : t('logServiceRecord.kilometersAtServiceRequired')}
                 </Text>
                 <TextInput
                   mode="outlined"
                   value={finalKilometers}
                   onChangeText={setFinalKilometers}
-                  placeholder="Odometer when service was completed"
+                  placeholder={t('logServiceRecord.kilometersPlaceholder')}
                   keyboardType="numeric"
                   style={styles.input}
                 />
                 <Text style={styles.kmHelper}>
-                  Old records are allowed — including lower mileage (dashboard replacement, correction, or historical
-                  entry). Vehicle current km only increases when this value is higher. Possible rollback warnings lower
-                  confidence only; they never block save.
+                  {t('logServiceRecord.kilometersHelper')}
                 </Text>
               </>
             )}
@@ -1213,14 +1212,13 @@ export default function LogServiceRecordScreen({ navigation, route }) {
             {variant === 'technical_inspection' ? (
               <>
                 <ServiceRecordDatePicker
-                  label="Valid until / next inspection due *"
+                  label={t('logServiceRecord.validUntilInspection')}
                   valueIso={technicalValidIso}
                   onChangeIso={setTechnicalValidIso}
                   optional={false}
                 />
                 <Text style={styles.sectionHint}>
-                  This updates your technical inspection reminder. Use Add Obligation / Payment if you only need to set
-                  a due date without logging workshop work.
+                  {t('logServiceRecord.inspectionReminderHint')}
                 </Text>
               </>
             ) : null}
@@ -1228,7 +1226,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
             {variant === 'oil' ? (
               <>
                 <Text variant="labelLarge" style={styles.label}>
-                  Oil change interval
+                  {t('logServiceRecord.oilChangeInterval')}
                 </Text>
                 <View style={styles.oilIntervalRow}>
                   {OIL_INTERVAL_KM_OPTIONS.map((opt) => {
@@ -1250,7 +1248,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
                   })}
                 </View>
                 <Text variant="labelLarge" style={styles.label}>
-                  Next due km
+                  {t('logServiceRecord.nextDueKm')}
                 </Text>
                 <TextInput
                   mode="outlined"
@@ -1259,12 +1257,12 @@ export default function LogServiceRecordScreen({ navigation, route }) {
                     setOilNextDueKmEdited(true);
                     setNextDueKm(text);
                   }}
-                  placeholder="Auto: current km + interval"
+                  placeholder={t('logServiceRecord.nextDueKmPlaceholder')}
                   keyboardType="numeric"
                   style={styles.input}
                 />
                 <ServiceRecordDatePicker
-                  label="Next due date"
+                  label={t('logServiceRecord.nextDueDate')}
                   valueIso={nextOilDueIso}
                   onChangeIso={(iso) => {
                     setOilNextDueDateEdited(true);
@@ -1274,8 +1272,9 @@ export default function LogServiceRecordScreen({ navigation, route }) {
                   minIso={completedAtIso || todayIso}
                 />
                 <Text style={styles.sectionHint}>
-                  Defaults to +{oilIntervalKm.toLocaleString()} km and +1 year from the service date. Edit either
-                  field to override.
+                  {t('logServiceRecord.oilDefaultsHint', {
+                    interval: oilIntervalKm.toLocaleString(),
+                  })}
                 </Text>
               </>
             ) : null}
@@ -1283,13 +1282,13 @@ export default function LogServiceRecordScreen({ navigation, route }) {
             {variant === 'brake_service' ? (
               <>
                 <Text variant="labelLarge" style={styles.label}>
-                  Recommended next brake check km (optional)
+                  {t('logServiceRecord.brakeNextCheckKm')}
                 </Text>
                 <TextInput
                   mode="outlined"
                   value={brakeNextCheckKm}
                   onChangeText={setBrakeNextCheckKm}
-                  placeholder="Overrides default recommendation after save if set"
+                  placeholder={t('logServiceRecord.brakeNextCheckPlaceholder')}
                   keyboardType="numeric"
                   style={styles.input}
                 />
@@ -1299,23 +1298,23 @@ export default function LogServiceRecordScreen({ navigation, route }) {
 
           <FloatingCard>
             <Text variant="titleMedium" style={styles.sectionTitle}>
-              Costs
+              {t('logServiceRecord.sections.costs')}
             </Text>
             {renderCostFields(variant !== 'technical_inspection')}
           </FloatingCard>
 
           <FloatingCard>
             <Text variant="titleMedium" style={styles.sectionTitle}>
-              Service provider
+              {t('logServiceRecord.sections.serviceProvider')}
             </Text>
             <Text style={styles.sectionHint}>
-              Optional. Link who performed the work, or mark it as owner-performed.
+              {t('logServiceRecord.providerHint')}
             </Text>
 
             {selectedProviderLabel ? (
               <View style={styles.manualSummaryCard}>
                 <Text variant="titleSmall" style={styles.unlistedTitle}>
-                  {providerMode === 'self' ? 'Self-performed' : 'Service center'}
+                  {providerMode === 'self' ? t('logServiceRecord.selfPerformed') : t('logServiceRecord.serviceCenter')}
                 </Text>
                 <Text style={styles.manualSummaryName}>{selectedProviderLabel}</Text>
                 {providerMode === 'manual'
@@ -1333,18 +1332,17 @@ export default function LogServiceRecordScreen({ navigation, route }) {
                 ) : null}
                 {providerMode === 'manual' ? (
                   <Text style={styles.manualSummaryHint}>
-                    Saved in the directory and linked to this record — not authorized on your vehicle
-                    until they join the platform.
+                    {t('logServiceRecord.manualCenterHint')}
                   </Text>
                 ) : null}
                 <View style={styles.manualSummaryActions}>
                   {providerMode === 'manual' ? (
                     <Button mode="outlined" compact onPress={openEditManualCenter}>
-                      Edit
+                      {t('logServiceRecord.edit')}
                     </Button>
                   ) : null}
                   <Button mode="outlined" compact onPress={openServiceCenterHub}>
-                    Change
+                    {t('logServiceRecord.change')}
                   </Button>
                   <Button
                     mode="text"
@@ -1355,7 +1353,7 @@ export default function LogServiceRecordScreen({ navigation, route }) {
                       clearManualProviderFields();
                     }}
                   >
-                    Remove
+                    {t('logServiceRecord.remove')}
                   </Button>
                 </View>
               </View>
@@ -1368,17 +1366,17 @@ export default function LogServiceRecordScreen({ navigation, route }) {
                 onPress={openServiceCenterHub}
                 style={styles.unlistedToggleBtn}
               >
-                Who performed this service?
+                {t('logServiceRecord.whoPerformed')}
               </Button>
             )}
           </FloatingCard>
 
           <FloatingCard>
             <Text variant="titleMedium" style={styles.sectionTitle}>
-              Notes & evidence
+              {t('logServiceRecord.sections.notesEvidence')}
             </Text>
             <Text variant="labelLarge" style={styles.label}>
-              Notes
+              {t('logServiceRecord.notes')}
             </Text>
             <TextInput
               mode="outlined"
@@ -1386,17 +1384,17 @@ export default function LogServiceRecordScreen({ navigation, route }) {
               onChangeText={setNotes}
               placeholder={
                 variant === 'technical_inspection'
-                  ? 'Station, findings, etc.'
-                  : 'What was done, parts brands, etc.'
+                  ? t('logServiceRecord.notesPlaceholderInspection')
+                  : t('logServiceRecord.notesPlaceholderDefault')
               }
               style={styles.input}
               multiline
             />
             <Text variant="labelLarge" style={[styles.label, styles.attachmentsLabel]}>
-              Attachments (optional)
+              {t('logServiceRecord.attachmentsOptional')}
             </Text>
             <Text style={styles.sectionHint}>
-              Odometer photos are optional evidence — no automatic mileage reading.
+              {t('logServiceRecord.odometerPhotoHint')}
             </Text>
             <DocumentAttachmentActions
               onAddReceipt={handlePickReceipt}
@@ -1407,10 +1405,10 @@ export default function LogServiceRecordScreen({ navigation, route }) {
             <DocumentAttachmentList
               attachments={pendingAttachments}
               onRemove={removeAttachment}
-              emptyHint="Add receipts, invoices, or photos now — they upload after you save."
+              emptyHint={t('logServiceRecord.attachmentsEmptyHint')}
             />
             <Text style={styles.sectionHint}>
-              Files are linked to this service record after save. You can add more from the record detail screen later.
+              {t('logServiceRecord.attachmentsAfterSaveHint')}
             </Text>
           </FloatingCard>
         </KeyboardAwareScrollView>

@@ -33,6 +33,7 @@ import {
   formatRevokeConfirmMessage,
   getAccessLevel,
 } from '../utils/shopDataAccess';
+import { useTranslation } from '../i18n';
 
 async function fetchVehicle(vehicleId, token) {
   const res = await fetch(`${API_BASE_URL}/api/vehicles/${vehicleId}/`, {
@@ -58,6 +59,7 @@ function normalizeCenters(vehicle) {
 }
 
 export default function ManageVehicleServiceCentersScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const handleBack = useGoBackOr(navigation);
   const insets = useSafeAreaInsets();
   const vehicleId = route.params?.vehicleId != null ? String(route.params.vehicleId) : '';
@@ -70,9 +72,9 @@ export default function ManageVehicleServiceCentersScreen({ navigation, route })
   const centers = useMemo(() => normalizeCenters(vehicle), [vehicle]);
 
   const vehicleTitle = useMemo(() => {
-    if (!vehicle) return 'Vehicle';
+    if (!vehicle) return t('vehicles.vehicle');
     const plate = vehicle.license_plate || '—';
-    const name = [vehicle.make_name, vehicle.model_name].filter(Boolean).join(' ') || 'Vehicle';
+    const name = [vehicle.make_name, vehicle.model_name].filter(Boolean).join(' ') || t('vehicles.vehicle');
     return `${plate} · ${name}`;
   }, [vehicle]);
 
@@ -93,7 +95,7 @@ export default function ManageVehicleServiceCentersScreen({ navigation, route })
       setVehicle(data);
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', e.message || 'Could not load vehicle.');
+      Alert.alert(t('common.error'), e.message || t('manageServiceCenters.loadError'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -125,17 +127,17 @@ export default function ManageVehicleServiceCentersScreen({ navigation, route })
       setVehicle(updated);
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Could not update authorization.');
+      Alert.alert(t('common.error'), t('manageServiceCenters.updateError'));
     } finally {
       setBusyShopId(null);
     }
   };
 
   const confirmRevoke = (center) => {
-    Alert.alert('Remove access?', formatRevokeConfirmMessage(center.name), [
-        { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('vehicles.detail.revokeAccessTitle'), formatRevokeConfirmMessage(center.name), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Remove access',
+          text: t('vehicles.detail.revokeAccessConfirm'),
           style: 'destructive',
           onPress: () => setShopAuthorized(center.id, false),
         },
@@ -170,28 +172,30 @@ export default function ManageVehicleServiceCentersScreen({ navigation, route })
 
   return (
     <ScreenBackground safeArea={false}>
-      <AppNavigationBar title="Service center access" backLabel="Vehicle" onBack={handleBack} />
+      <AppNavigationBar
+        title={t('manageServiceCenters.title')}
+        backLabel={t('vehicles.vehicle')}
+        onBack={handleBack}
+      />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingTop: 12, paddingBottom: insets.bottom + 24 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
       >
         <FloatingCard>
           <Text variant="titleMedium" style={styles.title}>
-            Service center access
+            {t('manageServiceCenters.title')}
           </Text>
           <Text style={styles.subtitle}>{vehicleTitle}</Text>
           {vehicle ? (
             <View style={styles.contextBanner}>
               <MaterialCommunityIcons name="car-info" size={18} color={COLORS.PRIMARY} />
               <Text style={styles.contextBannerText}>
-                Use Find & authorize to discover shops on the map. Your vehicle stays in context so you can
-                authorize with one tap from a pin or shop profile.
+                {t('manageServiceCenters.contextBanner')}
               </Text>
             </View>
           ) : null}
           <Text style={styles.hint}>
-            Choose who can see more than a single booked job. Booking a repair always grants job-only access for that
-            repair; authorizing a center below shares full mechanical history.
+            {t('manageServiceCenters.subtitle')}
           </Text>
           {[ACCESS_JOB_SCOPED, ACCESS_AUTHORIZED_MECHANICAL].map((scope) => {
             const level = getAccessLevel(scope);

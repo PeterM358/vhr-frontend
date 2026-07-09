@@ -6,6 +6,7 @@ import { COLORS } from '../../constants/colors';
 import FuelTypeChips from './FuelTypeChips';
 import { yearsFromGenerations } from './useVehicleMaintenanceSpec';
 import { filterLegacyModelSuggestions } from './resolveLegacyModel';
+import { useTranslation } from '../../i18n';
 
 export default function VehicleManualModelStep({
   brandLocked,
@@ -27,6 +28,7 @@ export default function VehicleManualModelStep({
   vinHint,
   onBackToCatalog,
 }) {
+  const { t } = useTranslation();
   const yearOptions = useMemo(() => yearsFromGenerations([]), []);
   const suggestions = useMemo(
     () => filterLegacyModelSuggestions(legacyModels, manualModelText),
@@ -58,7 +60,7 @@ export default function VehicleManualModelStep({
           <Text style={styles.label}>Make / brand *</Text>
           <View style={styles.pickerContainer}>
             <Picker selectedValue={selectedMake} onValueChange={onMakeChange} style={styles.picker}>
-              <Picker.Item label="Select brand" value="" />
+              <Picker.Item label={t('createVehicle.selectBrand')} value="" />
               {(makes || []).map((m) => (
                 <Picker.Item key={m.id} label={m.name} value={String(m.id)} />
               ))}
@@ -97,7 +99,7 @@ export default function VehicleManualModelStep({
       <Text style={styles.label}>Year *</Text>
       <View style={styles.pickerContainer}>
         <Picker selectedValue={selectedYear} onValueChange={onSelectedYearChange} style={styles.picker}>
-          <Picker.Item label="Select year" value="" />
+          <Picker.Item label={t('createVehicle.selectYear')} value="" />
           {yearOptions.map((y) => (
             <Picker.Item key={y} label={String(y)} value={String(y)} />
           ))}

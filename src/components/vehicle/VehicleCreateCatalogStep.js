@@ -10,6 +10,7 @@ import {
   enginesForFuel,
 } from './useVehicleMaintenanceSpec';
 import { mergeCatalogAndLegacyModels } from './resolveLegacyModel';
+import { useTranslation } from '../../i18n';
 
 export default function VehicleCreateCatalogStep({
   hasVehicleTypePicker,
@@ -40,6 +41,7 @@ export default function VehicleCreateCatalogStep({
   vinHint,
   onOpenManual,
 }) {
+  const { t } = useTranslation();
   const mergedModels = useMemo(
     () => mergeCatalogAndLegacyModels(catalogModels, legacyModels),
     [catalogModels, legacyModels]
@@ -80,7 +82,7 @@ export default function VehicleCreateCatalogStep({
               onValueChange={onVehicleTypeChange}
               style={styles.picker}
             >
-              <Picker.Item label="Select type" value="" />
+              <Picker.Item label={t('createVehicle.selectType')} value="" />
               {vehicleTypes.map((vt) => (
                 <Picker.Item key={vt.id} label={vt.name} value={vt.id.toString()} />
               ))}
@@ -92,7 +94,7 @@ export default function VehicleCreateCatalogStep({
       <Text style={styles.label}>Make / brand *</Text>
       <View style={styles.pickerContainer}>
         <Picker selectedValue={catalogBrand} onValueChange={onCatalogBrandChange} style={styles.picker}>
-          <Picker.Item label="Select brand" value="" />
+          <Picker.Item label={t('createVehicle.selectBrand')} value="" />
           {catalogBrands.map((b) => (
             <Picker.Item key={b.id} label={b.name} value={String(b.id)} />
           ))}
@@ -120,7 +122,7 @@ export default function VehicleCreateCatalogStep({
               onValueChange={onMergedModelChange}
               style={styles.picker}
             >
-              <Picker.Item label="Select model" value="" />
+              <Picker.Item label={t('createVehicle.selectModel')} value="" />
               {mergedModels.map((m) => (
                 <Picker.Item key={m.key} label={m.name} value={m.key} />
               ))}
@@ -143,7 +145,7 @@ export default function VehicleCreateCatalogStep({
               onValueChange={handleYearChange}
               style={styles.picker}
             >
-              <Picker.Item label="Select year" value="" />
+              <Picker.Item label={t('createVehicle.selectYear')} value="" />
               {yearOptions.map((y) => (
                 <Picker.Item key={y} label={String(y)} value={String(y)} />
               ))}
@@ -161,7 +163,7 @@ export default function VehicleCreateCatalogStep({
                   onValueChange={onCatalogEngineChange}
                   style={styles.picker}
                 >
-                  <Picker.Item label="Select engine" value="" />
+                  <Picker.Item label={t('createVehicle.selectEngine')} value="" />
                   {matchingEngines.map((e) => (
                     <Picker.Item key={e.id} label={e.name} value={String(e.id)} />
                   ))}

@@ -84,6 +84,7 @@ import { blurActiveElementOnWeb } from '../utils/webFocus';
 import NavigationFallback from './NavigationFallback';
 import { navigateToDashboard, navigateToVehicleDetail, navigateToVehicleList, navigateToVehicleServiceRecordNew, navigateToVehicleServiceRecordCenter, navigateToServiceCenters, navigateToPartnerDashboard } from './webNavigation';
 import { appNavBarScreenOptions } from './appNavBarOptions';
+import { t } from '../i18n';
 
 const Stack = createNativeStackNavigator();
 
@@ -188,40 +189,40 @@ function shopDetailHeaderLeft(navigation, route) {
 function vehicleDetailsHeaderLeft(navigation) {
   return createBackHeaderLeft({
     onPress: () => navigateToVehicleList(navigation),
-    label: 'My Vehicles',
-    accessibilityLabel: 'Back to my vehicles',
+    label: t('vehicles.backToVehicles', null, 'Vehicles'),
+    accessibilityLabel: t('vehicles.backToVehicles', null, 'Vehicles'),
   });
 }
 
 function vehicleSpecsHeaderLeft(navigation, vehicleId) {
   return createBackHeaderLeft({
     onPress: () => navigateToVehicleDetail(navigation, vehicleId),
-    label: 'Vehicle',
-    accessibilityLabel: 'Back to vehicle details',
+    label: t('vehicles.vehicle', null, 'Vehicle'),
+    accessibilityLabel: t('vehicles.vehicle', null, 'Vehicle'),
   });
 }
 
 function logServiceRecordHeaderLeft(navigation, vehicleId) {
   return createBackHeaderLeft({
     onPress: () => navigateToVehicleDetail(navigation, vehicleId),
-    label: 'Vehicle',
-    accessibilityLabel: 'Back to vehicle details',
+    label: t('vehicles.vehicle', null, 'Vehicle'),
+    accessibilityLabel: t('vehicles.vehicle', null, 'Vehicle'),
   });
 }
 
 function serviceRecordCenterHeaderLeft(navigation, vehicleId) {
   return createBackHeaderLeft({
     onPress: () => navigateToVehicleServiceRecordNew(navigation, vehicleId),
-    label: 'Record',
-    accessibilityLabel: 'Back to service record',
+    label: t('logServiceRecord.backToRecord', null, 'Record'),
+    accessibilityLabel: t('logServiceRecord.backToRecord', null, 'Record'),
   });
 }
 
 function createVehicleHeaderLeft(navigation) {
   return createBackHeaderLeft({
     onPress: () => navigateToVehicleList(navigation),
-    label: 'My Vehicles',
-    accessibilityLabel: 'Back to my vehicles',
+    label: t('vehicles.backToVehicles', null, 'Vehicles'),
+    accessibilityLabel: t('vehicles.backToVehicles', null, 'Vehicles'),
   });
 }
 
@@ -297,22 +298,22 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ClientVehicles"
           component={ClientVehiclesScreen}
-          options={{ ...appNavBarScreenOptions, title: 'My Vehicles' }}
+          options={{ ...appNavBarScreenOptions, title: t('vehicles.title', null, 'Vehicles') }}
         />
         <Stack.Screen
           name="VehicleDetail"
           component={VehicleDetailScreen}
-          options={{ ...appNavBarScreenOptions, title: 'Vehicle Details' }}
+          options={{ ...appNavBarScreenOptions, title: t('vehicles.nav.details', null, 'Details') }}
         />
         <Stack.Screen
           name="VehicleSpecs"
           component={VehicleSpecsScreen}
-          options={{ ...appNavBarScreenOptions, title: 'Vehicle specs' }}
+          options={{ ...appNavBarScreenOptions, title: t('vehicles.detail.vehicleSpecs', null, 'Vehicle specs') }}
         />
         <Stack.Screen
           name="EditVehicleDetails"
           component={EditVehicleDetailsScreen}
-          options={{ ...appNavBarScreenOptions, title: 'Technical details' }}
+          options={{ ...appNavBarScreenOptions, title: t('vehicles.nav.technical', null, 'Technical') }}
         />
         <Stack.Screen
           name="PublicSeoPage"
@@ -343,7 +344,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="LogServiceRecord"
           component={LogServiceRecordScreen}
-          options={{ ...appNavBarScreenOptions, title: 'Add Service Record' }}
+          options={{ ...appNavBarScreenOptions, title: t('vehicles.nav.serviceRecord', null, 'Service Record') }}
         />
         <Stack.Screen
           name="ServiceRecordServiceCenter"
@@ -368,7 +369,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="AddObligationPayment"
           component={AddObligationPaymentScreen}
-          options={{ ...appNavBarScreenOptions, title: 'Add Obligation / Payment' }}
+          options={{ ...appNavBarScreenOptions, title: t('vehicles.nav.obligation', null, 'Obligation') }}
         />
         <Stack.Screen
           name="CreateVehicle"

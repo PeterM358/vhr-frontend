@@ -13,6 +13,7 @@ import AppNavigationBar from '../components/common/AppNavigationBar';
 import FloatingCard from '../components/ui/FloatingCard';
 import { COLORS } from '../constants/colors';
 import { useServiceRecordBack } from '../navigation/appNavBarBack';
+import { useTranslation } from '../i18n';
 import {
   navigateToVehicleServiceRecordCenterAdd,
   navigateToVehicleServiceRecordNew,
@@ -23,6 +24,7 @@ import {
 } from '../utils/serviceRecordDraftStorage';
 
 export default function ServiceRecordServiceCenterScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const vehicleId = route.params?.vehicleId;
   const handleBack = useServiceRecordBack(navigation, vehicleId);
@@ -89,32 +91,36 @@ export default function ServiceRecordServiceCenterScreen({ navigation, route }) 
 
   return (
     <ScreenBackground safeArea={false}>
-      <AppNavigationBar title="Service center" backLabel="Record" onBack={handleBack} />
+      <AppNavigationBar
+        title={t('serviceRecordCenter.title')}
+        backLabel={t('serviceRecordCenter.backToRecord')}
+        onBack={handleBack}
+      />
       <View style={styles.container}>
         <FloatingCard>
           <Text variant="titleMedium" style={styles.title}>
-            Who performed this service?
+            {t('logServiceRecord.whoPerformed')}
           </Text>
           <Text style={styles.subtitle}>
-            Optional. Link a service center if someone else did the work, or mark it as self-performed.
+            {t('serviceRecordCenter.subtitle')}
           </Text>
 
           <OptionRow
             icon="account-wrench"
-            title="I did it myself"
-            description="Owner-performed work — no service center linked."
+            title={t('serviceRecordCenter.selfTitle')}
+            description={t('serviceRecordCenter.selfDescription')}
             onPress={handleSelfRepair}
           />
           <OptionRow
             icon="map-marker-radius"
-            title="Choose service center"
-            description="Search the map or directory for an existing center."
+            title={t('serviceRecordCenter.chooseTitle')}
+            description={t('serviceRecordCenter.chooseDescription')}
             onPress={handleChooseCenter}
           />
           <OptionRow
             icon="store-plus-outline"
-            title="Add service center not listed"
-            description="Drop a pin on the map or enter contact details manually."
+            title={t('serviceRecordCenter.addUnlistedTitle')}
+            description={t('serviceRecordCenter.addUnlistedDescription')}
             onPress={handleAddNotListed}
           />
         </FloatingCard>

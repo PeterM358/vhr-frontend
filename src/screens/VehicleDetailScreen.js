@@ -101,7 +101,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
   const { vehicleId, mileageIntent: mileageIntentParam, backLabel: backLabelParam } = route.params || {};
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useVehicleListBack(navigation);
-  const backLabel = backLabelParam || t('vehicles.myVehicles');
+  const backLabel = backLabelParam || t('vehicles.backToVehicles');
   const onBack = backLabelParam
     ? () => navigation.goBack()
     : handleBack;
@@ -1110,7 +1110,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
     <ScreenBackground safeArea={false}>
       <View style={styles.container}>
         <AppNavigationBar
-          title={t('vehicles.vehicleDetails')}
+          title={t('vehicles.nav.details')}
           backLabel={backLabel}
           onBack={onBack}
           scrolled={scrolled}
@@ -1131,7 +1131,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
             <Pressable
               onPress={openVehicleSpecs}
               accessibilityRole="button"
-              accessibilityLabel="View vehicle specs"
+              accessibilityLabel={t('vehicles.detail.viewVehicleSpecs')}
               style={({ pressed }) => [
                 styles.heroCard,
                 pressed ? styles.heroIdentityPressed : null,
@@ -1169,7 +1169,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
                   <Pressable
                     onPress={() => setMileageSheetVisible(true)}
                     accessibilityRole="button"
-                    accessibilityLabel="Mileage confidence details"
+                    accessibilityLabel={t('vehicles.detail.mileageConfidenceDetails')}
                     style={({ pressed }) => [
                       styles.heroConfidenceRow,
                       pressed && styles.heroConfidencePressed,
@@ -1204,7 +1204,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
             <Pressable
               onPress={openVehicleSpecs}
               accessibilityRole="button"
-              accessibilityLabel="View specs"
+              accessibilityLabel={t('vehicles.detail.viewSpecs')}
               hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
               style={({ pressed }) => [styles.heroViewSpecsRow, pressed ? styles.heroViewSpecsPressed : null]}
             >
@@ -1519,28 +1519,32 @@ export default function VehicleDetailScreen({ route, navigation }) {
           {vehicleDocuments.length > 0 ? (
             <FloatingCard>
               <SectionHeader
-                title={`Documents & photos (${vehicleDocuments.length})`}
+                title={t('vehicles.detail.documentsPhotos', { count: vehicleDocuments.length })}
                 sectionKey="documents"
               />
               {sectionsExpanded.documents ? (
                 <>
-                  {renderDocumentGroup('Invoices / receipts', documentGroups.invoices)}
+                  {renderDocumentGroup(t('vehicles.detail.documentGroupInvoices'), documentGroups.invoices)}
                   {renderDocumentGroup(
-                    'Insurance / inspection / vignette',
+                    t('vehicles.detail.documentGroupObligations'),
                     documentGroups.obligations
                   )}
-                  {renderDocumentGroup('Vehicle photos', documentGroups.photos)}
-                  {renderDocumentGroup('Other', documentGroups.other)}
+                  {renderDocumentGroup(t('vehicles.detail.documentGroupPhotos'), documentGroups.photos)}
+                  {renderDocumentGroup(t('vehicles.detail.documentGroupOther'), documentGroups.other)}
                   {isShop ? (
                     <Text style={styles.sectionHint}>
-                      Document archive is visible to the vehicle owner.
+                      {t('vehicles.detail.documentArchiveShopHint')}
                     </Text>
                   ) : null}
                 </>
               ) : (
                 <Text style={styles.sectionHint}>
-                  {vehicleDocuments.length} file{vehicleDocuments.length === 1 ? '' : 's'} on record. Expand to
-                  browse.
+                  {t(
+                    vehicleDocuments.length === 1
+                      ? 'vehicles.detail.documentsPhotosCollapsed'
+                      : 'vehicles.detail.documentsPhotosCollapsed_plural',
+                    { count: vehicleDocuments.length }
+                  )}
                 </Text>
               )}
             </FloatingCard>

@@ -47,6 +47,7 @@ import {
 } from '../components/vehicle/useVehicleMaintenanceSpec';
 import { applyVehicleCatalogFieldsToPayload } from '../components/vehicle/vehicleIdentityPayload';
 import { resolveLegacyModelId } from '../components/vehicle/resolveLegacyModel';
+import { useTranslation } from '../i18n';
 import {
   VEHICLE_OPTIONAL_GROUPS,
   vehicleToFormStrings,
@@ -57,6 +58,7 @@ import {
 } from '../components/vehicle/vehicleFormConfig';
 
 export default function CreateVehicleScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useVehicleListBack(navigation);
@@ -538,8 +540,8 @@ export default function CreateVehicleScreen({ navigation, route }) {
     <ScreenBackground safeArea={false}>
       <View style={{ flex: 1 }}>
         <AppNavigationBar
-          title="Add vehicle"
-          backLabel="My Vehicles"
+          title={t('createVehicle.title')}
+          backLabel={t('vehicles.backToVehicles')}
           onBack={handleBack}
           scrolled={scrolled}
         />
@@ -631,12 +633,12 @@ export default function CreateVehicleScreen({ navigation, route }) {
           ) : null}
 
           <FloatingCard>
-            <Text style={styles.cardTitle}>Registration & mileage</Text>
+            <Text style={styles.cardTitle}>{t('createVehicle.registrationMileage')}</Text>
 
             <MonthYearPicker
               valueIso={firstRegIso}
               onChangeIso={setFirstRegIso}
-              label="First registration (optional)"
+              label={t('createVehicle.firstRegistrationOptional')}
             />
 
             <VehicleRegistrationIdentityBlock
@@ -651,7 +653,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
               countryOnly
             />
 
-            <Text style={styles.label}>Kilometers</Text>
+            <Text style={styles.label}>{t('createVehicle.kilometers')}</Text>
             <TextInput
               mode="outlined"
               value={kilometers}

@@ -447,7 +447,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
     <ScreenBackground safeArea={false}>
       <View style={styles.root}>
         <AppNavigationBar
-          title={t('vehicles.detail.technicalDetails')}
+          title={t('vehicles.nav.technical')}
           backLabel={t('vehicles.vehicle')}
           onBack={handleBack}
           scrolled={scrolled}
@@ -472,7 +472,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
               <Text style={styles.cardTitle}>{t('vehicles.detail.vehicleIdentity')}</Text>
               <Text style={styles.fieldLabel}>{t('vehicles.detail.vehicleType')}</Text>
               <Text style={styles.hintMuted}>
-                Car, truck, motorcycle, bicycle, trailer, etc. Workshops and service matching use this on bookings.
+                {t('vehicles.detail.vehicleTypeHint')}
               </Text>
               <View style={styles.pickerContainer}>
                 <Picker
@@ -487,28 +487,28 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
                 </Picker>
               </View>
               <View style={styles.identityRow}>
-                <Text style={styles.identityLabel}>Plate</Text>
+                <Text style={styles.identityLabel}>{t('vehicles.detail.plate')}</Text>
                 <Text style={styles.identityValue}>{identityPlate}</Text>
               </View>
               <View style={styles.identityRow}>
-                <Text style={styles.identityLabel}>Brand / model</Text>
+                <Text style={styles.identityLabel}>{t('vehicles.detail.brandModel')}</Text>
                 <Text style={styles.identityValue}>{identityBrandModel}</Text>
               </View>
               {vinLocked ? (
                 <View style={styles.identityRow}>
-                  <Text style={styles.identityLabel}>VIN</Text>
+                  <Text style={styles.identityLabel}>{t('vehicles.detail.vin')}</Text>
                   <Text style={styles.identityValue} selectable>
                     {identityVin}
                   </Text>
                 </View>
               ) : (
                 <>
-                  <Text style={styles.identityLabel}>VIN (optional)</Text>
+                  <Text style={styles.identityLabel}>{t('vehicles.detail.vinOptional')}</Text>
                   <TextInput
                     mode="outlined"
                     value={vinEditable}
                     onChangeText={setVinEditable}
-                    placeholder="17-character VIN"
+                    placeholder={t('vehicles.detail.vinPlaceholder')}
                     autoCapitalize="characters"
                     style={{ marginBottom: 8 }}
                   />
@@ -557,28 +557,28 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
                 Retry vehicle types
               </Button>
               <View style={styles.identityRow}>
-                <Text style={styles.identityLabel}>Plate</Text>
+                <Text style={styles.identityLabel}>{t('vehicles.detail.plate')}</Text>
                 <Text style={styles.identityValue}>{identityPlate}</Text>
               </View>
               <View style={styles.identityRow}>
-                <Text style={styles.identityLabel}>Brand / model</Text>
+                <Text style={styles.identityLabel}>{t('vehicles.detail.brandModel')}</Text>
                 <Text style={styles.identityValue}>{identityBrandModel}</Text>
               </View>
               {vinLocked ? (
                 <View style={styles.identityRow}>
-                  <Text style={styles.identityLabel}>VIN</Text>
+                  <Text style={styles.identityLabel}>{t('vehicles.detail.vin')}</Text>
                   <Text style={styles.identityValue} selectable>
                     {identityVin}
                   </Text>
                 </View>
               ) : (
                 <>
-                  <Text style={styles.identityLabel}>VIN (optional)</Text>
+                  <Text style={styles.identityLabel}>{t('vehicles.detail.vinOptional')}</Text>
                   <TextInput
                     mode="outlined"
                     value={vinEditable}
                     onChangeText={setVinEditable}
-                    placeholder="17-character VIN"
+                    placeholder={t('vehicles.detail.vinPlaceholder')}
                     autoCapitalize="characters"
                     style={{ marginBottom: 8 }}
                   />

@@ -4,6 +4,7 @@ import { Picker } from '@react-native-picker/picker';
 import { Text } from 'react-native-paper';
 import { COLORS } from '../../constants/colors';
 import { normalizeRegistrationDateForApi } from './dateFieldUtils';
+import { useTranslation } from '../../i18n';
 
 const MONTHS = [
   { value: '01', label: 'January' },
@@ -45,6 +46,7 @@ export default function MonthYearPicker({
   label = 'First registration',
   disabled = false,
 }) {
+  const { t } = useTranslation();
   const { year, month } = useMemo(() => parseIsoMonthYear(valueIso), [valueIso]);
   const years = useMemo(() => buildYearOptions(), []);
 
@@ -67,7 +69,7 @@ export default function MonthYearPicker({
             onValueChange={(v) => emit(year || String(new Date().getFullYear()), v)}
             style={styles.picker}
           >
-            <Picker.Item label="Month" value="" />
+            <Picker.Item label={t('createVehicle.month')} value="" />
             {MONTHS.map((m) => (
               <Picker.Item key={m.value} label={m.label} value={m.value} />
             ))}
@@ -80,7 +82,7 @@ export default function MonthYearPicker({
             onValueChange={(v) => emit(v, month || '01')}
             style={styles.picker}
           >
-            <Picker.Item label="Year" value="" />
+            <Picker.Item label={t('createVehicle.year')} value="" />
             {years.map((y) => (
               <Picker.Item key={y} label={y} value={y} />
             ))}

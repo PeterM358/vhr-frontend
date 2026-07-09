@@ -35,16 +35,17 @@ import { pickObligationDocumentAttachment } from '../utils/pickDocumentFile';
 import { OBLIGATION_REMINDER_TO_DOCUMENT_TYPE } from '../utils/vehicleDocumentTypes';
 import { pickReminderForType } from '../utils/vehicleReminderUtils';
 import { navigateToVehicleDetail } from '../navigation/webNavigation';
+import { useTranslation } from '../i18n';
 
-const OBLIGATION_CHOICES = [
-  { reminder_type: 'insurance', label: 'Insurance', expense_type: 'insurance' },
+const OBLIGATION_CHOICE_KEYS = [
+  { reminder_type: 'insurance', labelKey: 'addObligationPayment.types.insurance', expense_type: 'insurance' },
   {
     reminder_type: 'technical_inspection',
-    label: 'Technical inspection (due date only)',
+    labelKey: 'addObligationPayment.types.technical_inspection',
     expense_type: 'technical_inspection',
   },
-  { reminder_type: 'vignette', label: 'Vignette', expense_type: 'vignette' },
-  { reminder_type: 'road_tax', label: 'Road tax / annual fees', expense_type: 'road_tax' },
+  { reminder_type: 'vignette', labelKey: 'addObligationPayment.types.vignette', expense_type: 'vignette' },
+  { reminder_type: 'road_tax', labelKey: 'addObligationPayment.types.road_tax', expense_type: 'road_tax' },
 ];
 
 /** EUR major → minor (2 decimals). */
@@ -64,6 +65,7 @@ function resolvedIso(valueIso) {
 }
 
 export default function AddObligationPaymentScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const vehicleId = route.params?.vehicleId != null ? String(route.params.vehicleId) : '';
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
@@ -73,7 +75,7 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
 
   const [vehicle, setVehicle] = useState(null);
   const [reminderType, setReminderType] = useState(
-    OBLIGATION_CHOICES.some((o) => o.reminder_type === initialReminderType)
+    OBLIGATION_CHOICE_KEYS.some((o) => o.reminder_type === initialReminderType)
       ? initialReminderType
       : 'insurance'
   );
@@ -94,7 +96,7 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
         const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
         const vid = parseInt(vehicleId, 10);
         if (!Number.isFinite(vid)) {
-          setDialogMessage('Missing vehicle.');
+          setDialogMessage(t('addObligationPayment.errors.missingVehicle'));
           setDialogVisible(true);
           setLoading(false);
           return;
@@ -102,18 +104,18 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
         const res = await fetch(`${API_BASE_URL}/api/vehicles/${vid}/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!res.ok) throw new Error('Failed to load vehicle');
+        if (!res.ok) throw new Error(t('addObligationPayment.errors.loadError'));
         setVehicle(await res.json());
       } catch (e) {
         console.error(e);
-        setDialogMessage(e.message || 'Error loading vehicle');
+        setDialogMessage(e.message || t('addObligationPayment.errors.loadError'));
         setDialogVisible(true);
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [vehicleId]);
+  }, [vehicleId, t]);
 
   const reminderRow = useMemo(
     () => pickReminderForType(vehicle?.reminders, reminderType),
@@ -128,7 +130,7 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
   }, [vehicle?.reminders, reminderType]);
 
   const expenseType = useMemo(() => {
-    return OBLIGATION_CHOICES.find((o) => o.reminder_type === reminderType)?.expense_type || 'other';
+    return OBLIGATION_CHOICE_KEYS.find((o) => o.reminder_type === reminderType)?.expense_type || 'other';
   }, [reminderType]);
 
   const handlePickDocument = async () => {
@@ -137,31 +139,31 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
       if (picked) setPendingDocument(picked);
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Could not pick document.');
+      Alert.alert(t('common.error'), t('addObligationPayment.errors.pickDocument'));
     }
   };
 
   const handleSave = async () => {
     const vid = parseInt(vehicleId, 10);
     if (!Number.isFinite(vid)) {
-      setDialogMessage('Vehicle is required.');
+      setDialogMessage(t('addObligationPayment.errors.vehicleRequired'));
       setDialogVisible(true);
       return;
     }
     const dueIso = resolvedIso(dueDateIso);
     if (dueIso === undefined) {
-      setDialogMessage('Choose a valid due / valid-until date.');
+      setDialogMessage(t('addObligationPayment.errors.invalidDueDate'));
       setDialogVisible(true);
       return;
     }
     if (!dueIso) {
-      setDialogMessage('Due or valid-until date is required.');
+      setDialogMessage(t('addObligationPayment.errors.dueDateRequired'));
       setDialogVisible(true);
       return;
     }
     const paidIso = resolvedIso(paidDateIso);
     if (paidIso === undefined) {
-      setDialogMessage('Paid date must be empty or a valid date.');
+      setDialogMessage(t('addObligationPayment.errors.invalidPaidDate'));
       setDialogVisible(true);
       return;
     }
@@ -170,7 +172,7 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
     if (amountRaw !== '') {
       const parsed = bgnToAmountMinor(amountBgn);
       if (parsed === undefined) {
-        setDialogMessage('Amount must be a valid number.');
+        setDialogMessage(t('addObligationPayment.errors.invalidAmount'));
         setDialogVisible(true);
         return;
       }
@@ -178,8 +180,8 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
     }
     if (!reminderRow?.id) {
       Alert.alert(
-        'Reminder unavailable',
-        'This reminder is not loaded yet. Go back to the vehicle screen and try again.'
+        t('addObligationPayment.reminderUnavailableTitle'),
+        t('addObligationPayment.reminderUnavailableBody')
       );
       return;
     }
@@ -216,8 +218,8 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
         } catch (expErr) {
           console.warn('Expense create failed (reminder still updated)', expErr?.responseText || expErr);
           Alert.alert(
-            'Reminder saved',
-            'Expense could not be recorded — check the API or try again later.'
+            t('addObligationPayment.reminderSaved'),
+            t('addObligationPayment.expenseFailed')
           );
         }
       }
@@ -237,8 +239,8 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
         } catch (docErr) {
           console.warn('Document upload failed (reminder still updated)', docErr?.responseText || docErr);
           Alert.alert(
-            'Reminder saved',
-            'Document could not be uploaded — try again from Documents & photos on the vehicle screen.'
+            t('addObligationPayment.reminderSaved'),
+            t('addObligationPayment.documentFailed')
           );
         }
       }
@@ -255,7 +257,7 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
       });
     } catch (err) {
       console.error(err);
-      setDialogMessage(err.message || 'Could not save.');
+      setDialogMessage(err.message || t('addObligationPayment.errors.saveError'));
       setDialogVisible(true);
     } finally {
       setSaving(false);
@@ -265,9 +267,9 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
   const vehicleLine = useMemo(() => {
     if (!vehicle) return null;
     const plate = vehicle.license_plate || '—';
-    const name = [vehicle.make_name, vehicle.model_name].filter(Boolean).join(' ') || 'Vehicle';
+    const name = [vehicle.make_name, vehicle.model_name].filter(Boolean).join(' ') || t('vehicles.vehicle');
     return `${plate} · ${name}`;
-  }, [vehicle]);
+  }, [vehicle, t]);
 
   if (loading) {
     return <ActivityIndicator animating size="large" style={{ flex: 1 }} />;
@@ -277,8 +279,8 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
     <ScreenBackground safeArea={false}>
       <View style={styles.root}>
         <AppNavigationBar
-          title="Add Obligation / Payment"
-          backLabel="Vehicle"
+          title={t('vehicles.nav.obligation')}
+          backLabel={t('vehicles.vehicle')}
           onBack={handleBack}
           scrolled={scrolled}
         />
@@ -293,17 +295,17 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
         >
           <FloatingCard>
             <Text variant="titleMedium" style={styles.sectionTitle}>
-              Obligation or payment
+              {t('addObligationPayment.sectionTitle')}
             </Text>
             <Text style={styles.subtitle}>
-              Use this for insurance, vignette, road tax, and inspection dates/payments.
+              {t('addObligationPayment.subtitle')}
             </Text>
             {vehicleLine ? <Text style={styles.vehicleLine}>{vehicleLine}</Text> : null}
           </FloatingCard>
 
           <FloatingCard>
             <Text variant="labelLarge" style={styles.label}>
-              Type *
+              {t('addObligationPayment.typeLabel')}
             </Text>
             <View style={styles.pickerContainer}>
               <Picker
@@ -311,46 +313,46 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
                 onValueChange={setReminderType}
                 style={styles.picker}
               >
-                {OBLIGATION_CHOICES.map((o) => (
-                  <Picker.Item key={o.reminder_type} label={o.label} value={o.reminder_type} />
+                {OBLIGATION_CHOICE_KEYS.map((o) => (
+                  <Picker.Item key={o.reminder_type} label={t(o.labelKey)} value={o.reminder_type} />
                 ))}
               </Picker>
             </View>
 
             <ServiceRecordDatePicker
-              label="Valid until / due date *"
+              label={t('addObligationPayment.validUntilDueDate')}
               valueIso={dueDateIso}
               onChangeIso={setDueDateIso}
               optional={false}
             />
 
             <Text variant="labelLarge" style={styles.label}>
-              Amount paid (EUR)
+              {t('addObligationPayment.amountPaid')}
             </Text>
             <TextInput
               mode="outlined"
               value={amountBgn}
               onChangeText={setAmountBgn}
-              placeholder="Optional — stored in minor units on the server"
+              placeholder={t('addObligationPayment.amountPlaceholder')}
               keyboardType="decimal-pad"
               style={styles.input}
             />
 
             <ServiceRecordDatePicker
-              label="Paid on"
+              label={t('addObligationPayment.paidOn')}
               valueIso={paidDateIso}
               onChangeIso={setPaidDateIso}
               optional
             />
 
             <Text variant="labelLarge" style={styles.label}>
-              Notes
+              {t('addObligationPayment.notes')}
             </Text>
             <TextInput
               mode="outlined"
               value={notes}
               onChangeText={setNotes}
-              placeholder="Policy number, reference, etc."
+              placeholder={t('addObligationPayment.notesPlaceholder')}
               style={styles.input}
               multiline
             />
@@ -358,13 +360,13 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
 
           <FloatingCard>
             <Text variant="titleMedium" style={styles.sectionTitle}>
-              Documents
+              {t('addObligationPayment.documents')}
             </Text>
             <Text style={styles.sectionHint}>
-              Optional — upload policy, sticker, or payment proof. Amount and valid-until from this form are sent with the file.
+              {t('addObligationPayment.documentsHint')}
             </Text>
             <Button mode="outlined" icon="file-upload-outline" onPress={handlePickDocument} disabled={saving}>
-              Add policy or receipt
+              {t('addObligationPayment.addPolicyReceipt')}
             </Button>
             <DocumentAttachmentList
               attachments={pendingDocument ? [pendingDocument] : []}
@@ -383,20 +385,20 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
             style={styles.sendButton}
             contentStyle={styles.sendButtonContent}
           >
-            Save
+            {t('addObligationPayment.save')}
           </Button>
         </View>
       </View>
 
       <Portal>
         <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)}>
-          <Dialog.Title>Notice</Dialog.Title>
+          <Dialog.Title>{t('common.notice')}</Dialog.Title>
           <Dialog.Content>
             <Text>{dialogMessage}</Text>
           </Dialog.Content>
           <Dialog.Actions>
             <Button mode="text" onPress={() => setDialogVisible(false)}>
-              OK
+              {t('common.ok')}
             </Button>
           </Dialog.Actions>
         </Dialog>

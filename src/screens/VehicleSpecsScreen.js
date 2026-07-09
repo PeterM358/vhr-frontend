@@ -286,9 +286,9 @@ export default function VehicleSpecsScreen({ navigation, route }) {
     return (
       <ScreenBackground safeArea={false}>
         <View style={styles.center}>
-          <Text style={styles.errorText}>Could not load vehicle specs.</Text>
+          <Text style={styles.errorText}>{t('vehicles.detail.specsLoadError')}</Text>
           <Button mode="contained-tonal" onPress={load} style={{ marginTop: 12 }}>
-            Retry
+            {t('common.retry')}
           </Button>
         </View>
       </ScreenBackground>
@@ -316,7 +316,7 @@ export default function VehicleSpecsScreen({ navigation, route }) {
       >
         {identityRows.length > 0 ? (
           <FloatingCard style={styles.card}>
-            <Text style={styles.cardTitle}>Identity</Text>
+            <Text style={styles.cardTitle}>{t('vehicles.detail.identity')}</Text>
             {identityRows.map((r) => (
               <View key={r.key} style={styles.row}>
                 <Text style={styles.label}>{r.label}</Text>
