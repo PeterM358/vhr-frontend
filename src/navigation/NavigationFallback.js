@@ -5,7 +5,7 @@ import ScreenBackground from '../components/ScreenBackground';
 /** Shown while React Navigation resolves deep links / initial web URL. */
 export default function NavigationFallback() {
   return (
-    <ScreenBackground>
+    <ScreenBackground enableRouteDetection={false}>
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#fff" />
       </View>

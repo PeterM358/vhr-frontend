@@ -14,7 +14,6 @@ import {
   SafeAreaView,
   View,
 } from 'react-native';
-import { useNavigationState } from '@react-navigation/native';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 
 import { useGarageScene } from '../context/GarageSceneContext';
@@ -22,6 +21,7 @@ import { useGarageSceneCrossfade } from '../hooks/useGarageSceneCrossfade';
 import { DEFAULT_SCENE_ID, getSceneById, getSceneImageSource } from '../theme/garageScenes';
 import { AuthContext } from '../context/AuthManager';
 import AppFooter from './common/AppFooter';
+import { RouteFooterBridge } from './screenBackgroundRoute';
 
 const DEFAULT_STOPS = [
   { offset: '0', color: '#000', opacity: '0.65' },
@@ -102,55 +102,54 @@ export default function ScreenBackground({
   style,
   contentStyle,
   children,
+  routeName = null,
+  enableRouteDetection = true,
 }) {
   const stops = gradientStops ?? DEFAULT_STOPS;
   const Wrapper = safeArea ? SafeAreaView : View;
   const useGarageSceneBackground = source == null;
-
-  const routeName = useNavigationState((state) => state?.routes?.[state.index]?.name);
   const authContext = useContext(AuthContext);
   const isAuthenticated = !!authContext?.isAuthenticated;
 
-  const isPublicRoute =
-    !routeName ||
-    routeName === 'AuthLoading' ||
-    routeName === 'PublicHome' ||
-    routeName === 'PublicSeoPage' ||
-    routeName === 'Login' ||
-    routeName === 'Register' ||
-    routeName === 'PasswordRequestReset' ||
-    routeName === 'PasswordConfirmReset' ||
-    String(routeName).startsWith('Public');
+  const renderBackground = (showFooter) => {
+    if (useGarageSceneBackground) {
+      return (
+        <View style={[styles.image, style]}>
+          <GarageSceneBackgroundLayers blurRadius={blurRadius} />
+          <Wrapper style={[styles.content, contentStyle]}>
+            <View style={styles.contentWrapper}>{children}</View>
+            {showFooter ? <AppFooter /> : null}
+          </Wrapper>
+        </View>
+      );
+    }
 
-  const showFooter = isAuthenticated && !isPublicRoute;
+    const fallbackSource = getSceneImageSource(getSceneById(DEFAULT_SCENE_ID));
 
-  if (useGarageSceneBackground) {
     return (
-      <View style={[styles.image, style]}>
-        <GarageSceneBackgroundLayers blurRadius={blurRadius} />
+      <ImageBackground
+        source={source ?? fallbackSource}
+        style={[styles.image, style]}
+        resizeMode={resizeMode}
+        blurRadius={blurRadius}
+      >
+        <SceneGradientOverlay stops={stops} />
         <Wrapper style={[styles.content, contentStyle]}>
           <View style={styles.contentWrapper}>{children}</View>
           {showFooter ? <AppFooter /> : null}
         </Wrapper>
-      </View>
+      </ImageBackground>
     );
-  }
-
-  const fallbackSource = getSceneImageSource(getSceneById(DEFAULT_SCENE_ID));
+  };
 
   return (
-    <ImageBackground
-      source={source ?? fallbackSource}
-      style={[styles.image, style]}
-      resizeMode={resizeMode}
-      blurRadius={blurRadius}
+    <RouteFooterBridge
+      isAuthenticated={isAuthenticated}
+      routeName={routeName}
+      enableRouteDetection={enableRouteDetection}
     >
-      <SceneGradientOverlay stops={stops} />
-      <Wrapper style={[styles.content, contentStyle]}>
-        <View style={styles.contentWrapper}>{children}</View>
-        {showFooter ? <AppFooter /> : null}
-      </Wrapper>
-    </ImageBackground>
+      {renderBackground}
+    </RouteFooterBridge>
   );
 }
 

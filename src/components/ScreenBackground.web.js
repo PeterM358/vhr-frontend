@@ -2,13 +2,13 @@
 
 import React, { useContext } from 'react';
 import { Animated, ImageBackground, StyleSheet, SafeAreaView, View } from 'react-native';
-import { useNavigationState } from '@react-navigation/native';
 
 import { useGarageScene } from '../context/GarageSceneContext';
 import { useGarageSceneCrossfade } from '../hooks/useGarageSceneCrossfade';
 import { DEFAULT_SCENE_ID, getSceneById, getSceneWebUri } from '../theme/garageScenes';
 import { AuthContext } from '../context/AuthManager';
 import AppFooter from './common/AppFooter';
+import { RouteFooterBridge } from './screenBackgroundRoute';
 
 /** Default centered content column on web (maps use `contentMaxWidth={false}`). */
 export const WEB_CONTENT_MAX_WIDTH_DEFAULT = 720;
@@ -78,6 +78,8 @@ export default function ScreenBackground({
   style,
   contentStyle,
   children,
+  routeName = null,
+  enableRouteDetection = true,
 }) {
   const Wrapper = safeArea ? SafeAreaView : View;
   const constrain =
@@ -92,53 +94,50 @@ export default function ScreenBackground({
       : null;
 
   const useGarageSceneBackground = source == null;
-
-  const routeName = useNavigationState((state) => state?.routes?.[state.index]?.name);
   const authContext = useContext(AuthContext);
   const isAuthenticated = !!authContext?.isAuthenticated;
 
-  const isPublicRoute =
-    !routeName ||
-    routeName === 'AuthLoading' ||
-    routeName === 'PublicHome' ||
-    routeName === 'PublicSeoPage' ||
-    routeName === 'Login' ||
-    routeName === 'Register' ||
-    routeName === 'PasswordRequestReset' ||
-    routeName === 'PasswordConfirmReset' ||
-    String(routeName).startsWith('Public');
+  const renderBackground = (showFooter) => {
+    if (useGarageSceneBackground) {
+      return (
+        <View style={[styles.image, style]}>
+          <GarageSceneBackgroundLayers />
+          <View pointerEvents="none" style={WEB_OVERLAY} />
+          <Wrapper style={[styles.content, contentStyle, constrain]}>
+            <View style={styles.contentWrapper}>{children}</View>
+            {showFooter ? <AppFooter /> : null}
+          </Wrapper>
+        </View>
+      );
+    }
 
-  const showFooter = isAuthenticated && !isPublicRoute;
+    const fallbackUri = getSceneWebUri(getSceneById(DEFAULT_SCENE_ID));
+    const resolvedSource =
+      typeof source === 'object' && source?.uri ? source : { uri: fallbackUri };
 
-  if (useGarageSceneBackground) {
     return (
-      <View style={[styles.image, style]}>
-        <GarageSceneBackgroundLayers />
+      <ImageBackground
+        source={resolvedSource}
+        style={[styles.image, style]}
+        resizeMode={resizeMode}
+      >
         <View pointerEvents="none" style={WEB_OVERLAY} />
         <Wrapper style={[styles.content, contentStyle, constrain]}>
           <View style={styles.contentWrapper}>{children}</View>
           {showFooter ? <AppFooter /> : null}
         </Wrapper>
-      </View>
+      </ImageBackground>
     );
-  }
-
-  const fallbackUri = getSceneWebUri(getSceneById(DEFAULT_SCENE_ID));
-  const resolvedSource =
-    typeof source === 'object' && source?.uri ? source : { uri: fallbackUri };
+  };
 
   return (
-    <ImageBackground
-      source={resolvedSource}
-      style={[styles.image, style]}
-      resizeMode={resizeMode}
+    <RouteFooterBridge
+      isAuthenticated={isAuthenticated}
+      routeName={routeName}
+      enableRouteDetection={enableRouteDetection}
     >
-      <View pointerEvents="none" style={WEB_OVERLAY} />
-      <Wrapper style={[styles.content, contentStyle, constrain]}>
-        <View style={styles.contentWrapper}>{children}</View>
-        {showFooter ? <AppFooter /> : null}
-      </Wrapper>
-    </ImageBackground>
+      {renderBackground}
+    </RouteFooterBridge>
   );
 }
 

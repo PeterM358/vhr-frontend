@@ -1,11 +1,29 @@
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { devLog, safeWarn } from '../utils/logger';
 
 /** Native FCM via @react-native-firebase/messaging (not available on web / many simulators). */
 let messagingModule = null;
 
+function isFirebaseMessagingConfigured() {
+  const flags = Constants.expoConfig?.extra?.firebaseMessagingEnabled;
+  if (!flags || typeof flags !== 'object') {
+    return false;
+  }
+  if (Platform.OS === 'ios') {
+    return flags.ios === true;
+  }
+  if (Platform.OS === 'android') {
+    return flags.android === true;
+  }
+  return false;
+}
+
 function loadMessaging() {
   if (Platform.OS === 'web') {
+    return null;
+  }
+  if (!isFirebaseMessagingConfigured()) {
     return null;
   }
   if (messagingModule !== null) {

@@ -1,5 +1,18 @@
 // app.config.js
 import 'dotenv/config';
+import fs from 'fs';
+import path from 'path';
+
+const IOS_GOOGLE_SERVICES = './GoogleService-Info.plist';
+const ANDROID_GOOGLE_SERVICES = './android/app/google-services.json';
+
+function googleServicesFileIfExists(relativePath) {
+  const absolutePath = path.resolve(process.cwd(), relativePath);
+  return fs.existsSync(absolutePath) ? relativePath : undefined;
+}
+
+const iosGoogleServicesFile = googleServicesFileIfExists(IOS_GOOGLE_SERVICES);
+const androidGoogleServicesFile = googleServicesFileIfExists(ANDROID_GOOGLE_SERVICES);
 
 export default {
   expo: {
@@ -36,7 +49,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.mihailovv.vhrfrontend",
-      googleServicesFile: "./GoogleService-Info.plist"
+      ...(iosGoogleServicesFile ? { googleServicesFile: iosGoogleServicesFile } : {}),
     },
     android: {
       package: "com.mihailovv.vhrfrontend",
@@ -44,7 +57,7 @@ export default {
         foregroundImage: "./src/assets/icons/adaptive-icon.png",
         backgroundColor: "#ffffff"
       },
-      googleServicesFile: "./android/app/google-services.json",
+      ...(androidGoogleServicesFile ? { googleServicesFile: androidGoogleServicesFile } : {}),
       config: {
         googleMaps: {
           apiKey: process.env.GOOGLE_MAPS_API_KEY
@@ -67,6 +80,10 @@ export default {
     extra: {
       eas: {
         projectId: "cde03e84-e27d-4ec0-9712-519a847ceb2d"
+      },
+      firebaseMessagingEnabled: {
+        ios: Boolean(iosGoogleServicesFile),
+        android: Boolean(androidGoogleServicesFile),
       },
       googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
       googleClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
