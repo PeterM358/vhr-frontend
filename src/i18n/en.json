@@ -23,7 +23,8 @@
     "email": "Email",
     "number": "Number",
     "allClear": "All clear",
-    "service": "Service"
+    "service": "Service",
+    "validation": "Validation"
   },
   "language": {
     "label": "Language",
@@ -98,7 +99,10 @@
     "passwordsDoNotMatch": "Passwords do not match.",
     "passwordMinLength": "Password must be at least 6 characters.",
     "resetFailed": "Failed to reset password.",
-    "resetSignInFailed": "Password was reset but sign-in failed. Please log in manually."
+    "resetSignInFailed": "Password was reset but sign-in failed. Please log in manually.",
+    "phonePrefix": "Prefix",
+    "phoneNumber": "Phone number",
+    "phoneLoginHelper": "Use the phone number linked to your account."
   },
   "dashboard": {
     "heroSubtitle": "Your vehicles, service history, and repairs — in one control center.",
@@ -696,7 +700,22 @@
       "documentArchiveShopHint": "Document archive is visible to the vehicle owner.",
       "viewVehicleSpecs": "View vehicle specs",
       "viewSpecs": "View specs",
-      "mileageConfidenceDetails": "Mileage confidence details"
+      "mileageConfidenceDetails": "Mileage confidence details",
+      "kilometersWholeNumber": "Kilometers must be a whole number.",
+      "chooseValidDueDate": "Choose a valid due date.",
+      "advanceNoticeDaysValidation": "Advance notice days must be a whole number or empty.",
+      "advanceNoticeKmValidation": "Advance notice kilometers must be a whole number or empty.",
+      "saveReminderError": "Could not save reminder.",
+      "noCompletedServiceTitle": "No completed service",
+      "noCompletedServiceBody": "Completed jobs will appear in service history.",
+      "noRepairsTitle": "No repairs",
+      "noRepairsBody": "There are no repair records on this vehicle yet."
+    },
+    "editDetails": {
+      "loadTypesError": "Could not load vehicle types.",
+      "savedTitle": "Saved",
+      "savedBody": "Vehicle details updated.",
+      "saveError": "Could not save vehicle."
     }
   },
   "fuelTypes": {
@@ -818,7 +837,28 @@
     "manualEntryHint": "Can't find your vehicle? Enter details manually.",
     "useCatalogInstead": "Use catalog selection instead",
     "registrationMileage": "Registration & mileage",
-    "kilometers": "Kilometers"
+    "kilometers": "Kilometers",
+    "errors": {
+      "selectTypeFirst": "Select a vehicle type first.",
+      "selectBrandFirst": "Select a brand first.",
+      "chooseMakeBrand": "Choose a make / brand.",
+      "enterModel": "Enter your vehicle model.",
+      "modelNotRecognizedTitle": "Model not recognized",
+      "modelNotRecognizedBody": "We could not match that model name. Check the spelling or tap a suggestion below the model field.",
+      "chooseYear": "Choose the vehicle year.",
+      "chooseFuelType": "Choose a fuel type.",
+      "chooseCatalogOrManual": "Choose a catalog brand and model, or enter your model manually.",
+      "kilometersWholeNumber": "Kilometers must be a whole number.",
+      "loadCountriesError": "Could not load countries.",
+      "loadDataError": "Error loading vehicle data",
+      "createdSuccess": "Vehicle created!",
+      "submitFailed": "Submission failed"
+    },
+    "location": {
+      "title": "Location",
+      "permissionBody": "Allow location access to detect your country.",
+      "countryError": "Could not determine your country from location."
+    }
   },
   "vehicleSpecSuggestion": {
     "lookingUp": "Looking up maintenance specs…",

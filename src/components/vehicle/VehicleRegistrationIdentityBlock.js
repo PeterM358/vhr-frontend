@@ -6,7 +6,6 @@ import {
   Platform,
   Modal,
   KeyboardAvoidingView,
-  Alert,
 } from 'react-native';
 import { Text, Button, ActivityIndicator } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
@@ -25,6 +24,7 @@ import {
 } from './dateFieldUtils';
 import { profileCountriesToPickerOptions } from './vehicleFormConfig';
 import { getWebGeolocation } from '../../utils/webGeolocation';
+import { showMessage } from '../../utils/crossPlatformAlert';
 import { reverseGeocodeLatLon } from '../../utils/reverseGeocodeLocation';
 import { useTranslation } from '../../i18n';
 
@@ -89,7 +89,7 @@ export default function VehicleRegistrationIdentityBlock({
       } else {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Location', 'Allow location access to detect your country.');
+          showMessage(t('createVehicle.location.title'), t('createVehicle.location.permissionBody'), { variant: 'error' });
           return;
         }
         const loc = await Location.getCurrentPositionAsync({});
@@ -99,12 +99,16 @@ export default function VehicleRegistrationIdentityBlock({
       const geo = await reverseGeocodeLatLon(latitude, longitude);
       const iso = String(geo?.countryIso || '').trim().toUpperCase();
       if (!iso) {
-        Alert.alert('Location', 'Could not determine your country from location.');
+        showMessage(t('createVehicle.location.title'), t('createVehicle.location.countryError'), { variant: 'error' });
         return;
       }
       onChangeRegistrationCountryIso(iso);
     } catch (error) {
-      Alert.alert('Location', error?.message || 'Could not get your location.');
+      showMessage(
+        t('createVehicle.location.title'),
+        error?.message || t('serviceCenters.discovery.geoError'),
+        { variant: 'error' }
+      );
     } finally {
       setLocating(false);
     }

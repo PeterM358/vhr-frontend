@@ -64,6 +64,7 @@ import {
   translateMileagePredictionPrompt,
   translateReminderDueDateTitle,
 } from '../i18n';
+import { showMessage } from '../utils/crossPlatformAlert';
 import { translateVehicleTypeLabel, translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 
 const BASE_VEHICLE_REMINDER_SECTION_ROWS = [
@@ -262,7 +263,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
     if (kmRaw) {
       const kn = Number(kmRaw);
       if (!Number.isFinite(kn) || kn < 0 || Math.round(kn) !== kn) {
-        Alert.alert('Validation', 'Kilometers must be a whole number.');
+        showMessage(t('common.validation'), t('vehicles.detail.kilometersWholeNumber'), { variant: 'error' });
         return;
       }
       km = kn;
@@ -326,7 +327,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
         : undefined
       : null;
     if (dueDate === undefined) {
-      Alert.alert('Validation', 'Choose a valid due date.');
+      showMessage(t('common.validation'), t('vehicles.detail.chooseValidDueDate'), { variant: 'error' });
       return;
     }
 
@@ -337,12 +338,12 @@ export default function VehicleDetailScreen({ route, navigation }) {
     }
     const advDays = parseOptionalInt(reminderDraft.advance_notice_days);
     if (advDays === undefined) {
-      Alert.alert('Validation', 'Advance notice days must be a whole number or empty.');
+      showMessage(t('common.validation'), t('vehicles.detail.advanceNoticeDaysValidation'), { variant: 'error' });
       return;
     }
     const advKm = parseOptionalInt(reminderDraft.advance_notice_kilometers);
     if (advKm === undefined) {
-      Alert.alert('Validation', 'Advance notice kilometers must be a whole number or empty.');
+      showMessage(t('common.validation'), t('vehicles.detail.advanceNoticeKmValidation'), { variant: 'error' });
       return;
     }
 
@@ -365,7 +366,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
       setReminderModalVisible(false);
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', e.message || 'Could not save reminder.');
+      showMessage(t('common.error'), e.message || t('vehicles.detail.saveReminderError'), { variant: 'error' });
     } finally {
       setReminderSaving(false);
     }
@@ -437,7 +438,11 @@ export default function VehicleDetailScreen({ route, navigation }) {
 
   const scrollToServiceHistorySection = useCallback(() => {
     if (!serviceHistorySorted.length) {
-      Alert.alert('No completed service', 'Completed jobs will appear in service history.');
+      showMessage(
+        t('vehicles.detail.noCompletedServiceTitle'),
+        t('vehicles.detail.noCompletedServiceBody'),
+        { variant: 'info' }
+      );
       return;
     }
     setSectionsExpanded((prev) => ({ ...prev, serviceHistory: true }));
@@ -457,7 +462,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
 
   const scrollToActiveRepairsSection = useCallback(() => {
     if (!repairs.length) {
-      Alert.alert('No repairs', 'There are no repair records on this vehicle yet.');
+      showMessage(t('vehicles.detail.noRepairsTitle'), t('vehicles.detail.noRepairsBody'), { variant: 'info' });
       return;
     }
     scrollToY(sectionScrollYs.current.activeRepairs);
@@ -466,7 +471,11 @@ export default function VehicleDetailScreen({ route, navigation }) {
   const openLatestCompletedRepair = useCallback(() => {
     const latest = serviceHistorySorted[0];
     if (!latest?.id) {
-      Alert.alert('No completed service', 'Completed jobs will appear in service history.');
+      showMessage(
+        t('vehicles.detail.noCompletedServiceTitle'),
+        t('vehicles.detail.noCompletedServiceBody'),
+        { variant: 'info' }
+      );
       return;
     }
     navigation.navigate('RepairDetail', { repairId: latest.id });

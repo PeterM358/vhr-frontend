@@ -17,7 +17,7 @@ import {
   updateVehicle,
 } from '../api/vehicles';
 import { Picker } from '@react-native-picker/picker';
-import { confirmMessage } from '../utils/crossPlatformAlert';
+import { confirmMessage, showMessage } from '../utils/crossPlatformAlert';
 import ScreenBackground from '../components/ScreenBackground';
 import AppNavigationBar from '../components/common/AppNavigationBar';
 import FloatingCard from '../components/ui/FloatingCard';
@@ -281,7 +281,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
       setVehicleTypes(Array.isArray(rows) ? rows : []);
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Could not load vehicle types.');
+      showMessage(t('common.error'), t('vehicles.editDetails.loadTypesError'), { variant: 'error' });
     }
   }, []);
 
@@ -397,7 +397,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
   const handleSave = async () => {
     const built = buildOptionalVehiclePayload(optionalStrings, optionalBools);
     if (built.error) {
-      Alert.alert('Validation', built.error);
+      showMessage(t('common.validation'), built.error, { variant: 'error' });
       return;
     }
 
@@ -423,11 +423,11 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
       delete payload.odometer_verified;
       delete payload.odometer_source;
       await updateVehicle(vehicleId, payload, token);
-      Alert.alert('Saved', 'Vehicle details updated.');
+      showMessage(t('vehicles.editDetails.savedTitle'), t('vehicles.editDetails.savedBody'), { variant: 'success' });
       goBackToVehicleDetail();
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', e.message || 'Could not save vehicle.');
+      showMessage(t('common.error'), e.message || t('vehicles.editDetails.saveError'), { variant: 'error' });
     } finally {
       setSaving(false);
     }

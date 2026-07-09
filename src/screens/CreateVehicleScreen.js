@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   StyleSheet,
   View,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ScreenBackground from '../components/ScreenBackground';
@@ -48,6 +47,7 @@ import {
 import { applyVehicleCatalogFieldsToPayload } from '../components/vehicle/vehicleIdentityPayload';
 import { resolveLegacyModelId } from '../components/vehicle/resolveLegacyModel';
 import { useTranslation } from '../i18n';
+import { showMessage } from '../utils/crossPlatformAlert';
 import {
   VEHICLE_OPTIONAL_GROUPS,
   vehicleToFormStrings,
@@ -231,7 +231,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
         } catch (ce) {
           const msg = ce && typeof ce.message === 'string' ? ce.message : '';
           if (__DEV__) console.warn('[CreateVehicle] getCountries failed', msg);
-          setCountriesState({ status: 'error', rows: [], error: 'Could not load countries.' });
+          setCountriesState({ status: 'error', rows: [], error: t('createVehicle.errors.loadCountriesError') });
         }
         setMakes(makesData);
         setVehicleTypes(typesData);
@@ -241,7 +241,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
         setSelectedVehicleType('');
       } catch (err) {
         console.error(err);
-        setDialogMessage('Error loading vehicle data');
+        setDialogMessage(t('createVehicle.errors.loadDataError'));
         setDialogVisible(true);
       } finally {
         setLoading(false);
@@ -313,11 +313,11 @@ export default function CreateVehicleScreen({ navigation, route }) {
 
   const openManualFromCatalog = () => {
     if (hasVehicleTypePicker && !selectedVehicleType) {
-      Alert.alert('Validation', 'Select a vehicle type first.');
+      showMessage(t('common.validation'), t('createVehicle.errors.selectTypeFirst'), { variant: 'error' });
       return;
     }
     if (!catalogBrand) {
-      Alert.alert('Validation', 'Select a brand first.');
+      showMessage(t('common.validation'), t('createVehicle.errors.selectBrandFirst'), { variant: 'error' });
       return;
     }
     const brand = catalogBrands.find((b) => String(b.id) === String(catalogBrand));
@@ -344,38 +344,39 @@ export default function CreateVehicleScreen({ navigation, route }) {
     let resolvedModelLegacy = selectedModelLegacy;
     if (manualMode) {
       if (!selectedMake) {
-        Alert.alert('Validation', 'Choose a make / brand.');
+        showMessage(t('common.validation'), t('createVehicle.errors.chooseMakeBrand'), { variant: 'error' });
         return;
       }
       const modelText = String(manualModelText ?? '').trim();
       if (!modelText) {
-        Alert.alert('Validation', 'Enter your vehicle model.');
+        showMessage(t('common.validation'), t('createVehicle.errors.enterModel'), { variant: 'error' });
         return;
       }
       resolvedModelLegacy = resolveLegacyModelId(legacyModels, modelText);
       if (!resolvedModelLegacy) {
-        Alert.alert(
-          'Model not recognized',
-          'We could not match that model name. Check the spelling or tap a suggestion below the model field.'
+        showMessage(
+          t('createVehicle.errors.modelNotRecognizedTitle'),
+          t('createVehicle.errors.modelNotRecognizedBody'),
+          { variant: 'error' }
         );
         return;
       }
       if (!selectedYear) {
-        Alert.alert('Validation', 'Choose the vehicle year.');
+        showMessage(t('common.validation'), t('createVehicle.errors.chooseYear'), { variant: 'error' });
         return;
       }
       if (!optionalStrings.fuel_type) {
-        Alert.alert('Validation', 'Choose a fuel type.');
+        showMessage(t('common.validation'), t('createVehicle.errors.chooseFuelType'), { variant: 'error' });
         return;
       }
     } else if (!catalogBrand || (!catalogModel && !selectedModelLegacy)) {
-      Alert.alert('Validation', 'Choose a catalog brand and model, or enter your model manually.');
+      showMessage(t('common.validation'), t('createVehicle.errors.chooseCatalogOrManual'), { variant: 'error' });
       return;
     } else if (!selectedYear) {
-      Alert.alert('Validation', 'Choose the vehicle year.');
+      showMessage(t('common.validation'), t('createVehicle.errors.chooseYear'), { variant: 'error' });
       return;
     } else if (!optionalStrings.fuel_type) {
-      Alert.alert('Validation', 'Choose a fuel type.');
+      showMessage(t('common.validation'), t('createVehicle.errors.chooseFuelType'), { variant: 'error' });
       return;
     }
 
@@ -384,7 +385,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
     if (kmRaw) {
       const kn = Number(kmRaw);
       if (!Number.isFinite(kn) || kn < 0 || Math.round(kn) !== kn) {
-        Alert.alert('Validation', 'Kilometers must be a whole number.');
+        showMessage(t('common.validation'), t('createVehicle.errors.kilometersWholeNumber'), { variant: 'error' });
         return;
       }
       km = kn;
@@ -392,7 +393,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
 
     const built = buildOptionalVehiclePayload(optionalStrings, optionalBools);
     if (built.error) {
-      Alert.alert('Validation', built.error);
+      showMessage(t('common.validation'), built.error, { variant: 'error' });
       return;
     }
 
@@ -437,7 +438,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
         client_phone: clientPhone || '',
       });
 
-      setDialogMessage('Vehicle created!');
+      setDialogMessage(t('createVehicle.errors.createdSuccess'));
       setDialogVisible(true);
 
       setTimeout(() => {
@@ -446,7 +447,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
       }, 1500);
     } catch (err) {
       console.error(err);
-      setDialogMessage(err.message || 'Submission failed');
+      setDialogMessage(err.message || t('createVehicle.errors.submitFailed'));
       setDialogVisible(true);
     } finally {
       setSaving(false);

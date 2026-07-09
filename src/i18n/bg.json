@@ -23,7 +23,8 @@
     "email": "Имейл",
     "number": "Номер",
     "allClear": "Всичко е наред",
-    "service": "Услуга"
+    "service": "Услуга",
+    "validation": "Валидация"
   },
   "language": {
     "label": "Език",
@@ -98,7 +99,10 @@
     "passwordsDoNotMatch": "Паролите не съвпадат.",
     "passwordMinLength": "Паролата трябва да е поне 6 символа.",
     "resetFailed": "Нулирането на паролата неуспешно.",
-    "resetSignInFailed": "Паролата беше сменена, но входът неуспешен. Влез ръчно."
+    "resetSignInFailed": "Паролата беше сменена, но входът неуспешен. Влез ръчно.",
+    "phonePrefix": "Префикс",
+    "phoneNumber": "Телефонен номер",
+    "phoneLoginHelper": "Използвай телефонния номер, свързан с акаунта ти."
   },
   "dashboard": {
     "heroSubtitle": "Автомобили, сервизна история и ремонти — на едно място.",
@@ -696,7 +700,22 @@
       "documentArchiveShopHint": "Архивът с документи е видим за собственика на автомобила.",
       "viewVehicleSpecs": "Виж спецификациите",
       "viewSpecs": "Виж спецификации",
-      "mileageConfidenceDetails": "Детайли за доверие в пробега"
+      "mileageConfidenceDetails": "Детайли за доверие в пробега",
+      "kilometersWholeNumber": "Пробегът трябва да е цяло число.",
+      "chooseValidDueDate": "Избери валидна крайна дата.",
+      "advanceNoticeDaysValidation": "Дните за предизвестие трябва да са цяло число или празно.",
+      "advanceNoticeKmValidation": "Километрите за предизвестие трябва да са цяло число или празно.",
+      "saveReminderError": "Неуспешно запазване на напомнянето.",
+      "noCompletedServiceTitle": "Няма завършен сервиз",
+      "noCompletedServiceBody": "Завършените сервизи ще се появят в историята на обслужване.",
+      "noRepairsTitle": "Няма ремонти",
+      "noRepairsBody": "Все още няма записи за ремонти за това превозно средство."
+    },
+    "editDetails": {
+      "loadTypesError": "Неуспешно зареждане на типовете превозни средства.",
+      "savedTitle": "Запазено",
+      "savedBody": "Данните за превозното средство са актуализирани.",
+      "saveError": "Неуспешно запазване на превозното средство."
     }
   },
   "fuelTypes": {
@@ -818,7 +837,28 @@
     "manualEntryHint": "Не намираш автомобила си? Въведи данните ръчно.",
     "useCatalogInstead": "Използвай избор от каталог",
     "registrationMileage": "Регистрация и пробег",
-    "kilometers": "Пробег"
+    "kilometers": "Пробег",
+    "errors": {
+      "selectTypeFirst": "Първо избери тип превозно средство.",
+      "selectBrandFirst": "Първо избери марка.",
+      "chooseMakeBrand": "Избери марка.",
+      "enterModel": "Въведи модела на превозното средство.",
+      "modelNotRecognizedTitle": "Моделът не е разпознат",
+      "modelNotRecognizedBody": "Не успяхме да съпоставим това име на модел. Провери правописа или избери предложение под полето за модел.",
+      "chooseYear": "Избери година на превозното средство.",
+      "chooseFuelType": "Избери тип гориво.",
+      "chooseCatalogOrManual": "Избери марка и модел от каталога или въведи модела ръчно.",
+      "kilometersWholeNumber": "Пробегът трябва да е цяло число.",
+      "loadCountriesError": "Неуспешно зареждане на държавите.",
+      "loadDataError": "Грешка при зареждане на данните за превозното средство",
+      "createdSuccess": "Превозното средство е създадено!",
+      "submitFailed": "Изпращането неуспешно"
+    },
+    "location": {
+      "title": "Местоположение",
+      "permissionBody": "Разреши достъп до местоположението, за да открием държавата ти.",
+      "countryError": "Не успяхме да определим държавата от местоположението."
+    }
   },
   "vehicleSpecSuggestion": {
     "lookingUp": "Търсене на спецификации за обслужване…",

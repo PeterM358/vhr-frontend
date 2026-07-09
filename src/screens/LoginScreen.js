@@ -277,7 +277,7 @@ export default function LoginScreen({ navigation, route }) {
             <>
               <View style={styles.phoneRow}>
                 <TextInput
-                  label="Prefix"
+                  label={t('auth.phonePrefix')}
                   mode="outlined"
                   theme={authInputTheme}
                   outlineColor="rgba(148,163,184,0.45)"
@@ -290,7 +290,7 @@ export default function LoginScreen({ navigation, route }) {
                   style={[styles.input, styles.prefixInput]}
                 />
                 <TextInput
-                  label="Phone number"
+                  label={t('auth.phoneNumber')}
                   mode="outlined"
                   theme={authInputTheme}
                   outlineColor="rgba(148,163,184,0.45)"
@@ -303,7 +303,7 @@ export default function LoginScreen({ navigation, route }) {
                   style={[styles.input, styles.phoneInput]}
                 />
               </View>
-              <Text style={styles.helperText}>Use the phone number linked to your account.</Text>
+              <Text style={styles.helperText}>{t('auth.phoneLoginHelper')}</Text>
             </>
           )}
 
