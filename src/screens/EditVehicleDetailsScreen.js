@@ -202,15 +202,15 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
 
   const registrationDateLabel = useMemo(() => {
     const iso = String(regFirstIso || '').trim();
-    return iso ? isoToDisplayDate(iso) || iso : 'Not set';
-  }, [regFirstIso]);
+    return iso ? isoToDisplayDate(iso) || iso : t('vehicles.detail.notSet');
+  }, [regFirstIso, t]);
 
   const registrationCountryLabel = useMemo(() => {
     const code = String(regCountryIso || '').trim().toUpperCase();
-    if (!code) return 'Not set';
+    if (!code) return t('vehicles.detail.notSet');
     const hit = countryPickerOptions.find((o) => o.value === code);
     return hit?.label || code;
-  }, [regCountryIso, countryPickerOptions]);
+  }, [regCountryIso, countryPickerOptions, t]);
 
   const showTrailerPoweredEquipmentToggle = useMemo(
     () =>
@@ -235,11 +235,11 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
 
   const vehicleTypeLabel = useCallback(
     (typeId) => {
-      if (!typeId) return 'Not set';
+      if (!typeId) return t('vehicles.detail.notSet');
       const row = vehicleTypes.find((vt) => String(vt.id) === String(typeId));
-      return row?.name || identityTypeName || 'Not set';
+      return row?.name || identityTypeName || t('vehicles.detail.notSet');
     },
-    [vehicleTypes, identityTypeName]
+    [vehicleTypes, identityTypeName, t]
   );
 
   const applyVehicleTypeChange = useCallback(
@@ -270,7 +270,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
       setSelectedVehicleTypeId(next);
       const row = vehicleTypes.find((vt) => String(vt.id) === next);
       setVehicleTypeCode(row?.code || '');
-      setIdentityTypeName(row?.name || 'Not set');
+      setIdentityTypeName(row?.name || t('vehicles.detail.notSet'));
     },
     [selectedVehicleTypeId, vehicleTypeLabel, vehicleTypes]
   );
@@ -339,7 +339,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
         setInitialVehicleTypeId(resolvedTypeId);
         setVehicleTypeCode(vehicle.vehicle_type_code || '');
         setIdentityPlate(vehicle.license_plate || '—');
-        setIdentityTypeName(vehicle.vehicle_type_name || 'Not set');
+        setIdentityTypeName(vehicle.vehicle_type_name || t('vehicles.detail.notSet'));
         const line =
           [vehicle.catalog_brand_name, vehicle.catalog_model_name, vehicle.catalog_generation_name]
             .filter(Boolean)
@@ -627,9 +627,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
             </FloatingCard>
           ) : null}
 
-          <Text style={styles.sectionLead}>
-            Edit engine, trailer, e-bike, and other technical fields below. Service reminders are edited from each reminder row on the vehicle screen.
-          </Text>
+          <Text style={styles.sectionLead}>{t('vehicles.detail.technicalEditLead')}</Text>
 
           {showEbikeCatalogSection || showTrailerCatalogSection ? (
             <VehicleCatalogEbikeTrailerSection
@@ -657,7 +655,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
             </FloatingCard>
           ) : null}
 
-          <Text style={styles.optionalIntro}>Technical sections (collapsed)</Text>
+          <Text style={styles.optionalIntro}>{t('vehicles.detail.technicalSectionsCollapsed')}</Text>
           <VehicleCollapsibleFormSections
             expanded={expandedOptional}
             onToggle={toggleOptional}

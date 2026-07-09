@@ -92,6 +92,8 @@ import {
   navigateToVehicleServiceRecordCenter,
   navigateToVehicleServiceRecordCenterAdd,
 } from '../navigation/webNavigation';
+import { useTranslation } from '../i18n';
+import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 import {
   saveServiceRecordFormDraft,
   loadServiceRecordFormDraft,
@@ -132,6 +134,7 @@ async function applyPostCreateReminderPatches({
 
 export default function LogServiceRecordScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const vehicleId = route.params?.vehicleId != null ? String(route.params.vehicleId) : '';
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useVehicleDetailBack(navigation, vehicleId);
@@ -1110,8 +1113,8 @@ export default function LogServiceRecordScreen({ navigation, route }) {
     <ScreenBackground safeArea={false}>
       <View style={styles.root}>
         <AppNavigationBar
-          title="Add Service Record"
-          backLabel="Vehicle"
+          title={t('logServiceRecord.title')}
+          backLabel={t('vehicles.vehicle')}
           onBack={handleBack}
           scrolled={scrolled}
         />
@@ -1129,10 +1132,10 @@ export default function LogServiceRecordScreen({ navigation, route }) {
         >
           <FloatingCard>
             <Text variant="titleMedium" style={styles.sectionTitle}>
-              Add Service Record
+              {t('logServiceRecord.title')}
             </Text>
             <Text style={styles.subtitle}>
-              Use this for completed maintenance or repair work.
+              {t('logServiceRecord.subtitle')}
             </Text>
             {vehicleSummary ? (
               <View style={styles.vehicleSummaryCard}>
@@ -1141,22 +1144,30 @@ export default function LogServiceRecordScreen({ navigation, route }) {
                 <Text style={styles.vehicleSummaryKm}>{vehicleSummary.km}</Text>
               </View>
             ) : (
-              <Text style={styles.sectionHint}>Vehicle not loaded.</Text>
+              <Text style={styles.sectionHint}>{t('logServiceRecord.vehicleNotLoaded')}</Text>
             )}
           </FloatingCard>
 
           <FloatingCard>
             <Text variant="titleMedium" style={styles.sectionTitle}>
-              Service
+              {t('logServiceRecord.sections.service')}
             </Text>
             <Text variant="labelLarge" style={styles.label}>
-              Service type *
+              {t('logServiceRecord.serviceTypeLabel')}
             </Text>
             <View style={styles.pickerContainer}>
               <Picker selectedValue={repairTypeId} onValueChange={setRepairTypeId} style={styles.picker}>
-                <Picker.Item label="Select type…" value="" />
-                {filteredTypes.map((t) => (
-                  <Picker.Item key={t.id} label={t.name || `Type ${t.id}`} value={String(t.id)} />
+                <Picker.Item label={t('logServiceRecord.selectType')} value="" />
+                {filteredTypes.map((repairType) => (
+                  <Picker.Item
+                    key={repairType.id}
+                    label={
+                      translateRepairTypeLabel(repairType, t) ||
+                      repairType.name ||
+                      `Type ${repairType.id}`
+                    }
+                    value={String(repairType.id)}
+                  />
                 ))}
               </Picker>
             </View>
@@ -1413,20 +1424,20 @@ export default function LogServiceRecordScreen({ navigation, route }) {
             style={styles.sendButton}
             contentStyle={styles.sendButtonContent}
           >
-            Save service record
+            {t('logServiceRecord.save')}
           </Button>
         </View>
       </View>
 
       <Portal>
         <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)}>
-          <Dialog.Title>Notice</Dialog.Title>
+          <Dialog.Title>{t('common.notice')}</Dialog.Title>
           <Dialog.Content>
             <Text>{dialogMessage}</Text>
           </Dialog.Content>
           <Dialog.Actions>
             <Button mode="text" onPress={() => setDialogVisible(false)}>
-              OK
+              {t('common.ok')}
             </Button>
           </Dialog.Actions>
         </Dialog>

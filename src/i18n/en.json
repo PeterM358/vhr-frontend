@@ -609,10 +609,95 @@
       "addServiceRecord": "Add service record",
       "addObligationPayment": "Add obligation / payment",
       "serviceProvider": "Service provider",
+      "completedAt": "Completed",
+      "total": "Total",
+      "kilometersFinal": "final",
+      "providerSelfRepair": "Self repair",
+      "providerAuthorizedCenter": "Authorized service center",
+      "providerWorkshop": "Workshop",
       "needsClassification": "Needs classification",
       "noDateOrMileage": "No date or mileage set yet.",
-      "vinHint": "Add VIN for better parts and service matching."
+      "vinHint": "Add VIN for better parts and service matching.",
+      "registrationCountry": "Registration country",
+      "firstRegistration": "First registration",
+      "notSetDash": "— Not set —",
+      "clearRegistration": "Clear",
+      "registrationHintWeb": "Optional. Month and year when the vehicle was first registered. Country can be updated later.",
+      "registrationHintNative": "Optional. Add first registration if you skipped it at create. You can change country later (e.g. if the vehicle was registered abroad).",
+      "registrationHintLockedSuffix": " First registration date cannot be changed after it is saved.",
+      "registrationDateModalHint": "Pick the month and year the vehicle was first registered.",
+      "technicalSectionsCollapsed": "Technical sections (collapsed)",
+      "technicalEditLead": "Edit engine, trailer, e-bike, and other technical fields below. Service reminders are edited from each reminder row on the vehicle screen.",
+      "maintenanceSpecifications": "Maintenance specifications",
+      "maintenanceSpecsHelper": "These are vehicle specifications, not service reminders.",
+      "mileageEvidenceHelper": "Higher confidence comes from receipts, service-center records, inspections, and before/after media.",
+      "obligationsManualHint": "Legal obligations can be entered manually now. Automatic checks by plate/VIN can be added later where legally available.",
+      "updateKilometersReminderPrompt": "Update kilometers to improve reminders.",
+      "activeRepairsHint": "Active repairs are kept separate from permanent service history.",
+      "activeRepairsEmpty": "No open or in-progress repairs on this vehicle.",
+      "serviceHistoryEmpty": "Completed jobs will appear here as part of your service history.",
+      "serviceHistoryCollapsed_one": "1 completed record. Expand to review details.",
+      "serviceHistoryCollapsed_other": "{count} completed records. Expand to review details.",
+      "authorizedCentersHint": "Authorizing a center shares full mechanical service history, reminders, and specs. Booking a repair without authorizing only grants job access: {jobAccessHint}",
+      "authorizedCentersEmpty": "No service centers are authorized yet.",
+      "authorizedCentersCollapsed_one": "1 authorized center. Expand to manage access.",
+      "authorizedCentersCollapsed_other": "{count} authorized centers. Expand to manage access.",
+      "bookingJobAccessHint": "Automatic when you book a repair. The center sees this job plus prior work in the same service area (e.g. brakes, oil).",
+      "locationNotSpecified": "Location not specified",
+      "fullMechanicalHistory": "Full mechanical history",
+      "tapForShopProfile": "Tap for shop profile",
+      "removeAccess": "Remove access",
+      "findServiceCenters": "Find service centers",
+      "manageServiceCenterAccess": "Manage service center access",
+      "autoCheckLaterTitle": "Auto-check later",
+      "autoCheckLaterBody": "Automatic checks are not enabled yet. You can enter the date manually.",
+      "tryAutoCheck": "Try auto-check",
+      "currentKilometersRepair": "Current kilometers",
+      "requestKilometers": "Request kilometers",
+      "reminderDueDateInsurance": "Set policy valid-until date",
+      "reminderDueDateInspection": "Set next inspection due date",
+      "reminderDueDateVignette": "Set vignette valid-until date",
+      "reminderDueDateRoadTax": "Set annual fee/tax due date",
+      "reminderDueDateDefault": "Set due date",
+      "reminderDueDateLabel": "Due date",
+      "reminderDueKilometersLabel": "Due kilometers",
+      "reminderNotifyDaysBefore": "Notify days before",
+      "reminderNotifyKmBefore": "Notify km before",
+      "reminderNotesOptional": "Notes (optional)",
+      "kmUpdateError": "Could not update kilometers.",
+      "reminderUnavailableTitle": "Reminder unavailable",
+      "reminderUnavailableBody": "This reminder is not loaded yet. Try again in a moment, or pull to refresh when available.",
+      "dueKilometersValidation": "Due kilometers must be a whole number or empty.",
+      "revokeAccessTitle": "Revoke access?",
+      "revokeAccessConfirm": "Remove access",
+      "authorizationUpdateError": "Could not update authorization."
     }
+  },
+  "fuelTypes": {
+    "diesel": "diesel",
+    "petrol": "petrol",
+    "gasoline": "gasoline",
+    "hybrid": "hybrid",
+    "electric": "electric",
+    "lpg": "lpg",
+    "cng": "cng",
+    "hydrogen": "hydrogen",
+    "other": "other"
+  },
+  "logServiceRecord": {
+    "title": "Add Service Record",
+    "subtitle": "Use this for completed maintenance or repair work.",
+    "vehicleNotLoaded": "Vehicle not loaded.",
+    "sections": {
+      "service": "Service",
+      "serviceDateMileage": "Service date & mileage",
+      "costs": "Costs",
+      "serviceProvider": "Service provider",
+      "notesEvidence": "Notes & evidence"
+    },
+    "serviceTypeLabel": "Service type *",
+    "selectType": "Select type…",
+    "save": "Save service record"
   },
   "mileageConfidence": {
     "title": "Mileage confidence",
@@ -641,9 +726,75 @@
       "viewServiceHistory": "View service history",
       "viewTimeline": "View timeline",
       "viewRecord": "View record",
+      "viewRecords": "View records",
+      "reviewHistory": "Review history",
       "addServiceRecord": "Add service record",
       "logServiceWithProvider": "Log service with provider",
+      "addReceiptOnRecord": "Add receipt on service record",
+      "addOdometerPhoto": "Add odometer photo",
+      "viewInspectionReminder": "View inspection reminder",
+      "addInspectionReminder": "Add inspection reminder",
+      "manageAccess": "Manage access",
       "open": "Open"
+    },
+    "workshopFallback": "Workshop",
+    "fallbackSummary": "Not enough corroborating records yet.",
+    "defaultHelper": "Confidence is built from service history, documents, and photos — never blocks saving records.",
+    "summaries": {
+      "verified": "Strong service history with corroborating records.",
+      "high": "Good supporting history; keep adding receipts or shop-confirmed records when you can.",
+      "mediumRollback": "Some history present, but mileage gaps or corrections lowered confidence.",
+      "mediumWorkshop": "{count} service record(s) on file including workshop names; shop-confirmed records and receipts would raise trust further.",
+      "mediumPartial": "Partial history; add receipts, shop-confirmed records, or optional odometer photos.",
+      "lowRollback": "Limited evidence and mileage corrections were noted — history is still saved.",
+      "lowWithRecords": "{count} service record(s) on file; attach receipts or optional odometer photos to improve confidence.",
+      "lowEmpty": "Log completed services and attach proof over time — nothing blocks saving corrections."
+    },
+    "factors": {
+      "service_history_on_file": {
+        "positive": "{count} completed service record on file",
+        "positive_plural": "{count} completed service records on file",
+        "missing": "No completed service records yet"
+      },
+      "chronological_service_history": {
+        "positive": "Chronological service history",
+        "negative": "Service history order or mileage progression looks uneven",
+        "missing": "Add more dated service records for a clearer timeline"
+      },
+      "workshop_attributed_records": {
+        "positive_one": "Workshop on service record — {shopName}",
+        "positive_many": "Workshop on {count} service records (latest: {shopName})",
+        "missing": "No workshop named on service records yet"
+      },
+      "service_center_confirmed_records": {
+        "positive": "Shop-confirmed on platform ({count} record)",
+        "positive_plural": "Shop-confirmed on platform ({count} records)",
+        "neutral": "Workshop named on record — not shop-confirmed on platform yet",
+        "missing": "No shop-confirmed records yet (booked or shop-entered jobs)"
+      },
+      "receipts_invoices_attached": {
+        "positive": "Receipts / invoices attached",
+        "missing": "No receipts / invoices attached yet"
+      },
+      "odometer_photos_attached": {
+        "positive": "Odometer photos attached",
+        "missing": "No odometer photos yet (optional — helps verify mileage)"
+      },
+      "technical_inspection_records": {
+        "positive": "Technical inspection records",
+        "neutral": "Inspection reminder is set, but no inspection evidence record is attached yet",
+        "missing": "No inspection / imported records yet"
+      },
+      "authorized_service_centers": {
+        "neutral": "{count} authorized service center (can view history — separate from mileage proof)",
+        "neutral_plural": "{count} authorized service centers (can view history — separate from mileage proof)"
+      }
+    },
+    "warnings": {
+      "mileage_inconsistencies": "Mileage inconsistencies detected",
+      "mileage_lower_than_prior": "Lower mileage entered after a higher recorded mileage",
+      "possible_odometer_rollback": "Possible odometer rollback detected",
+      "dashboard_replacement_hint": "Dashboard replacement or correction may have occurred"
     }
   },
   "repairStatuses": {
@@ -690,11 +841,14 @@
       "obligation_overdue": "{type} overdue"
     },
     "domains": {
-      "oil": "Oil service",
+      "oil": "Oil service history",
       "brake": "Brake service",
+      "brake_history": "Brake history",
       "reminders": "Reminders",
       "mileage": "Mileage",
-      "active_repairs": "Active repairs"
+      "active_repairs": "Active repairs",
+      "denied_repairs": "Repair request",
+      "obligations": "Obligations"
     },
     "actions": {
       "update_km": "Update kilometers",
@@ -710,11 +864,21 @@
       "overdue": "Overdue",
       "due_soon": "Due soon",
       "done": "Done",
+      "completed": "Completed",
+      "active_until": "Active until",
       "active_until_due": "Active until due",
       "prediction_only": "Estimated — confirm date"
     },
+    "due": {
+      "date": "Due {date}",
+      "kilometers": "Due at {km} km",
+      "operatingHours": "Due at {hours} h",
+      "estimatedCalendar": "Est. calendar {date}",
+      "estimatedConfidence": " · {confidence} confidence"
+    },
     "cta": {
-      "set_reminder": "Set reminder"
+      "set_reminder": "Set reminder",
+      "add_date_set_reminder": "Add date · Set reminder"
     },
     "types": {
       "insurance": "Insurance",

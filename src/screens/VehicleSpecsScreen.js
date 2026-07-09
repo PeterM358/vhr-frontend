@@ -27,7 +27,7 @@ import {
   navigateToVehicleManageServiceCenters,
   navigateToVehicleServiceRecordNew,
 } from '../navigation/webNavigation';
-import { useTranslation, translateMileageConfidenceCategory, translateVehicleFieldLabel, translateVehicleGroupTitle } from '../i18n';
+import { useTranslation, translateMileageConfidenceCategory, translateVehicleFieldLabel, translateVehicleGroupTitle, translateFuelTypeLabel } from '../i18n';
 import { translateVehicleTypeLabel } from '../utils/translateShopTypeLabels';
 
 function isoToDisplayDate(isoDate) {
@@ -231,7 +231,9 @@ export default function VehicleSpecsScreen({ navigation, route }) {
       const v = vehicle[f.key];
       if (v == null || v === '') return;
       let display = String(v);
-      if (f.kind === 'choice') {
+      if (f.key === 'fuel_type') {
+        display = translateFuelTypeLabel(v, t);
+      } else if (f.kind === 'choice') {
         const lbl = choiceLabel(choices, f.key, v);
         display = lbl != null ? lbl : String(v);
       } else if (f.kind === 'odometer_picker' || f.key === 'odometer_source') {

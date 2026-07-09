@@ -50,7 +50,7 @@ import {
   resolveMileageFactorAction,
 } from '../utils/mileageConfidence';
 import { mapHealthFromApi } from '../utils/vehicleHealthStatus';
-import { formatBookingAccessHint, formatRevokeConfirmMessage } from '../utils/shopDataAccess';
+import { formatRevokeConfirmMessage } from '../utils/shopDataAccess';
 import { navigateToVehicleServiceRecordNew, navigateToVehicleReminderNew, navigateToVehicleManageServiceCenters, navigateToVehicleSpecs } from '../navigation/webNavigation';
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import {
@@ -59,6 +59,10 @@ import {
   translateReminderUiStatus,
   translateRepairStatus,
   translateMileageConfidenceCategory,
+  formatVehicleReminderDueLine,
+  translateReminderCtaLabel,
+  translateMileagePredictionPrompt,
+  translateReminderDueDateTitle,
 } from '../i18n';
 import { translateVehicleTypeLabel, translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 
@@ -77,29 +81,6 @@ const SUSPENSION_REMINDER_ROW = {
   icon: 'shock-absorber',
 };
 
-function formatVehicleReminderDueLine(reminder) {
-  if (!reminder) return null;
-  const parts = [];
-  if (reminder.due_date) {
-    const label = isoToDisplayDate(String(reminder.due_date).slice(0, 10)) || reminder.due_date;
-    parts.push(`Due ${label}`);
-  }
-  if (reminder.due_kilometers != null && reminder.due_kilometers !== '') {
-    const n = Number(reminder.due_kilometers);
-    if (Number.isFinite(n)) parts.push(`Due at ${n.toLocaleString()} km`);
-  }
-  if (reminder.due_operating_hours != null && reminder.due_operating_hours !== '') {
-    const h = Number(reminder.due_operating_hours);
-    if (Number.isFinite(h)) parts.push(`Due at ${h.toLocaleString()} h`);
-  }
-  if (reminder.predicted_due_date && !reminder.due_date) {
-    const conf = reminder.prediction_confidence ? ` · ${reminder.prediction_confidence} confidence` : '';
-    const est = isoToDisplayDate(String(reminder.predicted_due_date).slice(0, 10)) || reminder.predicted_due_date;
-    parts.push(`Est. calendar ${est}${conf}`);
-  }
-  return parts.length ? parts.join(' · ') : null;
-}
-
 function reminderUiTone(uiStatus) {
   const k = String(uiStatus || '').toLowerCase();
   if (k === 'overdue') return { bg: 'rgba(220,38,38,0.15)', fg: '#B91C1C' };
@@ -108,14 +89,6 @@ function reminderUiTone(uiStatus) {
   if (k === 'active_until') return { bg: 'rgba(22,163,74,0.15)', fg: '#15803D' };
   if (k === 'completed') return { bg: 'rgba(22,163,74,0.15)', fg: '#15803D' };
   return { bg: 'rgba(100,116,139,0.12)', fg: '#475569' };
-}
-
-function reminderDueDateHelper(reminderType) {
-  if (reminderType === 'insurance') return 'Set policy valid-until date';
-  if (reminderType === 'technical_inspection') return 'Set next inspection due date';
-  if (reminderType === 'vignette') return 'Set vignette valid-until date';
-  if (reminderType === 'road_tax') return 'Set annual fee/tax due date';
-  return 'Set due date';
 }
 
 function isObligationReminderType(reminderType) {
@@ -302,7 +275,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
       setKmModalVisible(false);
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', e.message || 'Could not update kilometers.');
+      Alert.alert(t('common.error'), e.message || t('vehicles.detail.kmUpdateError'));
     } finally {
       setKmSaving(false);
     }
@@ -313,8 +286,8 @@ export default function VehicleDetailScreen({ route, navigation }) {
     const r = reminderRow;
     if (!r?.id) {
       Alert.alert(
-        'Reminder unavailable',
-        'This reminder is not loaded yet. Try again in a moment, or pull to refresh when available.'
+        t('vehicles.detail.reminderUnavailableTitle'),
+        t('vehicles.detail.reminderUnavailableBody')
       );
       return;
     }
@@ -359,7 +332,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
 
     const dueKm = parseOptionalInt(reminderDraft.due_kilometers);
     if (dueKm === undefined) {
-      Alert.alert('Validation', 'Due kilometers must be a whole number or empty.');
+      Alert.alert(t('common.notice'), t('vehicles.detail.dueKilometersValidation'));
       return;
     }
     const advDays = parseOptionalInt(reminderDraft.advance_notice_days);
@@ -539,7 +512,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
     [navigation, vehicleId]
   );
 
-  const vehicleHealth = useMemo(() => mapHealthFromApi(vehicle), [vehicle]);
+  const vehicleHealth = useMemo(() => mapHealthFromApi(vehicle, t), [vehicle, t]);
 
   const handleHealthAction = useCallback(
     (actionKey, row) => {
@@ -892,11 +865,11 @@ export default function VehicleDetailScreen({ route, navigation }) {
           <StatusBadge status={item.status} label={translateRepairStatus(item.status, t)} />
         </View>
         <Text style={styles.repairMeta} numberOfLines={2}>
-          {t('vehicles.detail.serviceProvider')}: {formatServiceRecordProvider(item)}
+          {t('vehicles.detail.serviceProvider')}: {formatServiceRecordProvider(item, t)}
         </Text>
         {item.final_kilometers != null || (item.kilometers != null && item.kilometers !== '') ? (
           <Text style={styles.repairMeta}>
-            {item.final_kilometers != null ? 'Current kilometers' : 'Request kilometers'}:{' '}
+            {item.final_kilometers != null ? t('vehicles.detail.currentKilometersRepair') : t('vehicles.detail.requestKilometers')}:{' '}
             {item.final_kilometers != null
               ? Number(item.final_kilometers).toLocaleString()
               : Number(item.kilometers).toLocaleString()}
@@ -931,25 +904,26 @@ export default function VehicleDetailScreen({ route, navigation }) {
             </View>
           </View>
           <Text style={styles.repairMeta} numberOfLines={2}>
-            Service provider: {formatServiceRecordProvider(item)}
+          {t('vehicles.detail.serviceProvider')}: {formatServiceRecordProvider(item, t)}
+        </Text>
+        {mediaIndicatorLabel(item) ? (
+          <Chip compact style={styles.mediaChip}>
+            {mediaIndicatorLabel(item)}
+          </Chip>
+        ) : null}
+        <Text style={styles.repairMeta}>
+          {t('vehicles.detail.completedAt')}:{' '}
+          {item.completed_at ? new Date(item.completed_at).toLocaleDateString() : '—'}
+        </Text>
+        <Text style={styles.repairMeta}>
+          {t('vehicles.detail.kilometersLabel')}: {km}
+          {item.final_kilometers != null ? ` (${t('vehicles.detail.kilometersFinal')})` : ''}
+        </Text>
+        {item.total_price != null && item.total_price !== '' ? (
+          <Text style={styles.repairTotalLine}>
+            {t('vehicles.detail.total')}: {Number(item.total_price).toLocaleString()} {currency}
           </Text>
-          {mediaIndicatorLabel(item) ? (
-            <Chip compact style={styles.mediaChip}>
-              {mediaIndicatorLabel(item)}
-            </Chip>
-          ) : null}
-          <Text style={styles.repairMeta}>
-            Completed: {item.completed_at ? new Date(item.completed_at).toLocaleDateString() : '—'}
-          </Text>
-          <Text style={styles.repairMeta}>
-            Kilometers: {km}
-            {item.final_kilometers != null ? ' (final)' : ''}
-          </Text>
-          {item.total_price != null && item.total_price !== '' ? (
-            <Text style={styles.repairTotalLine}>
-              Total: {Number(item.total_price).toLocaleString()} {currency}
-            </Text>
-          ) : null}
+        ) : null}
         </View>
       </TouchableRipple>
     );
@@ -1036,18 +1010,18 @@ export default function VehicleDetailScreen({ route, navigation }) {
       setVehicle(updated);
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Could not update authorization.');
+      Alert.alert(t('common.error'), t('vehicles.detail.authorizationUpdateError', null, 'Could not update authorization.'));
     }
   };
 
   const handleRevokeAuthorizedCenter = (center) => {
     Alert.alert(
-      'Remove access?',
-      formatRevokeConfirmMessage(center?.name || 'This service center'),
+      t('vehicles.detail.revokeAccessTitle'),
+      formatRevokeConfirmMessage(center?.name || t('mileageConfidence.workshopFallback')),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Remove access',
+          text: t('vehicles.detail.revokeAccessConfirm'),
           style: 'destructive',
           onPress: () => setCenterAuthorized(center, false),
         },
@@ -1343,17 +1317,21 @@ export default function VehicleDetailScreen({ route, navigation }) {
             {sectionsExpanded.remindersObligations ? (
               <>
                 <Text style={styles.sectionHint}>
-                  Legal obligations can be entered manually now. Automatic checks by plate/VIN can be added later where legally available.
+                  {t('vehicles.detail.obligationsManualHint')}
                 </Text>
                 {vehicle?.mileage_prediction_hints?.prompt_message ? (
-                  <Text style={styles.reminderOdometerPrompt}>{vehicle.mileage_prediction_hints.prompt_message}</Text>
+                  <Text style={styles.reminderOdometerPrompt}>
+                    {translateMileagePredictionPrompt(vehicle.mileage_prediction_hints.prompt_message, t)}
+                  </Text>
                 ) : null}
                 {reminderSectionRows.map((row) => {
                   const r = remindersByType[row.reminder_type];
-                  const dueLine = formatVehicleReminderDueLine(r);
+                  const dueLine = formatVehicleReminderDueLine(r, t);
                   const uiStatus = r?.ui_status || 'pending_setup';
                   const tone = reminderUiTone(uiStatus);
-                  const ctaText = r?.cta_label || (!dueLine && !isShop ? 'Add date · Set reminder' : null);
+                  const ctaText =
+                    translateReminderCtaLabel(r?.cta_label, t) ||
+                    (!dueLine && !isShop ? t('reminders.cta.add_date_set_reminder') : null);
                   return (
                     <Pressable
                       key={row.reminder_type}
@@ -1386,14 +1364,14 @@ export default function VehicleDetailScreen({ route, navigation }) {
                             compact
                             onPress={() =>
                               Alert.alert(
-                                'Auto-check later',
-                                'Automatic checks are not enabled yet. You can enter the date manually.'
+                                t('vehicles.detail.autoCheckLaterTitle'),
+                                t('vehicles.detail.autoCheckLaterBody')
                               )
                             }
                             labelStyle={styles.reminderAutoCheckLabel}
                             style={styles.reminderAutoCheckBtn}
                           >
-                            Try auto-check
+                            {t('vehicles.detail.tryAutoCheck')}
                           </Button>
                         ) : null}
                       </View>
@@ -1421,14 +1399,14 @@ export default function VehicleDetailScreen({ route, navigation }) {
             <FloatingCard>
               <Text style={styles.sectionTitle}>{t('vehicles.detail.activeRepairs')}</Text>
               <Text style={styles.sectionHint}>
-                Active repairs are kept separate from permanent service history.
+                {t('vehicles.detail.activeRepairsHint')}
               </Text>
               {activeRepairsList.length ? (
                 activeRepairsList.map((item) => (
                   <View key={`active-${item.id}`}>{renderActiveRepairCard(item)}</View>
                 ))
               ) : (
-                <Text style={styles.inlineEmptyMuted}>No open or in-progress repairs on this vehicle.</Text>
+                <Text style={styles.inlineEmptyMuted}>{t('vehicles.detail.activeRepairsEmpty')}</Text>
               )}
             </FloatingCard>
           </View>
@@ -1448,12 +1426,17 @@ export default function VehicleDetailScreen({ route, navigation }) {
                 ))
               ) : (
                 <Text style={styles.inlineEmptyMuted}>
-                  Completed jobs will appear here as part of your service history.
+                  {t('vehicles.detail.serviceHistoryEmpty')}
                 </Text>
               )
             ) : (
               <Text style={styles.sectionHint}>
-                {serviceHistorySorted.length} completed records. Expand to review details.
+                {t(
+                  serviceHistorySorted.length === 1
+                    ? 'vehicles.detail.serviceHistoryCollapsed_one'
+                    : 'vehicles.detail.serviceHistoryCollapsed_other',
+                  { count: serviceHistorySorted.length }
+                )}
               </Text>
             )}
             </FloatingCard>
@@ -1471,8 +1454,9 @@ export default function VehicleDetailScreen({ route, navigation }) {
             {sectionsExpanded.authorizedCenters ? (
               <>
                 <Text style={styles.sectionHint}>
-                  Authorizing a center shares full mechanical service history, reminders, and specs. Booking a repair
-                  without authorizing only grants job access: {formatBookingAccessHint()}
+                  {t('vehicles.detail.authorizedCentersHint', {
+                    jobAccessHint: t('vehicles.detail.bookingJobAccessHint'),
+                  })}
                 </Text>
                 {authorizedServiceCenters.length ? (
                   <View style={styles.authorizedList}>
@@ -1488,10 +1472,10 @@ export default function VehicleDetailScreen({ route, navigation }) {
                         <View style={styles.authorizedCardMain}>
                           <Text style={styles.authorizedName}>{center.name}</Text>
                           <Text style={styles.authorizedLocation}>
-                            {center.location || 'Location not specified'}
+                            {center.location || t('vehicles.detail.locationNotSpecified')}
                           </Text>
-                          <Text style={styles.authorizedAccessBadge}>Full mechanical history</Text>
-                          <Text style={styles.authorizedTapHint}>Tap for shop profile</Text>
+                          <Text style={styles.authorizedAccessBadge}>{t('vehicles.detail.fullMechanicalHistory')}</Text>
+                          <Text style={styles.authorizedTapHint}>{t('vehicles.detail.tapForShopProfile')}</Text>
                         </View>
                         <Button
                           mode="outlined"
@@ -1501,27 +1485,31 @@ export default function VehicleDetailScreen({ route, navigation }) {
                             handleRevokeAuthorizedCenter(center);
                           }}
                         >
-                          Remove access
+                          {t('vehicles.detail.removeAccess')}
                         </Button>
                       </Pressable>
                     ))}
                   </View>
                 ) : (
-                  <Text style={styles.sectionHint}>No service centers are authorized yet.</Text>
+                  <Text style={styles.sectionHint}>{t('vehicles.detail.authorizedCentersEmpty')}</Text>
                 )}
                 <View style={styles.quickActions}>
                   <Button mode="contained" icon="map-search" onPress={handleFindServiceCenters}>
-                    Find service centers
+                    {t('vehicles.detail.findServiceCenters')}
                   </Button>
                   <Button mode="outlined" icon="store-cog" onPress={handleManageServiceCenters}>
-                    Manage service center access
+                    {t('vehicles.detail.manageServiceCenterAccess')}
                   </Button>
                 </View>
               </>
             ) : (
               <Text style={styles.sectionHint}>
-                {authorizedServiceCenters.length} authorized center
-                {authorizedServiceCenters.length === 1 ? '' : 's'}. Expand to manage access.
+                {t(
+                  authorizedServiceCenters.length === 1
+                    ? 'vehicles.detail.authorizedCentersCollapsed_one'
+                    : 'vehicles.detail.authorizedCentersCollapsed_other',
+                  { count: authorizedServiceCenters.length }
+                )}
               </Text>
             )}
           </FloatingCard>
@@ -1618,10 +1606,10 @@ export default function VehicleDetailScreen({ route, navigation }) {
         >
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <Text style={styles.modalTitle}>
-              {reminderDueDateHelper(reminderDraft.reminder_type)}
+              {translateReminderDueDateTitle(reminderDraft.reminder_type, t)}
             </Text>
             <ServiceRecordDatePicker
-              label="Due date"
+              label={t('vehicles.detail.reminderDueDateLabel')}
               valueIso={reminderDraft.due_date}
               onChangeIso={(iso) => setReminderDraft((d) => ({ ...d, due_date: iso }))}
               optional={isObligationReminderType(reminderDraft.reminder_type)}
@@ -1629,36 +1617,36 @@ export default function VehicleDetailScreen({ route, navigation }) {
             {!isObligationReminderType(reminderDraft.reminder_type) ? (
               <TextInput
                 mode="outlined"
-                label="Due kilometers"
+                label={t('vehicles.detail.reminderDueKilometersLabel')}
                 value={reminderDraft.due_kilometers}
-                onChangeText={(t) => setReminderDraft((d) => ({ ...d, due_kilometers: t }))}
+                onChangeText={(val) => setReminderDraft((d) => ({ ...d, due_kilometers: val }))}
                 keyboardType="number-pad"
                 style={styles.modalInput}
               />
             ) : null}
             <TextInput
               mode="outlined"
-              label="Notify days before"
+              label={t('vehicles.detail.reminderNotifyDaysBefore')}
               value={reminderDraft.advance_notice_days}
-              onChangeText={(t) => setReminderDraft((d) => ({ ...d, advance_notice_days: t }))}
+              onChangeText={(val) => setReminderDraft((d) => ({ ...d, advance_notice_days: val }))}
               keyboardType="number-pad"
               style={styles.modalInput}
             />
             {!isObligationReminderType(reminderDraft.reminder_type) ? (
               <TextInput
                 mode="outlined"
-                label="Notify km before"
+                label={t('vehicles.detail.reminderNotifyKmBefore')}
                 value={reminderDraft.advance_notice_kilometers}
-                onChangeText={(t) => setReminderDraft((d) => ({ ...d, advance_notice_kilometers: t }))}
+                onChangeText={(val) => setReminderDraft((d) => ({ ...d, advance_notice_kilometers: val }))}
                 keyboardType="number-pad"
                 style={styles.modalInput}
               />
             ) : null}
             <TextInput
               mode="outlined"
-              label="Notes (optional)"
+              label={t('vehicles.detail.reminderNotesOptional')}
               value={reminderDraft.source_note}
-              onChangeText={(t) => setReminderDraft((d) => ({ ...d, source_note: t }))}
+              onChangeText={(val) => setReminderDraft((d) => ({ ...d, source_note: val }))}
               style={styles.modalInput}
             />
             <View style={styles.modalActions}>

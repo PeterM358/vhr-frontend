@@ -2,14 +2,17 @@
  * Labels for owner-logged service record provider and trust hints.
  */
 
-export function formatServiceRecordProvider(repair) {
-  if (!repair) return 'Not specified';
-  if (repair.self_repair) return 'Self repair';
+export function formatServiceRecordProvider(repair, translateFn) {
+  const tr = (key, fallback) =>
+    translateFn ? translateFn(key, null, fallback) : fallback;
+
+  if (!repair) return tr('vehicles.detail.notSpecified', 'Not specified');
+  if (repair.self_repair) return tr('vehicles.detail.providerSelfRepair', 'Self repair');
 
   const shopId = repair.shop_profile ?? repair.shop_profile_id;
   const shopName = String(repair.shop_profile_name || '').trim();
   if (shopId && shopName) return shopName;
-  if (shopId) return 'Authorized service center';
+  if (shopId) return tr('vehicles.detail.providerAuthorizedCenter', 'Authorized service center');
 
   const manualName = String(repair.manual_service_center_name || '').trim();
   if (manualName) return manualName;
@@ -22,10 +25,10 @@ export function formatServiceRecordProvider(repair) {
     String(repair.manual_service_center_email || '').trim() ||
     repair.manual_service_center_latitude != null ||
     repair.manual_service_center_longitude != null;
-  if (hasManual) return 'Workshop';
+  if (hasManual) return tr('vehicles.detail.providerWorkshop', 'Workshop');
 
   if (shopName) return shopName;
-  return 'Not specified';
+  return tr('vehicles.detail.notSpecified', 'Not specified');
 }
 
 export function ownerLoggedConfirmationStatus(repair) {

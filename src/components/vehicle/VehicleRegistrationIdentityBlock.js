@@ -26,6 +26,7 @@ import {
 import { profileCountriesToPickerOptions } from './vehicleFormConfig';
 import { getWebGeolocation } from '../../utils/webGeolocation';
 import { reverseGeocodeLatLon } from '../../utils/reverseGeocodeLocation';
+import { useTranslation } from '../../i18n';
 
 function countryLabelForIso(iso, options) {
   const code = String(iso || '').trim().toUpperCase();
@@ -53,6 +54,7 @@ export default function VehicleRegistrationIdentityBlock({
   /** When true and date is set, first registration date is read-only (fill once). */
   lockFirstRegistrationDate = false,
 }) {
+  const { t } = useTranslation();
   const [dateModalOpen, setDateModalOpen] = useState(false);
   const [countryModalOpen, setCountryModalOpen] = useState(false);
   const [androidDateOpen, setAndroidDateOpen] = useState(false);
@@ -113,7 +115,7 @@ export default function VehicleRegistrationIdentityBlock({
   const dateLocked = lockFirstRegistrationDate && !!String(firstRegistrationIso || '').trim();
   const dateSummary = firstRegistrationIso
     ? isoToDisplayDate(firstRegistrationIso) || firstRegistrationIso
-    : 'Not set';
+    : t('vehicles.detail.notSet');
 
   const pickerDate = useMemo(() => {
     const iso = draftDate || firstRegistrationIso || '';
@@ -138,13 +140,11 @@ export default function VehicleRegistrationIdentityBlock({
   const renderWebFields = () => (
     <>
       {!countryOnly && !hideHint ? (
-        <Text style={styles.hintMuted}>
-          Optional. Month and year when the vehicle was first registered. Country can be updated later.
-        </Text>
+        <Text style={styles.hintMuted}>{t('vehicles.detail.registrationHintWeb')}</Text>
       ) : null}
       {!countryOnly ? (
         <>
-          <Text style={styles.fieldLabel}>First registration</Text>
+          <Text style={styles.fieldLabel}>{t('vehicles.detail.firstRegistration')}</Text>
           {dateLocked ? (
             <Text style={styles.rowValue}>{dateSummary}</Text>
           ) : (
@@ -159,7 +159,9 @@ export default function VehicleRegistrationIdentityBlock({
           )}
         </>
       ) : null}
-      <Text style={[styles.fieldLabel, { marginTop: countryOnly ? 0 : 12 }]}>Registration country</Text>
+      <Text style={[styles.fieldLabel, { marginTop: countryOnly ? 0 : 12 }]}>
+        {t('vehicles.detail.registrationCountry')}
+      </Text>
       <View style={styles.countryRow}>
         <View style={styles.countryPickerFlex}>{renderCountryPickerInline()}</View>
         <Button
@@ -171,7 +173,7 @@ export default function VehicleRegistrationIdentityBlock({
           onPress={handleLocateRegistrationCountry}
           style={styles.locateBtn}
         >
-          Locate me
+          {t('serviceCenters.locateMe')}
         </Button>
       </View>
     </>
@@ -204,7 +206,7 @@ export default function VehicleRegistrationIdentityBlock({
           onValueChange={(v) => onChangeRegistrationCountryIso(v)}
           style={styles.picker}
         >
-          <Picker.Item label="— Not set —" value="" />
+          <Picker.Item label={t('vehicles.detail.notSetDash')} value="" />
           {options.map((o) => (
             <Picker.Item key={o.value} label={o.label} value={o.value} />
           ))}
@@ -217,8 +219,8 @@ export default function VehicleRegistrationIdentityBlock({
     <>
       {!countryOnly && !hideHint ? (
         <Text style={styles.hintMuted}>
-          Optional. Add first registration if you skipped it at create. You can change country later (e.g. if the vehicle was registered abroad).
-          {dateLocked ? ' First registration date cannot be changed after it is saved.' : ''}
+          {t('vehicles.detail.registrationHintNative')}
+          {dateLocked ? t('vehicles.detail.registrationHintLockedSuffix') : ''}
         </Text>
       ) : null}
 
@@ -233,7 +235,7 @@ export default function VehicleRegistrationIdentityBlock({
         ]}
       >
         <View style={styles.compactRowMain}>
-          <Text style={styles.compactRowLabel}>First registration</Text>
+          <Text style={styles.compactRowLabel}>{t('vehicles.detail.firstRegistration')}</Text>
           <Text style={styles.compactRowValue}>{dateSummary}</Text>
         </View>
         {!dateLocked ? (
@@ -248,8 +250,8 @@ export default function VehicleRegistrationIdentityBlock({
         style={({ pressed }) => [styles.compactRow, pressed && styles.compactRowPressed]}
       >
         <View style={styles.compactRowMain}>
-          <Text style={styles.compactRowLabel}>Registration country</Text>
-          <Text style={styles.compactRowValue}>{countryLabel || 'Not set'}</Text>
+          <Text style={styles.compactRowLabel}>{t('vehicles.detail.registrationCountry')}</Text>
+          <Text style={styles.compactRowValue}>{countryLabel || t('vehicles.detail.notSet')}</Text>
         </View>
         <MaterialCommunityIcons name="chevron-right" size={22} color={COLORS.TEXT_MUTED} />
       </Pressable>
@@ -274,8 +276,8 @@ export default function VehicleRegistrationIdentityBlock({
         <Pressable style={styles.modalBackdrop} onPress={() => setDateModalOpen(false)}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
-              <Text style={styles.modalTitle}>First registration</Text>
-              <Text style={styles.modalHint}>Pick the month and year the vehicle was first registered.</Text>
+              <Text style={styles.modalTitle}>{t('vehicles.detail.firstRegistration')}</Text>
+              <Text style={styles.modalHint}>{t('vehicles.detail.registrationDateModalHint')}</Text>
               <DateTimePicker
                 value={pickerDate}
                 mode="date"
@@ -289,10 +291,10 @@ export default function VehicleRegistrationIdentityBlock({
               />
               <View style={styles.modalActions}>
                 <Button mode="text" onPress={() => handleRegistrationDateChange('')}>
-                  Clear
+                  {t('vehicles.detail.clearRegistration')}
                 </Button>
                 <Button mode="text" onPress={() => setDateModalOpen(false)}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   mode="contained"
@@ -301,7 +303,7 @@ export default function VehicleRegistrationIdentityBlock({
                     setDateModalOpen(false);
                   }}
                 >
-                  Done
+                  {t('mileageConfidence.done')}
                 </Button>
               </View>
             </Pressable>
@@ -317,7 +319,7 @@ export default function VehicleRegistrationIdentityBlock({
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setCountryModalOpen(false)}>
           <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>Registration country</Text>
+            <Text style={styles.modalTitle}>{t('vehicles.detail.registrationCountry')}</Text>
             {countriesState.status === 'loading' ? (
               <ActivityIndicator animating style={styles.spinner} />
             ) : countriesState.status === 'error' ? (
@@ -336,7 +338,7 @@ export default function VehicleRegistrationIdentityBlock({
                   onValueChange={(v) => onChangeRegistrationCountryIso(v)}
                   style={styles.modalPickerWheel}
                 >
-                  <Picker.Item label="— Not set —" value="" />
+                  <Picker.Item label={t('vehicles.detail.notSetDash')} value="" />
                   {options.map((o) => (
                     <Picker.Item key={o.value} label={o.label} value={o.value} />
                   ))}
@@ -344,7 +346,7 @@ export default function VehicleRegistrationIdentityBlock({
               </View>
             )}
             <Button mode="contained" onPress={() => setCountryModalOpen(false)} style={styles.modalDone}>
-              Done
+              {t('mileageConfidence.done')}
             </Button>
           </Pressable>
         </Pressable>

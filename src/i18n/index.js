@@ -25,6 +25,10 @@ import es from './es.json';
 import {
   getSupportedLanguagePrefixFromPathname,
 } from '../navigation/localizedRoutes';
+import { isoToDisplayDate } from '../components/vehicle/dateFieldUtils';
+import { translateRepairTypeLabel, translateFuelTypeLabel } from '../utils/translateShopTypeLabels';
+
+export { translateFuelTypeLabel };
 
 export const STORAGE_KEY_LOCALE = '@veversal_locale';
 export const DEFAULT_LOCALE = 'en';
@@ -324,7 +328,86 @@ export function translateReminderType(type, translateFn = t) {
 }
 
 export function translateReminderUiStatus(status, translateFn = t) {
-  return translateFn(`reminders.uiStatus.${status}`, null, status);
+  const key = String(status ?? '').toLowerCase().trim();
+  if (!key) return '';
+  return translateFn(`reminders.uiStatus.${key}`, null, status);
+}
+
+const REMINDER_CTA_BY_TEXT = {
+  'set reminder': 'reminders.cta.set_reminder',
+  'add date · set reminder': 'reminders.cta.add_date_set_reminder',
+};
+
+export function translateReminderCtaLabel(ctaLabel, translateFn = t) {
+  const raw = String(ctaLabel || '').trim();
+  if (!raw) return '';
+  const key = REMINDER_CTA_BY_TEXT[raw.toLowerCase()];
+  return key ? translateFn(key, null, raw) : raw;
+}
+
+export function translateMileagePredictionPrompt(message, translateFn = t) {
+  const raw = String(message || '').trim();
+  if (!raw) return '';
+  if (raw.toLowerCase().includes('update kilometer')) {
+    return translateFn('vehicles.detail.updateKilometersReminderPrompt', null, raw);
+  }
+  return raw;
+}
+
+export function formatVehicleReminderDueLine(reminder, translateFn = t) {
+  if (!reminder) return null;
+  const parts = [];
+  if (reminder.due_date) {
+    const label = isoToDisplayDate(String(reminder.due_date).slice(0, 10)) || reminder.due_date;
+    parts.push(translateFn('reminders.due.date', { date: label }, `Due ${label}`));
+  }
+  if (reminder.due_kilometers != null && reminder.due_kilometers !== '') {
+    const n = Number(reminder.due_kilometers);
+    if (Number.isFinite(n)) {
+      parts.push(
+        translateFn('reminders.due.kilometers', { km: n.toLocaleString() }, `Due at ${n.toLocaleString()} km`)
+      );
+    }
+  }
+  if (reminder.due_operating_hours != null && reminder.due_operating_hours !== '') {
+    const h = Number(reminder.due_operating_hours);
+    if (Number.isFinite(h)) {
+      parts.push(
+        translateFn(
+          'reminders.due.operatingHours',
+          { hours: h.toLocaleString() },
+          `Due at ${h.toLocaleString()} h`
+        )
+      );
+    }
+  }
+  if (reminder.predicted_due_date && !reminder.due_date) {
+    const est = isoToDisplayDate(String(reminder.predicted_due_date).slice(0, 10)) || reminder.predicted_due_date;
+    let line = translateFn('reminders.due.estimatedCalendar', { date: est }, `Est. calendar ${est}`);
+    if (reminder.prediction_confidence) {
+      line += translateFn(
+        'reminders.due.estimatedConfidence',
+        { confidence: reminder.prediction_confidence },
+        ` · ${reminder.prediction_confidence} confidence`
+      );
+    }
+    parts.push(line);
+  }
+  return parts.length ? parts.join(' · ') : null;
+}
+
+const REMINDER_DUE_DATE_TITLE_KEYS = {
+  insurance: 'vehicles.detail.reminderDueDateInsurance',
+  technical_inspection: 'vehicles.detail.reminderDueDateInspection',
+  vignette: 'vehicles.detail.reminderDueDateVignette',
+  road_tax: 'vehicles.detail.reminderDueDateRoadTax',
+};
+
+export function translateReminderDueDateTitle(reminderType, translateFn = t) {
+  const key = REMINDER_DUE_DATE_TITLE_KEYS[String(reminderType || '').toLowerCase()];
+  return key
+    ? translateFn(key, null, 'Set due date')
+    : translateFn('vehicles.detail.reminderDueDateDefault', null, 'Set due date');
 }
 
 export function translateRepairStatus(status, translateFn = t) {
@@ -343,19 +426,25 @@ const MILEAGE_ACTION_LABEL_KEYS = {
   service_history: 'mileageConfidence.actions.viewServiceHistory',
   repair_detail: 'mileageConfidence.actions.viewRecord',
   log_service: 'mileageConfidence.actions.addServiceRecord',
-  log_service_receipt: 'mileageConfidence.actions.addServiceRecord',
-  log_service_odometer: 'mileageConfidence.actions.addServiceRecord',
-  add_obligation_inspection: 'mileageConfidence.actions.open',
-  manage_authorized_centers: 'mileageConfidence.actions.open',
-  vehicle_specs: 'mileageConfidence.actions.open',
+  log_service_receipt: 'mileageConfidence.actions.addReceiptOnRecord',
+  log_service_odometer: 'mileageConfidence.actions.addOdometerPhoto',
+  manage_authorized_centers: 'mileageConfidence.actions.manageAccess',
 };
 
 const MILEAGE_ACTION_LABEL_BY_TEXT = {
   'view service history': 'mileageConfidence.actions.viewServiceHistory',
   'view timeline': 'mileageConfidence.actions.viewTimeline',
   'view record': 'mileageConfidence.actions.viewRecord',
+  'view records': 'mileageConfidence.actions.viewRecords',
+  'review history': 'mileageConfidence.actions.reviewHistory',
   'add service record': 'mileageConfidence.actions.addServiceRecord',
   'log service with provider': 'mileageConfidence.actions.logServiceWithProvider',
+  'add receipt on service record': 'mileageConfidence.actions.addReceiptOnRecord',
+  'add odometer photo': 'mileageConfidence.actions.addOdometerPhoto',
+  'view inspection reminder': 'mileageConfidence.actions.viewInspectionReminder',
+  'add inspection reminder': 'mileageConfidence.actions.addInspectionReminder',
+  'manage access': 'mileageConfidence.actions.manageAccess',
+  'view specs': 'vehicles.detail.viewSpecs',
 };
 
 export function translateMileageFactorActionLabel(factor, translateFn = t) {
@@ -370,6 +459,191 @@ export function translateMileageFactorActionLabel(factor, translateFn = t) {
   return raw || translateFn('mileageConfidence.actions.open', null, 'Open');
 }
 
+function parseWorkshopNameFromLabel(label, translateFn = t) {
+  const raw = String(label || '').trim();
+  const dashMatch = raw.match(/— (.+)$/);
+  if (dashMatch) return dashMatch[1];
+  const latestMatch = raw.match(/latest: (.+)\)$/i);
+  if (latestMatch) return latestMatch[1];
+  return translateFn('mileageConfidence.workshopFallback', null, 'Workshop');
+}
+
+function parseCountFromParenthetical(label) {
+  const match = String(label || '').match(/\((\d+) record/i);
+  return match ? Number(match[1]) : null;
+}
+
+function mileageHasRollbackWarnings(conf) {
+  const keys = new Set((conf?.warnings || []).map((w) => w?.key).filter(Boolean));
+  return (
+    keys.has('mileage_lower_than_prior') ||
+    keys.has('possible_odometer_rollback') ||
+    keys.has('mileage_inconsistencies')
+  );
+}
+
+/** Translate backend mileage confidence factor labels by key + status. */
+export function translateMileageFactorLabel(factor, conf, translateFn = t) {
+  const factorKey = factor?.key;
+  const status = factor?.status || 'missing';
+  if (!factorKey) return factor?.label || '';
+
+  const done = conf?.done_service_records ?? 0;
+  const workshop = conf?.workshop_attributed_records ?? 0;
+  const shopConfirmed = conf?.shop_confirmed_records ?? 0;
+  const authorized = conf?.authorized_service_centers ?? 0;
+  const fallback = factor?.label || '';
+
+  if (factorKey === 'service_history_on_file') {
+    if (status === 'positive') {
+      const key =
+        done === 1
+          ? 'mileageConfidence.factors.service_history_on_file.positive'
+          : 'mileageConfidence.factors.service_history_on_file.positive_plural';
+      return translateFn(key, { count: done }, fallback);
+    }
+    if (status === 'missing') {
+      return translateFn('mileageConfidence.factors.service_history_on_file.missing', null, fallback);
+    }
+  }
+
+  if (factorKey === 'chronological_service_history') {
+    const key = `mileageConfidence.factors.chronological_service_history.${status}`;
+    return translateFn(key, null, fallback);
+  }
+
+  if (factorKey === 'workshop_attributed_records') {
+    if (status === 'positive') {
+      const shopName = parseWorkshopNameFromLabel(factor?.label, translateFn);
+      if (workshop <= 1) {
+        return translateFn(
+          'mileageConfidence.factors.workshop_attributed_records.positive_one',
+          { shopName },
+          fallback
+        );
+      }
+      return translateFn(
+        'mileageConfidence.factors.workshop_attributed_records.positive_many',
+        { count: workshop, shopName },
+        fallback
+      );
+    }
+    if (status === 'missing') {
+      return translateFn('mileageConfidence.factors.workshop_attributed_records.missing', null, fallback);
+    }
+  }
+
+  if (factorKey === 'service_center_confirmed_records') {
+    if (status === 'positive') {
+      const count = parseCountFromParenthetical(factor?.label) ?? shopConfirmed ?? 1;
+      const key =
+        count === 1
+          ? 'mileageConfidence.factors.service_center_confirmed_records.positive'
+          : 'mileageConfidence.factors.service_center_confirmed_records.positive_plural';
+      return translateFn(key, { count }, fallback);
+    }
+    const key = `mileageConfidence.factors.service_center_confirmed_records.${status}`;
+    return translateFn(key, null, fallback);
+  }
+
+  if (factorKey === 'receipts_invoices_attached' || factorKey === 'odometer_photos_attached') {
+    const key = `mileageConfidence.factors.${factorKey}.${status}`;
+    return translateFn(key, null, fallback);
+  }
+
+  if (factorKey === 'technical_inspection_records') {
+    const key = `mileageConfidence.factors.technical_inspection_records.${status}`;
+    return translateFn(key, null, fallback);
+  }
+
+  if (factorKey === 'authorized_service_centers' && status === 'neutral') {
+    const key =
+      authorized === 1
+        ? 'mileageConfidence.factors.authorized_service_centers.neutral'
+        : 'mileageConfidence.factors.authorized_service_centers.neutral_plural';
+    return translateFn(key, { count: authorized }, fallback);
+  }
+
+  const genericKey = `mileageConfidence.factors.${factorKey}.${status}`;
+  return translateFn(genericKey, null, fallback);
+}
+
+export function translateMileageWarningLabel(warning, translateFn = t) {
+  const key = warning?.key;
+  if (!key) return warning?.label || '';
+  return translateFn(`mileageConfidence.warnings.${key}`, null, warning?.label || '');
+}
+
+/** Mirror backend category summary logic with localized strings. */
+export function translateMileageConfidenceSummary(conf, translateFn = t) {
+  if (!conf || typeof conf !== 'object') {
+    return translateFn('mileageConfidence.fallbackSummary', null, '');
+  }
+  const apiSummary = String(conf.summary || '').trim();
+  if (!apiSummary) {
+    return translateFn('mileageConfidence.fallbackSummary', null, '');
+  }
+
+  const category = conf.category || 'low';
+  const done = conf.done_service_records ?? 0;
+  const workshop = conf.workshop_attributed_records ?? 0;
+  const hasRollback = mileageHasRollbackWarnings(conf);
+
+  if (category === 'verified_history') {
+    return translateFn('mileageConfidence.summaries.verified', null, apiSummary);
+  }
+  if (category === 'high') {
+    return translateFn('mileageConfidence.summaries.high', null, apiSummary);
+  }
+  if (category === 'medium') {
+    if (hasRollback) {
+      return translateFn('mileageConfidence.summaries.mediumRollback', null, apiSummary);
+    }
+    if (workshop && done) {
+      return translateFn('mileageConfidence.summaries.mediumWorkshop', { count: done }, apiSummary);
+    }
+    return translateFn('mileageConfidence.summaries.mediumPartial', null, apiSummary);
+  }
+  if (hasRollback) {
+    return translateFn('mileageConfidence.summaries.lowRollback', null, apiSummary);
+  }
+  if (done) {
+    return translateFn('mileageConfidence.summaries.lowWithRecords', { count: done }, apiSummary);
+  }
+  return translateFn('mileageConfidence.summaries.lowEmpty', null, apiSummary);
+}
+
+export function translateHealthDomainLabel(domainId, fallback, translateFn = t) {
+  const key = domainId ? `health.domains.${domainId}` : null;
+  if (key) {
+    const translated = translateFn(key, null, '__MISSING_HEALTH_DOMAIN__');
+    if (translated !== '__MISSING_HEALTH_DOMAIN__') return translated;
+  }
+  const repairSlugByDomain = {
+    oil: 'oil-change',
+    brake: 'brake-repair',
+    brake_history: 'brake-repair',
+  };
+  const repairSlug = repairSlugByDomain[domainId];
+  if (repairSlug) {
+    const repairLabel = translateRepairTypeLabel(repairSlug, translateFn);
+    if (repairLabel) return repairLabel;
+  }
+  return fallback;
+}
+
+export function translateHealthInlineAction(actionKey, fallback, translateFn = t) {
+  const map = {
+    add_service_history: 'common.add',
+    schedule_maintenance: 'common.configure',
+    configure_reminders: 'common.setup',
+    update_km: 'common.update',
+    book_repair: 'common.book',
+  };
+  const key = map[actionKey];
+  return key ? translateFn(key, null, fallback) : fallback;
+}
+
 const VEHICLE_FIELD_LABEL_KEYS = {
   fuel_type: 'vehicles.detail.fuelType',
   power_hp: 'vehicles.detail.powerHp',
@@ -377,7 +651,19 @@ const VEHICLE_FIELD_LABEL_KEYS = {
 
 const VEHICLE_GROUP_TITLE_KEYS = {
   technical: 'vehicles.detail.technicalDetails',
+  maintenance: 'vehicles.detail.maintenanceSpecifications',
+  odometer: 'vehicles.detail.mileageEvidence',
 };
+
+const VEHICLE_GROUP_HELPER_KEYS = {
+  maintenance: 'vehicles.detail.maintenanceSpecsHelper',
+  odometer: 'vehicles.detail.mileageEvidenceHelper',
+};
+
+export function translateVehicleGroupHelper(groupKey, fallback, translateFn = t) {
+  const key = VEHICLE_GROUP_HELPER_KEYS[groupKey];
+  return key ? translateFn(key, null, fallback) : fallback;
+}
 
 export function translateVehicleFieldLabel(fieldKey, fallback, translateFn = t) {
   const key = VEHICLE_FIELD_LABEL_KEYS[fieldKey];

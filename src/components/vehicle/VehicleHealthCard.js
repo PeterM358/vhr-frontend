@@ -5,88 +5,83 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import FloatingCard from '../ui/FloatingCard';
 import { COLORS } from '../../constants/colors';
 import { getHealthStatusAccent } from '../../utils/vehicleHealthStatus';
+import {
+  useTranslation,
+  translateHealthAction,
+  translateHealthDomainLabel,
+  translateHealthInlineAction,
+} from '../../i18n';
 
 const REASON_ROW_MAP = {
   no_oil_service_history: {
     id: 'oil',
-    label: 'Oil service',
+    domainId: 'oil',
     icon: 'engine-oil',
-    button: 'Add',
     actionKey: 'add_service_history',
   },
   oil_service_overdue: {
     id: 'oil',
-    label: 'Oil service',
+    domainId: 'oil',
     icon: 'engine-oil',
-    button: 'Configure',
     actionKey: 'schedule_maintenance',
   },
   oil_service_due_soon: {
     id: 'oil',
-    label: 'Oil service',
+    domainId: 'oil',
     icon: 'engine-oil',
-    button: 'Configure',
     actionKey: 'schedule_maintenance',
   },
   no_brake_check_history: {
     id: 'brake',
-    label: 'Brake history',
+    domainId: 'brake_history',
     icon: 'car-brake-alert',
-    button: 'Add',
     actionKey: 'add_service_history',
   },
   brake_check_overdue: {
     id: 'brake',
-    label: 'Brake service',
+    domainId: 'brake',
     icon: 'car-brake-alert',
-    button: 'Configure',
     actionKey: 'schedule_maintenance',
   },
   brake_check_due_soon: {
     id: 'brake',
-    label: 'Brake service',
+    domainId: 'brake',
     icon: 'car-brake-alert',
-    button: 'Configure',
     actionKey: 'schedule_maintenance',
   },
   no_reminders: {
     id: 'reminders',
-    label: 'Reminders',
+    domainId: 'reminders',
     icon: 'bell-outline',
-    button: 'Setup',
     actionKey: 'configure_reminders',
   },
   mileage_missing: {
     id: 'mileage',
-    label: 'Mileage',
+    domainId: 'mileage',
     icon: 'speedometer',
-    button: 'Update',
     actionKey: 'update_km',
   },
   mileage_stale: {
     id: 'mileage',
-    label: 'Mileage',
+    domainId: 'mileage',
     icon: 'speedometer-slow',
-    button: 'Update',
     actionKey: 'update_km',
   },
   active_repairs: {
     id: 'active_repairs',
-    label: 'Active repairs',
+    domainId: 'active_repairs',
     icon: 'wrench',
-    button: 'Book',
     actionKey: 'book_repair',
   },
   denied_repairs: {
     id: 'denied_repairs',
-    label: 'Repair request',
+    domainId: 'denied_repairs',
     icon: 'close-circle-outline',
-    button: 'Book',
     actionKey: 'book_repair',
   },
 };
 
-function buildHealthRows(reasons) {
+function buildHealthRows(reasons, translateFn) {
   const rows = [];
   const seen = new Set();
   for (const reason of reasons || []) {
@@ -94,7 +89,13 @@ function buildHealthRows(reasons) {
     if (base) {
       if (seen.has(base.id)) continue;
       seen.add(base.id);
-      rows.push({ ...base, reasonKey: reason.key, severity: reason.severity });
+      rows.push({
+        ...base,
+        label: translateHealthDomainLabel(base.domainId, base.domainId, translateFn),
+        button: translateHealthInlineAction(base.actionKey, base.actionKey, translateFn),
+        reasonKey: reason.key,
+        severity: reason.severity,
+      });
       continue;
     }
     if (String(reason.key || '').startsWith('obligation_overdue_')) {
@@ -102,9 +103,9 @@ function buildHealthRows(reasons) {
       seen.add('obligation');
       rows.push({
         id: 'obligation',
-        label: 'Obligations',
+        label: translateHealthDomainLabel('obligations', 'Obligations', translateFn),
         icon: 'shield-alert-outline',
-        button: 'Setup',
+        button: translateHealthInlineAction('configure_reminders', 'Setup', translateFn),
         actionKey: 'configure_reminders',
         reasonKey: reason.key,
         severity: reason.severity,
@@ -131,7 +132,8 @@ function InlineAction({ label, accent, onPress }) {
 }
 
 export default function VehicleHealthCard({ health, onAction }) {
-  const rows = useMemo(() => buildHealthRows(health?.reasons), [health?.reasons]);
+  const { t } = useTranslation();
+  const rows = useMemo(() => buildHealthRows(health?.reasons, t), [health?.reasons, t]);
 
   if (!health) return null;
 
@@ -171,7 +173,7 @@ export default function VehicleHealthCard({ health, onAction }) {
       ) : isHealthy ? (
         <View style={styles.healthyRow}>
           <MaterialCommunityIcons name="check-circle-outline" size={18} color={accent.color} />
-          <Text style={styles.healthyText}>No urgent issues found.</Text>
+          <Text style={styles.healthyText}>{t('health.subtitle.healthy')}</Text>
         </View>
       ) : null}
 
@@ -185,7 +187,7 @@ export default function VehicleHealthCard({ health, onAction }) {
           buttonColor={accent.color}
           textColor="#fff"
         >
-          Add service history
+          {translateHealthAction('add_service_history', t)}
         </Button>
       ) : null}
     </FloatingCard>

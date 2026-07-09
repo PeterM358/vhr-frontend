@@ -12,6 +12,7 @@ import {
   useTranslation,
   translateVehicleFieldLabel,
   translateVehicleGroupTitle,
+  translateFuelTypeLabel,
 } from '../../i18n';
 
 function labelForOdometerSource(value) {
@@ -43,7 +44,9 @@ export default function OptionalVehicleGroupsReadonly({ vehicle }) {
           const v = vehicle[f.key];
           if (v == null || v === '') return;
           let display = String(v);
-          if (f.kind === 'odometer_picker' || f.key === 'odometer_source') {
+          if (f.key === 'fuel_type') {
+            display = translateFuelTypeLabel(v, t);
+          } else if (f.kind === 'odometer_picker' || f.key === 'odometer_source') {
             display = labelForOdometerSource(v);
           } else if (f.key === 'registration_country') {
             display =

@@ -152,6 +152,21 @@ export function mapHealthFromApi(vehicle, translateFn = t) {
   const reasons = Array.isArray(raw.reasons) ? raw.reasons : Array.isArray(raw.issues) ? raw.issues : [];
   const subtitleKey = `health.subtitle.${status}`;
   const defaultSubtitle = translateFn(subtitleKey, null, raw.subtitle || cfg.label);
+  const mappedReasons = reasons.map((row) => ({
+    key: row.key,
+    label: translateHealthReason(row, translateFn),
+    severity: row.level || row.severity || 'maintenance',
+    icon: row.icon || 'alert-circle-outline',
+  }));
+  const translatedSubtitle = raw.short_reason
+    ? translateHealthReason(
+        {
+          key: reasons[0]?.key || raw.short_reason_key,
+          label: raw.short_reason,
+        },
+        translateFn
+      )
+    : defaultSubtitle;
 
   return {
     status,
@@ -159,22 +174,9 @@ export function mapHealthFromApi(vehicle, translateFn = t) {
     status_label: raw.status_label
       ? translateHealthStatus(status, translateFn)
       : cfg.label,
-    subtitle: raw.subtitle || raw.short_reason || defaultSubtitle,
-    shortReason: raw.short_reason
-      ? translateHealthReason(
-          {
-            key: reasons[0]?.key || raw.short_reason_key,
-            label: raw.short_reason,
-          },
-          translateFn
-        )
-      : defaultSubtitle,
-    reasons: reasons.map((row) => ({
-      key: row.key,
-      label: translateHealthReason(row, translateFn),
-      severity: row.level || row.severity || 'maintenance',
-      icon: row.icon || 'alert-circle-outline',
-    })),
+    subtitle: translatedSubtitle,
+    shortReason: translatedSubtitle,
+    reasons: mappedReasons,
     actions: healthActionButtonsFromApi(raw, translateFn),
   };
 }

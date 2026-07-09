@@ -180,3 +180,32 @@ export function translateVehicleTypePublicLabels(values, t) {
 export function translateRepairTypeLabels(values, t) {
   return (values || []).map((v) => translateRepairTypeLabel(v, t)).filter(Boolean);
 }
+
+const FUEL_TYPE_ALIASES = {
+  gasoline: 'petrol',
+  hybrid_petrol: 'hybrid',
+  'plug-in-hybrid': 'hybrid',
+  phev: 'hybrid',
+};
+
+const FUEL_TYPE_I18N_KEYS = {
+  diesel: 'fuelTypes.diesel',
+  petrol: 'fuelTypes.petrol',
+  gasoline: 'fuelTypes.gasoline',
+  hybrid: 'fuelTypes.hybrid',
+  electric: 'fuelTypes.electric',
+  lpg: 'fuelTypes.lpg',
+  cng: 'fuelTypes.cng',
+  hydrogen: 'fuelTypes.hydrogen',
+  other: 'fuelTypes.other',
+};
+
+export function translateFuelTypeLabel(value, t) {
+  if (value == null || value === '') return '';
+  const raw = String(value).trim();
+  const normalized = normalizeKey(raw);
+  const code = FUEL_TYPE_ALIASES[normalized] || normalized;
+  const key = FUEL_TYPE_I18N_KEYS[code];
+  if (key) return t(key, null, raw);
+  return raw;
+}

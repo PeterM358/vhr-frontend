@@ -14,6 +14,9 @@ import {
   useTranslation,
   translateMileageConfidenceCategory,
   translateMileageFactorActionLabel,
+  translateMileageFactorLabel,
+  translateMileageWarningLabel,
+  translateMileageConfidenceSummary,
 } from '../../i18n';
 
 const FALLBACK_CONFIDENCE = {
@@ -46,9 +49,10 @@ const FALLBACK_CONFIDENCE = {
   warnings: [],
 };
 
-function FactorRow({ factor, onPress, interactive, t }) {
+function FactorRow({ factor, conf, onPress, interactive, t }) {
   const actionable = interactive && factorIsActionable(factor);
   const actionLabel = translateMileageFactorActionLabel(factor, t);
+  const factorLabel = translateMileageFactorLabel(factor, conf, t);
   const content = (
     <>
       <MaterialCommunityIcons
@@ -58,7 +62,7 @@ function FactorRow({ factor, onPress, interactive, t }) {
         style={styles.factorIcon}
       />
       <View style={styles.factorTextWrap}>
-        <Text style={styles.factorLabel}>{factor.label}</Text>
+        <Text style={styles.factorLabel}>{factorLabel}</Text>
         {actionable && actionLabel ? (
           <Text style={styles.factorActionHint}>{actionLabel}</Text>
         ) : null}
@@ -78,7 +82,7 @@ function FactorRow({ factor, onPress, interactive, t }) {
       onPress={() => onPress?.(factor)}
       style={({ pressed }) => [styles.factorRow, styles.factorRowTappable, pressed && styles.factorRowPressed]}
       accessibilityRole="button"
-      accessibilityLabel={`${factor.label}. ${actionLabel || t('mileageConfidence.actions.open')}`}
+      accessibilityLabel={`${factorLabel}. ${actionLabel || t('mileageConfidence.actions.open')}`}
     >
       {content}
     </Pressable>
@@ -106,8 +110,9 @@ export default function MileageEvidenceCard({
   const categoryLabel = translateMileageConfidenceCategory(conf.category, t);
   const resolvedHelper =
     helperText === undefined
-      ? 'Confidence is built from service history, documents, and photos — never blocks saving records.'
+      ? t('mileageConfidence.defaultHelper')
       : helperText;
+  const summaryText = conf.summary ? translateMileageConfidenceSummary(conf, t) : null;
 
   return (
     <View>
@@ -115,8 +120,8 @@ export default function MileageEvidenceCard({
       {showCategoryTitle ? (
         <Text style={styles.status}>{categoryLabel}</Text>
       ) : null}
-      {conf.summary ? (
-        <Text style={[styles.summary, compact && styles.summaryCompact]}>{conf.summary}</Text>
+      {summaryText ? (
+        <Text style={[styles.summary, compact && styles.summaryCompact]}>{summaryText}</Text>
       ) : null}
       {mileageConfidenceCategoryHint(conf.category, t) ? (
         <Text style={styles.categoryHint}>{mileageConfidenceCategoryHint(conf.category, t)}</Text>
@@ -127,6 +132,7 @@ export default function MileageEvidenceCard({
           <FactorRow
             key={f.key}
             factor={f}
+            conf={conf}
             interactive={interactive}
             onPress={onFactorPress}
             t={t}
@@ -144,7 +150,7 @@ export default function MileageEvidenceCard({
                 color={warningIconColor()}
                 style={styles.factorIcon}
               />
-              <Text style={styles.warningLabel}>{w.label}</Text>
+              <Text style={styles.warningLabel}>{translateMileageWarningLabel(w, t)}</Text>
             </View>
           ))}
         </View>

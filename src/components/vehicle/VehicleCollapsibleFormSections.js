@@ -7,6 +7,7 @@ import FloatingCard from '../ui/FloatingCard';
 import { COLORS } from '../../constants/colors';
 import { VEHICLE_OPTIONAL_GROUPS, ODOMETER_SOURCE_OPTIONS } from './vehicleFormConfig';
 import ServiceRecordDatePicker from './ServiceRecordDatePicker';
+import { useTranslation, translateVehicleGroupTitle, translateVehicleGroupHelper } from '../../i18n';
 
 export default function VehicleCollapsibleFormSections({
   expanded,
@@ -20,6 +21,7 @@ export default function VehicleCollapsibleFormSections({
   choiceExtras = {},
   groups = VEHICLE_OPTIONAL_GROUPS,
 }) {
+  const { t } = useTranslation();
   const renderDateField = (field) => (
     <View key={field.key} style={styles.fieldBlock}>
       <ServiceRecordDatePicker
@@ -38,7 +40,9 @@ export default function VehicleCollapsibleFormSections({
         return (
           <FloatingCard key={group.key} style={styles.sectionCard}>
             <Pressable onPress={() => onToggle(group.key)} style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{group.title}</Text>
+              <Text style={styles.sectionTitle}>
+                {translateVehicleGroupTitle(group.key, group.title, t)}
+              </Text>
               <MaterialCommunityIcons
                 name={isOpen ? 'chevron-up' : 'chevron-down'}
                 size={22}
@@ -48,7 +52,9 @@ export default function VehicleCollapsibleFormSections({
             {isOpen ? (
               <View style={styles.sectionBody}>
                 {group.helperText ? (
-                  <Text style={styles.helperText}>{group.helperText}</Text>
+                  <Text style={styles.helperText}>
+                    {translateVehicleGroupHelper(group.key, group.helperText, t)}
+                  </Text>
                 ) : null}
                 {(group.boolFields || []).map((bf) => (
                   <View key={bf.key} style={styles.switchRow}>

@@ -598,7 +598,7 @@
       "saveChanges": "Запази промените",
       "mileageEvidence": "Доказателства за пробег",
       "vehicleSpecs": "Спецификации",
-      "notSpecified": "Не е посочено",
+      "notSpecified": "Не е посочен",
       "notSet": "Не е зададено",
       "registered": "Регистриран",
       "registeredApprox": "Регистриран ~{year}",
@@ -608,11 +608,96 @@
       "requestService": "Заяви ремонт",
       "addServiceRecord": "Добави сервизен запис",
       "addObligationPayment": "Добави задължение / плащане",
-      "serviceProvider": "Сервизен доставчик",
+      "serviceProvider": "Сервиз",
+      "completedAt": "Завършен",
+      "total": "Общо",
+      "kilometersFinal": "финални",
+      "providerSelfRepair": "Самостоятелен ремонт",
+      "providerAuthorizedCenter": "Оторизиран сервиз",
+      "providerWorkshop": "Сервиз",
       "needsClassification": "Изисква класификация",
       "noDateOrMileage": "Няма зададена дата или пробег.",
-      "vinHint": "Добави VIN за по-добро съвпадение на части и услуги."
+      "vinHint": "Добави VIN за по-добро съвпадение на части и услуги.",
+      "registrationCountry": "Държава на регистрация",
+      "firstRegistration": "Първа регистрация",
+      "notSetDash": "— Не е зададено —",
+      "clearRegistration": "Изчисти",
+      "registrationHintWeb": "По избор. Месец и година на първата регистрация. Държавата може да се промени по-късно.",
+      "registrationHintNative": "По избор. Добави първа регистрация, ако си пропуснал при създаване. Можеш да смениш държавата по-късно (напр. при регистрация в чужбина).",
+      "registrationHintLockedSuffix": " Датата на първа регистрация не може да се променя след запис.",
+      "registrationDateModalHint": "Избери месеца и годината на първата регистрация.",
+      "technicalSectionsCollapsed": "Технически секции (сгънати)",
+      "technicalEditLead": "Редактирай двигател, ремарке, e-bike и други технически полета по-долу. Напомнянията за обслужване се редактират от всеки ред на екрана на автомобила.",
+      "maintenanceSpecifications": "Спецификации за обслужване",
+      "maintenanceSpecsHelper": "Това са спецификации на автомобила, не напомняния за сервиз.",
+      "mileageEvidenceHelper": "По-високо доверие идва от касови бележки, записи от сервиз, прегледи и снимки преди/след.",
+      "obligationsManualHint": "Задълженията могат да се въвеждат ръчно. Автоматични проверки по рег. номер/VIN могат да се добавят по-късно, където е позволено.",
+      "updateKilometersReminderPrompt": "Обнови пробега, за да подобриш напомнянията.",
+      "activeRepairsHint": "Активните ремонти са отделени от постоянната сервизна история.",
+      "activeRepairsEmpty": "Няма отворени или текущи ремонти по този автомобил.",
+      "serviceHistoryEmpty": "Завършените ремонти ще се показват тук като част от сервизната история.",
+      "serviceHistoryCollapsed_one": "1 завършен запис. Разгъни за детайли.",
+      "serviceHistoryCollapsed_other": "{count} завършени записа. Разгъни за детайли.",
+      "authorizedCentersHint": "Оторизацията споделя пълната механична сервизна история, напомняния и спецификации. Записване на ремонт без оторизация дава достъп само до тази работа: {jobAccessHint}",
+      "authorizedCentersEmpty": "Все още няма оторизирани сервизи.",
+      "authorizedCentersCollapsed_one": "1 оторизиран сервиз. Разгъни за управление на достъпа.",
+      "authorizedCentersCollapsed_other": "{count} оторизирани сервиза. Разгъни за управление на достъпа.",
+      "bookingJobAccessHint": "Автоматично при записване на ремонт. Сервизът вижда тази работа и предишна в същата категория (напр. спирачки, масло).",
+      "locationNotSpecified": "Местоположение не е посочено",
+      "fullMechanicalHistory": "Пълна механична история",
+      "tapForShopProfile": "Натисни за профил на сервиза",
+      "removeAccess": "Премахни достъп",
+      "findServiceCenters": "Намери сервизи",
+      "manageServiceCenterAccess": "Управлявай достъп до сервизи",
+      "autoCheckLaterTitle": "Автоматична проверка по-късно",
+      "autoCheckLaterBody": "Автоматичните проверки все още не са налични. Можеш да въведеш датата ръчно.",
+      "tryAutoCheck": "Опитай автопроверка",
+      "currentKilometersRepair": "Текущ пробег",
+      "requestKilometers": "Пробег при заявка",
+      "reminderDueDateInsurance": "Задай дата на валидност на полицата",
+      "reminderDueDateInspection": "Задай дата на следващ преглед",
+      "reminderDueDateVignette": "Задай дата на валидност на винетката",
+      "reminderDueDateRoadTax": "Задай дата на данък МПС",
+      "reminderDueDateDefault": "Задай падежна дата",
+      "reminderDueDateLabel": "Падежна дата",
+      "reminderDueKilometersLabel": "Падеж на километри",
+      "reminderNotifyDaysBefore": "Известие дни преди",
+      "reminderNotifyKmBefore": "Известие км преди",
+      "reminderNotesOptional": "Бележки (по избор)",
+      "kmUpdateError": "Неуспешно обновяване на пробега.",
+      "reminderUnavailableTitle": "Напомнянето не е налично",
+      "reminderUnavailableBody": "Напомнянето все още не е заредено. Опитай отново или дръпни за опресняване.",
+      "dueKilometersValidation": "Падежните километри трябва да са цяло число или празно.",
+      "revokeAccessTitle": "Отнемане на достъп?",
+      "revokeAccessConfirm": "Премахни достъп",
+      "authorizationUpdateError": "Неуспешно обновяване на оторизацията."
     }
+  },
+  "fuelTypes": {
+    "diesel": "дизел",
+    "petrol": "бензин",
+    "gasoline": "бензин",
+    "hybrid": "хибрид",
+    "electric": "електрически",
+    "lpg": "LPG",
+    "cng": "CNG",
+    "hydrogen": "водород",
+    "other": "друго"
+  },
+  "logServiceRecord": {
+    "title": "Добави сервизен запис",
+    "subtitle": "Използвай за завършено обслужване или ремонт.",
+    "vehicleNotLoaded": "Автомобилът не е зареден.",
+    "sections": {
+      "service": "Услуга",
+      "serviceDateMileage": "Дата и пробег на услугата",
+      "costs": "Разходи",
+      "serviceProvider": "Сервиз",
+      "notesEvidence": "Бележки и доказателства"
+    },
+    "serviceTypeLabel": "Вид услуга *",
+    "selectType": "Избери вид…",
+    "save": "Запази сервизен запис"
   },
   "mileageConfidence": {
     "title": "Доверие в пробега",
@@ -641,9 +726,75 @@
       "viewServiceHistory": "Виж сервизна история",
       "viewTimeline": "Виж хронология",
       "viewRecord": "Виж запис",
+      "viewRecords": "Виж записи",
+      "reviewHistory": "Прегледай историята",
       "addServiceRecord": "Добави сервизен запис",
       "logServiceWithProvider": "Запиши сервиз с доставчик",
+      "addReceiptOnRecord": "Добави касова бележка към записа",
+      "addOdometerPhoto": "Добави снимка на таблото",
+      "viewInspectionReminder": "Виж напомняне за преглед",
+      "addInspectionReminder": "Добави напомняне за преглед",
+      "manageAccess": "Управлявай достъпа",
       "open": "Отвори"
+    },
+    "workshopFallback": "Сервиз",
+    "fallbackSummary": "Все още няма достатъчно потвърждаващи записи.",
+    "defaultHelper": "Доверието се изгражда от сервизна история, документи и снимки — не блокира записването.",
+    "summaries": {
+      "verified": "Силна сервизна история с потвърждаващи записи.",
+      "high": "Добра подкрепяща история; продължавай да добавяш касови бележки или потвърдени от сервиз записи.",
+      "mediumRollback": "Има история, но пропуски или корекции в пробега намалиха доверието.",
+      "mediumWorkshop": "{count} сервизен/и запис/а с имена на сервизи; потвърдени записи и бележки биха повишили доверието.",
+      "mediumPartial": "Частична история; добави касови бележки, потвърдени записи или снимки на таблото (по избор).",
+      "lowRollback": "Ограничени доказателства и корекции в пробега — историята все пак е запазена.",
+      "lowWithRecords": "{count} сервизен/и запис/а; прикачи касови бележки или снимки на таблото за по-високо доверие.",
+      "lowEmpty": "Записвай завършени сервизи и прикачвай доказателства с времето — нищо не блокира корекциите."
+    },
+    "factors": {
+      "service_history_on_file": {
+        "positive": "{count} завършен сервизен запис в досието",
+        "positive_plural": "{count} завършени сервизни записа в досието",
+        "missing": "Все още няма завършени сервизни записи"
+      },
+      "chronological_service_history": {
+        "positive": "Хронологична сервизна история",
+        "negative": "Редът на историята или пробегът изглеждат неравномерни",
+        "missing": "Добави още датирани сервизни записи за по-ясна хронология"
+      },
+      "workshop_attributed_records": {
+        "positive_one": "Сервиз в записа — {shopName}",
+        "positive_many": "Сервиз в {count} сервизни записа (последен: {shopName})",
+        "missing": "Все още няма име на сервиз в сервизните записи"
+      },
+      "service_center_confirmed_records": {
+        "positive": "Потвърдено от сервиз в платформата ({count} запис)",
+        "positive_plural": "Потвърдено от сервиз в платформата ({count} записа)",
+        "neutral": "Име на сервиз в записа — все още не е потвърдено в платформата",
+        "missing": "Все още няма потвърдени от сервиз записи (резервации или въведени от сервиз)"
+      },
+      "receipts_invoices_attached": {
+        "positive": "Прикачени касови бележки / фактури",
+        "missing": "Все още няма касови бележки / фактури"
+      },
+      "odometer_photos_attached": {
+        "positive": "Прикачени снимки на таблото",
+        "missing": "Все още няма снимки на таблото (по избор — помага за проверка на пробега)"
+      },
+      "technical_inspection_records": {
+        "positive": "Записи за технически преглед",
+        "neutral": "Напомнянето за преглед е зададено, но няма прикачен запис за доказателство",
+        "missing": "Все още няма записи за преглед / импортирани данни"
+      },
+      "authorized_service_centers": {
+        "neutral": "{count} оторизиран сервиз (може да вижда история — отделно от доказателство за пробег)",
+        "neutral_plural": "{count} оторизирани сервиза (могат да виждат история — отделно от доказателство за пробег)"
+      }
+    },
+    "warnings": {
+      "mileage_inconsistencies": "Открити несъответствия в пробега",
+      "mileage_lower_than_prior": "Въведен е по-нисък пробег след по-висок записан",
+      "possible_odometer_rollback": "Възможен откат на одометъра",
+      "dashboard_replacement_hint": "Възможна е смяна или корекция на таблото"
     }
   },
   "repairStatuses": {
@@ -690,11 +841,14 @@
       "obligation_overdue": "Просрочено: {type}"
     },
     "domains": {
-      "oil": "Смяна на масло",
-      "brake": "Спирачки",
+      "oil": "История за смяна на масло",
+      "brake": "Ремонт на спирачки",
+      "brake_history": "История на спирачки",
       "reminders": "Напомняния",
       "mileage": "Пробег",
-      "active_repairs": "Активни ремонти"
+      "active_repairs": "Активни ремонти",
+      "denied_repairs": "Заявка за ремонт",
+      "obligations": "Задължения"
     },
     "actions": {
       "update_km": "Обнови пробега",
@@ -710,11 +864,21 @@
       "overdue": "Просрочено",
       "due_soon": "Скоро",
       "done": "Готово",
+      "completed": "Завършено",
+      "active_until": "Активно до",
       "active_until_due": "Активно до падеж",
       "prediction_only": "Очаквано — потвърди дата"
     },
+    "due": {
+      "date": "Падеж {date}",
+      "kilometers": "Падеж на {km} км",
+      "operatingHours": "Падеж на {hours} ч",
+      "estimatedCalendar": "Очаквано {date}",
+      "estimatedConfidence": " · {confidence} доверие"
+    },
     "cta": {
-      "set_reminder": "Задай напомняне"
+      "set_reminder": "Задай напомняне",
+      "add_date_set_reminder": "Добави дата · Задай напомняне"
     },
     "types": {
       "insurance": "Застраховка",
