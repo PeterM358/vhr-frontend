@@ -11,6 +11,8 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { COLORS } from '../../styles/colors';
+import DISCOVERY_MOBILE from './discoveryMobileTokens';
+import { useTranslation } from '../../i18n';
 import DiscoveryExpandedFiltersPanel from './DiscoveryExpandedFiltersPanel';
 
 const ANIM_MS = 200;
@@ -22,6 +24,7 @@ export default function DiscoveryFiltersBottomSheet({
   activeFilterCount = 0,
   filterProps,
 }) {
+  const { t } = useTranslation();
   const slide = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -37,6 +40,10 @@ export default function DiscoveryFiltersBottomSheet({
     outputRange: [420, 0],
   });
 
+  const title = activeFilterCount
+    ? t('serviceCenters.filtersCount', { count: activeFilterCount })
+    : t('serviceCenters.filters');
+
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
       <View style={styles.root}>
@@ -46,9 +53,7 @@ export default function DiscoveryFiltersBottomSheet({
           <View style={styles.sheetHeader}>
             <View style={styles.sheetTitleRow}>
               <MaterialCommunityIcons name="tune-variant" size={20} color={COLORS.primary} />
-              <Text style={styles.sheetTitle}>
-                Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}
-              </Text>
+              <Text style={styles.sheetTitle}>{title}</Text>
             </View>
             <Pressable onPress={onClose} hitSlop={8} style={styles.closeBtn}>
               <MaterialCommunityIcons name="close" size={22} color="#64748b" />
@@ -66,7 +71,7 @@ export default function DiscoveryFiltersBottomSheet({
 
           <View style={styles.footer}>
             <Pressable style={styles.applyBtn} onPress={onApply}>
-              <Text style={styles.applyBtnText}>Apply filters</Text>
+              <Text style={styles.applyBtnText}>{t('serviceCenters.applyFilters')}</Text>
             </Pressable>
           </View>
         </Animated.View>
@@ -143,7 +148,7 @@ const styles = StyleSheet.create({
   },
   applyBtn: {
     backgroundColor: COLORS.primary,
-    borderRadius: 12,
+    borderRadius: DISCOVERY_MOBILE.radius.cta,
     paddingVertical: 14,
     alignItems: 'center',
     cursor: 'pointer',

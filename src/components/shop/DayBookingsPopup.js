@@ -17,16 +17,15 @@ export default function DayBookingsPopup({ visible, dateLabel, bookings = [], on
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <View style={styles.root}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.sheet}>
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
           <Text style={styles.title}>Bookings this day</Text>
           {dateLabel ? <Text style={styles.dateLine}>{dateLabel}</Text> : null}
           <Text style={styles.summaryLine}>{bookingCountLabel}</Text>
           {vehicleSummary ? <Text style={styles.summarySubline}>Vehicle mix: {vehicleSummary}</Text> : null}
           {serviceSummary ? <Text style={styles.summarySubline}>Repair mix: {serviceSummary}</Text> : null}
 
-          <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
+          <ScrollView style={styles.list} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
             {bookings.length === 0 ? (
               <Text style={styles.emptyText}>No bookings for this day.</Text>
             ) : (
@@ -55,21 +54,18 @@ export default function DayBookingsPopup({ visible, dateLabel, bookings = [], on
           <Button mode="contained" onPress={onClose} style={styles.closeBtn}>
             Close
           </Button>
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
+  backdrop: {
     flex: 1,
     justifyContent: 'center',
     padding: 20,
     backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
   },
   sheet: {
     backgroundColor: '#fff',

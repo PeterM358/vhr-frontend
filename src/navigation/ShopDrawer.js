@@ -41,6 +41,7 @@ import {
   drawerMenuItemProps,
   drawerScreenOptions,
 } from './DrawerBranding';
+import CompactLanguageSelector from '../components/common/CompactLanguageSelector';
 import { useTranslation } from '../i18n';
 
 const Drawer = createDrawerNavigator();
@@ -48,9 +49,8 @@ const Drawer = createDrawerNavigator();
 function CustomDrawerContent(props) {
   const navigation = useNavigation();
   const { t } = useTranslation();
-  const { notifications } = useContext(WebSocketContext);
+  const { unreadCount } = useContext(WebSocketContext);
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
   const [unscheduledCount, setUnscheduledCount] = useState(0);
 
   useFocusEffect(
@@ -229,6 +229,11 @@ function CustomDrawerContent(props) {
           icon={({ color, size }) => <DrawerMenuIcon name="swap-horizontal" color={color} size={size} />}
           {...itemProps}
         />
+
+        <View style={drawerGlassStyles.languageSection}>
+          <Text style={drawerGlassStyles.languageLabel}>{t('language.label')}</Text>
+          <CompactLanguageSelector variant="dark" compact presentation="modal" showFullLabel />
+        </View>
 
         <View style={drawerGlassStyles.divider} />
 

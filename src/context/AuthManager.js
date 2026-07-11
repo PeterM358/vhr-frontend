@@ -2,7 +2,6 @@ import React, { createContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
-  attachPushTokenRefreshListener,
   syncPushDeviceToken,
 } from '../notifications/pushDeviceSync';
 
@@ -42,8 +41,7 @@ export default function AuthManager({ children }) {
       setUserEmailOrPhone(session.emailOrPhone);
       setIsAuthenticated(session.hasAuth);
       if (session.hasAuth) {
-        await syncPushDeviceToken(session.token);
-        attachPushTokenRefreshListener(async () => AsyncStorage.getItem('@access_token'));
+        await syncPushDeviceToken(session.token, { isAuthenticated: true });
       }
       setIsLoading(false);
     })();

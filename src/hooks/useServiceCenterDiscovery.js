@@ -21,6 +21,7 @@ import {
   brandIdFromSlug,
   hydrateSeoSlugCatalog,
 } from '../utils/seo/seoSlugCatalog';
+import { dedupeShopsByListId, logMapDiscoveryData } from '../utils/mapDiscoveryData';
 
 export const SORT_OPTIONS = [
   { value: 'recommended', label: 'Recommended' },
@@ -70,6 +71,8 @@ export function useServiceCenterDiscovery({
   const [taxonomyLoaded, setTaxonomyLoaded] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
   const [userLocatedExplicitly, setUserLocatedExplicitly] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+  const [authRequired, setAuthRequired] = useState(false);
 
   const activeSearchRef = useRef('');
   const matchedCityRef = useRef(null);
@@ -173,11 +176,14 @@ export function useServiceCenterDiscovery({
 
   const fetchShops = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
+    setAuthRequired(false);
+    let hadValidToken = false;
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const userIdStr = await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
       const userId = userIdStr ? parseInt(userIdStr, 10) : null;
-      const hasValidToken = !!token && token !== 'null' && token !== 'undefined';
+      hadValidToken = !!token && token !== 'null' && token !== 'undefined';
 
       const rawTerm = activeSearchRef.current.trim();
       const currentCity = matchedCityRef.current;
@@ -203,30 +209,40 @@ export function useServiceCenterDiscovery({
         filters.lon = userLocRef.current[1];
       }
 
-      const headers = hasValidToken ? { Authorization: `Bearer ${token}` } : {};
-      const tryFetch = async (h) => getServiceCenters(filters, { headers: h });
+      const headers = hadValidToken ? { Authorization: `Bearer ${token}` } : {};
+      const shopsArray = await getServiceCenters(filters, { headers });
+      const normalized = shopsArray.map((shop) => ({
+        ...shop,
+        isMyShop:
+          Number.isInteger(userId) && Array.isArray(shop.users) && shop.users.includes(userId),
+      }));
+      const { shops: uniqueShops, duplicateIds } = dedupeShopsByListId(normalized);
 
-      let shopsArray;
-      try {
-        shopsArray = await tryFetch(headers);
-      } catch (err) {
-        if (err.response?.status === 401 && hasValidToken) {
-          shopsArray = await tryFetch({});
-        } else {
-          throw err;
-        }
-      }
+      logMapDiscoveryData({
+        api_count: shopsArray.length,
+        normalized_count: normalized.length,
+        unique_count: uniqueShops.length,
+        duplicate_ids: duplicateIds,
+      });
 
-      setAllShops(
-        shopsArray.map((shop) => ({
-          ...shop,
-          isMyShop:
-            Number.isInteger(userId) && Array.isArray(shop.users) && shop.users.includes(userId),
-        }))
-      );
+      setAllShops(uniqueShops);
     } catch (error) {
+      const status = error.response?.status;
       console.error('Error fetching shops:', error);
-      throw error;
+      setAllShops([]);
+      if (status === 401) {
+        setAuthRequired(true);
+        setLoadError(error.message || 'Sign in required to view service centers');
+        if (hadValidToken) {
+          AsyncStorage.multiRemove([
+            STORAGE_KEYS.ACCESS_TOKEN,
+            STORAGE_KEYS.REFRESH_TOKEN,
+            STORAGE_KEYS.USER_ID,
+          ]).catch(() => {});
+        }
+      } else {
+        setLoadError(error.message || 'Could not load service centers');
+      }
     } finally {
       setLoading(false);
     }
@@ -254,14 +270,22 @@ export function useServiceCenterDiscovery({
       setCitySlug(null);
       citySlugRef.current = null;
       await fetchShops();
-      return;
+      if (__DEV__) {
+        console.log('[search] query= cleared matched_city= region=default');
+      }
+      return { matchedCity: null, citySlug: null };
     }
+
+    let nextMatchedCity = null;
+    let nextCitySlug = null;
 
     try {
       const cities = await searchDiscoveryCities(term, { country: 'BG', limit: 8 });
       const match = findExactCityMatch(cities, term);
       if (match) {
         const slug = citySlugFromMatch(match);
+        nextMatchedCity = match;
+        nextCitySlug = slug;
         setMatchedCity(match);
         matchedCityRef.current = match;
         setCitySlug(slug);
@@ -269,14 +293,31 @@ export function useServiceCenterDiscovery({
       } else {
         setMatchedCity(null);
         matchedCityRef.current = null;
+        setCitySlug(null);
+        citySlugRef.current = null;
       }
     } catch (e) {
       console.warn('Discovery: city lookup failed', e);
       setMatchedCity(null);
       matchedCityRef.current = null;
+      setCitySlug(null);
+      citySlugRef.current = null;
     }
 
     await fetchShops();
+
+    if (__DEV__) {
+      console.log(
+        '[search] query=',
+        term,
+        'matched_city=',
+        nextMatchedCity?.name || nextMatchedCity?.slug_en || 'none',
+        'city_slug=',
+        nextCitySlug || 'none'
+      );
+    }
+
+    return { matchedCity: nextMatchedCity, citySlug: nextCitySlug };
   }, [addressQuery, fetchShops]);
 
   const clearFilters = useCallback(
@@ -430,6 +471,8 @@ export function useServiceCenterDiscovery({
     showAllInMatchedCity,
     loadFilterTaxonomy,
     taxonomyLoaded,
+    loadError,
+    authRequired,
     RATING_FILTER_OPTIONS,
     DISTANCE_FILTER_OPTIONS,
     SORT_OPTIONS,

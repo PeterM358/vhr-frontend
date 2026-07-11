@@ -475,6 +475,7 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
     setAndroidPickerVisible(false);
     setAndroidPickerContext(null);
     setAndroidPhase('date');
+    setDayBookingsPopupDate(null);
   };
 
   const openBringPicker = () => {
@@ -938,8 +939,9 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
     const chipHint = formatDayLoadChipHint(booked, bookings, laborRow);
     const selected = !bringCustomDateActive && dayOffsetFromToday(workingDate) === opt.days;
     return (
-      <View
+      <Pressable
         key={opt.label}
+        onPress={() => applyBringOffsetDays(opt.days)}
         style={[
           styles.timeChip,
           styles.dayLoadChip,
@@ -948,14 +950,15 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
           selected && level === 'full' && styles.timeChipSelectedFull,
         ]}
       >
-        <Pressable onPress={() => applyBringOffsetDays(opt.days)} style={styles.dayLoadChipMain}>
-          <Text style={[styles.timeChipText, selected && styles.timeChipTextSelected]}>
-            {opt.label}
-          </Text>
-        </Pressable>
+        <Text style={[styles.timeChipText, selected && styles.timeChipTextSelected]}>
+          {opt.label}
+        </Text>
         {chipHint ? (
           <Pressable
-            onPress={() => openDayBookingsPopup(chipDate)}
+            onPress={(event) => {
+              event?.stopPropagation?.();
+              openDayBookingsPopup(chipDate);
+            }}
             hitSlop={6}
             style={styles.dayLoadChipPeek}
           >
@@ -970,7 +973,7 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
             </Text>
           </Pressable>
         ) : null}
-      </View>
+      </Pressable>
     );
   };
 
@@ -1387,35 +1390,46 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         visible={pickerModalVisible}
         onRequestClose={resetPickerUi}
       >
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdropFill} onPress={resetPickerUi} />
-          <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 16), maxHeight: '92%' }]}>
-            <Text style={styles.modalTitle}>{modalTitle}</Text>
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-              {pickerTarget === 'bring' ? renderBringModalBody() : renderPickupModalBody()}
-            </ScrollView>
-            {pickerTarget === 'bring' && Platform.OS === 'android' ? (
-              <Button mode="outlined" onPress={startAndroidBringFullPicker} style={{ marginTop: 8 }}>
-                Custom date & time (system picker)
-              </Button>
-            ) : null}
-            {pickerTarget === 'pickup' && Platform.OS === 'android' ? (
-              <Button mode="outlined" onPress={startAndroidPickupFullPicker} style={{ marginTop: 8 }}>
-                Custom date & time (system picker)
-              </Button>
-            ) : null}
-            <View style={styles.modalActions}>
-              <Button onPress={resetPickerUi}>Cancel</Button>
-              <Button
-                mode="contained"
-                style={styles.modalDoneButton}
-                onPress={pickerTarget === 'bring' ? confirmBringModalDone : confirmPickupModalDone}
+        <Pressable style={styles.modalBackdrop} onPress={resetPickerUi}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.modalKeyboardWrap}
+          >
+            <Pressable
+              style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 16), maxHeight: '92%' }]}
+              onPress={(event) => event.stopPropagation()}
+            >
+              <Text style={styles.modalTitle}>{modalTitle}</Text>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
               >
-                Done
-              </Button>
-            </View>
-          </View>
-        </View>
+                {pickerTarget === 'bring' ? renderBringModalBody() : renderPickupModalBody()}
+              </ScrollView>
+              {pickerTarget === 'bring' && Platform.OS === 'android' ? (
+                <Button mode="outlined" onPress={startAndroidBringFullPicker} style={{ marginTop: 8 }}>
+                  Custom date & time (system picker)
+                </Button>
+              ) : null}
+              {pickerTarget === 'pickup' && Platform.OS === 'android' ? (
+                <Button mode="outlined" onPress={startAndroidPickupFullPicker} style={{ marginTop: 8 }}>
+                  Custom date & time (system picker)
+                </Button>
+              ) : null}
+              <View style={styles.modalActions}>
+                <Button onPress={resetPickerUi}>Cancel</Button>
+                <Button
+                  mode="contained"
+                  style={styles.modalDoneButton}
+                  onPress={pickerTarget === 'bring' ? confirmBringModalDone : confirmPickupModalDone}
+                >
+                  Done
+                </Button>
+              </View>
+            </Pressable>
+          </KeyboardAvoidingView>
+        </Pressable>
       </Modal>
 
       {Platform.OS === 'android' && androidPickerVisible ? (
@@ -1525,13 +1539,14 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_MUTED,
     marginLeft: 8,
   },
-  modalRoot: {
+  modalBackdrop: {
     flex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
-  modalBackdropFill: {
-    ...StyleSheet.absoluteFillObject,
+  modalKeyboardWrap: {
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   modalSheet: {
     backgroundColor: '#fff',
@@ -1638,10 +1653,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.TEXT_MUTED,
     textAlign: 'center',
-  },
-  dayLoadChipMain: {
-    alignItems: 'center',
-    width: '100%',
   },
   dayLoadChipPeek: {
     marginTop: 2,

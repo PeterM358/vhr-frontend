@@ -1,7 +1,10 @@
 // app.config.js
-import 'dotenv/config';
+import { loadProjectEnv } from '@expo/env';
 import fs from 'fs';
 import path from 'path';
+
+// Load .env.local / .env.development.local / .env (same order as Expo CLI)
+loadProjectEnv(process.cwd());
 
 const IOS_GOOGLE_SERVICES = './GoogleService-Info.plist';
 const ANDROID_GOOGLE_SERVICES = './android/app/google-services.json';
@@ -90,7 +93,8 @@ export default {
       googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
       googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
       apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL,
-      wsBaseUrl: process.env.EXPO_PUBLIC_WS_BASE_URL
+      wsBaseUrl: process.env.EXPO_PUBLIC_WS_BASE_URL,
+      wsEnabled: process.env.EXPO_PUBLIC_WS_ENABLED,
     },
     owner: "mihailovv"
   }

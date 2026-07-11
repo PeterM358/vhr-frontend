@@ -1440,7 +1440,7 @@
     "serviceCenters": "Service Centers"
   },
   "serviceCenters": {
-    "findTitle": "Find Service Centers",
+    "findTitle": "Find a service center",
     "authorizeTitle": "Authorize a service center",
     "exploreTitle": "Explore Service Centers",
     "searchPlaceholder": "Search centers, city, service, brand...",
@@ -1458,6 +1458,7 @@
     "requestService": "Request service",
     "useForRecord": "Use for this record",
     "distanceUnavailable": "Distance unavailable",
+    "closeSelectedPanelA11y": "Close service center details",
     "setLocationForDistance": "Set location to see distance",
     "allBrands": "All brands",
     "brandsLabel": "Brands: {brands}",
@@ -1465,6 +1466,13 @@
     "listTab": "List",
     "mapTab": "Map",
     "geoError": "Could not get your location.",
+    "geoPermissionDenied": "Location permission is required to use this feature.",
+    "locationHintNear": "Distances shown from your current location.",
+    "locationHintTap": "Tap Locate me to sort and show distances.",
+    "authorizeBanner": "Authorizing for {vehicle}. Open a shop profile to choose vehicles and authorize access.",
+    "applyFilters": "Apply filters",
+    "resultsCount": "{count} service centers",
+    "resultsCountInArea": "{count} in this area",
     "emptyTitle": "No service centers match these filters.",
     "clearFilters": "Clear filters",
     "showAllInCity": "Show all in {city}",
@@ -1476,6 +1484,7 @@
     "brand": "Brand",
     "rating": "Rating",
     "distance": "Distance",
+    "sortBy": "Sort",
     "sort": {
       "recommended": "Recommended",
       "distance": "Distance",

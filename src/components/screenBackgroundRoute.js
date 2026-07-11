@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { useNavigationState } from '@react-navigation/native';
 
 export function shouldShowAppFooter(isAuthenticated, routeName) {
@@ -13,7 +14,11 @@ export function shouldShowAppFooter(isAuthenticated, routeName) {
     routeName === 'PasswordConfirmReset' ||
     String(routeName).startsWith('Public');
 
-  return isAuthenticated && !isPublicRoute;
+  const isNativeMapFirstDiscovery =
+    Platform.OS !== 'web' &&
+    (routeName === 'ShopMap' || routeName === 'PartnerServiceCenters');
+
+  return isAuthenticated && !isPublicRoute && !isNativeMapFirstDiscovery;
 }
 
 function RouteFooterFromNav({ isAuthenticated, children }) {

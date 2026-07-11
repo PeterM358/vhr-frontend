@@ -55,6 +55,10 @@ export default function DiscoveryExpandedFiltersPanel({
   setMinRating,
   radiusKm,
   setRadiusKm,
+  openNowOnly,
+  setOpenNowOnly,
+  verifiedOnly,
+  setVerifiedOnly,
   categoryOptions,
   repairTypeChipOptions,
   brands,
@@ -63,6 +67,25 @@ export default function DiscoveryExpandedFiltersPanel({
 
   return (
     <View style={styles.panel}>
+      {typeof setOpenNowOnly === 'function' || typeof setVerifiedOnly === 'function' ? (
+        <FilterSection title={t('serviceCenters.filters')}>
+          {typeof setOpenNowOnly === 'function' ? (
+            <DiscoveryFilterChip
+              label={t('serviceCenters.openNow')}
+              selected={openNowOnly}
+              onPress={() => setOpenNowOnly((v) => !v)}
+            />
+          ) : null}
+          {typeof setVerifiedOnly === 'function' ? (
+            <DiscoveryFilterChip
+              label={t('serviceCenters.verified')}
+              selected={verifiedOnly}
+              onPress={() => setVerifiedOnly((v) => !v)}
+            />
+          ) : null}
+        </FilterSection>
+      ) : null}
+
       <FilterSection title={t('serviceCenters.vehicleType')}>
         <DiscoveryFilterChip
           label={t('serviceCenters.any')}

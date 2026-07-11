@@ -31,19 +31,39 @@ function citiesCacheKey(countryId, options = {}) {
   return `${countryId}|${search}|${limit}`;
 }
 
+function isPersistableCountryList(data) {
+  return Array.isArray(data) && data.length > 0;
+}
+
+async function clearPersistedCountries() {
+  try {
+    await AsyncStorage.removeItem(COUNTRIES_STORAGE_KEY);
+  } catch {
+    // ignore storage failures
+  }
+}
+
 async function readPersistedCountries() {
   try {
     const raw = await AsyncStorage.getItem(COUNTRIES_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed?.data || !isFresh(parsed.at, COUNTRIES_TTL_MS)) return null;
-    return parsed.data;
+    const rows = parsed?.data;
+    const stale = !isFresh(parsed?.at, COUNTRIES_TTL_MS);
+    const invalid = !isPersistableCountryList(rows);
+    if (stale || invalid) {
+      if (raw) await clearPersistedCountries();
+      return null;
+    }
+    return rows;
   } catch {
+    await clearPersistedCountries();
     return null;
   }
 }
 
 async function writePersistedCountries(data) {
+  if (!isPersistableCountryList(data)) return;
   try {
     await AsyncStorage.setItem(
       COUNTRIES_STORAGE_KEY,
@@ -64,7 +84,7 @@ export function invalidateReferenceDataCache() {
 
 export async function fetchCountriesCached(fetcher, { force = false } = {}) {
   const bucket = memory.countries;
-  if (!force && bucket.data && isFresh(bucket.at, COUNTRIES_TTL_MS)) {
+  if (!force && isPersistableCountryList(bucket.data) && isFresh(bucket.at, COUNTRIES_TTL_MS)) {
     return bucket.data;
   }
   if (bucket.promise) {
@@ -83,11 +103,15 @@ export async function fetchCountriesCached(fetcher, { force = false } = {}) {
     }
 
     const data = await fetcher();
-    bucket.data = data;
+    bucket.data = Array.isArray(data) ? data : [];
     bucket.at = Date.now();
     bucket.promise = null;
-    await writePersistedCountries(data);
-    return data;
+    if (isPersistableCountryList(bucket.data)) {
+      await writePersistedCountries(bucket.data);
+    } else {
+      await clearPersistedCountries();
+    }
+    return bucket.data;
   })().catch((err) => {
     bucket.promise = null;
     throw err;

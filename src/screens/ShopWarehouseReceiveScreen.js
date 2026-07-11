@@ -13,6 +13,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import ScreenBackground from '../components/ScreenBackground';
 import AppNavigationBar from '../components/common/AppNavigationBar';
 import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
+import { navigateToShopDashboard } from '../navigation/drawerNavigation';
 import { useTranslation } from '../i18n';
 import FloatingCard from '../components/ui/FloatingCard';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
@@ -733,7 +734,7 @@ export default function ShopWarehouseReceiveScreen({
           <Appbar.Action
             icon="chevron-left"
             color="#fff"
-            onPress={() => navigation.navigate('ShopDashboard')}
+            onPress={() => navigateToShopDashboard(navigation)}
           />
           <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color="#fff" />
           <Appbar.Content title={t('drawer.partner.warehouse')} titleStyle={{ color: '#fff' }} />

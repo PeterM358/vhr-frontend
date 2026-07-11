@@ -1,10 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { API_BASE_URL } from './config';
-import { safeError } from '../utils/logger';
+import { safeError, devLog } from '../utils/logger';
 import {
   fetchCitiesForCountryCached,
   fetchCountriesCached,
 } from '../utils/referenceDataCache';
+import {
+  describeApiListShape,
+  normalizeApiListResponse,
+} from '../utils/normalizeApiList';
 
 function buildCityQuery(options = {}) {
   const params = new URLSearchParams();
@@ -15,26 +20,66 @@ function buildCityQuery(options = {}) {
   return qs ? `?${qs}` : '';
 }
 
+function logCountryLoad({ endpoint, status, raw, normalizedCount, error = '' }) {
+  if (!__DEV__) return;
+  devLog(
+    `[country-load] platform=${Platform.OS} api_base=${API_BASE_URL} endpoint=${endpoint} status=${status} raw_shape=${describeApiListShape(raw)} normalized_count=${normalizedCount} error=${error}`
+  );
+}
+
+function normalizeFetchedList(raw, resourceLabel) {
+  const rows = normalizeApiListResponse(raw);
+  if (rows === null) {
+    throw new Error(`Unexpected ${resourceLabel} response shape`);
+  }
+  return rows;
+}
+
 async function fetchCountriesRaw() {
+  const endpoint = '/api/profiles/countries/';
   const token = await AsyncStorage.getItem('@access_token');
-  const res = await fetch(`${API_BASE_URL}/api/profiles/countries/`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error('Failed to fetch countries');
-  return res.json();
+  let status = 0;
+  let raw = null;
+  try {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    status = res.status;
+    if (!res.ok) {
+      throw new Error(`Failed to fetch countries (${status})`);
+    }
+    raw = await res.json();
+    const rows = normalizeFetchedList(raw, 'countries');
+    logCountryLoad({
+      endpoint,
+      status,
+      raw,
+      normalizedCount: rows.length,
+    });
+    return rows;
+  } catch (err) {
+    const message = err?.message || String(err);
+    logCountryLoad({
+      endpoint,
+      status,
+      raw,
+      normalizedCount: 0,
+      error: message,
+    });
+    throw err;
+  }
 }
 
 async function fetchCitiesForCountryRaw(countryId, options = {}) {
   const token = await AsyncStorage.getItem('@access_token');
   const query = buildCityQuery(options);
-  const res = await fetch(
-    `${API_BASE_URL}/api/profiles/countries/${countryId}/cities/${query}`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    }
-  );
+  const endpoint = `/api/profiles/countries/${countryId}/cities/${query}`;
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
   if (!res.ok) throw new Error('Failed to fetch cities');
-  return res.json();
+  const raw = await res.json();
+  return normalizeFetchedList(raw, 'cities');
 }
 
 // 🔹 Create a new service center linked to the current shop user

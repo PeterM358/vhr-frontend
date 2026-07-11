@@ -122,6 +122,18 @@ export const drawerGlassStyles = StyleSheet.create({
     marginVertical: 8,
     marginHorizontal: 20,
   },
+  languageSection: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 4,
+    gap: 8,
+  },
+  languageLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: DRAWER_TINT.title,
+    letterSpacing: 0.4,
+  },
 });
 
 const styles = StyleSheet.create({

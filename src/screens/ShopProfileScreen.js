@@ -128,6 +128,27 @@ function toSafeArray(v) {
   return Array.isArray(v) ? v : [];
 }
 
+function ensureSelectedCountry(countryList, selectedId, selectedName) {
+  if (!selectedId) return countryList;
+  if (countryList.some((country) => Number(country.id) === Number(selectedId))) {
+    return countryList;
+  }
+  return [{ id: selectedId, name: selectedName || 'Selected country' }, ...countryList];
+}
+
+function ensureSelectedCity(cityList, selectedId, selectedName) {
+  if (!selectedId) return cityList;
+  if (cityList.some((city) => Number(city.id) === Number(selectedId))) {
+    return cityList;
+  }
+  return [{ id: selectedId, name: selectedName || 'Selected city' }, ...cityList];
+}
+
+async function fetchCountryRows({ force = false } = {}) {
+  const rows = await getCountries({ force });
+  return toSafeArray(rows);
+}
+
 function parseWorkingHours(value) {
   let src = value;
   if (typeof src === 'string') {
@@ -641,14 +662,29 @@ export default function ShopProfileScreen({ navigation, route }) {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
-      const [shopProfiles, countryList, makes] = await Promise.all([
+      let countryList = [];
+      let countriesLoadFailed = false;
+
+      try {
+        countryList = await fetchCountryRows();
+        if (!countryList.length) {
+          countryList = await fetchCountryRows({ force: true });
+        }
+      } catch (err) {
+        countriesLoadFailed = true;
+        console.error('[ShopProfile] getCountries failed', err);
+      }
+
+      const [shopProfiles, makes] = await Promise.all([
         getMyShopProfiles(),
-        getCountries(),
         token ? getMakes().catch(() => []) : Promise.resolve([]),
       ]);
 
       setCountries(countryList);
-      if (!countryList?.length) {
+      if (countriesLoadFailed) {
+        setDialogMessage('Could not load countries. Check your connection and try again.');
+        setDialogVisible(true);
+      } else if (countryList.length === 0) {
         setDialogMessage(
           'Country list is empty on the server. Ask your administrator to run: python manage.py seed_bootstrap'
         );
@@ -662,6 +698,9 @@ export default function ShopProfileScreen({ navigation, route }) {
         const p0 =
           shopProfiles.find((row) => String(row.id) === String(currentShopId)) || shopProfiles[0];
         const p = await mergeRegistrationContact(p0);
+        setCountries(
+          ensureSelectedCountry(countryList, p.country, p.country_name)
+        );
         const loadedServices = sanitizeArray(p.available_repairs);
         const loadedVehicleTypes = sanitizeArray(p.supported_vehicle_types);
         const loadedBrandIds = sanitizeArray(p.brands);
@@ -705,7 +744,13 @@ export default function ShopProfileScreen({ navigation, route }) {
 
         if (p.country) {
           const cityList = await getCitiesForCountry(p.country);
-          setCities(cityList);
+          setCities(
+            ensureSelectedCity(
+              toSafeArray(cityList),
+              p.city,
+              p.city_name
+            )
+          );
         }
 
         if (token && p.id) {
@@ -734,7 +779,32 @@ export default function ShopProfileScreen({ navigation, route }) {
   };
 
   const handleCountryChange = async (value) => {
-    const countryRow = countries.find((c) => Number(c.id) === Number(value));
+    let countryRows = countries;
+    if (!countryRows.length) {
+      try {
+        countryRows = await fetchCountryRows({ force: true });
+        countryRows = ensureSelectedCountry(
+          countryRows,
+          profile?.country,
+          profile?.country_name
+        );
+        setCountries(countryRows);
+      } catch (err) {
+        console.error('[ShopProfile] getCountries failed on picker', err);
+        setDialogMessage('Could not load countries. Check your connection and try again.');
+        setDialogVisible(true);
+        return;
+      }
+      if (!countryRows.length) {
+        setDialogMessage(
+          'Country list is empty on the server. Ask your administrator to run: python manage.py seed_bootstrap'
+        );
+        setDialogVisible(true);
+        return;
+      }
+    }
+
+    const countryRow = countryRows.find((c) => Number(c.id) === Number(value));
     const prefix = dialPrefixForCountry(countryRow);
     setProfile((prev) => ({
       ...prev,
@@ -745,7 +815,7 @@ export default function ShopProfileScreen({ navigation, route }) {
     if (value) {
       try {
         const cityList = await getCitiesForCountry(value);
-        setCities(cityList);
+        setCities(toSafeArray(cityList));
       } catch (err) {
         console.error(err);
         setDialogMessage('Error loading cities');

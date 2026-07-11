@@ -69,7 +69,7 @@ export default function AppFooter() {
         isMobile ? styles.footerMobile : null,
         Platform.OS === 'web' ? styles.glass : null,
       ]}
-      accessibilityRole="contentinfo"
+      accessibilityRole={Platform.OS === 'web' ? 'contentinfo' : undefined}
     >
       <View style={styles.inner}>
         <View style={styles.mainRow}>

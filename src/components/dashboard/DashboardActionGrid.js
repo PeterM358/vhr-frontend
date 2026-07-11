@@ -43,8 +43,8 @@ export default function DashboardActionGrid({ tiles = [] }) {
     <View style={styles.wrap}>
       {rows.map((row, rowIndex) => (
         <View key={`grid-row-${rowIndex}`} style={styles.row}>
-          {row.map((tile) => (
-            <ActionTile key={tile.key} {...tile} />
+          {row.map(({ key, ...tile }) => (
+            <ActionTile key={key} {...tile} />
           ))}
           {row.length === 1 ? <View style={styles.spacer} /> : null}
         </View>

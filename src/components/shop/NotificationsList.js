@@ -53,8 +53,11 @@ export default function NotificationsList() {
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [activeTab, setActiveTab] = useState('alerts');
   const [markingAll, setMarkingAll] = useState(false);
-  const { notifications: liveNotifications = [], setNotifications } =
-    useContext(WebSocketContext);
+  const {
+    notifications: liveNotifications = [],
+    setNotifications,
+    refreshUnreadFromRest,
+  } = useContext(WebSocketContext);
   const navigation = useNavigation();
   const handleBack = usePartnerDashboardBack(navigation);
 
@@ -64,29 +67,57 @@ export default function NotificationsList() {
       const token = await AsyncStorage.getItem('@access_token');
       const data = await getNotifications(token);
       const rows = Array.isArray(data) ? data : data?.results ?? [];
-      setRemoteNotifications(rows.map(normalizeNotification));
+      const normalized = rows.map(normalizeNotification);
+      setRemoteNotifications(normalized);
+      if (typeof setNotifications === 'function') {
+        setNotifications((prev) => {
+          const mergedMap = new Map();
+          [...(prev || []), ...normalized].forEach((row) => {
+            if (row?.id == null) return;
+            const existing = mergedMap.get(row.id);
+            mergedMap.set(
+              row.id,
+              existing ? normalizeNotification({ ...existing, ...row }) : normalizeNotification(row)
+            );
+          });
+          return Array.from(mergedMap.values()).sort(
+            (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
+          );
+        });
+      }
+      if (typeof refreshUnreadFromRest === 'function') {
+        await refreshUnreadFromRest();
+      }
     } catch (err) {
       console.error('Failed to load notifications', err);
       Alert.alert(t('common.error'), t('notifications.loadError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshUnreadFromRest, setNotifications, t]);
 
   useFocusEffect(
     useCallback(() => {
       fetchNotifications();
-    }, [fetchNotifications])
+      return () => {
+        if (typeof refreshUnreadFromRest === 'function') {
+          refreshUnreadFromRest();
+        }
+      };
+    }, [fetchNotifications, refreshUnreadFromRest])
   );
 
   const markReadLocally = useCallback(
-    (id) => {
+    async (id) => {
       setRemoteNotifications((prev) => patchNotificationReadInList(prev, id));
       if (typeof setNotifications === 'function') {
         setNotifications((prev) => patchNotificationReadInList(prev, id));
       }
+      if (typeof refreshUnreadFromRest === 'function') {
+        await refreshUnreadFromRest();
+      }
     },
-    [setNotifications]
+    [refreshUnreadFromRest, setNotifications]
   );
 
   const handleMarkAllRead = async () => {
@@ -97,6 +128,9 @@ export default function NotificationsList() {
       setRemoteNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       if (typeof setNotifications === 'function') {
         setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      }
+      if (typeof refreshUnreadFromRest === 'function') {
+        await refreshUnreadFromRest();
       }
     } catch (err) {
       console.error('Failed to mark all read', err);
@@ -112,7 +146,7 @@ export default function NotificationsList() {
 
       if (!item.is_read) {
         await markNotificationRead(token, item.id);
-        markReadLocally(item.id);
+        await markReadLocally(item.id);
       }
 
       const opened = navigateShopNotification(navigation, item);
@@ -128,7 +162,8 @@ export default function NotificationsList() {
 
   const mergedNotifications = useMemo(() => {
     const mergedMap = new Map();
-    [...(remoteNotifications || []), ...(liveNotifications || [])].forEach((n) => {
+    // REST rows are fetched on focus; prefer them over stale websocket snapshots.
+    [...(liveNotifications || []), ...(remoteNotifications || [])].forEach((n) => {
       if (n?.id == null) return;
       const normalized = normalizeNotification(n);
       const existing = mergedMap.get(n.id);
@@ -161,10 +196,8 @@ export default function NotificationsList() {
   );
 
   const unreadCount = useMemo(
-    () =>
-      [...(remoteNotifications || []), ...(liveNotifications || [])].filter((n) => !n?.is_read)
-        .length,
-    [remoteNotifications, liveNotifications]
+    () => mergedNotifications.filter((n) => !n.is_read).length,
+    [mergedNotifications]
   );
 
   const renderItem = ({ item }) => {

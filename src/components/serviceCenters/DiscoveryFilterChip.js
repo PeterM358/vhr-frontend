@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { COLORS } from '../../styles/colors';
+import DISCOVERY_MOBILE, { discoveryMinFont } from './discoveryMobileTokens';
 
 export function DiscoveryFilterChip({
   label,
@@ -52,12 +53,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 18,
+    minHeight: DISCOVERY_MOBILE.height.chip,
+    borderRadius: DISCOVERY_MOBILE.radius.chip,
     backgroundColor: '#fff',
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: DISCOVERY_MOBILE.color.border,
     cursor: 'pointer',
   },
   filtersChip: {
@@ -65,7 +66,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primaryDark,
     paddingHorizontal: 14,
     shadowColor: COLORS.primary,
-    shadowOpacity: 0.22,
+    shadowOpacity: 0.18,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
   },
@@ -81,7 +82,7 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   chipText: {
-    fontSize: 13,
+    fontSize: discoveryMinFont(13),
     color: '#334155',
     fontWeight: '600',
   },

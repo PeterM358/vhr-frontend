@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "expo start",
+    "start": "node scripts/with-env.js .env.local npx expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
@@ -15,7 +15,8 @@
     "build:web:production": "node scripts/with-env.js .env.production npx expo export --platform web",
     "prebuild:android": "expo prebuild --platform android",
     "start:android": "expo run:android",
-    "start:dev": "expo start --dev-client"
+    "start:dev": "expo start --dev-client",
+    "verify:firebase-config": "node scripts/verify-firebase-config.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "^5.0.4",

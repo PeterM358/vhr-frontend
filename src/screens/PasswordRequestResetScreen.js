@@ -16,7 +16,7 @@ import { showMessage } from '../utils/crossPlatformAlert';
 
 export default function PasswordRequestResetScreen({ navigation }) {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const insets = useSafeAreaInsets();
   const headerReserve = insets.top + (Platform.OS === 'ios' ? 52 : 56);
   const [email, setEmail] = useState('');
@@ -46,7 +46,7 @@ export default function PasswordRequestResetScreen({ navigation }) {
     setError('');
     try {
       setLoading(true);
-      await requestPasswordReset(email.trim());
+      await requestPasswordReset(email.trim(), locale);
       showMessage(t('common.notice'), t('auth.resetEmailSent'));
       navigation.reset({
         index: 0,
