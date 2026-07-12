@@ -33,9 +33,12 @@ async function fetchVehicleTypesRaw() {
   const res = await fetch(`${API_BASE_URL}/api/vehicles/types/`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error('Failed to load vehicle types');
+  if (!res.ok) throw new Error(`Failed to load vehicle types (${res.status})`);
   const rows = await res.json();
-  return Array.isArray(rows) ? rows : [];
+  if (!Array.isArray(rows)) {
+    throw new Error('Unexpected vehicle types response shape');
+  }
+  return rows;
 }
 
 export async function getVehicles() {
@@ -125,7 +128,11 @@ export async function createVehicleExpense(vehicleId, payload, token) {
 }
 
 export async function getVehicleTypes(options = {}) {
-  return fetchVehicleTypesCached(() => fetchVehicleTypesRaw(), options);
+  const rows = await fetchVehicleTypesCached(() => fetchVehicleTypesRaw(), options);
+  if (!options.force && rows.length === 0) {
+    return fetchVehicleTypesCached(() => fetchVehicleTypesRaw(), { ...options, force: true });
+  }
+  return rows;
 }
 
 export async function getMakes() {

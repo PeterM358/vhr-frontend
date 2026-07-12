@@ -20,7 +20,7 @@ const androidGoogleServicesFile = googleServicesFileIfExists(ANDROID_GOOGLE_SERV
 export default {
   expo: {
     name: "Veversal",
-    slug: "veversal",
+    slug: "vhr-frontend",
     scheme: "service1001",
     version: "1.0.0",
     orientation: "portrait",
@@ -36,7 +36,8 @@ export default {
           android: {
             compileSdkVersion: 35,
             targetSdkVersion: 34,
-            minSdkVersion: 24
+            minSdkVersion: 24,
+            usesCleartextTraffic: true
           },
           ios: {
             useFrameworks: "static"
@@ -91,7 +92,6 @@ export default {
       googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
       googleClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
       googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-      googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
       apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL,
       wsBaseUrl: process.env.EXPO_PUBLIC_WS_BASE_URL,
       wsEnabled: process.env.EXPO_PUBLIC_WS_ENABLED,

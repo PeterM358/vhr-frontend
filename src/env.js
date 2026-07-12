@@ -18,10 +18,12 @@ function resolveDevHost() {
   if (Platform.OS === 'web') {
     return '127.0.0.1';
   }
-  if (Platform.OS === 'android' && !Constants.isDevice) {
+  // Only treat as emulator/simulator when isDevice is explicitly false.
+  // undefined → physical device → LAN host from env (not 10.0.2.2).
+  if (Platform.OS === 'android' && Constants.isDevice === false) {
     return '10.0.2.2';
   }
-  if (Platform.OS === 'ios' && !Constants.isDevice) {
+  if (Platform.OS === 'ios' && Constants.isDevice === false) {
     return '127.0.0.1';
   }
   return DEV_LAN_HOST;
@@ -101,9 +103,34 @@ export function wsSkipReason() {
   return 'WebSocket skipped — REST notifications only';
 }
 
+function describeApiSource() {
+  if (trimUrl(process.env.EXPO_PUBLIC_API_BASE_URL)) {
+    return 'env:EXPO_PUBLIC_API_BASE_URL';
+  }
+  if (Platform.OS === 'web') {
+    return 'fallback:web-localhost';
+  }
+  if (Platform.OS === 'android' && Constants.isDevice === false) {
+    return 'fallback:android-emulator';
+  }
+  if (Platform.OS === 'ios' && Constants.isDevice === false) {
+    return 'fallback:ios-simulator';
+  }
+  return 'fallback:EXPO_PUBLIC_DEV_LAN_HOST';
+}
+
+function describeWsSource() {
+  if (trimUrl(process.env.EXPO_PUBLIC_WS_BASE_URL)) {
+    return 'env:EXPO_PUBLIC_WS_BASE_URL';
+  }
+  return 'derived-from-api';
+}
+
 if (__DEV__) {
   devLog(
-    `[Veversal] API → ${API_BASE_URL} (platform=${Platform.OS}, device=${Constants.isDevice})`
+    `[Veversal] API → ${API_BASE_URL} (source=${describeApiSource()}, platform=${Platform.OS})`
   );
-  devLog(`[Veversal] WS  → ${WS_BASE_URL} (enabled=${WS_ENABLED}, route=/ws/notifications/)`);
+  devLog(
+    `[Veversal] WS  → ${WS_BASE_URL} (source=${describeWsSource()}, enabled=${WS_ENABLED}, route=/ws/notifications/)`
+  );
 }

@@ -27,6 +27,13 @@ function logCountryLoad({ endpoint, status, raw, normalizedCount, error = '' }) 
   );
 }
 
+function logReferenceLoad(label, { endpoint, status, normalizedCount, error = '' }) {
+  if (!__DEV__) return;
+  devLog(
+    `[${label}] platform=${Platform.OS} api_base=${API_BASE_URL} endpoint=${endpoint} status=${status} normalized_count=${normalizedCount} error=${error}`
+  );
+}
+
 function normalizeFetchedList(raw, resourceLabel) {
   const rows = normalizeApiListResponse(raw);
   if (rows === null) {
@@ -74,12 +81,31 @@ async function fetchCitiesForCountryRaw(countryId, options = {}) {
   const token = await AsyncStorage.getItem('@access_token');
   const query = buildCityQuery(options);
   const endpoint = `/api/profiles/countries/${countryId}/cities/${query}`;
-  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error('Failed to fetch cities');
-  const raw = await res.json();
-  return normalizeFetchedList(raw, 'cities');
+  let status = 0;
+  try {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    status = res.status;
+    if (!res.ok) throw new Error(`Failed to fetch cities (${status})`);
+    const raw = await res.json();
+    const rows = normalizeFetchedList(raw, 'cities');
+    logReferenceLoad('city-load', {
+      endpoint,
+      status,
+      normalizedCount: rows.length,
+    });
+    return rows;
+  } catch (err) {
+    const message = err?.message || String(err);
+    logReferenceLoad('city-load', {
+      endpoint,
+      status,
+      normalizedCount: 0,
+      error: message,
+    });
+    throw err;
+  }
 }
 
 // 🔹 Create a new service center linked to the current shop user
@@ -132,17 +158,29 @@ export async function updateShopProfile(profileId, payload) {
 
 // 🔹 Load countries (cached)
 export async function getCountries(options = {}) {
-  return fetchCountriesCached(() => fetchCountriesRaw(), options);
+  const rows = await fetchCountriesCached(() => fetchCountriesRaw(), options);
+  if (!options.force && rows.length === 0) {
+    return fetchCountriesCached(() => fetchCountriesRaw(), { ...options, force: true });
+  }
+  return rows;
 }
 
 // 🔹 Load cities for a country (cached per country/search/limit)
 export async function getCitiesForCountry(countryId, options = {}) {
   if (!countryId) return [];
-  return fetchCitiesForCountryCached(
+  const rows = await fetchCitiesForCountryCached(
     countryId,
     () => fetchCitiesForCountryRaw(countryId, options),
     options
   );
+  if (!options.force && rows.length === 0) {
+    return fetchCitiesForCountryCached(
+      countryId,
+      () => fetchCitiesForCountryRaw(countryId, options),
+      { ...options, force: true }
+    );
+  }
+  return rows;
 }
 
 /** Search cities for discovery (lazy; cached per search term). */

@@ -29,7 +29,8 @@ function isFirebaseMessagingConfigured() {
 }
 
 function loadMessagingModular() {
-  return require('@react-native-firebase/messaging/lib/modular');
+  // Main package entry registers the messaging namespace; /lib/modular alone does not.
+  return require('@react-native-firebase/messaging');
 }
 
 function getNativeMessaging() {

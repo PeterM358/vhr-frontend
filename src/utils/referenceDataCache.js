@@ -31,8 +31,13 @@ function citiesCacheKey(countryId, options = {}) {
   return `${countryId}|${search}|${limit}`;
 }
 
-function isPersistableCountryList(data) {
+/** Non-empty lists are safe to serve from cache; empty often means a failed/partial fetch. */
+function isNonEmptyList(data) {
   return Array.isArray(data) && data.length > 0;
+}
+
+function isPersistableCountryList(data) {
+  return isNonEmptyList(data);
 }
 
 async function clearPersistedCountries() {
@@ -104,7 +109,7 @@ export async function fetchCountriesCached(fetcher, { force = false } = {}) {
 
     const data = await fetcher();
     bucket.data = Array.isArray(data) ? data : [];
-    bucket.at = Date.now();
+    bucket.at = isPersistableCountryList(bucket.data) ? Date.now() : 0;
     bucket.promise = null;
     if (isPersistableCountryList(bucket.data)) {
       await writePersistedCountries(bucket.data);
@@ -124,7 +129,7 @@ export async function fetchCitiesForCountryCached(countryId, fetcher, options = 
   const key = citiesCacheKey(countryId, options);
   const bucket = memory.cities.get(key) || { data: null, at: 0, promise: null };
 
-  if (!options.force && bucket.data && isFresh(bucket.at, CITIES_TTL_MS)) {
+  if (!options.force && isNonEmptyList(bucket.data) && isFresh(bucket.at, CITIES_TTL_MS)) {
     return bucket.data;
   }
   if (bucket.promise) {
@@ -133,14 +138,19 @@ export async function fetchCitiesForCountryCached(countryId, fetcher, options = 
 
   bucket.promise = fetcher()
     .then((data) => {
-      bucket.data = data;
-      bucket.at = Date.now();
+      const rows = Array.isArray(data) ? data : [];
+      bucket.data = rows;
+      bucket.at = isNonEmptyList(rows) ? Date.now() : 0;
       bucket.promise = null;
       memory.cities.set(key, bucket);
-      return data;
+      return rows;
     })
     .catch((err) => {
       bucket.promise = null;
+      if (!isNonEmptyList(bucket.data)) {
+        bucket.data = null;
+        bucket.at = 0;
+      }
       memory.cities.set(key, bucket);
       throw err;
     });
@@ -151,7 +161,7 @@ export async function fetchCitiesForCountryCached(countryId, fetcher, options = 
 
 export async function fetchVehicleTypesCached(fetcher, { force = false } = {}) {
   const bucket = memory.vehicleTypes;
-  if (!force && bucket.data && isFresh(bucket.at, VEHICLE_TYPES_TTL_MS)) {
+  if (!force && isNonEmptyList(bucket.data) && isFresh(bucket.at, VEHICLE_TYPES_TTL_MS)) {
     return bucket.data;
   }
   if (bucket.promise) {
@@ -160,13 +170,18 @@ export async function fetchVehicleTypesCached(fetcher, { force = false } = {}) {
 
   bucket.promise = fetcher()
     .then((data) => {
-      bucket.data = data;
-      bucket.at = Date.now();
+      const rows = Array.isArray(data) ? data : [];
+      bucket.data = rows;
+      bucket.at = isNonEmptyList(rows) ? Date.now() : 0;
       bucket.promise = null;
-      return data;
+      return rows;
     })
     .catch((err) => {
       bucket.promise = null;
+      if (!isNonEmptyList(bucket.data)) {
+        bucket.data = null;
+        bucket.at = 0;
+      }
       throw err;
     });
 
@@ -176,7 +191,7 @@ export async function fetchVehicleTypesCached(fetcher, { force = false } = {}) {
 function createSimpleBucketFetcher(bucketName, ttl) {
   return async function fetchCached(fetcher, { force = false } = {}) {
     const bucket = memory[bucketName];
-    if (!force && bucket.data && isFresh(bucket.at, ttl)) {
+    if (!force && isNonEmptyList(bucket.data) && isFresh(bucket.at, ttl)) {
       return bucket.data;
     }
     if (bucket.promise) {
@@ -185,13 +200,18 @@ function createSimpleBucketFetcher(bucketName, ttl) {
 
     bucket.promise = fetcher()
       .then((data) => {
-        bucket.data = data;
-        bucket.at = Date.now();
+        const rows = Array.isArray(data) ? data : [];
+        bucket.data = rows;
+        bucket.at = isNonEmptyList(rows) ? Date.now() : 0;
         bucket.promise = null;
-        return data;
+        return rows;
       })
       .catch((err) => {
         bucket.promise = null;
+        if (!isNonEmptyList(bucket.data)) {
+          bucket.data = null;
+          bucket.at = 0;
+        }
         throw err;
       });
 
