@@ -63,6 +63,7 @@
       "documentImports": "Импорт на документи",
       "complaints": "Рекламации",
       "purchaseOrders": "Поръчки за доставка",
+      "businessNetwork": "Бизнес мрежа",
       "storageLocations": "Складови адреси",
       "complaints": "Оплаквания",
       "priceList": "Ценоразпис",
@@ -2067,6 +2068,84 @@
       "agricultural": "Селскостопански",
       "construction": "Строителни",
       "other": "Друго"
+    }
+  },
+  "network": {
+    "common": {
+      "error": "Възникна грешка",
+      "empty": "Няма записи",
+      "active": "Активна",
+      "inactive": "Неактивна",
+      "refresh": "Обнови"
+    },
+    "organization": {
+      "title": "Моята организация",
+      "status": "Статус"
+    },
+    "roles": {
+      "title": "Бизнес роли",
+      "activate": "Активирай {role}",
+      "types": {
+        "SERVICE_CENTER": "Сервиз",
+        "SUPPLIER": "Доставчик",
+        "MANUFACTURER": "Производител",
+        "IMPORTER": "Вносител",
+        "DISTRIBUTOR": "Дистрибутор",
+        "WHOLESALER": "Търговец на едро",
+        "RETAILER": "Търговец на дребно",
+        "FLEET_OPERATOR": "Автопарк",
+        "TRANSPORT_COMPANY": "Транспортна фирма",
+        "WAREHOUSE_OPERATOR": "Складов оператор",
+        "ACCOUNTING_FIRM": "Счетоводна къща",
+        "INSPECTION_CENTER": "Технически преглед",
+        "ROADSIDE_ASSISTANCE": "Пътна помощ"
+      }
+    },
+    "partners": {
+      "title": "Бизнес партньори"
+    },
+    "relationships": {
+      "types": {
+        "SUPPLIES": "Доставя",
+        "BUYS_FROM": "Купува от",
+        "TRANSPORTS_FOR": "Транспортира за",
+        "ACCOUNTING_FOR": "Счетоводство за",
+        "SERVICES_FLEET_FOR": "Обслужва автопарк",
+        "MANUFACTURES_FOR": "Произвежда за",
+        "DISTRIBUTES_FOR": "Дистрибутира за"
+      }
+    },
+    "invite": {
+      "title": "Покани партньор",
+      "email": "Имейл",
+      "companyName": "Име на фирма",
+      "vatNumber": "ДДС номер",
+      "send": "Изпрати покана",
+      "sent": "Поканата е изпратена"
+    },
+    "incomingOrders": {
+      "title": "Входящи поръчки",
+      "detailTitle": "Входяща поръчка",
+      "status": "Статус",
+      "acknowledge": "Потвърди",
+      "partialAck": "Частично потвърждение",
+      "reject": "Отхвърли"
+    },
+    "mapping": {
+      "title": "Картографиране SKU",
+      "sellerSku": "SKU на доставчик",
+      "buyerSku": "SKU на купувач",
+      "create": "Създай картографиране"
+    },
+    "packaging": {
+      "title": "Управление на опаковки",
+      "shopPartId": "ID на артикул в сервиза",
+      "packageUomId": "ID на мерна единица",
+      "quantity": "Количество в базова единица",
+      "supplierSku": "SKU на доставчик",
+      "create": "Създай опаковка",
+      "version": "Версия",
+      "locked": "Заключена"
     }
   }
 }

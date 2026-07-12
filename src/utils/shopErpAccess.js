@@ -60,6 +60,10 @@ export const PARTNER_ERP_ROUTES = {
     permissionAny: ['manage_storage_locations', 'move_stock'],
     requiresAccess: true,
   },
+  NetworkOrganization: {
+    drawerKey: 'businessNetwork',
+    requiresAccess: true,
+  },
   ShopInvoicing: {
     drawerKey: 'invoicing',
     capability: 'uses_invoicing',

@@ -114,6 +114,7 @@ function CustomDrawerContent(props) {
   const showComplaints = canAccessPartnerRoute('ShopComplaints', erpContext);
   const showPurchaseOrders = canAccessPartnerRoute('ShopPurchaseOrders', erpContext);
   const showStorageLocations = canAccessPartnerRoute('ShopStorageLocations', erpContext);
+  const showBusinessNetwork = canAccessPartnerRoute('NetworkOrganization', erpContext);
 
   const openStackRoute = (webNav, routeName) => {
     props.navigation.closeDrawer();
@@ -279,6 +280,15 @@ function CustomDrawerContent(props) {
             label={t('drawer.partner.storageLocations')}
             onPress={() => openStackRoute(navigateToPartnerStorageLocations, 'ShopStorageLocations')}
             icon={({ color, size }) => <DrawerMenuIcon name="map-marker-path" color={color} size={size} />}
+            {...itemProps}
+          />
+        ) : null}
+
+        {showBusinessNetwork ? (
+          <DrawerItem
+            label={t('drawer.partner.businessNetwork')}
+            onPress={() => openStackRoute(() => {}, 'NetworkOrganization')}
+            icon={({ color, size }) => <DrawerMenuIcon name="domain" color={color} size={size} />}
             {...itemProps}
           />
         ) : null}

@@ -63,6 +63,14 @@ import {
   ShopPurchaseOrderDetailScreen,
   ShopGoodsReceiptScreen,
   ShopStorageLocationsScreen,
+  NetworkOrganizationScreen,
+  NetworkRolesScreen,
+  NetworkPartnersScreen,
+  NetworkInvitePartnerScreen,
+  NetworkIncomingOrdersScreen,
+  NetworkIncomingOrderDetailScreen,
+  NetworkProductMappingScreen,
+  NetworkPackagingScreen,
   ClientProfileScreen,
   AddShopPartScreen,
   SelectRepairPartsScreen,
@@ -552,6 +560,46 @@ export default function AppNavigator() {
           name="ShopStorageLocations"
           component={ShopStorageLocationsScreen}
           options={{ ...appNavBarScreenOptions, title: t('erp.procurement.storageLocations') }}
+        />
+        <Stack.Screen
+          name="NetworkOrganization"
+          component={NetworkOrganizationScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.organization.title') }}
+        />
+        <Stack.Screen
+          name="NetworkRoles"
+          component={NetworkRolesScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.roles.title') }}
+        />
+        <Stack.Screen
+          name="NetworkPartners"
+          component={NetworkPartnersScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.partners.title') }}
+        />
+        <Stack.Screen
+          name="NetworkInvitePartner"
+          component={NetworkInvitePartnerScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.invite.title') }}
+        />
+        <Stack.Screen
+          name="NetworkIncomingOrders"
+          component={NetworkIncomingOrdersScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.incomingOrders.title') }}
+        />
+        <Stack.Screen
+          name="NetworkIncomingOrderDetail"
+          component={NetworkIncomingOrderDetailScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.incomingOrders.detailTitle') }}
+        />
+        <Stack.Screen
+          name="NetworkProductMapping"
+          component={NetworkProductMappingScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.mapping.title') }}
+        />
+        <Stack.Screen
+          name="NetworkPackaging"
+          component={NetworkPackagingScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.packaging.title') }}
         />
         <Stack.Screen
           name="ShopInvoiceDetail"

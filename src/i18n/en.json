@@ -63,6 +63,7 @@
       "documentImports": "Document imports",
       "complaints": "Complaints",
       "purchaseOrders": "Purchase orders",
+      "businessNetwork": "Business network",
       "storageLocations": "Storage locations",
       "complaints": "Complaints",
       "priceList": "Price list",
@@ -2067,6 +2068,84 @@
       "agricultural": "Agricultural",
       "construction": "Construction",
       "other": "Other"
+    }
+  },
+  "network": {
+    "common": {
+      "error": "Something went wrong",
+      "empty": "No records yet",
+      "active": "Active",
+      "inactive": "Inactive",
+      "refresh": "Refresh"
+    },
+    "organization": {
+      "title": "My organization",
+      "status": "Status"
+    },
+    "roles": {
+      "title": "Business roles",
+      "activate": "Activate {role}",
+      "types": {
+        "SERVICE_CENTER": "Service center",
+        "SUPPLIER": "Supplier",
+        "MANUFACTURER": "Manufacturer",
+        "IMPORTER": "Importer",
+        "DISTRIBUTOR": "Distributor",
+        "WHOLESALER": "Wholesaler",
+        "RETAILER": "Retailer",
+        "FLEET_OPERATOR": "Fleet operator",
+        "TRANSPORT_COMPANY": "Transport company",
+        "WAREHOUSE_OPERATOR": "Warehouse operator",
+        "ACCOUNTING_FIRM": "Accounting firm",
+        "INSPECTION_CENTER": "Inspection center",
+        "ROADSIDE_ASSISTANCE": "Roadside assistance"
+      }
+    },
+    "partners": {
+      "title": "Business partners"
+    },
+    "relationships": {
+      "types": {
+        "SUPPLIES": "Supplies",
+        "BUYS_FROM": "Buys from",
+        "TRANSPORTS_FOR": "Transports for",
+        "ACCOUNTING_FOR": "Accounting for",
+        "SERVICES_FLEET_FOR": "Services fleet for",
+        "MANUFACTURES_FOR": "Manufactures for",
+        "DISTRIBUTES_FOR": "Distributes for"
+      }
+    },
+    "invite": {
+      "title": "Invite partner",
+      "email": "Email",
+      "companyName": "Company name",
+      "vatNumber": "VAT number",
+      "send": "Send invitation",
+      "sent": "Invitation sent"
+    },
+    "incomingOrders": {
+      "title": "Incoming orders",
+      "detailTitle": "Incoming order",
+      "status": "Status",
+      "acknowledge": "Acknowledge",
+      "partialAck": "Partially acknowledge",
+      "reject": "Reject"
+    },
+    "mapping": {
+      "title": "Product / SKU mapping",
+      "sellerSku": "Seller SKU",
+      "buyerSku": "Buyer SKU",
+      "create": "Create mapping"
+    },
+    "packaging": {
+      "title": "Packaging management",
+      "shopPartId": "Shop part ID",
+      "packageUomId": "Package UOM ID",
+      "quantity": "Quantity in base UOM",
+      "supplierSku": "Supplier SKU",
+      "create": "Create packaging",
+      "version": "Version",
+      "locked": "Locked"
     }
   }
 }
