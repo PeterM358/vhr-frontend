@@ -35,6 +35,12 @@ export default function NetworkIncomingOrderDetailScreen({ navigation, route }) 
           <Text variant="titleMedium">{order.document_number}</Text>
           <Text>{order.sender_organization_name}</Text>
           <Text>{t('network.incomingOrders.status')}: {status}</Text>
+          {(order.traceability_summaries || []).map((summary, idx) => (
+            <Text key={`trace-${idx}`} style={styles.traceability}>
+              {summary.summary_label || t('network.incomingOrders.traceabilityPending')}
+              {summary.country_of_origin ? ` (${summary.country_of_origin})` : ''}
+            </Text>
+          ))}
         </AppCard>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Button mode="contained" onPress={() => act('acknowledge')}>{t('network.incomingOrders.acknowledge')}</Button>
@@ -48,4 +54,5 @@ export default function NetworkIncomingOrderDetailScreen({ navigation, route }) 
 const styles = StyleSheet.create({
   content: { padding: 16, gap: 12 },
   error: { color: '#b00020' },
+  traceability: { marginTop: 8, color: '#444' },
 });
