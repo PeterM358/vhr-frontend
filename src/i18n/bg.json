@@ -224,6 +224,8 @@
     },
     "actions": {
       "sendOffer": "Изпрати оферта",
+      "sendProposal": "Изпрати оферта",
+      "updateProposal": "Обнови офертата",
       "editOffer": "Редактирай оферта",
       "openRepair": "Отвори ремонта",
       "continueRepair": "Продължи ремонта",

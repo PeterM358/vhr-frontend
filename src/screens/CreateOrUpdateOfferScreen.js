@@ -39,6 +39,7 @@ import { stackContentPaddingTop } from '../navigation/stackContentInset';
 import FloatingCard from '../components/ui/FloatingCard';
 import DayBookingsPopup from '../components/shop/DayBookingsPopup';
 import { COLORS } from '../constants/colors';
+import { useTranslation } from '../i18n';
 
 const TIME_SLOTS = [
   '08:00',
@@ -314,6 +315,7 @@ function pickupFromBringShortcut(bring, key) {
 }
 
 export default function CreateOrUpdateOfferScreen({ route, navigation }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { existingOffer, selectedOfferParts = [], shopId: routeShopId } = route.params || {};
   const [repairId, setRepairId] = useState(route.params?.repairId || existingOffer?.repair || null);
@@ -354,10 +356,12 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTitle: existingOffer ? 'Update proposal' : 'Send proposal',
+      headerTitle: existingOffer
+        ? t('partnerDashboard.actions.updateProposal')
+        : t('partnerDashboard.actions.sendProposal'),
       headerBackTitleVisible: true,
     });
-  }, [navigation, existingOffer]);
+  }, [navigation, existingOffer, t]);
 
   const syncTotalFromEstimates = useCallback((nextLaborFrom, nextPartsFrom) => {
     if (priceManuallyEditedRef.current) return;
@@ -1380,7 +1384,9 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
           onPress={handleSubmit}
           style={styles.submitButton}
         >
-          {existingOffer ? 'Update proposal' : 'Send proposal'}
+          {existingOffer
+            ? t('partnerDashboard.actions.updateProposal')
+            : t('partnerDashboard.actions.sendProposal')}
         </Button>
       </ScrollView>
 

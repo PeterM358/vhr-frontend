@@ -224,6 +224,8 @@
     },
     "actions": {
       "sendOffer": "Send Offer",
+      "sendProposal": "Send proposal",
+      "updateProposal": "Update proposal",
       "editOffer": "Edit Offer",
       "openRepair": "Open Repair",
       "continueRepair": "Continue Repair",
