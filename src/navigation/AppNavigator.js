@@ -57,6 +57,7 @@ import {
   ShopAnalyticsScreen,
   ShopComplaintsScreen,
   ShopDocumentImportsScreen,
+  ShopDocumentImportDetailScreen,
   ShopWorkforceScreen,
   ClientProfileScreen,
   AddShopPartScreen,
@@ -506,22 +507,27 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ShopAnalytics"
           component={ShopAnalyticsScreen}
-          options={{ ...appNavBarScreenOptions, title: 'Analytics' }}
+          options={{ ...appNavBarScreenOptions, title: t('erp.analytics.title') }}
         />
         <Stack.Screen
           name="ShopComplaints"
           component={ShopComplaintsScreen}
-          options={{ ...appNavBarScreenOptions, title: 'Complaints' }}
+          options={{ ...appNavBarScreenOptions, title: t('erp.complaints.title') }}
         />
         <Stack.Screen
           name="ShopDocumentImports"
           component={ShopDocumentImportsScreen}
-          options={{ ...appNavBarScreenOptions, title: 'Document imports' }}
+          options={{ ...appNavBarScreenOptions, title: t('erp.documentImports.title') }}
+        />
+        <Stack.Screen
+          name="ShopDocumentImportDetail"
+          component={ShopDocumentImportDetailScreen}
+          options={{ ...appNavBarScreenOptions, title: t('erp.documentImports.detailTitle') }}
         />
         <Stack.Screen
           name="ShopWorkforce"
           component={ShopWorkforceScreen}
-          options={{ ...appNavBarScreenOptions, title: 'Workforce' }}
+          options={{ ...appNavBarScreenOptions, title: t('erp.workforce.title') }}
         />
         <Stack.Screen
           name="ShopInvoiceDetail"

@@ -36,11 +36,64 @@ export async function updateShopComplaint(token, shopId, complaintId, payload) {
   return response.json();
 }
 
+export async function createClientComplaint(token, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/complaints/`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to submit complaint'));
+  return response.json();
+}
+
 export async function listDocumentImports(token, shopId, params = {}) {
   const qs = new URLSearchParams(params).toString();
   const url = `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/document-imports/${qs ? `?${qs}` : ''}`;
   const response = await fetch(url, { headers: await shopScopedHeaders(token) });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load document imports'));
+  return response.json();
+}
+
+export async function uploadDocumentImport(token, shopId, filePayload, fields = {}) {
+  const form = new FormData();
+  const blob = filePayload.file || filePayload;
+  form.append('file', blob, filePayload.fileName || blob.name || 'document.pdf');
+  if (fields.repair_id != null) form.append('repair_id', String(fields.repair_id));
+  if (fields.total_amount_minor != null) form.append('total_amount_minor', String(fields.total_amount_minor));
+  if (fields.supplier_name) form.append('supplier_name', fields.supplier_name);
+  if (fields.document_date) form.append('document_date', fields.document_date);
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/document-imports/upload/`,
+    {
+      method: 'POST',
+      headers: await shopScopedHeaders(token),
+      body: form,
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to upload document'));
+  return response.json();
+}
+
+export async function getDocumentImportLines(token, shopId, importId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/document-imports/${importId}/lines/`,
+    { headers: await shopScopedHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load import lines'));
+  return response.json();
+}
+
+export async function confirmDocumentImport(token, shopId, importId, fields) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/document-imports/${importId}/confirm/`,
+    {
+      method: 'POST',
+      headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields }),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to confirm import'));
   return response.json();
 }
 
@@ -59,6 +112,19 @@ export async function listShopDepartments(token, shopId) {
     { headers: await shopScopedHeaders(token) },
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load departments'));
+  return response.json();
+}
+
+export async function createShopReview(token, shopId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/profiles/shops/${shopId}/reviews/create/`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to submit review'));
   return response.json();
 }
 

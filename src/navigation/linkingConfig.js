@@ -43,6 +43,19 @@ export const linkingScreens = {
   ShopServiceMenu: 'partner/services',
   PartnerBookings: 'partner/bookings',
   PartnerServiceCenters: 'partner/service-centers',
+  ShopAnalytics: 'partner/analytics',
+  ShopWorkforce: 'partner/workforce',
+  ShopDocumentImports: 'partner/document-imports',
+  ShopDocumentImportDetail: {
+    path: 'partner/document-imports/:importId',
+    parse: {
+      importId: (value) => {
+        const id = parseInt(String(value), 10);
+        return Number.isFinite(id) ? id : undefined;
+      },
+    },
+  },
+  ShopComplaints: 'partner/complaints',
   PasswordConfirmReset: 'reset-password/:uid/:token',
   ClientVehicles: 'dashboard/vehicles',
   CreateVehicle: 'dashboard/vehicles/add',

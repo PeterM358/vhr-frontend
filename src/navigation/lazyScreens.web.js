@@ -40,6 +40,7 @@ export { default as ShopWarehouseReceiveScreen } from '../screens/ShopWarehouseR
 export { default as ShopAnalyticsScreen } from '../screens/ShopAnalyticsScreen';
 export { default as ShopComplaintsScreen } from '../screens/ShopComplaintsScreen';
 export { default as ShopDocumentImportsScreen } from '../screens/ShopDocumentImportsScreen';
+export { default as ShopDocumentImportDetailScreen } from '../screens/ShopDocumentImportDetailScreen';
 export { default as ShopWorkforceScreen } from '../screens/ShopWorkforceScreen';
 export { default as ShopInvoiceDetailScreen } from '../screens/ShopInvoiceDetailScreen';
 export { default as ClientProfileScreen } from '../screens/ClientProfileScreen';

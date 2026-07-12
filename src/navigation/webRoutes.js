@@ -267,8 +267,29 @@ export function normalizeWebPath(input) {
   if (raw === 'AddPartnerServiceCenter' || raw.startsWith('AddPartnerServiceCenter')) {
     return `${PARTNER}/switch-center/add${query}`;
   }
-  if (raw === 'partner/service-centers' || raw.endsWith('/partner/service-centers')) {
+  if (raw === 'PartnerServiceCenters' || canonicalTrimmed.startsWith('PartnerServiceCenters')) {
     return `${PARTNER}/service-centers${query}`;
+  }
+  if (raw === 'ShopAnalytics' || raw.startsWith('ShopAnalytics')) {
+    return `${PARTNER}/analytics${query}`;
+  }
+  if (raw === 'ShopWorkforce' || raw.startsWith('ShopWorkforce')) {
+    return `${PARTNER}/workforce${query}`;
+  }
+  if (raw === 'ShopDocumentImports' || raw.startsWith('ShopDocumentImports')) {
+    return `${PARTNER}/document-imports${query}`;
+  }
+  const importDetail = lastGlobalMatch(raw, String.raw`ShopDocumentImportDetail\/(?:importId\/|)(\d+)`);
+  if (importDetail) {
+    return `${PARTNER}/document-imports/${importDetail[1]}${query}`;
+  }
+  if (raw === 'ShopComplaints' || raw.startsWith('ShopComplaints')) {
+    return `${PARTNER}/complaints${query}`;
+  }
+
+  const partnerImportDetail = lastGlobalMatch(raw, String.raw`partner\/document-imports\/(\d+)`);
+  if (partnerImportDetail) {
+    return `${PARTNER}/document-imports/${partnerImportDetail[1]}${query}`;
   }
 
   const partnerRepairOfferMatch = lastGlobalMatch(raw, String.raw`partner\/repairs\/(\d+)\/offer`);
@@ -520,6 +541,26 @@ export function partnerAddServiceCenter(params = {}) {
 
 export function partnerServiceCenters(params = {}) {
   return buildPathWithQuery(`${PARTNER}/service-centers`, params);
+}
+
+export function partnerAnalytics(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/analytics`, params);
+}
+
+export function partnerWorkforce(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/workforce`, params);
+}
+
+export function partnerDocumentImports(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/document-imports`, params);
+}
+
+export function partnerDocumentImportDetail(importId, params = {}) {
+  return buildPathWithQuery(`${PARTNER}/document-imports/${normalizeId(importId)}`, params);
+}
+
+export function partnerComplaints(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/complaints`, params);
 }
 
 function buildPathWithQuery(base, params = {}) {

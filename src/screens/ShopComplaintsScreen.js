@@ -1,40 +1,39 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Button, Text } from 'react-native-paper';
+import { ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
 import AppNavigationBar from '../components/common/AppNavigationBar';
+import ErpAccessGate from '../components/erp/ErpAccessGate';
+import useShopErpContext from '../hooks/useShopErpContext';
 import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import { listShopComplaints, updateShopComplaint } from '../api/erp';
-import { getMyShopProfiles } from '../api/profiles';
+import { complaintStatusLabelKey } from '../utils/shopErpAccess';
+import { useTranslation } from '../i18n';
 
 export default function ShopComplaintsScreen() {
   const onBack = usePartnerDashboardBack();
-  const [loading, setLoading] = useState(true);
+  const { t } = useTranslation();
+  const { loading, shopProfile, membership, shopId, error } = useShopErpContext();
   const [rows, setRows] = useState([]);
-  const [shopId, setShopId] = useState(null);
-  const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [notes, setNotes] = useState({});
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
+    if (!shopId) return;
+    setLoadError('');
     try {
       const token = await AsyncStorage.getItem('@access_token');
-      const shops = await getMyShopProfiles(token);
-      const id = shops?.[0]?.id;
-      if (!id) throw new Error('No service center selected');
-      setShopId(id);
-      const data = await listShopComplaints(token, id);
+      const data = await listShopComplaints(token, shopId);
       setRows(Array.isArray(data) ? data : data.results || []);
     } catch (e) {
-      setError(e.message || 'Failed to load');
-    } finally {
-      setLoading(false);
+      setRows([]);
+      setLoadError(e.message || t('erp.common.error'));
     }
-  }, []);
+  }, [shopId, t]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -42,29 +41,51 @@ export default function ShopComplaintsScreen() {
     const token = await AsyncStorage.getItem('@access_token');
     await updateShopComplaint(token, shopId, complaintId, {
       status: 'resolved',
-      resolution_notes: 'Resolved from shop console',
+      resolution_notes: notes[complaintId] || t('erp.complaints.markResolved'),
     });
     load();
   };
 
   return (
-    <ScreenBackground>
-      <AppNavigationBar title="Complaints" onBack={onBack} />
-      <ScrollView contentContainerStyle={styles.content}>
-        {loading ? <ActivityIndicator /> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {rows.map((row) => (
-          <AppCard key={row.id}>
-            <Text variant="titleMedium">{row.subject}</Text>
-            <Text>{row.description}</Text>
-            <Text>Status: {row.status}</Text>
-            {row.status !== 'resolved' ? (
-              <Button mode="outlined" onPress={() => resolve(row.id)}>Mark resolved</Button>
-            ) : null}
-          </AppCard>
-        ))}
-      </ScrollView>
-    </ScreenBackground>
+    <ErpAccessGate
+      routeName="ShopComplaints"
+      shopProfile={shopProfile}
+      membership={membership}
+      loading={loading}
+      error={error}
+      onBack={onBack}
+      title={t('erp.complaints.title')}
+    >
+      <ScreenBackground>
+        <AppNavigationBar title={t('erp.complaints.title')} onBack={onBack} />
+        <ScrollView contentContainerStyle={styles.content}>
+          {loading ? <ActivityIndicator /> : null}
+          {loadError ? <Text style={styles.error}>{loadError}</Text> : null}
+          {!loading && !rows.length ? <Text>{t('erp.common.empty')}</Text> : null}
+          {rows.map((row) => (
+            <AppCard key={row.id}>
+              <Text variant="titleMedium">{row.subject}</Text>
+              <Text>{row.description}</Text>
+              <Text>
+                {t('erp.documentImports.status')}: {t(complaintStatusLabelKey(row.status))}
+              </Text>
+              {row.status !== 'resolved' ? (
+                <>
+                  <TextInput
+                    label={t('erp.complaints.resolutionNotes')}
+                    value={notes[row.id] || ''}
+                    onChangeText={(value) => setNotes((prev) => ({ ...prev, [row.id]: value }))}
+                  />
+                  <Button mode="outlined" onPress={() => resolve(row.id)}>
+                    {t('erp.complaints.markResolved')}
+                  </Button>
+                </>
+              ) : null}
+            </AppCard>
+          ))}
+        </ScrollView>
+      </ScreenBackground>
+    </ErpAccessGate>
   );
 }
 

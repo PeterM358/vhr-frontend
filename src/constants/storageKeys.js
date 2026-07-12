@@ -6,6 +6,7 @@ export const STORAGE_KEYS = {
   IS_SHOP: '@is_shop',
   IS_CLIENT: '@is_client',
   SHOP_PROFILES: '@shop_profiles',
+  SHOP_MEMBERSHIPS: '@shop_memberships',
   CURRENT_SHOP_ID: '@current_shop_id',
   AUTH_RETURN_URL: '@auth_return_url',
   LOCALE: '@veversal_locale',

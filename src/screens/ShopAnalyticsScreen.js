@@ -7,51 +7,63 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
 import AppNavigationBar from '../components/common/AppNavigationBar';
+import ErpAccessGate from '../components/erp/ErpAccessGate';
+import useShopErpContext from '../hooks/useShopErpContext';
 import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import { getOwnerAnalyticsSummary } from '../api/erp';
-import { getMyShopProfiles } from '../api/profiles';
+import { useTranslation } from '../i18n';
 
 export default function ShopAnalyticsScreen() {
   const onBack = usePartnerDashboardBack();
-  const [loading, setLoading] = useState(true);
+  const { t } = useTranslation();
+  const { loading, shopProfile, membership, shopId, error } = useShopErpContext();
   const [summary, setSummary] = useState(null);
-  const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
+    if (!shopId) return;
+    setLoadError('');
     try {
       const token = await AsyncStorage.getItem('@access_token');
-      const shops = await getMyShopProfiles(token);
-      const shopId = shops?.[0]?.id;
-      if (!shopId) throw new Error('No service center selected');
       const data = await getOwnerAnalyticsSummary(token, shopId);
       setSummary(data);
     } catch (e) {
-      setError(e.message || 'Failed to load');
-    } finally {
-      setLoading(false);
+      setSummary(null);
+      setLoadError(e.message || t('erp.common.error'));
     }
-  }, []);
+  }, [shopId, t]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   return (
-    <ScreenBackground>
-      <AppNavigationBar title="Analytics" onBack={onBack} />
-      <ScrollView contentContainerStyle={styles.content}>
-        {loading ? <ActivityIndicator /> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {summary ? (
-          <AppCard>
-            <Text>Completed repairs: {summary.completed_repairs}</Text>
-            <Text>Labor entries: {summary.labor?.entry_count}</Text>
-            <Text>Billable hours: {summary.labor?.billable_hours}</Text>
-            <Text>Header revenue (minor): {summary.revenue?.header_total_sales_minor}</Text>
-          </AppCard>
-        ) : null}
-      </ScrollView>
-    </ScreenBackground>
+    <ErpAccessGate
+      routeName="ShopAnalytics"
+      shopProfile={shopProfile}
+      membership={membership}
+      loading={loading}
+      error={error}
+      onBack={onBack}
+      title={t('erp.analytics.title')}
+    >
+      <ScreenBackground>
+        <AppNavigationBar title={t('erp.analytics.title')} onBack={onBack} />
+        <ScrollView contentContainerStyle={styles.content}>
+          {loading ? <ActivityIndicator /> : null}
+          {loadError ? <Text style={styles.error}>{loadError}</Text> : null}
+          {summary ? (
+            <AppCard>
+              <Text>{t('erp.analytics.completedRepairs')}: {summary.completed_repairs}</Text>
+              <Text>{t('erp.analytics.laborEntries')}: {summary.labor?.entry_count}</Text>
+              <Text>{t('erp.analytics.billableHours')}: {summary.labor?.billable_hours}</Text>
+              <Text>{t('erp.analytics.headerRevenue')}: {summary.revenue?.header_total_sales_minor}</Text>
+            </AppCard>
+          ) : null}
+          {!loading && !summary && !loadError ? (
+            <Text>{t('erp.common.empty')}</Text>
+          ) : null}
+        </ScrollView>
+      </ScreenBackground>
+    </ErpAccessGate>
   );
 }
 

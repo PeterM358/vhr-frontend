@@ -44,10 +44,10 @@ import {
 import { getShopParts, prepareRepairPartsData } from '../api/parts';
 import { getOffersForRepair, bookOffer, unbookOffer, deleteOffer } from '../api/offers';
 import { RepairsList } from '../components/shop/RepairsList';
-import ScreenBackground from '../components/ScreenBackground';
+import RepairOutcomePanel from '../components/client/RepairOutcomePanel';
 import AppNavigationBar from '../components/common/AppNavigationBar';
 import { useScrollShadow } from '../hooks/useScrollShadow';
-import { useReturnToBack, useGoBackOr } from '../navigation/appNavBarBack';
+import { useReturnToBack, useGoBackOr, useRouteBackLabel } from '../navigation/appNavBarBack';
 import { navigateToPartnerRepairOffer } from '../navigation/webNavigation';
 import { markRepairNotificationsRead } from '../api/notifications';
 import { WebSocketContext } from '../context/WebSocketManager';
@@ -70,7 +70,8 @@ import FloatingCard from '../components/ui/FloatingCard';
 import RelatedServiceHistoryCard from '../components/repair/RelatedServiceHistoryCard';
 import StatusBadge from '../components/ui/StatusBadge';
 import { COLORS } from '../constants/colors';
-import { useTranslation } from '../i18n';
+import { useTranslation, translateRepairStatus } from '../i18n';
+import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -204,10 +205,10 @@ export default function RepairDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { repairId, returnTo } = route.params || {};
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
-  const backLabel = route.params?.backLabel;
+  const backLabel = useRouteBackLabel(route);
   const handleBack = useReturnToBack(navigation, returnTo, backLabel);
   const fallbackBack = useGoBackOr(navigation);
-  const onBack = returnTo || backLabel ? handleBack : fallbackBack;
+  const onBack = returnTo || route.params?.backLabel || route.params?.backLabelKey ? handleBack : fallbackBack;
   const { setNotifications } = useContext(WebSocketContext);
   const theme = useTheme();
 
@@ -265,14 +266,13 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [relatedHistoryLoading, setRelatedHistoryLoading] = useState(false);
 
   const navTitle = useMemo(() => {
-    const st = String(repair?.status || '').toLowerCase();
-    const src = String(repair?.source || '').toLowerCase();
-    if (st === 'open') return 'Service Request';
-    if (st === 'done' && src === 'owner_logged') return 'Service record';
-    if (st === 'done') return 'Service record';
-    if (st === 'ongoing') return 'Repair';
-    return 'Repair Details';
-  }, [repair?.status, repair?.source]);
+    if (!repair) return t('repairs.detail.navRepairDetails');
+    const st = String(repair.status || '').toLowerCase();
+    if (st === 'open') return t('repairs.detail.navServiceRequest');
+    if (st === 'done') return t('repairs.detail.serviceRecordTitle');
+    if (st === 'ongoing') return t('repairs.detail.navRepair');
+    return t('repairs.detail.navRepairDetails');
+  }, [repair, t]);
 
   const formatSumTotal = (labor, parts) => {
     const sum = (labor ?? 0) + (parts ?? 0);
@@ -812,11 +812,68 @@ export default function RepairDetailScreen({ route, navigation }) {
     if (!canOpenVehicleProfile) return;
     navigation.navigate('VehicleDetail', {
       vehicleId: String(repair.vehicle),
-      backLabel: 'Repair',
+      backLabel: t('repairs.detail.navRepair'),
       returnTo: 'RepairDetail',
       repairId,
     });
-  }, [canOpenVehicleProfile, navigation, repair?.vehicle, repairId]);
+  }, [canOpenVehicleProfile, navigation, repair?.vehicle, repairId, t]);
+
+  const linkedShopProfileId = useMemo(() => {
+    const raw = repair?.shop_profile ?? repair?.shop_profile_id;
+    if (raw == null || raw === '') return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, [repair?.shop_profile, repair?.shop_profile_id]);
+
+  const canOpenShopProfile = useMemo(
+    () => !isShop && linkedShopProfileId != null,
+    [isShop, linkedShopProfileId]
+  );
+
+  const openShopProfile = useCallback(() => {
+    if (!canOpenShopProfile || linkedShopProfileId == null) return;
+    navigation.navigate('ShopDetail', {
+      shopId: linkedShopProfileId,
+      vehicleId: repair?.vehicle ? Number(repair.vehicle) : undefined,
+      returnTo: 'RepairDetail',
+      repairId,
+    });
+  }, [canOpenShopProfile, linkedShopProfileId, navigation, repair?.vehicle, repairId]);
+
+  const localizedPaymentStatus = useCallback(
+    (status) => {
+      if (!status) return '—';
+      const key = String(status).toLowerCase();
+      return t(`repairs.detail.paymentStatusValues.${key}`, null, formatPaymentStatus(status));
+    },
+    [t]
+  );
+
+  const renderLinkedServiceCenterValue = useCallback(
+    (name, { emphasize = false } = {}) => {
+      const displayName = String(name || '').trim() || '—';
+      if (!canOpenShopProfile || displayName === '—') {
+        return (
+          <Text style={[styles.summaryValue, emphasize ? styles.summaryValueEmphasis : null]}>
+            {displayName}
+          </Text>
+        );
+      }
+      return (
+        <Pressable
+          onPress={openShopProfile}
+          accessibilityRole="link"
+          style={({ pressed }) => [pressed ? { opacity: 0.85 } : null]}
+        >
+          <Text style={[styles.summaryValue, styles.shopNameLink, emphasize ? styles.summaryValueEmphasis : null]}>
+            {displayName}
+          </Text>
+          <Text style={styles.shopTapHint}>{t('vehicles.detail.tapForShopProfile')}</Text>
+        </Pressable>
+      );
+    },
+    [canOpenShopProfile, openShopProfile, t]
+  );
 
   const openHistoryRepair = useCallback(
     (historyRepairId) => {
@@ -1048,14 +1105,31 @@ export default function RepairDetailScreen({ route, navigation }) {
     repair.parts_price != null ||
     repair.total_price != null ||
     repair.calculated_total_price != null;
-  const vehicleDisplay = `${repair.vehicle_make || ''} ${repair.vehicle_model || ''}`.trim() || 'Vehicle';
+  const vehicleDisplay =
+    `${repair.vehicle_make || ''} ${repair.vehicle_model || ''}`.trim() ||
+    t('repairs.detail.vehicleFallback');
   const completionRecordedAt = formatHistoryDate(repair.completed_at || repair.updated_at);
   const summaryCurrency = repair.currency || DEFAULT_CURRENCY;
   const completedServiceTypeName =
-    repair.final_repair_type_name ||
-    repair.effective_repair_type_name ||
-    repair.repair_type_name ||
-    'Not specified';
+    translateRepairTypeLabel(
+      {
+        slug:
+          repair.final_repair_type_slug ||
+          repair.effective_repair_type_slug ||
+          repair.repair_type_slug,
+        repair_type_name:
+          repair.final_repair_type_name ||
+          repair.effective_repair_type_name ||
+          repair.repair_type_name ||
+          null,
+        name:
+          repair.final_repair_type_name ||
+          repair.effective_repair_type_name ||
+          repair.repair_type_name ||
+          null,
+      },
+      t
+    ) || t('vehicles.detail.notSpecified');
   const qualityWarnings = Array.isArray(repair.quality_warnings) ? repair.quality_warnings : [];
   const showMissingTypeWarning =
     isShop &&
@@ -1066,12 +1140,12 @@ export default function RepairDetailScreen({ route, navigation }) {
   const canEditClientRequest = isOpenRequest && isClientOwner;
 
   const heroReferenceLine = isOwnerLoggedServiceRecord
-    ? `Service record #${repair.id}`
+    ? t('repairs.detail.referenceServiceRecord', { id: repair.id })
     : isOpenStatus
-      ? `Request #${repair.id}`
+      ? t('repairs.detail.referenceRequest', { id: repair.id })
       : isOngoingStatus
-        ? `Repair #${repair.id}`
-        : `Reference #${repair.id}`;
+        ? t('repairs.detail.referenceRepair', { id: repair.id })
+        : t('repairs.detail.referenceGeneric', { id: repair.id });
 
   const handleEditRequest = () => {
     if (!canEditClientRequest) return;
@@ -1243,11 +1317,11 @@ export default function RepairDetailScreen({ route, navigation }) {
       await clientReportVehicleArrival(token, repairId);
       await refreshRepair();
       Alert.alert(
-        'Checked in',
-        'The service center has been notified. They will confirm when your vehicle is on site.'
+        t('repairs.detail.checkedInTitle'),
+        t('repairs.detail.checkedInBody')
       );
     } catch (err) {
-      Alert.alert('Could not check in', parseApiErrorMessage(err, 'Please try again.'));
+      Alert.alert(t('repairs.detail.couldNotCheckIn'), parseApiErrorMessage(err, 'Please try again.'));
     } finally {
       setRespondingArrival(false);
     }
@@ -1255,14 +1329,14 @@ export default function RepairDetailScreen({ route, navigation }) {
 
   const handleCancelAppointment = () => {
     Alert.alert(
-      'Cancel appointment?',
+      t('repairs.detail.cancelAppointmentTitle'),
       isShop
-        ? 'The owner will be notified. The visit will be removed from your calendar.'
-        : 'The service center will be notified. You can request a new time later.',
+        ? t('repairs.detail.cancelAppointmentShopBody')
+        : t('repairs.detail.cancelAppointmentOwnerBody'),
       [
-        { text: 'Keep appointment', style: 'cancel' },
+        { text: t('repairs.detail.keepAppointment'), style: 'cancel' },
         {
-          text: 'Cancel appointment',
+          text: t('repairs.detail.cancelAppointment'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -1271,9 +1345,12 @@ export default function RepairDetailScreen({ route, navigation }) {
               await cancelScheduledAppointment(token, repairId);
               await markRepairNotificationsRead(repairId, { setNotifications });
               await refreshRepair();
-              Alert.alert('Appointment canceled', 'Both sides have been notified.');
+              Alert.alert(
+                t('repairs.detail.appointmentCanceled'),
+                t('repairs.detail.appointmentCanceledBody')
+              );
             } catch (err) {
-              Alert.alert('Could not cancel', parseApiErrorMessage(err, 'Please try again.'));
+              Alert.alert(t('repairs.detail.couldNotCancel'), parseApiErrorMessage(err, 'Please try again.'));
             } finally {
               setCancelingAppointment(false);
             }
@@ -1648,10 +1725,14 @@ export default function RepairDetailScreen({ route, navigation }) {
         style={[styles.headerCard, !isShop && styles.offersProminentCard]}
       >
         <Card.Title
-          title={!isShop && offers.length > 0 ? `Offers (${offers.length})` : 'Offers'}
+          title={
+            !isShop && offers.length > 0
+              ? t('repairs.detail.offersWithCount', { count: offers.length })
+              : t('repairs.detail.offers')
+          }
           subtitle={
             !isShop && offers.length > 0
-              ? 'Compare and book a proposal below'
+              ? t('repairs.detail.compareAndBook')
               : undefined
           }
         />
@@ -1815,9 +1896,9 @@ export default function RepairDetailScreen({ route, navigation }) {
     <ScreenBackground safeArea={false}>
       <AppNavigationBar
         title={navTitle}
-        backLabel={backLabel || (returnTo ? 'Back' : 'Back')}
+        backLabel={backLabel}
         onBack={onBack}
-        showBack={Boolean(returnTo || backLabel || navigation.canGoBack?.())}
+        showBack={Boolean(returnTo || route.params?.backLabel || route.params?.backLabelKey || navigation.canGoBack?.())}
         scrolled={scrolled}
       />
       <ScrollView
@@ -1845,18 +1926,20 @@ export default function RepairDetailScreen({ route, navigation }) {
                     >
                       {canViewerSeeVehiclePlate
                         ? (String(repair.vehicle_license_plate || '').trim() || '—')
-                        : 'Plate hidden until booking'}
+                        : t('repairs.detail.plateHiddenUntilBooking')}
                     </Text>
                     {canOpenVehicleProfile ? (
-                      <Text style={styles.heroVehicleLink}>Tap to open vehicle profile</Text>
+                      <Text style={styles.heroVehicleLink}>{t('repairs.detail.tapOpenVehicleProfile')}</Text>
                     ) : null}
                     {repair.vehicle_vin ? (
-                      <Text style={styles.heroMeta}>VIN: {repair.vehicle_vin}</Text>
+                      <Text style={styles.heroMeta}>
+                        {t('repairs.detail.vinLabel')}: {repair.vehicle_vin}
+                      </Text>
                     ) : null}
                     <Text style={styles.heroReference}>{heroReferenceLine}</Text>
                     {repair.scheduled_start ? (
                       <Text style={styles.heroMeta}>
-                        Scheduled:{' '}
+                        {t('repairs.detail.scheduled')}{' '}
                         {new Date(repair.scheduled_start).toLocaleString()}
                         {repair.scheduled_end
                           ? ` – ${new Date(repair.scheduled_end).toLocaleTimeString(undefined, {
@@ -1866,14 +1949,18 @@ export default function RepairDetailScreen({ route, navigation }) {
                           : ''}
                       </Text>
                     ) : null}
-                    <Text style={styles.heroMeta}>Service type: {completedServiceTypeName}</Text>
+                    <Text style={styles.heroMeta}>
+                      {t('repairs.detail.serviceType')}: {completedServiceTypeName}
+                    </Text>
                     {isDone ? (
                       <Text style={styles.heroMeta}>
-                        Payment: {formatPaymentStatus(repair.payment_status)}
+                        {t('repairs.detail.payment')}: {localizedPaymentStatus(repair.payment_status)}
                       </Text>
                     ) : null}
                     <Text style={styles.heroMeta}>
-                      {isDone ? 'Final kilometers: ' : 'Request kilometers: '}
+                      {isDone
+                        ? `${t('repairs.detail.finalKilometers')}: `
+                        : `${t('repairs.detail.requestKilometers')}: `}
                       {isDone && repair.final_kilometers != null
                         ? repair.final_kilometers
                         : repair.kilometers != null
@@ -1881,7 +1968,10 @@ export default function RepairDetailScreen({ route, navigation }) {
                           : '—'}
                     </Text>
                   </View>
-                  <StatusBadge status={repair.status} />
+                  <StatusBadge
+                    status={repair.status}
+                    label={translateRepairStatus(repair.status, t)}
+                  />
                 </View>
               </Pressable>
             </AppCard>
@@ -1918,12 +2008,35 @@ export default function RepairDetailScreen({ route, navigation }) {
 
             {!isShop && isDone && repair.shop_profile_name ? (
               <FloatingCard style={styles.readyPickupClientCard}>
-                <Text style={styles.cardTitle}>Ready for pickup</Text>
+                <Text style={styles.cardTitle}>{t('repairs.detail.readyForPickup')}</Text>
                 <Text style={styles.mutedText}>
-                  {repair.shop_profile_name} has finished your service. You can collect {vehicleDisplay}{' '}
-                  when convenient.
+                  {canOpenShopProfile ? (
+                    <>
+                      <Text style={styles.shopNameLink} onPress={openShopProfile} accessibilityRole="link">
+                        {repair.shop_profile_name}
+                      </Text>
+                      {t('repairs.detail.readyForPickupAfterShop', { vehicle: vehicleDisplay })}
+                    </>
+                  ) : (
+                    t('repairs.detail.readyForPickupBody', {
+                      shopName: repair.shop_profile_name,
+                      vehicle: vehicleDisplay,
+                    })
+                  )}
                 </Text>
+                {canOpenShopProfile ? (
+                  <Text style={[styles.shopTapHint, styles.shopTapHintLeft]}>
+                    {t('vehicles.detail.tapForShopProfile')}
+                  </Text>
+                ) : null}
               </FloatingCard>
+            ) : null}
+
+            {!isShop && isDone && isClientOwner && repair.shop_profile ? (
+              <RepairOutcomePanel
+                repair={repair}
+                shopProfileId={Number(repair.shop_profile)}
+              />
             ) : null}
 
             {!isShop && isOngoingStatus ? (
@@ -2028,17 +2141,17 @@ export default function RepairDetailScreen({ route, navigation }) {
 
             {!isDone && upcomingAppointment && !isShop && isClientOwner ? (
               <FloatingCard style={styles.rescheduleCard}>
-                <Text style={styles.cardTitle}>Upcoming appointment</Text>
+                <Text style={styles.cardTitle}>{t('repairs.detail.upcomingAppointment')}</Text>
                 <Text style={styles.detailLine}>
-                  Scheduled:{' '}
+                  {t('repairs.detail.scheduled')}{' '}
                   {repair.scheduled_start
                     ? new Date(repair.scheduled_start).toLocaleString()
                     : '—'}
                 </Text>
                 <Text style={styles.mutedText}>
                   {ownerCheckedIn
-                    ? 'You checked in. The service center will confirm when your vehicle is on site.'
-                    : 'Your visit has not started yet. Check in when you arrive at the service center.'}
+                    ? t('repairs.detail.checkedInWaiting')
+                    : t('repairs.detail.visitNotStarted')}
                 </Text>
                 {!ownerCheckedIn ? (
                   <Button
@@ -2048,7 +2161,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                     disabled={respondingArrival || cancelingAppointment}
                     style={styles.arrivalButton}
                   >
-                    I&apos;m here for my appointment
+                    {t('repairs.detail.checkInButton')}
                   </Button>
                 ) : null}
                 {showCancelAppointment ? (
@@ -2060,7 +2173,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                     style={styles.cancelAppointmentButton}
                     textColor="#B91C1C"
                   >
-                    Cancel appointment
+                    {t('repairs.detail.cancelAppointment')}
                   </Button>
                 ) : null}
               </FloatingCard>
@@ -2106,7 +2219,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                     style={styles.cancelAppointmentButton}
                     textColor="#B91C1C"
                   >
-                    Cancel appointment
+                    {t('repairs.detail.cancelAppointment')}
                   </Button>
                 ) : null}
               </FloatingCard>
@@ -2141,22 +2254,24 @@ export default function RepairDetailScreen({ route, navigation }) {
             {isDone ? (
             <FloatingCard style={styles.historyRecordCard}>
               <Text style={styles.cardTitle}>
-                {isOwnerLoggedServiceRecord ? 'Service record' : 'Completed service record'}
+                {isOwnerLoggedServiceRecord
+                  ? t('repairs.detail.serviceRecordTitle')
+                  : t('repairs.detail.completedServiceRecord')}
               </Text>
               <Text style={styles.historyHelperText}>
                 {isOwnerLoggedServiceRecord
-                  ? 'You logged this service. It is saved as part of your vehicle history.'
-                  : 'This repair is now part of the vehicle service history.'}
+                  ? t('repairs.detail.ownerLoggedRecordHelper')
+                  : t('repairs.detail.completedRecordHelper')}
               </Text>
               <View style={styles.completedPillRow}>
                 <View style={styles.completedPill}>
-                  <Text style={styles.completedPillText}>Completed</Text>
+                  <Text style={styles.completedPillText}>{t('repairs.detail.completedBadge')}</Text>
                 </View>
               </View>
 
-              <Text style={styles.summarySectionTitle}>Service</Text>
+              <Text style={styles.summarySectionTitle}>{t('repairs.detail.sectionService')}</Text>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Service type</Text>
+                <Text style={styles.summaryLabel}>{t('repairs.detail.serviceType')}</Text>
                 <Text style={styles.summaryValue}>{completedServiceTypeName}</Text>
               </View>
               {isOwnerLoggedServiceRecord ? (
@@ -2310,8 +2425,10 @@ export default function RepairDetailScreen({ route, navigation }) {
                 </>
               ) : (
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Service center</Text>
-                  <Text style={styles.summaryValue}>{repair.shop_profile_name || '—'}</Text>
+                  <Text style={styles.summaryLabel}>{t('repairs.detail.serviceCenter')}</Text>
+                  <View style={styles.summaryValueCol}>
+                    {renderLinkedServiceCenterValue(repair.shop_profile_name)}
+                  </View>
                 </View>
               )}
               {sourceLower === 'service_center_direct' ? (
@@ -2322,12 +2439,12 @@ export default function RepairDetailScreen({ route, navigation }) {
               ) : null}
               {completionRecordedAt ? (
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Completed on</Text>
+                  <Text style={styles.summaryLabel}>{t('repairs.detail.completedOn')}</Text>
                   <Text style={styles.summaryValue}>{completionRecordedAt}</Text>
                 </View>
               ) : null}
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Final kilometers</Text>
+                <Text style={styles.summaryLabel}>{t('repairs.detail.finalKilometers')}</Text>
                 <Text style={styles.summaryValue}>
                   {repair.final_kilometers != null
                     ? repair.final_kilometers
@@ -2343,7 +2460,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                 </View>
               ) : null}
 
-              <Text style={styles.summarySectionTitle}>Notes</Text>
+              <Text style={styles.summarySectionTitle}>{t('repairs.detail.sectionNotes')}</Text>
               {repair.shop_description ? (
                 <Text style={styles.detailLine}>Workshop notes: {repair.shop_description}</Text>
               ) : null}
@@ -2363,22 +2480,22 @@ export default function RepairDetailScreen({ route, navigation }) {
                 <Text style={styles.mutedText}>No notes captured for this record.</Text>
               ) : null}
 
-              <Text style={styles.summarySectionTitle}>Parts used</Text>
+              <Text style={styles.summarySectionTitle}>{t('repairs.detail.sectionPartsUsed')}</Text>
               {displayPartsList.length === 0 ? (
-                <Text style={styles.mutedText}>No parts recorded for this service.</Text>
+                <Text style={styles.mutedText}>{t('repairs.detail.noPartsRecorded')}</Text>
               ) : (
                 <>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <Text style={{ flex: 2, fontWeight: 'bold' }}>Part</Text>
-                    <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>Qty</Text>
-                    <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>Price</Text>
-                    <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>Labor</Text>
+                    <Text style={{ flex: 2, fontWeight: 'bold' }}>{t('repairs.detail.partColumn')}</Text>
+                    <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>{t('repairs.detail.qtyColumn')}</Text>
+                    <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>{t('repairs.detail.priceColumn')}</Text>
+                    <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>{t('repairs.detail.laborColumn')}</Text>
                   </View>
                   {displayPartsList.map((item, index) => (
                     <View key={item.id || index}>{renderRepairPartItem({ item })}</View>
                   ))}
                   <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10 }}>
-                    <Text style={{ fontWeight: 'bold', marginRight: 10 }}>Line items total:</Text>
+                    <Text style={{ fontWeight: 'bold', marginRight: 10 }}>{t('repairs.detail.lineItemsTotal')}</Text>
                     <Text>
                       {displayPartsList
                         .reduce((acc, part) => {
@@ -2396,23 +2513,23 @@ export default function RepairDetailScreen({ route, navigation }) {
                 </>
               )}
 
-              <Text style={styles.summarySectionTitle}>Amounts</Text>
+              <Text style={styles.summarySectionTitle}>{t('repairs.detail.sectionAmounts')}</Text>
               {hasFinancialSummary ? (
                 <>
                   <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Labor</Text>
+                    <Text style={styles.summaryLabel}>{t('repairs.detail.labor')}</Text>
                     <Text style={styles.summaryValue}>
                       {repair.labor_price != null ? `${repair.labor_price} ${summaryCurrency}` : '—'}
                     </Text>
                   </View>
                   <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Parts (summary)</Text>
+                    <Text style={styles.summaryLabel}>{t('repairs.detail.partsSummary')}</Text>
                     <Text style={styles.summaryValue}>
                       {repair.parts_price != null ? `${repair.parts_price} ${summaryCurrency}` : '—'}
                     </Text>
                   </View>
                   <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Total</Text>
+                    <Text style={styles.summaryLabel}>{t('repairs.detail.total')}</Text>
                     <Text style={[styles.summaryValue, styles.summaryValueEmphasis]}>
                       {repair.total_price != null || repair.calculated_total_price != null
                         ? `${repair.total_price ?? repair.calculated_total_price} ${summaryCurrency}`
@@ -2421,23 +2538,25 @@ export default function RepairDetailScreen({ route, navigation }) {
                   </View>
                 </>
               ) : (
-                <Text style={styles.mutedText}>No amounts recorded on this repair.</Text>
+                <Text style={styles.mutedText}>{t('repairs.detail.noAmountsRecorded')}</Text>
               )}
               {!(isDone && isMyShopRepair) ? (
                 isMyShopRepair ? (
                   renderPaymentStatusSelector({ saveOnSelect: true })
                 ) : (
                   <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Payment status</Text>
-                    <Text style={styles.summaryValue}>{formatPaymentStatus(repair.payment_status)}</Text>
+                    <Text style={styles.summaryLabel}>{t('repairs.detail.paymentStatus')}</Text>
+                    <Text style={styles.summaryValue}>{localizedPaymentStatus(repair.payment_status)}</Text>
                   </View>
                 )
               ) : null}
               {hasFinancialSummary ? (
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Warranty</Text>
+                  <Text style={styles.summaryLabel}>{t('repairs.detail.warranty')}</Text>
                   <Text style={styles.summaryValue}>
-                    {repair.warranty_months != null ? `${repair.warranty_months} months` : '—'}
+                    {repair.warranty_months != null
+                      ? t('repairs.detail.warrantyMonths', { count: repair.warranty_months })
+                      : '—'}
                   </Text>
                 </View>
               ) : null}
@@ -2708,12 +2827,12 @@ export default function RepairDetailScreen({ route, navigation }) {
             ) : null}
 
             <FloatingCard style={styles.mediaCardCompact}>
-              <Text style={styles.cardTitle}>Photos & videos</Text>
+              <Text style={styles.cardTitle}>{t('repairs.detail.photosAndVideos')}</Text>
               <Text style={styles.mutedText}>
                 {isDone
                   ? isOwnerLoggedServiceRecord
-                    ? 'Add photos or receipts from this screen to strengthen this logged record (when uploads are enabled).'
-                    : 'Part of the permanent service record as visual proof and history evidence.'
+                    ? t('repairs.detail.photosOwnerLoggedDone')
+                    : t('repairs.detail.photosPermanentRecord')
                   : isOpenStatus
                     ? canEditClientRequest
                       ? 'Add or remove photos and videos while this request is open. After a shop is booked, media here becomes read-only.'
@@ -2808,7 +2927,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                   ) : null}
                 </>
               ) : (
-                <Text style={styles.detailLine}>No photos or videos added yet.</Text>
+                <Text style={styles.detailLine}>{t('repairs.detail.noPhotosOrVideos')}</Text>
               )}
             </FloatingCard>
 
@@ -3642,5 +3761,22 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_DARK,
     fontSize: 14,
     fontWeight: '600',
+  },
+  summaryValueCol: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  shopNameLink: {
+    color: COLORS.PRIMARY,
+    fontWeight: '700',
+  },
+  shopTapHint: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 11,
+    marginTop: 2,
+    textAlign: 'right',
+  },
+  shopTapHintLeft: {
+    textAlign: 'left',
   },
 });

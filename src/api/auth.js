@@ -97,7 +97,8 @@ const storeLoginData = async (data, fallbackDisplay) => {
     user_id,
     email,
     phone,
-    shop_profiles
+    shop_profiles,
+    shop_memberships,
   } = data;
 
   let userDisplay = '';
@@ -119,6 +120,9 @@ const storeLoginData = async (data, fallbackDisplay) => {
   // Only for shops with valid shop_profiles
   if (is_shop && Array.isArray(shop_profiles) && shop_profiles.length > 0) {
     itemsToStore.push(['@shop_profiles', JSON.stringify(shop_profiles)]);
+  }
+  if (is_shop && Array.isArray(shop_memberships) && shop_memberships.length > 0) {
+    itemsToStore.push(['@shop_memberships', JSON.stringify(shop_memberships)]);
   }
 
   await AsyncStorage.multiSet(itemsToStore);
