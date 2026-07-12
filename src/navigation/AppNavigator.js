@@ -54,6 +54,10 @@ import {
   ShopInvoicingScreen,
   ShopWarehouseReceiveScreen,
   ShopInvoiceDetailScreen,
+  ShopAnalyticsScreen,
+  ShopComplaintsScreen,
+  ShopDocumentImportsScreen,
+  ShopWorkforceScreen,
   ClientProfileScreen,
   AddShopPartScreen,
   SelectRepairPartsScreen,
@@ -498,6 +502,26 @@ export default function AppNavigator() {
           name="ShopWarehouse"
           component={ShopWarehouseReceiveScreen}
           options={{ ...appNavBarScreenOptions, title: 'Warehouse' }}
+        />
+        <Stack.Screen
+          name="ShopAnalytics"
+          component={ShopAnalyticsScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Analytics' }}
+        />
+        <Stack.Screen
+          name="ShopComplaints"
+          component={ShopComplaintsScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Complaints' }}
+        />
+        <Stack.Screen
+          name="ShopDocumentImports"
+          component={ShopDocumentImportsScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Document imports' }}
+        />
+        <Stack.Screen
+          name="ShopWorkforce"
+          component={ShopWorkforceScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Workforce' }}
         />
         <Stack.Screen
           name="ShopInvoiceDetail"
