@@ -70,6 +70,7 @@ import FloatingCard from '../components/ui/FloatingCard';
 import RelatedServiceHistoryCard from '../components/repair/RelatedServiceHistoryCard';
 import StatusBadge from '../components/ui/StatusBadge';
 import { COLORS } from '../constants/colors';
+import { useTranslation } from '../i18n';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -199,6 +200,7 @@ function parseApiErrorMessage(error, fallback = 'Request failed.') {
 }
 
 export default function RepairDetailScreen({ route, navigation }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { repairId, returnTo } = route.params || {};
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
@@ -1664,7 +1666,7 @@ export default function RepairDetailScreen({ route, navigation }) {
               }
               style={{ marginBottom: 10 }}
             >
-              Send offer
+              {t('partnerDashboard.actions.sendOffer')}
             </Button>
           )}
           {offers.length === 0 ? (
