@@ -136,3 +136,110 @@ export async function deleteAccount(token) {
   if (!response.ok) throw new Error(await parseError(response, 'Failed to delete account'));
   return response.json();
 }
+
+// --- Procurement / warehouse ERP ---
+
+export async function listPurchaseOrders(token, params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const url = `${API_BASE_URL}/api/billing/purchase-orders/${qs ? `?${qs}` : ''}`;
+  const response = await fetch(url, { headers: await shopScopedHeaders(token) });
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load purchase orders'));
+  return response.json();
+}
+
+export async function getPurchaseOrder(token, poId) {
+  const response = await fetch(`${API_BASE_URL}/api/billing/purchase-orders/${poId}/`, {
+    headers: await shopScopedHeaders(token),
+  });
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load purchase order'));
+  return response.json();
+}
+
+export async function createPurchaseOrder(token, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/billing/purchase-orders/`, {
+    method: 'POST',
+    headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to create purchase order'));
+  return response.json();
+}
+
+export async function updatePurchaseOrder(token, poId, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/billing/purchase-orders/${poId}/`, {
+    method: 'PATCH',
+    headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to update purchase order'));
+  return response.json();
+}
+
+export async function purchaseOrderAction(token, poId, action, payload = {}) {
+  const response = await fetch(`${API_BASE_URL}/api/billing/purchase-orders/${poId}/${action}/`, {
+    method: 'POST',
+    headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(await parseError(response, `Failed to ${action} purchase order`));
+  return response.json();
+}
+
+export async function listGoodsReceipts(token, params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const url = `${API_BASE_URL}/api/billing/goods-receipts/${qs ? `?${qs}` : ''}`;
+  const response = await fetch(url, { headers: await shopScopedHeaders(token) });
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load goods receipts'));
+  return response.json();
+}
+
+export async function postGoodsReceipt(token, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/billing/goods-receipts/`, {
+    method: 'POST',
+    headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ post: true, ...payload }),
+  });
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to post goods receipt'));
+  return response.json();
+}
+
+export async function listWarehouses(token) {
+  const response = await fetch(`${API_BASE_URL}/api/billing/warehouses/`, {
+    headers: await shopScopedHeaders(token),
+  });
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load warehouses'));
+  return response.json();
+}
+
+export async function listStorageLocations(token, warehouseId) {
+  const qs = new URLSearchParams({ warehouse_id: String(warehouseId) }).toString();
+  const response = await fetch(`${API_BASE_URL}/api/billing/storage-locations/?${qs}`, {
+    headers: await shopScopedHeaders(token),
+  });
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load storage locations'));
+  return response.json();
+}
+
+export async function createStorageLocation(token, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/billing/storage-locations/`, {
+    method: 'POST',
+    headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to create storage location'));
+  return response.json();
+}
+
+export async function scanStorageLocation(token, warehouseId, code) {
+  const qs = new URLSearchParams({ warehouse_id: String(warehouseId), code }).toString();
+  const response = await fetch(`${API_BASE_URL}/api/billing/storage-locations/scan/?${qs}`, {
+    headers: await shopScopedHeaders(token),
+  });
+  if (!response.ok) throw new Error(await parseError(response, 'Storage address not found'));
+  return response.json();
+}
+
+export function storageLocationLabelUrl(locationId) {
+  return `${API_BASE_URL}/api/billing/storage-locations/${locationId}/label/`;
+}
+

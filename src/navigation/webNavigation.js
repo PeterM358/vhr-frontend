@@ -49,6 +49,10 @@ import {
   partnerDocumentImports,
   partnerDocumentImportDetail,
   partnerComplaints,
+  partnerPurchaseOrders,
+  partnerPurchaseOrderDetail,
+  partnerGoodsReceipt,
+  partnerStorageLocations,
 } from './webRoutes';
 
 const PARTNER_HOME_ROUTE = {
@@ -839,4 +843,20 @@ export function navigateToPartnerComplaints(navigation) {
     return;
   }
   navigation.navigate('ShopComplaints');
+}
+
+export function navigateToPartnerPurchaseOrders(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'ShopPurchaseOrders' }], partnerPurchaseOrders());
+    return;
+  }
+  navigation.navigate('ShopPurchaseOrders');
+}
+
+export function navigateToPartnerStorageLocations(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'ShopStorageLocations' }], partnerStorageLocations());
+    return;
+  }
+  navigation.navigate('ShopStorageLocations');
 }

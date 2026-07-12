@@ -59,6 +59,10 @@ import {
   ShopDocumentImportsScreen,
   ShopDocumentImportDetailScreen,
   ShopWorkforceScreen,
+  ShopPurchaseOrdersScreen,
+  ShopPurchaseOrderDetailScreen,
+  ShopGoodsReceiptScreen,
+  ShopStorageLocationsScreen,
   ClientProfileScreen,
   AddShopPartScreen,
   SelectRepairPartsScreen,
@@ -528,6 +532,26 @@ export default function AppNavigator() {
           name="ShopWorkforce"
           component={ShopWorkforceScreen}
           options={{ ...appNavBarScreenOptions, title: t('erp.workforce.title') }}
+        />
+        <Stack.Screen
+          name="ShopPurchaseOrders"
+          component={ShopPurchaseOrdersScreen}
+          options={{ ...appNavBarScreenOptions, title: t('erp.procurement.purchaseOrders') }}
+        />
+        <Stack.Screen
+          name="ShopPurchaseOrderDetail"
+          component={ShopPurchaseOrderDetailScreen}
+          options={{ ...appNavBarScreenOptions, title: t('erp.procurement.poDetail') }}
+        />
+        <Stack.Screen
+          name="ShopGoodsReceipt"
+          component={ShopGoodsReceiptScreen}
+          options={{ ...appNavBarScreenOptions, title: t('erp.procurement.goodsReceipt') }}
+        />
+        <Stack.Screen
+          name="ShopStorageLocations"
+          component={ShopStorageLocationsScreen}
+          options={{ ...appNavBarScreenOptions, title: t('erp.procurement.storageLocations') }}
         />
         <Stack.Screen
           name="ShopInvoiceDetail"

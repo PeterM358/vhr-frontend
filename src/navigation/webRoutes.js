@@ -286,6 +286,19 @@ export function normalizeWebPath(input) {
   if (raw === 'ShopComplaints' || raw.startsWith('ShopComplaints')) {
     return `${PARTNER}/complaints${query}`;
   }
+  if (raw === 'ShopPurchaseOrders' || raw.startsWith('ShopPurchaseOrders')) {
+    return `${PARTNER}/purchase-orders${query}`;
+  }
+  const poDetail = lastGlobalMatch(raw, String.raw`ShopPurchaseOrderDetail\/(?:poId\/|)(\d+)`);
+  if (poDetail) {
+    return `${PARTNER}/purchase-orders/${poDetail[1]}${query}`;
+  }
+  if (raw === 'ShopGoodsReceipt' || raw.startsWith('ShopGoodsReceipt')) {
+    return `${PARTNER}/goods-receipt${query}`;
+  }
+  if (raw === 'ShopStorageLocations' || raw.startsWith('ShopStorageLocations')) {
+    return `${PARTNER}/storage-locations${query}`;
+  }
 
   const partnerImportDetail = lastGlobalMatch(raw, String.raw`partner\/document-imports\/(\d+)`);
   if (partnerImportDetail) {
@@ -561,6 +574,22 @@ export function partnerDocumentImportDetail(importId, params = {}) {
 
 export function partnerComplaints(params = {}) {
   return buildPathWithQuery(`${PARTNER}/complaints`, params);
+}
+
+export function partnerPurchaseOrders(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/purchase-orders`, params);
+}
+
+export function partnerPurchaseOrderDetail(poId, params = {}) {
+  return buildPathWithQuery(`${PARTNER}/purchase-orders/${normalizeId(poId)}`, params);
+}
+
+export function partnerGoodsReceipt(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/goods-receipt`, params);
+}
+
+export function partnerStorageLocations(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/storage-locations`, params);
 }
 
 function buildPathWithQuery(base, params = {}) {

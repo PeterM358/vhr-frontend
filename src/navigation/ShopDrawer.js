@@ -37,6 +37,8 @@ import {
   navigateToPartnerWorkforce,
   navigateToPartnerDocumentImports,
   navigateToPartnerComplaints,
+  navigateToPartnerPurchaseOrders,
+  navigateToPartnerStorageLocations,
 } from './webNavigation';
 import { readCachedUnscheduledCount } from '../utils/shopCalendarBadge';
 import {
@@ -110,6 +112,8 @@ function CustomDrawerContent(props) {
   const showWorkforce = canAccessPartnerRoute('ShopWorkforce', erpContext);
   const showDocumentImports = canAccessPartnerRoute('ShopDocumentImports', erpContext);
   const showComplaints = canAccessPartnerRoute('ShopComplaints', erpContext);
+  const showPurchaseOrders = canAccessPartnerRoute('ShopPurchaseOrders', erpContext);
+  const showStorageLocations = canAccessPartnerRoute('ShopStorageLocations', erpContext);
 
   const openStackRoute = (webNav, routeName) => {
     props.navigation.closeDrawer();
@@ -257,6 +261,24 @@ function CustomDrawerContent(props) {
             label={t('drawer.partner.complaints')}
             onPress={() => openStackRoute(navigateToPartnerComplaints, 'ShopComplaints')}
             icon={({ color, size }) => <DrawerMenuIcon name="alert-circle-outline" color={color} size={size} />}
+            {...itemProps}
+          />
+        ) : null}
+
+        {showPurchaseOrders ? (
+          <DrawerItem
+            label={t('drawer.partner.purchaseOrders')}
+            onPress={() => openStackRoute(navigateToPartnerPurchaseOrders, 'ShopPurchaseOrders')}
+            icon={({ color, size }) => <DrawerMenuIcon name="cart-outline" color={color} size={size} />}
+            {...itemProps}
+          />
+        ) : null}
+
+        {showStorageLocations ? (
+          <DrawerItem
+            label={t('drawer.partner.storageLocations')}
+            onPress={() => openStackRoute(navigateToPartnerStorageLocations, 'ShopStorageLocations')}
+            icon={({ color, size }) => <DrawerMenuIcon name="map-marker-path" color={color} size={size} />}
             {...itemProps}
           />
         ) : null}

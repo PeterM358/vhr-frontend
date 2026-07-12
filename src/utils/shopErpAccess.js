@@ -42,6 +42,24 @@ export const PARTNER_ERP_ROUTES = {
     capability: 'uses_inventory',
     requiresAccess: true,
   },
+  ShopPurchaseOrders: {
+    drawerKey: 'purchaseOrders',
+    capability: 'uses_purchase_orders',
+    permissionAny: ['view_purchase_orders', 'create_purchase_orders'],
+    requiresAccess: true,
+  },
+  ShopGoodsReceipt: {
+    drawerKey: 'goodsReceipt',
+    capability: 'uses_inventory',
+    permissionAny: ['receive_goods'],
+    requiresAccess: true,
+  },
+  ShopStorageLocations: {
+    drawerKey: 'storageLocations',
+    capability: 'uses_inventory',
+    permissionAny: ['manage_storage_locations', 'move_stock'],
+    requiresAccess: true,
+  },
   ShopInvoicing: {
     drawerKey: 'invoicing',
     capability: 'uses_invoicing',
