@@ -1,9 +1,19 @@
+import { Platform } from 'react-native';
 import { API_BASE_URL } from '../api/config';
 import { shopScopedHeaders } from './currentShop';
+import {
+  extractRelativeMediaPath,
+  fetchPrivateMediaAccessUrl,
+  isPrivateMediaPath,
+} from './mediaAccess';
 
 /** Align media URLs with the API host the app actually uses (localhost vs 127.0.0.1). */
 export function normalizeMediaUrl(url) {
   if (!url) return '';
+  if (url.startsWith('blob:')) return url;
+  if (isPrivateMediaPath(url)) {
+    return url;
+  }
   if (url.startsWith('/')) {
     return `${API_BASE_URL.replace(/\/$/, '')}${url}`;
   }
@@ -26,6 +36,12 @@ export function normalizeMediaUrl(url) {
 }
 
 export async function fetchDocumentBlobUrl(remoteUrl, token) {
+  const relativePath = extractRelativeMediaPath(remoteUrl);
+  if (isPrivateMediaPath(relativePath || remoteUrl)) {
+    const headers = await shopScopedHeaders(token);
+    return fetchPrivateMediaAccessUrl(relativePath || remoteUrl, token, headers);
+  }
+
   const url = normalizeMediaUrl(remoteUrl);
   const headers = await shopScopedHeaders(token);
   const response = await fetch(url, { headers, credentials: 'include' });
@@ -34,4 +50,13 @@ export async function fetchDocumentBlobUrl(remoteUrl, token) {
   }
   const blob = await response.blob();
   return URL.createObjectURL(blob);
+}
+
+export async function openPrivateDocument(remoteUrl, token) {
+  const accessUrl = await fetchDocumentBlobUrl(remoteUrl, token);
+  if (Platform.OS === 'web') {
+    window.open(accessUrl, '_blank', 'noopener,noreferrer');
+    return accessUrl;
+  }
+  return accessUrl;
 }

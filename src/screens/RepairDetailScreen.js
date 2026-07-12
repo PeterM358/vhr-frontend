@@ -48,6 +48,7 @@ import RepairOutcomePanel from '../components/client/RepairOutcomePanel';
 import AppNavigationBar from '../components/common/AppNavigationBar';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import { useReturnToBack, useGoBackOr, useRouteBackLabel } from '../navigation/appNavBarBack';
+import RepairMediaThumbnail from '../components/repair/RepairMediaThumbnail';
 import { navigateToPartnerRepairOffer } from '../navigation/webNavigation';
 import { markRepairNotificationsRead } from '../api/notifications';
 import { WebSocketContext } from '../context/WebSocketManager';
@@ -2859,9 +2860,11 @@ export default function RepairDetailScreen({ route, navigation }) {
                           style={styles.imageMediaCard}
                         >
                           <View style={styles.imageMediaCardInner}>
-                            <Pressable onPress={() => setSelectedImageUri(mediaUrl(m))}>
-                              <Image source={{ uri: mediaUrl(m) }} style={styles.imageMediaThumb} />
-                            </Pressable>
+                            <RepairMediaThumbnail
+                              sourcePath={mediaUrl(m)}
+                              onPress={setSelectedImageUri}
+                              style={styles.imageMediaThumb}
+                            />
                             {canEditClientRequest && m.id != null ? (
                               <Pressable
                                 style={styles.mediaRemoveBtn}
