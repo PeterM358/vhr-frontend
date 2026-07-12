@@ -160,3 +160,56 @@ export async function supersedePackaging(token, packagingId, payload) {
   if (!response.ok) throw new Error(await parseError(response, 'Failed to supersede packaging'));
   return response.json();
 }
+
+export async function listNetworkClaims(token, organizationId, scope = 'all') {
+  const base = orgQuery(organizationId);
+  const sep = base ? '&' : '?';
+  const response = await fetch(
+    `${API_BASE_URL}/api/network/claims/${base}${sep}scope=${encodeURIComponent(scope)}`,
+    { headers: await shopScopedHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load claims'));
+  return response.json();
+}
+
+export async function getNetworkClaim(token, organizationId, claimId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/network/claims/${claimId}/${orgQuery(organizationId)}`,
+    { headers: await shopScopedHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load claim'));
+  return response.json();
+}
+
+export async function createNetworkClaim(token, organizationId, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/network/claims/${orgQuery(organizationId)}`, {
+    method: 'POST',
+    headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ organization_id: organizationId, ...payload }),
+  });
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to create claim'));
+  return response.json();
+}
+
+export async function networkClaimAction(token, organizationId, claimId, action, payload = {}) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/network/claims/${claimId}/${action}/${orgQuery(organizationId)}`,
+    {
+      method: 'POST',
+      headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organization_id: organizationId, ...payload }),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to update claim'));
+  return response.json();
+}
+
+export async function listProductMappingsAsBuyer(token, organizationId) {
+  const q = orgQuery(organizationId);
+  const response = await fetch(
+    `${API_BASE_URL}/api/network/product-mappings/${q}${q ? '&' : '?'}as_buyer=1`,
+    { headers: await shopScopedHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load product mappings'));
+  return response.json();
+}

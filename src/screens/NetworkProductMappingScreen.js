@@ -10,6 +10,40 @@ import AppNavigationBar from '../components/common/AppNavigationBar';
 import { createProductMapping, getMyOrganization, listProductMappings } from '../api/network';
 import { useTranslation } from '../i18n';
 
+function TraceabilityBlock({ summary, identity, t }) {
+  if (!summary && !identity) return null;
+  return (
+    <>
+      {identity?.brand_name ? (
+        <Text style={styles.meta}>{t('network.mapping.brand')}: {identity.brand_name}</Text>
+      ) : null}
+      {identity?.oem_number ? (
+        <Text style={styles.meta}>{t('network.mapping.oem')}: {identity.oem_number}</Text>
+      ) : null}
+      {identity?.ean ? (
+        <Text style={styles.meta}>{t('network.mapping.ean')}: {identity.ean}</Text>
+      ) : null}
+      {summary?.summary_label ? (
+        <Text style={styles.trace}>{summary.summary_label}</Text>
+      ) : null}
+      {summary?.country_of_origin ? (
+        <Text style={styles.meta}>{t('network.mapping.origin')}: {summary.country_of_origin}</Text>
+      ) : null}
+      {summary?.lot_traceable ? (
+        <Text style={styles.meta}>{t('network.mapping.lotTraceable')}</Text>
+      ) : null}
+      {summary?.warranty_route_available ? (
+        <Text style={styles.meta}>{t('network.mapping.warrantyRoute')}</Text>
+      ) : null}
+      {summary?.verified_chain_depth ? (
+        <Text style={styles.meta}>
+          {t('network.mapping.chainDepth')}: {summary.verified_chain_depth}
+        </Text>
+      ) : null}
+    </>
+  );
+}
+
 export default function NetworkProductMappingScreen({ navigation }) {
   const { t } = useTranslation();
   const [rows, setRows] = useState([]);
@@ -62,6 +96,11 @@ export default function NetworkProductMappingScreen({ navigation }) {
           <AppCard key={row.id}>
             <Text variant="titleMedium">{row.seller_sku}</Text>
             <Text>{row.buyer_sku || '—'}</Text>
+            <TraceabilityBlock
+              summary={row.traceability_summary}
+              identity={row.product_identity}
+              t={t}
+            />
           </AppCard>
         ))}
       </ScrollView>
@@ -72,4 +111,6 @@ export default function NetworkProductMappingScreen({ navigation }) {
 const styles = StyleSheet.create({
   content: { padding: 16, gap: 12 },
   error: { color: '#b00020' },
+  meta: { color: '#555', marginTop: 4 },
+  trace: { marginTop: 8, color: '#444' },
 });

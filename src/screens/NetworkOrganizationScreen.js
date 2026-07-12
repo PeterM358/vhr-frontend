@@ -71,6 +71,12 @@ export default function NetworkOrganizationScreen({ navigation }) {
         <Button mode="outlined" onPress={() => navigation.navigate('NetworkPackaging')}>
           {t('network.packaging.title')}
         </Button>
+        <Button mode="outlined" onPress={() => navigation.navigate('NetworkClaimsList')}>
+          {t('network.claims.myClaims')}
+        </Button>
+        <Button mode="outlined" onPress={() => navigation.navigate('NetworkIncomingClaims')}>
+          {t('network.claims.incoming')}
+        </Button>
       </ScrollView>
     </ScreenBackground>
   );

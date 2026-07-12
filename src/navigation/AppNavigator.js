@@ -71,6 +71,10 @@ import {
   NetworkIncomingOrderDetailScreen,
   NetworkProductMappingScreen,
   NetworkPackagingScreen,
+  NetworkClaimsListScreen,
+  NetworkClaimCreateScreen,
+  NetworkClaimDetailScreen,
+  NetworkIncomingClaimsScreen,
   ClientProfileScreen,
   AddShopPartScreen,
   SelectRepairPartsScreen,
@@ -600,6 +604,26 @@ export default function AppNavigator() {
           name="NetworkPackaging"
           component={NetworkPackagingScreen}
           options={{ ...appNavBarScreenOptions, title: t('network.packaging.title') }}
+        />
+        <Stack.Screen
+          name="NetworkClaimsList"
+          component={NetworkClaimsListScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.claims.myClaims') }}
+        />
+        <Stack.Screen
+          name="NetworkClaimCreate"
+          component={NetworkClaimCreateScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.claims.create') }}
+        />
+        <Stack.Screen
+          name="NetworkClaimDetail"
+          component={NetworkClaimDetailScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.claims.detail') }}
+        />
+        <Stack.Screen
+          name="NetworkIncomingClaims"
+          component={NetworkIncomingClaimsScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.claims.incoming') }}
         />
         <Stack.Screen
           name="ShopInvoiceDetail"

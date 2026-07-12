@@ -2124,18 +2124,65 @@
       "sent": "Поканата е изпратена"
     },
     "incomingOrders": {
-      "title": "Входящи поръчки",
-      "detailTitle": "Входяща поръчка",
-      "status": "Статус",
-      "acknowledge": "Потвърди",
-      "partialAck": "Частично потвърждение",
-      "reject": "Отхвърли"
+      "title": "Incoming orders",
+      "detailTitle": "Incoming order",
+      "status": "Status",
+      "acknowledge": "Acknowledge",
+      "partialAck": "Partially acknowledge",
+      "reject": "Reject",
+      "traceabilityPending": "Traceability pending"
     },
     "mapping": {
       "title": "Картографиране SKU",
       "sellerSku": "SKU на доставчик",
       "buyerSku": "SKU на купувач",
-      "create": "Създай картографиране"
+      "create": "Създай картографиране",
+      "brand": "Марка",
+      "oem": "OEM номер",
+      "ean": "EAN",
+      "origin": "Страна на произход",
+      "lotTraceable": "Проследима партида",
+      "warrantyRoute": "Наличен гаранционен маршрут",
+      "chainDepth": "Потвърдена дълбочина на верига"
+    },
+    "claims": {
+      "myClaims": "Моите рекламации",
+      "incoming": "Входящи рекламации",
+      "create": "Нова рекламация",
+      "detail": "Детайли на рекламация",
+      "subject": "Тема",
+      "description": "Описание",
+      "repairId": "ID на ремонт",
+      "submit": "Подай рекламация",
+      "status": "Статус",
+      "hopRole": "Текущ етап",
+      "response": "Отговор",
+      "evidence": "Доказателства",
+      "evidenceDescription": "Описание на доказателство",
+      "uploadEvidence": "Добави доказателство",
+      "forward": "Препрати нагоре",
+      "resolve": "Приключи",
+      "close": "Затвори",
+      "accept": "Приеми",
+      "reject": "Отхвърли",
+      "respond": "Отговори",
+      "statuses": {
+        "open": "Отворена",
+        "waiting_for_direct_supplier": "Изчаква директен доставчик",
+        "waiting_for_evidence": "Изчаква доказателства",
+        "forwarded_upstream": "Препратена нагоре",
+        "accepted": "Приета",
+        "rejected": "Отхвърлена",
+        "resolved": "Приключена",
+        "closed": "Затворена"
+      },
+      "roles": {
+        "service_center": "Сервиз",
+        "supplier": "Доставчик",
+        "distributor": "Дистрибутор",
+        "importer": "Вносител",
+        "manufacturer": "Производител"
+      }
     },
     "packaging": {
       "title": "Управление на опаковки",
