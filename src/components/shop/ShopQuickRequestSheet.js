@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ShopQuickRequestCard from './ShopQuickRequestCard';
 import { COLORS } from '../../constants/colors';
 import { formatShopDisplayName } from '../../utils/shopDisplayName';
+import { useTranslation } from '../../i18n';
 
 export default function ShopQuickRequestSheet({
   visible,
@@ -27,6 +28,7 @@ export default function ShopQuickRequestSheet({
   vehicleType,
 }) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const formRef = useRef(null);
   const [actionState, setActionState] = useState({ submitting: false, canSubmit: false });
   const shopName = formatShopDisplayName(shop?.name || 'this shop');
@@ -46,7 +48,7 @@ export default function ShopQuickRequestSheet({
             <View style={styles.handle} />
             <View style={styles.header}>
               <View style={styles.headerTextCol}>
-                <Text style={styles.title}>Request service</Text>
+                <Text style={styles.title}>{t('serviceCenters.requestService')}</Text>
                 <Text style={styles.headerSubtitle}>{shopName}</Text>
               </View>
               <IconButton icon="close" size={22} onPress={onClose} style={styles.closeBtn} />
@@ -83,14 +85,14 @@ export default function ShopQuickRequestSheet({
                   disabled={!actionState.canSubmit}
                   style={styles.primaryBtn}
                 >
-                  Send request
+                  {t('repairs.sendRequest')}
                 </Button>
                 <Button
                   mode="text"
                   onPress={() => formRef.current?.openFullRequest()}
                   disabled={actionState.submitting}
                 >
-                  More options (photos, details)
+                  {t('serviceCenters.quickRequest.moreOptions')}
                 </Button>
               </View>
             ) : null}

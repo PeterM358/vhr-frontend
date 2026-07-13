@@ -12,6 +12,7 @@ import { buildVisitSlotOptions, formatPreferredVisitNote, buildPreferredVisitTim
 import { parseOdometerKm } from '../../utils/finalizeMileageValidation';
 import { formatShopDisplayName } from '../../utils/shopDisplayName';
 import { navigateToRepairRequestNew } from '../../navigation/webNavigation';
+import { useTranslation } from '../../i18n';
 
 const VISIBLE_SERVICE_CHIPS = 6;
 
@@ -30,11 +31,12 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
   },
   ref
 ) {
+  const { t, locale } = useTranslation();
   const shopName = formatShopDisplayName(shop?.name || 'this shop');
   const repairOptions = useMemo(() => collectShopRepairOptions(shop), [shop]);
   const visitDays = useMemo(
-    () => buildVisitSlotOptions(shop?.working_hours, { maxDays: 7 }),
-    [shop?.working_hours]
+    () => buildVisitSlotOptions(shop?.working_hours, { maxDays: 7, t, locale }),
+    [shop?.working_hours, t, locale]
   );
 
   const [vehicleId, setVehicleId] = useState(
@@ -72,23 +74,37 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
       vehicleType,
       vehicleId: vehicleId || undefined,
       repairTypeId: repairTypeId || undefined,
-      description: selectedRepair ? `${selectedRepair.name} at ${shopName}` : `Request at ${shopName}`,
-      availabilityNotes: formatPreferredVisitNote(selectedDay, timeSlot),
+      description: selectedRepair
+        ? t('serviceCenters.quickRequest.descriptionAtShop', {
+            service: selectedRepair.name,
+            shop: shopName,
+          })
+        : t('serviceCenters.quickRequest.requestAtShop', { shop: shopName }),
+      availabilityNotes: formatPreferredVisitNote(selectedDay, timeSlot, t),
       symptoms: note.trim() || undefined,
     });
   };
 
   const handleSubmit = async () => {
     if (!isLoggedIn) {
-      Alert.alert('Sign in required', 'Please sign in to send a service request.');
+      Alert.alert(
+        t('serviceCenters.quickRequest.signInRequiredTitle'),
+        t('serviceCenters.quickRequest.signInRequiredBody')
+      );
       return;
     }
     if (!vehicles.length) {
-      Alert.alert('Add a vehicle', 'Register a vehicle before requesting service.');
+      Alert.alert(
+        t('serviceCenters.quickRequest.addVehicleTitle'),
+        t('serviceCenters.quickRequest.addVehicleBody')
+      );
       return;
     }
     if (!vehicleId) {
-      Alert.alert('Choose a vehicle', 'Select which vehicle this request is for.');
+      Alert.alert(
+        t('serviceCenters.quickRequest.chooseVehicleTitle'),
+        t('serviceCenters.quickRequest.chooseVehicleBody')
+      );
       return;
     }
 
@@ -102,13 +118,16 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
     setSubmitting(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const availabilityNotes = formatPreferredVisitNote(selectedDay, timeSlot);
+      const availabilityNotes = formatPreferredVisitNote(selectedDay, timeSlot, t);
       const preferredTimes = buildPreferredVisitTimes(selectedDay, timeSlot);
-      const repairLabel = selectedRepair?.name || 'Service';
+      const repairLabel = selectedRepair?.name || t('serviceCenters.quickRequest.defaultServiceLabel');
       const created = await createRepair(token, {
         vehicle: parseInt(vehicleId, 10),
         repair_type: repairTypeId ? parseInt(repairTypeId, 10) : null,
-        description: `${repairLabel} at ${shopName}`,
+        description: t('serviceCenters.quickRequest.descriptionAtShop', {
+          service: repairLabel,
+          shop: shopName,
+        }),
         symptoms: note.trim() || null,
         availability_notes: availabilityNotes || null,
         client_preferred_start: preferredTimes.start,
@@ -123,18 +142,21 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
 
       onClose?.();
       Alert.alert(
-        'Request sent',
-        'The shop will review your request and confirm date and time before you should bring your vehicle.',
+        t('serviceCenters.quickRequest.requestSentTitle'),
+        t('serviceCenters.quickRequest.requestSentBody'),
         [
           {
-            text: 'View request',
+            text: t('serviceCenters.quickRequest.viewRequest'),
             onPress: () => navigation.navigate('RepairDetail', { repairId: created.id }),
           },
-          { text: 'OK', style: 'cancel' },
+          { text: t('common.ok'), style: 'cancel' },
         ]
       );
     } catch (error) {
-      Alert.alert('Could not send request', error.message || 'Please try again.');
+      Alert.alert(
+        t('serviceCenters.quickRequest.requestFailedTitle'),
+        error.message || t('serviceCenters.quickRequest.requestFailedBody')
+      );
     } finally {
       setSubmitting(false);
     }
@@ -151,7 +173,7 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
     return (
       <View style={styles.body}>
         <Text style={styles.subtitle}>
-          Sign in to ask {shopName} for a quote and preferred visit time.
+          {t('serviceCenters.quickRequest.signInSubtitle', { shopName })}
         </Text>
         <Button
           mode="contained"
@@ -165,7 +187,7 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
           }}
           style={styles.primaryBtn}
         >
-          Sign in to request
+          {t('serviceCenters.quickRequest.signInToRequest')}
         </Button>
       </View>
     );
@@ -173,21 +195,16 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
 
   return (
     <View style={styles.body}>
-      <Text style={styles.subtitle}>
-        Pick a service and preferred visit. The shop can accept or decline — wait for their confirmation
-        before you drive over.
-      </Text>
+      <Text style={styles.subtitle}>{t('serviceCenters.quickRequest.subtitle')}</Text>
 
       <View style={styles.notice}>
         <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#b45309" />
-        <Text style={styles.noticeText}>
-          Your preferred time is not booked until the center confirms.
-        </Text>
+        <Text style={styles.noticeText}>{t('serviceCenters.quickRequest.notice')}</Text>
       </View>
 
       {vehicles.length > 1 ? (
         <>
-          <Text style={styles.fieldLabel}>Vehicle</Text>
+          <Text style={styles.fieldLabel}>{t('vehicles.vehicle')}</Text>
           <View style={styles.chipRow}>
             {vehicles.map((item) => {
               const selected = String(item.id) === String(vehicleId);
@@ -209,7 +226,7 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
 
       {repairOptions.length ? (
         <>
-          <Text style={styles.fieldLabel}>Service</Text>
+          <Text style={styles.fieldLabel}>{t('common.service')}</Text>
           <View style={styles.chipRow}>
             {visibleRepairOptions.map((item) => {
               const selected = String(item.id) === String(repairTypeId);
@@ -231,15 +248,17 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
               onPress={() => setServicesExpanded((value) => !value)}
               style={styles.expandBtn}
             >
-              {servicesExpanded ? 'Show fewer' : `Show all ${repairOptions.length} services`}
+              {servicesExpanded
+                ? t('serviceCenters.quickRequest.showFewer')
+                : t('serviceCenters.quickRequest.showAllServices', { count: repairOptions.length })}
             </Button>
           ) : null}
         </>
       ) : (
-        <Text style={styles.helperMuted}>This shop has not listed specific services yet.</Text>
+        <Text style={styles.helperMuted}>{t('serviceCenters.quickRequest.noServicesListed')}</Text>
       )}
 
-      <Text style={styles.fieldLabel}>Preferred visit</Text>
+      <Text style={styles.fieldLabel}>{t('repairs.preferredVisit')}</Text>
       <View style={styles.chipRow}>
         {visitDays.map((day) => {
           const selected = day.offset === dayOffset;
@@ -261,7 +280,9 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
       </View>
 
       {selectedDay ? (
-        <Text style={styles.hoursHint}>Shop hours: {selectedDay.hoursLabel}</Text>
+        <Text style={styles.hoursHint}>
+          {t('serviceCenters.quickRequest.shopHours', { hours: selectedDay.hoursLabel })}
+        </Text>
       ) : null}
 
       <View style={styles.chipRow}>
@@ -281,10 +302,10 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
 
       <TextInput
         mode="outlined"
-        label="Notes (optional)"
+        label={t('serviceCenters.quickRequest.notesLabel')}
         value={note}
         onChangeText={setNote}
-        placeholder="Brake noise, specific parts, etc."
+        placeholder={t('serviceCenters.quickRequest.notesPlaceholder')}
         style={styles.noteInput}
         multiline
       />
@@ -298,10 +319,10 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
             disabled={!canSubmit}
             style={styles.primaryBtn}
           >
-            Send request
+            {t('repairs.sendRequest')}
           </Button>
           <Button mode="text" onPress={openFullRequest} disabled={submitting} style={styles.secondaryBtn}>
-            More options (photos, details)
+            {t('serviceCenters.quickRequest.moreOptions')}
           </Button>
           {submitting ? <ActivityIndicator style={styles.loader} color={COLORS.PRIMARY} /> : null}
         </>

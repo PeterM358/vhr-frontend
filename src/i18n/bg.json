@@ -1734,6 +1734,33 @@
       "requestServiceA11y": "Заяви ремонт в този сервиз",
       "addVehicleFirstTitle": "Първо добавете автомобил",
       "addVehicleFirstBody": "Нужен е поне един автомобил, преди да заявите ремонт."
+    },
+    "quickRequest": {
+      "subtitle": "Изберете услуга и предпочитан час. Сервизът може да приеме или откаже — изчакайте потвърждение, преди да тръгнете.",
+      "notice": "Предпочитаният час не е запазен, докато сервизът не потвърди.",
+      "shopHours": "Работно време: {hours}",
+      "notesLabel": "Бележки (по избор)",
+      "notesPlaceholder": "Шум от спирачки, конкретни части и др.",
+      "moreOptions": "Още опции (снимки, детайли)",
+      "showFewer": "Покажи по-малко",
+      "showAllServices": "Покажи всички {count} услуги",
+      "noServicesListed": "Този сервиз все още не е посочил конкретни услуги.",
+      "signInSubtitle": "Влезте, за да поискате оферта и предпочитан час от {shopName}.",
+      "signInToRequest": "Влезте, за да заявите",
+      "signInRequiredTitle": "Необходим е вход",
+      "signInRequiredBody": "Моля, влезте в профила си, за да изпратите заявка за сервиз.",
+      "addVehicleTitle": "Добавете автомобил",
+      "addVehicleBody": "Регистрирайте автомобил, преди да заявите сервиз.",
+      "chooseVehicleTitle": "Изберете автомобил",
+      "chooseVehicleBody": "Изберете за кой автомобил е тази заявка.",
+      "requestSentTitle": "Заявката е изпратена",
+      "requestSentBody": "Сервизът ще прегледа заявката и ще потвърди дата и час, преди да доведете автомобила.",
+      "viewRequest": "Виж заявката",
+      "requestFailedTitle": "Неуспешно изпращане на заявката",
+      "requestFailedBody": "Моля, опитайте отново.",
+      "descriptionAtShop": "{service} в {shop}",
+      "requestAtShop": "Заявка в {shop}",
+      "defaultServiceLabel": "Услуга"
     }
   },
   "footer": {

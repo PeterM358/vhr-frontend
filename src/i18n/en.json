@@ -1734,6 +1734,33 @@
       "requestServiceA11y": "Request service at this shop",
       "addVehicleFirstTitle": "Add a vehicle first",
       "addVehicleFirstBody": "You need at least one vehicle before requesting a repair."
+    },
+    "quickRequest": {
+      "subtitle": "Pick a service and preferred visit. The shop can accept or decline — wait for their confirmation before you drive over.",
+      "notice": "Your preferred time is not booked until the center confirms.",
+      "shopHours": "Shop hours: {hours}",
+      "notesLabel": "Notes (optional)",
+      "notesPlaceholder": "Brake noise, specific parts, etc.",
+      "moreOptions": "More options (photos, details)",
+      "showFewer": "Show fewer",
+      "showAllServices": "Show all {count} services",
+      "noServicesListed": "This shop has not listed specific services yet.",
+      "signInSubtitle": "Sign in to ask {shopName} for a quote and preferred visit time.",
+      "signInToRequest": "Sign in to request",
+      "signInRequiredTitle": "Sign in required",
+      "signInRequiredBody": "Please sign in to send a service request.",
+      "addVehicleTitle": "Add a vehicle",
+      "addVehicleBody": "Register a vehicle before requesting service.",
+      "chooseVehicleTitle": "Choose a vehicle",
+      "chooseVehicleBody": "Select which vehicle this request is for.",
+      "requestSentTitle": "Request sent",
+      "requestSentBody": "The shop will review your request and confirm date and time before you should bring your vehicle.",
+      "viewRequest": "View request",
+      "requestFailedTitle": "Could not send request",
+      "requestFailedBody": "Please try again.",
+      "descriptionAtShop": "{service} at {shop}",
+      "requestAtShop": "Request at {shop}",
+      "defaultServiceLabel": "Service"
     }
   },
   "footer": {
