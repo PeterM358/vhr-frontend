@@ -16,6 +16,7 @@ import AppNavigationBar from '../common/AppNavigationBar';
 import { useScrollShadow } from '../../hooks/useScrollShadow';
 import { useClientDashboardBack, useGoBackOr } from '../../navigation/appNavBarBack';
 import { syncWebPath } from '../../navigation/authNavigation';
+import { navigateToRepairRequestDetail } from '../../navigation/webNavigation';
 import { repairRequests } from '../../navigation/webRoutes';
 import { useTranslation } from '../../i18n';
 
@@ -101,10 +102,10 @@ export default function ClientRepairsList({ navigation, route }) {
     return (
       <FloatingCard
         onPress={() =>
-          navigation.navigate('RepairDetail', {
-            repairId: item.id,
+          navigateToRepairRequestDetail(navigation, item.id, {
+            returnTo: 'ClientRepairs',
+            initialTab: statusFilter,
             fromVehicleDetail: route.params?.fromVehicleDetail || false,
-            vehicleId: scopedVehicleId,
           })
         }
       >

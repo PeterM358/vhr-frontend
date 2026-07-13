@@ -337,7 +337,7 @@ function buildRepairDetailRouteParams(repairId, params = {}) {
 }
 
 export function navigateToRepairRequestDetail(navigation, repairId, params = {}) {
-  const { returnTo, shopId, backLabel, ...rest } = params;
+  const { returnTo, shopId, backLabel, initialTab, tab, ...rest } = params;
   const routeParams = buildRepairDetailRouteParams(repairId, {
     returnTo,
     shopId,
@@ -352,7 +352,9 @@ export function navigateToRepairRequestDetail(navigation, repairId, params = {})
       tailRoutes.push({ name: 'ShopMap' });
       tailRoutes.push({ name: 'ShopDetail', params: { shopId } });
     } else if (returnTo === 'ClientRepairs') {
-      tailRoutes.push({ name: 'ClientRepairs' });
+      const listTab = initialTab || tab;
+      const listParams = listTab ? { initialTab: listTab } : undefined;
+      tailRoutes.push({ name: 'ClientRepairs', params: listParams });
     }
     tailRoutes.push({ name: 'RepairDetail', params: routeParams });
     resetWebRoutes(navigation, tailRoutes, path);

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Partner repair detail web path tests (no Jest). Run: npm run test:partner-repair-nav
+ * Repair detail web path tests (no Jest). Run: npm run test:partner-repair-nav
  */
 
 const assert = require('assert');
-const { repairDetailWebPath } = require('../src/navigation/webRoutes');
+const { repairDetailWebPath, repairRequestDetail } = require('../src/navigation/webRoutes');
 
 assert.strictEqual(
   repairDetailWebPath({ repairId: 42, returnTo: 'RepairsList' }),
@@ -34,6 +34,18 @@ assert.strictEqual(
   repairDetailWebPath({ returnTo: 'ClientRepairs' }),
   '/dashboard/repair-requests',
   'client repair detail without id falls back to list path'
+);
+
+assert.strictEqual(
+  repairDetailWebPath({ repairId: 55 }),
+  '/dashboard/repair-requests/55',
+  'client repair detail without returnTo still uses detail path when id present'
+);
+
+assert.strictEqual(
+  repairRequestDetail(123),
+  '/dashboard/repair-requests/123',
+  'repairRequestDetail builds canonical client detail URL'
 );
 
 console.log('test-partner-repair-navigation: ok');
