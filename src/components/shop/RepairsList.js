@@ -18,6 +18,7 @@ import {
   fetchShopProfileCompleteness,
   gateRepairNavigation,
 } from '../../utils/shopProfileGate';
+import { navigateToPartnerRepairDetail } from '../../navigation/webNavigation';
 import ShopProfileSetupBanner from './ShopProfileSetupBanner';
 import {
   fetchShopRepairsTab,
@@ -438,6 +439,7 @@ export default function RepairsList() {
   }, [selectedRepairIds, exitInvoiceSelectMode, navigation]);
 
   const handleRepairPress = (repairId) => {
+    if (repairId == null || repairId === '') return;
     if (
       !gateRepairNavigation(navigation, {
         isComplete: profileComplete,
@@ -446,7 +448,10 @@ export default function RepairsList() {
     ) {
       return;
     }
-    navigation.navigate('RepairDetail', { repairId });
+    navigateToPartnerRepairDetail(navigation, repairId, {
+      returnTo: 'RepairsList',
+      backLabel: t('drawer.partner.repairs'),
+    });
   };
 
   const renderRepair = ({ item }) => {

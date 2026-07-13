@@ -17,6 +17,7 @@
     "start:android": "expo run:android",
     "start:dev": "expo start --dev-client",
     "test:erp": "node scripts/test-shop-erp-access.js",
+    "test:partner-repair-nav": "node scripts/test-partner-repair-navigation.js",
     "eas-build-pre-install": "./eas-build-pre-install.sh"
   },
   "dependencies": {

@@ -512,6 +512,21 @@ export function partnerRepairOffer(repairId, params = {}) {
   return buildPathWithQuery(`${PARTNER}/repairs/${normalizeId(repairId)}/offer`, query);
 }
 
+/** Canonical browser path for RepairDetail — partner context keeps list/calendar URLs. */
+export function repairDetailWebPath(params = {}) {
+  const returnTo = params.returnTo;
+  if (returnTo === 'ShopCalendar') {
+    return partnerCalendar();
+  }
+  if (returnTo === 'RepairsList' || returnTo === 'ShopDashboard') {
+    return partnerRepairs();
+  }
+  if (params.repairId != null && params.repairId !== '') {
+    return repairRequestDetail(params.repairId);
+  }
+  return repairRequests();
+}
+
 export function partnerBookings(params = {}) {
   return buildPathWithQuery(`${PARTNER}/bookings`, params);
 }

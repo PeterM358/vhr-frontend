@@ -51,6 +51,7 @@ import {
   repairRequests,
   repairRequestNew,
   repairRequestDetail,
+  repairDetailWebPath,
   serviceCenters,
   serviceCenterProfile,
   serviceHistory,
@@ -157,7 +158,7 @@ export function getCanonicalWebPath(state) {
       });
     }
     case 'RepairDetail':
-      return params.repairId != null ? repairRequestDetail(params.repairId) : repairRequests();
+      return repairDetailWebPath(params);
     case 'OffersScreen':
       return repairRequests({ tab: 'offers' });
     case 'ClientServiceHistory':

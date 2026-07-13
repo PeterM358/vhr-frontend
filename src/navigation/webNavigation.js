@@ -33,6 +33,7 @@ import {
   partnerPublicPreview,
   partnerRepairs,
   partnerRepairOffer,
+  repairDetailWebPath,
   partnerBookings,
   partnerCalendar,
   partnerClients,
@@ -649,6 +650,19 @@ export function navigateToPartnerRepairOffer(navigation, repairId, params = {}) 
   navigation.navigate('CreateOrUpdateOffer', routeParams);
 }
 
+function buildPartnerHomeRouteForRepairDetail(returnTo) {
+  if (returnTo === 'RepairsList') {
+    return {
+      name: 'ShopHome',
+      state: {
+        index: 1,
+        routes: [{ name: 'ShopDashboard' }, { name: 'RepairsList' }],
+      },
+    };
+  }
+  return PARTNER_HOME_ROUTE;
+}
+
 export function navigateToPartnerRepairDetail(navigation, repairId, params = {}) {
   const routeParams = {
     repairId,
@@ -659,14 +673,18 @@ export function navigateToPartnerRepairDetail(navigation, repairId, params = {})
 
   if (Platform.OS === 'web') {
     const root = getRootNavigation(navigation);
+    const webPath = repairDetailWebPath(routeParams);
     root.dispatch(
       CommonActions.reset({
         index: 1,
-        routes: [PARTNER_HOME_ROUTE, { name: 'RepairDetail', params: routeParams }],
+        routes: [
+          buildPartnerHomeRouteForRepairDetail(routeParams.returnTo),
+          { name: 'RepairDetail', params: routeParams },
+        ],
       })
     );
-    syncWebPath(partnerRepairs());
-    requestAnimationFrame(() => syncWebPath(partnerRepairs()));
+    syncWebPath(webPath);
+    requestAnimationFrame(() => syncWebPath(webPath));
     return;
   }
 
