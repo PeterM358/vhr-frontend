@@ -267,7 +267,7 @@ export function normalizeWebPath(input) {
   if (raw === 'AddPartnerServiceCenter' || raw.startsWith('AddPartnerServiceCenter')) {
     return `${PARTNER}/switch-center/add${query}`;
   }
-  if (raw === 'PartnerServiceCenters' || canonicalTrimmed.startsWith('PartnerServiceCenters')) {
+  if (raw === 'PartnerServiceCenters' || raw.startsWith('PartnerServiceCenters')) {
     return `${PARTNER}/service-centers${query}`;
   }
   if (raw === 'ShopAnalytics' || raw.startsWith('ShopAnalytics')) {
