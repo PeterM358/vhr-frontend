@@ -60,14 +60,22 @@ function hoursForDate(workingHours, date) {
   return { start, end };
 }
 
+function localeTag(locale) {
+  const key = String(locale || '').trim().toLowerCase();
+  if (!key) return undefined;
+  if (key === 'bg') return 'bg-BG';
+  if (key === 'en') return 'en-GB';
+  return key;
+}
+
 function formatDayLabel(date, offset, { t, locale } = {}) {
   if (offset === 0) return t ? t('requestService.today') : 'Today';
   if (offset === 1) return t ? t('requestService.tomorrow') : 'Tomorrow';
-  const loc = locale || undefined;
-  const weekday = date.toLocaleDateString(loc, { weekday: 'short' });
-  const day = date.getDate();
-  const month = date.toLocaleDateString(loc, { month: 'short' });
-  return `${weekday} ${day} ${month}`;
+  return date.toLocaleDateString(localeTag(locale), {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
 }
 
 /**
