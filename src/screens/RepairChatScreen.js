@@ -42,7 +42,7 @@ import { formatMoneyAmount } from '../constants/currency';
 export default function RepairChatScreen({ route, navigation }) {
   const { repairId } = route.params;
   const theme = useTheme();
-  const { notifications } = useContext(WebSocketContext);
+  const { chatMessages } = useContext(WebSocketContext);
 
   const [repair, setRepair] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -117,21 +117,24 @@ export default function RepairChatScreen({ route, navigation }) {
   );
 
   useEffect(() => {
-    const matching = notifications.find(n => n.repair === repairId);
+    const matching = chatMessages.filter((n) => n.repair === repairId).slice(-1)[0];
     if (matching) {
       const incomingMessage = {
-        id: Date.now(),
-        sender: matching.sender_id || 0,
-        sender_email: matching.sender_email || "Unknown",
-        text: matching.body,
-        price_offer: typeof matching.price_offer !== "undefined" ? matching.price_offer : null,
-        offerId: typeof matching.offer !== "undefined" ? matching.offer : null,
-        created_at: new Date().toISOString(),
+        id: matching.id || Date.now(),
+        sender: matching.sender || matching.sender_id || 0,
+        sender_email: matching.sender_email || 'Unknown',
+        text: matching.text ?? matching.body,
+        price_offer: typeof matching.price_offer !== 'undefined' ? matching.price_offer : null,
+        offerId: typeof matching.offer !== 'undefined' ? matching.offer : null,
+        created_at: matching.created_at || new Date().toISOString(),
         is_read: false,
       };
-      setMessages(prev => [...prev, incomingMessage]);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === incomingMessage.id)) return prev;
+        return [...prev, incomingMessage];
+      });
     }
-  }, [notifications]);
+  }, [chatMessages, repairId]);
 
   useEffect(() => {
     if (isShop) {

@@ -28,6 +28,7 @@ import ScreenBackground from '../ScreenBackground';
 import AppNavigationBar from '../common/AppNavigationBar';
 import { useScrollShadow } from '../../hooks/useScrollShadow';
 import { usePartnerDashboardBack } from '../../navigation/appNavBarBack';
+import { navigateToShopDashboard } from '../../navigation/drawerNavigation';
 import FloatingCard from '../ui/FloatingCard';
 import StatusBadge from '../ui/StatusBadge';
 import EmptyStateCard from '../ui/EmptyStateCard';
@@ -98,6 +99,10 @@ export default function RepairsList() {
   const handlePartnerBack = usePartnerDashboardBack(navigation);
   const handleBack = useCallback(() => {
     const returnTo = route.params?.returnTo;
+    if (returnTo === 'ShopDashboard') {
+      navigateToShopDashboard(navigation);
+      return;
+    }
     if (returnTo) {
       navigation.navigate(returnTo);
       return;

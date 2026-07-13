@@ -29,7 +29,7 @@ import { formatMoneyAmount } from '../constants/currency';
 export default function OfferChatScreen({ route, navigation }) {
   const { offerId } = route.params;
   const theme = useTheme();
-  const { notifications } = useContext(WebSocketContext);
+  const { chatMessages } = useContext(WebSocketContext);
 
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -61,20 +61,23 @@ export default function OfferChatScreen({ route, navigation }) {
   }, [offerId]);
 
   useEffect(() => {
-    const matching = notifications.find(n => n.offer === offerId);
+    const matching = chatMessages.filter((n) => n.offer === offerId).slice(-1)[0];
     if (matching) {
       const incomingMessage = {
-        id: Date.now(),
-        sender: matching.sender_id || 0,
-        sender_email: matching.sender_email || "Unknown",
-        text: matching.text ?? (matching.price_offer ? "💰 Offer Price" : null),
+        id: matching.id || Date.now(),
+        sender: matching.sender || matching.sender_id || 0,
+        sender_email: matching.sender_email || 'Unknown',
+        text: matching.text ?? (matching.price_offer ? '💰 Offer Price' : null),
         price_offer: matching.price_offer ?? null,
-        created_at: new Date().toISOString(),
+        created_at: matching.created_at || new Date().toISOString(),
         is_read: false,
       };
-      setMessages(prev => [...prev, incomingMessage]);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === incomingMessage.id)) return prev;
+        return [...prev, incomingMessage];
+      });
     }
-  }, [notifications]);
+  }, [chatMessages, offerId]);
 
   const loadMessages = async () => {
     try {

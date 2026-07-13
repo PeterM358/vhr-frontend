@@ -42,6 +42,11 @@ import {
   partnerSwitchCenter,
   partnerAddServiceCenter,
   partnerServiceCenters,
+  partnerAnalytics,
+  partnerWorkforce,
+  partnerDocumentImports,
+  partnerDocumentImportDetail,
+  partnerComplaints,
   profile,
   repairRequests,
   repairRequestNew,
@@ -212,6 +217,18 @@ export function getCanonicalWebPath(state) {
       return partnerServiceCenters();
     case 'PartnerBookings':
       return partnerBookings();
+    case 'ShopAnalytics':
+      return partnerAnalytics();
+    case 'ShopWorkforce':
+      return partnerWorkforce();
+    case 'ShopDocumentImports':
+      return partnerDocumentImports();
+    case 'ShopDocumentImportDetail': {
+      const importId = params.importId;
+      return importId != null ? partnerDocumentImportDetail(importId) : partnerDocumentImports();
+    }
+    case 'ShopComplaints':
+      return partnerComplaints();
     case 'CreateOrUpdateOffer': {
       const repairId = params.repairId ?? params.existingOffer?.repair;
       if (repairId != null) {
@@ -381,7 +398,7 @@ export function getDashboardNavigationStateFromPath(path) {
     if (!Number.isFinite(repairId)) return null;
     return vehicleStackState([
       { name: 'ClientRepairs' },
-      { name: 'RepairDetail', params: { repairId, returnTo: 'ClientRepairs', backLabel: 'Requests' } },
+      { name: 'RepairDetail', params: { repairId, returnTo: 'ClientRepairs' } },
     ]);
   }
   if (pathPart === 'dashboard/offers') {
@@ -721,6 +738,30 @@ export function getPartnerNavigationStateFromPath(path) {
       index: 1,
     };
   }
+  if (pathPart === 'partner/analytics') {
+    return { routes: [partnerHome, { name: 'ShopAnalytics' }], index: 1 };
+  }
+  if (pathPart === 'partner/workforce') {
+    return { routes: [partnerHome, { name: 'ShopWorkforce' }], index: 1 };
+  }
+  if (pathPart === 'partner/document-imports') {
+    return { routes: [partnerHome, { name: 'ShopDocumentImports' }], index: 1 };
+  }
+  const importDetailMatch = pathPart.match(/^partner\/document-imports\/(\d+)$/);
+  if (importDetailMatch) {
+    const importId = parseInt(importDetailMatch[1], 10);
+    return {
+      routes: [
+        partnerHome,
+        { name: 'ShopDocumentImports' },
+        { name: 'ShopDocumentImportDetail', params: { importId } },
+      ],
+      index: 2,
+    };
+  }
+  if (pathPart === 'partner/complaints') {
+    return { routes: [partnerHome, { name: 'ShopComplaints' }], index: 1 };
+  }
 
   return null;
 }
@@ -855,6 +896,22 @@ export function normalizeWebLinkingPath(path) {
   if (canonicalTrimmed === 'PartnerServiceCenters' || canonicalTrimmed.startsWith('PartnerServiceCenters')) {
     return 'partner/service-centers';
   }
+  if (canonicalTrimmed === 'ShopAnalytics' || canonicalTrimmed.startsWith('ShopAnalytics')) {
+    return 'partner/analytics';
+  }
+  if (canonicalTrimmed === 'ShopWorkforce' || canonicalTrimmed.startsWith('ShopWorkforce')) {
+    return 'partner/workforce';
+  }
+  if (canonicalTrimmed === 'ShopDocumentImports' || canonicalTrimmed.startsWith('ShopDocumentImports')) {
+    return 'partner/document-imports';
+  }
+  if (canonicalTrimmed === 'ShopDocumentImportDetail' || canonicalTrimmed.startsWith('ShopDocumentImportDetail')) {
+    const importId = canonicalTrimmed.match(/importId[=:](\d+)/i)?.[1];
+    return importId ? `partner/document-imports/${importId}` : 'partner/document-imports';
+  }
+  if (canonicalTrimmed === 'ShopComplaints' || canonicalTrimmed.startsWith('ShopComplaints')) {
+    return 'partner/complaints';
+  }
   if (canonicalTrimmed === 'ShopDetail' || canonicalTrimmed.startsWith('ShopDetail/')) {
     const shopId = canonicalTrimmed.match(/shopId[=:](\d+)/i)?.[1];
     return shopId ? `service-centers/${shopId}` : 'service-centers';
@@ -975,7 +1032,7 @@ function legacyRepairDetailNavigationState() {
   if (!repairId) return null;
   return vehicleStackState([
     { name: 'ClientRepairs' },
-    { name: 'RepairDetail', params: { repairId, returnTo: 'ClientRepairs', backLabel: 'Requests' } },
+    { name: 'RepairDetail', params: { repairId, returnTo: 'ClientRepairs' } },
   ]);
 }
 

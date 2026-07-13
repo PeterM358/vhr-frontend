@@ -44,6 +44,15 @@ import {
   partnerSwitchCenter,
   partnerAddServiceCenter,
   partnerServiceCenters,
+  partnerAnalytics,
+  partnerWorkforce,
+  partnerDocumentImports,
+  partnerDocumentImportDetail,
+  partnerComplaints,
+  partnerPurchaseOrders,
+  partnerPurchaseOrderDetail,
+  partnerGoodsReceipt,
+  partnerStorageLocations,
 } from './webRoutes';
 
 const PARTNER_HOME_ROUTE = {
@@ -786,4 +795,68 @@ export function navigateToPartnerBookings(navigation) {
     return;
   }
   navigation.navigate('PartnerBookings', routeParams);
+}
+
+export function navigateToPartnerAnalytics(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'ShopAnalytics' }], partnerAnalytics());
+    return;
+  }
+  navigation.navigate('ShopAnalytics');
+}
+
+export function navigateToPartnerWorkforce(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'ShopWorkforce' }], partnerWorkforce());
+    return;
+  }
+  navigation.navigate('ShopWorkforce');
+}
+
+export function navigateToPartnerDocumentImports(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'ShopDocumentImports' }], partnerDocumentImports());
+    return;
+  }
+  navigation.navigate('ShopDocumentImports');
+}
+
+export function navigateToPartnerDocumentImportDetail(navigation, importId) {
+  const params = { importId };
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(
+      navigation,
+      [
+        { name: 'ShopDocumentImports' },
+        { name: 'ShopDocumentImportDetail', params },
+      ],
+      partnerDocumentImportDetail(importId)
+    );
+    return;
+  }
+  navigation.navigate('ShopDocumentImportDetail', params);
+}
+
+export function navigateToPartnerComplaints(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'ShopComplaints' }], partnerComplaints());
+    return;
+  }
+  navigation.navigate('ShopComplaints');
+}
+
+export function navigateToPartnerPurchaseOrders(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'ShopPurchaseOrders' }], partnerPurchaseOrders());
+    return;
+  }
+  navigation.navigate('ShopPurchaseOrders');
+}
+
+export function navigateToPartnerStorageLocations(navigation) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'ShopStorageLocations' }], partnerStorageLocations());
+    return;
+  }
+  navigation.navigate('ShopStorageLocations');
 }

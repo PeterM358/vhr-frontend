@@ -79,7 +79,7 @@ export default function HomeScreen({ navigation }) {
     setUserEmailOrPhone,
   } = useContext(AuthContext);
   const hasSession = isAuthenticated || !!authToken;
-  const { notifications } = useContext(WebSocketContext);
+  const { unreadCount: unreadNotifications } = useContext(WebSocketContext);
 
   const [vehicles, setVehicles] = useState(() => getCachedVehicles());
   const [activeRepairs, setActiveRepairs] = useState([]);
@@ -174,7 +174,6 @@ export default function HomeScreen({ navigation }) {
     ])
   );
 
-  const unreadNotifications = notifications.filter((n) => !n.is_read).length;
   const hasVehicles = vehicles.length > 0;
 
   const handleLogout = async () => {

@@ -36,7 +36,7 @@ function resolveInitialTab(route) {
 export default function ClientActivityScreen({ navigation }) {
   const route = useRoute();
   const { t } = useTranslation();
-  const { notifications } = useContext(WebSocketContext);
+  const { unreadCount: unreadInboxCount } = useContext(WebSocketContext);
 
   const returnTo = route.params?.returnTo || 'Home';
   const backLabel = route.params?.backLabelKey
@@ -55,8 +55,6 @@ export default function ClientActivityScreen({ navigation }) {
   const [unseenPromoCount, setUnseenPromoCount] = useState(0);
   const [unseenOffersCount, setUnseenOffersCount] = useState(0);
   const [actionNeededCount, setActionNeededCount] = useState(0);
-
-  const unreadInboxCount = notifications.filter((n) => !n.is_read).length;
 
   useEffect(() => {
     const next = route.params?.initialTab;

@@ -31,19 +31,44 @@ function citiesCacheKey(countryId, options = {}) {
   return `${countryId}|${search}|${limit}`;
 }
 
+/** Non-empty lists are safe to serve from cache; empty often means a failed/partial fetch. */
+function isNonEmptyList(data) {
+  return Array.isArray(data) && data.length > 0;
+}
+
+function isPersistableCountryList(data) {
+  return isNonEmptyList(data);
+}
+
+async function clearPersistedCountries() {
+  try {
+    await AsyncStorage.removeItem(COUNTRIES_STORAGE_KEY);
+  } catch {
+    // ignore storage failures
+  }
+}
+
 async function readPersistedCountries() {
   try {
     const raw = await AsyncStorage.getItem(COUNTRIES_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed?.data || !isFresh(parsed.at, COUNTRIES_TTL_MS)) return null;
-    return parsed.data;
+    const rows = parsed?.data;
+    const stale = !isFresh(parsed?.at, COUNTRIES_TTL_MS);
+    const invalid = !isPersistableCountryList(rows);
+    if (stale || invalid) {
+      if (raw) await clearPersistedCountries();
+      return null;
+    }
+    return rows;
   } catch {
+    await clearPersistedCountries();
     return null;
   }
 }
 
 async function writePersistedCountries(data) {
+  if (!isPersistableCountryList(data)) return;
   try {
     await AsyncStorage.setItem(
       COUNTRIES_STORAGE_KEY,
@@ -64,7 +89,7 @@ export function invalidateReferenceDataCache() {
 
 export async function fetchCountriesCached(fetcher, { force = false } = {}) {
   const bucket = memory.countries;
-  if (!force && bucket.data && isFresh(bucket.at, COUNTRIES_TTL_MS)) {
+  if (!force && isPersistableCountryList(bucket.data) && isFresh(bucket.at, COUNTRIES_TTL_MS)) {
     return bucket.data;
   }
   if (bucket.promise) {
@@ -83,11 +108,15 @@ export async function fetchCountriesCached(fetcher, { force = false } = {}) {
     }
 
     const data = await fetcher();
-    bucket.data = data;
-    bucket.at = Date.now();
+    bucket.data = Array.isArray(data) ? data : [];
+    bucket.at = isPersistableCountryList(bucket.data) ? Date.now() : 0;
     bucket.promise = null;
-    await writePersistedCountries(data);
-    return data;
+    if (isPersistableCountryList(bucket.data)) {
+      await writePersistedCountries(bucket.data);
+    } else {
+      await clearPersistedCountries();
+    }
+    return bucket.data;
   })().catch((err) => {
     bucket.promise = null;
     throw err;
@@ -100,7 +129,7 @@ export async function fetchCitiesForCountryCached(countryId, fetcher, options = 
   const key = citiesCacheKey(countryId, options);
   const bucket = memory.cities.get(key) || { data: null, at: 0, promise: null };
 
-  if (!options.force && bucket.data && isFresh(bucket.at, CITIES_TTL_MS)) {
+  if (!options.force && isNonEmptyList(bucket.data) && isFresh(bucket.at, CITIES_TTL_MS)) {
     return bucket.data;
   }
   if (bucket.promise) {
@@ -109,14 +138,19 @@ export async function fetchCitiesForCountryCached(countryId, fetcher, options = 
 
   bucket.promise = fetcher()
     .then((data) => {
-      bucket.data = data;
-      bucket.at = Date.now();
+      const rows = Array.isArray(data) ? data : [];
+      bucket.data = rows;
+      bucket.at = isNonEmptyList(rows) ? Date.now() : 0;
       bucket.promise = null;
       memory.cities.set(key, bucket);
-      return data;
+      return rows;
     })
     .catch((err) => {
       bucket.promise = null;
+      if (!isNonEmptyList(bucket.data)) {
+        bucket.data = null;
+        bucket.at = 0;
+      }
       memory.cities.set(key, bucket);
       throw err;
     });
@@ -127,7 +161,7 @@ export async function fetchCitiesForCountryCached(countryId, fetcher, options = 
 
 export async function fetchVehicleTypesCached(fetcher, { force = false } = {}) {
   const bucket = memory.vehicleTypes;
-  if (!force && bucket.data && isFresh(bucket.at, VEHICLE_TYPES_TTL_MS)) {
+  if (!force && isNonEmptyList(bucket.data) && isFresh(bucket.at, VEHICLE_TYPES_TTL_MS)) {
     return bucket.data;
   }
   if (bucket.promise) {
@@ -136,13 +170,18 @@ export async function fetchVehicleTypesCached(fetcher, { force = false } = {}) {
 
   bucket.promise = fetcher()
     .then((data) => {
-      bucket.data = data;
-      bucket.at = Date.now();
+      const rows = Array.isArray(data) ? data : [];
+      bucket.data = rows;
+      bucket.at = isNonEmptyList(rows) ? Date.now() : 0;
       bucket.promise = null;
-      return data;
+      return rows;
     })
     .catch((err) => {
       bucket.promise = null;
+      if (!isNonEmptyList(bucket.data)) {
+        bucket.data = null;
+        bucket.at = 0;
+      }
       throw err;
     });
 
@@ -152,7 +191,7 @@ export async function fetchVehicleTypesCached(fetcher, { force = false } = {}) {
 function createSimpleBucketFetcher(bucketName, ttl) {
   return async function fetchCached(fetcher, { force = false } = {}) {
     const bucket = memory[bucketName];
-    if (!force && bucket.data && isFresh(bucket.at, ttl)) {
+    if (!force && isNonEmptyList(bucket.data) && isFresh(bucket.at, ttl)) {
       return bucket.data;
     }
     if (bucket.promise) {
@@ -161,13 +200,18 @@ function createSimpleBucketFetcher(bucketName, ttl) {
 
     bucket.promise = fetcher()
       .then((data) => {
-        bucket.data = data;
-        bucket.at = Date.now();
+        const rows = Array.isArray(data) ? data : [];
+        bucket.data = rows;
+        bucket.at = isNonEmptyList(rows) ? Date.now() : 0;
         bucket.promise = null;
-        return data;
+        return rows;
       })
       .catch((err) => {
         bucket.promise = null;
+        if (!isNonEmptyList(bucket.data)) {
+          bucket.data = null;
+          bucket.at = 0;
+        }
         throw err;
       });
 

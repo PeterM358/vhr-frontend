@@ -39,6 +39,7 @@ import { stackContentPaddingTop } from '../navigation/stackContentInset';
 import FloatingCard from '../components/ui/FloatingCard';
 import DayBookingsPopup from '../components/shop/DayBookingsPopup';
 import { COLORS } from '../constants/colors';
+import { useTranslation } from '../i18n';
 
 const TIME_SLOTS = [
   '08:00',
@@ -51,24 +52,6 @@ const TIME_SLOTS = [
   '15:00',
   '16:00',
   '17:00',
-];
-
-const BRING_QUICK_OFFSETS = [
-  { label: 'Today', days: 0 },
-  { label: 'Tomorrow', days: 1 },
-  { label: '+2 days', days: 2 },
-  { label: '+3 days', days: 3 },
-  { label: '+1 week', days: 7 },
-  { label: '+2 weeks', days: 14 },
-];
-
-const PICKUP_DAY_OFFSETS_FROM_BRING = [
-  { label: 'Same day', days: 0 },
-  { label: '+1 day', days: 1 },
-  { label: '+2 days', days: 2 },
-  { label: '+3 days', days: 3 },
-  { label: '+1 week', days: 7 },
-  { label: '+2 weeks', days: 14 },
 ];
 
 /** Local UI only — not submitted to API. */
@@ -89,25 +72,27 @@ function formatEstimateAmount(n) {
   return String(Math.round(n * 100) / 100);
 }
 
-function validatePricingInputs(laborFrom, laborTo, partsFrom, partsTo, total) {
+function validatePricingInputs(laborFrom, laborTo, partsFrom, partsTo, total, translate) {
   const lf = String(laborFrom ?? '').trim();
   const pf = String(partsFrom ?? '').trim();
   const totalStr = String(total ?? '').trim();
-  if (!lf) return 'Enter labor from/exact amount.';
-  if (!pf) return 'Enter parts from/exact amount.';
-  if (!totalStr) return 'Enter quoted total.';
+  if (!lf) return translate('partnerDashboard.createOffer.enterLaborFrom');
+  if (!pf) return translate('partnerDashboard.createOffer.enterPartsFrom');
+  if (!totalStr) return translate('partnerDashboard.createOffer.enterQuotedTotal');
   if (parseEstimateNumber(lf) < 0 || parseEstimateNumber(pf) < 0) {
-    return 'Amounts cannot be negative.';
+    return translate('partnerDashboard.createOffer.amountsNegative');
   }
   const lt = String(laborTo ?? '').trim();
   const pt = String(partsTo ?? '').trim();
   if (lt && parseEstimateNumber(lt) < parseEstimateNumber(lf)) {
-    return 'Labor To must be at least Labor from/exact.';
+    return translate('partnerDashboard.createOffer.laborToMin');
   }
   if (pt && parseEstimateNumber(pt) < parseEstimateNumber(pf)) {
-    return 'Parts To must be at least Parts from/exact.';
+    return translate('partnerDashboard.createOffer.partsToMin');
   }
-  if (!Number.isFinite(parseFloat(totalStr))) return 'Enter a valid quoted total.';
+  if (!Number.isFinite(parseFloat(totalStr))) {
+    return translate('partnerDashboard.createOffer.enterValidQuotedTotal');
+  }
   return null;
 }
 
@@ -200,8 +185,8 @@ function formatPayloadDateTime(d) {
 }
 
 /** Card row: Mon 12.05.2026, 08:00 */
-function formatDisplayDateTimeComma(d) {
-  if (!d || Number.isNaN(d.getTime())) return 'Tap to set';
+function formatDisplayDateTimeComma(d, tapToSetLabel) {
+  if (!d || Number.isNaN(d.getTime())) return tapToSetLabel;
   const dd = d.getDate().toString().padStart(2, '0');
   const mm = (d.getMonth() + 1).toString().padStart(2, '0');
   const yyyy = d.getFullYear();
@@ -210,9 +195,9 @@ function formatDisplayDateTimeComma(d) {
   return `${weekday} ${dd}.${mm}.${yyyy}, ${hm}`;
 }
 
-function formatBigDatePreview(d) {
+function formatBigDatePreview(d, pickADateLabel) {
   if (!d || Number.isNaN(d.getTime())) {
-    return { dayName: '—', dateLine: 'Pick a date', timeLine: '—' };
+    return { dayName: '—', dateLine: pickADateLabel, timeLine: '—' };
   }
   return {
     dayName: d.toLocaleDateString(undefined, { weekday: 'long' }),
@@ -314,6 +299,7 @@ function pickupFromBringShortcut(bring, key) {
 }
 
 export default function CreateOrUpdateOfferScreen({ route, navigation }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { existingOffer, selectedOfferParts = [], shopId: routeShopId } = route.params || {};
   const [repairId, setRepairId] = useState(route.params?.repairId || existingOffer?.repair || null);
@@ -352,12 +338,41 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
 
   const isWeb = Platform.OS === 'web';
 
+  const bringQuickOffsets = useMemo(
+    () => [
+      { label: t('partnerDashboard.createOffer.quickToday'), days: 0 },
+      { label: t('partnerDashboard.createOffer.quickTomorrow'), days: 1 },
+      { label: t('partnerDashboard.createOffer.quickPlus2Days'), days: 2 },
+      { label: t('partnerDashboard.createOffer.quickPlus3Days'), days: 3 },
+      { label: t('partnerDashboard.createOffer.quickPlus1Week'), days: 7 },
+      { label: t('partnerDashboard.createOffer.quickPlus2Weeks'), days: 14 },
+    ],
+    [t]
+  );
+
+  const pickupDayOffsetsFromBring = useMemo(
+    () => [
+      { label: t('partnerDashboard.createOffer.pickupSameDay'), days: 0 },
+      { label: t('partnerDashboard.createOffer.pickupPlus1Day'), days: 1 },
+      { label: t('partnerDashboard.createOffer.pickupPlus2Days'), days: 2 },
+      { label: t('partnerDashboard.createOffer.pickupPlus3Days'), days: 3 },
+      { label: t('partnerDashboard.createOffer.pickupPlus1Week'), days: 7 },
+      { label: t('partnerDashboard.createOffer.pickupPlus2Weeks'), days: 14 },
+    ],
+    [t]
+  );
+
+  const tapToSetLabel = t('partnerDashboard.createOffer.tapToSet');
+  const pickADateLabel = t('partnerDashboard.createOffer.pickADate');
+
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTitle: existingOffer ? 'Update proposal' : 'Send proposal',
+      headerTitle: existingOffer
+        ? t('partnerDashboard.actions.updateProposal')
+        : t('partnerDashboard.actions.sendProposal'),
       headerBackTitleVisible: true,
     });
-  }, [navigation, existingOffer]);
+  }, [navigation, existingOffer, t]);
 
   const syncTotalFromEstimates = useCallback((nextLaborFrom, nextPartsFrom) => {
     if (priceManuallyEditedRef.current) return;
@@ -475,13 +490,14 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
     setAndroidPickerVisible(false);
     setAndroidPickerContext(null);
     setAndroidPhase('date');
+    setDayBookingsPopupDate(null);
   };
 
   const openBringPicker = () => {
     const initial = bringAt || defaultDateAtHour(10, 0);
     setWorkingDate(new Date(initial.getTime()));
     const offset = dayOffsetFromToday(initial);
-    const matchesQuick = BRING_QUICK_OFFSETS.some((opt) => opt.days === offset);
+    const matchesQuick = bringQuickOffsets.some((opt) => opt.days === offset);
     setBringCustomDateActive(Boolean(bringAt) && !matchesQuick);
     setWebCustomBringDateStr('');
     setPickerTarget('bring');
@@ -495,7 +511,10 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
 
   const openPickupPicker = () => {
     if (!bringAt || Number.isNaN(bringAt.getTime())) {
-      Alert.alert('Bring time required', 'Set bring vehicle date and time first.');
+      Alert.alert(
+        t('partnerDashboard.createOffer.bringTimeRequiredTitle'),
+        t('partnerDashboard.createOffer.bringTimeRequiredBody')
+      );
       return;
     }
     const initial =
@@ -504,7 +523,7 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         : pickupFromBringShortcut(bringAt, 'plus4h') || new Date(bringAt.getTime() + 4 * 3600000);
     setWorkingDate(new Date(initial.getTime()));
     const offset = dayOffsetFromAnchor(bringAt, initial);
-    const matchesQuick = PICKUP_DAY_OFFSETS_FROM_BRING.some((opt) => opt.days === offset);
+    const matchesQuick = pickupDayOffsetsFromBring.some((opt) => opt.days === offset);
     setPickupCustomDateActive(Boolean(pickupAt) && !matchesQuick);
     setBringCustomDateActive(false);
     setWebCustomBringDateStr('');
@@ -590,7 +609,10 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
       const next = new Date(workingDate);
       next.setHours(date.getHours(), date.getMinutes(), 0, 0);
       if (next.getTime() <= bringAt.getTime()) {
-        Alert.alert('Invalid times', 'Pickup/ready time must be after bring time.');
+        Alert.alert(
+          t('partnerDashboard.createOffer.invalidTimesTitle'),
+          t('partnerDashboard.createOffer.pickupAfterBringBody')
+        );
         setAndroidPickerVisible(false);
         setAndroidPickerContext(null);
         setAndroidPhase('date');
@@ -640,7 +662,10 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
   const applyWebCustomBringDate = () => {
     const parsed = parseDdMmYyyy(webCustomBringDateStr);
     if (!parsed) {
-      Alert.alert('Invalid date', 'Use DD.MM.YYYY (example: 12.05.2026).');
+      Alert.alert(
+        t('partnerDashboard.createOffer.invalidDateTitle'),
+        t('partnerDashboard.createOffer.invalidDateBody')
+      );
       return false;
     }
     setWorkingDate(mergeDateWithTimeOf(parsed, workingDate));
@@ -664,14 +689,20 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
     if (isWeb && pickupCustomDateActive) {
       const parsed = parseDdMmYyyy(webCustomBringDateStr);
       if (!parsed) {
-        Alert.alert('Invalid date', 'Use DD.MM.YYYY (example: 12.05.2026).');
+        Alert.alert(
+        t('partnerDashboard.createOffer.invalidDateTitle'),
+        t('partnerDashboard.createOffer.invalidDateBody')
+      );
         return;
       }
       next = mergeDateWithTimeOf(parsed, workingDate);
       setPickupCustomDateActive(false);
     }
     if (next.getTime() <= bringAt.getTime()) {
-      Alert.alert('Invalid times', 'Pickup/ready time must be after bring time.');
+      Alert.alert(
+        t('partnerDashboard.createOffer.invalidTimesTitle'),
+        t('partnerDashboard.createOffer.pickupAfterBringBody')
+      );
       return;
     }
     commitPickup(next);
@@ -682,7 +713,10 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
     if (isWeb && bringCustomDateActive) {
       const parsed = parseDdMmYyyy(webCustomBringDateStr);
       if (!parsed) {
-        Alert.alert('Invalid date', 'Use DD.MM.YYYY (example: 12.05.2026).');
+        Alert.alert(
+        t('partnerDashboard.createOffer.invalidDateTitle'),
+        t('partnerDashboard.createOffer.invalidDateBody')
+      );
         return;
       }
       next = mergeDateWithTimeOf(parsed, workingDate);
@@ -797,29 +831,35 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
 
   const draftSourceLabel =
     offerDraft?.source === 'history'
-      ? 'Prior job on this vehicle'
+      ? t('partnerDashboard.createOffer.draftSourceHistory')
       : offerDraft?.source === 'offer'
-        ? 'Your last offer for this service'
-      : offerDraft?.source === 'menu'
-        ? 'Published price list'
-        : offerDraft?.source === 'manual'
-          ? 'No automatic suggestion'
-          : null;
+        ? t('partnerDashboard.createOffer.draftSourceOffer')
+        : offerDraft?.source === 'menu'
+          ? t('partnerDashboard.createOffer.draftSourceMenu')
+          : offerDraft?.source === 'manual'
+            ? t('partnerDashboard.createOffer.draftSourceManual')
+            : null;
 
   const handleSubmit = async () => {
     if (!repairId) {
-      Alert.alert('Missing Info', 'Repair ID is missing. Please reopen this offer from repair details.');
+      Alert.alert(
+        t('partnerDashboard.createOffer.missingInfoTitle'),
+        t('partnerDashboard.createOffer.missingRepairIdBody')
+      );
       return;
     }
 
     if (bringAt && pickupAt && pickupAt.getTime() <= bringAt.getTime()) {
-      Alert.alert('Invalid times', 'Pickup/ready time must be after bring time.');
+      Alert.alert(
+        t('partnerDashboard.createOffer.invalidTimesTitle'),
+        t('partnerDashboard.createOffer.pickupAfterBringBody')
+      );
       return;
     }
 
-    const pricingError = validatePricingInputs(laborFrom, laborTo, partsFrom, partsTo, price);
+    const pricingError = validatePricingInputs(laborFrom, laborTo, partsFrom, partsTo, price, t);
     if (pricingError) {
-      Alert.alert('Pricing required', pricingError);
+      Alert.alert(t('partnerDashboard.createOffer.pricingRequiredTitle'), pricingError);
       return;
     }
 
@@ -857,10 +897,16 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
 
       if (existingOffer?.id) {
         await updateOffer(token, existingOffer.id, payload);
-        Alert.alert('Success', 'Offer updated');
+        Alert.alert(
+          t('partnerDashboard.createOffer.successTitle'),
+          t('partnerDashboard.createOffer.offerUpdated')
+        );
       } else {
         await createOffer(token, payload);
-        Alert.alert('Success', 'Offer created');
+        Alert.alert(
+          t('partnerDashboard.createOffer.successTitle'),
+          t('partnerDashboard.createOffer.offerCreated')
+        );
       }
 
       if (navigation.canGoBack()) {
@@ -874,7 +920,10 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
       navigation.navigate('Home');
     } catch (err) {
       console.error(err);
-      Alert.alert('Error', err.message || 'Failed to send offer');
+      Alert.alert(
+        t('common.error'),
+        err.message || t('partnerDashboard.createOffer.failedToSend')
+      );
     }
   };
 
@@ -889,7 +938,7 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
   };
 
   const renderDateTimeHero = (showLoad = false) => {
-    const preview = formatBigDatePreview(workingDate);
+    const preview = formatBigDatePreview(workingDate, pickADateLabel);
     const canPeek = showLoad && selectedDayLoad.booked > 0;
     return (
       <View style={styles.dateHero}>
@@ -919,9 +968,10 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
                 selectedDayLoad.level === 'busy' && styles.dayLoadHeroBusy,
               ]}
             >
-              {selectedDayLoad.peekLine || `${selectedDayLoad.booked} booked`}
+              {selectedDayLoad.peekLine ||
+                t('partnerDashboard.createOffer.bookedCount', { count: selectedDayLoad.booked })}
             </Text>
-            <Text style={styles.dayLoadPeekHint}>Tap to see bookings</Text>
+            <Text style={styles.dayLoadPeekHint}>{t('partnerDashboard.createOffer.tapToSeeBookings')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -938,8 +988,9 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
     const chipHint = formatDayLoadChipHint(booked, bookings, laborRow);
     const selected = !bringCustomDateActive && dayOffsetFromToday(workingDate) === opt.days;
     return (
-      <View
+      <Pressable
         key={opt.label}
+        onPress={() => applyBringOffsetDays(opt.days)}
         style={[
           styles.timeChip,
           styles.dayLoadChip,
@@ -948,14 +999,15 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
           selected && level === 'full' && styles.timeChipSelectedFull,
         ]}
       >
-        <Pressable onPress={() => applyBringOffsetDays(opt.days)} style={styles.dayLoadChipMain}>
-          <Text style={[styles.timeChipText, selected && styles.timeChipTextSelected]}>
-            {opt.label}
-          </Text>
-        </Pressable>
+        <Text style={[styles.timeChipText, selected && styles.timeChipTextSelected]}>
+          {opt.label}
+        </Text>
         {chipHint ? (
           <Pressable
-            onPress={() => openDayBookingsPopup(chipDate)}
+            onPress={(event) => {
+              event?.stopPropagation?.();
+              openDayBookingsPopup(chipDate);
+            }}
             hitSlop={6}
             style={styles.dayLoadChipPeek}
           >
@@ -970,7 +1022,7 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
             </Text>
           </Pressable>
         ) : null}
-      </View>
+      </Pressable>
     );
   };
 
@@ -1004,7 +1056,7 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
                     selected && styles.timeChipBookedSubSelected,
                   ]}
                 >
-                  booked
+                  {t('partnerDashboard.createOffer.timeSlotBooked')}
                 </Text>
               ) : null}
             </Pressable>
@@ -1017,9 +1069,9 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
   const renderBringModalBody = () => (
     <>
       {renderDateTimeHero(true)}
-      <Text style={styles.modalSubtitle}>Date</Text>
+      <Text style={styles.modalSubtitle}>{t('partnerDashboard.createOffer.date')}</Text>
       <View style={styles.chipRowWrap}>
-        {BRING_QUICK_OFFSETS.map((opt) => renderBringDayChip(opt))}
+        {bringQuickOffsets.map((opt) => renderBringDayChip(opt))}
         <Pressable
           onPress={() => {
             if (Platform.OS === 'ios') {
@@ -1038,7 +1090,7 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
           style={[styles.timeChip, bringCustomDateActive && styles.timeChipSelected]}
         >
           <Text style={[styles.timeChipText, bringCustomDateActive && styles.timeChipTextSelected]}>
-            Custom date
+            {t('partnerDashboard.createOffer.customDate')}
           </Text>
         </Pressable>
       </View>
@@ -1052,21 +1104,21 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
       ) : null}
       {isWeb && bringCustomDateActive ? (
         <View style={styles.webCustomDateBlock}>
-          <Text style={styles.helperMuted}>Custom date (DD.MM.YYYY)</Text>
+          <Text style={styles.helperMuted}>{t('partnerDashboard.createOffer.customDateFormat')}</Text>
           <TextInput
             mode="outlined"
             dense
             value={webCustomBringDateStr}
             onChangeText={setWebCustomBringDateStr}
-            placeholder="12.05.2026"
+            placeholder={t('partnerDashboard.createOffer.customDatePlaceholder')}
             style={styles.webCustomInput}
           />
           <Button mode="outlined" compact onPress={applyWebCustomBringDate}>
-            Apply custom date
+            {t('partnerDashboard.createOffer.applyCustomDate')}
           </Button>
         </View>
       ) : null}
-      <Text style={styles.modalSubtitle}>Time</Text>
+      <Text style={styles.modalSubtitle}>{t('partnerDashboard.createOffer.time')}</Text>
       {renderTimeSlotChips(true)}
     </>
   );
@@ -1074,9 +1126,9 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
   const renderPickupModalBody = () => (
     <>
       {renderDateTimeHero()}
-      <Text style={styles.modalSubtitle}>Ready date (after bring day)</Text>
+      <Text style={styles.modalSubtitle}>{t('partnerDashboard.createOffer.readyDateAfterBring')}</Text>
       <View style={styles.chipRowWrap}>
-        {PICKUP_DAY_OFFSETS_FROM_BRING.map((opt) => {
+        {pickupDayOffsetsFromBring.map((opt) => {
           const selected =
             !pickupCustomDateActive && dayOffsetFromAnchor(bringAt, workingDate) === opt.days;
           return (
@@ -1109,7 +1161,7 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
           style={[styles.timeChip, pickupCustomDateActive && styles.timeChipSelected]}
         >
           <Text style={[styles.timeChipText, pickupCustomDateActive && styles.timeChipTextSelected]}>
-            Custom date
+            {t('partnerDashboard.createOffer.customDate')}
           </Text>
         </Pressable>
       </View>
@@ -1124,27 +1176,29 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
       ) : null}
       {isWeb && pickupCustomDateActive ? (
         <View style={styles.webCustomDateBlock}>
-          <Text style={styles.helperMuted}>Custom date (DD.MM.YYYY)</Text>
+          <Text style={styles.helperMuted}>{t('partnerDashboard.createOffer.customDateFormat')}</Text>
           <TextInput
             mode="outlined"
             dense
             value={webCustomBringDateStr}
             onChangeText={setWebCustomBringDateStr}
-            placeholder="12.05.2026"
+            placeholder={t('partnerDashboard.createOffer.customDatePlaceholder')}
             style={styles.webCustomInput}
           />
           <Button mode="outlined" compact onPress={applyWebCustomBringDate}>
-            Apply custom date
+            {t('partnerDashboard.createOffer.applyCustomDate')}
           </Button>
         </View>
       ) : null}
-      <Text style={styles.modalSubtitle}>Time</Text>
+      <Text style={styles.modalSubtitle}>{t('partnerDashboard.createOffer.time')}</Text>
       {renderTimeSlotChips()}
     </>
   );
 
   const modalTitle =
-    pickerTarget === 'bring' ? 'Bring vehicle' : 'Pickup / ready';
+    pickerTarget === 'bring'
+      ? t('partnerDashboard.createOffer.bringVehicle')
+      : t('partnerDashboard.createOffer.pickupReady');
 
   const fromSumAmount = computeFromSum(laborFrom, partsFrom);
   const toSumAmount = computeToSum(laborFrom, laborTo, partsFrom, partsTo);
@@ -1164,36 +1218,42 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         styles.container,
         { paddingTop: stackContentPaddingTop(insets, 4), paddingBottom: Math.max(insets.bottom, 16) },
       ]}>
-        <Text style={styles.pageIntro}>Send a service proposal to the client.</Text>
+        <Text style={styles.pageIntro}>{t('partnerDashboard.createOffer.pageIntro')}</Text>
 
         {offerDraft && !draftDismissed && !existingOffer ? (
           <FloatingCard style={styles.formCard}>
-            <Text style={styles.sectionTitle}>Suggested pricing</Text>
+            <Text style={styles.sectionTitle}>{t('partnerDashboard.createOffer.suggestedPricing')}</Text>
             <Text style={styles.helperText}>
-              Source: {draftSourceLabel}
-              {offerDraft.notes ? ` — ${offerDraft.notes}` : ''}
+              {t('partnerDashboard.createOffer.sourceLabel', {
+                source: draftSourceLabel,
+                notes: offerDraft.notes
+                  ? t('partnerDashboard.createOffer.sourceNotesSeparator', { notes: offerDraft.notes })
+                  : '',
+              })}
             </Text>
             {offerDraft.suggested_price != null ? (
               <Text style={styles.helperText}>
-                Suggested total: {formatMoneyAmount(offerDraft.suggested_price)}
+                {t('partnerDashboard.createOffer.suggestedTotal', {
+                  amount: formatMoneyAmount(offerDraft.suggested_price),
+                })}
               </Text>
             ) : null}
             <View style={styles.draftActions}>
               <Button mode="contained" onPress={applyOfferDraft} style={styles.draftBtn}>
-                Use suggestion
+                {t('partnerDashboard.createOffer.useSuggestion')}
               </Button>
               <Button mode="text" onPress={() => setDraftDismissed(true)}>
-                Dismiss
+                {t('partnerDashboard.createOffer.dismiss')}
               </Button>
             </View>
           </FloatingCard>
         ) : null}
 
         <FloatingCard style={styles.formCard}>
-          <Text style={styles.sectionTitle}>Repair notes</Text>
+          <Text style={styles.sectionTitle}>{t('partnerDashboard.createOffer.repairNotes')}</Text>
           <TextInput
             mode="outlined"
-            label="Description"
+            label={t('partnerDashboard.createOffer.description')}
             value={description}
             onChangeText={setDescription}
             multiline
@@ -1202,19 +1262,19 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         </FloatingCard>
 
         <FloatingCard style={styles.formCard}>
-          <Text style={styles.sectionTitle}>Estimated pricing ({DEFAULT_CURRENCY})</Text>
-          <Text style={styles.helperText}>
-            From/exact is required. To is optional for a range. Total is saved separately from the from sum.
+          <Text style={styles.sectionTitle}>
+            {t('partnerDashboard.createOffer.estimatedPricing', { currency: DEFAULT_CURRENCY })}
           </Text>
-          <Text style={styles.fieldGroupLabel}>Labor</Text>
+          <Text style={styles.helperText}>{t('partnerDashboard.createOffer.pricingHelper')}</Text>
+          <Text style={styles.fieldGroupLabel}>{t('partnerDashboard.createOffer.labor')}</Text>
           <View style={styles.rangeRow}>
             <TextInput
               mode="outlined"
-              label="From/exact"
+              label={t('partnerDashboard.createOffer.fromExact')}
               value={laborFrom}
-              onChangeText={(t) => {
-                setLaborFrom(t);
-                syncTotalFromEstimates(t, partsFrom);
+              onChangeText={(value) => {
+                setLaborFrom(value);
+                syncTotalFromEstimates(value, partsFrom);
               }}
               keyboardType="decimal-pad"
               placeholder="10"
@@ -1223,7 +1283,7 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
             />
             <TextInput
               mode="outlined"
-              label="To (optional)"
+              label={t('partnerDashboard.createOffer.toOptional')}
               value={laborTo}
               onChangeText={setLaborTo}
               keyboardType="decimal-pad"
@@ -1232,15 +1292,15 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
               style={styles.rangeInput}
             />
           </View>
-          <Text style={styles.fieldGroupLabel}>Parts</Text>
+          <Text style={styles.fieldGroupLabel}>{t('partnerDashboard.createOffer.parts')}</Text>
           <View style={styles.rangeRow}>
             <TextInput
               mode="outlined"
-              label="From/exact"
+              label={t('partnerDashboard.createOffer.fromExact')}
               value={partsFrom}
-              onChangeText={(t) => {
-                setPartsFrom(t);
-                syncTotalFromEstimates(laborFrom, t);
+              onChangeText={(value) => {
+                setPartsFrom(value);
+                syncTotalFromEstimates(laborFrom, value);
               }}
               keyboardType="decimal-pad"
               placeholder="50"
@@ -1249,7 +1309,7 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
             />
             <TextInput
               mode="outlined"
-              label="To (optional)"
+              label={t('partnerDashboard.createOffer.toOptional')}
               value={partsTo}
               onChangeText={setPartsTo}
               keyboardType="decimal-pad"
@@ -1260,37 +1320,38 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
           </View>
           {showFromSum ? (
             <Text style={styles.pricingSumLine}>
-              From sum: {formatMoneyAmount(fromSumAmount, DEFAULT_CURRENCY)}
+              {t('partnerDashboard.createOffer.fromSum', {
+                amount: formatMoneyAmount(fromSumAmount, DEFAULT_CURRENCY),
+              })}
             </Text>
           ) : null}
           {showToSum ? (
             <Text style={styles.pricingSumLine}>
-              To sum: {formatMoneyAmount(toSumAmount, DEFAULT_CURRENCY)}
+              {t('partnerDashboard.createOffer.toSum', {
+                amount: formatMoneyAmount(toSumAmount, DEFAULT_CURRENCY),
+              })}
             </Text>
           ) : null}
           <TextInput
             mode="outlined"
-            label="Quoted total"
+            label={t('partnerDashboard.createOffer.quotedTotal')}
             value={price}
-            onChangeText={(t) => {
+            onChangeText={(value) => {
               priceManuallyEditedRef.current = true;
-              setPrice(t);
+              setPrice(value);
             }}
             keyboardType="decimal-pad"
-            placeholder="e.g. 115"
+            placeholder={t('partnerDashboard.createOffer.quotedTotalPlaceholder')}
             right={<TextInput.Affix text="€" />}
             style={styles.input}
           />
-          <Text style={styles.helperText}>
-            From sum and to sum are saved on the offer. Quoted total is what the client books against.
-          </Text>
+          <Text style={styles.helperText}>{t('partnerDashboard.createOffer.quotedTotalHelper')}</Text>
         </FloatingCard>
 
         <FloatingCard style={styles.formCard}>
-          <Text style={styles.sectionTitle}>Availability</Text>
+          <Text style={styles.sectionTitle}>{t('partnerDashboard.createOffer.availability')}</Text>
           <Text style={[styles.helperText, { marginBottom: 12 }]}>
-            Tell the client when to bring the vehicle and when it may be ready. Day chips show bookings
-            and times already taken from your calendar.
+            {t('partnerDashboard.createOffer.availabilityHelper')}
           </Text>
 
           <Pressable
@@ -1299,7 +1360,11 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.selectorLine}>
-                Bring vehicle: {bringAt ? formatDisplayDateTimeComma(bringAt) : 'Tap to set'}
+                {t('partnerDashboard.createOffer.bringVehicleLine', {
+                  datetime: bringAt
+                    ? formatDisplayDateTimeComma(bringAt, tapToSetLabel)
+                    : tapToSetLabel,
+                })}
               </Text>
             </View>
             <Text style={styles.selectorChevron}>›</Text>
@@ -1311,7 +1376,11 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.selectorLine}>
-                Pickup / ready: {pickupAt ? formatDisplayDateTimeComma(pickupAt) : 'Tap to set'}
+                {t('partnerDashboard.createOffer.pickupReadyLine', {
+                  datetime: pickupAt
+                    ? formatDisplayDateTimeComma(pickupAt, tapToSetLabel)
+                    : tapToSetLabel,
+                })}
               </Text>
             </View>
             <Text style={styles.selectorChevron}>›</Text>
@@ -1319,53 +1388,63 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
 
           <TextInput
             mode="outlined"
-            label="Availability note (optional)"
+            label={t('partnerDashboard.createOffer.availabilityNoteOptional')}
             value={optionalAvailabilityNote}
             onChangeText={setOptionalAvailabilityNote}
-            placeholder="Any extra detail for the client"
+            placeholder={t('partnerDashboard.createOffer.availabilityNotePlaceholder')}
             multiline
             style={styles.input}
           />
 
           <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Phone call allowed</Text>
+            <Text style={styles.switchLabel}>{t('partnerDashboard.createOffer.phoneCallAllowed')}</Text>
             <Switch value={phoneCallAllowed} onValueChange={setPhoneCallAllowed} />
           </View>
-          <Text style={styles.helperText}>You can update the offer later.</Text>
+          <Text style={styles.helperText}>{t('partnerDashboard.createOffer.updateLaterHint')}</Text>
         </FloatingCard>
 
         <FloatingCard>
-          <Text style={styles.sectionTitle}>Estimated parts</Text>
-          <Text style={styles.helperText}>
-            Add parts if you already know what may be needed. Final parts can be updated during repair.
-          </Text>
+          <Text style={styles.sectionTitle}>{t('partnerDashboard.createOffer.estimatedParts')}</Text>
+          <Text style={styles.helperText}>{t('partnerDashboard.createOffer.estimatedPartsHelper')}</Text>
           <Button
             mode="outlined"
             icon="tools"
             onPress={navigateToSelectParts}
             style={styles.partsButton}
           >
-            Manage estimated parts
+            {t('partnerDashboard.createOffer.manageEstimatedParts')}
           </Button>
         </FloatingCard>
 
         <FloatingCard>
-          <Text style={styles.sectionTitle}>Selected estimated parts</Text>
+          <Text style={styles.sectionTitle}>{t('partnerDashboard.createOffer.selectedEstimatedParts')}</Text>
           {parts.length === 0 ? (
-            <Text style={styles.emptyText}>No estimated parts selected yet.</Text>
+            <Text style={styles.emptyText}>{t('partnerDashboard.createOffer.noEstimatedParts')}</Text>
           ) : (
             <View>
             {parts.map((part, index) => (
               <FloatingCard key={index} style={styles.partCard}>
-                <Text style={styles.partTitle}>{part.partsMaster?.name || 'Part'}</Text>
+                <Text style={styles.partTitle}>
+                  {part.partsMaster?.name || t('partnerDashboard.createOffer.partFallback')}
+                </Text>
                 {!!part.partsMaster?.part_number && (
-                  <Text style={styles.partMeta}>Part number: {part.partsMaster.part_number}</Text>
-                )}
-                  <Text style={styles.partMeta}>Qty: {part.quantity}</Text>
                   <Text style={styles.partMeta}>
-                    Estimated price: {formatMoneyAmount(part.price, DEFAULT_CURRENCY)}
+                    {t('partnerDashboard.createOffer.partNumber', {
+                      number: part.partsMaster.part_number,
+                    })}
                   </Text>
-                  {part.note && <Text>Note: {part.note}</Text>}
+                )}
+                  <Text style={styles.partMeta}>
+                    {t('partnerDashboard.createOffer.qty', { count: part.quantity })}
+                  </Text>
+                  <Text style={styles.partMeta}>
+                    {t('partnerDashboard.createOffer.estimatedPrice', {
+                      amount: formatMoneyAmount(part.price, DEFAULT_CURRENCY),
+                    })}
+                  </Text>
+                  {part.note ? (
+                    <Text>{t('partnerDashboard.createOffer.partNote', { note: part.note })}</Text>
+                  ) : null}
               </FloatingCard>
             ))}
             </View>
@@ -1377,7 +1456,9 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
           onPress={handleSubmit}
           style={styles.submitButton}
         >
-          {existingOffer ? 'Update proposal' : 'Send proposal'}
+          {existingOffer
+            ? t('partnerDashboard.actions.updateProposal')
+            : t('partnerDashboard.actions.sendProposal')}
         </Button>
       </ScrollView>
 
@@ -1387,35 +1468,46 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         visible={pickerModalVisible}
         onRequestClose={resetPickerUi}
       >
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdropFill} onPress={resetPickerUi} />
-          <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 16), maxHeight: '92%' }]}>
-            <Text style={styles.modalTitle}>{modalTitle}</Text>
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-              {pickerTarget === 'bring' ? renderBringModalBody() : renderPickupModalBody()}
-            </ScrollView>
-            {pickerTarget === 'bring' && Platform.OS === 'android' ? (
-              <Button mode="outlined" onPress={startAndroidBringFullPicker} style={{ marginTop: 8 }}>
-                Custom date & time (system picker)
-              </Button>
-            ) : null}
-            {pickerTarget === 'pickup' && Platform.OS === 'android' ? (
-              <Button mode="outlined" onPress={startAndroidPickupFullPicker} style={{ marginTop: 8 }}>
-                Custom date & time (system picker)
-              </Button>
-            ) : null}
-            <View style={styles.modalActions}>
-              <Button onPress={resetPickerUi}>Cancel</Button>
-              <Button
-                mode="contained"
-                style={styles.modalDoneButton}
-                onPress={pickerTarget === 'bring' ? confirmBringModalDone : confirmPickupModalDone}
+        <Pressable style={styles.modalBackdrop} onPress={resetPickerUi}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.modalKeyboardWrap}
+          >
+            <Pressable
+              style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 16), maxHeight: '92%' }]}
+              onPress={(event) => event.stopPropagation()}
+            >
+              <Text style={styles.modalTitle}>{modalTitle}</Text>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
               >
-                Done
-              </Button>
-            </View>
-          </View>
-        </View>
+                {pickerTarget === 'bring' ? renderBringModalBody() : renderPickupModalBody()}
+              </ScrollView>
+              {pickerTarget === 'bring' && Platform.OS === 'android' ? (
+                <Button mode="outlined" onPress={startAndroidBringFullPicker} style={{ marginTop: 8 }}>
+                  {t('partnerDashboard.createOffer.customDateTimeSystemPicker')}
+                </Button>
+              ) : null}
+              {pickerTarget === 'pickup' && Platform.OS === 'android' ? (
+                <Button mode="outlined" onPress={startAndroidPickupFullPicker} style={{ marginTop: 8 }}>
+                  {t('partnerDashboard.createOffer.customDateTimeSystemPicker')}
+                </Button>
+              ) : null}
+              <View style={styles.modalActions}>
+                <Button onPress={resetPickerUi}>{t('common.cancel')}</Button>
+                <Button
+                  mode="contained"
+                  style={styles.modalDoneButton}
+                  onPress={pickerTarget === 'bring' ? confirmBringModalDone : confirmPickupModalDone}
+                >
+                  {t('partnerDashboard.createOffer.done')}
+                </Button>
+              </View>
+            </Pressable>
+          </KeyboardAvoidingView>
+        </Pressable>
       </Modal>
 
       {Platform.OS === 'android' && androidPickerVisible ? (
@@ -1525,13 +1617,14 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_MUTED,
     marginLeft: 8,
   },
-  modalRoot: {
+  modalBackdrop: {
     flex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
-  modalBackdropFill: {
-    ...StyleSheet.absoluteFillObject,
+  modalKeyboardWrap: {
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   modalSheet: {
     backgroundColor: '#fff',
@@ -1638,10 +1731,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.TEXT_MUTED,
     textAlign: 'center',
-  },
-  dayLoadChipMain: {
-    alignItems: 'center',
-    width: '100%',
   },
   dayLoadChipPeek: {
     marginTop: 2,

@@ -9,26 +9,47 @@ import {
   summarizeBookingsByService,
   summarizeBookingsByVehicleType,
 } from '../../utils/shopDayLoad';
+import { useTranslation } from '../../i18n';
 
 export default function DayBookingsPopup({ visible, dateLabel, bookings = [], onClose }) {
+  const { t } = useTranslation();
   const vehicleSummary = summarizeBookingsByVehicleType(bookings);
   const serviceSummary = summarizeBookingsByService(bookings);
-  const bookingCountLabel = bookings.length === 1 ? '1 booking' : `${bookings.length} bookings`;
+  const bookingCountLabel =
+    bookings.length === 1
+      ? t('partnerDashboard.createOffer.dayBookingsPopup.bookingCountOne')
+      : t('partnerDashboard.createOffer.dayBookingsPopup.bookingCountMany', {
+          count: bookings.length,
+        });
+  const notSelected = t('partnerDashboard.createOffer.dayBookingsPopup.notSelected');
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <View style={styles.root}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.sheet}>
-          <Text style={styles.title}>Bookings this day</Text>
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
+          <Text style={styles.title}>{t('partnerDashboard.createOffer.dayBookingsPopup.title')}</Text>
           {dateLabel ? <Text style={styles.dateLine}>{dateLabel}</Text> : null}
           <Text style={styles.summaryLine}>{bookingCountLabel}</Text>
-          {vehicleSummary ? <Text style={styles.summarySubline}>Vehicle mix: {vehicleSummary}</Text> : null}
-          {serviceSummary ? <Text style={styles.summarySubline}>Repair mix: {serviceSummary}</Text> : null}
+          {vehicleSummary ? (
+            <Text style={styles.summarySubline}>
+              {t('partnerDashboard.createOffer.dayBookingsPopup.vehicleMix', {
+                summary: vehicleSummary,
+              })}
+            </Text>
+          ) : null}
+          {serviceSummary ? (
+            <Text style={styles.summarySubline}>
+              {t('partnerDashboard.createOffer.dayBookingsPopup.repairMix', {
+                summary: serviceSummary,
+              })}
+            </Text>
+          ) : null}
 
-          <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
+          <ScrollView style={styles.list} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
             {bookings.length === 0 ? (
-              <Text style={styles.emptyText}>No bookings for this day.</Text>
+              <Text style={styles.emptyText}>
+                {t('partnerDashboard.createOffer.dayBookingsPopup.empty')}
+              </Text>
             ) : (
               bookings.map((item) => (
                 <View key={String(item.id)} style={styles.row}>
@@ -38,9 +59,13 @@ export default function DayBookingsPopup({ visible, dateLabel, bookings = [], on
                       {formatCalendarVehicleLabel(item)}
                     </Text>
                     <Text style={styles.rowService}>
-                      {`Vehicle type - ${item.vehicle_type_name || 'not selected'}, repair type - ${String(formatRepairTypeLabel(item) || '').toLowerCase() || 'not selected'}`}
+                      {t('partnerDashboard.createOffer.dayBookingsPopup.vehicleTypeRepairType', {
+                        vehicleType: item.vehicle_type_name || notSelected,
+                        repairType:
+                          String(formatRepairTypeLabel(item) || '').toLowerCase() || notSelected,
+                      })}
                       {item.schedule_confirmed === false && item.is_pending_appointment
-                        ? ' · pending confirm'
+                        ? t('partnerDashboard.createOffer.dayBookingsPopup.pendingConfirm')
                         : ''}
                     </Text>
                     {item.vehicle_license_plate ? (
@@ -53,23 +78,20 @@ export default function DayBookingsPopup({ visible, dateLabel, bookings = [], on
           </ScrollView>
 
           <Button mode="contained" onPress={onClose} style={styles.closeBtn}>
-            Close
+            {t('partnerDashboard.createOffer.dayBookingsPopup.close')}
           </Button>
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
+  backdrop: {
     flex: 1,
     justifyContent: 'center',
     padding: 20,
     backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
   },
   sheet: {
     backgroundColor: '#fff',

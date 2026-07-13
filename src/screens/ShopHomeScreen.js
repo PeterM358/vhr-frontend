@@ -87,7 +87,7 @@ export default function ShopHomeScreen() {
   const navigation = useNavigation();
   const { t } = useTranslation();
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
-  const { notifications } = useContext(WebSocketContext);
+  const { notifications, unreadCount, refreshUnreadFromRest } = useContext(WebSocketContext);
 
   const [loading, setLoading] = useState(true);
   const [shopProfile, setShopProfile] = useState(null);
@@ -102,7 +102,6 @@ export default function ShopHomeScreen() {
   const [profileComplete, setProfileComplete] = useState(true);
   const [missingProfileFields, setMissingProfileFields] = useState([]);
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
   const lastRepairNotifIdRef = React.useRef(null);
 
   const openRepairs = dashboardRepairs;
@@ -250,7 +249,10 @@ export default function ShopHomeScreen() {
       loadDashboardRepairs();
       loadDashboardMetrics();
       loadUnscheduledBadge();
-    }, [refreshProfileGate, loadDashboardRepairs, loadDashboardMetrics])
+      if (typeof refreshUnreadFromRest === 'function') {
+        refreshUnreadFromRest();
+      }
+    }, [refreshProfileGate, loadDashboardRepairs, loadDashboardMetrics, refreshUnreadFromRest])
   );
 
   const handleRepairPress = (repairId) => {
@@ -465,16 +467,14 @@ export default function ShopHomeScreen() {
     <ScreenBackground safeArea={false}>
       <Appbar.Header style={{ backgroundColor: SHOP_TOP_BAR }}>
         <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color="#fff" />
-        {Platform.OS === 'web' ? (
-          <View style={styles.languageSelectorWrap}>
-            <CompactLanguageSelector
-              variant="dark"
-              compact
-              presentation="portalDropdown"
-              style={styles.languageSelector}
-            />
-          </View>
-        ) : null}
+        <View style={styles.languageSelectorWrap}>
+          <CompactLanguageSelector
+            variant="dark"
+            compact
+            presentation={Platform.OS === 'web' ? 'portalDropdown' : 'modal'}
+            style={styles.languageSelector}
+          />
+        </View>
         <Pressable
           onPress={() => openPartnerProfile(navigation, { requireSetup: !profileComplete })}
           style={styles.titlePressable}
@@ -510,7 +510,7 @@ export default function ShopHomeScreen() {
                 navigateToPartnerNotifications(navigation);
                 return;
               }
-              navigation.navigate('ShopNotificationsScreen');
+              navigation.navigate('NotificationsList');
             }}
             color="#fff"
           />

@@ -2,11 +2,16 @@
  * PATH: src/navigation/AppNavigator.js
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useContext } from 'react';
 import { Platform } from 'react-native';
 import { NavigationContainer, getPathFromState } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBackHeaderLeft } from '../components/navigation/BackHeaderButton';
+import { AuthContext } from '../context/AuthManager';
+import {
+  flushPendingNotificationNavigation,
+  setNotificationNavigationRef,
+} from '../notifications/notificationOpenRouting';
 
 import {
   LoginScreen,
@@ -49,6 +54,27 @@ import {
   ShopInvoicingScreen,
   ShopWarehouseReceiveScreen,
   ShopInvoiceDetailScreen,
+  ShopAnalyticsScreen,
+  ShopComplaintsScreen,
+  ShopDocumentImportsScreen,
+  ShopDocumentImportDetailScreen,
+  ShopWorkforceScreen,
+  ShopPurchaseOrdersScreen,
+  ShopPurchaseOrderDetailScreen,
+  ShopGoodsReceiptScreen,
+  ShopStorageLocationsScreen,
+  NetworkOrganizationScreen,
+  NetworkRolesScreen,
+  NetworkPartnersScreen,
+  NetworkInvitePartnerScreen,
+  NetworkIncomingOrdersScreen,
+  NetworkIncomingOrderDetailScreen,
+  NetworkProductMappingScreen,
+  NetworkPackagingScreen,
+  NetworkClaimsListScreen,
+  NetworkClaimCreateScreen,
+  NetworkClaimDetailScreen,
+  NetworkIncomingClaimsScreen,
   ClientProfileScreen,
   AddShopPartScreen,
   SelectRepairPartsScreen,
@@ -237,14 +263,28 @@ function getLinkingPrefixes() {
 export default function AppNavigator() {
   const linking = buildAppLinking(getLinkingPrefixes());
   const navigationRef = useRef(null);
+  const { isAuthenticated } = useContext(AuthContext);
 
   useEffect(() => {
     redirectLegacyWebUrl();
   }, []);
 
+  useEffect(() => {
+    setNotificationNavigationRef(navigationRef);
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      flushPendingNotificationNavigation(true);
+    }
+  }, [isAuthenticated]);
+
   const handleNavigationStateChange = () => {
     if (Platform.OS === 'web') {
       blurActiveElementOnWeb();
+    }
+    if (isAuthenticated) {
+      flushPendingNotificationNavigation(true);
     }
     if (Platform.OS !== 'web' || !navigationRef.current) {
       return;
@@ -266,13 +306,20 @@ export default function AppNavigator() {
     }
   };
 
+  const handleNavigationReady = () => {
+    handleNavigationStateChange();
+    if (isAuthenticated) {
+      flushPendingNotificationNavigation(true);
+    }
+  };
+
   return (
     <NavigationContainer
       ref={navigationRef}
       linking={linking}
       fallback={<NavigationFallback />}
       documentTitle={{ enabled: false }}
-      onReady={handleNavigationStateChange}
+      onReady={handleNavigationReady}
       onStateChange={handleNavigationStateChange}
     >
       <Stack.Navigator
@@ -396,17 +443,17 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ClientActivity"
           component={ClientActivityScreen}
-          options={{ headerShown: false, title: 'Notifications' }}
+          options={{ ...appNavBarScreenOptions, title: 'Notifications' }}
         />
         <Stack.Screen
           name="OffersScreen"
           component={ClientActivityScreen}
-          options={{ headerShown: false, title: 'Notifications' }}
+          options={{ ...appNavBarScreenOptions, title: 'Notifications' }}
         />
         <Stack.Screen
           name="ClientNotifications"
           component={ClientActivityScreen}
-          options={{ headerShown: false, title: 'Notifications' }}
+          options={{ ...appNavBarScreenOptions, title: 'Notifications' }}
         />
         <Stack.Screen
           name="ClientServiceHistory"
@@ -451,12 +498,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ShopNotificationsScreen"
           component={NotificationsWithAppbar}
-          options={{
-            ...transparentStackHeader,
-            title: 'Notifications',
-            headerBackTitle: 'Back',
-            headerBackTitleVisible: true,
-          }}
+          options={{ ...appNavBarScreenOptions, title: 'Notifications' }}
         />
         <Stack.Screen
           name="ShopProfile"
@@ -477,6 +519,111 @@ export default function AppNavigator() {
           name="ShopWarehouse"
           component={ShopWarehouseReceiveScreen}
           options={{ ...appNavBarScreenOptions, title: 'Warehouse' }}
+        />
+        <Stack.Screen
+          name="ShopAnalytics"
+          component={ShopAnalyticsScreen}
+          options={{ ...appNavBarScreenOptions, title: t('erp.analytics.title') }}
+        />
+        <Stack.Screen
+          name="ShopComplaints"
+          component={ShopComplaintsScreen}
+          options={{ ...appNavBarScreenOptions, title: t('erp.complaints.title') }}
+        />
+        <Stack.Screen
+          name="ShopDocumentImports"
+          component={ShopDocumentImportsScreen}
+          options={{ ...appNavBarScreenOptions, title: t('erp.documentImports.title') }}
+        />
+        <Stack.Screen
+          name="ShopDocumentImportDetail"
+          component={ShopDocumentImportDetailScreen}
+          options={{ ...appNavBarScreenOptions, title: t('erp.documentImports.detailTitle') }}
+        />
+        <Stack.Screen
+          name="ShopWorkforce"
+          component={ShopWorkforceScreen}
+          options={{ ...appNavBarScreenOptions, title: t('erp.workforce.title') }}
+        />
+        <Stack.Screen
+          name="ShopPurchaseOrders"
+          component={ShopPurchaseOrdersScreen}
+          options={{ ...appNavBarScreenOptions, title: t('erp.procurement.purchaseOrders') }}
+        />
+        <Stack.Screen
+          name="ShopPurchaseOrderDetail"
+          component={ShopPurchaseOrderDetailScreen}
+          options={{ ...appNavBarScreenOptions, title: t('erp.procurement.poDetail') }}
+        />
+        <Stack.Screen
+          name="ShopGoodsReceipt"
+          component={ShopGoodsReceiptScreen}
+          options={{ ...appNavBarScreenOptions, title: t('erp.procurement.goodsReceipt') }}
+        />
+        <Stack.Screen
+          name="ShopStorageLocations"
+          component={ShopStorageLocationsScreen}
+          options={{ ...appNavBarScreenOptions, title: t('erp.procurement.storageLocations') }}
+        />
+        <Stack.Screen
+          name="NetworkOrganization"
+          component={NetworkOrganizationScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.organization.title') }}
+        />
+        <Stack.Screen
+          name="NetworkRoles"
+          component={NetworkRolesScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.roles.title') }}
+        />
+        <Stack.Screen
+          name="NetworkPartners"
+          component={NetworkPartnersScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.partners.title') }}
+        />
+        <Stack.Screen
+          name="NetworkInvitePartner"
+          component={NetworkInvitePartnerScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.invite.title') }}
+        />
+        <Stack.Screen
+          name="NetworkIncomingOrders"
+          component={NetworkIncomingOrdersScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.incomingOrders.title') }}
+        />
+        <Stack.Screen
+          name="NetworkIncomingOrderDetail"
+          component={NetworkIncomingOrderDetailScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.incomingOrders.detailTitle') }}
+        />
+        <Stack.Screen
+          name="NetworkProductMapping"
+          component={NetworkProductMappingScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.mapping.title') }}
+        />
+        <Stack.Screen
+          name="NetworkPackaging"
+          component={NetworkPackagingScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.packaging.title') }}
+        />
+        <Stack.Screen
+          name="NetworkClaimsList"
+          component={NetworkClaimsListScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.claims.myClaims') }}
+        />
+        <Stack.Screen
+          name="NetworkClaimCreate"
+          component={NetworkClaimCreateScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.claims.create') }}
+        />
+        <Stack.Screen
+          name="NetworkClaimDetail"
+          component={NetworkClaimDetailScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.claims.detail') }}
+        />
+        <Stack.Screen
+          name="NetworkIncomingClaims"
+          component={NetworkIncomingClaimsScreen}
+          options={{ ...appNavBarScreenOptions, title: t('network.claims.incoming') }}
         />
         <Stack.Screen
           name="ShopInvoiceDetail"

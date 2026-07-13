@@ -2,11 +2,12 @@
  * PATH: src/navigation/ShopDrawer.js
  */
 
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useCallback } from 'react';
 import { View, Platform } from 'react-native';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Text } from 'react-native-paper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import ShopHomeScreen from '../screens/ShopHomeScreen';
 import ShopCalendarScreen from '../screens/ShopCalendarScreen';
@@ -20,6 +21,7 @@ import ShopWarehouseHubScreen from '../screens/ShopWarehouseHubScreen';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import { logout } from '../api/auth';
+import { getMyShopProfiles } from '../api/profiles';
 import { resetFromShopDrawer, resetShopDrawerRepairs, resetShopDrawerCalendar } from './drawerNavigation';
 import {
   navigateToPartnerClients,
@@ -31,8 +33,20 @@ import {
   navigateToPartnerServices,
   navigateToPartnerSwitchCenter,
   navigateToPartnerWarehouse,
+  navigateToPartnerAnalytics,
+  navigateToPartnerWorkforce,
+  navigateToPartnerDocumentImports,
+  navigateToPartnerComplaints,
+  navigateToPartnerPurchaseOrders,
+  navigateToPartnerStorageLocations,
 } from './webNavigation';
 import { readCachedUnscheduledCount } from '../utils/shopCalendarBadge';
+import {
+  canAccessPartnerRoute,
+  readShopMemberships,
+  shopMembershipFor,
+} from '../utils/shopErpAccess';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 import {
   DrawerMenuIcon,
   DrawerLabelWithBadge,
@@ -41,6 +55,7 @@ import {
   drawerMenuItemProps,
   drawerScreenOptions,
 } from './DrawerBranding';
+import CompactLanguageSelector from '../components/common/CompactLanguageSelector';
 import { useTranslation } from '../i18n';
 
 const Drawer = createDrawerNavigator();
@@ -48,10 +63,28 @@ const Drawer = createDrawerNavigator();
 function CustomDrawerContent(props) {
   const navigation = useNavigation();
   const { t } = useTranslation();
-  const { notifications } = useContext(WebSocketContext);
+  const { unreadCount } = useContext(WebSocketContext);
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
   const [unscheduledCount, setUnscheduledCount] = useState(0);
+  const [shopProfile, setShopProfile] = useState(null);
+  const [membership, setMembership] = useState(null);
+
+  const loadErpContext = useCallback(async () => {
+    try {
+      const [shopId, memberships, profiles] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID),
+        readShopMemberships(),
+        getMyShopProfiles(),
+      ]);
+      const profile =
+        profiles?.find((row) => String(row.id) === String(shopId)) || profiles?.[0] || null;
+      setShopProfile(profile);
+      setMembership(shopMembershipFor(memberships, profile?.id ?? shopId));
+    } catch {
+      setShopProfile(null);
+      setMembership(null);
+    }
+  }, []);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -60,10 +93,11 @@ function CustomDrawerContent(props) {
         const count = await readCachedUnscheduledCount();
         if (active) setUnscheduledCount(count);
       })();
+      loadErpContext();
       return () => {
         active = false;
       };
-    }, [])
+    }, [loadErpContext])
   );
 
   const handleLogout = async () => {
@@ -71,6 +105,25 @@ function CustomDrawerContent(props) {
   };
 
   const itemProps = drawerMenuItemProps;
+  const erpContext = { profile: shopProfile, membership };
+  const showWarehouse = canAccessPartnerRoute('ShopWarehouse', erpContext);
+  const showInvoicing = canAccessPartnerRoute('ShopInvoicing', erpContext);
+  const showAnalytics = canAccessPartnerRoute('ShopAnalytics', erpContext);
+  const showWorkforce = canAccessPartnerRoute('ShopWorkforce', erpContext);
+  const showDocumentImports = canAccessPartnerRoute('ShopDocumentImports', erpContext);
+  const showComplaints = canAccessPartnerRoute('ShopComplaints', erpContext);
+  const showPurchaseOrders = canAccessPartnerRoute('ShopPurchaseOrders', erpContext);
+  const showStorageLocations = canAccessPartnerRoute('ShopStorageLocations', erpContext);
+  const showBusinessNetwork = canAccessPartnerRoute('NetworkOrganization', erpContext);
+
+  const openStackRoute = (webNav, routeName) => {
+    props.navigation.closeDrawer();
+    if (Platform.OS === 'web') {
+      webNav(navigation);
+      return;
+    }
+    resetFromShopDrawer(navigation, routeName);
+  };
 
   return (
     <DrawerContentScrollView
@@ -150,34 +203,95 @@ function CustomDrawerContent(props) {
           {...itemProps}
         />
 
-        <DrawerItem
-          label={t('drawer.partner.warehouse')}
-          onPress={() => {
-            if (Platform.OS === 'web') {
-              navigateToPartnerWarehouse(navigation);
-            } else {
-              props.navigation.navigate('ShopWarehouse');
-            }
-            props.navigation.closeDrawer();
-          }}
-          icon={({ color, size }) => <DrawerMenuIcon name="warehouse" color={color} size={size} />}
-          {...itemProps}
-        />
+        {showWarehouse ? (
+          <DrawerItem
+            label={t('drawer.partner.warehouse')}
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                navigateToPartnerWarehouse(navigation);
+              } else {
+                props.navigation.navigate('ShopWarehouse');
+              }
+              props.navigation.closeDrawer();
+            }}
+            icon={({ color, size }) => <DrawerMenuIcon name="warehouse" color={color} size={size} />}
+            {...itemProps}
+          />
+        ) : null}
 
-        <DrawerItem
-          label={t('drawer.partner.invoicing')}
-          onPress={() => {
-            if (Platform.OS === 'web') {
-              navigateToPartnerInvoicing(navigation);
-            } else {
-              resetFromShopDrawer(navigation, 'ShopInvoicing');
-            }
-          }}
-          icon={({ color, size }) => (
-            <DrawerMenuIcon name="file-document-outline" color={color} size={size} />
-          )}
-          {...itemProps}
-        />
+        {showInvoicing ? (
+          <DrawerItem
+            label={t('drawer.partner.invoicing')}
+            onPress={() => openStackRoute(navigateToPartnerInvoicing, 'ShopInvoicing')}
+            icon={({ color, size }) => (
+              <DrawerMenuIcon name="file-document-outline" color={color} size={size} />
+            )}
+            {...itemProps}
+          />
+        ) : null}
+
+        {showAnalytics ? (
+          <DrawerItem
+            label={t('drawer.partner.analytics')}
+            onPress={() => openStackRoute(navigateToPartnerAnalytics, 'ShopAnalytics')}
+            icon={({ color, size }) => <DrawerMenuIcon name="chart-line" color={color} size={size} />}
+            {...itemProps}
+          />
+        ) : null}
+
+        {showWorkforce ? (
+          <DrawerItem
+            label={t('drawer.partner.workforce')}
+            onPress={() => openStackRoute(navigateToPartnerWorkforce, 'ShopWorkforce')}
+            icon={({ color, size }) => <DrawerMenuIcon name="account-hard-hat" color={color} size={size} />}
+            {...itemProps}
+          />
+        ) : null}
+
+        {showDocumentImports ? (
+          <DrawerItem
+            label={t('drawer.partner.documentImports')}
+            onPress={() => openStackRoute(navigateToPartnerDocumentImports, 'ShopDocumentImports')}
+            icon={({ color, size }) => <DrawerMenuIcon name="file-upload-outline" color={color} size={size} />}
+            {...itemProps}
+          />
+        ) : null}
+
+        {showComplaints ? (
+          <DrawerItem
+            label={t('drawer.partner.complaints')}
+            onPress={() => openStackRoute(navigateToPartnerComplaints, 'ShopComplaints')}
+            icon={({ color, size }) => <DrawerMenuIcon name="alert-circle-outline" color={color} size={size} />}
+            {...itemProps}
+          />
+        ) : null}
+
+        {showPurchaseOrders ? (
+          <DrawerItem
+            label={t('drawer.partner.purchaseOrders')}
+            onPress={() => openStackRoute(navigateToPartnerPurchaseOrders, 'ShopPurchaseOrders')}
+            icon={({ color, size }) => <DrawerMenuIcon name="cart-outline" color={color} size={size} />}
+            {...itemProps}
+          />
+        ) : null}
+
+        {showStorageLocations ? (
+          <DrawerItem
+            label={t('drawer.partner.storageLocations')}
+            onPress={() => openStackRoute(navigateToPartnerStorageLocations, 'ShopStorageLocations')}
+            icon={({ color, size }) => <DrawerMenuIcon name="map-marker-path" color={color} size={size} />}
+            {...itemProps}
+          />
+        ) : null}
+
+        {showBusinessNetwork ? (
+          <DrawerItem
+            label={t('drawer.partner.businessNetwork')}
+            onPress={() => openStackRoute(() => {}, 'NetworkOrganization')}
+            icon={({ color, size }) => <DrawerMenuIcon name="domain" color={color} size={size} />}
+            {...itemProps}
+          />
+        ) : null}
 
         <DrawerItem
           label={t('drawer.partner.priceList')}
@@ -229,6 +343,11 @@ function CustomDrawerContent(props) {
           icon={({ color, size }) => <DrawerMenuIcon name="swap-horizontal" color={color} size={size} />}
           {...itemProps}
         />
+
+        <View style={drawerGlassStyles.languageSection}>
+          <Text style={drawerGlassStyles.languageLabel}>{t('language.label')}</Text>
+          <CompactLanguageSelector variant="dark" compact presentation="modal" showFullLabel />
+        </View>
 
         <View style={drawerGlassStyles.divider} />
 

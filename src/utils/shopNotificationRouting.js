@@ -2,6 +2,19 @@
  * Shop bell notifications → screen routing by event type.
  */
 
+import { CommonActions } from '@react-navigation/native';
+
+import {
+  getRootNavigation,
+  isShopDrawerNavigation,
+  resetShopDrawerCalendar,
+} from '../navigation/drawerNavigation';
+
+const PARTNER_HOME_ROUTE = {
+  name: 'ShopHome',
+  state: { routes: [{ name: 'ShopDashboard' }], index: 0 },
+};
+
 export function notificationEventType(item) {
   return String(
     item?.data?.event_type ||
@@ -162,11 +175,26 @@ export function navigateShopNotification(navigation, item) {
   const target = resolveShopNotificationTarget(item);
   if (!target) return false;
 
+  const root = getRootNavigation(navigation);
+
   if (target.nested) {
-    navigation.navigate('ShopHome', {
-      screen: target.route,
-      params: target.params,
-    });
+    // Drawer screens (ShopCalendar) only exist under ShopHome — match in-app drawer taps.
+    if (isShopDrawerNavigation(navigation)) {
+      navigation.navigate('ShopCalendar', target.params);
+    } else {
+      // Root ref (FCM / cold start): reset nested drawer stack instead of flat NAVIGATE.
+      resetShopDrawerCalendar(root, target.params);
+    }
+    return true;
+  }
+
+  if (!isShopDrawerNavigation(navigation)) {
+    root.dispatch(
+      CommonActions.reset({
+        index: 1,
+        routes: [PARTNER_HOME_ROUTE, { name: target.route, params: target.params }],
+      })
+    );
     return true;
   }
 

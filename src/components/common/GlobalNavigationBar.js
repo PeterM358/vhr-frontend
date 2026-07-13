@@ -30,14 +30,12 @@ export default function GlobalNavigationBar({
             onPress={onMenuPress}
             accessibilityLabel="Open menu"
           />
-          {Platform.OS === 'web' ? (
-            <CompactLanguageSelector
-              variant="dark"
-              compact
-              presentation="portalDropdown"
-              style={styles.languageSelector}
-            />
-          ) : null}
+          <CompactLanguageSelector
+            variant="dark"
+            compact
+            presentation={Platform.OS === 'web' ? 'portalDropdown' : 'modal'}
+            style={styles.languageSelector}
+          />
         </View>
       }
       rightAction={

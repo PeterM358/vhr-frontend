@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B8E4F3C25D0E7196F2C3B5A8 /* Firebase iOS config in Resources */ = {isa = PBXBuildFile; fileRef = A7F3E2B14C9D6085E1B2A4F7; };
 		07893E9147CC11967C926353 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 865C986CC6F024BECA6DB967 /* PrivacyInfo.xcprivacy */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
@@ -17,6 +18,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A7F3E2B14C9D6085E1B2A4F7 /* Firebase iOS config */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "../GoogleService-Info.plist"; sourceTree = "<group>"; };
 		07E1FAE899C2DD0A5A461861 /* Pods-vhrfrontend.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-vhrfrontend.release.xcconfig"; path = "Target Support Files/Pods-vhrfrontend/Pods-vhrfrontend.release.xcconfig"; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* vhrfrontend.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = vhrfrontend.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = vhrfrontend/Images.xcassets; sourceTree = "<group>"; };
@@ -95,6 +97,7 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				A7F3E2B14C9D6085E1B2A4F7 /* Firebase iOS config */,
 				13B07FAE1A68108700A75B9A /* vhrfrontend */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
@@ -194,6 +197,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B8E4F3C25D0E7196F2C3B5A8 /* Firebase iOS config in Resources */,
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
@@ -436,7 +440,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.vhr-frontend";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mihailovv.vhrfrontend";
 				PRODUCT_NAME = vhrfrontend;
 				SWIFT_OBJC_BRIDGING_HEADER = "vhrfrontend/vhrfrontend-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -467,7 +471,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.vhr-frontend";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mihailovv.vhrfrontend";
 				PRODUCT_NAME = vhrfrontend;
 				SWIFT_OBJC_BRIDGING_HEADER = "vhrfrontend/vhrfrontend-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;

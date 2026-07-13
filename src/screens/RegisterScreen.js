@@ -19,7 +19,7 @@ import { useTranslation } from '../i18n';
 
 export default function RegisterScreen({ navigation }) {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const insets = useSafeAreaInsets();
   const headerReserve = insets.top + (Platform.OS === 'ios' ? 52 : 56);
   const { setIsAuthenticated, setAuthToken, setUserEmailOrPhone } = useContext(AuthContext);
@@ -66,6 +66,12 @@ export default function RegisterScreen({ navigation }) {
       await AsyncStorage.removeItem(STORAGE_KEYS.SHOP_PROFILES);
       await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SHOP_ID);
     }
+
+    if (data.shop_memberships && data.shop_memberships.length > 0) {
+      await AsyncStorage.setItem(STORAGE_KEYS.SHOP_MEMBERSHIPS, JSON.stringify(data.shop_memberships));
+    } else {
+      await AsyncStorage.removeItem(STORAGE_KEYS.SHOP_MEMBERSHIPS);
+    }
   };
 
   const saveRegistration = async () => {
@@ -82,7 +88,8 @@ export default function RegisterScreen({ navigation }) {
         identifier,
         password,
         role === 'client',
-        role === 'shop'
+        role === 'shop',
+        locale
       );
 
       await applyAuthSession(result, identifier);
@@ -145,7 +152,11 @@ export default function RegisterScreen({ navigation }) {
               >
                 {t('auth.clientRole')}
               </Text>
-              <Text style={styles.roleSub}>{t('auth.clientRoleDescription')}</Text>
+              <Text
+                style={[styles.roleSub, role === 'client' && styles.roleSubSelected]}
+              >
+                {t('auth.clientRoleDescription')}
+              </Text>
             </Pressable>
 
             <Pressable
@@ -161,7 +172,11 @@ export default function RegisterScreen({ navigation }) {
               >
                 {t('auth.serviceCenterRole')}
               </Text>
-              <Text style={styles.roleSub}>{t('auth.serviceCenterRoleDescription')}</Text>
+              <Text
+                style={[styles.roleSub, role === 'shop' && styles.roleSubSelected]}
+              >
+                {t('auth.serviceCenterRoleDescription')}
+              </Text>
             </Pressable>
           </View>
 
@@ -302,36 +317,41 @@ const styles = StyleSheet.create({
   roleButton: {
     flex: 1,
     borderWidth: 1.5,
-    borderColor: 'rgba(15,23,42,0.12)',
+    borderColor: 'rgba(148,163,184,0.35)',
     borderRadius: 14,
     paddingVertical: 16,
     paddingHorizontal: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.CARD_DARK,
+    opacity: 0.72,
   },
   roleButtonSelected: {
     borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(37,99,235,0.07)',
+    backgroundColor: 'rgba(37,99,235,0.28)',
+    opacity: 1,
   },
   roleButtonPressed: {
-    opacity: 0.92,
+    opacity: 0.88,
   },
   roleTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#0F172A',
+    color: 'rgba(255,255,255,0.72)',
   },
   roleTitleSelected: {
-    color: COLORS.PRIMARY,
+    color: '#ffffff',
     fontWeight: '700',
   },
   roleSub: {
     fontSize: 12,
-    color: COLORS.TEXT_MUTED,
+    color: 'rgba(255,255,255,0.55)',
     marginTop: 4,
     textAlign: 'center',
     lineHeight: 16,
+  },
+  roleSubSelected: {
+    color: 'rgba(255,255,255,0.82)',
   },
   loading: {
     marginTop: 8,

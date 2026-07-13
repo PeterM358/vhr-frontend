@@ -37,11 +37,17 @@ import PartnerMarketComparisonCard from '../components/partner/PartnerMarketComp
 import CompactLanguageSelector from '../components/common/CompactLanguageSelector';
 import { DiscoveryFilterChip } from '../components/serviceCenters/DiscoveryFilterChip';
 import DiscoveryExpandedFiltersPanel from '../components/serviceCenters/DiscoveryExpandedFiltersPanel';
-import DiscoveryFiltersBottomSheet from '../components/serviceCenters/DiscoveryFiltersBottomSheet.web';
+import DiscoveryFiltersBottomSheet from '../components/serviceCenters/DiscoveryFiltersBottomSheet';
+import DiscoveryViewToggle from '../components/serviceCenters/DiscoveryViewToggle';
+import DiscoverySortSheet, { DiscoverySortTrigger } from '../components/serviceCenters/DiscoverySortSheet';
+import DiscoveryCompactFooter from '../components/serviceCenters/DiscoveryCompactFooter';
+import DISCOVERY_MOBILE, { discoveryMinFont } from '../components/serviceCenters/discoveryMobileTokens';
 import { DISCOVERY_QUICK_VEHICLE_CHIPS } from '../api/serviceCenters';
 import { spreadShopMarkersForMap } from '../utils/mapMarkerSpread';
+import { shopHasMappableCoordinates } from '../utils/mapDiscoveryData';
 import { getWebGeolocation } from '../utils/webGeolocation';
 import { ensureLeafletCss } from '../utils/leafletAssets.web';
+import createVeversalLeafletPinIcon from '../components/maps/VeversalMapPin.web';
 import {
   useServiceCenterDiscovery,
   SORT_OPTIONS,
@@ -58,6 +64,7 @@ import {
   navigateToServiceCenterDetail,
 } from '../navigation/serviceCentersNavigation';
 import { navigateToPartnerDashboard, navigateToVehicleServiceRecordNew, navigateToRepairRequestNew } from '../navigation/webNavigation';
+import { navigateToSignIn } from '../navigation/authNavigation';
 import {
   loadServiceRecordFormDraft,
   saveServiceRecordFormDraft,
@@ -114,6 +121,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 960;
+  const isMobileWeb = !isDesktop;
   const listBottomPadding = useScrollContentBottomPadding(24);
 
   const discovery = useServiceCenterDiscovery({
@@ -161,6 +169,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   const [mobileTab, setMobileTab] = useState('list');
   const [selectedListId, setSelectedListId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
   const cardRefs = useRef({});
   const zoom = 12;
 
@@ -203,6 +212,9 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     clearFilters,
     showAllInMatchedCity,
     loadFilterTaxonomy,
+    fetchShops,
+    loadError,
+    authRequired,
   } = discovery;
 
   const handleBrandChange = useCallback(
@@ -297,13 +309,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   const mapShops = useMemo(
     () =>
       spreadShopMarkersForMap(
-        shops
-          .map((shop) => ({
-            ...shop,
-            latitude: shop.latitude ? parseFloat(shop.latitude) : null,
-            longitude: shop.longitude ? parseFloat(shop.longitude) : null,
-          }))
-          .filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude)),
+        shops.filter((shop) => shopHasMappableCoordinates(shop)),
         userLocatedExplicitly && userLocation
           ? { latitude: userLocation[0], longitude: userLocation[1] }
           : null
@@ -457,6 +463,11 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     [t]
   );
 
+  const activeSortLabel = useMemo(
+    () => sortOptions.find((opt) => opt.value === sort)?.label || t('serviceCenters.sortBy'),
+    [sort, sortOptions, t]
+  );
+
   const expandedFilterProps = {
     selectedVehicleType,
     setSelectedVehicleType,
@@ -476,6 +487,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   };
 
   const cityLabel = matchedCity?.name || 'Sofia';
+  const resultsLabel = t('serviceCenters.resultsCount', { count: shops.length });
 
   const quickChipsRow = (
     <ScrollView
@@ -516,7 +528,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
 
   const stickyToolbar = (
     <View style={styles.stickyToolbar}>
-      <View style={styles.header}>
+      <View style={[styles.header, isMobileWeb && styles.headerMobile]}>
         <BackHeaderButton
           onPress={() => {
             if (route.params?.returnTo === 'ManageVehicleServiceCenters' && authorizeVehicleId != null) {
@@ -530,43 +542,69 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
             partnerMode ? navigateToPartnerDashboard(navigation) : goBackFromServiceCenters(navigation);
           }}
           label={t('navigation.back')}
-          variant="glass"
-          iconOnly={false}
+          variant={isMobileWeb ? 'light' : 'glass'}
+          iconOnly={isMobileWeb}
         />
-          <Text style={styles.title}>
+        <Text style={[styles.title, isMobileWeb && styles.titleMobile]} numberOfLines={1}>
           {authorizeMode
             ? t('serviceCenters.authorizeTitle')
             : partnerMode
               ? t('serviceCenters.exploreTitle')
               : seoMeta?.h1 || t('serviceCenters.findTitle')}
         </Text>
-        <CompactLanguageSelector
-          variant="light"
-          compact
-          presentation="portalDropdown"
-          style={styles.serviceCentersLangSelector}
-        />
+        {isDesktop ? (
+          <CompactLanguageSelector
+            variant="light"
+            compact
+            presentation="portalDropdown"
+            style={styles.serviceCentersLangSelector}
+          />
+        ) : null}
       </View>
 
-      <View style={styles.searchRow}>
-        <TextInput
-          placeholder={t('serviceCenters.searchPlaceholder')}
-          value={addressQuery}
-          onChangeText={setAddressQuery}
-          onSubmitEditing={() => handleSearch().catch(() => {})}
-          style={styles.searchInput}
-          returnKeyType="search"
-        />
+      <View style={[styles.searchRow, isMobileWeb && styles.searchRowMobile]}>
+        <View style={[styles.searchInputWrap, isMobileWeb && styles.searchInputWrapMobile]}>
+          <MaterialCommunityIcons name="magnify" size={18} color="#64748b" style={styles.searchIcon} />
+          <TextInput
+            placeholder={t('serviceCenters.searchPlaceholder')}
+            value={addressQuery}
+            onChangeText={setAddressQuery}
+            onSubmitEditing={() => handleSearch().catch(() => {})}
+            style={styles.searchInput}
+            returnKeyType="search"
+            placeholderTextColor="#94a3b8"
+          />
+        </View>
         <Pressable
-          style={[styles.locatePill, locating && styles.locatePillDisabled]}
+          style={[
+            isMobileWeb ? styles.locateIconBtn : styles.locatePill,
+            locating && styles.locatePillDisabled,
+          ]}
           onPress={handleLocateMe}
           disabled={locating}
+          accessibilityLabel={t('serviceCenters.locateMe')}
         >
-          <Text style={styles.locatePillText}>{locating ? '…' : t('serviceCenters.locateMe')}</Text>
+          {locating ? (
+            <ActivityIndicator size="small" color={isMobileWeb ? COLORS.primary : '#fff'} />
+          ) : (
+            <MaterialCommunityIcons
+              name="crosshairs-gps"
+              size={isMobileWeb ? 20 : 16}
+              color={isMobileWeb ? COLORS.primary : '#fff'}
+              style={isMobileWeb ? null : styles.locateIcon}
+            />
+          )}
+          {!isMobileWeb ? (
+            <Text style={styles.locatePillText} numberOfLines={1}>
+              {locating ? '…' : t('serviceCenters.locateMe')}
+            </Text>
+          ) : null}
         </Pressable>
-        <Pressable style={styles.searchButton} onPress={() => handleSearch().catch(() => {})}>
-          <Text style={styles.searchButtonText}>{t('serviceCenters.search')}</Text>
-        </Pressable>
+        {isDesktop ? (
+          <Pressable style={styles.searchButton} onPress={() => handleSearch().catch(() => {})}>
+            <Text style={styles.searchButtonText}>{t('serviceCenters.search')}</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.filterChrome}>{quickChipsRow}</View>
@@ -587,42 +625,75 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
 
   const emptyState = (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>{t('serviceCenters.emptyTitle')}</Text>
-      <View style={styles.emptyActions}>
-        <Pressable style={styles.emptyButton} onPress={() => clearFilters().catch(() => {})}>
-          <Text style={styles.emptyButtonText}>{t('serviceCenters.clearFilters')}</Text>
-        </Pressable>
-        <Pressable style={styles.emptyButtonSecondary} onPress={() => showAllInMatchedCity().catch(() => {})}>
-          <Text style={styles.emptyButtonSecondaryText}>
-            {t('serviceCenters.showAllInCity', { city: cityLabel })}
+      {loadError ? (
+        <>
+          <Text style={styles.emptyTitle}>
+            {authRequired
+              ? t('serviceCenters.signInRequired', null, 'Sign in to view service centers')
+              : t('serviceCenters.loadError', null, 'Could not load service centers')}
           </Text>
-        </Pressable>
-        <Pressable
-          style={styles.emptyButtonSecondary}
-          onPress={() => navigation.navigate('AddManualServiceCenter', { discoveryReport: true })}
-        >
-          <Text style={styles.emptyButtonSecondaryText}>{t('serviceCenters.addMissingCenter')}</Text>
-        </Pressable>
-      </View>
+          {authRequired ? (
+            <Pressable style={styles.emptyButton} onPress={() => navigateToSignIn(navigation)}>
+              <Text style={styles.emptyButtonText}>{t('auth.signIn')}</Text>
+            </Pressable>
+          ) : (
+            <Pressable style={styles.emptyButton} onPress={() => fetchShops().catch(() => {})}>
+              <Text style={styles.emptyButtonText}>{t('common.retry', null, 'Try again')}</Text>
+            </Pressable>
+          )}
+        </>
+      ) : (
+        <>
+          <Text style={styles.emptyTitle}>{t('serviceCenters.emptyTitle')}</Text>
+          <View style={styles.emptyActions}>
+            <Pressable style={styles.emptyButton} onPress={() => clearFilters().catch(() => {})}>
+              <Text style={styles.emptyButtonText}>{t('serviceCenters.clearFilters')}</Text>
+            </Pressable>
+            <Pressable style={styles.emptyButtonSecondary} onPress={() => showAllInMatchedCity().catch(() => {})}>
+              <Text style={styles.emptyButtonSecondaryText}>
+                {t('serviceCenters.showAllInCity', { city: cityLabel })}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.emptyButtonSecondary}
+              onPress={() => navigation.navigate('AddManualServiceCenter', { discoveryReport: true })}
+            >
+              <Text style={styles.emptyButtonSecondaryText}>{t('serviceCenters.addMissingCenter')}</Text>
+            </Pressable>
+          </View>
+        </>
+      )}
     </View>
   );
 
   const listPanel = (
-    <View style={styles.listPanel}>
-      {partnerMode ? <PartnerMarketComparisonCard onCompare={() => {}} /> : null}
-      <View style={styles.sortRow}>
-        {sortOptions.map((opt) => (
-          <Pressable
-            key={opt.value}
-            onPress={() => setSort(opt.value)}
-            style={[styles.sortChip, sort === opt.value && styles.sortChipActive]}
+    <View style={[styles.listPanel, isMobileWeb && styles.listPanelMobile]}>
+      {partnerMode ? (
+        <PartnerMarketComparisonCard compact={isMobileWeb} onCompare={() => {}} />
+      ) : null}
+      {isDesktop ? (
+        <View style={styles.listPanelHeader}>
+          <Text style={styles.resultsCount}>{resultsLabel}</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.sortRowScroll}
+            contentContainerStyle={styles.sortRow}
           >
-            <Text style={[styles.sortChipText, sort === opt.value && styles.sortChipTextActive]}>
-              {opt.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+            {sortOptions.map((opt) => (
+              <Pressable
+                key={opt.value}
+                onPress={() => setSort(opt.value)}
+                style={[styles.sortChip, sort === opt.value && styles.sortChipActive]}
+              >
+                <Text style={[styles.sortChipText, sort === opt.value && styles.sortChipTextActive]}>
+                  {opt.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
       <ScrollView
         style={styles.listScroll}
         contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPadding }]}
@@ -653,10 +724,12 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
                     ? () => selectCenterForServiceRecord(shop)
                     : () => handleRequestService(shop)
                 }
+                mobile={isMobileWeb}
               />
             </View>
           );
         })}
+        {isMobileWeb ? <DiscoveryCompactFooter /> : null}
       </ScrollView>
     </View>
   );
@@ -692,24 +765,15 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
         />
       ) : null}
       {mapShops.map((shop) => {
-        const isReported = shop.source === 'owner_reported';
         const markerKey = shop.list_id || `${shop.source || 'shop'}-${shop.id}`;
         const lat = shop.displayLatitude ?? shop.latitude;
         const lon = shop.displayLongitude ?? shop.longitude;
-        const markerColor = shop.isMyShop ? 'green' : isReported ? 'orange' : 'red';
         const isSelected = selectedListId === markerKey;
         return (
           <Marker
             key={markerKey}
             position={[lat, lon]}
-            icon={L.icon({
-              iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${isSelected ? 'violet' : markerColor}.png`,
-              shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-              iconSize: [25, 41],
-              iconAnchor: [12, 41],
-              popupAnchor: [1, -34],
-              shadowSize: [41, 41],
-            })}
+            icon={createVeversalLeafletPinIcon(shop, { selected: isSelected })}
             eventHandlers={{
               click: () => {
                 setSelectedListId(markerKey);
@@ -761,39 +825,39 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
         <View style={styles.authorizeBanner}>
           <MaterialCommunityIcons name="car-info" size={18} color={COLORS.primary} />
           <Text style={styles.authorizeBannerText}>
-            Authorizing for {formatVehicleAuthorizeLabel(authorizeVehicle)}. Open a shop profile to choose
-            vehicles and authorize access.
+            {t('serviceCenters.authorizeBanner', {
+              vehicle: formatVehicleAuthorizeLabel(authorizeVehicle),
+            })}
           </Text>
         </View>
       ) : null}
       {geoHint ? <Text style={styles.geoHint}>{geoHint}</Text> : null}
         {userLocatedExplicitly ? (
-          <Text style={styles.locationHint}>Distances shown from your current location.</Text>
+          <Text style={styles.locationHint}>{t('serviceCenters.locationHintNear')}</Text>
         ) : (
-          <Text style={styles.locationHint}>Tap Locate me to sort and show distances.</Text>
+          <Text style={styles.locationHint}>{t('serviceCenters.locationHintTap')}</Text>
         )}
 
         {!isDesktop ? (
-          <View style={styles.mobileTabs}>
-            <Pressable
-              style={[styles.mobileTab, mobileTab === 'list' && styles.mobileTabActive]}
-              onPress={() => setMobileTab('list')}
-            >
-              <Text style={styles.mobileTabText}>{t('serviceCenters.listTab')}</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.mobileTab, mobileTab === 'map' && styles.mobileTabActive]}
-              onPress={() => setMobileTab('map')}
-            >
-              <Text style={styles.mobileTabText}>{t('serviceCenters.mapTab')}</Text>
-            </Pressable>
+          <View style={styles.mobileChrome}>
+            <DiscoveryViewToggle
+              value={mobileTab}
+              onChange={setMobileTab}
+              listLabel={t('serviceCenters.listTab')}
+              mapLabel={t('serviceCenters.mapTab')}
+              style={styles.mobileTabs}
+            />
+            <View style={styles.mobileMetaRow}>
+              <Text style={styles.mobileResultsCount}>{resultsLabel}</Text>
+              <DiscoverySortTrigger label={activeSortLabel} onPress={() => setSortOpen(true)} />
+            </View>
           </View>
         ) : null}
 
         <View style={[styles.body, isDesktop && styles.bodyDesktop]}>
           {(!isDesktop && mobileTab === 'list') || isDesktop ? listPanel : null}
           {(!isDesktop && mobileTab === 'map') || isDesktop ? (
-            <View style={styles.mapWrap}>
+            <View style={[styles.mapWrap, isDesktop && styles.mapWrapDesktop]}>
               {mapPanel}
               {filtersOpen ? <View style={styles.mapDimOverlay} pointerEvents="none" /> : null}
             </View>
@@ -808,6 +872,16 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
           onApply={() => handleSearch().catch(() => {})}
           activeFilterCount={activeAdvancedFilterCount}
           filterProps={expandedFilterProps}
+        />
+      ) : null}
+
+      {!isDesktop ? (
+        <DiscoverySortSheet
+          visible={sortOpen}
+          onClose={() => setSortOpen(false)}
+          value={sort}
+          options={sortOptions}
+          onSelect={setSort}
         />
       ) : null}
     </ScreenBackground>
@@ -833,7 +907,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
   },
+  headerMobile: {
+    paddingHorizontal: DISCOVERY_MOBILE.space.screenX,
+    paddingTop: 10,
+    gap: 8,
+  },
   title: { flex: 1, fontSize: 18, fontWeight: '700', color: '#0f172a' },
+  titleMobile: {
+    fontSize: DISCOVERY_MOBILE.type.title,
+  },
   serviceCentersLangSelector: {
     maxWidth: 220,
   },
@@ -842,28 +924,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingTop: 8,
   },
-  searchInput: {
+  searchRowMobile: {
+    paddingHorizontal: DISCOVERY_MOBILE.space.screenX,
+    gap: DISCOVERY_MOBILE.space.rowGap,
+  },
+  searchInputWrap: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#cbd5e1',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 12,
     backgroundColor: '#fff',
+    paddingHorizontal: 10,
+    minHeight: 42,
     minWidth: 0,
+  },
+  searchInputWrapMobile: {
+    borderRadius: DISCOVERY_MOBILE.radius.search,
+    minHeight: DISCOVERY_MOBILE.height.search,
+    borderColor: DISCOVERY_MOBILE.color.border,
+  },
+  searchIcon: { marginRight: 6 },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 8,
+    fontSize: 15,
+    color: '#0f172a',
+    minWidth: 0,
+    borderWidth: 0,
+    outlineStyle: 'none',
   },
   searchButton: {
     backgroundColor: COLORS.primary,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 12,
+    minHeight: 42,
+    justifyContent: 'center',
     cursor: 'pointer',
   },
-  searchButtonText: { color: '#fff', fontWeight: '700' },
-  filterChrome: { paddingHorizontal: 16, paddingTop: 8 },
-  filterRow: { maxHeight: 46 },
+  searchButtonText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  filterChrome: { paddingHorizontal: 16, paddingTop: 6 },
+  filterRow: { maxHeight: DISCOVERY_MOBILE.height.chip + 4 },
   filterRowContent: {
     alignItems: 'center',
     paddingRight: 8,
@@ -908,22 +1013,45 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 4,
     color: '#64748b',
-    fontSize: 12,
+    fontSize: discoveryMinFont(12),
   },
-  body: { flex: 1, marginTop: 8 },
-  bodyDesktop: { flexDirection: 'row', gap: 0 },
+  body: { flex: 1, marginTop: 6 },
+  bodyDesktop: {
+    flexDirection: 'row',
+    gap: 0,
+    minHeight: 0,
+    paddingHorizontal: 0,
+  },
   listPanel: {
     flex: 1,
-    maxWidth: 420,
+    maxWidth: 440,
+    minWidth: 320,
     borderRightWidth: StyleSheet.hairlineWidth,
     borderRightColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 12,
-    paddingTop: 8,
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 14,
+    paddingTop: 10,
+  },
+  listPanelMobile: {
+    maxWidth: '100%',
+    minWidth: 0,
+    borderRightWidth: 0,
+    paddingHorizontal: DISCOVERY_MOBILE.space.screenX,
+    backgroundColor: DISCOVERY_MOBILE.color.canvas,
+  },
+  listPanelHeader: {
+    marginBottom: 8,
+    gap: 8,
+  },
+  resultsCount: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
   },
   listScroll: { flex: 1 },
   listContent: {},
-  sortRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  sortRowScroll: { maxHeight: 36 },
+  sortRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   sortChip: {
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -937,24 +1065,32 @@ const styles = StyleSheet.create({
   sortChipText: { fontSize: 12, fontWeight: '600', color: '#334155' },
   sortChipTextActive: { color: '#fff' },
   mapWrap: { flex: 2, minHeight: 320, position: 'relative' },
-  map: { flex: 1, height: '100%', width: '100%' },
+  mapWrapDesktop: { minHeight: 480 },
+  map: { flex: 1, height: '100%', width: '100%', minHeight: 320 },
   mapDimOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(15, 23, 42, 0.08)',
     zIndex: 500,
   },
   mapLoading: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' },
-  mobileTabs: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
+  mobileChrome: {
+    marginHorizontal: DISCOVERY_MOBILE.space.screenX,
     marginTop: 8,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 10,
-    padding: 4,
+    gap: 8,
   },
-  mobileTab: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 8, cursor: 'pointer' },
-  mobileTabActive: { backgroundColor: '#fff' },
-  mobileTabText: { fontWeight: '700', color: '#0f172a' },
+  mobileTabs: {},
+  mobileMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  mobileResultsCount: {
+    flex: 1,
+    fontSize: discoveryMinFont(DISCOVERY_MOBILE.type.meta),
+    fontWeight: '600',
+    color: DISCOVERY_MOBILE.color.textMuted,
+  },
   emptyState: { paddingVertical: 24, paddingHorizontal: 8, alignItems: 'center' },
   emptyTitle: { color: '#64748b', textAlign: 'center', marginBottom: 16, fontSize: 15 },
   emptyActions: { gap: 10, width: '100%', maxWidth: 320 },
@@ -977,17 +1113,32 @@ const styles = StyleSheet.create({
   },
   emptyButtonSecondaryText: { color: '#334155', fontWeight: '600' },
   locatePill: {
-    minWidth: 88,
-    borderRadius: 10,
-    backgroundColor: '#2563eb',
+    flexDirection: 'row',
     alignItems: 'center',
+    minWidth: 44,
+    maxWidth: 120,
+    borderRadius: 12,
+    backgroundColor: '#1d4ed8',
     justifyContent: 'center',
     paddingHorizontal: 10,
     paddingVertical: 10,
+    minHeight: 42,
     cursor: 'pointer',
   },
+  locateIcon: { marginRight: 4 },
   locatePillDisabled: { opacity: 0.7 },
-  locatePillText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  locatePillText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  locateIconBtn: {
+    width: DISCOVERY_MOBILE.height.locateBtn,
+    height: DISCOVERY_MOBILE.height.locateBtn,
+    borderRadius: DISCOVERY_MOBILE.radius.search,
+    borderWidth: 1,
+    borderColor: DISCOVERY_MOBILE.color.border,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+  },
   popupButton: {
     backgroundColor: COLORS.primary,
     padding: 6,

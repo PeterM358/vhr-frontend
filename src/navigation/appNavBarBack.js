@@ -1,9 +1,8 @@
 import { useCallback } from 'react';
 import { Platform } from 'react-native';
-import { DrawerActions } from '@react-navigation/native';
+import { navigateToShopDashboard } from './drawerNavigation';
 import {
   navigateToDashboard,
-  navigateToPartnerDashboard,
   navigateToServiceCenters,
   navigateToVehicleDetail,
   navigateToVehicleList,
@@ -25,18 +24,7 @@ export function useClientDashboardBack(navigation) {
 }
 
 export function usePartnerDashboardBack(navigation) {
-  return useCallback(() => {
-    if (Platform.OS === 'web') {
-      navigateToPartnerDashboard(navigation);
-      return;
-    }
-    const parent = navigation.getParent?.();
-    if (parent?.openDrawer) {
-      navigation.dispatch(DrawerActions.jumpTo('ShopDashboard'));
-      return;
-    }
-    navigateToPartnerDashboard(navigation);
-  }, [navigation]);
+  return useCallback(() => navigateToShopDashboard(navigation), [navigation]);
 }
 
 export function useVehicleListBack(navigation) {
@@ -74,6 +62,10 @@ export function useReturnToBack(navigation, returnTo, backLabel) {
         navigateToDashboard(navigation);
         return;
       }
+    }
+    if (returnTo === 'ShopDashboard') {
+      navigateToShopDashboard(navigation);
+      return;
     }
     if (returnTo) {
       navigation.navigate(returnTo);

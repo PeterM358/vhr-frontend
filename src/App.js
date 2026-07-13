@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, Alert, Platform, Linking, View } from 'react-native';
+import { StyleSheet, Platform, Linking, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import AppNavigator from './navigation/AppNavigator';
@@ -12,7 +12,6 @@ import { I18nProvider } from './i18n';
 import { GarageSceneProvider } from './context/GarageSceneContext';
 import MessageDialogHost from './components/ui/MessageDialog';
 import MobileWebInsetsBridge from './components/MobileWebInsetsBridge';
-import { devLog } from './utils/logger';
 import { initializeAnalytics } from './services/analytics';
 
 const handleDeepLink = ({ url }) => {
@@ -26,31 +25,13 @@ const handleDeepLink = ({ url }) => {
 };
 
 export default function App() {
-
   useEffect(() => {
     initializeAnalytics();
   }, []);
 
   useEffect(() => {
-    let unsubscribeOnMessage = () => {};
-    if (Platform.OS !== 'web') {
-      import('firebase/messaging')
-        .then(({ getMessaging, onMessage }) => {
-          const messaging = getMessaging();
-          unsubscribeOnMessage = onMessage(messaging, (payload) => {
-            devLog('Foreground notification received', payload?.messageId || 'unknown');
-            Alert.alert(payload.notification?.title || '🔔 Notification', payload.notification?.body || '');
-          });
-        })
-        .catch((err) => {
-          devLog('Firebase messaging unavailable', err?.message || err);
-        });
-    }
-
     const subscription = Linking.addEventListener('url', handleDeepLink);
-
     return () => {
-      unsubscribeOnMessage();
       subscription.remove();
     };
   }, []);

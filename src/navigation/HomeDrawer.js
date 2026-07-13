@@ -26,6 +26,7 @@ import {
   drawerMenuItemProps,
   drawerScreenOptions,
 } from './DrawerBranding';
+import CompactLanguageSelector from '../components/common/CompactLanguageSelector';
 import { useTranslation } from '../i18n';
 
 const Drawer = createDrawerNavigator();
@@ -33,10 +34,8 @@ const Drawer = createDrawerNavigator();
 function CustomDrawerContent(props) {
   const navigation = useNavigation();
   const { t } = useTranslation();
-  const { notifications } = useContext(WebSocketContext);
+  const { unreadCount: unreadNotifications } = useContext(WebSocketContext);
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
-
-  const unreadNotifications = notifications.filter((n) => !n.is_read).length;
 
   const handleLogout = async () => {
     await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
@@ -112,6 +111,11 @@ function CustomDrawerContent(props) {
           )}
           {...itemProps}
         />
+
+        <View style={drawerGlassStyles.languageSection}>
+          <Text style={drawerGlassStyles.languageLabel}>{t('language.label')}</Text>
+          <CompactLanguageSelector variant="dark" compact presentation="modal" showFullLabel />
+        </View>
 
         <View style={drawerGlassStyles.divider} />
 

@@ -1,0 +1,62 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [main, production-readiness-phase-1]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ESLint is not configured in this repo yet — add `npm run lint` when eslint config lands.
+      - name: Document missing lint gate
+        run: |
+          if npm run | grep -qE '^  lint'; then
+            npm run lint
+          else
+            echo "NOTE: npm run lint is not configured; skipping lint gate."
+          fi
+
+      - name: ERP access smoke script
+        run: npm run test:erp
+
+      - name: Expo config validation
+        run: npx expo config --type public
+
+      - name: Web staging build
+        run: |
+          if [ -f .env.staging.example ]; then
+            cp .env.staging.example .env.staging
+          elif [ -f .env.staging ]; then
+            echo "Using committed .env.staging"
+          else
+            echo "EXPO_PUBLIC_API_BASE_URL=https://api-beta.veversal.com" > .env.staging
+            echo "EXPO_PUBLIC_APP_BASE_URL=https://beta.veversal.com" >> .env.staging
+          fi
+          npm run build:web:staging
+
+      # Jest/unit tests are not configured yet — add `npm test -- --ci` when jest-expo lands.
+      - name: Document missing unit test gate
+        run: |
+          if npm run | grep -qE '^  test$'; then
+            npm test -- --ci
+          else
+            echo "NOTE: npm test is not configured; skipping unit test gate."
+          fi

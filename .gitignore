@@ -45,6 +45,9 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+# Firebase client config (download locally; do not commit)
+GoogleService-Info.plist
+
 # Android - untrack secrets and build artifacts
 android/app/google-services.json
 android/app/src/main/res/values/secrets.xml

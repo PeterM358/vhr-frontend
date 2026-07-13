@@ -8,6 +8,7 @@ import ProTabBar from '../components/ui/ProTabBar';
 import ShopWarehouseReceiveScreen from './ShopWarehouseReceiveScreen';
 import ShopWarehouseDocumentsPanel from '../components/warehouse/ShopWarehouseDocumentsPanel';
 import ShopWarehouseStockPanel from '../components/warehouse/ShopWarehouseStockPanel';
+import { navigateToShopDashboard } from '../navigation/drawerNavigation';
 import { useTranslation } from '../i18n';
 
 const SHOP_TOP_BAR = 'rgba(11,18,32,0.92)';
@@ -43,7 +44,7 @@ export default function ShopWarehouseHubScreen({ navigation }) {
             <Appbar.Action
               icon="chevron-left"
               color="#fff"
-              onPress={() => navigation.navigate('ShopDashboard')}
+              onPress={() => navigateToShopDashboard(navigation)}
             />
             <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color="#fff" />
             <Appbar.Content title={t('drawer.partner.warehouse')} titleStyle={{ color: '#fff' }} />

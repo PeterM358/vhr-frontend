@@ -38,6 +38,7 @@ import {
 } from '../utils/scheduleSlotPicker';
 import { cacheUnscheduledCount } from '../utils/shopCalendarBadge';
 import { fetchShopCalendarCached, invalidateShopCalendarCache } from '../utils/shopCalendarCache';
+import { navigateToShopDashboard } from '../navigation/drawerNavigation';
 import {
   buildDailyLoadMap,
   dayLoadUsesLaborCapacity,
@@ -354,6 +355,10 @@ export default function ShopCalendarScreen() {
   const returnTo = route.params?.returnTo || 'ShopDashboard';
 
   const handleBackHome = () => {
+    if (returnTo === 'ShopDashboard') {
+      navigateToShopDashboard(navigation);
+      return;
+    }
     navigation.navigate(returnTo);
   };
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));

@@ -14,8 +14,8 @@ export default function DashboardQuickActions({ actions = [] }) {
     <View style={styles.wrap}>
       {rows.map((row, rowIndex) => (
         <View key={`qa-${rowIndex}`} style={styles.row}>
-          {row.map((action) => (
-            <QuickActionChip key={action.key} {...action} />
+          {row.map(({ key, ...action }) => (
+            <QuickActionChip key={key} {...action} />
           ))}
           {row.length < 4
             ? Array.from({ length: 4 - row.length }).map((_, i) => (

@@ -6,6 +6,12 @@ import { syncPushDeviceToken, deactivatePushDeviceToken } from '../notifications
 import { messageFromApiError } from '../utils/apiErrorMessage';
 import { resetToPublicHome } from '../navigation/authNavigation';
 import { safeError } from '../utils/logger';
+import { getLocale } from '../i18n';
+
+const normalizeAuthLanguage = (locale) => {
+  const value = String(locale || getLocale() || 'en').trim().toLowerCase().split('-')[0];
+  return value === 'bg' ? 'bg' : 'en';
+};
 
 const normalizeLoginPhone = (value) => {
   if (!value) return '';
@@ -25,16 +31,29 @@ const buildLoginIdentifierBody = (emailOrPhone, password) => {
 
 
 // ✅ Register
-export const register = async (emailOrPhone, password, isClient, isShop) => {
+export const register = async (emailOrPhone, password, isClient, isShop, language = getLocale()) => {
   try {
     let registerData;
     const raw = (emailOrPhone || '').trim();
     const loginData = buildLoginIdentifierBody(raw, password);
+    const authLanguage = normalizeAuthLanguage(language);
 
     if (raw.includes('@')) {
-      registerData = { email: raw.toLowerCase(), password, is_client: isClient, is_shop: isShop };
+      registerData = {
+        email: raw.toLowerCase(),
+        password,
+        is_client: isClient,
+        is_shop: isShop,
+        language: authLanguage,
+      };
     } else {
-      registerData = { phone: normalizeLoginPhone(raw), password, is_client: isClient, is_shop: isShop };
+      registerData = {
+        phone: normalizeLoginPhone(raw),
+        password,
+        is_client: isClient,
+        is_shop: isShop,
+        language: authLanguage,
+      };
     }
 
     await axios.post(`${API_BASE_URL}/api/users/register/`, registerData);
@@ -78,7 +97,8 @@ const storeLoginData = async (data, fallbackDisplay) => {
     user_id,
     email,
     phone,
-    shop_profiles
+    shop_profiles,
+    shop_memberships,
   } = data;
 
   let userDisplay = '';
@@ -100,6 +120,9 @@ const storeLoginData = async (data, fallbackDisplay) => {
   // Only for shops with valid shop_profiles
   if (is_shop && Array.isArray(shop_profiles) && shop_profiles.length > 0) {
     itemsToStore.push(['@shop_profiles', JSON.stringify(shop_profiles)]);
+  }
+  if (is_shop && Array.isArray(shop_memberships) && shop_memberships.length > 0) {
+    itemsToStore.push(['@shop_memberships', JSON.stringify(shop_memberships)]);
   }
 
   await AsyncStorage.multiSet(itemsToStore);
@@ -143,10 +166,11 @@ export const logout = async (
 };
 
 // ✅ Request Password Reset (send email)
-export const requestPasswordReset = async (email) => {
+export const requestPasswordReset = async (email, language = getLocale()) => {
   try {
     const response = await axios.post(`${API_BASE_URL}/api/users/password/reset/`, {
       email,
+      language: normalizeAuthLanguage(language),
     });
     return response.data;
   } catch (error) {

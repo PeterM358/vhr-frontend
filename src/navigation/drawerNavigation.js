@@ -4,10 +4,11 @@
  */
 
 import { Platform } from 'react-native';
-import { CommonActions } from '@react-navigation/native';
+import { CommonActions, DrawerActions } from '@react-navigation/native';
 import { syncWebPath } from './authNavigation';
 import {
   notifications,
+  partnerDashboard,
   partnerProfile,
   partnerPublicPreview,
   partnerRepairs,
@@ -26,12 +27,46 @@ import {
   vehicles,
 } from './webRoutes';
 
-function getRootNavigation(navigation) {
+export function getRootNavigation(navigation) {
   let current = navigation;
   while (current.getParent?.()) {
     current = current.getParent();
   }
   return current;
+}
+
+export function isShopDrawerNavigation(navigation) {
+  return navigation.getState?.()?.type === 'drawer';
+}
+
+export function isRootNavigation(navigation) {
+  return !navigation.getParent?.();
+}
+
+const SHOP_DASHBOARD_HOME_ROUTE = {
+  name: 'ShopHome',
+  state: { routes: [{ name: 'ShopDashboard' }], index: 0 },
+};
+
+/** ShopDashboard lives inside ShopDrawer — never flat-navigate from root stack. */
+export function navigateToShopDashboard(navigation) {
+  if (isShopDrawerNavigation(navigation)) {
+    navigation.dispatch(DrawerActions.jumpTo('ShopDashboard'));
+    return;
+  }
+  const root = getRootNavigation(navigation);
+  if (Platform.OS === 'web') {
+    root.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [SHOP_DASHBOARD_HOME_ROUTE],
+      })
+    );
+    syncWebPath(partnerDashboard());
+    requestAnimationFrame(() => syncWebPath(partnerDashboard()));
+    return;
+  }
+  root.navigate('ShopHome', { screen: 'ShopDashboard' });
 }
 
 const WEB_PATH_BY_SCREEN = {

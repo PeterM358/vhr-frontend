@@ -180,6 +180,12 @@ export default function LoginScreen({ navigation, route }) {
         await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SHOP_ID);
       }
 
+      if (data.shop_memberships && data.shop_memberships.length > 0) {
+        await AsyncStorage.setItem(STORAGE_KEYS.SHOP_MEMBERSHIPS, JSON.stringify(data.shop_memberships));
+      } else {
+        await AsyncStorage.removeItem(STORAGE_KEYS.SHOP_MEMBERSHIPS);
+      }
+
       if (data.is_shop) {
         const shopRoute = await resolveShopEntryRoute();
         await waitForAuthContextCommit();
