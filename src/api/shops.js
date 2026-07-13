@@ -62,16 +62,11 @@ export async function uploadShopImage(shopProfileId, token, imageUri, file = nul
   const formData = new FormData();
   await appendImageToFormData(formData, imageUri, file);
 
-  const headers = { Authorization: `Bearer ${token}` };
-  if (Platform.OS !== 'web') {
-    headers['Content-Type'] = 'multipart/form-data';
-  }
-
   const response = await fetch(
     `${API_BASE_URL}/api/profiles/shop_profiles/${shopProfileId}/images/`,
     {
       method: 'POST',
-      headers,
+      headers: { Authorization: `Bearer ${token}` },
       body: formData,
     }
   );
@@ -80,7 +75,11 @@ export async function uploadShopImage(shopProfileId, token, imageUri, file = nul
     let detail = 'Upload failed';
     try {
       const err = await response.json();
-      detail = err.detail || detail;
+      if (typeof err.detail === 'string') {
+        detail = err.detail;
+      } else if (err.image) {
+        detail = Array.isArray(err.image) ? err.image.join(', ') : String(err.image);
+      }
     } catch (_e) {
       /* ignore */
     }
