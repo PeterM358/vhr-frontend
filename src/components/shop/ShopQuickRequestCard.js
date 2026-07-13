@@ -13,6 +13,7 @@ import { parseOdometerKm } from '../../utils/finalizeMileageValidation';
 import { formatShopDisplayName } from '../../utils/shopDisplayName';
 import { navigateToRepairRequestNew } from '../../navigation/webNavigation';
 import { useTranslation } from '../../i18n';
+import { translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
 
 const VISIBLE_SERVICE_CHIPS = 6;
 
@@ -52,6 +53,7 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
   const [servicesExpanded, setServicesExpanded] = useState(false);
 
   const canSubmit = isLoggedIn && vehicles.length > 0 && !submitting;
+  const repairOptionLabel = (item) => translateRepairTypeLabel(item, t) || item?.name || '';
 
   useEffect(() => {
     onActionStateChange?.({ submitting, canSubmit });
@@ -76,7 +78,7 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
       repairTypeId: repairTypeId || undefined,
       description: selectedRepair
         ? t('serviceCenters.quickRequest.descriptionAtShop', {
-            service: selectedRepair.name,
+            service: repairOptionLabel(selectedRepair),
             shop: shopName,
           })
         : t('serviceCenters.quickRequest.requestAtShop', { shop: shopName }),
@@ -120,7 +122,9 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const availabilityNotes = formatPreferredVisitNote(selectedDay, timeSlot, t);
       const preferredTimes = buildPreferredVisitTimes(selectedDay, timeSlot);
-      const repairLabel = selectedRepair?.name || t('serviceCenters.quickRequest.defaultServiceLabel');
+      const repairLabel =
+        (selectedRepair ? repairOptionLabel(selectedRepair) : '') ||
+        t('serviceCenters.quickRequest.defaultServiceLabel');
       const created = await createRepair(token, {
         vehicle: parseInt(vehicleId, 10),
         repair_type: repairTypeId ? parseInt(repairTypeId, 10) : null,
@@ -236,7 +240,9 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
                   onPress={() => setRepairTypeId(String(item.id))}
                   style={[styles.chip, selected && styles.chipSelected]}
                 >
-                  <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{item.name}</Text>
+                  <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                    {repairOptionLabel(item)}
+                  </Text>
                 </Pressable>
               );
             })}
