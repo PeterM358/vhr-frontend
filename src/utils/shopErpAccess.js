@@ -1,10 +1,12 @@
 /**
  * Partner ERP menu/route visibility from shop capabilities and membership permissions.
  * Keys under erp.* in en.json / bg.json.
+ * Subscription entitlements (can_use_erp) are checked separately from staff roles.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { canUseErp, canUseCalendar, canUseRepairs } from './partnerEntitlements';
 
 const MANAGE_ROLES = new Set(['owner', 'manager']);
 const ACCOUNTANT_ARCHIVE_ROLES = new Set(['owner', 'accountant']);
@@ -64,9 +66,11 @@ export const PARTNER_ERP_ROUTES = {
     drawerKey: 'businessNetwork',
     requiresAccess: true,
   },
+  // Visible for owners/managers (and staff with financial perms) even when
+  // uses_invoicing is off — billing invoice APIs do not enforce that flag yet,
+  // and BASIC shops still need the Invoicing drawer entry for series + list.
   ShopInvoicing: {
     drawerKey: 'invoicing',
-    capability: 'uses_invoicing',
     permissionAny: ['post_financial_document', 'view_margin'],
     requiresAccess: true,
   },
@@ -124,6 +128,13 @@ export function getPartnerRouteDeniedReason(routeName, { profile, membership } =
   const rule = PARTNER_ERP_ROUTES[routeName];
   if (!rule) return null;
 
+  // Subscription entitlement — independent of staff permission / capabilities
+  if (rule.requiresAccess || rule.capability || rule.requiresManage) {
+    if (profile?.entitlements && !canUseErp(profile)) {
+      return 'subscription';
+    }
+  }
+
   if (rule.capability && !shopCapabilityEnabled(profile, rule.capability)) {
     return 'capability';
   }
@@ -147,6 +158,17 @@ export function getPartnerRouteDeniedReason(routeName, { profile, membership } =
   }
 
   return null;
+}
+
+/** Calendar / repairs drawer items — entitlement-aware. */
+export function canAccessPartnerCalendar(profile) {
+  if (!profile?.entitlements) return true;
+  return canUseCalendar(profile);
+}
+
+export function canAccessPartnerRepairsOps(profile) {
+  if (!profile?.entitlements) return true;
+  return canUseRepairs(profile);
 }
 
 export function canAccessPartnerRoute(routeName, context = {}) {

@@ -190,6 +190,17 @@ function CustomDrawerContent(props) {
           {...itemProps}
         />
 
+        {showInvoicing ? (
+          <DrawerItem
+            label={t('drawer.partner.invoicing')}
+            onPress={() => openStackRoute(navigateToPartnerInvoicing, 'ShopInvoicing')}
+            icon={({ color, size }) => (
+              <DrawerMenuIcon name="file-document-outline" color={color} size={size} />
+            )}
+            {...itemProps}
+          />
+        ) : null}
+
         <DrawerItem
           label={t('drawer.partner.promotions')}
           onPress={() => {
@@ -215,17 +226,6 @@ function CustomDrawerContent(props) {
               props.navigation.closeDrawer();
             }}
             icon={({ color, size }) => <DrawerMenuIcon name="warehouse" color={color} size={size} />}
-            {...itemProps}
-          />
-        ) : null}
-
-        {showInvoicing ? (
-          <DrawerItem
-            label={t('drawer.partner.invoicing')}
-            onPress={() => openStackRoute(navigateToPartnerInvoicing, 'ShopInvoicing')}
-            icon={({ color, size }) => (
-              <DrawerMenuIcon name="file-document-outline" color={color} size={size} />
-            )}
             {...itemProps}
           />
         ) : null}

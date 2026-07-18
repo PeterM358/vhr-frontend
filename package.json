@@ -18,6 +18,12 @@
     "start:dev": "expo start --dev-client",
     "test:erp": "node scripts/test-shop-erp-access.js",
     "test:partner-repair-nav": "node scripts/test-partner-repair-navigation.js",
+    "test:partner-nav-chrome": "node scripts/test-partner-nav-chrome.js",
+    "test:partner-entitlements": "node scripts/test-partner-entitlements.js",
+    "test:partner-subscription-bank": "node scripts/test-partner-subscription-bank.js",
+    "test:operation-icons": "node scripts/test-operation-icons.js",
+    "test:discovery-filters": "node scripts/test-discovery-filter-taxonomy.js",
+    "test:pickup-calendar": "node scripts/test-pickup-calendar-ux.js",
     "eas-build-pre-install": "./eas-build-pre-install.sh"
   },
   "dependencies": {

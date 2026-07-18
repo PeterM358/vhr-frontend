@@ -23,6 +23,7 @@ export { default as ServiceRecordServiceCenterScreen } from '../screens/ServiceR
 export { default as MapLocationPickerScreen } from '../screens/MapLocationPickerScreen.impl.web';
 export { default as AddManualServiceCenterScreen } from '../screens/AddManualServiceCenterScreen';
 export { default as ManageVehicleServiceCentersScreen } from '../screens/ManageVehicleServiceCentersScreen';
+export { default as VehicleHistoryAccessScreen } from '../screens/VehicleHistoryAccessScreen';
 export { default as AddObligationPaymentScreen } from '../screens/AddObligationPaymentScreen';
 export { default as CreateVehicleScreen } from '../screens/CreateVehicleScreen';
 export { default as CreatePromotionScreen } from '../screens/CreatePromotionScreen';
@@ -34,6 +35,7 @@ export { default as ClientActivityScreen } from '../screens/ClientActivityScreen
 export { default as ClientServiceHistoryScreen } from '../screens/ClientServiceHistoryScreen';
 export { default as ClientDashboardPlaceholderScreen } from '../screens/ClientDashboardPlaceholderScreen';
 export { default as ShopProfileScreen } from '../screens/ShopProfileScreen';
+export { default as ShopSubscriptionUpgradeScreen } from '../screens/ShopSubscriptionUpgradeScreen';
 export { default as ShopServiceMenuScreen } from '../screens/ShopServiceMenuScreen';
 export { default as ShopInvoicingScreen } from '../screens/ShopInvoicingScreen';
 export { default as ShopWarehouseReceiveScreen } from '../screens/ShopWarehouseReceiveScreen';
