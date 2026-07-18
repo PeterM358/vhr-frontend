@@ -32,6 +32,7 @@ export { default as ClientServiceHistoryScreen } from '../screens/ClientServiceH
 export { default as ClientDashboardPlaceholderScreen } from '../screens/ClientDashboardPlaceholderScreen';
 export { default as ShopProfileScreen } from '../screens/ShopProfileScreen';
 export { default as ShopSubscriptionUpgradeScreen } from '../screens/ShopSubscriptionUpgradeScreen';
+export { default as ShopSubscriptionSuccessScreen } from '../screens/ShopSubscriptionSuccessScreen';
 export { default as ShopServiceMenuScreen } from '../screens/ShopServiceMenuScreen';
 export { default as ShopInvoicingScreen } from '../screens/ShopInvoicingScreen';
 export { default as ShopWarehouseReceiveScreen } from '../screens/ShopWarehouseReceiveScreen';

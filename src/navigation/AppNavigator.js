@@ -52,6 +52,7 @@ import {
   NotificationsWithAppbar,
   ShopProfileScreen,
   ShopSubscriptionUpgradeScreen,
+  ShopSubscriptionSuccessScreen,
   ShopServiceMenuScreen,
   ShopInvoicingScreen,
   ShopWarehouseReceiveScreen,
@@ -516,6 +517,11 @@ export default function AppNavigator() {
           name="ShopSubscriptionUpgrade"
           component={ShopSubscriptionUpgradeScreen}
           options={{ ...appNavBarScreenOptions, title: 'Upgrade' }}
+        />
+        <Stack.Screen
+          name="ShopSubscriptionSuccess"
+          component={ShopSubscriptionSuccessScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Subscription' }}
         />
         <Stack.Screen
           name="ShopServiceMenu"

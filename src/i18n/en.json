@@ -2487,6 +2487,13 @@
     "lockedTeaserBody": "Marketplace leads and offers require an active PRO plan.",
     "expiresAt": "Expires",
     "payByBankTransfer": "Pay by bank transfer",
+    "payByCard": "Pay by card",
+    "payByCardCta": "Continue to secure card checkout",
+    "choosePlan": "Choose a plan",
+    "cardCheckoutIntro": "Pay securely with Stripe Checkout. Veversal never stores your card. Activation happens after payment is confirmed — not when you return from checkout.",
+    "stripeConfigMissingTitle": "Card checkout not configured",
+    "stripeConfigMissingBody": "Stripe Checkout is not available yet. Use bank transfer or contact Veversal partners support.",
+    "checkoutUrlMissing": "Checkout URL was not returned. Try again or use bank transfer.",
     "bankTransferIntro": "Choose a plan. You will receive bank details and a unique payment reference. Your subscription activates after Veversal confirms the transfer.",
     "planOption": {
       "pro_monthly": "PRO monthly",
@@ -2509,6 +2516,14 @@
     "bic": "BIC",
     "period": "Service period",
     "paymentStatus": "Status",
-    "notAnInvoice": "This is a payment instruction, not an accounting invoice."
+    "notAnInvoice": "This is a payment instruction, not an accounting invoice.",
+    "successTitle": "Payment received",
+    "successHeadline": "Thanks — confirming your plan",
+    "successBody": "Card checkout completed on Stripe. Your Veversal subscription activates when payment is confirmed (usually within a few seconds). This page refreshes automatically.",
+    "successPending": "Waiting for confirmation…",
+    "successActive": "Your plan is active.",
+    "successBackHome": "Back to shop home",
+    "successRefresh": "Refresh status",
+    "successPollNote": "Status checks: {{polls}}"
   }
 }

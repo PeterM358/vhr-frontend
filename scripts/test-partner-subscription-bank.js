@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Partner subscription upgrade / bank-transfer UX helpers.
+ * Partner subscription — Stripe + bank transfer UX helpers.
  * Run: npm run test:partner-subscription-bank
  */
 
@@ -50,6 +50,8 @@ assert.strictEqual(findOption(options, 'premium', 'monthly').amount, '79');
 
 const incompleteBank = { configured: false, incomplete: true };
 assert.strictEqual(Boolean(incompleteBank.incomplete), true);
+const incompleteStripe = { configured: false, incomplete: true };
+assert.strictEqual(Boolean(incompleteStripe.incomplete), true);
 
 const payment = {
   payment_reference: 'SUB-2026-000154',
@@ -77,16 +79,34 @@ const screenSrc = fs.readFileSync(
   'utf8'
 );
 assert.ok(screenSrc.includes('payByBankTransfer'));
+assert.ok(screenSrc.includes('payByCard'));
+assert.ok(screenSrc.includes('createSubscriptionCheckout'));
 assert.ok(screenSrc.includes('payment_reference'));
 assert.ok(screenSrc.includes('bankIncomplete') || screenSrc.includes('bankConfigMissing'));
+assert.ok(screenSrc.includes('stripeIncomplete') || screenSrc.includes('stripeConfigMissing'));
 assert.ok(!/plan_key\s*===\s*['"]pro['"]/.test(screenSrc));
 assert.ok(!/plan_key\s*===\s*['"]premium['"]/.test(screenSrc));
+
+const successSrc = fs.readFileSync(
+  path.join(__dirname, '../src/screens/ShopSubscriptionSuccessScreen.js'),
+  'utf8'
+);
+assert.ok(successSrc.includes('getShopEntitlementsApi'));
+assert.ok(successSrc.includes('successPending') || successSrc.includes('successBody'));
+
+const apiSrc = fs.readFileSync(path.join(__dirname, '../src/api/profiles.js'), 'utf8');
+assert.ok(apiSrc.includes('subscription-checkout'));
+assert.ok(apiSrc.includes('createSubscriptionCheckout'));
 
 const en = JSON.parse(fs.readFileSync(path.join(__dirname, '../src/i18n/en.json'), 'utf8'));
 const bg = JSON.parse(fs.readFileSync(path.join(__dirname, '../src/i18n/bg.json'), 'utf8'));
 assert.ok(en.subscription.payByBankTransfer);
 assert.ok(bg.subscription.payByBankTransfer);
+assert.ok(en.subscription.payByCard);
+assert.ok(bg.subscription.payByCard);
 assert.ok(en.subscription.useExactReference);
 assert.ok(bg.subscription.notAnInvoice);
+assert.ok(en.subscription.successBody);
+assert.ok(bg.subscription.successBody);
 
-console.log('partner-subscription-bank: ok');
+console.log('partner-subscription-bank: ok (stripe+bank)');

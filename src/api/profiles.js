@@ -255,7 +255,7 @@ export async function deleteShopInvoiceLogo(profileId, token) {
     throw new Error('Failed to remove invoice logo');
   }
 }
-/** Subscription bank-payment catalog + instructions for a shop. */
+/** Subscription payment catalog + Stripe/bank instructions for a shop. */
 export async function getSubscriptionPaymentOptions(shopId) {
   const token = await AsyncStorage.getItem('@access_token');
   const res = await fetch(
@@ -290,6 +290,30 @@ export async function createSubscriptionPaymentRequest(shopId, { planKey, billin
   return res.json();
 }
 
+/** Start Stripe Checkout (subscription mode). Server resolves Price IDs/amounts. */
+export async function createSubscriptionCheckout(shopId, { planKey, billingInterval }) {
+  const token = await AsyncStorage.getItem('@access_token');
+  const res = await fetch(
+    `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/subscription-checkout/`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        plan_key: planKey,
+        billing_interval: billingInterval,
+      }),
+    }
+  );
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(JSON.stringify(errorData));
+  }
+  return res.json();
+}
+
 export async function listSubscriptionPaymentRequests(shopId) {
   const token = await AsyncStorage.getItem('@access_token');
   const res = await fetch(
@@ -297,5 +321,15 @@ export async function listSubscriptionPaymentRequests(shopId) {
     { headers: { Authorization: `Bearer ${token}` } }
   );
   if (!res.ok) throw new Error('Failed to load payment requests');
+  return res.json();
+}
+
+export async function getShopEntitlementsApi(shopId) {
+  const token = await AsyncStorage.getItem('@access_token');
+  const res = await fetch(
+    `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/entitlements/`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) throw new Error('Failed to load entitlements');
   return res.json();
 }

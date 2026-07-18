@@ -1,5 +1,5 @@
 /**
- * Upgrade screen — manual bank transfer (V1).
+ * Upgrade screen — Stripe Checkout + manual bank transfer (V1).
  * Gates must use entitlements from the API, not plan-name hardcoding.
  */
 
@@ -11,6 +11,7 @@ import {
   Platform,
   Pressable,
   Share,
+  Linking,
 } from 'react-native';
 import { Text, Button, ActivityIndicator } from 'react-native-paper';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
@@ -23,6 +24,7 @@ import {
   getMyShopProfiles,
   getSubscriptionPaymentOptions,
   createSubscriptionPaymentRequest,
+  createSubscriptionCheckout,
 } from '../api/profiles';
 import { COLORS } from '../constants/colors';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -84,6 +86,7 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
   const [profile, setProfile] = useState(null);
   const [optionsPayload, setOptionsPayload] = useState(null);
   const [selected, setSelected] = useState({ planKey: 'pro', billingInterval: 'annual' });
@@ -128,7 +131,9 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   const completion = ents?.profile_completion;
   const expiresAt = ents?.expires_at;
   const bank = optionsPayload?.bank || {};
+  const stripe = optionsPayload?.stripe || {};
   const bankIncomplete = Boolean(bank.incomplete || bank.configured === false);
+  const stripeIncomplete = Boolean(stripe.incomplete || stripe.configured === false);
   const featureRequested =
     featureLabelParam ||
     (featureKey && FEATURE_LABEL_KEYS[featureKey]
@@ -155,6 +160,35 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
       setError(String(e?.message || e));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const payByCard = async () => {
+    if (!profile?.id || stripeIncomplete) return;
+    setCheckoutSubmitting(true);
+    setError(null);
+    try {
+      const row = await createSubscriptionCheckout(profile.id, {
+        planKey: selected.planKey,
+        billingInterval: selected.billingInterval,
+      });
+      const url = row?.checkout_url;
+      if (!url) {
+        throw new Error(t('subscription.checkoutUrlMissing'));
+      }
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.location.assign(url);
+      } else {
+        await Linking.openURL(url);
+        navigation.navigate('ShopSubscriptionSuccess', {
+          paymentId: row.payment_id,
+          sessionId: row.checkout_session_id,
+        });
+      }
+    } catch (e) {
+      setError(String(e?.message || e));
+    } finally {
+      setCheckoutSubmitting(false);
     }
   };
 
@@ -218,9 +252,7 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
               </View>
             ) : null}
 
-            <Text style={styles.sectionTitle}>{t('subscription.payByBankTransfer')}</Text>
-            <Text style={styles.sectionBody}>{t('subscription.bankTransferIntro')}</Text>
-
+            <Text style={styles.sectionTitle}>{t('subscription.choosePlan')}</Text>
             <View style={styles.optionGrid}>
               {PLAN_OPTIONS.map((row) => {
                 const opt = findOption(optionsPayload?.options, row.planKey, row.billingInterval);
@@ -254,6 +286,43 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
               })}
             </View>
 
+            <Text style={styles.sectionTitle}>{t('subscription.payByCard')}</Text>
+            <Text style={styles.sectionBody}>{t('subscription.cardCheckoutIntro')}</Text>
+            {stripeIncomplete ? (
+              <View style={styles.warnCard}>
+                <Text style={styles.warnTitle}>{t('subscription.stripeConfigMissingTitle')}</Text>
+                <Text style={styles.warnBody}>{t('subscription.stripeConfigMissingBody')}</Text>
+              </View>
+            ) : (
+              <Pressable
+                onPress={payByCard}
+                disabled={checkoutSubmitting || !selectedOption}
+                style={({ pressed }) => [
+                  styles.cta,
+                  styles.ctaCard,
+                  (pressed || checkoutSubmitting) && { opacity: 0.9 },
+                ]}
+              >
+                <View style={styles.ctaInner}>
+                  {checkoutSubmitting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Text style={styles.ctaText}>{t('subscription.payByCardCta')}</Text>
+                      <Text style={styles.ctaSub}>
+                        {selectedOption
+                          ? `${selectedOption.amount} ${selectedOption.currency}`
+                          : ''}
+                      </Text>
+                    </>
+                  )}
+                </View>
+              </Pressable>
+            )}
+
+            <Text style={styles.sectionTitle}>{t('subscription.payByBankTransfer')}</Text>
+            <Text style={styles.sectionBody}>{t('subscription.bankTransferIntro')}</Text>
+
             {bankIncomplete ? (
               <View style={styles.warnCard}>
                 <Text style={styles.warnTitle}>{t('subscription.bankConfigMissingTitle')}</Text>
@@ -265,6 +334,7 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
                 disabled={submitting || !selectedOption}
                 style={({ pressed }) => [
                   styles.cta,
+                  styles.ctaBank,
                   (pressed || submitting) && { opacity: 0.9 },
                 ]}
               >
@@ -448,6 +518,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.TEXT_DARK,
     marginBottom: 8,
+    marginTop: 8,
   },
   sectionBody: {
     fontSize: 14,
@@ -504,8 +575,13 @@ const styles = StyleSheet.create({
   cta: {
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: COLORS.PRIMARY,
     marginBottom: 16,
+  },
+  ctaCard: {
+    backgroundColor: COLORS.PRIMARY,
+  },
+  ctaBank: {
+    backgroundColor: COLORS.PRIMARY_DARK,
   },
   ctaInner: {
     paddingVertical: 18,

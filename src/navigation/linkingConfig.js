@@ -40,6 +40,7 @@ export const linkingScreens = {
   },
   ShopProfile: 'partner/profile',
   ShopSubscriptionUpgrade: 'partner/upgrade',
+  ShopSubscriptionSuccess: 'shop/subscription/success',
   ShopInvoicing: 'partner/invoicing',
   ShopServiceMenu: 'partner/services',
   PartnerBookings: 'partner/bookings',
