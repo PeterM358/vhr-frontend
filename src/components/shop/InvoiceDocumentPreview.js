@@ -82,7 +82,10 @@ export default function InvoiceDocumentPreview({ invoice }) {
   if (!invoice) return null;
 
   const currency = invoice.currency;
-  const title = invoice.document_title || (invoice.status === 'draft' ? 'Proforma invoice' : 'Tax invoice');
+  const isDraft = invoice.status === 'draft';
+  const title =
+    invoice.document_title ||
+    (isDraft ? 'Proforma invoice' : invoice.status === 'void' ? 'Void invoice' : 'Invoice');
   const numberLabel = invoiceDisplayNumber(invoice);
   const dateLabel = invoice.issued_at
     ? new Date(invoice.issued_at).toLocaleDateString()
@@ -126,7 +129,9 @@ export default function InvoiceDocumentPreview({ invoice }) {
           <IssuerLogo uri={invoice.issuer_logo_url || invoice.issuer_logo} name={invoice.issuer_name} />
           <View style={styles.docMeta}>
             <Text style={styles.docTitle}>{title.toUpperCase()}</Text>
-            <Text style={styles.docSubTitle}>Проформа / Фактура</Text>
+            <Text style={styles.docSubTitle}>
+              {isDraft ? 'Draft / Proforma · Чернова / Проформа' : 'Invoice · Фактура'}
+            </Text>
             <Text style={styles.docNumber}>№ {numberLabel}</Text>
             <Text style={styles.docDate}>Date / Дата: {dateLabel}</Text>
             <Text style={styles.paymentChip}>{paymentLabel}</Text>
@@ -187,7 +192,9 @@ export default function InvoiceDocumentPreview({ invoice }) {
         ) : null}
 
         <Text style={styles.footerHint}>
-          Draft = proforma (no fiscal number until issued). PDF export and accountant export coming next.
+          {isDraft
+            ? 'Draft = proforma (no fiscal number until issued). PDF export and accountant export coming next.'
+            : 'Issued = numbered tax invoice. Offers remain commercial estimates, not fiscal documents.'}
         </Text>
       </View>
     </ScrollView>
@@ -228,30 +235,35 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   docMeta: {
-    alignItems: 'flex-end',
+    alignItems: 'center',
     flex: 1,
+    paddingTop: 4,
   },
   docTitle: {
     fontSize: 22,
     fontWeight: '800',
     color: '#0f172a',
     letterSpacing: 0.5,
+    textAlign: 'center',
   },
   docSubTitle: {
     fontSize: 12,
     color: '#64748b',
     marginTop: 2,
+    textAlign: 'center',
   },
   docNumber: {
     fontSize: 16,
     fontWeight: '700',
     color: '#1e3a5f',
     marginTop: 8,
+    textAlign: 'center',
   },
   docDate: {
     fontSize: 13,
     color: '#475569',
     marginTop: 4,
+    textAlign: 'center',
   },
   paymentChip: {
     marginTop: 8,
@@ -259,6 +271,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#15803d',
     textTransform: 'uppercase',
+    textAlign: 'center',
   },
   partiesRow: {
     flexDirection: 'row',

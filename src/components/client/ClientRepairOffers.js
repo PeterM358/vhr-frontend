@@ -109,7 +109,8 @@ export default function ClientRepairOffers({
   const [checkingInId, setCheckingInId] = useState(null);
   const navigation = useNavigation();
   const hasLoadedRef = useRef(false);
-  const { notifications, setNotifications } = useContext(WebSocketContext);
+  const { notifications, setNotifications, refreshUnreadFromRest } =
+    useContext(WebSocketContext);
 
   const openRepairDetail = useCallback(
     (repairId) => {
@@ -195,6 +196,9 @@ export default function ClientRepairOffers({
               n.id === matchingNotif.id ? { ...n, is_read: true } : n
             )
           );
+          if (typeof refreshUnreadFromRest === 'function') {
+            await refreshUnreadFromRest();
+          }
         }
 
         await markOfferSeen(token, item.id);
@@ -210,7 +214,7 @@ export default function ClientRepairOffers({
         Alert.alert('Error', 'Could not open detail');
       }
     },
-    [notifications, openRepairDetail, setNotifications]
+    [notifications, openRepairDetail, refreshUnreadFromRest, setNotifications]
   );
 
   const { upcomingAppointments, inServiceRepairs, offersToReview } = useMemo(() => {

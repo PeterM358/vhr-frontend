@@ -25,7 +25,7 @@ const STATUS_KEYS = {
 };
 
 export default function ShopPurchaseOrdersScreen({ navigation }) {
-  const onBack = usePartnerDashboardBack();
+  const onBack = usePartnerDashboardBack(navigation);
   const { t } = useTranslation();
   const { loading, shopProfile, membership, shopId, error } = useShopErpContext();
   const [rows, setRows] = useState([]);

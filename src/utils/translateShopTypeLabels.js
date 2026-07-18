@@ -141,12 +141,43 @@ export function translateVehicleTypePublicLabel(value, t) {
   return translateVehicleTypeLabel(value, t, { public: true });
 }
 
+function humanizeSlugLabel(slug) {
+  const raw = String(slug || '')
+    .trim()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!raw) return '';
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+/** Slug → serviceCategories.* i18n key (camelCase slug). */
+const SERVICE_CATEGORY_I18N_KEY_BY_SLUG = {
+  maintenance: 'serviceCategories.maintenance',
+  mechanical: 'serviceCategories.mechanical',
+  'electrical-diagnostics': 'serviceCategories.electricalDiagnostics',
+  'tires-wheels': 'serviceCategories.tiresWheels',
+  'bodywork-paint': 'serviceCategories.bodyworkPaint',
+  'air-conditioning': 'serviceCategories.airConditioning',
+  'battery-charging': 'serviceCategories.batteryCharging',
+  'cleaning-detailing': 'serviceCategories.cleaningDetailing',
+  'insurance-documents': 'serviceCategories.insuranceDocuments',
+  'inspections-legal': 'serviceCategories.inspectionsLegal',
+  'accessories-installation': 'serviceCategories.accessoriesInstallation',
+  other: 'serviceCategories.other',
+};
+
+function resolveCategorySlug(value) {
+  const v = typeof value === 'string' ? { slug: value } : value || {};
+  return normalizeKey(v.slug || v.category_slug || v.code || v.name || v.category_name);
+}
+
 export function translateRepairTypeLabel(value, t) {
   if (!value) return '';
 
   const slug = resolveRepairSlug(value);
   const v = typeof value === 'string' ? { name: value } : value;
-  const rawName = v.repair_type_name || v.name;
+  const rawName = v.repair_type_name || v.name || v.display_name || v.name_en || v.name_bg;
   const rawSlug = v.slug || v.repair_type_slug || v.code || v.repair_type_code;
 
   const explicitKey = REPAIR_I18N_KEY_BY_SLUG[slug];
@@ -166,7 +197,35 @@ export function translateRepairTypeLabel(value, t) {
     }
   }
 
-  return String(rawName || rawSlug || value).trim();
+  const fallback = String(rawName || '').trim() || humanizeSlugLabel(rawSlug || slug);
+  return fallback || String(value).trim();
+}
+
+/**
+ * Service category = grouping (Maintenance, Mechanical, …).
+ * Repair type / operation = leaf service under a category.
+ */
+export function translateServiceCategoryLabel(value, t) {
+  if (!value) return '';
+
+  const slug = resolveCategorySlug(value);
+  const v = typeof value === 'string' ? { name: value } : value || {};
+  const rawName = v.category_name || v.name || v.display_name || v.name_en;
+
+  const explicitKey = SERVICE_CATEGORY_I18N_KEY_BY_SLUG[slug];
+  if (explicitKey) {
+    return t(explicitKey, null, String(rawName || slug || value));
+  }
+
+  const camel = camelCaseFromSlug(slug);
+  if (camel) {
+    const key = `serviceCategories.${camel}`;
+    const fallbackSentinel = '__MISSING_CATEGORY_TRANSLATION__';
+    const translated = t(key, null, fallbackSentinel);
+    if (translated !== fallbackSentinel) return translated;
+  }
+
+  return String(rawName || '').trim() || humanizeSlugLabel(slug) || String(value).trim();
 }
 
 export function translateVehicleTypeLabels(values, t, options) {

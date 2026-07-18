@@ -64,6 +64,7 @@ export default function AppNavigationBar({
   largeTitle = false,
   scrolled = false,
   compact = false,
+  iconOnlyBack = false,
   style,
 }) {
   const insets = useSafeAreaInsets();
@@ -102,14 +103,25 @@ export default function AppNavigationBar({
         ]}
       >
         <View style={[styles.bar, compact && styles.barCompact, largeTitle && styles.barLarge]}>
-          <View style={[styles.sideSlot, compact && styles.sideSlotCompact]}>
+          <View
+            style={[
+              styles.sideSlot,
+              compact && styles.sideSlotCompact,
+              iconOnlyBack && styles.sideSlotIconOnly,
+            ]}
+          >
             {leftAction ??
               (showBack && onBack ? (
                 <BackHeaderButton
                   onPress={onBack}
                   label={backLabel}
                   variant={theme.backVariant}
-                  accessibilityLabel={`Back to ${backLabel}`}
+                  iconOnly={iconOnlyBack}
+                  accessibilityLabel={
+                    iconOnlyBack
+                      ? 'Back'
+                      : `Back to ${backLabel}`
+                  }
                 />
               ) : null)}
           </View>
@@ -132,7 +144,16 @@ export default function AppNavigationBar({
             <View style={styles.largeTitleSpacer} />
           )}
 
-          <View style={[styles.sideSlot, styles.sideSlotRight, compact && styles.sideSlotCompact]}>
+          <View
+            style={[
+              styles.sideSlot,
+              styles.sideSlotRight,
+              compact && styles.sideSlotCompact,
+              // Keep right slot wide enough for labeled actions (e.g. Select to invoice).
+              !rightAction && iconOnlyBack && styles.sideSlotIconOnly,
+              rightAction && styles.sideSlotRightWide,
+            ]}
+          >
             {rightAction ?? null}
           </View>
         </View>
@@ -214,8 +235,17 @@ const styles = StyleSheet.create({
   sideSlotCompact: {
     width: 96,
   },
+  sideSlotIconOnly: {
+    width: 52,
+  },
   sideSlotRight: {
     alignItems: 'flex-end',
+  },
+  sideSlotRightWide: {
+    width: 'auto',
+    minWidth: 52,
+    maxWidth: 200,
+    flexShrink: 0,
   },
   titleWrap: {
     flex: 1,

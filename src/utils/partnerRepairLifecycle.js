@@ -161,7 +161,12 @@ export function getPartnerRequestGuide(
   const shopOffers = (offers || []).filter(
     (o) => shopId != null && !Number.isNaN(shopId) && Number(o.shop) === shopId
   );
-  const bookedOffer = shopOffers.some((o) => o.is_booked);
+  const assignedShopId = Number(repair.shop_profile ?? repair.shop_profile_id);
+  const assignedToThisShop =
+    shopId != null && !Number.isNaN(shopId) && Number.isFinite(assignedShopId) && assignedShopId === shopId;
+  // Prefer offer.is_booked; also treat assigned shop as booked so we never show
+  // "waiting for customer to book" alongside Awaiting arrival / job access.
+  const bookedOffer = shopOffers.some((o) => o.is_booked) || assignedToThisShop;
   const sentOffer = shopOffers.length > 0;
 
   if (bookedOffer) {

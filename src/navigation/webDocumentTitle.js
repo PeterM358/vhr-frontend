@@ -119,6 +119,9 @@ export function getWebDocumentTitle(pathname) {
   if (/^\/partner\/repairs\/\d+\/offer$/.test(unprefixed)) {
     return seo('sendProposal');
   }
+  if (/^\/partner\/repairs\/\d+$/.test(unprefixed)) {
+    return seo('repairs');
+  }
   if (/^\/(car|truck|motorcycle|bike|ebike|scooter)-service-centers/.test(unprefixed)) {
     return t('seo.serviceCentersMeta.title', { app: t('common.appName', null, BASE_TITLE) }, seo('serviceCenters'));
   }

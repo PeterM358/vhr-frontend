@@ -12,7 +12,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ScreenBackground from '../components/ScreenBackground';
-import AppNavigationBar from '../components/common/AppNavigationBar';
+import PartnerAppHeader from '../components/partner/PartnerAppHeader';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import {
@@ -51,18 +51,20 @@ import SearchableChipSelector from '../components/ui/SearchableChipSelector';
 import { vehicleTypeEmoji } from '../utils/vehicleTypeIcons';
 
 import AppCard from '../components/ui/AppCard';
-import EmptyStateCard from '../components/ui/EmptyStateCard';
 import { COLORS } from '../constants/colors';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { AuthContext } from '../context/AuthManager';
 import { logout } from '../api/auth';
 import {
   getShopProfileIncompleteFields,
+  getShopProfileGateIncompleteFields,
   getShopProfileCompletionPercent,
   getShopProfileStrengthHints,
+  getShopProfileSectionStatus,
   hasShopMapPin,
   isShopProfileEssentialsComplete,
 } from '../utils/shopProfileCompleteness';
+import { profileSectionForField } from '../utils/shopProfileSectionMap';
 import ShopProfileCompletionCard from '../components/shop/ShopProfileCompletionCard';
 import ShopProfileMissingAlert from '../components/shop/ShopProfileMissingAlert';
 import { getInitialShopProfileExpandedSections } from '../utils/shopProfileGate';
@@ -73,8 +75,12 @@ import {
   dedupeRepeatedAddressText,
 } from '../utils/reverseGeocodeLocation';
 import { dialPrefixForCountry, parseStoredPhone } from '../utils/phoneE164';
-import ShopPublicPagePreview from '../components/shop/ShopPublicPagePreview';
+import ShopPublicPreviewTabs from '../components/shop/ShopPublicPreviewTabs';
+import ShopViewPublicProfileButton from '../components/shop/ShopViewPublicProfileButton';
 import ShopPhotoGallery from '../components/shop/ShopPhotoGallery';
+import ShopOperationsPricingSection from '../components/shop/ShopOperationsPricingSection';
+import ShopOnlinePresenceSection from '../components/shop/ShopOnlinePresenceSection';
+import ShopNotificationSettingsSection from '../components/shop/ShopNotificationSettingsSection';
 import {
   buildShopProfileFormDraft,
   applyShopProfileFormDraft,
@@ -89,17 +95,18 @@ import {
   buildShopGeneratedPublicProfile,
   deriveServiceCenterTypeFromVehicles,
 } from '../utils/shopPublicProfileText';
-import { getServiceMenu } from '../api/serviceMenu';
-import { resolveRepairTypeIcon } from '../utils/repairTypeIcons';
+import {
+  getServiceMenu,
+  createServiceMenuItem,
+  updateServiceMenuItem,
+} from '../api/serviceMenu';
 import ShopInvoiceSettingsSection from '../components/shop/ShopInvoiceSettingsSection';
-import LanguagePicker from '../components/profile/LanguagePicker';
 import ProfileHeaderSaveButton from '../components/profile/ProfileHeaderSaveButton';
 import { useTranslation } from '../i18n';
 import { pickVehiclePhotoAttachment, pickInvoiceLogoAttachment } from '../utils/pickDocumentFile';
 import { emptyLegalEntityDraft } from '../utils/invoiceTaxLabels';
 import { attachLunchBreak, parseLunchBreak } from '../utils/shopWorkingHours';
 import { buildShopProfileSaveSnapshot } from '../utils/shopProfileSaveSnapshot';
-import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const DAY_KEY = {
@@ -285,6 +292,8 @@ export default function ShopProfileScreen({ navigation, route }) {
   const [lunchBreakHours, setLunchBreakHours] = useState(0);
   const [lunchStart, setLunchStart] = useState('12:00');
   const [publishedMenuItems, setPublishedMenuItems] = useState([]);
+  const [serviceMenuItems, setServiceMenuItems] = useState([]);
+  const [savingPricing, setSavingPricing] = useState(false);
   const [preferredContactMethods, setPreferredContactMethods] = useState(['chat']);
   const [expandedSections, setExpandedSections] = useState({});
   const [resolvingMapLocation, setResolvingMapLocation] = useState(false);
@@ -293,6 +302,8 @@ export default function ShopProfileScreen({ navigation, route }) {
   const [legalEntityOptions, setLegalEntityOptions] = useState([]);
   const sectionsInitialized = useRef(false);
   const mapPickHandledRef = useRef(null);
+  const profileScrollRef = useRef(null);
+  const sectionOffsetYs = useRef({});
   const [savedSnapshot, setSavedSnapshot] = useState(null);
 
   useFocusEffect(
@@ -303,8 +314,12 @@ export default function ShopProfileScreen({ navigation, route }) {
 
   const profileForCompleteness = useMemo(() => {
     if (!profile) return null;
-    return { ...profile, supported_vehicle_types: selectedVehicleTypes };
-  }, [profile, selectedVehicleTypes]);
+    return {
+      ...profile,
+      supported_vehicle_types: selectedVehicleTypes,
+      legal_entity_detail: legalEntity || profile.legal_entity_detail || null,
+    };
+  }, [profile, selectedVehicleTypes, legalEntity]);
 
   const countryLabel = useMemo(() => {
     const row = countries.find((c) => Number(c.id) === Number(profile?.country));
@@ -330,7 +345,9 @@ export default function ShopProfileScreen({ navigation, route }) {
       shopName: profile?.name,
       vehicleTypeNames: vehicleNames,
       repairTypeNames: repairNames,
-      publishedMenuItems,
+      publishedMenuItems: (publishedMenuItems || []).filter((row) =>
+        selectedServices.includes(Number(row.repair_type ?? row.repair_type_id))
+      ),
       cityName: cityLabel,
       countryName: countryLabel,
       address: profile?.address,
@@ -369,7 +386,18 @@ export default function ShopProfileScreen({ navigation, route }) {
   useEffect(() => {
     const key = route.params?.expandSection;
     if (!key) return;
-    setExpandedSections((prev) => ({ ...prev, [key]: true }));
+    const sectionKey = key === 'invoice' ? 'company' : key;
+    setExpandedSections((prev) => ({ ...prev, [sectionKey]: true, company: sectionKey === 'company' ? true : prev.company }));
+    const scrollToY = () => {
+      const y = sectionOffsetYs.current[sectionKey];
+      if (typeof y !== 'number' || !profileScrollRef.current?.scrollTo) return;
+      profileScrollRef.current.scrollTo({ y: Math.max(0, y - 12), animated: true });
+    };
+    requestAnimationFrame(() => {
+      scrollToY();
+      setTimeout(scrollToY, 160);
+      setTimeout(scrollToY, 400);
+    });
   }, [route.params?.expandSection]);
 
   const applyMapPick = useCallback(
@@ -579,6 +607,27 @@ export default function ShopProfileScreen({ navigation, route }) {
     setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const recordSectionOffset = useCallback((sectionKey, y) => {
+    if (!sectionKey || typeof y !== 'number' || Number.isNaN(y)) return;
+    sectionOffsetYs.current[sectionKey] = y;
+  }, []);
+
+  const scrollToMissingField = useCallback((fieldKey) => {
+    const sectionKey = profileSectionForField(fieldKey);
+    if (!sectionKey) return;
+    setExpandedSections((prev) => ({ ...prev, [sectionKey]: true }));
+    const scrollToY = () => {
+      const y = sectionOffsetYs.current[sectionKey];
+      if (typeof y !== 'number' || !profileScrollRef.current?.scrollTo) return;
+      profileScrollRef.current.scrollTo({ y: Math.max(0, y - 12), animated: true });
+    };
+    // Expand accordion first, then scroll (layout may shift after expand).
+    requestAnimationFrame(() => {
+      scrollToY();
+      setTimeout(scrollToY, 120);
+    });
+  }, []);
+
   useLayoutEffect(() => {
     navigation.setOptions({
       title: requireSetup ? t('partnerProfile.completeCenterDetails') : t('partnerProfile.centerDetails'),
@@ -759,11 +808,12 @@ export default function ShopProfileScreen({ navigation, route }) {
               getServiceMenu(token, String(p.id)),
               getLegalEntities(token).catch(() => []),
             ]);
-            setPublishedMenuItems(
-              (Array.isArray(menuRows) ? menuRows : []).filter((row) => row.is_published)
-            );
+            const rows = Array.isArray(menuRows) ? menuRows : [];
+            setServiceMenuItems(rows);
+            setPublishedMenuItems(rows.filter((row) => row.is_published));
             setLegalEntityOptions(Array.isArray(entities) ? entities : []);
           } catch {
+            setServiceMenuItems([]);
             setPublishedMenuItems([]);
             setLegalEntityOptions([]);
           }
@@ -834,7 +884,9 @@ export default function ShopProfileScreen({ navigation, route }) {
       working_hours: buildWorkingHoursPayload(hoursRows, lunchBreakHours, lunchStart),
       supported_vehicle_types: selectedVehicleTypes,
     };
-    const missing = getShopProfileIncompleteFields(draftProfile);
+    const missing = getShopProfileGateIncompleteFields(draftProfile, {
+      vehicleTypeIds: selectedVehicleTypes,
+    });
     if (missing.length) {
       setDialogMessage(t('partnerProfile.missingFields', { fields: missing.join(', ') }));
       setDialogVisible(true);
@@ -858,10 +910,17 @@ export default function ShopProfileScreen({ navigation, route }) {
       const token = await AsyncStorage.getItem('@access_token');
       if (token) {
         const menuRows = await getServiceMenu(token, String(profile.id));
-        menuForSummary = (Array.isArray(menuRows) ? menuRows : []).filter((row) => row.is_published);
+        const selectedSet = new Set(selectedServices.map(Number));
+        menuForSummary = (Array.isArray(menuRows) ? menuRows : []).filter(
+          (row) =>
+            row.is_published && selectedSet.has(Number(row.repair_type ?? row.repair_type_id))
+        );
       }
     } catch {
-      menuForSummary = publishedMenuItems;
+      const selectedSet = new Set(selectedServices.map(Number));
+      menuForSummary = (publishedMenuItems || []).filter((row) =>
+        selectedSet.has(Number(row.repair_type ?? row.repair_type_id))
+      );
     }
 
     const generated = buildShopGeneratedPublicProfile({
@@ -937,6 +996,7 @@ export default function ShopProfileScreen({ navigation, route }) {
       working_hours: workingHoursPayload,
       service_center_type: deriveServiceCenterTypeFromVehicles(vehicleNames),
       description: profile.description,
+      short_description: profile.short_description || '',
       seo_city: generated.seoCity,
       seo_country: generated.seoCountry,
       seo_keywords: generated.seoKeywords,
@@ -968,7 +1028,17 @@ export default function ShopProfileScreen({ navigation, route }) {
       if (updated.legal_entity_detail) {
         setLegalEntity({ ...updated.legal_entity_detail });
       }
-      setPublishedMenuItems(menuForSummary);
+      // Re-fetch menu after profile save — never merge stale published rows over
+      // labor_from/to that were just written by the operations modal.
+      try {
+        if (token) {
+          await refreshServiceMenuFromApi(token, profile.id);
+        } else {
+          setPublishedMenuItems(menuForSummary);
+        }
+      } catch {
+        setPublishedMenuItems(menuForSummary);
+      }
       setHoursRows(parseWorkingHours(workingHoursPayload));
       setSavedSnapshot(
         buildShopProfileSaveSnapshot({
@@ -982,6 +1052,15 @@ export default function ShopProfileScreen({ navigation, route }) {
           legalEntity: updated.legal_entity_detail || legalEntity,
         })
       );
+      const returnTo = route.params?.returnTo;
+      if (returnTo === 'ShopInvoiceDetail' && route.params?.invoiceId) {
+        navigation.navigate('ShopInvoiceDetail', { invoiceId: route.params.invoiceId });
+        return;
+      }
+      if (returnTo === 'ShopInvoiceDetail') {
+        navigation.navigate('ShopInvoicing');
+        return;
+      }
       if (requireSetup || !isShopProfileEssentialsComplete(updated)) {
         if (isShopProfileEssentialsComplete(updated)) {
           navigation.reset({ index: 0, routes: [{ name: 'ShopHome' }] });
@@ -1154,6 +1233,99 @@ export default function ShopProfileScreen({ navigation, route }) {
     }
   };
 
+  /** Client-side only — ShopImage has no sort_order API yet. */
+  const handleReorderImages = (nextImages) => {
+    setProfile((prev) => ({ ...prev, images: nextImages }));
+  };
+
+  const refreshServiceMenuFromApi = async (token, shopId) => {
+    const menuRows = await getServiceMenu(token, String(shopId));
+    const rows = Array.isArray(menuRows) ? menuRows : [];
+    setServiceMenuItems(rows);
+    setPublishedMenuItems(rows.filter((row) => row.is_published));
+    return rows;
+  };
+
+  const handleUpsertOperationPricing = async ({
+    repairType,
+    ensureSelected,
+    typical_labor_minutes,
+    typical_labor_minutes_to,
+    labor_from,
+    labor_to,
+  }) => {
+    if (!profile?.id || !repairType?.id) {
+      throw new Error('Missing shop profile or operation.');
+    }
+    const token = await AsyncStorage.getItem('@access_token');
+    if (!token) {
+      throw new Error('You are not logged in.');
+    }
+    setSavingPricing(true);
+    try {
+      const typeId = Number(repairType.id);
+      const existing = serviceMenuItems.find((row) => Number(row.repair_type) === typeId);
+      // Operations & Pricing UI is labor-only — clear any stale parts ranges so
+      // published totals and offer draft do not keep old parts+labor sums.
+      const payload = {
+        labor_from,
+        labor_to,
+        parts_from: null,
+        parts_to: null,
+        typical_labor_minutes,
+        typical_labor_minutes_to:
+          typical_labor_minutes_to != null ? typical_labor_minutes_to : null,
+        is_published: true,
+      };
+      if (existing?.id) {
+        await updateServiceMenuItem(token, String(profile.id), existing.id, payload);
+      } else {
+        await createServiceMenuItem(token, String(profile.id), {
+          repair_type: typeId,
+          ...payload,
+        });
+      }
+      // Always re-fetch so chips/preview match persisted labor_from/to + cleared parts.
+      await refreshServiceMenuFromApi(token, profile.id);
+      if (ensureSelected) {
+        setSelectedServices((prev) =>
+          prev.includes(typeId) ? prev : [...prev, typeId]
+        );
+      }
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Could not save operation pricing');
+      throw err;
+    } finally {
+      setSavingPricing(false);
+    }
+  };
+
+  const handleToggleOperationService = async (id) => {
+    const typeId = Number(id);
+    const wasSelected = selectedServices.includes(typeId);
+    setSelectedServices((prev) =>
+      prev.includes(typeId) ? prev.filter((x) => x !== typeId) : [...prev, typeId]
+    );
+    if (!wasSelected || !profile?.id) return;
+    // Deselect = unpublish so public profile does not keep showing the operation price.
+    const existing = serviceMenuItems.find((row) => Number(row.repair_type) === typeId);
+    if (!existing?.id || !existing.is_published) return;
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      if (!token) return;
+      await updateServiceMenuItem(token, String(profile.id), existing.id, {
+        is_published: false,
+      });
+      await refreshServiceMenuFromApi(token, profile.id);
+    } catch (err) {
+      // Roll back local selection if unpublish failed.
+      setSelectedServices((prev) =>
+        prev.includes(typeId) ? prev : [...prev, typeId]
+      );
+      Alert.alert('Error', err.message || 'Could not update published operation');
+    }
+  };
+
   const toggleId = (id, setter) => {
     const n = Number(id);
     setter((prev) => (prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n]));
@@ -1193,9 +1365,14 @@ export default function ShopProfileScreen({ navigation, route }) {
   const previewVehicleNames = vehicleTypeOptions
     .filter((v) => selectedVehicleTypes.includes(Number(v.id)))
     .map((v) => v.name);
+  // Pricing list = published ∩ selected (same as public API filter).
+  // Services chips = all selected operations (matches available_repairs on ShopDetail).
   const previewRepairNames = repairTypeOptions
     .filter((r) => selectedServices.includes(Number(r.id)))
     .map((r) => r.name);
+  const previewPublishedMenuItems = (publishedMenuItems || []).filter((row) =>
+    selectedServices.includes(Number(row.repair_type ?? row.repair_type_id))
+  );
   const previewBrandNames = allBrandsServiced
     ? ['All brands']
     : makeOptions.filter((m) => selectedBrandIds.includes(Number(m.id))).map((m) => m.name);
@@ -1203,17 +1380,30 @@ export default function ShopProfileScreen({ navigation, route }) {
     String(profile.phone_e164 || '').trim() ||
     [profile.phone_country_code, profile.phone_national].filter(Boolean).join(' ').trim() ||
     String(profile.phone || '').trim();
-  const missingFields = getShopProfileIncompleteFields(profileForCompleteness);
-  const isEssentialsComplete = missingFields.length === 0;
-  const completionPercent = getShopProfileCompletionPercent(profileForCompleteness, {
-    servicesCount: selectedServices.length,
-    hasPhotos: toSafeArray(profile?.images).length > 0,
-    hasDescription: !!String(profile?.description || '').trim(),
-  });
-  const strengthHints = getShopProfileStrengthHints(profile, {
-    servicesCount: selectedServices.length,
-    hasPhotos: toSafeArray(profile?.images).length > 0,
-  });
+  const workingHoursPayloadPreview = buildWorkingHoursPayload(
+    hoursRows,
+    lunchBreakHours,
+    lunchStart
+  );
+  const completenessOptions = {
+    vehicleTypeIds: selectedVehicleTypes,
+    operationIds: selectedServices,
+    serviceMenuItems,
+    photoCount: toSafeArray(profile?.images).length,
+    workingHours: workingHoursPayloadPreview,
+    hasWorkingHours: hoursRows.some((row) => !row.closed && row.start && row.end),
+    legalEntity,
+  };
+  const missingFields = getShopProfileIncompleteFields(profileForCompleteness, completenessOptions);
+  const gateMissing = getShopProfileGateIncompleteFields(profileForCompleteness, completenessOptions);
+  const isEssentialsComplete = gateMissing.length === 0;
+  const completionPercent = getShopProfileCompletionPercent(
+    profileForCompleteness,
+    completenessOptions
+  );
+  const strengthHints = getShopProfileStrengthHints(profile, completenessOptions);
+  const sectionStatus = (key) =>
+    getShopProfileSectionStatus(key, profileForCompleteness, completenessOptions);
   const showSetupBanner = (requireSetup || !isEssentialsComplete) && !isEssentialsComplete;
   const mapPinSet = hasShopMapPin(profile);
   const pickedLat = parseOptionalCoordinate(profile.latitude);
@@ -1224,13 +1414,15 @@ export default function ShopProfileScreen({ navigation, route }) {
       title={t('partnerProfile.publicPreviewTitle')}
       expanded={!!expandedSections.public_preview}
       onToggle={() => toggleSection('public_preview')}
+      status={isEssentialsComplete ? 'completed' : null}
     >
+      <ShopViewPublicProfileButton shop={profile} navigation={navigation} />
       <Text style={styles.helperText}>
         {isEssentialsComplete
           ? t('partnerProfile.publicPreviewReady')
           : t('partnerProfile.publicPreviewDraft')}
       </Text>
-      <ShopPublicPagePreview
+      <ShopPublicPreviewTabs
         shopName={formatShopDisplayName(profile.name)}
         vehicleTypeNames={previewVehicleNames}
         repairTypeNames={previewRepairNames}
@@ -1243,8 +1435,8 @@ export default function ShopProfileScreen({ navigation, route }) {
         phone={previewPhone}
         generatedSummary={generatedPublicProfile.summary}
         userDescription={profile.description}
-        workingHours={buildWorkingHoursPayload(hoursRows, lunchBreakHours, lunchStart)}
-        publishedMenuItems={publishedMenuItems}
+        workingHours={workingHoursPayloadPreview}
+        publishedMenuItems={previewPublishedMenuItems}
         offersGuarantee={profile.offers_guarantee === true}
         images={profile.images}
         brandNames={previewBrandNames}
@@ -1254,10 +1446,11 @@ export default function ShopProfileScreen({ navigation, route }) {
 
   return (
     <ScreenBackground safeArea={false}>
-      <AppNavigationBar
+      <PartnerAppHeader
         title={t('partnerProfile.title')}
-        backLabel={t('partnerProfile.backLabel')}
+        backLabel={t('navigation.backToDashboard')}
         onBack={handleBack}
+        iconOnlyBack
         scrolled={scrolled}
         rightAction={
           <ProfileHeaderSaveButton
@@ -1269,6 +1462,7 @@ export default function ShopProfileScreen({ navigation, route }) {
         }
       />
       <ScrollView
+        ref={profileScrollRef}
         onScroll={onScroll}
         scrollEventThrottle={scrollEventThrottle}
         contentContainerStyle={[
@@ -1279,9 +1473,19 @@ export default function ShopProfileScreen({ navigation, route }) {
         <ShopProfileCompletionCard
           percent={completionPercent}
           strengthHints={strengthHints}
+          encourageText={t('partnerProfile.profileEncourage')}
         />
 
-        {!isEssentialsComplete ? <ShopProfileMissingAlert fields={missingFields} /> : null}
+        <ShopViewPublicProfileButton shop={profile} navigation={navigation} compact />
+
+        {!isEssentialsComplete ? (
+          <ShopProfileMissingAlert
+            fields={gateMissing.length ? gateMissing : missingFields}
+            onFieldPress={scrollToMissingField}
+          />
+        ) : missingFields.length ? (
+          <ShopProfileMissingAlert fields={missingFields} onFieldPress={scrollToMissingField} />
+        ) : null}
 
         {showSetupBanner ? (
           <AppCard variant="dark" contentStyle={styles.setupBannerInner}>
@@ -1299,7 +1503,8 @@ export default function ShopProfileScreen({ navigation, route }) {
               onPress={openMapPicker}
               style={({ pressed }) => [
                 styles.mapCtaCard,
-                missingFields.includes('map pin') && styles.mapCtaCardAttention,
+                (gateMissing.includes('map pin') || missingFields.includes('address')) &&
+                  styles.mapCtaCardAttention,
                 pressed && styles.mapCtaCardPressed,
               ]}
               accessibilityRole="button"
@@ -1321,7 +1526,7 @@ export default function ShopProfileScreen({ navigation, route }) {
                 <MaterialCommunityIcons
                   name="check-circle"
                   size={18}
-                  color={missingFields.includes('map pin') ? '#fbbf24' : COLORS.PRIMARY}
+                  color={gateMissing.includes('map pin') || missingFields.includes('address') ? '#fbbf24' : COLORS.PRIMARY}
                 />
                 <Text style={styles.mapPickSummary}>
                   Location set · {pickedLat.toFixed(5)}, {pickedLon.toFixed(5)}
@@ -1332,29 +1537,43 @@ export default function ShopProfileScreen({ navigation, route }) {
           </>
         ) : null}
 
-        {isEssentialsComplete ? publicPagePreviewSection : null}
+        {publicPagePreviewSection}
 
+        <View onLayout={(e) => recordSectionOffset('business', e.nativeEvent.layout.y)}>
         <ShopProfileAccordionSection
-          title="Shop name"
-          expanded={!!expandedSections.basic}
-          onToggle={() => toggleSection('basic')}
-          needsAttention={missingFields.includes('shop name')}
+          title={t('partnerProfile.businessInformation')}
+          expanded={!!expandedSections.business || !!expandedSections.basic}
+          onToggle={() => toggleSection('business')}
+          needsAttention={
+            missingFields.includes('business name') || missingFields.includes('description')
+          }
+          status={sectionStatus('business').completed ? 'completed' : null}
         >
           <TextInput
-            label="Service center name"
+            label={t('partnerProfile.publicBusinessName')}
             mode="outlined"
             value={profile.name || ''}
             onChangeText={(text) => setProfile((prev) => ({ ...prev, name: text }))}
             style={styles.input}
           />
-        </ShopProfileAccordionSection>
-
-        <ShopProfileAccordionSection
-          title="Vehicle types you service"
-          expanded={!!expandedSections.vehicle_types}
-          onToggle={() => toggleSection('vehicle_types')}
-          needsAttention={missingFields.includes('vehicle type')}
-        >
+          <TextInput
+            label={t('partnerProfile.shortTagline')}
+            mode="outlined"
+            value={profile.short_description || ''}
+            onChangeText={(text) => setProfile((prev) => ({ ...prev, short_description: text }))}
+            style={styles.input}
+          />
+          <Text style={styles.helperText}>{t('partnerProfile.descriptionHelper')}</Text>
+          <TextInput
+            label={t('partnerProfile.description')}
+            mode="outlined"
+            multiline
+            numberOfLines={5}
+            value={profile.description || ''}
+            onChangeText={(text) => setProfile((prev) => ({ ...prev, description: text }))}
+            style={styles.input}
+          />
+          <Text style={styles.label}>Vehicle types you service</Text>
           <Text style={styles.helperText}>
             Full-service centers can tap Select all. Required for map discovery.
           </Text>
@@ -1368,16 +1587,9 @@ export default function ShopProfileScreen({ navigation, route }) {
           {!vehicleTypeOptions.length && (
             <Text style={styles.helperMuted}>Vehicle types are loading from backend taxonomy.</Text>
           )}
-        </ShopProfileAccordionSection>
-
-        <ShopProfileAccordionSection
-          title="Brands you service"
-          expanded={!!expandedSections.brands}
-          onToggle={() => toggleSection('brands')}
-        >
+          <Text style={[styles.label, { marginTop: 12 }]}>Brands you service</Text>
           <Text style={styles.helperText}>
             General garages can choose All brands. Specialists can search and pick (e.g. Volvo, BMW).
-            Motorcycle / e-bike catalog brands (KTM, Yamaha, etc.) will expand in a future update.
           </Text>
           <SearchableChipSelector
             items={brandChipItems}
@@ -1390,60 +1602,29 @@ export default function ShopProfileScreen({ navigation, route }) {
             onToggleAllMode={setAllBrandsServiced}
             allModeHint="Clients can find you for any make — brakes, engine, paint, diagnostics, and more."
           />
-          {!makeOptions.length && !allBrandsServiced && (
-            <Text style={styles.helperMuted}>Brand list is loading from the vehicle catalog.</Text>
-          )}
         </ShopProfileAccordionSection>
+        </View>
 
+        <View onLayout={(e) => recordSectionOffset('contact_location', e.nativeEvent.layout.y)}>
         <ShopProfileAccordionSection
-          title="Repair services you offer"
-          expanded={!!expandedSections.services}
-          onToggle={() => toggleSection('services')}
+          title={t('partnerProfile.contactLocation')}
+          expanded={
+            !!expandedSections.contact_location ||
+            !!expandedSections.contact ||
+            !!expandedSections.location
+          }
+          onToggle={() => toggleSection('contact_location')}
+          needsAttention={
+            missingFields.includes('map pin') ||
+            missingFields.includes('address') ||
+            missingFields.includes('country') ||
+            missingFields.includes('city') ||
+            missingFields.includes('phone')
+          }
+          status={sectionStatus('contact_location').completed ? 'completed' : null}
         >
           <Text style={styles.helperText}>
-            Select all repair types you do — e.g. body repair and engine repair together.
-          </Text>
-          {repairTypesByCategory.map(([category, rows]) => (
-            <View key={category} style={styles.categoryBlock}>
-              <Text style={styles.categoryTitle}>{category}</Text>
-              <View style={styles.chipWrap}>
-                {rows.map((row) => {
-                  const selected = selectedServices.includes(Number(row.id));
-                  return (
-                    <Pressable
-                      key={row.id}
-                      onPress={() => toggleId(row.id, setSelectedServices)}
-                      style={[styles.chip, selected && styles.chipSelected]}
-                    >
-                      <View style={styles.serviceChipInner}>
-                        <MaterialCommunityIcons
-                          name={resolveRepairTypeIcon(row)}
-                          size={16}
-                          color={selected ? COLORS.PRIMARY : COLORS.TEXT_MUTED}
-                        />
-                        <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                          {translateRepairTypeLabel(row, t)}
-                        </Text>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          ))}
-          {!repairTypesByCategory.length && (
-            <Text style={styles.helperMuted}>Services are loading from backend taxonomy.</Text>
-          )}
-        </ShopProfileAccordionSection>
-
-        <ShopProfileAccordionSection
-          title="Contact"
-          expanded={!!expandedSections.contact}
-          onToggle={() => toggleSection('contact')}
-        >
-          <Text style={styles.helperText}>
-            Phone is optional — add it if you want customers to call. Chat works without a phone
-            number.
+            Phone helps customers reach you. Chat still works without a phone number.
           </Text>
           <TextInput
             label="Country prefix"
@@ -1456,7 +1637,7 @@ export default function ShopProfileScreen({ navigation, route }) {
             left={<TextInput.Icon icon="phone-outline" />}
           />
           <TextInput
-            label="Phone number (optional)"
+            label="Phone number"
             mode="outlined"
             placeholder="888123456"
             value={profile.phone_national || ''}
@@ -1494,27 +1675,8 @@ export default function ShopProfileScreen({ navigation, route }) {
             keyboardType="email-address"
             left={<TextInput.Icon icon="email-outline" />}
           />
-          <TextInput
-            label="Website"
-            mode="outlined"
-            value={profile.website || ''}
-            onChangeText={(text) => setProfile((prev) => ({ ...prev, website: text }))}
-            style={styles.input}
-            left={<TextInput.Icon icon="web" />}
-          />
-        </ShopProfileAccordionSection>
 
-        <ShopProfileAccordionSection
-          title="Location details"
-          expanded={!!expandedSections.location}
-          onToggle={() => toggleSection('location')}
-          needsAttention={
-            missingFields.includes('map pin') ||
-            missingFields.includes('address') ||
-            missingFields.includes('country') ||
-            missingFields.includes('city')
-          }
-        >
+          <Text style={[styles.label, { marginTop: 12 }]}>Location</Text>
           <Text style={styles.helperText}>
             Usually filled from the map pin. Adjust street, country, or city if needed.
           </Text>
@@ -1532,7 +1694,6 @@ export default function ShopProfileScreen({ navigation, route }) {
             onChangeText={(text) => setProfile((prev) => ({ ...prev, postal_code: text }))}
             style={styles.input}
           />
-          <Text style={styles.helperMuted}>Usually filled from the map pin together with the address.</Text>
           <Text style={styles.label}>Country</Text>
           <View style={styles.pickerWrap}>
             <Picker selectedValue={profile.country} onValueChange={handleCountryChange} style={styles.picker}>
@@ -1589,11 +1750,56 @@ export default function ShopProfileScreen({ navigation, route }) {
             style={styles.input}
           />
         </ShopProfileAccordionSection>
+        </View>
 
+        <View onLayout={(e) => recordSectionOffset('operations', e.nativeEvent.layout.y)}>
         <ShopProfileAccordionSection
-          title="Working hours"
+          title={t('partnerProfile.operationsPricing')}
+          expanded={!!expandedSections.operations || !!expandedSections.services}
+          onToggle={() => toggleSection('operations')}
+          needsAttention={
+            missingFields.includes('operation') || missingFields.includes('operation price')
+          }
+          status={sectionStatus('operations').completed ? 'completed' : null}
+        >
+          <ShopOperationsPricingSection
+            styles={styles}
+            repairTypesByCategory={repairTypesByCategory}
+            selectedServices={selectedServices}
+            serviceMenuItems={serviceMenuItems}
+            savingPricing={savingPricing}
+            onToggleService={handleToggleOperationService}
+            onUpsertOperationPricing={handleUpsertOperationPricing}
+          />
+        </ShopProfileAccordionSection>
+        </View>
+
+        <View onLayout={(e) => recordSectionOffset('photos', e.nativeEvent.layout.y)}>
+        <ShopProfileAccordionSection
+          title={t('partnerProfile.photos')}
+          expanded={!!expandedSections.photos}
+          onToggle={() => toggleSection('photos')}
+          needsAttention={missingFields.includes('photos')}
+          status={sectionStatus('photos').completed ? 'completed' : null}
+        >
+          <ShopPhotoGallery
+            images={toSafeArray(profile.images)}
+            onDelete={handleDeleteImage}
+            onReorder={handleReorderImages}
+            onAddPhoto={handlePickAndUploadImage}
+            maxPhotos={MAX_SHOP_PHOTOS}
+            uploading={saving}
+          />
+        </ShopProfileAccordionSection>
+        </View>
+
+        <View onLayout={(e) => recordSectionOffset('working_hours', e.nativeEvent.layout.y)}>
+        <ShopProfileAccordionSection
+          title={t('partnerProfile.workingHours')}
           expanded={!!expandedSections.working_hours}
           onToggle={() => toggleSection('working_hours')}
+          needsAttention={missingFields.includes('working hours')}
+          status={sectionStatus('working_hours').completed ? 'completed' : null}
         >
           <Text style={styles.helperText}>
             Tap a time field to set hours, or use the quick fill below. Save your profile to publish
@@ -1729,11 +1935,87 @@ export default function ShopProfileScreen({ navigation, route }) {
             </View>
           ))}
         </ShopProfileAccordionSection>
+        </View>
 
+        <View onLayout={(e) => recordSectionOffset('warranty', e.nativeEvent.layout.y)}>
         <ShopProfileAccordionSection
-          title="Warehouse & stock"
+          title={t('partnerProfile.warranty')}
+          expanded={!!expandedSections.warranty || !!expandedSections.guarantee}
+          onToggle={() => toggleSection('warranty')}
+          status="optional"
+        >
+          <Text style={styles.helperText}>
+            Tell customers whether this service center can provide warranty for offers or completed work.
+          </Text>
+          <View style={styles.guaranteeToggleRow}>
+            <Pressable
+              onPress={() => setProfile((prev) => ({ ...prev, offers_guarantee: true }))}
+              style={[
+                styles.guaranteePill,
+                profile.offers_guarantee === true && styles.guaranteePillSelected,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.guaranteePillText,
+                  profile.offers_guarantee === true && styles.guaranteePillTextSelected,
+                ]}
+              >
+                Offers warranty
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setProfile((prev) => ({ ...prev, offers_guarantee: false }))}
+              style={[
+                styles.guaranteePill,
+                profile.offers_guarantee !== true && styles.guaranteePillSelected,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.guaranteePillText,
+                  profile.offers_guarantee !== true && styles.guaranteePillTextSelected,
+                ]}
+              >
+                No warranty
+              </Text>
+            </Pressable>
+          </View>
+          <Text style={styles.helperMuted}>Optional — you can update this later.</Text>
+        </ShopProfileAccordionSection>
+        </View>
+
+        <View onLayout={(e) => recordSectionOffset('company', e.nativeEvent.layout.y)}>
+        <ShopProfileAccordionSection
+          title={t('partnerProfile.companyLegal')}
+          expanded={!!expandedSections.company || !!expandedSections.invoice}
+          onToggle={() => toggleSection('company')}
+          subtitle="Separate from your public profile — used on invoices"
+        >
+          <ShopInvoiceSettingsSection
+            styles={styles}
+            profile={profile}
+            setProfile={setProfile}
+            countries={countries}
+            cityLabel={cityLabel}
+            legalEntity={legalEntity}
+            setLegalEntity={setLegalEntity}
+            legalEntityOptions={legalEntityOptions}
+            onFillBranchFromPublic={fillInvoiceFromPublicProfile}
+            onUploadLogo={handlePickAndUploadInvoiceLogo}
+            onRemoveLogo={handleRemoveInvoiceLogo}
+            uploadingLogo={uploadingInvoiceLogo}
+            companyOnly
+          />
+        </ShopProfileAccordionSection>
+        </View>
+
+        <View onLayout={(e) => recordSectionOffset('warehouse', e.nativeEvent.layout.y)}>
+        <ShopProfileAccordionSection
+          title={t('partnerProfile.warehouseStock')}
           expanded={!!expandedSections.warehouse}
           onToggle={() => toggleSection('warehouse')}
+          status="optional"
         >
           <Text style={styles.helperText}>
             When enabled, completing supplier documents updates on-hand quantities. You can still import
@@ -1754,165 +2036,35 @@ export default function ShopProfileScreen({ navigation, route }) {
             />
           </View>
         </ShopProfileAccordionSection>
+        </View>
 
+        <View onLayout={(e) => recordSectionOffset('notifications', e.nativeEvent.layout.y)}>
         <ShopProfileAccordionSection
-          title={t('profile.appearance')}
-          expanded={!!expandedSections.appearance}
-          onToggle={() => toggleSection('appearance')}
+          title={t('partnerProfile.notificationSettings', null, null) !== 'partnerProfile.notificationSettings'
+            ? t('partnerProfile.notificationSettings')
+            : 'Notification settings'}
+          expanded={!!expandedSections.notifications}
+          onToggle={() => toggleSection('notifications')}
+          status="optional"
         >
-          <LanguagePicker />
+          <ShopNotificationSettingsSection />
         </ShopProfileAccordionSection>
+        </View>
 
+        <View onLayout={(e) => recordSectionOffset('online_presence', e.nativeEvent.layout.y)}>
         <ShopProfileAccordionSection
-          title="Social links"
-          expanded={!!expandedSections.social}
-          onToggle={() => toggleSection('social')}
+          title={t('partnerProfile.onlinePresence')}
+          expanded={!!expandedSections.online_presence || !!expandedSections.social}
+          onToggle={() => toggleSection('online_presence')}
+          status="optional"
         >
-          <TextInput
-            label="YouTube"
-            mode="outlined"
-            value={profile.youtube_url || ''}
-            onChangeText={(text) => setProfile((prev) => ({ ...prev, youtube_url: text }))}
-            style={styles.input}
-            left={<TextInput.Icon icon="youtube" />}
-          />
-          <TextInput
-            label="Facebook"
-            mode="outlined"
-            value={profile.facebook_url || ''}
-            onChangeText={(text) => setProfile((prev) => ({ ...prev, facebook_url: text }))}
-            style={styles.input}
-            left={<TextInput.Icon icon="facebook" />}
-          />
-          <TextInput
-            label="Instagram"
-            mode="outlined"
-            value={profile.instagram_url || ''}
-            onChangeText={(text) => setProfile((prev) => ({ ...prev, instagram_url: text }))}
-            style={styles.input}
-            left={<TextInput.Icon icon="instagram" />}
-          />
-        </ShopProfileAccordionSection>
-
-        <ShopProfileAccordionSection
-          title="Your description"
-          expanded={!!expandedSections.description}
-          onToggle={() => toggleSection('description')}
-        >
-          <Text style={styles.helperText}>
-            Write a short introduction in your language. Clients will see a translated version later.
-          </Text>
-          <TextInput
-            label="About your shop"
-            mode="outlined"
-            multiline
-            numberOfLines={5}
-            value={profile.description || ''}
-            onChangeText={(text) => setProfile((prev) => ({ ...prev, description: text }))}
-            style={styles.input}
-          />
-        </ShopProfileAccordionSection>
-
-        {!isEssentialsComplete ? publicPagePreviewSection : null}
-
-        <ShopProfileAccordionSection
-          title="Guarantee"
-          expanded={!!expandedSections.guarantee}
-          onToggle={() => toggleSection('guarantee')}
-        >
-          <Text style={styles.helperText}>
-            Tell customers whether this service center can provide guarantee for offers or completed work.
-          </Text>
-          <View style={styles.guaranteeToggleRow}>
-            <Pressable
-              onPress={() => setProfile((prev) => ({ ...prev, offers_guarantee: true }))}
-              style={[
-                styles.guaranteePill,
-                profile.offers_guarantee === true && styles.guaranteePillSelected,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.guaranteePillText,
-                  profile.offers_guarantee === true && styles.guaranteePillTextSelected,
-                ]}
-              >
-                Offers guarantee
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setProfile((prev) => ({ ...prev, offers_guarantee: false }))}
-              style={[
-                styles.guaranteePill,
-                profile.offers_guarantee !== true && styles.guaranteePillSelected,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.guaranteePillText,
-                  profile.offers_guarantee !== true && styles.guaranteePillTextSelected,
-                ]}
-              >
-                No guarantee
-              </Text>
-            </Pressable>
-          </View>
-          <Text style={styles.helperMuted}>You can update this later.</Text>
-        </ShopProfileAccordionSection>
-
-        <ShopProfileAccordionSection
-          title="Invoice settings"
-          expanded={!!expandedSections.invoice}
-          onToggle={() => toggleSection('invoice')}
-        >
-          <ShopInvoiceSettingsSection
+          <ShopOnlinePresenceSection
             styles={styles}
             profile={profile}
             setProfile={setProfile}
-            countries={countries}
-            cityLabel={cityLabel}
-            legalEntity={legalEntity}
-            setLegalEntity={setLegalEntity}
-            legalEntityOptions={legalEntityOptions}
-            onFillBranchFromPublic={fillInvoiceFromPublicProfile}
-            onUploadLogo={handlePickAndUploadInvoiceLogo}
-            onRemoveLogo={handleRemoveInvoiceLogo}
-            uploadingLogo={uploadingInvoiceLogo}
           />
         </ShopProfileAccordionSection>
-
-        <ShopProfileAccordionSection
-          title={t('partnerProfile.photos')}
-          expanded={!!expandedSections.photos}
-          onToggle={() => toggleSection('photos')}
-        >
-          <Text style={styles.helperText}>
-            Show your workspace, tools, and real service moments (up to {MAX_SHOP_PHOTOS} photos).
-          </Text>
-          {toSafeArray(profile.images).length > 0 ? (
-            <ShopPhotoGallery
-              images={profile.images}
-              onDelete={handleDeleteImage}
-              maxPhotos={MAX_SHOP_PHOTOS}
-            />
-          ) : (
-            <EmptyStateCard
-              icon="image-outline"
-              title={t('partnerProfile.noPhotosTitle')}
-              subtitle={t('partnerProfile.noPhotosSubtitle')}
-            />
-          )}
-
-          <Button
-            mode="contained"
-            icon="plus"
-            onPress={handlePickAndUploadImage}
-            style={styles.uploadButton}
-            disabled={toSafeArray(profile.images).length >= MAX_SHOP_PHOTOS}
-          >
-            {t('partnerProfile.addPhoto')}
-          </Button>
-        </ShopProfileAccordionSection>
+        </View>
 
       </ScrollView>
 

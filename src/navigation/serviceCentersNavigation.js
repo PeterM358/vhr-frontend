@@ -8,7 +8,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resetFromClientDrawer } from './drawerNavigation';
 import { syncWebPath } from './authNavigation';
 import { serviceCenters } from './webRoutes';
+import { resolveIsPartnerSession } from '../utils/partnerSession';
 import {
+  navigateToPartnerDashboard,
   navigateToServiceCenterProfile as navigateToServiceCenterProfileWeb,
   navigateToServiceCenterDetail as navigateToServiceCenterDetailWeb,
 } from './webNavigation';
@@ -100,6 +102,11 @@ export async function goBackFromServiceCenters(navigation) {
   const authed = await hasStoredAuthToken();
   const root = getRootNavigation(navigation);
   if (authed) {
+    const isPartner = await resolveIsPartnerSession();
+    if (isPartner) {
+      navigateToPartnerDashboard(root);
+      return;
+    }
     root.navigate('Home', { screen: 'HomeMain' });
     if (Platform.OS === 'web') {
       syncWebPath('/dashboard');

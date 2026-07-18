@@ -11,6 +11,7 @@ const PALETTE = {
   verified:  { bg: 'rgba(22,163,74,0.18)',  fg: '#15803D' }, // verified service center
   open:      { bg: 'rgba(37,99,235,0.16)',  fg: '#1D4ED8' }, // primary blue
   requested: { bg: 'rgba(124,58,237,0.18)', fg: '#6D28D9' }, // direct client request
+  booked:    { bg: 'rgba(22,163,74,0.18)',  fg: '#15803D' }, // booked appointment
   ongoing:   { bg: 'rgba(245,158,11,0.18)', fg: '#B45309' }, // amber
   done:      { bg: 'rgba(22,163,74,0.18)',  fg: '#15803D' }, // green
   completed: { bg: 'rgba(22,163,74,0.18)',  fg: '#15803D' },

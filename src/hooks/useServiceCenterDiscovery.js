@@ -22,6 +22,11 @@ import {
   hydrateSeoSlugCatalog,
 } from '../utils/seo/seoSlugCatalog';
 import { dedupeShopsByListId, logMapDiscoveryData } from '../utils/mapDiscoveryData';
+import {
+  buildCategoryFilterOptions,
+  normalizeRepairTypeForFilter,
+} from '../utils/discoveryFilterTaxonomy';
+import { useTranslation } from '../i18n';
 
 export const SORT_OPTIONS = [
   { value: 'recommended', label: 'Recommended' },
@@ -73,6 +78,7 @@ export function useServiceCenterDiscovery({
   const [userLocatedExplicitly, setUserLocatedExplicitly] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [authRequired, setAuthRequired] = useState(false);
+  const { t, locale } = useTranslation();
 
   const activeSearchRef = useRef('');
   const matchedCityRef = useRef(null);
@@ -85,23 +91,18 @@ export function useServiceCenterDiscovery({
   citySlugRef.current = citySlug;
   userLocRef.current = userLocatedExplicitly ? userLocation : null;
 
-  const categoryOptions = useMemo(() => {
-    const map = {};
-    repairTypes.forEach((rt) => {
-      const slug = rt.category_slug;
-      const name = rt.category_name || slug;
-      if (slug && name && !map[slug]) map[slug] = name;
-    });
-    return Object.entries(map)
-      .map(([slug, name]) => ({ slug, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [repairTypes]);
+  const categoryOptions = useMemo(
+    () => buildCategoryFilterOptions(repairTypes, { t, locale }),
+    [repairTypes, t, locale]
+  );
 
   const repairTypeChipOptions = useMemo(() => {
-    const rows = repairTypes.filter((rt) => rt.slug);
+    const rows = repairTypes
+      .map((rt) => normalizeRepairTypeForFilter(rt, { t, locale }))
+      .filter(Boolean);
     if (!selectedCategory) return rows;
     return rows.filter((rt) => rt.category_slug === selectedCategory);
-  }, [repairTypes, selectedCategory]);
+  }, [repairTypes, selectedCategory, t, locale]);
 
   const shops = useMemo(() => {
     const term = activeSearchTerm.trim();

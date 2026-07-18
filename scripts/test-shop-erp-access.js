@@ -15,7 +15,6 @@ const PARTNER_ERP_ROUTES = {
   ShopComplaints: { requiresManage: true },
   ShopWarehouse: { capability: 'uses_inventory', requiresAccess: true },
   ShopInvoicing: {
-    capability: 'uses_invoicing',
     permissionAny: ['post_financial_document', 'view_margin'],
     requiresAccess: true,
   },
@@ -86,6 +85,9 @@ assert.strictEqual(canAccessPartnerRoute('ShopAnalytics', { profile: fullProfile
 assert.strictEqual(canAccessPartnerRoute('ShopWarehouse', { profile: bareProfile, membership: ownerMembership }), false);
 assert.strictEqual(canAccessPartnerRoute('ShopDocumentImports', { profile: fullProfile, membership: ownerMembership }), true);
 assert.strictEqual(canAccessPartnerRoute('ShopDocumentImports', { profile: fullProfile, membership: mechanicMembership }), false);
+// Invoicing stays visible for owners even when uses_invoicing capability is off.
+assert.strictEqual(canAccessPartnerRoute('ShopInvoicing', { profile: bareProfile, membership: ownerMembership }), true);
+assert.strictEqual(canAccessPartnerRoute('ShopInvoicing', { profile: fullProfile, membership: mechanicMembership }), false);
 assert.strictEqual(COMPLAINT_STATUS_V1_MAP.submitted, 'erp.complaints.status.open');
 
 console.log('shopErpAccess: all tests passed');

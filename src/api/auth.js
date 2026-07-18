@@ -106,22 +106,35 @@ const storeLoginData = async (data, fallbackDisplay) => {
   else if (phone && phone.trim()) userDisplay = phone.trim();
   else userDisplay = fallbackDisplay;
 
+  const hasShopProfiles = Array.isArray(shop_profiles) && shop_profiles.length > 0;
+  const hasShopMemberships = Array.isArray(shop_memberships) && shop_memberships.length > 0;
+  // Linked shop access counts as partner even if the API flag is briefly stale.
+  const shopMode = Boolean(is_shop) || hasShopProfiles || hasShopMemberships;
+
   const itemsToStore = [
     ['@access_token', access],
     ['@refresh_token', refresh],
-    ['@is_client', JSON.stringify(is_client)],
-    ['@is_shop', JSON.stringify(is_shop)],
+    ['@is_client', is_client ? 'true' : 'false'],
+    ['@is_shop', shopMode ? 'true' : 'false'],
     ['@user_id', user_id?.toString() || ''],
     ['@user_email_or_phone', userDisplay],
     ['@login_email', email && String(email).trim() ? String(email).trim() : ''],
     ['@login_phone', phone && String(phone).trim() ? String(phone).trim() : ''],
   ];
 
-  // Only for shops with valid shop_profiles
-  if (is_shop && Array.isArray(shop_profiles) && shop_profiles.length > 0) {
+  if (shopMode && hasShopProfiles) {
     itemsToStore.push(['@shop_profiles', JSON.stringify(shop_profiles)]);
+    const shopId = shop_profiles[0]?.id;
+    if (shopId != null) {
+      itemsToStore.push(['@current_shop_id', String(shopId)]);
+    }
+  } else if (shopMode && hasShopMemberships) {
+    const shopId = shop_memberships[0]?.shop_id ?? shop_memberships[0]?.shopId;
+    if (shopId != null) {
+      itemsToStore.push(['@current_shop_id', String(shopId)]);
+    }
   }
-  if (is_shop && Array.isArray(shop_memberships) && shop_memberships.length > 0) {
+  if (shopMode && hasShopMemberships) {
     itemsToStore.push(['@shop_memberships', JSON.stringify(shop_memberships)]);
   }
 

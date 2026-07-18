@@ -7,7 +7,7 @@ import { Platform } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { syncWebDocumentTitle } from './webDocumentTitle';
-import { normalizeWebPath } from './webRoutes';
+import { normalizeWebPath, serviceCenters } from './webRoutes';
 import { getSupportedLanguagePrefixFromPathname, localizeCanonicalPath } from './localizedRoutes';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import {
@@ -24,6 +24,74 @@ function getRootNavigation(navigation) {
     current = current.getParent();
   }
   return current;
+}
+
+/** Routes that are safe to return to without auth when leaving Login/Register. */
+const PUBLIC_ESCAPE_ROUTE_NAMES = new Set([
+  'ShopMap',
+  'PublicHome',
+  'ShopDetail',
+  'PartnerShopMap',
+]);
+
+const AUTH_STACK_ROUTE_NAMES = new Set([
+  'Login',
+  'Register',
+  'PasswordRequestReset',
+  'PasswordResetConfirm',
+  'AuthLoading',
+]);
+
+function getPreviousRootRoute(navigation) {
+  const root = getRootNavigation(navigation);
+  const state = root.getState?.();
+  if (!state?.routes?.length || state.index == null || state.index <= 0) {
+    return null;
+  }
+  return state.routes[state.index - 1] || null;
+}
+
+/**
+ * Decide how Login/Register should escape back to public browse.
+ * @returns {{ kind: 'back' | 'map' | 'home', previousName: string | null }}
+ */
+export function resolveAuthPublicEscape(navigation) {
+  const previous = getPreviousRootRoute(navigation);
+  const previousName = previous?.name || null;
+  if (previousName && PUBLIC_ESCAPE_ROUTE_NAMES.has(previousName)) {
+    return { kind: previousName === 'PublicHome' ? 'home' : 'map', previousName };
+  }
+  if (previousName && !AUTH_STACK_ROUTE_NAMES.has(previousName)) {
+    return { kind: 'back', previousName };
+  }
+  return { kind: 'map', previousName };
+}
+
+/**
+ * Leave Login/Register without trapping the user.
+ * Prefer goBack when history has a public (or non-auth) screen; else open the map.
+ */
+export function leaveAuthToPublic(navigation, { forceMap = false } = {}) {
+  clearAuthReturnUrl().catch(() => {});
+  const root = getRootNavigation(navigation);
+  if (!forceMap) {
+    const escape = resolveAuthPublicEscape(navigation);
+    if (escape.previousName && root.canGoBack?.()) {
+      if (
+        PUBLIC_ESCAPE_ROUTE_NAMES.has(escape.previousName)
+        || !AUTH_STACK_ROUTE_NAMES.has(escape.previousName)
+      ) {
+        root.goBack();
+        return;
+      }
+    }
+  }
+
+  root.navigate('ShopMap');
+  if (Platform.OS === 'web') {
+    syncWebPath(serviceCenters());
+    requestAnimationFrame(() => syncWebPath(serviceCenters()));
+  }
 }
 
 export const CLIENT_DASHBOARD_ROUTE = {
@@ -137,12 +205,20 @@ export function resetToSignIn(navigation) {
   syncWebPath('/login');
 }
 
-/** Push sign-in from landing — keeps back navigation to /. */
-export function navigateToSignIn(navigation) {
+/**
+ * Push sign-in while preserving history so public map/home remain reachable via back.
+ * On web, stores the current public path as post-login return when available.
+ */
+export async function navigateToSignIn(navigation) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const currentPath = `${window.location.pathname || ''}${window.location.search || ''}`;
+    await storeAuthReturnUrl(currentPath);
+  }
   const root = getRootNavigation(navigation);
   root.navigate('Login');
   if (Platform.OS === 'web') {
     syncWebPath('/login');
+    requestAnimationFrame(() => syncWebPath('/login'));
   }
 }
 

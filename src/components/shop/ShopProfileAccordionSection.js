@@ -11,14 +11,28 @@ export default function ShopProfileAccordionSection({
   onToggle,
   children,
   needsAttention = false,
+  /** Optional future-onboarding status: completed | incomplete | optional */
+  status = null,
+  subtitle = null,
 }) {
   return (
     <FloatingCard style={needsAttention ? styles.attentionCard : null}>
       <Pressable onPress={onToggle} style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
+        <View style={styles.titleWrap}>
+          <Text style={styles.title}>{title}</Text>
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        </View>
         {needsAttention ? (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>Required</Text>
+          </View>
+        ) : null}
+        {status === 'completed' && !needsAttention ? (
+          <MaterialCommunityIcons name="check-circle" size={18} color="#16a34a" />
+        ) : null}
+        {status === 'optional' && !needsAttention ? (
+          <View style={styles.optionalBadge}>
+            <Text style={styles.optionalBadgeText}>Optional</Text>
           </View>
         ) : null}
         <MaterialCommunityIcons
@@ -45,11 +59,19 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     gap: 8,
   },
+  titleWrap: {
+    flex: 1,
+    gap: 2,
+  },
   title: {
     color: COLORS.TEXT_DARK,
     fontWeight: '700',
     fontSize: 17,
-    flex: 1,
+  },
+  subtitle: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 12,
+    lineHeight: 16,
   },
   badge: {
     backgroundColor: '#fde68a',
@@ -62,6 +84,18 @@ const styles = StyleSheet.create({
   badgeText: {
     color: '#92400e',
     fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  optionalBadge: {
+    backgroundColor: '#e2e8f0',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  optionalBadgeText: {
+    color: '#475569',
+    fontSize: 10,
     fontWeight: '800',
     textTransform: 'uppercase',
   },

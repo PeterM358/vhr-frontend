@@ -90,7 +90,7 @@ export default function RepairInvoicingCard({
       ) : (
         <Button
           mode="contained"
-          icon="file-document-plus-outline"
+          icon="file-plus-outline"
           onPress={handleCreatePlatformInvoice}
           loading={busy}
           disabled={busy}

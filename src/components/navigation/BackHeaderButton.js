@@ -62,6 +62,7 @@ export default function BackHeaderButton({
             backgroundColor: theme.backgroundColor,
             borderColor: theme.borderColor,
           },
+          !showLabel && styles.pillIconOnly,
           style,
         ]}
       >
@@ -126,6 +127,9 @@ const styles = StyleSheet.create({
         boxShadow: '0 2px 10px rgba(15, 23, 42, 0.24)',
       },
     }),
+  },
+  pillIconOnly: {
+    paddingRight: 4,
   },
   label: {
     fontSize: 15,

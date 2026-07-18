@@ -25,6 +25,7 @@ import {
   vehicleServiceRecordCenterAdd,
   vehicleReminderNew,
   vehicleManageServiceCenters,
+  vehicleHistoryAccess,
   vehicleSpecs,
   serviceCenters,
   serviceCenterProfile,
@@ -246,6 +247,24 @@ export function navigateToVehicleManageServiceCenters(navigation, vehicleId, par
   navigation.navigate('ManageVehicleServiceCenters', routeParams);
 }
 
+export function navigateToVehicleHistoryAccess(navigation, vehicleId, params = {}) {
+  const routeParams = { vehicleId, returnTo: 'VehicleDetail', ...params };
+
+  if (Platform.OS === 'web') {
+    resetWebRoutes(
+      navigation,
+      [
+        { name: 'ClientVehicles' },
+        { name: 'VehicleDetail', params: { vehicleId } },
+        { name: 'VehicleHistoryAccess', params: routeParams },
+      ],
+      vehicleHistoryAccess(vehicleId)
+    );
+    return;
+  }
+  navigation.navigate('VehicleHistoryAccess', routeParams);
+}
+
 export function navigateToVehicleServiceRecordCenter(navigation, vehicleId, params = {}) {
   const { type, ...rest } = params;
   const routeParams = { vehicleId, ...rest };
@@ -307,13 +326,10 @@ export async function navigateToRepairRequestNew(navigation, params = {}) {
 
   const authed = await hasStoredAuthToken();
   if (!authed) {
+    // Keep map/browse in history (navigate, not replace) so Login can goBack.
     await storeAuthReturnUrl(path);
     const root = getRootNavigation(navigation);
-    if (typeof root.replace === 'function') {
-      root.replace('Login');
-    } else {
-      root.navigate('Login');
-    }
+    root.navigate('Login');
     if (Platform.OS === 'web') {
       syncWebPath('/login');
       requestAnimationFrame(() => syncWebPath('/login'));
@@ -329,11 +345,39 @@ export async function navigateToRepairRequestNew(navigation, params = {}) {
   root.navigate('CreateRepair', routeParams);
 }
 
+const PARTNER_REPAIR_DETAIL_RETURN_TOS = new Set([
+  'RepairsList',
+  'ShopDashboard',
+  'ShopCalendar',
+  'ShopHome',
+]);
+
+function normalizeRepairId(repairId) {
+  const id = Number(repairId);
+  return Number.isFinite(id) ? id : repairId;
+}
+
 function buildRepairDetailRouteParams(repairId, params = {}) {
-  const routeParams = { repairId, ...params };
+  const routeParams = { repairId: normalizeRepairId(repairId), ...params };
   delete routeParams.origin;
   delete routeParams.vehicleId;
   return routeParams;
+}
+
+/** Web-safe repair detail navigation — resets stack + syncs URL (avoids blank screen without fetch). */
+export function navigateToRepairDetail(navigation, repairId, params = {}) {
+  if (repairId == null || repairId === '') return;
+  const returnTo = params.returnTo;
+  if (Platform.OS === 'web') {
+    if (PARTNER_REPAIR_DETAIL_RETURN_TOS.has(returnTo)) {
+      navigateToPartnerRepairDetail(navigation, repairId, params);
+      return;
+    }
+    navigateToRepairRequestDetail(navigation, repairId, params);
+    return;
+  }
+  const root = getRootNavigation(navigation);
+  root.navigate('RepairDetail', buildRepairDetailRouteParams(repairId, params));
 }
 
 export function navigateToRepairRequestDetail(navigation, repairId, params = {}) {
@@ -623,7 +667,11 @@ export function navigateToPartnerRepairOffer(navigation, repairId, params = {}) 
     if (includeRepairDetail) {
       tailRoutes.push({
         name: 'RepairDetail',
-        params: { repairId, returnTo: 'RepairsList' },
+        params: {
+          repairId,
+          returnTo: 'RepairsList',
+          backLabelKey: 'drawer.partner.repairs',
+        },
       });
     }
     tailRoutes.push({ name: 'CreateOrUpdateOffer', params: routeParams });
@@ -652,13 +700,40 @@ export function navigateToPartnerRepairOffer(navigation, repairId, params = {}) 
   navigation.navigate('CreateOrUpdateOffer', routeParams);
 }
 
-function buildPartnerHomeRouteForRepairDetail(returnTo) {
+function buildPartnerListParams(params = {}) {
+  const listParams = {};
+  const tab = params.initialTab || params.statusFilter || params.tab;
+  if (tab) {
+    listParams.initialTab = tab;
+  }
+  return Object.keys(listParams).length ? listParams : undefined;
+}
+
+function buildPartnerHomeRouteForRepairDetail(returnTo, listParams) {
   if (returnTo === 'RepairsList') {
     return {
       name: 'ShopHome',
       state: {
         index: 1,
-        routes: [{ name: 'ShopDashboard' }, { name: 'RepairsList' }],
+        routes: [
+          { name: 'ShopDashboard' },
+          { name: 'RepairsList', params: listParams },
+        ],
+      },
+    };
+  }
+  if (returnTo === 'ShopCalendar') {
+    return {
+      name: 'ShopHome',
+      state: {
+        index: 1,
+        routes: [
+          { name: 'ShopDashboard' },
+          {
+            name: 'ShopCalendar',
+            params: { returnTo: 'ShopDashboard', backLabelKey: 'navigation.dashboard' },
+          },
+        ],
       },
     };
   }
@@ -667,11 +742,15 @@ function buildPartnerHomeRouteForRepairDetail(returnTo) {
 
 export function navigateToPartnerRepairDetail(navigation, repairId, params = {}) {
   const routeParams = {
-    repairId,
+    repairId: normalizeRepairId(repairId),
     returnTo: 'ShopDashboard',
-    backLabel: 'Home',
+    backLabelKey: 'navigation.dashboard',
     ...params,
   };
+  if (!routeParams.backLabelKey && !routeParams.backLabel) {
+    routeParams.backLabelKey = 'navigation.dashboard';
+  }
+  const listParams = buildPartnerListParams(routeParams);
 
   if (Platform.OS === 'web') {
     const root = getRootNavigation(navigation);
@@ -680,7 +759,7 @@ export function navigateToPartnerRepairDetail(navigation, repairId, params = {})
       CommonActions.reset({
         index: 1,
         routes: [
-          buildPartnerHomeRouteForRepairDetail(routeParams.returnTo),
+          buildPartnerHomeRouteForRepairDetail(routeParams.returnTo, listParams),
           { name: 'RepairDetail', params: routeParams },
         ],
       })

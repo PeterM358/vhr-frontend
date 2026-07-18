@@ -13,7 +13,7 @@ import { getMyOrganization } from '../api/network';
 import { useTranslation } from '../i18n';
 
 export default function NetworkOrganizationScreen({ navigation }) {
-  const onBack = usePartnerDashboardBack();
+  const onBack = usePartnerDashboardBack(navigation);
   const { t } = useTranslation();
   const { shopId } = useShopErpContext();
   const [org, setOrg] = useState(null);

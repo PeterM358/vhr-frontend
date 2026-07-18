@@ -15,7 +15,7 @@ import {
 } from '../../api/notifications';
 import { WebSocketContext } from '../../context/WebSocketManager';
 import ScreenBackground from '../ScreenBackground';
-import AppNavigationBar from '../common/AppNavigationBar';
+import PartnerAppHeader from '../partner/PartnerAppHeader';
 import { usePartnerDashboardBack } from '../../navigation/appNavBarBack';
 import FloatingCard from '../ui/FloatingCard';
 import EmptyStateCard from '../ui/EmptyStateCard';
@@ -35,9 +35,10 @@ import {
   translateShopNotificationHint,
   translateShopNotificationTitle,
 } from '../../utils/translateShopNotification';
+import { formatNotificationTimestamp } from '../../utils/formatNotificationTimestamp';
 
 export default function NotificationsList() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const tabs = useMemo(
     () => [
       { id: 'alerts', label: t('partnerDashboard.notifications.tabs.alerts') },
@@ -179,19 +180,16 @@ export default function NotificationsList() {
   }, [remoteNotifications, liveNotifications, unreadOnly]);
 
   const tabbedNotifications = useMemo(() => {
-    if (activeTab === 'alerts') return mergedNotifications;
+    // Alerts = residual / uncategorized only (not an "All" inbox).
+    // Bookings / Repairs / Offers each own their event types.
     return mergedNotifications.filter((n) => shopNotificationCategory(n) === activeTab);
   }, [mergedNotifications, activeTab]);
 
   const tabBadge = useCallback(
-    (tabId) => {
-      if (tabId === 'alerts') {
-        return mergedNotifications.filter((n) => !n.is_read).length;
-      }
-      return mergedNotifications.filter(
+    (tabId) =>
+      mergedNotifications.filter(
         (n) => !n.is_read && shopNotificationCategory(n) === tabId
-      ).length;
-    },
+      ).length,
     [mergedNotifications]
   );
 
@@ -230,7 +228,7 @@ export default function NotificationsList() {
         {hint ? <Text style={styles.hint}>{hint}</Text> : null}
 
         <Text style={styles.timestamp}>
-          {new Date(item.created_at).toLocaleString()}
+          {formatNotificationTimestamp(item.created_at, locale)}
         </Text>
       </FloatingCard>
     );
@@ -248,10 +246,12 @@ export default function NotificationsList() {
 
   return (
     <ScreenBackground safeArea={false}>
-      <AppNavigationBar
+      <PartnerAppHeader
         title={t('drawer.partner.notifications')}
         backLabel={t('navigation.backToDashboard')}
         onBack={handleBack}
+        iconOnlyBack
+        showNotifications={false}
       />
       <View style={styles.container}>
         <View style={styles.toolbar}>

@@ -10,7 +10,7 @@ import { useTranslation } from '../../i18n';
 import { joinLocalizedList } from '../../i18n/joinLocalizedList';
 import { translateRepairTypeLabels, translateVehicleTypePublicLabels, translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
 import { formatMoneyAmount } from '../../constants/currency';
-import { resolveRepairTypeIcon } from '../../utils/repairTypeIcons';
+import { getOperationIcon } from '../../icons/operationIconRegistry';
 import { openShopInMaps, resolveShopMapsUrl } from '../../utils/shopMapsLink';
 import { formatDayHoursWithLunch, parseLunchBreak } from '../../utils/shopWorkingHours';
 
@@ -192,23 +192,33 @@ export default function ShopPublicPagePreview({
         <>
           <SectionHeading title={t('serviceCenters.profile.publishedPricing')} />
           <FloatingCard>
+            <Text style={styles.menuDisclaimer}>
+              {t('serviceCenters.profile.partsQuotedSeparately')}
+            </Text>
             {publishedMenuItems.map((item) => {
               const label = translateRepairTypeLabel(item, t) || t('common.service');
-              const from = item.price_from;
-              const to = item.price_to;
+              const from = item.labor_from ?? item.price_from;
+              const to = item.labor_to ?? item.price_to;
               let priceLine = t('serviceCenters.profile.priceOnRequest');
               if (from != null && to != null && String(from) !== String(to)) {
-                priceLine = `${formatMoneyAmount(from)} – ${formatMoneyAmount(to)}`;
+                priceLine = t('serviceCenters.profile.laborPriceRange', {
+                  from: formatMoneyAmount(from),
+                  to: formatMoneyAmount(to),
+                });
               } else if (from != null) {
-                priceLine = t('serviceCenters.profile.priceFrom', { price: formatMoneyAmount(from) });
+                priceLine = t('serviceCenters.profile.laborPriceFrom', {
+                  price: formatMoneyAmount(from),
+                });
               } else if (to != null) {
-                priceLine = t('serviceCenters.profile.priceFrom', { price: formatMoneyAmount(to) });
+                priceLine = t('serviceCenters.profile.laborPriceFrom', {
+                  price: formatMoneyAmount(to),
+                });
               }
               return (
                 <View key={`${item.id || label}-${label}`} style={styles.menuRow}>
                   <View style={styles.menuIconCircle}>
                     <MaterialCommunityIcons
-                      name={resolveRepairTypeIcon(item)}
+                      name={getOperationIcon(item)}
                       size={20}
                       color={COLORS.PRIMARY}
                     />
@@ -401,6 +411,12 @@ const styles = StyleSheet.create({
     color: COLORS.PRIMARY,
     fontWeight: '600',
     marginTop: 2,
+  },
+  menuDisclaimer: {
+    fontSize: 12,
+    color: COLORS.TEXT_MUTED,
+    marginBottom: 8,
+    lineHeight: 16,
   },
   photoRow: {
     marginBottom: 4,

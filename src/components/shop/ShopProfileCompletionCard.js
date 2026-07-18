@@ -10,6 +10,7 @@ import { useTranslation } from '../../i18n';
 export default function ShopProfileCompletionCard({
   percent = 0,
   strengthHints = [],
+  encourageText = null,
 }) {
   const { t } = useTranslation();
   const complete = percent >= 100;
@@ -32,6 +33,9 @@ export default function ShopProfileCompletionCard({
         color={complete ? '#4ade80' : COLORS.PRIMARY}
         style={styles.bar}
       />
+      {!complete && encourageText ? (
+        <Text style={styles.readyText}>{encourageText}</Text>
+      ) : null}
       {complete ? (
         <Text style={styles.readyText}>
           {t('partnerProfile.profileReadyBody')}

@@ -15,7 +15,8 @@ import {
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Appbar, Badge, Button, Modal, Portal, Text, TextInput } from 'react-native-paper';
+import { Badge, Button, Modal, Portal, Text, TextInput } from 'react-native-paper';
+import PartnerAppHeader from '../components/partner/PartnerAppHeader';
 import {
   declineDirectRepairRequest,
   dismissRepairFromScheduleQueue,
@@ -31,6 +32,11 @@ import {
   addCalendarDays,
   applyDayOffset,
   applyTimeSlotToDate,
+  dayOffsetFromAnchor,
+  dayOffsetFromToday,
+  dayStart,
+  ensurePickupAfterBring,
+  formatCustomDateInput,
   formatSchedulePreview,
   isWeb,
   mergeDateWithTime,
@@ -39,6 +45,8 @@ import {
 import { cacheUnscheduledCount } from '../utils/shopCalendarBadge';
 import { fetchShopCalendarCached, invalidateShopCalendarCache } from '../utils/shopCalendarCache';
 import { navigateToShopDashboard } from '../navigation/drawerNavigation';
+import { navigateToRepairDetail } from '../navigation/webNavigation';
+import { normalizeReturnToRoute } from '../utils/partnerNavChrome';
 import {
   buildDailyLoadMap,
   dayLoadUsesLaborCapacity,
@@ -46,13 +54,22 @@ import {
   getLaborLoadLevel,
 } from '../utils/shopDayLoad';
 import { formatDurationMinutes } from '../utils/laborDuration';
-import { isPendingAppointmentRequest, getCalendarJobKind } from '../utils/shopCalendarJob';
+import {
+  assignShopBayNumbers,
+  getBayAccent,
+  getCalendarJobKind,
+  getOccupancyRoleForDay,
+  isPendingAppointmentRequest,
+  isPendingReschedule,
+} from '../utils/shopCalendarJob';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useTranslation } from '../i18n';
+import { isCalendarNotification } from '../utils/shopNotificationRouting';
+import { normalizeNotification } from '../utils/normalizeNotification';
 
-const SHOP_TOP_BAR = 'rgba(11,18,32,0.92)';
 const CALENDAR_DAY_COUNT = 14;
+const CALENDAR_POLL_MS = 12_000;
 
 function localeTag(locale) {
   const key = String(locale || '').trim().toLowerCase();
@@ -69,10 +86,11 @@ function formatDayLabel(date, locale) {
 function formatTimeRange(startIso, endIso, locale, t) {
   if (!startIso) return t('partnerDashboard.calendar.noTimeSet');
   const start = new Date(startIso);
+  if (Number.isNaN(start.getTime())) return t('partnerDashboard.calendar.noTimeSet');
   const end = endIso ? new Date(endIso) : null;
   const timeLocale = localeTag(locale);
   const t1 = start.toLocaleTimeString(timeLocale, { hour: '2-digit', minute: '2-digit' });
-  if (!end) return t1;
+  if (!end || Number.isNaN(end.getTime())) return t1;
   const t2 = end.toLocaleTimeString(timeLocale, { hour: '2-digit', minute: '2-digit' });
   return `${t1} – ${t2}`;
 }
@@ -111,6 +129,18 @@ function startOfWeek(date) {
 
 function toApiIso(date) {
   return date.toISOString();
+}
+
+function timeSlotFromDate(d) {
+  if (!d || Number.isNaN(d.getTime())) return '09:00';
+  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+}
+
+function defaultPickupFromBring(bring, durationMs = 2 * 60 * 60 * 1000) {
+  if (!bring || Number.isNaN(bring.getTime())) {
+    return applyDayOffset(new Date(), 1, new Date());
+  }
+  return ensurePickupAfterBring(bring, new Date(bring.getTime() + durationMs));
 }
 
 function dayStartLocal(d) {
@@ -168,21 +198,48 @@ function groupByDay(items, rangeStart, dayCount = CALENDAR_DAY_COUNT) {
     date: addCalendarDays(rangeStart, i),
     items: [],
   }));
+  const rangeStartDay = dayStart(rangeStart);
+  const rangeEndDay = dayStart(addCalendarDays(rangeStart, dayCount - 1));
   (items || []).forEach((item) => {
     const startIso = item.display_start || item.scheduled_start || item.client_preferred_start;
     if (!startIso) return;
-    const d = new Date(startIso);
-    const bucket = buckets.find((b) => b.date.toDateString() === d.toDateString());
-    if (bucket) bucket.items.push(item);
+    const startDay = dayStart(new Date(startIso));
+    if (Number.isNaN(startDay.getTime())) return;
+    // Null / missing scheduled_end → same-day occupancy (do not crash or hang).
+    const endIso = item.display_end || item.scheduled_end || item.client_preferred_end || startIso;
+    let endDay = dayStart(new Date(endIso));
+    if (Number.isNaN(endDay.getTime()) || endDay < startDay) {
+      endDay = startDay;
+    }
+    // Skip jobs that cannot intersect the visible range.
+    if (endDay < rangeStartDay || startDay > rangeEndDay) return;
+    buckets.forEach((bucket) => {
+      const bucketDay = dayStart(bucket.date);
+      if (bucketDay >= startDay && bucketDay <= endDay) {
+        bucket.items.push(item);
+      }
+    });
   });
   buckets.forEach((bucket) => {
     bucket.items.sort((a, b) => {
-      const aStart = new Date(a.display_start || a.scheduled_start || 0).getTime();
-      const bStart = new Date(b.display_start || b.scheduled_start || 0).getTime();
+      const aStart = new Date(a.display_start || a.scheduled_start || a.client_preferred_start || 0).getTime();
+      const bStart = new Date(b.display_start || b.scheduled_start || b.client_preferred_start || 0).getTime();
       return aStart - bStart;
     });
   });
   return buckets;
+}
+
+function BayChip({ bayNumber, t }) {
+  if (!bayNumber) return null;
+  const accent = getBayAccent(bayNumber);
+  return (
+    <View style={[styles.bayChip, { backgroundColor: accent.bg, borderColor: accent.border }]}>
+      <Text style={[styles.bayChipText, { color: accent.text }]}>
+        {t('partnerDashboard.calendar.occupancy.bay', { n: bayNumber })}
+      </Text>
+    </View>
+  );
 }
 
 function CompactJobCard({
@@ -196,19 +253,185 @@ function CompactJobCard({
   loadingSecondary,
   secondaryDestructive,
   statusHint,
+  occupancyRole = null,
+  bayNumber = null,
   t,
   locale,
 }) {
   const kind = getCalendarJobKind(item);
+  const pending = isPendingReschedule(item);
   const vehicle = [item.vehicle_make, item.vehicle_model].filter(Boolean).join(' ') || t('partnerDashboard.calendar.vehicleFallback');
   const plate = item.vehicle_license_plate;
   const timeStart = item.display_start || item.scheduled_start || item.client_preferred_start;
   const timeEnd = item.display_end || item.scheduled_end || item.client_preferred_end;
-  const timeLabel =
-    kind === 'needs_date'
-      ? t('partnerDashboard.calendar.pickTime')
-      : formatTimeRange(timeStart, timeEnd, locale, t);
   const isRequest = kind === 'client_request';
+  const isStay = occupancyRole === 'stay';
+  const isReadyDay = occupancyRole === 'ready';
+  const isBringDay = occupancyRole === 'bring';
+  const isMultiDay = isStay || isReadyDay || isBringDay;
+  const showBay = Boolean(bayNumber) && isMultiDay;
+  const bayAccent = showBay ? getBayAccent(bayNumber) : null;
+
+  // Middle days: compact identity row (bay + plate), not a full duplicate card.
+  if (isStay) {
+    const plateLabel = plate || vehicle;
+    const serviceShort = item.repair_type_name;
+    return (
+      <Pressable
+        onPress={() => onOpen?.(item)}
+        style={({ pressed }) => [
+          styles.stayRow,
+          bayAccent && {
+            borderLeftColor: bayAccent.border,
+            backgroundColor: bayAccent.bg,
+          },
+          pressed && { opacity: 0.92 },
+        ]}
+      >
+        <BayChip bayNumber={bayNumber} t={t} />
+        <Text style={styles.stayRowText} numberOfLines={1}>
+          {plateLabel}
+          {serviceShort ? ` · ${serviceShort}` : ''}
+        </Text>
+      </Pressable>
+    );
+  }
+
+  let timeLabel;
+  if (kind === 'needs_date') {
+    timeLabel = t('partnerDashboard.calendar.pickTime');
+  } else if (isReadyDay) {
+    timeLabel = formatTimeRange(timeEnd || timeStart, null, locale, t);
+  } else if (isBringDay) {
+    timeLabel = formatTimeRange(timeStart, null, locale, t);
+  } else {
+    timeLabel = formatTimeRange(timeStart, timeEnd, locale, t);
+  }
+
+  let badgeKind = kind;
+  let badgeLabel = jobKindLabel(kind, t);
+  if (isRequest) {
+    badgeKind = 'client_request';
+    badgeLabel = jobKindLabel('client_request', t);
+  } else if (isReadyDay) {
+    badgeKind = 'ready';
+    badgeLabel = t('partnerDashboard.calendar.occupancy.pickup');
+  } else if (pending) {
+    badgeKind = 'pending_confirm';
+    badgeLabel = jobKindLabel('pending_confirm', t);
+  } else if (isBringDay) {
+    badgeKind = 'booked';
+    badgeLabel = t('partnerDashboard.calendar.occupancy.comeIn');
+  }
+
+  // Bay chip is the shared multi-day identity; drop the old prose hint when present.
+  const occupancyHint =
+    isMultiDay && !showBay
+      ? t('partnerDashboard.calendar.occupancy.multiDayHint')
+      : null;
+
+  const cardBody = (
+    <>
+      <View style={styles.compactHeader}>
+        <View style={styles.compactHeaderLeft}>
+          {showBay ? <BayChip bayNumber={bayNumber} t={t} /> : null}
+          <Text
+            style={[
+              styles.compactTime,
+              isRequest && styles.compactTimeRequest,
+              pending && !showBay && styles.compactTimePending,
+            ]}
+          >
+            {timeLabel}
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.kindPill,
+            badgeKind === 'client_request' && styles.kindPillRequest,
+            badgeKind === 'ready' && styles.kindPillReady,
+            badgeKind === 'pending_confirm' && styles.kindPillPending,
+            badgeKind === 'booked' && styles.kindPillBooked,
+          ]}
+        >
+          <Text
+            style={[
+              styles.kindPillText,
+              badgeKind === 'client_request' && styles.kindPillTextRequest,
+              badgeKind === 'ready' && styles.kindPillTextReady,
+              badgeKind === 'pending_confirm' && styles.kindPillTextPending,
+            ]}
+          >
+            {badgeLabel}
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.compactVehicle} numberOfLines={1}>
+        {plate ? `${plate} · ${vehicle}` : vehicle}
+      </Text>
+      {!isReadyDay ? (
+        <Text style={styles.compactService} numberOfLines={2}>
+          {item.repair_type_name || t('partnerDashboard.calendar.repairTypeMissing')}
+          {item.vehicle_type_name ? ` · ${item.vehicle_type_name}` : ` · ${t('partnerDashboard.calendar.vehicleTypeMissing')}`}
+        </Text>
+      ) : null}
+      {occupancyHint ? <Text style={styles.compactHint}>{occupancyHint}</Text> : null}
+      {statusHint ? <Text style={styles.compactHint}>{statusHint}</Text> : null}
+    </>
+  );
+
+  const actionRow =
+    primaryLabel || secondaryLabel ? (
+      <View style={styles.compactActions}>
+        {primaryLabel ? (
+          <Button
+            mode="contained"
+            compact
+            onPress={() => onPrimary?.(item)}
+            loading={loadingPrimary}
+            disabled={loadingPrimary}
+            style={styles.compactBtn}
+          >
+            {primaryLabel}
+          </Button>
+        ) : null}
+        {secondaryLabel ? (
+          <Button
+            mode="outlined"
+            compact
+            onPress={() => onSecondary?.(item)}
+            loading={loadingSecondary}
+            disabled={loadingSecondary}
+            style={styles.compactBtn}
+            textColor={secondaryDestructive ? '#B91C1C' : undefined}
+          >
+            {secondaryLabel}
+          </Button>
+        ) : null}
+      </View>
+    ) : null;
+
+  // Keep Arrived / Change time outside Pressable so web clicks do not open Booking detail.
+  if (actionRow) {
+    return (
+      <View
+        style={[
+          styles.compactCard,
+          isRequest && styles.compactCardRequest,
+          bayAccent && {
+            borderLeftWidth: 3,
+            borderLeftColor: bayAccent.border,
+          },
+          !bayAccent && pending && styles.compactCardPending,
+        ]}
+      >
+        <Pressable onPress={() => onOpen?.(item)} style={({ pressed }) => [pressed && { opacity: 0.92 }]}>
+          {cardBody}
+        </Pressable>
+        {actionRow}
+      </View>
+    );
+  }
 
   return (
     <Pressable
@@ -216,54 +439,15 @@ function CompactJobCard({
       style={({ pressed }) => [
         styles.compactCard,
         isRequest && styles.compactCardRequest,
+        bayAccent && {
+          borderLeftWidth: 3,
+          borderLeftColor: bayAccent.border,
+        },
+        !bayAccent && pending && styles.compactCardPending,
         pressed && { opacity: 0.92 },
       ]}
     >
-      <View style={styles.compactHeader}>
-        <Text style={[styles.compactTime, isRequest && styles.compactTimeRequest]}>{timeLabel}</Text>
-        <View style={[styles.kindPill, isRequest ? styles.kindPillRequest : styles.kindPillBooked]}>
-          <Text style={[styles.kindPillText, isRequest && styles.kindPillTextRequest]}>
-            {jobKindLabel(kind, t)}
-          </Text>
-        </View>
-      </View>
-      <Text style={styles.compactVehicle} numberOfLines={1}>
-        {plate ? `${plate} · ${vehicle}` : vehicle}
-      </Text>
-      <Text style={styles.compactService} numberOfLines={2}>
-        {item.repair_type_name || t('partnerDashboard.calendar.repairTypeMissing')}
-        {item.vehicle_type_name ? ` · ${item.vehicle_type_name}` : ` · ${t('partnerDashboard.calendar.vehicleTypeMissing')}`}
-      </Text>
-      {statusHint ? <Text style={styles.compactHint}>{statusHint}</Text> : null}
-      {primaryLabel || secondaryLabel ? (
-        <View style={styles.compactActions}>
-          {primaryLabel ? (
-            <Button
-              mode="contained"
-              compact
-              onPress={() => onPrimary?.(item)}
-              loading={loadingPrimary}
-              disabled={loadingPrimary}
-              style={styles.compactBtn}
-            >
-              {primaryLabel}
-            </Button>
-          ) : null}
-          {secondaryLabel ? (
-            <Button
-              mode="outlined"
-              compact
-              onPress={() => onSecondary?.(item)}
-              loading={loadingSecondary}
-              disabled={loadingSecondary}
-              style={styles.compactBtn}
-              textColor={secondaryDestructive ? '#B91C1C' : undefined}
-            >
-              {secondaryLabel}
-            </Button>
-          ) : null}
-        </View>
-      ) : null}
+      {cardBody}
     </Pressable>
   );
 }
@@ -286,29 +470,41 @@ function QueueJobRow({ item, onSchedule, onDismiss, dismissing, t, locale }) {
 
 function DayJobCard({
   item,
+  dayDate,
   onOpen,
   onReschedule,
   onConfirmArrival,
   onDecline,
   confirming,
   declining,
+  bayNumber = null,
   t,
   locale,
 }) {
   const kind = getCalendarJobKind(item);
-  const pending = item.pending_reschedule?.status === 'pending';
+  const pending = isPendingReschedule(item);
+  const occupancyRole = getOccupancyRoleForDay(item, dayDate) || 'single';
   const atShop = Boolean(item.vehicle_arrived_at);
   const startIso = item.display_start || item.scheduled_start || item.client_preferred_start;
   const visitDayOrLater = isVisitDayOrLater(startIso);
+  const cardDayIsToday =
+    Boolean(dayDate) && dayStartLocal(dayDate).getTime() === dayStartLocal(new Date()).getTime();
+  // Arrived only on bring/single visit-day card for today (same API as RepairDetail).
   const canConfirmArrival =
-    kind === 'booked'
+    (occupancyRole === 'single' || occupancyRole === 'bring')
+    && kind === 'booked'
     && !pending
     && !atShop
     && item.schedule_confirmed !== false
-    && visitDayOrLater;
+    && Boolean(item.scheduled_start || item.display_start)
+    && visitDayOrLater
+    && cardDayIsToday;
   const statusHint = atShop
     ? t('partnerDashboard.calendar.vehicleAtCenter')
-    : kind === 'booked' && !pending && !visitDayOrLater
+    : (occupancyRole === 'single' || occupancyRole === 'bring')
+      && kind === 'booked'
+      && !pending
+      && !visitDayOrLater
       ? t('partnerDashboard.calendar.arrivalOnVisitDay')
       : null;
 
@@ -316,6 +512,8 @@ function DayJobCard({
     return (
       <CompactJobCard
         item={item}
+        occupancyRole={occupancyRole}
+        bayNumber={bayNumber}
         onOpen={onOpen}
         primaryLabel={t('partnerDashboard.calendar.scheduleVisit')}
         onPrimary={onReschedule}
@@ -330,15 +528,23 @@ function DayJobCard({
     );
   }
 
+  const showActions = occupancyRole !== 'stay';
+
   return (
     <CompactJobCard
       item={item}
+      occupancyRole={occupancyRole}
+      bayNumber={bayNumber}
       onOpen={onOpen}
-      primaryLabel={canConfirmArrival ? t('partnerDashboard.calendar.arrived') : null}
-      onPrimary={canConfirmArrival ? onConfirmArrival : null}
+      primaryLabel={showActions && canConfirmArrival ? t('partnerDashboard.calendar.arrived') : null}
+      onPrimary={showActions && canConfirmArrival ? onConfirmArrival : null}
       loadingPrimary={confirming === item.id}
-      secondaryLabel={pending ? t('partnerDashboard.calendar.reschedule') : t('partnerDashboard.calendar.changeTime')}
-      onSecondary={onReschedule}
+      secondaryLabel={
+        showActions
+          ? (pending ? t('partnerDashboard.calendar.reschedule') : t('partnerDashboard.calendar.changeTime'))
+          : null
+      }
+      onSecondary={showActions ? onReschedule : null}
       statusHint={statusHint}
       t={t}
       locale={locale}
@@ -350,9 +556,9 @@ export default function ShopCalendarScreen() {
   const { t, locale } = useTranslation();
   const navigation = useNavigation();
   const route = useRoute();
-  const { refreshNotifications, setNotifications } = useContext(WebSocketContext);
+  const { refreshNotifications, setNotifications, notifications } = useContext(WebSocketContext);
   const backLabel = route.params?.backLabel || t('common.home');
-  const returnTo = route.params?.returnTo || 'ShopDashboard';
+  const returnTo = normalizeReturnToRoute(route.params?.returnTo) || 'ShopDashboard';
 
   const handleBackHome = () => {
     if (returnTo === 'ShopDashboard') {
@@ -370,24 +576,54 @@ export default function ShopCalendarScreen() {
     daily_load: [],
   });
   const [selectedJob, setSelectedJob] = useState(null);
-  const [moveDate, setMoveDate] = useState(() => applyDayOffset(new Date(), 1, new Date()));
+  const [bringDate, setBringDate] = useState(() => applyDayOffset(new Date(), 1, new Date()));
+  const [pickupDate, setPickupDate] = useState(() => defaultPickupFromBring(applyDayOffset(new Date(), 1, new Date())));
   const [moveNote, setMoveNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [dismissingId, setDismissingId] = useState(null);
   const [confirmingArrivalId, setConfirmingArrivalId] = useState(null);
-  const [selectedDayOffset, setSelectedDayOffset] = useState(1);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState('09:00');
-  const [customDateActive, setCustomDateActive] = useState(false);
-  const [webCustomDateStr, setWebCustomDateStr] = useState('');
+  const [bringDayOffset, setBringDayOffset] = useState(1);
+  const [bringTimeSlot, setBringTimeSlot] = useState('09:00');
+  const [bringCustomDateActive, setBringCustomDateActive] = useState(false);
+  const [webBringCustomDateStr, setWebBringCustomDateStr] = useState('');
+  const [pickupDayOffset, setPickupDayOffset] = useState(0);
+  const [pickupTimeSlot, setPickupTimeSlot] = useState('11:00');
+  const [pickupCustomDateActive, setPickupCustomDateActive] = useState(false);
+  const [webPickupCustomDateStr, setWebPickupCustomDateStr] = useState('');
+  const [androidPickerTarget, setAndroidPickerTarget] = useState(null); // 'bring' | 'pickup'
   const [androidPickerPhase, setAndroidPickerPhase] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [toast, setToast] = useState(null);
   const loadGenerationRef = useRef(0);
+  const lastCalendarNotifRef = useRef(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const pickupDayOffsets = useMemo(
+    () => [
+      { label: t('partnerDashboard.createOffer.pickupSameDay'), days: 0 },
+      { label: t('partnerDashboard.createOffer.pickupPlus1Day'), days: 1 },
+      { label: t('partnerDashboard.createOffer.pickupPlus2Days'), days: 2 },
+      { label: t('partnerDashboard.createOffer.pickupPlus3Days'), days: 3 },
+      { label: t('partnerDashboard.createOffer.pickupPlus1Week'), days: 7 },
+    ],
+    [t]
+  );
 
   const rangeEnd = useMemo(() => addCalendarDays(weekStart, CALENDAR_DAY_COUNT), [weekStart]);
   const dayBuckets = useMemo(
     () => groupByDay(calendar.scheduled, weekStart, CALENDAR_DAY_COUNT),
     [calendar.scheduled, weekStart]
+  );
+  const bayByJobId = useMemo(
+    () => assignShopBayNumbers(calendar.scheduled),
+    [calendar.scheduled]
   );
   const dailyLoadMap = useMemo(
     () => buildDailyLoadMap(calendar.daily_load),
@@ -395,9 +631,9 @@ export default function ShopCalendarScreen() {
   );
   const unscheduledCount = calendar.unscheduled_count ?? calendar.unscheduled?.length ?? 0;
 
-  const loadCalendar = useCallback(async ({ force = false } = {}) => {
+  const loadCalendar = useCallback(async ({ force = false, quiet = false } = {}) => {
     const generation = ++loadGenerationRef.current;
-    setLoading(true);
+    if (!quiet && mountedRef.current) setLoading(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
       const data = await fetchShopCalendarCached(token, {
@@ -405,7 +641,7 @@ export default function ShopCalendarScreen() {
         to: toApiIso(rangeEnd),
         force,
       });
-      if (generation !== loadGenerationRef.current) return;
+      if (generation !== loadGenerationRef.current || !mountedRef.current) return;
       const count = data.unscheduled_count ?? (data.unscheduled || []).length;
       setCalendar({
         scheduled: data.scheduled || [],
@@ -415,21 +651,46 @@ export default function ShopCalendarScreen() {
       });
       await cacheUnscheduledCount(count);
     } catch (err) {
-      if (generation !== loadGenerationRef.current) return;
+      if (generation !== loadGenerationRef.current || !mountedRef.current) return;
       console.error('Shop calendar load failed', err);
-      Alert.alert(t('common.error'), err.message || t('partnerDashboard.calendar.loadError'));
+      // Quiet polls must not block or alert — initial paint already has a spinner path.
+      if (!quiet) {
+        Alert.alert(t('common.error'), err.message || t('partnerDashboard.calendar.loadError'));
+      }
     } finally {
-      if (generation === loadGenerationRef.current) {
+      // Always clear loading for the latest generation. Quiet polls never set loading
+      // true, but they can supersede an in-flight initial fetch — skipping clear here
+      // left the spinner up until week arrows remounted a non-quiet load.
+      if (generation === loadGenerationRef.current && mountedRef.current) {
         setLoading(false);
       }
     }
-  }, [weekStart, rangeEnd]);
+  }, [weekStart, rangeEnd, t]);
 
   useFocusEffect(
     useCallback(() => {
-      loadCalendar();
+      loadCalendar({ force: true });
+      const pollId = setInterval(() => {
+        invalidateShopCalendarCache();
+        loadCalendar({ force: true, quiet: true });
+      }, CALENDAR_POLL_MS);
+      return () => clearInterval(pollId);
     }, [loadCalendar])
   );
+
+  useEffect(() => {
+    if (!Array.isArray(notifications) || notifications.length === 0) return;
+    const newest = normalizeNotification(notifications[0]);
+    if (!newest?.id || !isCalendarNotification(newest)) return;
+    if (lastCalendarNotifRef.current === newest.id) return;
+    const prevId = lastCalendarNotifRef.current;
+    lastCalendarNotifRef.current = newest.id;
+    // Seed on first observation so an existing calendar notif does not race the
+    // focus load with a quiet refetch (which previously stuck loading forever).
+    if (prevId == null) return;
+    invalidateShopCalendarCache();
+    loadCalendar({ force: true, quiet: true });
+  }, [notifications, loadCalendar]);
 
   useEffect(() => {
     const focusDate = route.params?.focusDate;
@@ -441,6 +702,79 @@ export default function ShopCalendarScreen() {
     }
   }, [route.params?.focusDate]);
 
+  const syncBringPickerMeta = (nextBring) => {
+    const offset = dayOffsetFromToday(nextBring);
+    const matchesQuick = SCHEDULE_DAY_OFFSETS.some((opt) => opt.days === offset);
+    setBringDayOffset(matchesQuick ? offset : null);
+    setBringCustomDateActive(!matchesQuick);
+    setBringTimeSlot(timeSlotFromDate(nextBring));
+    setWebBringCustomDateStr(matchesQuick ? '' : formatCustomDateInput(nextBring));
+  };
+
+  const syncPickupPickerMeta = (nextPickup, bring) => {
+    const offset = dayOffsetFromAnchor(bring, nextPickup);
+    const matchesQuick = pickupDayOffsets.some((opt) => opt.days === offset);
+    setPickupDayOffset(matchesQuick ? offset : null);
+    setPickupCustomDateActive(Boolean(nextPickup) && !matchesQuick);
+    setPickupTimeSlot(timeSlotFromDate(nextPickup));
+    setWebPickupCustomDateStr(matchesQuick ? '' : formatCustomDateInput(nextPickup));
+  };
+
+  const applyBringChange = (nextBring, { preservePickup = true } = {}) => {
+    const candidate =
+      preservePickup && pickupDate && !Number.isNaN(pickupDate.getTime())
+        ? pickupDate
+        : defaultPickupFromBring(nextBring);
+    const safePickup = ensurePickupAfterBring(nextBring, candidate);
+    setBringDate(nextBring);
+    syncBringPickerMeta(nextBring);
+    setPickupDate(safePickup);
+    syncPickupPickerMeta(safePickup, nextBring);
+  };
+
+  const applyPickupChange = (nextPickup) => {
+    const safePickup = ensurePickupAfterBring(bringDate, nextPickup);
+    if (safePickup.getTime() <= bringDate.getTime()) {
+      Alert.alert(
+        t('partnerDashboard.calendar.invalidDateTitle'),
+        t('partnerDashboard.createOffer.pickupAfterBringBody')
+      );
+      return;
+    }
+    setPickupDate(safePickup);
+    syncPickupPickerMeta(safePickup, bringDate);
+  };
+
+  const openMoveModal = (job) => {
+    const preferred = job.client_preferred_start || job.display_start;
+    const preferredEnd = job.client_preferred_end || job.display_end;
+    const baseBring = job.scheduled_start
+      ? new Date(job.scheduled_start)
+      : preferred
+        ? new Date(preferred)
+        : applyDayOffset(new Date(), 1, new Date());
+    let durationMs = 2 * 60 * 60 * 1000;
+    const endSource = job.scheduled_end || preferredEnd;
+    if (endSource) {
+      const end = new Date(endSource);
+      if (!Number.isNaN(end.getTime()) && end.getTime() > baseBring.getTime()) {
+        durationMs = end.getTime() - baseBring.getTime();
+      }
+    }
+    const basePickup = endSource
+      ? ensurePickupAfterBring(baseBring, new Date(endSource))
+      : defaultPickupFromBring(baseBring, durationMs);
+
+    setSelectedJob(job);
+    setMoveNote('');
+    setAndroidPickerTarget(null);
+    setAndroidPickerPhase(null);
+    setBringDate(baseBring);
+    syncBringPickerMeta(baseBring);
+    setPickupDate(basePickup);
+    syncPickupPickerMeta(basePickup, baseBring);
+  };
+
   useEffect(() => {
     const focusRepairId = route.params?.focusRepairId;
     if (!focusRepairId) return;
@@ -449,106 +783,136 @@ export default function ShopCalendarScreen() {
       calendar.unscheduled?.find((row) => Number(row.id) === Number(focusRepairId));
     if (!job) return;
     if (job.schedule_confirmed === false || (!job.scheduled_start && job.client_preferred_start)) {
-      setSelectedJob(job);
+      openMoveModal(job);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open once when focus/job list resolves
   }, [route.params?.focusRepairId, calendar.scheduled, calendar.unscheduled]);
-
-  const resetPickerState = (baseDate) => {
-    const base = baseDate || applyDayOffset(new Date(), 1, new Date());
-    setMoveDate(base);
-    setSelectedDayOffset(1);
-    setSelectedTimeSlot('09:00');
-    setCustomDateActive(false);
-    setWebCustomDateStr('');
-    setAndroidPickerPhase(null);
-  };
-
-  const openMoveModal = (job) => {
-    const preferred = job.client_preferred_start || job.display_start;
-    const base = job.scheduled_start
-      ? new Date(job.scheduled_start)
-      : preferred
-        ? new Date(preferred)
-        : applyDayOffset(new Date(), 1, new Date());
-    setSelectedJob(job);
-    setMoveNote('');
-    resetPickerState(base);
-    const timeSource = job.scheduled_start || preferred;
-    if (timeSource) {
-      const d = new Date(timeSource);
-      setSelectedTimeSlot(
-        `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
-      );
-      setMoveDate(d);
-    }
-  };
 
   const closeMoveModal = () => {
     setSelectedJob(null);
     setSaving(false);
+    setAndroidPickerTarget(null);
     setAndroidPickerPhase(null);
   };
 
-  const pickDayOffset = (days) => {
-    setCustomDateActive(false);
-    setSelectedDayOffset(days);
-    const next = applyDayOffset(new Date(), days, applyTimeSlotToDate(moveDate, selectedTimeSlot));
-    setMoveDate(next);
+  const pickBringDayOffset = (days) => {
+    const next = applyDayOffset(new Date(), days, bringDate);
+    applyBringChange(next);
   };
 
-  const pickTimeSlot = (slot) => {
-    setSelectedTimeSlot(slot);
-    setMoveDate(applyTimeSlotToDate(moveDate, slot));
+  const pickBringTimeSlot = (slot) => {
+    applyBringChange(applyTimeSlotToDate(bringDate, slot));
   };
 
-  const openCustomDate = () => {
-    setCustomDateActive(true);
+  const openBringCustomDate = () => {
+    setBringCustomDateActive(true);
+    setBringDayOffset(null);
     if (isWeb) {
-      setWebCustomDateStr(formatSchedulePreview(moveDate).split(',')[0] || '');
+      setWebBringCustomDateStr(formatCustomDateInput(bringDate));
       return;
     }
     if (Platform.OS === 'android') {
+      setAndroidPickerTarget('bring');
       setAndroidPickerPhase('date');
     }
   };
 
-  const applyWebCustomDate = () => {
-    const parsed = parseDdMmYyyy(webCustomDateStr);
+  const applyWebBringCustomDate = () => {
+    const parsed = parseDdMmYyyy(webBringCustomDateStr);
     if (!parsed) {
       Alert.alert(t('partnerDashboard.calendar.invalidDateTitle'), t('partnerDashboard.calendar.invalidDate'));
       return;
     }
-    setMoveDate(mergeDateWithTime(parsed, moveDate));
-    setCustomDateActive(false);
+    applyBringChange(mergeDateWithTime(parsed, bringDate));
+  };
+
+  const pickPickupDayOffset = (days) => {
+    const base = addCalendarDays(dayStart(bringDate), days);
+    const next = ensurePickupAfterBring(bringDate, mergeDateWithTime(base, pickupDate));
+    applyPickupChange(next);
+  };
+
+  const pickPickupTimeSlot = (slot) => {
+    applyPickupChange(applyTimeSlotToDate(pickupDate, slot));
+  };
+
+  const openPickupCustomDate = () => {
+    setPickupCustomDateActive(true);
+    setPickupDayOffset(null);
+    if (isWeb) {
+      setWebPickupCustomDateStr(formatCustomDateInput(pickupDate));
+      return;
+    }
+    if (Platform.OS === 'android') {
+      setAndroidPickerTarget('pickup');
+      setAndroidPickerPhase('date');
+    }
+  };
+
+  const applyWebPickupCustomDate = () => {
+    const raw = String(webPickupCustomDateStr || '').trim();
+    if (!raw) {
+      // Re-open existing custom pickup without retyping.
+      applyPickupChange(pickupDate);
+      return;
+    }
+    const parsed = parseDdMmYyyy(raw);
+    if (!parsed) {
+      Alert.alert(t('partnerDashboard.calendar.invalidDateTitle'), t('partnerDashboard.calendar.invalidDate'));
+      return;
+    }
+    applyPickupChange(mergeDateWithTime(parsed, pickupDate));
   };
 
   const onAndroidPickerChange = (event, picked) => {
     if (event?.type === 'dismissed') {
       setAndroidPickerPhase(null);
+      setAndroidPickerTarget(null);
       return;
     }
     if (!picked) {
       setAndroidPickerPhase(null);
+      setAndroidPickerTarget(null);
       return;
     }
+    const target = androidPickerTarget || 'bring';
     if (androidPickerPhase === 'date') {
-      setMoveDate(mergeDateWithTime(picked, moveDate));
+      if (target === 'pickup') {
+        setPickupDate(mergeDateWithTime(picked, pickupDate));
+      } else {
+        setBringDate(mergeDateWithTime(picked, bringDate));
+      }
       setAndroidPickerPhase('time');
       return;
     }
-    setMoveDate(mergeDateWithTime(moveDate, picked));
+    if (target === 'pickup') {
+      applyPickupChange(mergeDateWithTime(pickupDate, picked));
+    } else {
+      applyBringChange(mergeDateWithTime(bringDate, picked));
+    }
     setAndroidPickerPhase(null);
+    setAndroidPickerTarget(null);
   };
 
   const submitMove = async () => {
     if (!selectedJob) return;
-    const end = new Date(moveDate.getTime() + 2 * 60 * 60 * 1000);
+    if (!bringDate || Number.isNaN(bringDate.getTime()) || !pickupDate || Number.isNaN(pickupDate.getTime())) {
+      return;
+    }
+    const safePickup = ensurePickupAfterBring(bringDate, pickupDate);
+    if (safePickup.getTime() <= bringDate.getTime()) {
+      Alert.alert(
+        t('partnerDashboard.calendar.invalidDateTitle'),
+        t('partnerDashboard.createOffer.pickupAfterBringBody')
+      );
+      return;
+    }
     setSaving(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
       const result = await proposeRepairSchedule(token, selectedJob.id, {
-        scheduledStart: toApiIso(moveDate),
-        scheduledEnd: toApiIso(end),
+        scheduledStart: toApiIso(bringDate),
+        scheduledEnd: toApiIso(safePickup),
         note: moveNote,
       });
       closeMoveModal();
@@ -588,10 +952,9 @@ export default function ShopCalendarScreen() {
   };
 
   const openRepairDetail = (job) => {
-    navigation.navigate('RepairDetail', {
-      repairId: job.id,
+    navigateToRepairDetail(navigation, job.id, {
       returnTo: 'ShopCalendar',
-      backLabel: t('drawer.partner.calendar'),
+      backLabelKey: 'drawer.partner.calendar',
     });
   };
 
@@ -704,31 +1067,37 @@ export default function ShopCalendarScreen() {
 
   return (
     <ScreenBackground safeArea={false}>
-      <Appbar.Header style={{ backgroundColor: SHOP_TOP_BAR }}>
-        <Appbar.Action
-          icon="arrow-left"
-          onPress={handleBackHome}
-          color="#fff"
-          accessibilityLabel={`Back to ${backLabel}`}
-        />
-        <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color="#fff" />
-        <Appbar.Content title={t('drawer.partner.calendar')} titleStyle={{ color: '#fff' }} />
-        <Appbar.Action
-          icon="chevron-left"
-          onPress={() => setWeekStart((w) => addCalendarDays(w, -CALENDAR_DAY_COUNT))}
-          color="#fff"
-        />
-        <Appbar.Action
-          icon="chevron-right"
-          onPress={() => setWeekStart((w) => addCalendarDays(w, CALENDAR_DAY_COUNT))}
-          color="#fff"
-        />
-      </Appbar.Header>
+      <PartnerAppHeader
+        title={t('drawer.partner.calendar')}
+        backLabel={backLabel}
+        onBack={handleBackHome}
+        iconOnlyBack
+        showCalendar={false}
+        loadCalendarBadge={false}
+      />
 
       <View style={styles.weekLabelWrap}>
+        <Button
+          compact
+          mode="text"
+          textColor="#fff"
+          onPress={() => setWeekStart((w) => addCalendarDays(w, -CALENDAR_DAY_COUNT))}
+          accessibilityLabel="Previous period"
+        >
+          ‹
+        </Button>
         <Text style={styles.weekLabel}>
           {formatDayLabel(weekStart, locale)} – {formatDayLabel(addCalendarDays(weekStart, CALENDAR_DAY_COUNT - 1), locale)}
         </Text>
+        <Button
+          compact
+          mode="text"
+          textColor="#fff"
+          onPress={() => setWeekStart((w) => addCalendarDays(w, CALENDAR_DAY_COUNT))}
+          accessibilityLabel="Next period"
+        >
+          ›
+        </Button>
         <Button compact mode="text" textColor="#fff" onPress={() => setWeekStart(startOfWeek(new Date()))}>
           {t('partnerDashboard.calendar.today')}
         </Button>
@@ -772,8 +1141,10 @@ export default function ShopCalendarScreen() {
               ) : (
                 bucket.items.map((job) => (
                   <DayJobCard
-                    key={job.id}
+                    key={`${job.id}-${bucket.date.toISOString()}`}
                     item={job}
+                    dayDate={bucket.date}
+                    bayNumber={bayByJobId.get(job.id) || null}
                     onOpen={openRepairDetail}
                     onReschedule={openMoveModal}
                     onConfirmArrival={confirmArrival}
@@ -803,21 +1174,24 @@ export default function ShopCalendarScreen() {
               </Text>
             ) : null}
 
-            <Text style={styles.modalLabel}>Date</Text>
+            <Text style={styles.modalSectionTitle}>
+              {t('partnerDashboard.calendar.comeInSection')}
+            </Text>
+            <Text style={styles.modalLabel}>{t('partnerDashboard.calendar.dateLabel')}</Text>
             <View style={styles.chipRow}>
               {SCHEDULE_DAY_OFFSETS.map((opt) => (
                 <Pressable
                   key={opt.label}
-                  onPress={() => pickDayOffset(opt.days)}
+                  onPress={() => pickBringDayOffset(opt.days)}
                   style={[
                     styles.chip,
-                    !customDateActive && selectedDayOffset === opt.days && styles.chipSelected,
+                    !bringCustomDateActive && bringDayOffset === opt.days && styles.chipSelected,
                   ]}
                 >
                   <Text
                     style={[
                       styles.chipText,
-                      !customDateActive && selectedDayOffset === opt.days && styles.chipTextSelected,
+                      !bringCustomDateActive && bringDayOffset === opt.days && styles.chipTextSelected,
                     ]}
                   >
                     {opt.label}
@@ -825,59 +1199,135 @@ export default function ShopCalendarScreen() {
                 </Pressable>
               ))}
               <Pressable
-                onPress={openCustomDate}
-                style={[styles.chip, customDateActive && styles.chipSelected]}
+                onPress={openBringCustomDate}
+                style={[styles.chip, bringCustomDateActive && styles.chipSelected]}
               >
-                <Text style={[styles.chipText, customDateActive && styles.chipTextSelected]}>
-                  Custom date
+                <Text style={[styles.chipText, bringCustomDateActive && styles.chipTextSelected]}>
+                  {t('partnerDashboard.calendar.customDate')}
                 </Text>
               </Pressable>
             </View>
 
-            {Platform.OS === 'ios' && customDateActive ? (
+            {Platform.OS === 'ios' && bringCustomDateActive ? (
               <DateTimePicker
-                value={moveDate}
+                value={bringDate}
                 mode="date"
                 display="spinner"
                 onChange={(_, d) => {
-                  if (d) setMoveDate(mergeDateWithTime(d, moveDate));
+                  if (d) applyBringChange(mergeDateWithTime(d, bringDate));
                 }}
               />
             ) : null}
 
-            {isWeb && customDateActive ? (
+            {isWeb && bringCustomDateActive ? (
               <View style={styles.webCustomBlock}>
                 <TextInput
                   mode="outlined"
                   label={t('partnerDashboard.calendar.customDateLabel')}
-                  value={webCustomDateStr}
-                  onChangeText={setWebCustomDateStr}
+                  value={webBringCustomDateStr}
+                  onChangeText={setWebBringCustomDateStr}
                   placeholder="12.06.2026"
                   dense
                 />
-                <Button mode="outlined" compact onPress={applyWebCustomDate} style={styles.webApplyBtn}>
-                  Apply date
+                <Button mode="outlined" compact onPress={applyWebBringCustomDate} style={styles.webApplyBtn}>
+                  {t('partnerDashboard.calendar.applyDate')}
+                </Button>
+              </View>
+            ) : null}
+
+            <Text style={styles.modalLabel}>{t('partnerDashboard.calendar.timeLabel')}</Text>
+            <View style={styles.chipRow}>
+              {SCHEDULE_TIME_SLOTS.map((slot) => (
+                <Pressable
+                  key={`bring-${slot}`}
+                  onPress={() => pickBringTimeSlot(slot)}
+                  style={[styles.chip, bringTimeSlot === slot && styles.chipSelected]}
+                >
+                  <Text style={[styles.chipText, bringTimeSlot === slot && styles.chipTextSelected]}>
+                    {slot}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.modalSectionTitle}>
+              {t('partnerDashboard.calendar.pickupSection')}
+            </Text>
+            <Text style={styles.modalLabel}>{t('partnerDashboard.calendar.dateLabel')}</Text>
+            <View style={styles.chipRow}>
+              {pickupDayOffsets.map((opt) => (
+                <Pressable
+                  key={opt.label}
+                  onPress={() => pickPickupDayOffset(opt.days)}
+                  style={[
+                    styles.chip,
+                    !pickupCustomDateActive && pickupDayOffset === opt.days && styles.chipSelected,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      !pickupCustomDateActive && pickupDayOffset === opt.days && styles.chipTextSelected,
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+              <Pressable
+                onPress={openPickupCustomDate}
+                style={[styles.chip, pickupCustomDateActive && styles.chipSelected]}
+              >
+                <Text style={[styles.chipText, pickupCustomDateActive && styles.chipTextSelected]}>
+                  {t('partnerDashboard.calendar.customDate')}
+                </Text>
+              </Pressable>
+            </View>
+
+            {Platform.OS === 'ios' && pickupCustomDateActive ? (
+              <DateTimePicker
+                value={pickupDate}
+                mode="date"
+                display="spinner"
+                onChange={(_, d) => {
+                  if (d) applyPickupChange(mergeDateWithTime(d, pickupDate));
+                }}
+              />
+            ) : null}
+
+            {isWeb && pickupCustomDateActive ? (
+              <View style={styles.webCustomBlock}>
+                <TextInput
+                  mode="outlined"
+                  label={t('partnerDashboard.calendar.customDateLabel')}
+                  value={webPickupCustomDateStr}
+                  onChangeText={setWebPickupCustomDateStr}
+                  placeholder="12.06.2026"
+                  dense
+                />
+                <Button mode="outlined" compact onPress={applyWebPickupCustomDate} style={styles.webApplyBtn}>
+                  {t('partnerDashboard.calendar.applyDate')}
                 </Button>
               </View>
             ) : null}
 
             {Platform.OS === 'android' && androidPickerPhase ? (
               <DateTimePicker
-                value={moveDate}
+                value={androidPickerTarget === 'pickup' ? pickupDate : bringDate}
                 mode={androidPickerPhase}
                 onChange={onAndroidPickerChange}
               />
             ) : null}
 
-            <Text style={styles.modalLabel}>Time</Text>
+            <Text style={styles.modalLabel}>{t('partnerDashboard.calendar.timeLabel')}</Text>
             <View style={styles.chipRow}>
               {SCHEDULE_TIME_SLOTS.map((slot) => (
                 <Pressable
-                  key={slot}
-                  onPress={() => pickTimeSlot(slot)}
-                  style={[styles.chip, selectedTimeSlot === slot && styles.chipSelected]}
+                  key={`pickup-${slot}`}
+                  onPress={() => pickPickupTimeSlot(slot)}
+                  style={[styles.chip, pickupTimeSlot === slot && styles.chipSelected]}
                 >
-                  <Text style={[styles.chipText, selectedTimeSlot === slot && styles.chipTextSelected]}>
+                  <Text style={[styles.chipText, pickupTimeSlot === slot && styles.chipTextSelected]}>
                     {slot}
                   </Text>
                 </Pressable>
@@ -892,7 +1342,16 @@ export default function ShopCalendarScreen() {
               style={styles.noteInput}
             />
 
-            <Text style={styles.modalPreview}>Selected: {formatSchedulePreview(moveDate)}</Text>
+            <Text style={styles.modalPreview}>
+              {t('partnerDashboard.calendar.comeInPreview', {
+                datetime: formatSchedulePreview(bringDate),
+              })}
+            </Text>
+            <Text style={styles.modalPreviewSecondary}>
+              {t('partnerDashboard.calendar.pickupPreview', {
+                datetime: formatSchedulePreview(pickupDate),
+              })}
+            </Text>
 
             <View style={styles.modalActions}>
               <Button mode="text" onPress={closeMoveModal} disabled={saving}>
@@ -931,10 +1390,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  weekLabel: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  weekLabel: { color: '#fff', fontSize: 15, fontWeight: '600', flex: 1, textAlign: 'center' },
   loader: { marginTop: 24 },
   scroll: { paddingHorizontal: 12, paddingBottom: 24 },
   section: { marginBottom: 16 },
@@ -974,12 +1434,52 @@ const styles = StyleSheet.create({
     borderLeftColor: '#DC2626',
     backgroundColor: '#FFFBFB',
   },
+  compactCardPending: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#D97706',
+    backgroundColor: '#FFFBEB',
+  },
+  stayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#64748B',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 4,
+  },
+  stayRowText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  bayChip: {
+    borderRadius: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  bayChipText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
   compactHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
     marginBottom: 4,
+  },
+  compactHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 1,
   },
   compactTime: {
     fontSize: 13,
@@ -989,6 +1489,9 @@ const styles = StyleSheet.create({
   compactTimeRequest: {
     color: '#DC2626',
   },
+  compactTimePending: {
+    color: '#B45309',
+  },
   kindPill: {
     borderRadius: 999,
     paddingHorizontal: 8,
@@ -996,6 +1499,12 @@ const styles = StyleSheet.create({
   },
   kindPillRequest: {
     backgroundColor: 'rgba(220,38,38,0.12)',
+  },
+  kindPillReady: {
+    backgroundColor: 'rgba(13,148,136,0.14)',
+  },
+  kindPillPending: {
+    backgroundColor: 'rgba(217,119,6,0.16)',
   },
   kindPillBooked: {
     backgroundColor: 'rgba(37,99,235,0.1)',
@@ -1009,6 +1518,12 @@ const styles = StyleSheet.create({
   },
   kindPillTextRequest: {
     color: '#B91C1C',
+  },
+  kindPillTextReady: {
+    color: '#0F766E',
+  },
+  kindPillTextPending: {
+    color: '#B45309',
   },
   compactVehicle: {
     fontSize: 14,
@@ -1059,6 +1574,13 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
   modalSub: { fontSize: 14, color: '#64748B', marginBottom: 12 },
+  modalSectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 8,
+    marginBottom: 4,
+  },
   modalLabel: { fontSize: 13, fontWeight: '600', color: '#475569', marginBottom: 8, marginTop: 4 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   chip: {
@@ -1079,5 +1601,6 @@ const styles = StyleSheet.create({
   webApplyBtn: { alignSelf: 'flex-start' },
   noteInput: { marginTop: 4, backgroundColor: '#fff' },
   modalPreview: { fontSize: 14, color: '#334155', marginTop: 10, fontWeight: '600' },
+  modalPreviewSecondary: { fontSize: 14, color: '#334155', marginTop: 4, fontWeight: '600' },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 16, marginBottom: 8 },
 });

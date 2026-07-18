@@ -16,6 +16,7 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { deletePromotion, getPromotions } from '../../api/promotions';
+import { getOperationIcon } from '../../icons/operationIconRegistry';
 import ScreenBackground from '../ScreenBackground';
 import AppNavigationBar from '../common/AppNavigationBar';
 import { usePartnerDashboardBack } from '../../navigation/appNavBarBack';
@@ -105,7 +106,7 @@ export default function ShopPromotions() {
         {!!item.repair_type_name && (
           <View style={styles.metaItem}>
             <MaterialCommunityIcons
-              name="wrench-outline"
+              name={getOperationIcon(item)}
               size={14}
               color={TEXT_MUTED}
             />

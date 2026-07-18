@@ -224,6 +224,39 @@ function workingTimeSlotString(d) {
   return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
 }
 
+function slotToMinutes(slot) {
+  const [h, m] = String(slot || '').split(':').map(Number);
+  if (!Number.isFinite(h)) return null;
+  return h * 60 + (Number.isFinite(m) ? m : 0);
+}
+
+/** Ensure pickup datetime is strictly after bring; bump to next valid TIME_SLOTS on that day when needed. */
+function ensurePickupAfterBring(bring, candidate) {
+  if (!bring || !candidate || Number.isNaN(bring.getTime()) || Number.isNaN(candidate.getTime())) {
+    return candidate;
+  }
+  if (candidate.getTime() > bring.getTime()) return candidate;
+  const sameDay = dayStart(bring).getTime() === dayStart(candidate).getTime();
+  if (sameDay) {
+    const bringMins = bring.getHours() * 60 + bring.getMinutes();
+    for (const slot of TIME_SLOTS) {
+      const mins = slotToMinutes(slot);
+      if (mins != null && mins > bringMins) {
+        return applyTimeStringToDate(candidate, slot);
+      }
+    }
+  }
+  // No later slot same day — keep candidate; confirm will still validate.
+  return candidate;
+}
+
+function formatCustomDateInput(d) {
+  if (!d || Number.isNaN(d.getTime())) return '';
+  return `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1)
+    .toString()
+    .padStart(2, '0')}.${d.getFullYear()}`;
+}
+
 function buildScheduleAvailabilityNote(bringAt, pickupAt, optionalNote) {
   const opt = String(optionalNote || '').trim();
   const parts = [];
@@ -521,12 +554,14 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
       pickupAt && pickupAt.getTime() > bringAt.getTime()
         ? pickupAt
         : pickupFromBringShortcut(bringAt, 'plus4h') || new Date(bringAt.getTime() + 4 * 3600000);
-    setWorkingDate(new Date(initial.getTime()));
-    const offset = dayOffsetFromAnchor(bringAt, initial);
+    const safeInitial = ensurePickupAfterBring(bringAt, new Date(initial.getTime()));
+    setWorkingDate(safeInitial);
+    const offset = dayOffsetFromAnchor(bringAt, safeInitial);
     const matchesQuick = pickupDayOffsetsFromBring.some((opt) => opt.days === offset);
-    setPickupCustomDateActive(Boolean(pickupAt) && !matchesQuick);
+    const useCustom = Boolean(pickupAt) && !matchesQuick;
+    setPickupCustomDateActive(useCustom);
     setBringCustomDateActive(false);
-    setWebCustomBringDateStr('');
+    setWebCustomBringDateStr(useCustom ? formatCustomDateInput(safeInitial) : '');
     setPickerTarget('pickup');
     setPickerModalVisible(true);
   };
@@ -550,13 +585,20 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
   };
 
   const applyWorkingTimeSlot = (timeStr) => {
-    setWorkingDate(applyTimeStringToDate(workingDate, timeStr));
+    const next = applyTimeStringToDate(workingDate, timeStr);
+    if (pickerTarget === 'pickup' && bringAt && next.getTime() <= bringAt.getTime()) {
+      return;
+    }
+    setWorkingDate(next);
   };
 
   const onIosBringDateOnlyChange = (_e, date) => {
-    if (date) {
-      setWorkingDate(mergeDateWithTimeOf(date, workingDate));
+    if (!date) return;
+    let next = mergeDateWithTimeOf(date, workingDate);
+    if (pickerTarget === 'pickup' && bringAt) {
+      next = ensurePickupAfterBring(bringAt, next);
     }
+    setWorkingDate(next);
   };
 
   const onIosDateTimeChange = (_e, date) => {
@@ -579,7 +621,9 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
       return;
     }
     if (ctx === 'pickupCustomDate') {
-      setWorkingDate(mergeDateWithTimeOf(date, workingDate));
+      let next = mergeDateWithTimeOf(date, workingDate);
+      if (bringAt) next = ensurePickupAfterBring(bringAt, next);
+      setWorkingDate(next);
       setAndroidPickerVisible(false);
       setAndroidPickerContext(null);
       return;
@@ -668,8 +712,15 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
       );
       return false;
     }
-    setWorkingDate(mergeDateWithTimeOf(parsed, workingDate));
+    let next = mergeDateWithTimeOf(parsed, workingDate);
+    if (pickerTarget === 'pickup' && bringAt) {
+      next = ensurePickupAfterBring(bringAt, next);
+    }
+    setWorkingDate(next);
     setBringCustomDateActive(false);
+    if (pickerTarget === 'pickup') {
+      setPickupCustomDateActive(false);
+    }
     return true;
   };
 
@@ -680,24 +731,31 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
       bringAt.getMonth(),
       bringAt.getDate() + daysAfterBring
     );
-    setWorkingDate(mergeDateWithTimeOf(base, workingDate));
+    const next = ensurePickupAfterBring(bringAt, mergeDateWithTimeOf(base, workingDate));
+    setWorkingDate(next);
     setPickupCustomDateActive(false);
+    setWebCustomBringDateStr('');
   };
 
   const confirmPickupModalDone = () => {
     let next = workingDate;
     if (isWeb && pickupCustomDateActive) {
       const parsed = parseDdMmYyyy(webCustomBringDateStr);
-      if (!parsed) {
+      if (parsed) {
+        next = mergeDateWithTimeOf(parsed, workingDate);
+      } else if (!webCustomBringDateStr.trim()) {
+        // Working date already holds the selected day (re-opened existing pickup).
+        next = workingDate;
+      } else {
         Alert.alert(
-        t('partnerDashboard.createOffer.invalidDateTitle'),
-        t('partnerDashboard.createOffer.invalidDateBody')
-      );
+          t('partnerDashboard.createOffer.invalidDateTitle'),
+          t('partnerDashboard.createOffer.invalidDateBody')
+        );
         return;
       }
-      next = mergeDateWithTimeOf(parsed, workingDate);
       setPickupCustomDateActive(false);
     }
+    next = ensurePickupAfterBring(bringAt, next);
     if (next.getTime() <= bringAt.getTime()) {
       Alert.alert(
         t('partnerDashboard.createOffer.invalidTimesTitle'),
@@ -770,6 +828,9 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         if (b) setBringAt(b);
         if (p) setPickupAt(p);
         setOptionalAvailabilityNote(parsed.extra || '');
+      } else if (existingOffer?.available_from) {
+        const from = new Date(existingOffer.available_from);
+        if (!Number.isNaN(from.getTime())) setBringAt(from);
       }
     }
     if (!existingOffer?.id) {
@@ -805,14 +866,37 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
 
   const applyOfferDraft = () => {
     if (!offerDraft) return;
-    const labor = offerDraft.labor_estimate != null ? String(offerDraft.labor_estimate) : '';
-    const partsVal = offerDraft.parts_estimate != null ? String(offerDraft.parts_estimate) : '';
-    if (labor) setLaborFrom(labor);
-    if (partsVal) setPartsFrom(partsVal);
-    if (labor || partsVal) syncTotalFromEstimates(labor, partsVal);
-    if (offerDraft.suggested_price != null) {
+
+    const draftLaborFrom =
+      offerDraft.labor_from != null
+        ? String(offerDraft.labor_from)
+        : offerDraft.labor_estimate != null
+          ? String(offerDraft.labor_estimate)
+          : '';
+    const draftLaborTo =
+      offerDraft.labor_to != null ? String(offerDraft.labor_to) : '';
+    // Menu / price-list amounts are labor. Only fill parts when the draft
+    // explicitly includes a parts estimate (history, prior offer, or menu parts).
+    const hasPartsEstimate =
+      offerDraft.parts_from != null || offerDraft.parts_estimate != null;
+    const draftPartsFrom = hasPartsEstimate
+      ? String(offerDraft.parts_from ?? offerDraft.parts_estimate)
+      : '0';
+    const draftPartsTo =
+      offerDraft.parts_to != null ? String(offerDraft.parts_to) : '';
+
+    if (draftLaborFrom) setLaborFrom(draftLaborFrom);
+    setLaborTo(draftLaborTo);
+    setPartsFrom(draftPartsFrom);
+    setPartsTo(draftPartsTo);
+
+    priceManuallyEditedRef.current = false;
+    if (draftLaborFrom || hasPartsEstimate) {
+      syncTotalFromEstimates(draftLaborFrom, draftPartsFrom);
+    } else if (offerDraft.suggested_price != null) {
       setPrice(String(offerDraft.suggested_price));
     }
+
     if (Array.isArray(offerDraft.parts) && offerDraft.parts.length > 0) {
       setParts(
         offerDraft.parts.map((p) => ({
@@ -881,7 +965,8 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         parts_from: parseFloat(String(partsFrom).trim()),
         parts_to: String(partsTo || '').trim() ? parseFloat(String(partsTo).trim()) : null,
         price: quotedTotal,
-        available_from: availableFrom || null,
+        // Keep available_from in sync with bring time so booking schedule matches the note.
+        available_from: bringAt && !Number.isNaN(bringAt.getTime()) ? bringAt.toISOString() : null,
         estimated_duration_minutes: computedDuration != null ? computedDuration : null,
         availability_note,
         phone_call_allowed: phoneCallAllowed,
@@ -917,7 +1002,7 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         navigation.navigate('RepairDetail', { repairId });
         return;
       }
-      navigation.navigate('Home');
+      navigation.navigate('ShopHome', { screen: 'ShopDashboard' });
     } catch (err) {
       console.error(err);
       Alert.alert(
@@ -1026,30 +1111,47 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
     );
   };
 
-  const renderTimeSlotChips = (showBookedHints = false) => {
+  const renderTimeSlotChips = (showBookedHints = false, { minExclusiveDate = null } = {}) => {
     const activeSlot = workingTimeSlotString(workingDate);
     const bookedTimes = showBookedHints
       ? getBookedTimeSet(getBookingsOnDate(workingDate))
       : new Set();
+    const minMins =
+      minExclusiveDate && !Number.isNaN(minExclusiveDate.getTime())
+        ? minExclusiveDate.getHours() * 60 + minExclusiveDate.getMinutes()
+        : null;
     return (
       <View style={styles.chipRowWrap}>
         {TIME_SLOTS.map((slot) => {
           const selected = activeSlot === slot;
           const isBooked = bookedTimes.has(slot);
+          const slotMins = slotToMinutes(slot);
+          const tooEarly = minMins != null && slotMins != null && slotMins <= minMins;
           return (
             <Pressable
               key={slot}
-              onPress={() => applyWorkingTimeSlot(slot)}
+              disabled={tooEarly}
+              onPress={() => {
+                if (tooEarly) return;
+                applyWorkingTimeSlot(slot);
+              }}
               style={[
                 styles.timeChip,
                 isBooked && !selected && styles.timeChipBooked,
                 selected && styles.timeChipSelected,
+                tooEarly && styles.timeChipDisabled,
               ]}
             >
-              <Text style={[styles.timeChipText, selected && styles.timeChipTextSelected]}>
+              <Text
+                style={[
+                  styles.timeChipText,
+                  selected && styles.timeChipTextSelected,
+                  tooEarly && styles.timeChipTextDisabled,
+                ]}
+              >
                 {slot}
               </Text>
-              {isBooked ? (
+              {isBooked && !tooEarly ? (
                 <Text
                   style={[
                     styles.timeChipBookedSub,
@@ -1191,7 +1293,10 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
         </View>
       ) : null}
       <Text style={styles.modalSubtitle}>{t('partnerDashboard.createOffer.time')}</Text>
-      {renderTimeSlotChips()}
+      {renderTimeSlotChips(false, {
+        minExclusiveDate:
+          bringAt && dayOffsetFromAnchor(bringAt, workingDate) === 0 ? bringAt : null,
+      })}
     </>
   );
 
@@ -1678,6 +1783,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(100,116,139,0.55)',
     backgroundColor: 'rgba(241,245,249,0.95)',
   },
+  timeChipDisabled: {
+    opacity: 0.4,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f1f5f9',
+  },
   timeChipBookedSub: {
     fontSize: 10,
     fontWeight: '600',
@@ -1745,6 +1855,9 @@ const styles = StyleSheet.create({
   timeChipTextSelected: {
     color: '#fff',
     fontWeight: '700',
+  },
+  timeChipTextDisabled: {
+    color: '#94a3b8',
   },
   dateHero: {
     alignItems: 'center',

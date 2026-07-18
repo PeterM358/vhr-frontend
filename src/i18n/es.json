@@ -288,7 +288,13 @@
         "all": "All payments",
         "unpaid": "Unpaid",
         "paid": "Paid"
-      }
+      },
+      "selectToInvoice": "Select to invoice",
+      "cancelSelection": "Cancel",
+      "invoice": "Invoice",
+      "creatingInvoice": "Creating…",
+      "createInvoice": "Create invoice",
+      "createInvoiceCount": "Create invoice ({count})"
     },
     "notifications": {
       "tabs": {

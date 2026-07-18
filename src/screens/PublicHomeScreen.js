@@ -11,6 +11,8 @@ import DashboardCard from '../components/dashboard/DashboardCard';
 
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import { navigateToSignIn, resetToClientDashboard, resetToSignIn } from '../navigation/authNavigation';
+import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
+import { resolveIsPartnerSession } from '../utils/partnerSession';
 import { useTranslation } from '../i18n';
 import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
 
@@ -26,6 +28,14 @@ export default function PublicHomeScreen({ navigation }) {
         const token = await AsyncStorage.getItem('@access_token');
         if (cancelled) return;
         if (token && token !== 'null' && token !== 'undefined') {
+          const isPartner = await resolveIsPartnerSession();
+          if (cancelled) return;
+          if (isPartner) {
+            const route = await resolveShopEntryRoute();
+            if (cancelled) return;
+            navigation.reset(buildShopAuthReset(route));
+            return;
+          }
           resetToClientDashboard(navigation);
           return;
         }

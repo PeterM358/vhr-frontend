@@ -205,8 +205,11 @@ export const WebSocketProvider = ({ children }) => {
             return;
           }
           const normalized = normalizeNotification(data);
-          if (normalized?.id != null) {
-            markNotificationSeen(normalized.id);
+          if (normalized?.id != null || normalized?.event_key || normalized?.data?.event_key) {
+            markNotificationSeen(
+              normalized.id,
+              normalized.event_key || normalized.data?.event_key
+            );
             devLog('[notification] websocket inbox update', normalized.id);
           }
           setNotifications((prev) => mergeNotificationLists(prev, [normalized]));

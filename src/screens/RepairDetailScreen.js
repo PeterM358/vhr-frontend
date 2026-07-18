@@ -25,9 +25,17 @@ import { API_BASE_URL } from '../api/config';
 import {
   getRepairById,
   getRepairParts,
+  createRepairOperation,
+  startRepairOperation,
+  completeRepairOperation,
+  cancelRepairOperation,
+  operationStatusLabel,
   addRepairPart,
   deleteRepairPart,
   updateRepairPart,
+  issueRepairPartFromStock,
+  reverseRepairPartStockIssue,
+  repairPartSourceLabel,
   updateRepair,
   getRelatedServiceHistory,
   requestOwnerLoggedRepairConfirmation,
@@ -46,6 +54,8 @@ import { getOffersForRepair, bookOffer, unbookOffer, deleteOffer } from '../api/
 import { RepairsList } from '../components/shop/RepairsList';
 import RepairOutcomePanel from '../components/client/RepairOutcomePanel';
 import AppNavigationBar from '../components/common/AppNavigationBar';
+import PartnerAppHeader from '../components/partner/PartnerAppHeader';
+import ScreenBackground from '../components/ScreenBackground';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import { useReturnToBack, useGoBackOr, useRouteBackLabel } from '../navigation/appNavBarBack';
 import RepairMediaThumbnail from '../components/repair/RepairMediaThumbnail';
@@ -69,10 +79,16 @@ import {
 import AppCard from '../components/ui/AppCard';
 import FloatingCard from '../components/ui/FloatingCard';
 import RelatedServiceHistoryCard from '../components/repair/RelatedServiceHistoryCard';
+import {
+  createVehicleAccessRequest,
+  getVehicleAccessRequest,
+} from '../api/vehicleAccess';
 import StatusBadge from '../components/ui/StatusBadge';
 import { COLORS } from '../constants/colors';
 import { useTranslation, translateRepairStatus } from '../i18n';
 import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
+import { formatDurationMinutes } from '../utils/laborDuration';
+import { getOperationIcon } from '../icons/operationIconRegistry';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -100,6 +116,13 @@ import { safeError } from '../utils/logger';
 import { getPartsExport } from '../api/serviceMenu';
 import { presentPartsExportShareSheet } from '../utils/partsExportShare';
 import { computePartsTotals } from '../utils/repairPartsTotals';
+import {
+  readShopMemberships,
+  shopCapabilityEnabled,
+  shopHasPermission,
+  shopMembershipFor,
+} from '../utils/shopErpAccess';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 import FinalizeOdometerEvidenceSheet from '../components/repair/FinalizeOdometerEvidenceSheet';
 import RepairInvoicingCard from '../components/shop/RepairInvoicingCard';
 
@@ -204,17 +227,29 @@ function parseApiErrorMessage(error, fallback = 'Request failed.') {
 export default function RepairDetailScreen({ route, navigation }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { repairId, returnTo } = route.params || {};
+  const { returnTo } = route.params || {};
+  const repairId = useMemo(() => {
+    const id = Number(route.params?.repairId);
+    return Number.isFinite(id) ? id : null;
+  }, [route.params?.repairId]);
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const backLabel = useRouteBackLabel(route);
-  const handleBack = useReturnToBack(navigation, returnTo, backLabel);
+  const returnParams = useMemo(() => {
+    if (returnTo !== 'RepairsList' && returnTo !== 'ClientRepairs') return undefined;
+    const tab = route.params?.initialTab || route.params?.statusFilter || route.params?.tab;
+    return tab ? { initialTab: tab } : undefined;
+  }, [returnTo, route.params?.initialTab, route.params?.statusFilter, route.params?.tab]);
+  const handleBack = useReturnToBack(navigation, returnTo, backLabel, returnParams);
   const fallbackBack = useGoBackOr(navigation);
   const onBack = returnTo || route.params?.backLabel || route.params?.backLabelKey ? handleBack : fallbackBack;
-  const { setNotifications } = useContext(WebSocketContext);
+  const { setNotifications, refreshUnreadFromRest } = useContext(WebSocketContext);
   const theme = useTheme();
 
   const [repair, setRepair] = useState(null);
   const [repairParts, setRepairParts] = useState([]);
+  const [operations, setOperations] = useState([]);
+  const [operationsExpanded, setOperationsExpanded] = useState({});
+  const [operationActionId, setOperationActionId] = useState(null);
   const [selectedParts, setSelectedParts] = useState([]);
   const [availableShopParts, setAvailableShopParts] = useState([]);
   const [newPart, setNewPart] = useState({
@@ -229,6 +264,10 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [isShop, setIsShop] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [shopProfileId, setShopProfileId] = useState(null);
+  const [shopUsesInventory, setShopUsesInventory] = useState(false);
+  const [canIssueStock, setCanIssueStock] = useState(false);
+  const [issuingPartId, setIssuingPartId] = useState(null);
+  const [reversingPartId, setReversingPartId] = useState(null);
   const [editDescription, setEditDescription] = useState('');
   const [finalKilometers, setFinalKilometers] = useState('');
   const [laborPrice, setLaborPrice] = useState('');
@@ -265,11 +304,16 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [cancelingAppointment, setCancelingAppointment] = useState(false);
   const [relatedServiceHistory, setRelatedServiceHistory] = useState(null);
   const [relatedHistoryLoading, setRelatedHistoryLoading] = useState(false);
+  const [historyAccessRequest, setHistoryAccessRequest] = useState(null);
+  const [requestingHistoryAccess, setRequestingHistoryAccess] = useState(false);
 
   const navTitle = useMemo(() => {
     if (!repair) return t('repairs.detail.navRepairDetails');
     const st = String(repair.status || '').toLowerCase();
-    if (st === 'open') return t('repairs.detail.navServiceRequest');
+    if (st === 'open') {
+      if (repair.scheduled_start) return t('repairs.detail.navBooking');
+      return t('repairs.detail.navRequest');
+    }
     if (st === 'done') return t('repairs.detail.serviceRecordTitle');
     if (st === 'ongoing') return t('repairs.detail.navRepair');
     return t('repairs.detail.navRepairDetails');
@@ -544,6 +588,11 @@ export default function RepairDetailScreen({ route, navigation }) {
   };
 
   useEffect(() => {
+    if (repairId == null) {
+      setLoading(false);
+      return undefined;
+    }
+
     const loadData = async () => {
       const token = await AsyncStorage.getItem('@access_token');
       const shopFlag = await AsyncStorage.getItem('@is_shop');
@@ -554,9 +603,28 @@ export default function RepairDetailScreen({ route, navigation }) {
       // Fetch shop profile id if isShop
       if (shopFlag === 'true') {
         const currentShopId = await AsyncStorage.getItem('@current_shop_id');
-        setShopProfileId(parseInt(currentShopId));
+        const parsedShopId = parseInt(currentShopId, 10);
+        setShopProfileId(parsedShopId);
+        const [profilesRaw, memberships] = await Promise.all([
+          AsyncStorage.getItem(STORAGE_KEYS.SHOP_PROFILES),
+          readShopMemberships(),
+        ]);
+        let profile = null;
+        if (profilesRaw) {
+          try {
+            const profiles = JSON.parse(profilesRaw);
+            profile = profiles.find((row) => Number(row.id) === parsedShopId) || null;
+          } catch {
+            profile = null;
+          }
+        }
+        const membership = shopMembershipFor(memberships, parsedShopId);
+        setShopUsesInventory(shopCapabilityEnabled(profile, 'uses_inventory'));
+        setCanIssueStock(shopHasPermission(membership, 'move_stock'));
       } else {
         setShopProfileId(null);
+        setShopUsesInventory(false);
+        setCanIssueStock(false);
       }
 
       try {
@@ -583,6 +651,7 @@ export default function RepairDetailScreen({ route, navigation }) {
         }
 
         setRepair(repairData);
+        setOperations(Array.isArray(repairData.operations) ? repairData.operations : []);
         setEditDescription(repairData.description || '');
         setShopDescription(repairData.shop_description || '');
         setFinalKilometers(initialFinalKilometersInput(repairData));
@@ -701,6 +770,7 @@ export default function RepairDetailScreen({ route, navigation }) {
     const token = await AsyncStorage.getItem('@access_token');
     const repairData = await getRepairById(token, repairId);
     setRepair(repairData);
+    setOperations(Array.isArray(repairData.operations) ? repairData.operations : []);
     setEditDescription(repairData.description || '');
     setShopDescription(repairData.shop_description || '');
     setFinalKilometers(initialFinalKilometersInput(repairData));
@@ -758,6 +828,215 @@ export default function RepairDetailScreen({ route, navigation }) {
     setRepairParts(parts);
   };
 
+  const handleAddOperation = async () => {
+    if (!isMyShopRepair || !repairTypes.length) return;
+    const defaultType = repairTypes[0];
+    try {
+      setOperationActionId('create');
+      const token = await AsyncStorage.getItem('@access_token');
+      const nextSequence = (operations.reduce((max, row) => Math.max(max, Number(row.sequence) || 0), 0) || 0) + 10;
+      await createRepairOperation(token, repairId, {
+        repair_type_id: defaultType.id,
+        sequence: nextSequence,
+      });
+      await refreshRepair();
+    } catch (err) {
+      showMessage('Could not add operation', messageFromApiError(err, 'Please try again.'));
+    } finally {
+      setOperationActionId(null);
+    }
+  };
+
+  const handleOperationLifecycle = async (operationId, action) => {
+    if (!isMyShopRepair) return;
+    try {
+      setOperationActionId(operationId);
+      const token = await AsyncStorage.getItem('@access_token');
+      if (action === 'start') {
+        await startRepairOperation(token, repairId, operationId);
+      } else if (action === 'complete') {
+        await completeRepairOperation(token, repairId, operationId);
+      } else if (action === 'cancel') {
+        await cancelRepairOperation(token, repairId, operationId);
+      }
+      await refreshRepair();
+      await refreshParts();
+    } catch (err) {
+      showMessage('Operation update failed', messageFromApiError(err, 'Please try again.'));
+    } finally {
+      setOperationActionId(null);
+    }
+  };
+
+  const computeOperationSubtotals = (operationId) => {
+    const opParts = repairParts.filter(
+      (part) => Number(part.service_order_operation_id) === Number(operationId)
+    );
+    return computePartsTotals(opParts);
+  };
+
+  const renderRepairTotalsFooter = () => {
+    if (!repair || (!isMyShopRepair && !isShop)) return null;
+    if (footerTotals.total <= 0 && footerTotals.partsSum <= 0 && footerTotals.laborSum <= 0) {
+      return null;
+    }
+    return (
+      <FloatingCard style={styles.lightActionCard}>
+        <Text style={styles.cardTitle}>Repair totals</Text>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Parts total</Text>
+          <Text style={styles.summaryValue}>
+            {formatMoneyAmount(footerTotals.partsSum, footerTotals.currency)}
+          </Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Labor total</Text>
+          <Text style={styles.summaryValue}>
+            {formatMoneyAmount(footerTotals.laborSum, footerTotals.currency)}
+          </Text>
+        </View>
+        <View style={[styles.summaryRow, { borderBottomWidth: 0 }]}>
+          <Text style={[styles.summaryLabel, { fontWeight: '700', color: COLORS.TEXT_DARK }]}>Grand total</Text>
+          <Text style={[styles.summaryValue, styles.summaryValueEmphasis]}>
+            {formatMoneyAmount(footerTotals.total, footerTotals.currency)}
+          </Text>
+        </View>
+        {repair.total_margin != null && repair.total_parts_cost != null ? (
+          <Text style={[styles.mutedText, { marginTop: 8 }]}>
+            Internal margin: {formatMoneyAmount(parseFloat(repair.total_margin), footerTotals.currency)}
+          </Text>
+        ) : null}
+      </FloatingCard>
+    );
+  };
+
+  const toggleOperationExpanded = (operationId) => {
+    setOperationsExpanded((prev) => ({ ...prev, [operationId]: !prev[operationId] }));
+  };
+
+  const renderOperationsSection = () => {
+    if (!isShop || !isMyShopRepair || String(repair?.status || '').toLowerCase() === 'done') {
+      return null;
+    }
+    const progress = repair?.operations_progress;
+    return (
+      <FloatingCard style={styles.lightActionCard}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={styles.cardTitle}>Operations</Text>
+          {progress ? (
+            <Text style={styles.mutedText}>
+              {progress.completed}/{progress.total} completed
+            </Text>
+          ) : null}
+        </View>
+        <Text style={styles.mutedText}>
+          Split work into job lines. One default operation is enough for simple repairs.
+        </Text>
+        {operations.length === 0 ? (
+          <Text style={styles.mutedText}>No operations yet — add one to organize parts and labor.</Text>
+        ) : (
+          operations.map((op) => {
+            const expanded = operationsExpanded[op.id];
+            const opParts = repairParts.filter(
+              (part) => Number(part.service_order_operation_id) === Number(op.id)
+            );
+            const opTotals = computeOperationSubtotals(op.id);
+            return (
+              <View key={op.id} style={{ marginTop: 12, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#ddd' }}>
+                <Pressable onPress={() => toggleOperationExpanded(op.id)}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8, paddingRight: 8 }}>
+                      <MaterialCommunityIcons
+                        name={getOperationIcon(op)}
+                        size={20}
+                        color={COLORS.PRIMARY}
+                      />
+                      <Text style={{ fontWeight: '600', flexShrink: 1 }}>
+                        {op.sequence != null ? `${op.sequence} · ` : ''}
+                        {op.operation_name || 'Work performed'}
+                      </Text>
+                    </View>
+                    <StatusBadge status={op.status} label={operationStatusLabel(op.status)} />
+                  </View>
+                  <Text style={styles.mutedText}>
+                    Parts {formatMoneyAmount(opTotals.partsSum, DEFAULT_CURRENCY)} · Labor{' '}
+                    {formatMoneyAmount(opTotals.laborSum, DEFAULT_CURRENCY)} · Total{' '}
+                    {formatMoneyAmount(opTotals.total, DEFAULT_CURRENCY)}
+                  </Text>
+                </Pressable>
+                {expanded ? (
+                  <View style={{ marginTop: 8, gap: 6 }}>
+                    {opParts.length ? (
+                      <View>
+                        <Text style={styles.mutedText}>Parts</Text>
+                        {opParts.map((part) => (
+                          <Text key={part.id} style={styles.detailLine}>
+                            {(part.description || part.part_master_detail?.name || 'Part').trim()} ×{' '}
+                            {part.quantity || 1}
+                          </Text>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={styles.mutedText}>No parts on this operation yet.</Text>
+                    )}
+                    {op.assigned_mechanics?.length ? (
+                      <Text style={styles.mutedText}>Mechanics: {op.assigned_mechanics.join(', ')}</Text>
+                    ) : null}
+                    {op.notes ? <Text style={styles.mutedText}>{op.notes}</Text> : null}
+                    {op.status !== 'completed' && op.status !== 'cancelled' && op.status !== 'declined' ? (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {op.status !== 'in_progress' ? (
+                          <Button
+                            compact
+                            mode="outlined"
+                            loading={operationActionId === op.id}
+                            disabled={operationActionId != null}
+                            onPress={() => handleOperationLifecycle(op.id, 'start')}
+                          >
+                            Start
+                          </Button>
+                        ) : null}
+                        <Button
+                          compact
+                          mode="contained"
+                          loading={operationActionId === op.id}
+                          disabled={operationActionId != null}
+                          onPress={() => handleOperationLifecycle(op.id, 'complete')}
+                        >
+                          Complete
+                        </Button>
+                        <Button
+                          compact
+                          mode="outlined"
+                          textColor={COLORS.ERROR || '#b91c1c'}
+                          loading={operationActionId === op.id}
+                          disabled={operationActionId != null}
+                          onPress={() => handleOperationLifecycle(op.id, 'cancel')}
+                        >
+                          Cancel
+                        </Button>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })
+        )}
+        <Button
+          mode="outlined"
+          icon="plus"
+          style={{ marginTop: 12 }}
+          loading={operationActionId === 'create'}
+          disabled={operationActionId != null || !repairTypes.length}
+          onPress={handleAddOperation}
+        >
+          Add operation
+        </Button>
+      </FloatingCard>
+    );
+  };
+
   const isMyShopRepair = useMemo(() => {
     if (!isShop || !repair || shopProfileId == null) return false;
     return Number(repair.shop_profile) === Number(shopProfileId);
@@ -807,6 +1086,30 @@ export default function RepairDetailScreen({ route, navigation }) {
     () => computePartsTotals(displayPartsList),
     [selectedParts, repairParts]
   );
+  const repairDerivedTotals = useMemo(() => {
+    const currency = repair?.currency || DEFAULT_CURRENCY;
+    const parts = repair?.total_parts_customer;
+    const labor = repair?.total_labor_customer;
+    const grand = repair?.total_repair_customer;
+    if (parts == null && labor == null && grand == null) return null;
+    return {
+      partsSum: parts != null ? parseFloat(parts) : 0,
+      laborSum: labor != null ? parseFloat(labor) : 0,
+      total: grand != null ? parseFloat(grand) : 0,
+      currency,
+    };
+  }, [
+    repair?.total_parts_customer,
+    repair?.total_labor_customer,
+    repair?.total_repair_customer,
+    repair?.currency,
+  ]);
+  const footerTotals = repairDerivedTotals || {
+    partsSum: displayPartsTotals.partsSum,
+    laborSum: displayPartsTotals.laborSum,
+    total: displayPartsTotals.total,
+    currency: repair?.currency || DEFAULT_CURRENCY,
+  };
   const hasPartsLines = displayPartsList.length > 0;
 
   const openVehicleProfile = useCallback(() => {
@@ -995,11 +1298,74 @@ export default function RepairDetailScreen({ route, navigation }) {
     await Linking.openURL(phoneUrl);
   };
 
-  const renderRepairPartItem = ({ item }) => (
+  const handleIssuePartFromStock = async (partId) => {
+    try {
+      setIssuingPartId(partId);
+      const token = await AsyncStorage.getItem('@access_token');
+      await issueRepairPartFromStock(token, repairId, partId);
+      await refreshParts();
+    } catch (err) {
+      Alert.alert('Stock issue failed', err.responseText || err.message || 'Could not issue from stock.');
+    } finally {
+      setIssuingPartId(null);
+    }
+  };
+
+  const handleReverseStockIssue = (partId, partLabel) => {
+    Alert.alert(
+      'Reverse stock issue?',
+      `Return "${partLabel}" to warehouse stock? The part line stays on this repair — only the stock deduction is undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reverse stock issue',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setReversingPartId(partId);
+              const token = await AsyncStorage.getItem('@access_token');
+              await reverseRepairPartStockIssue(token, repairId, partId);
+              await refreshParts();
+            } catch (err) {
+              Alert.alert(
+                'Reverse failed',
+                err.message || err.responseText || 'Could not reverse stock issue.',
+              );
+            } finally {
+              setReversingPartId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const renderRepairPartItem = ({ item }) => {
+    const stockBacked = ['inventory', 'catalog', 'catalog_pick'].includes(item.source_type);
+    const partLabel =
+      item.partsMaster?.name ||
+      item.part_master_detail?.name ||
+      item.shop_part_detail?.part?.name ||
+      item.description ||
+      'Unnamed Part';
+    const canIssueThisPart =
+      shopUsesInventory &&
+      canIssueStock &&
+      shopCanManagePartsOnRepair &&
+      stockBacked &&
+      !item.stock_issued &&
+      Boolean(item.shop_part_detail || item.shop_part_id);
+    const canReverseStockIssue =
+      shopUsesInventory &&
+      canIssueStock &&
+      shopCanManagePartsOnRepair &&
+      item.stock_issued;
+    const partBusy = issuingPartId === item.id || reversingPartId === item.id;
+    return (
     <View style={{ borderBottomWidth: 1, borderBottomColor: '#ddd', paddingVertical: 6 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <Text style={{ flex: 2 }}>
-          {item.partsMaster?.name || item.part_master_detail?.name || item.shop_part_detail?.part?.name || 'Unnamed Part'}
+          {item.partsMaster?.name || item.part_master_detail?.name || item.shop_part_detail?.part?.name || item.description || 'Unnamed Part'}
         </Text>
         <Text style={{ flex: 1, textAlign: 'center' }}>{item.quantity}</Text>
         <Text style={{ flex: 1, textAlign: 'center' }}>
@@ -1009,15 +1375,51 @@ export default function RepairDetailScreen({ route, navigation }) {
           {item.labor_cost ?? item.labor ?? '—'}
         </Text>
       </View>
+      <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
+        {repairPartSourceLabel(item.source_type)}
+        {item.stock_issued ? ' · Issued from stock' : stockBacked ? ' · Not issued' : ''}
+      </Text>
+      {canIssueThisPart ? (
+        <Button
+          mode="outlined"
+          compact
+          loading={issuingPartId === item.id}
+          disabled={partBusy}
+          onPress={() => handleIssuePartFromStock(item.id)}
+          style={{ alignSelf: 'flex-start', marginTop: 4 }}
+        >
+          Issue from stock
+        </Button>
+      ) : null}
+      {canReverseStockIssue ? (
+        <Button
+          mode="outlined"
+          compact
+          loading={reversingPartId === item.id}
+          disabled={partBusy}
+          onPress={() => handleReverseStockIssue(item.id, partLabel)}
+          style={{ alignSelf: 'flex-start', marginTop: 4 }}
+          textColor="#b45309"
+        >
+          Reverse stock issue
+        </Button>
+      ) : null}
       {item.note ? <Text style={{ fontStyle: 'italic', fontSize: 12, marginTop: 2 }}>Note: {item.note}</Text> : null}
     </View>
   );
+  };
 
   if (loading || !repair) {
     return (
       <ScreenBackground safeArea={false}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#fff" />
+          {repairId == null && !loading ? (
+            <Text style={{ color: '#fff', textAlign: 'center', paddingHorizontal: 24 }}>
+              Repair not found — open this job from your repairs list.
+            </Text>
+          ) : (
+            <ActivityIndicator size="large" color="#fff" />
+          )}
         </View>
       </ScreenBackground>
     );
@@ -1311,6 +1713,94 @@ export default function RepairDetailScreen({ route, navigation }) {
     }
   };
 
+  const handleRequestVehicleHistory = async () => {
+    const vehicleId = repair?.vehicle?.id || repair?.vehicle;
+    if (!vehicleId) {
+      showMessage(t('common.error'), t('repairs.detail.historyAccess.missingVehicle'));
+      return;
+    }
+    try {
+      setRequestingHistoryAccess(true);
+      const data = await createVehicleAccessRequest(vehicleId, {
+        related_repair_id: repairId,
+        shop_profile_id: shopProfileIdNum || linkedShopProfileId || undefined,
+        reason: t('repairs.detail.historyAccess.defaultReason'),
+        requested_scope: 'BASIC_SERVICE_HISTORY',
+        channel: 'qr_in_person',
+      });
+      setHistoryAccessRequest(data);
+    } catch (err) {
+      let errorBody = null;
+      try {
+        errorBody = err?.responseText ? JSON.parse(err.responseText) : null;
+      } catch {
+        errorBody = null;
+      }
+      const code = err?.code || errorBody?.code;
+      const isDuplicatePending =
+        code === 'duplicate_pending' ||
+        code === 'already_pending' ||
+        (Number(err?.status) === 409 && /pending|duplicate/i.test(String(code || '')));
+
+      // If the API ever returns the existing pending request/token, restore the card.
+      const existingRequest =
+        errorBody?.request ||
+        errorBody?.access_request ||
+        (errorBody?.id && errorBody?.status ? errorBody : null);
+      if (existingRequest?.id) {
+        setHistoryAccessRequest((prev) => ({
+          ...prev,
+          ...existingRequest,
+          authorization_token:
+            existingRequest.authorization_token || prev?.authorization_token,
+          authorization_code:
+            existingRequest.authorization_code || prev?.authorization_code,
+          qr_payload: existingRequest.qr_payload || prev?.qr_payload,
+        }));
+      }
+
+      if (isDuplicatePending) {
+        showMessage(
+          t('repairs.detail.historyAccess.alreadySentTitle'),
+          t('repairs.detail.historyAccess.alreadySent')
+        );
+        return;
+      }
+
+      const fallback =
+        code === 'shop_ineligible'
+          ? t('repairs.detail.historyAccess.shopIneligible')
+          : t('repairs.detail.historyAccess.requestFailed');
+      showMessage(
+        t('repairs.detail.historyAccess.requestFailed'),
+        parseApiErrorMessage(err, fallback)
+      );
+    } finally {
+      setRequestingHistoryAccess(false);
+    }
+  };
+
+  const refreshHistoryAccessRequest = async () => {
+    if (!historyAccessRequest?.id) return;
+    const vehicleId = repair?.vehicle?.id || repair?.vehicle;
+    if (!vehicleId) return;
+    try {
+      const data = await getVehicleAccessRequest(vehicleId, historyAccessRequest.id);
+      setHistoryAccessRequest((prev) => ({
+        ...prev,
+        ...data,
+        authorization_token: prev?.authorization_token,
+        authorization_code: prev?.authorization_code,
+        qr_payload: prev?.qr_payload,
+      }));
+      if (data.status === 'approved' || data.status === 'partially_approved') {
+        await refreshRepair();
+      }
+    } catch (err) {
+      // Keep showing the last known waiting card.
+    }
+  };
+
   const handleClientArrival = async () => {
     try {
       setRespondingArrival(true);
@@ -1344,7 +1834,10 @@ export default function RepairDetailScreen({ route, navigation }) {
               setCancelingAppointment(true);
               const token = await AsyncStorage.getItem('@access_token');
               await cancelScheduledAppointment(token, repairId);
-              await markRepairNotificationsRead(repairId, { setNotifications });
+              await markRepairNotificationsRead(repairId, {
+                setNotifications,
+                refreshUnreadFromRest,
+              });
               await refreshRepair();
               Alert.alert(
                 t('repairs.detail.appointmentCanceled'),
@@ -1362,7 +1855,10 @@ export default function RepairDetailScreen({ route, navigation }) {
   };
 
   const afterRescheduleAction = async (action) => {
-    await markRepairNotificationsRead(repairId, { setNotifications });
+    await markRepairNotificationsRead(repairId, {
+      setNotifications,
+      refreshUnreadFromRest,
+    });
     await refreshRepair();
     if (returnTo === 'ClientActivity' || returnTo === 'ClientNotifications') {
       navigation.goBack();
@@ -1441,7 +1937,10 @@ export default function RepairDetailScreen({ route, navigation }) {
         note: counterNote,
       });
       setCounterModalVisible(false);
-      await markRepairNotificationsRead(repairId, { setNotifications });
+      await markRepairNotificationsRead(repairId, {
+        setNotifications,
+        refreshUnreadFromRest,
+      });
       await refreshRepair();
       Alert.alert(
         'Suggestion sent',
@@ -1895,13 +2394,25 @@ export default function RepairDetailScreen({ route, navigation }) {
   return (
     <>
     <ScreenBackground safeArea={false}>
-      <AppNavigationBar
-        title={navTitle}
-        backLabel={backLabel}
-        onBack={onBack}
-        showBack={Boolean(returnTo || route.params?.backLabel || route.params?.backLabelKey || navigation.canGoBack?.())}
-        scrolled={scrolled}
-      />
+      {isShop ? (
+        <PartnerAppHeader
+          title={navTitle}
+          backLabel={backLabel}
+          onBack={onBack}
+          iconOnlyBack={Boolean(backLabel && String(backLabel).length > 8)}
+          showBack={Boolean(returnTo || route.params?.backLabel || route.params?.backLabelKey || navigation.canGoBack?.())}
+          scrolled={scrolled}
+        />
+      ) : (
+        <AppNavigationBar
+          title={navTitle}
+          backLabel={backLabel}
+          onBack={onBack}
+          iconOnlyBack={Boolean(backLabel && String(backLabel).length > 8)}
+          showBack={Boolean(returnTo || route.params?.backLabel || route.params?.backLabelKey || navigation.canGoBack?.())}
+          scrolled={scrolled}
+        />
+      )}
       <ScrollView
         key={`repair-${repair.id}-${repair.status}`}
         onScroll={onScroll}
@@ -1942,12 +2453,18 @@ export default function RepairDetailScreen({ route, navigation }) {
                       <Text style={styles.heroMeta}>
                         {t('repairs.detail.scheduled')}{' '}
                         {new Date(repair.scheduled_start).toLocaleString()}
-                        {repair.scheduled_end
-                          ? ` – ${new Date(repair.scheduled_end).toLocaleTimeString(undefined, {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}`
-                          : ''}
+                      </Text>
+                    ) : null}
+                    {repair.scheduled_end ? (
+                      <Text style={styles.heroMeta}>
+                        {t('repairs.detail.estimatedCompletion')}{' '}
+                        {new Date(repair.scheduled_end).toLocaleString()}
+                      </Text>
+                    ) : null}
+                    {repair.planned_labor_minutes != null && repair.planned_labor_minutes > 0 ? (
+                      <Text style={styles.heroMeta}>
+                        {t('repairs.detail.plannedLabor')}{' '}
+                        {formatDurationMinutes(repair.planned_labor_minutes)}
                       </Text>
                     ) : null}
                     <Text style={styles.heroMeta}>
@@ -1978,6 +2495,10 @@ export default function RepairDetailScreen({ route, navigation }) {
             </AppCard>
 
             {renderShopFinalizeServiceTypeCard()}
+
+            {renderOperationsSection()}
+
+            {renderRepairTotalsFooter()}
 
             {isDone && isMyShopRepair ? (
               <FloatingCard style={styles.lightActionCard}>
@@ -2047,7 +2568,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                   {repair.shop_profile_name
                     ? `Your vehicle is being serviced at ${repair.shop_profile_name}.`
                     : 'This repair is in progress.'}{' '}
-                  New offers are not available on this request — send a new service request if you need
+                  New offers are not available on this request — send a new request if you need
                   other quotes.
                 </Text>
               </FloatingCard>
@@ -2149,6 +2670,12 @@ export default function RepairDetailScreen({ route, navigation }) {
                     ? new Date(repair.scheduled_start).toLocaleString()
                     : '—'}
                 </Text>
+                {repair.scheduled_end ? (
+                  <Text style={styles.detailLine}>
+                    {t('repairs.detail.estimatedCompletion')}{' '}
+                    {new Date(repair.scheduled_end).toLocaleString()}
+                  </Text>
+                ) : null}
                 <Text style={styles.mutedText}>
                   {ownerCheckedIn
                     ? t('repairs.detail.checkedInWaiting')
@@ -2223,6 +2750,70 @@ export default function RepairDetailScreen({ route, navigation }) {
                     {t('repairs.detail.cancelAppointment')}
                   </Button>
                 ) : null}
+              </FloatingCard>
+            ) : null}
+
+            {isShop &&
+            isMyShopRepair &&
+            !isDone &&
+            repair?.shop_data_access_scope !== 'owner_grant' &&
+            repair?.shop_data_access_scope !== 'authorized_mechanical' ? (
+              <FloatingCard style={styles.rescheduleCard}>
+                <Text style={styles.cardTitle}>
+                  {t('repairs.detail.historyAccess.cardTitle')}
+                </Text>
+                {!historyAccessRequest ? (
+                  <>
+                    <Text style={styles.mutedText}>
+                      {t('repairs.detail.historyAccess.cardHint')}
+                    </Text>
+                    <Button
+                      mode="contained"
+                      onPress={handleRequestVehicleHistory}
+                      loading={requestingHistoryAccess}
+                      disabled={requestingHistoryAccess}
+                      style={styles.arrivalButton}
+                    >
+                      {t('repairs.detail.historyAccess.requestButton')}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.detailLine}>
+                      {t('repairs.detail.historyAccess.scope')}:{' '}
+                      {historyAccessRequest.requested_scope}
+                    </Text>
+                    <Text style={styles.detailLine}>
+                      {t('repairs.detail.historyAccess.duration')}:{' '}
+                      {historyAccessRequest.requested_duration}
+                    </Text>
+                    <Text style={styles.detailLine}>
+                      {t('repairs.detail.historyAccess.status')}:{' '}
+                      {historyAccessRequest.status === 'pending'
+                        ? t('repairs.detail.historyAccess.waiting')
+                        : historyAccessRequest.status}
+                    </Text>
+                    {historyAccessRequest.authorization_code ? (
+                      <Text style={[styles.cardTitle, { marginTop: 8 }]}>
+                        {historyAccessRequest.authorization_code}
+                      </Text>
+                    ) : null}
+                    {historyAccessRequest.qr_payload ? (
+                      <Text style={styles.mutedText} selectable>
+                        {historyAccessRequest.qr_payload}
+                      </Text>
+                    ) : null}
+                    {historyAccessRequest.status === 'pending' ? (
+                      <Button
+                        mode="outlined"
+                        onPress={refreshHistoryAccessRequest}
+                        style={styles.arrivalButton}
+                      >
+                        {t('repairs.detail.historyAccess.refresh')}
+                      </Button>
+                    ) : null}
+                  </>
+                )}
               </FloatingCard>
             ) : null}
 
@@ -2837,7 +3428,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                   : isOpenStatus
                     ? canEditClientRequest
                       ? 'Add or remove photos and videos while this request is open. After a shop is booked, media here becomes read-only.'
-                      : 'Photos and videos attached to this service request.'
+                      : 'Photos and videos attached to this request.'
                     : 'Documentation shared during this repair.'}
               </Text>
               {canEditClientRequest ? (

@@ -67,10 +67,16 @@ function notificationIdFromMessage(remoteMessage) {
   return data.notification_id ?? remoteMessage?.messageId ?? null;
 }
 
+function eventKeyFromMessage(remoteMessage) {
+  const data = remoteMessage?.data || {};
+  return data.event_key || null;
+}
+
 function shouldSuppressForegroundAlert(remoteMessage) {
   const notificationId = notificationIdFromMessage(remoteMessage);
-  if (notificationId != null && hasSeenNotification(notificationId)) {
-    devLog('[notification] suppress duplicate foreground alert', notificationId);
+  const eventKey = eventKeyFromMessage(remoteMessage);
+  if (hasSeenNotification(notificationId, eventKey)) {
+    devLog('[notification] suppress duplicate foreground alert', eventKey || notificationId);
     return true;
   }
   if (isWsConnected()) {
@@ -108,9 +114,10 @@ export function registerBackgroundMessageHandler() {
     const { setBackgroundMessageHandler } = loadMessagingModular();
     setBackgroundMessageHandler(messaging, async (remoteMessage) => {
       const notificationId = notificationIdFromMessage(remoteMessage);
-      devLog('[notification] background push received', notificationId || 'unknown');
-      if (notificationId != null) {
-        markNotificationSeen(notificationId);
+      const eventKey = eventKeyFromMessage(remoteMessage);
+      devLog('[notification] background push received', eventKey || notificationId || 'unknown');
+      if (notificationId != null || eventKey) {
+        markNotificationSeen(notificationId, eventKey);
       }
     });
   } catch (err) {
@@ -153,13 +160,16 @@ function attachForegroundListener(messaging) {
   const { onMessage } = loadMessagingModular();
   foregroundUnsub = onMessage(messaging, async (remoteMessage) => {
     const notificationId = notificationIdFromMessage(remoteMessage);
-    devLog('[notification] foreground push received', notificationId || 'unknown');
-    if (notificationId != null) {
-      markNotificationSeen(notificationId);
+    const eventKey = eventKeyFromMessage(remoteMessage);
+    devLog('[notification] foreground push received', eventKey || notificationId || 'unknown');
+    if (notificationId != null || eventKey) {
+      markNotificationSeen(notificationId, eventKey);
     }
     if (shouldSuppressForegroundAlert(remoteMessage)) {
       return;
     }
+    // Partner foreground: PartnerInAppBannerHost owns visible alerts when WS delivers.
+    // Keep a lightweight Alert only when WS is down and this is a true FCM-only path.
     const { Alert } = require('react-native');
     const title = remoteMessage?.notification?.title || remoteMessage?.data?.title || 'Notification';
     const body = remoteMessage?.notification?.body || remoteMessage?.data?.body || '';

@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Image, Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
-import { useFocusEffect, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import ScreenBackground from '../components/ScreenBackground';
@@ -19,9 +19,10 @@ import { showMessage } from '../utils/crossPlatformAlert';
 import { useTranslation } from '../i18n';
 
 export default function ShopDocumentImportDetailScreen() {
+  const navigation = useNavigation();
   const route = useRoute();
   const importId = Number(route.params?.importId);
-  const onBack = usePartnerDashboardBack();
+  const onBack = usePartnerDashboardBack(navigation);
   const { t } = useTranslation();
   const { loading, shopProfile, membership, shopId, error } = useShopErpContext();
   const [row, setRow] = useState(null);

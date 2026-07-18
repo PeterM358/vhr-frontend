@@ -23,7 +23,8 @@ export default function ClientPromotions({ navigation, onUpdateUnseenCount }) {
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const { notifications, setNotifications } = useContext(WebSocketContext);
+  const { notifications, setNotifications, refreshUnreadFromRest } =
+    useContext(WebSocketContext);
 
   const fetchPromotions = async () => {
     setLoading(true);
@@ -76,6 +77,9 @@ export default function ClientPromotions({ navigation, onUpdateUnseenCount }) {
                 n.id === matchingNotif.id ? { ...n, is_read: true } : n
               )
             );
+          }
+          if (typeof refreshUnreadFromRest === 'function') {
+            await refreshUnreadFromRest();
           }
         }
       }

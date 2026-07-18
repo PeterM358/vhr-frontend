@@ -19,7 +19,7 @@ import { useTranslation } from '../i18n';
 
 export default function ShopDocumentImportsScreen() {
   const navigation = useNavigation();
-  const onBack = usePartnerDashboardBack();
+  const onBack = usePartnerDashboardBack(navigation);
   const { t } = useTranslation();
   const { loading, shopProfile, membership, shopId, error, reload } = useShopErpContext();
   const [rows, setRows] = useState([]);

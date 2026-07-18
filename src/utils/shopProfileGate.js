@@ -1,37 +1,51 @@
 import { Alert } from 'react-native';
 import { getMyShopProfiles } from '../api/profiles';
 import {
+  getShopProfileGateIncompleteFields,
   getShopProfileIncompleteFields,
   isShopProfileEssentialsComplete,
+  SHOP_PROFILE_BUILD_SECTIONS,
 } from './shopProfileCompleteness';
 
 export const SHOP_PROFILE_SECTION_KEYS = [
-  'basic',
+  ...SHOP_PROFILE_BUILD_SECTIONS,
   'vehicle_types',
   'brands',
-  'services',
+  'basic',
   'contact',
   'location',
-  'working_hours',
+  'services',
   'social',
   'description',
-  'public_preview',
   'guarantee',
-  'photos',
+  'invoice',
 ];
 
 /** Section keys that should start expanded when required fields are missing. */
 export function getShopProfileIncompleteSectionKeys(profile, options = {}) {
   const missing = getShopProfileIncompleteFields(profile, options);
   const keys = [];
-  if (missing.includes('shop name')) keys.push('basic');
-  if (missing.includes('vehicle type')) keys.push('vehicle_types');
+  if (missing.includes('business name') || missing.includes('description')) {
+    keys.push('business');
+  }
   if (
     missing.some((field) =>
-      ['map pin', 'address', 'city', 'country'].includes(field)
+      ['map pin', 'address', 'city', 'country', 'phone'].includes(field)
     )
   ) {
-    keys.push('location');
+    keys.push('contact_location');
+  }
+  if (missing.includes('operation') || missing.includes('operation price')) {
+    keys.push('operations');
+  }
+  if (missing.includes('photos')) keys.push('photos');
+  if (missing.includes('working hours')) keys.push('working_hours');
+  if (
+    missing.includes('legal name') ||
+    missing.includes('vat number') ||
+    missing.includes('invoice address')
+  ) {
+    keys.push('company');
   }
   return keys;
 }
@@ -41,11 +55,8 @@ export const getShopProfileSectionsToExpand = getShopProfileIncompleteSectionKey
 
 export function getInitialShopProfileExpandedSections(profile, requireSetup, options = {}) {
   const expandKeys = requireSetup ? getShopProfileIncompleteSectionKeys(profile, options) : [];
-  if (requireSetup && !expandKeys.includes('public_preview')) {
+  if (!expandKeys.includes('public_preview')) {
     expandKeys.push('public_preview');
-  }
-  if (!requireSetup && profile && getShopProfileIncompleteFields(profile, options).length === 0) {
-    if (!expandKeys.includes('public_preview')) expandKeys.push('public_preview');
   }
   return Object.fromEntries(
     SHOP_PROFILE_SECTION_KEYS.map((key) => [key, expandKeys.includes(key)])
@@ -58,14 +69,14 @@ export async function fetchShopProfileCompleteness() {
   return {
     profile,
     isComplete: isShopProfileEssentialsComplete(profile),
-    missingFields: getShopProfileIncompleteFields(profile),
+    missingFields: getShopProfileGateIncompleteFields(profile),
   };
 }
 
 export function showShopProfileGateAlert(navigation, missingFields = []) {
   const stillNeeded = missingFields.length
     ? `Still needed: ${missingFields.join(', ')}.`
-    : 'Add your shop name, map pin, address, city, country, and at least one vehicle type to start serving jobs.';
+    : 'Add your business name, map pin, address, city, country, and at least one vehicle type to start serving jobs.';
   const message = `Complete your shop profile before opening repair requests.\n\n${stillNeeded}`;
 
   Alert.alert('Complete your profile', message, [

@@ -2,6 +2,10 @@
  * Where a client notification should open in the app.
  */
 
+import { Platform } from 'react-native';
+import { navigateToRepairDetail, navigateToVehicleHistoryAccess } from '../navigation/webNavigation';
+import { isVehicleHistoryAccessClientEvent } from './partnerNavChrome';
+
 export function notificationEventType(item) {
   return (
     item?.event_type ||
@@ -10,6 +14,16 @@ export function notificationEventType(item) {
     item?.data?.notification_type ||
     ''
   );
+}
+
+function vehicleIdFromNotification(item) {
+  const raw =
+    item?.data?.vehicle_id ??
+    item?.vehicle_id ??
+    item?.data?.vehicleId ??
+    null;
+  if (raw == null || raw === '') return null;
+  return String(raw);
 }
 
 export function isRescheduleNotification(item) {
@@ -29,10 +43,33 @@ export function isRepairReadyNotification(item) {
   return t === 'repair_ready_for_pickup' || String(item?.title || '').toLowerCase().includes('ready for pickup');
 }
 
+export function isVehicleHistoryAccessNotification(item) {
+  return isVehicleHistoryAccessClientEvent(notificationEventType(item));
+}
+
 export function navigateForClientNotification(navigation, item, options = {}) {
   if (!item) return false;
 
   const returnTo = options.returnTo;
+
+  if (isVehicleHistoryAccessNotification(item)) {
+    const vehicleId = vehicleIdFromNotification(item);
+    if (vehicleId) {
+      const accessParams = {
+        returnTo: returnTo || 'ClientVehicles',
+        requestId: item?.data?.request_id || item?.request_id || undefined,
+      };
+      if (Platform.OS === 'web') {
+        navigateToVehicleHistoryAccess(navigation, vehicleId, accessParams);
+      } else {
+        navigation.navigate('VehicleHistoryAccess', {
+          vehicleId,
+          ...accessParams,
+        });
+      }
+      return true;
+    }
+  }
 
   if (item.promotion) {
     navigation.navigate('PromotionDetail', { promotionId: item.promotion });
@@ -40,18 +77,22 @@ export function navigateForClientNotification(navigation, item, options = {}) {
   }
 
   if (item.repair) {
-    navigation.navigate('RepairDetail', {
-      repairId: item.repair,
-      ...(returnTo ? { returnTo } : {}),
-    });
+    const params = { repairId: item.repair, returnTo: returnTo || 'ClientRepairs' };
+    if (Platform.OS === 'web') {
+      navigateToRepairDetail(navigation, item.repair, params);
+    } else {
+      navigation.navigate('RepairDetail', params);
+    }
     return true;
   }
 
   if (item.offer) {
-    navigation.navigate('RepairDetail', {
-      repairId: item.offer,
-      ...(returnTo ? { returnTo } : {}),
-    });
+    const params = { repairId: item.offer, returnTo: returnTo || 'ClientRepairs' };
+    if (Platform.OS === 'web') {
+      navigateToRepairDetail(navigation, item.offer, params);
+    } else {
+      navigation.navigate('RepairDetail', params);
+    }
     return true;
   }
 
@@ -67,6 +108,12 @@ export function notificationActionHint(item) {
   }
   if (isRepairReadyNotification(item)) {
     return 'Tap to view completed service details';
+  }
+  if (isVehicleHistoryAccessNotification(item)) {
+    return 'Tap to review the history access request';
+  }
+  if (String(notificationEventType(item)).toLowerCase() === 'invoice_issued') {
+    return 'Tap to view the related service';
   }
   if (item?.repair) {
     return 'Tap to open repair';
