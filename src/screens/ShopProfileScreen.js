@@ -101,7 +101,7 @@ import {
   updateServiceMenuItem,
 } from '../api/serviceMenu';
 import ShopInvoiceSettingsSection from '../components/shop/ShopInvoiceSettingsSection';
-import ProfileHeaderSaveButton from '../components/profile/ProfileHeaderSaveButton';
+import FloatingSaveBar from '../components/ui/FloatingSaveBar';
 import { useTranslation } from '../i18n';
 import { pickVehiclePhotoAttachment, pickInvoiceLogoAttachment } from '../utils/pickDocumentFile';
 import { emptyLegalEntityDraft } from '../utils/invoiceTaxLabels';
@@ -1452,14 +1452,6 @@ export default function ShopProfileScreen({ navigation, route }) {
         onBack={handleBack}
         iconOnlyBack
         scrolled={scrolled}
-        rightAction={
-          <ProfileHeaderSaveButton
-            onPress={handleSave}
-            saving={saving}
-            dirty={isDirty}
-            label={requireSetup ? t('partnerProfile.saveAndContinue') : t('partnerProfile.saveCenterDetails')}
-          />
-        }
       />
       <ScrollView
         ref={profileScrollRef}
@@ -2079,6 +2071,18 @@ export default function ShopProfileScreen({ navigation, route }) {
           </Dialog.Actions>
         </Dialog>
       </Portal>
+
+      {isDirty || saving ? (
+        <FloatingSaveBar
+          onPress={handleSave}
+          loading={saving}
+          label={
+            requireSetup
+              ? t('partnerProfile.saveAndContinue')
+              : t('partnerProfile.saveCenterDetails')
+          }
+        />
+      ) : null}
     </ScreenBackground>
   );
 }

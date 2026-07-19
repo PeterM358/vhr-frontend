@@ -86,7 +86,12 @@ export function formatRepairListDate(raw) {
   });
 }
 
-export function repairListDateLabel(statusTab) {
+export function repairListDateLabel(statusTab, translateFn) {
+  if (translateFn) {
+    if (statusTab === 'done') return translateFn('partnerDashboard.repairsList.dateCompleted');
+    if (statusTab === 'ongoing') return translateFn('partnerDashboard.repairsList.dateStarted');
+    return translateFn('partnerDashboard.repairsList.dateRequested');
+  }
   if (statusTab === 'done') return 'Completed';
   if (statusTab === 'ongoing') return 'Started';
   return 'Requested';
@@ -109,9 +114,17 @@ const PAYMENT_STATUS_LABELS = {
   included_in_invoice: 'Included in invoice',
 };
 
-export function formatRepairPaymentStatus(status) {
+export function formatRepairPaymentStatus(status, translateFn) {
   if (!status) return null;
-  return PAYMENT_STATUS_LABELS[String(status)] || String(status).replace(/_/g, ' ');
+  const key = String(status);
+  if (translateFn) {
+    return translateFn(
+      `partnerDashboard.repairsList.paymentStatus.${key}`,
+      null,
+      PAYMENT_STATUS_LABELS[key] || key.replace(/_/g, ' ')
+    );
+  }
+  return PAYMENT_STATUS_LABELS[key] || key.replace(/_/g, ' ');
 }
 
 export function isRepairPaymentSettled(status) {

@@ -437,7 +437,38 @@
       "invoice": "Фактура",
       "creatingInvoice": "Създаване…",
       "createInvoice": "Създай фактура",
-      "createInvoiceCount": "Създай фактура ({count})"
+      "createInvoiceCount": "Създай фактура ({count})",
+      "selectInvoiceHint": "Изберете ремонти за същия клиент, после създайте една обща фактура.",
+      "selectedCount": "{count} избрани",
+      "searchPlaceholder": "Номер (латиница или кирилица), клиент, автомобил",
+      "filters": "Филтри",
+      "filtersCount": "Филтри ({count})",
+      "hideFilters": "Скрий филтрите",
+      "clear": "Изчисти",
+      "plateHiddenUntilBooking": "Номерът е скрит до записване",
+      "platformInvoiceIssued": "Издадена е платформена фактура",
+      "paymentLabel": "Плащане: {status}",
+      "vehicleFallback": "Автомобил",
+      "dateNotRecorded": "Няма записана дата",
+      "dateCompleted": "Завършен",
+      "dateStarted": "Започнат",
+      "dateRequested": "Заявен",
+      "emptyFiltered": "Опитайте друг номер (латиница или кирилица), клиент или филтър за автомобил.",
+      "emptyDefault": "Когато има ремонти с този статус, ще се появят тук.",
+      "status": {
+        "open": "Отворен",
+        "ongoing": "В процес",
+        "done": "Завършен",
+        "requested": "Заявен",
+        "booked": "Записан"
+      },
+      "paymentStatus": {
+        "unpaid": "Неплатено",
+        "partially_paid": "Частично платено",
+        "paid": "Платено",
+        "included_in_invoice": "Включено във фактура"
+      },
+      "createInvoiceError": "Неуспешно създаване на чернова на фактура"
     },
     "notifications": {
       "tabs": {

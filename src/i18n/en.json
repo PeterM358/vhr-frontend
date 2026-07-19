@@ -436,7 +436,38 @@
       "invoice": "Invoice",
       "creatingInvoice": "Creating…",
       "createInvoice": "Create invoice",
-      "createInvoiceCount": "Create invoice ({count})"
+      "createInvoiceCount": "Create invoice ({count})",
+      "selectInvoiceHint": "Tap repairs for the same client, then create one combined invoice.",
+      "selectedCount": "{count} selected",
+      "searchPlaceholder": "Plate (Latin or Cyrillic), client, vehicle",
+      "filters": "Filters",
+      "filtersCount": "Filters ({count})",
+      "hideFilters": "Hide filters",
+      "clear": "Clear",
+      "plateHiddenUntilBooking": "Plate hidden until booking",
+      "platformInvoiceIssued": "Platform invoice issued",
+      "paymentLabel": "Payment: {status}",
+      "vehicleFallback": "Vehicle",
+      "dateNotRecorded": "Date not recorded",
+      "dateCompleted": "Completed",
+      "dateStarted": "Started",
+      "dateRequested": "Requested",
+      "emptyFiltered": "Try another plate (Latin or Cyrillic), client, or vehicle filter.",
+      "emptyDefault": "When repairs match this status, they'll show up here.",
+      "status": {
+        "open": "Open",
+        "ongoing": "Ongoing",
+        "done": "Done",
+        "requested": "Requested",
+        "booked": "Booked"
+      },
+      "paymentStatus": {
+        "unpaid": "Unpaid",
+        "partially_paid": "Partially paid",
+        "paid": "Paid",
+        "included_in_invoice": "Included in invoice"
+      },
+      "createInvoiceError": "Could not create invoice draft"
     },
     "notifications": {
       "tabs": {

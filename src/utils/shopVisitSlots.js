@@ -139,6 +139,37 @@ export function formatPreferredVisitNote(dayOption, timeSlot, translateFn) {
   return `Preferred visit: ${dateLabel}, ${timeSlot} (pending service center confirmation)`;
 }
 
+/**
+ * Re-localize English preferred-visit notes stored on repairs for display.
+ * Keeps the date/time fragment; wraps with the current locale template.
+ */
+export function localizePreferredVisitNote(notes, translateFn) {
+  const raw = String(notes || '').trim();
+  if (!raw) return '';
+  if (!translateFn) return raw;
+
+  const withTime = raw.match(
+    /^Preferred visit:\s*(.+?),\s*(\d{1,2}:\d{2})\s*\(pending (?:service center|shop) confirmation\)\.?$/i
+  );
+  if (withTime) {
+    return translateFn('requestService.preferredVisitSummaryWithTime', {
+      date: withTime[1].trim(),
+      time: withTime[2],
+    });
+  }
+
+  const dateOnly = raw.match(
+    /^Preferred visit:\s*(.+?)\s*\(pending (?:service center|shop) confirmation\)\.?$/i
+  );
+  if (dateOnly) {
+    return translateFn('requestService.preferredVisitSummary', {
+      date: dateOnly[1].trim(),
+    });
+  }
+
+  return raw;
+}
+
 export function buildPreferredVisitTimes(dayOption, timeSlot) {
   if (!dayOption?.date) return { start: null, end: null };
   const slot = timeSlot || '09:00';

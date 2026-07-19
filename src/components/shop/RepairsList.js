@@ -48,6 +48,8 @@ import {
   isRepairPaymentSettled,
   applyDoneTabClientFilters,
 } from '../../utils/repairListUtils';
+import { translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
+import { localizePreferredVisitNote } from '../../utils/shopVisitSlots';
 import { WebSocketContext } from '../../context/WebSocketManager';
 import { useTranslation } from '../../i18n';
 
@@ -77,6 +79,20 @@ export default function RepairsList() {
       { key: 'unpaid', label: t('partnerDashboard.repairsList.paymentFilters.unpaid') },
       { key: 'paid', label: t('partnerDashboard.repairsList.paymentFilters.paid') },
     ],
+    [t]
+  );
+  const resolveStatusBadgeLabel = useCallback(
+    (statusKey) => {
+      const key = String(statusKey || '').toLowerCase();
+      const labelKey = {
+        open: 'partnerDashboard.repairsList.status.open',
+        ongoing: 'partnerDashboard.repairsList.status.ongoing',
+        done: 'partnerDashboard.repairsList.status.done',
+        requested: 'partnerDashboard.repairsList.status.requested',
+        booked: 'partnerDashboard.repairsList.status.booked',
+      }[key];
+      return labelKey ? t(labelKey) : undefined;
+    },
     [t]
   );
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
@@ -406,7 +422,10 @@ export default function RepairsList() {
 
   const toggleRepairSelection = useCallback((item) => {
     if (item.has_issued_invoice) {
-      Alert.alert('Already invoiced', 'This repair is already on an issued platform invoice.');
+      Alert.alert(
+        t('common.notice'),
+        t('partnerDashboard.repairsList.platformInvoiceIssued')
+      );
       return;
     }
     setSelectedRepairIds((prev) => {
@@ -419,16 +438,13 @@ export default function RepairsList() {
         const anchorClient = anchor?.client ?? null;
         const nextClient = item.client ?? null;
         if (anchorClient != null && nextClient != null && Number(anchorClient) !== Number(nextClient)) {
-          Alert.alert(
-            'Same client only',
-            'Combined invoices must be for one client. Finish the current selection or clear it first.'
-          );
+          Alert.alert(t('common.notice'), t('partnerDashboard.repairsList.selectInvoiceHint'));
           return prev;
         }
       }
       return [...prev, id];
     });
-  }, [repairs]);
+  }, [repairs, t]);
 
   const exitInvoiceSelectMode = useCallback(() => {
     setInvoiceSelectMode(false);
@@ -444,11 +460,11 @@ export default function RepairsList() {
       exitInvoiceSelectMode();
       navigation.navigate('ShopInvoiceDetail', { invoiceId: invoice.id });
     } catch (err) {
-      Alert.alert('Error', err.message || 'Could not create invoice draft');
+      Alert.alert(t('common.error'), err.message || t('partnerDashboard.repairsList.createInvoiceError'));
     } finally {
       setCreatingInvoice(false);
     }
-  }, [selectedRepairIds, exitInvoiceSelectMode, navigation]);
+  }, [selectedRepairIds, exitInvoiceSelectMode, navigation, t]);
 
   const handleInvoiceSingleRepair = useCallback(
     async (item) => {
@@ -459,12 +475,12 @@ export default function RepairsList() {
         const invoice = await draftInvoiceFromRepairs(token, [item.id]);
         navigation.navigate('ShopInvoiceDetail', { invoiceId: invoice.id });
       } catch (err) {
-        Alert.alert('Error', err.message || 'Could not create invoice draft');
+        Alert.alert(t('common.error'), err.message || t('partnerDashboard.repairsList.createInvoiceError'));
       } finally {
         setInvoicingRepairId(null);
       }
     },
-    [invoicingRepairId, navigation]
+    [invoicingRepairId, navigation, t]
   );
 
   const handleRepairPress = (repairId) => {
@@ -485,12 +501,24 @@ export default function RepairsList() {
   };
 
   const renderRepair = ({ item }) => {
-    const title = `${item.vehicle_make ?? ''} ${item.vehicle_model ?? ''}`.trim() || 'Vehicle';
+    const title =
+      `${item.vehicle_make ?? ''} ${item.vehicle_model ?? ''}`.trim() ||
+      t('partnerDashboard.repairsList.vehicleFallback');
     const plate = String(item.vehicle_license_plate || '').trim();
     const showPlate = Boolean(plate);
     const clientName = String(item.client_display_name || '').trim();
-    const serviceType =
+    const serviceTypeName =
       item.final_repair_type_name || item.effective_repair_type_name || null;
+    const serviceTypeLabel = serviceTypeName
+      ? translateRepairTypeLabel(
+          {
+            name: serviceTypeName,
+            repair_type_name: serviceTypeName,
+            slug: item.repair_type_slug || item.effective_repair_type_slug,
+          },
+          t
+        ) || serviceTypeName
+      : null;
     const statusLower = String(item.status || '').toLowerCase();
     const isBookedAwaiting =
       statusLower === 'open' &&
@@ -513,14 +541,14 @@ export default function RepairsList() {
       : isDirectRequest
         ? 'requested'
         : item.status;
-    const badgeLabel = isBookedAwaiting ? t('partnerDashboard.status.booked') : undefined;
+    const badgeLabel = resolveStatusBadgeLabel(badgeStatus);
     const dateMetaLabel = isBookedAwaiting
-      ? t('partnerDashboard.status.booked')
-      : repairListDateLabel(selectedTab);
-    const preferredVisit = String(item.availability_notes || '').trim();
+      ? t('partnerDashboard.repairsList.status.booked')
+      : repairListDateLabel(selectedTab, t);
+    const preferredVisit = localizePreferredVisitNote(item.availability_notes, t);
     const isSelected = selectedRepairIds.includes(item.id);
     const alreadyInvoiced = Boolean(item.has_issued_invoice);
-    const paymentLabel = formatRepairPaymentStatus(item.payment_status);
+    const paymentStatusText = formatRepairPaymentStatus(item.payment_status, t);
     const paymentSettled = isRepairPaymentSettled(item.payment_status);
 
     const onCardPress = () => {
@@ -558,7 +586,7 @@ export default function RepairsList() {
               </Text>
             ) : (
               <Text style={styles.cardPlate} numberOfLines={1}>
-                Plate hidden until booking
+                {t('partnerDashboard.repairsList.plateHiddenUntilBooking')}
               </Text>
             )}
             {clientName ? (
@@ -571,17 +599,19 @@ export default function RepairsList() {
         </View>
 
         {alreadyInvoiced && selectedTab === 'done' ? (
-          <Text style={styles.invoicedHint}>Platform invoice issued</Text>
+          <Text style={styles.invoicedHint}>
+            {t('partnerDashboard.repairsList.platformInvoiceIssued')}
+          </Text>
         ) : null}
 
-        {selectedTab === 'done' && !alreadyInvoiced && paymentLabel ? (
+        {selectedTab === 'done' && !alreadyInvoiced && paymentStatusText ? (
           <Text
             style={[
               styles.paymentHint,
               paymentSettled ? styles.paymentHintPaid : styles.paymentHintUnpaid,
             ]}
           >
-            Payment: {paymentLabel}
+            {t('partnerDashboard.repairsList.paymentLabel', { status: paymentStatusText })}
           </Text>
         ) : null}
 
@@ -609,9 +639,9 @@ export default function RepairsList() {
           </Pressable>
         ) : null}
 
-        {serviceType ? (
+        {serviceTypeLabel ? (
           <Text style={styles.cardServiceType} numberOfLines={1}>
-            {serviceType}
+            {serviceTypeLabel}
           </Text>
         ) : null}
 
@@ -633,7 +663,7 @@ export default function RepairsList() {
               {dateMetaLabel} · {sortDate}
             </Text>
           ) : (
-            <Text style={styles.cardMeta}>Date not recorded</Text>
+            <Text style={styles.cardMeta}>{t('partnerDashboard.repairsList.dateNotRecorded')}</Text>
           )}
           {kmValue != null ? (
             <Text style={styles.cardKm}>{Number(kmValue).toLocaleString()} km</Text>
@@ -658,16 +688,20 @@ export default function RepairsList() {
     vehicleFilters.repairTypeId,
     vehicleFilters.serviceYear,
   ].filter(Boolean).length;
-  const vehicleFiltersLabel = vehicleFiltersOpen
-    ? 'Hide filters'
-    : vehicleFilterCount > 0
-      ? `Filters (${vehicleFilterCount})`
-      : 'Filters';
+  const vehicleFiltersLabel = useMemo(() => {
+    if (vehicleFiltersOpen) return t('partnerDashboard.repairsList.hideFilters');
+    if (vehicleFilterCount > 0) {
+      return t('partnerDashboard.repairsList.filtersCount', { count: vehicleFilterCount });
+    }
+    return t('partnerDashboard.repairsList.filters');
+  }, [t, vehicleFiltersOpen, vehicleFilterCount]);
   const hasPaymentOrClientFilters = hasDoneClientFilters;
 
-  const emptySubtitle = hasSearch || hasVehicleFilters || hasPaymentOrClientFilters
-    ? 'Try another plate (Latin or Cyrillic), client, or vehicle filter.'
-    : "When repairs match this status, they'll show up here.";
+  const emptySubtitle =
+    hasSearch || hasVehicleFilters || hasPaymentOrClientFilters
+      ? t('partnerDashboard.repairsList.emptyFiltered')
+      : t('partnerDashboard.repairsList.emptyDefault');
+  const emptyTitle = t('repairs.emptyTitle');
 
   return (
     <ScreenBackground safeArea={false}>
@@ -715,9 +749,11 @@ export default function RepairsList() {
                     color="#fff"
                   />
                   <Text style={styles.selectBannerText}>
-                    Tap repairs for the same client, then create one combined invoice.
+                    {t('partnerDashboard.repairsList.selectInvoiceHint')}
                     {selectedRepairIds.length > 0
-                      ? ` (${selectedRepairIds.length} selected)`
+                      ? ` (${t('partnerDashboard.repairsList.selectedCount', {
+                          count: selectedRepairIds.length,
+                        })})`
                       : ''}
                   </Text>
                 </View>
@@ -811,7 +847,7 @@ export default function RepairsList() {
         {clientFilterId ? (
           <View style={styles.clientFilterRow}>
             <Text style={styles.clientFilterText} numberOfLines={1}>
-              Client: {clientFilterLabel || `ID ${clientFilterId}`}
+              {t('drawer.partner.clients')}: {clientFilterLabel || `ID ${clientFilterId}`}
             </Text>
             <Pressable
               onPress={() => {
@@ -820,13 +856,15 @@ export default function RepairsList() {
               }}
               hitSlop={8}
             >
-              <Text style={styles.clientFilterClear}>Clear</Text>
+              <Text style={styles.clientFilterClear}>
+                {t('partnerDashboard.repairsList.clear')}
+              </Text>
             </Pressable>
           </View>
         ) : null}
 
         <Searchbar
-          placeholder="Plate (Latin or Cyrillic), client, vehicle"
+          placeholder={t('partnerDashboard.repairsList.searchPlaceholder')}
           value={searchQuery}
           onChangeText={setSearchQuery}
           style={styles.searchBar}
@@ -887,11 +925,7 @@ export default function RepairsList() {
             ListEmptyComponent={
               <EmptyStateCard
                 icon="wrench-outline"
-                title={
-                  hasSearch || hasVehicleFilters || hasPaymentOrClientFilters
-                    ? `No ${selectedTab} repairs match your filters`
-                    : `No ${selectedTab} repairs`
-                }
+                title={emptyTitle}
                 subtitle={emptySubtitle}
               />
             }

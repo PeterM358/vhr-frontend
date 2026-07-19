@@ -1,4 +1,4 @@
-"""Partner notification delivery helpers — priority, session dedup, banner eligibility."""
+// Partner notification delivery helpers — priority, session dedup, banner eligibility.
 
 export const PRIORITY_CRITICAL = 'critical';
 export const PRIORITY_IMPORTANT = 'important';
