@@ -35,6 +35,10 @@ export function setNotificationNavigationRef(ref) {
   navigationRef = ref;
 }
 
+export function getNotificationNavigationRef() {
+  return navigationRef;
+}
+
 export function buildNotificationItemFromPushPayload(remoteMessage) {
   const data = { ...(remoteMessage?.data || {}) };
   if (remoteMessage?.notification?.title && !data.title) {

@@ -35,7 +35,10 @@ function extractHtmlExceptionMessage(html) {
 
 export function formatDrfErrorMessage(parsed, fallback = 'Request failed') {
   if (typeof parsed === 'string') return parsed;
-  if (parsed?.detail) return String(parsed.detail);
+  if (parsed?.detail) {
+    const detail = String(parsed.detail);
+    return parsed.code ? `${detail} (${parsed.code})` : detail;
+  }
   if (Array.isArray(parsed) && parsed.length) return String(parsed[0]);
   if (typeof parsed === 'object' && parsed !== null) {
     const parts = Object.entries(parsed).flatMap(([key, val]) => {

@@ -3,18 +3,27 @@ import { ActivityIndicator, View, StyleSheet, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ScreenBackground from '../components/ScreenBackground';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
+import { resolveIsPartnerSession } from '../utils/partnerSession';
 import {
   resetToClientDashboard,
   resetToSignIn,
   storeAuthReturnUrl,
 } from '../navigation/authNavigation';
 import { isProtectedWebPath, resetNavigationToCanonicalPath } from '../navigation/webLinking';
+import { toCanonicalAppPath } from '../navigation/localizedRoutes';
+
+function isClientDashboardPath(path) {
+  const pathOnly = String(path || '').split('?')[0];
+  const canonical = toCanonicalAppPath(pathOnly) || pathOnly;
+  const normalized = String(canonical).replace(/\/$/, '');
+  return normalized === '/dashboard';
+}
 
 export default function AuthLoadingScreen({ navigation }) {
   useEffect(() => {
     const checkAuth = async () => {
       const token = await AsyncStorage.getItem('@access_token');
-      const isShop = await AsyncStorage.getItem('@is_shop');
+      const isPartner = token ? await resolveIsPartnerSession() : false;
 
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         const currentPath = `${window.location.pathname}${window.location.search}`;
@@ -31,6 +40,14 @@ export default function AuthLoadingScreen({ navigation }) {
             }
             return;
           }
+
+          // Shop users must not land in the client Home shell via /dashboard.
+          if (isPartner && isClientDashboardPath(currentPath)) {
+            const route = await resolveShopEntryRoute();
+            navigation.reset(buildShopAuthReset(route));
+            return;
+          }
+
           if (resetNavigationToCanonicalPath(navigation, currentPath)) {
             return;
           }
@@ -38,7 +55,7 @@ export default function AuthLoadingScreen({ navigation }) {
       }
 
       if (token) {
-        if (isShop === 'true') {
+        if (isPartner) {
           const route = await resolveShopEntryRoute();
           navigation.reset(buildShopAuthReset(route));
         } else {

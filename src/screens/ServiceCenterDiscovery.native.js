@@ -125,11 +125,11 @@ function buildActiveFilterSummary(filters, t) {
   if (filters.verifiedOnly) parts.push(t('serviceCenters.verified'));
   if (filters.selectedCategory) {
     const cat = filters.categoryOptions?.find((c) => c.slug === filters.selectedCategory);
-    parts.push(cat?.name || cat?.label || filters.selectedCategory);
+    parts.push(cat?.display_name || cat?.name || cat?.label || filters.selectedCategory);
   }
   if (filters.selectedRepairType) {
     const rt = filters.repairTypeChipOptions?.find((r) => r.slug === filters.selectedRepairType);
-    parts.push(rt?.name || rt?.label || filters.selectedRepairType);
+    parts.push(rt?.display_name || rt?.name || rt?.label || filters.selectedRepairType);
   }
   if (filters.selectedBrand) {
     const brand = filters.brands?.find((b) => b.id === filters.selectedBrand);

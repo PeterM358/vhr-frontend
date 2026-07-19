@@ -1509,6 +1509,18 @@ export default function VehicleDetailScreen({ route, navigation }) {
                   <Button mode="outlined" icon="store-cog" onPress={handleManageServiceCenters}>
                     {t('vehicles.detail.manageServiceCenterAccess')}
                   </Button>
+                  <Button
+                    mode="outlined"
+                    icon="shield-key"
+                    onPress={() =>
+                      navigation.navigate('VehicleHistoryAccess', {
+                        vehicleId,
+                        returnTo: 'VehicleDetail',
+                      })
+                    }
+                  >
+                    {t('vehicles.detail.vehicleHistoryAccess')}
+                  </Button>
                 </View>
               </>
             ) : (

@@ -310,6 +310,11 @@ export function normalizeWebPath(input) {
     return partnerRepairOffer(partnerRepairOfferMatch[1], parseRouteQuery(query));
   }
 
+  const partnerRepairDetailMatch = lastGlobalMatch(raw, String.raw`partner\/repairs\/(\d+)$`);
+  if (partnerRepairDetailMatch) {
+    return partnerRepairDetail(partnerRepairDetailMatch[1], parseRouteQuery(query));
+  }
+
   if (raw === 'CreateOrUpdateOffer' || raw.endsWith('/CreateOrUpdateOffer')) {
     const legacyQuery = parseRouteQuery(query);
     const repairId = legacyQuery.repairId || legacyQuery.repair_id;
@@ -366,6 +371,10 @@ export function vehicleReminderNew({ vehicleId, reminderType } = {}) {
 
 export function vehicleManageServiceCenters(vehicleId) {
   return `${VEHICLES}/${normalizeId(vehicleId)}/service-centers`;
+}
+
+export function vehicleHistoryAccess(vehicleId) {
+  return `${VEHICLES}/${normalizeId(vehicleId)}/access`;
 }
 
 export function vehicleServiceRecordCenter(id) {
@@ -481,7 +490,7 @@ export function serviceCenterProfile(slug, params = {}) {
 
 /** @deprecated use serviceCenterProfile(slug) after resolving public_slug */
 export function serviceCenterDetail(id) {
-  return `${SERVICE_CENTERS}/${normalizeId(id)}`;
+  return serviceCenterProfile(String(normalizeId(id)));
 }
 
 export function partnerDashboard() {
@@ -492,6 +501,15 @@ export function partnerProfile(params = {}) {
   const query = {};
   if (params.requireSetup === true || params.requireSetup === 'true') {
     query.requireSetup = 'true';
+  }
+  if (params.expandSection) {
+    query.expandSection = String(params.expandSection);
+  }
+  if (params.returnTo) {
+    query.returnTo = String(params.returnTo);
+  }
+  if (params.invoiceId != null && params.invoiceId !== '') {
+    query.invoiceId = String(params.invoiceId);
   }
   return buildPathWithQuery(`${PARTNER}/profile`, query);
 }
@@ -504,6 +522,10 @@ export function partnerRepairs(params = {}) {
   return buildPathWithQuery(`${PARTNER}/repairs`, params);
 }
 
+export function partnerRepairDetail(repairId, params = {}) {
+  return buildPathWithQuery(`${PARTNER}/repairs/${normalizeId(repairId)}`, params);
+}
+
 export function partnerRepairOffer(repairId, params = {}) {
   const query = {};
   if (params.offerId != null && params.offerId !== '') {
@@ -512,17 +534,33 @@ export function partnerRepairOffer(repairId, params = {}) {
   return buildPathWithQuery(`${PARTNER}/repairs/${normalizeId(repairId)}/offer`, query);
 }
 
-/** Canonical browser path for RepairDetail — partner context keeps list/calendar URLs. */
+const PARTNER_REPAIR_DETAIL_RETURN_TOS = new Set([
+  'RepairsList',
+  'ShopDashboard',
+  'ShopCalendar',
+  'ShopHome',
+]);
+
+/** Canonical browser path for RepairDetail — partner uses /partner/repairs/:id; client uses dashboard. */
 export function repairDetailWebPath(params = {}) {
   const returnTo = params.returnTo;
+  const hasRepairId = params.repairId != null && params.repairId !== '';
+  if (hasRepairId && PARTNER_REPAIR_DETAIL_RETURN_TOS.has(returnTo)) {
+    const tab = params.initialTab || params.statusFilter || params.tab;
+    const query = {};
+    if (tab === 'open' || tab === 'ongoing' || tab === 'done') {
+      query.tab = tab;
+    }
+    return partnerRepairDetail(params.repairId, query);
+  }
+  if (hasRepairId) {
+    return repairRequestDetail(params.repairId);
+  }
   if (returnTo === 'ShopCalendar') {
     return partnerCalendar();
   }
-  if (returnTo === 'RepairsList' || returnTo === 'ShopDashboard') {
+  if (returnTo === 'RepairsList' || returnTo === 'ShopDashboard' || returnTo === 'ShopHome') {
     return partnerRepairs();
-  }
-  if (params.repairId != null && params.repairId !== '') {
-    return repairRequestDetail(params.repairId);
   }
   return repairRequests();
 }

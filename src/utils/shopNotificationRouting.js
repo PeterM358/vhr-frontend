@@ -3,17 +3,30 @@
  */
 
 import { CommonActions } from '@react-navigation/native';
+import { Platform } from 'react-native';
 
 import {
   getRootNavigation,
   isShopDrawerNavigation,
   resetShopDrawerCalendar,
 } from '../navigation/drawerNavigation';
+import { navigateToPartnerRepairDetail } from '../navigation/webNavigation';
 
 const PARTNER_HOME_ROUTE = {
   name: 'ShopHome',
   state: { routes: [{ name: 'ShopDashboard' }], index: 0 },
 };
+
+function partnerRepairDetailTarget(repairId) {
+  return {
+    route: 'RepairDetail',
+    params: {
+      repairId,
+      returnTo: 'RepairsList',
+      backLabelKey: 'drawer.partner.repairs',
+    },
+  };
+}
 
 export function notificationEventType(item) {
   return String(
@@ -112,7 +125,7 @@ export function resolveShopNotificationTarget(item) {
     case 'offer_booked':
     case 'offer_booking_cancelled':
       if (repairId) {
-        return { route: 'RepairDetail', params: { repairId } };
+        return partnerRepairDetailTarget(repairId);
       }
       break;
 
@@ -125,7 +138,7 @@ export function resolveShopNotificationTarget(item) {
         };
       }
       if (repairId) {
-        return { route: 'RepairDetail', params: { repairId } };
+        return partnerRepairDetailTarget(repairId);
       }
       break;
 
@@ -147,8 +160,12 @@ export function resolveShopNotificationTarget(item) {
     case 'owner_service_record_confirmation_requested':
     case 'owner_service_record_confirmation_confirmed':
     case 'owner_service_record_confirmation_rejected':
+    case 'vehicle_history_access_approved':
+    case 'vehicle_history_access_rejected':
+    case 'vehicle_history_access_blocked':
+    case 'vehicle_history_access_revoked':
       if (repairId) {
-        return { route: 'RepairDetail', params: { repairId } };
+        return partnerRepairDetailTarget(repairId);
       }
       break;
 
@@ -160,12 +177,12 @@ export function resolveShopNotificationTarget(item) {
     return { route: 'PromotionDetail', params: { promotionId } };
   }
   if (repairId) {
-    return { route: 'RepairDetail', params: { repairId } };
+    return partnerRepairDetailTarget(repairId);
   }
 
   const offerId = offerIdFrom(item);
   if (offerId && repairId) {
-    return { route: 'RepairDetail', params: { repairId } };
+    return partnerRepairDetailTarget(repairId);
   }
 
   return null;
@@ -189,12 +206,21 @@ export function navigateShopNotification(navigation, item) {
   }
 
   if (!isShopDrawerNavigation(navigation)) {
+    if (target.route === 'RepairDetail' && target.params?.repairId != null) {
+      navigateToPartnerRepairDetail(root, target.params.repairId, target.params);
+      return true;
+    }
     root.dispatch(
       CommonActions.reset({
         index: 1,
         routes: [PARTNER_HOME_ROUTE, { name: target.route, params: target.params }],
       })
     );
+    return true;
+  }
+
+  if (Platform.OS === 'web' && target.route === 'RepairDetail' && target.params?.repairId != null) {
+    navigateToPartnerRepairDetail(navigation, target.params.repairId, target.params);
     return true;
   }
 
@@ -229,6 +255,11 @@ export function notificationActionHint(item) {
     case 'vehicle_arrived':
     case 'client_arrival_reported':
       return 'Tap to open repair';
+    case 'vehicle_history_access_approved':
+    case 'vehicle_history_access_rejected':
+    case 'vehicle_history_access_blocked':
+    case 'vehicle_history_access_revoked':
+      return 'Tap to open repair';
     case 'owner_service_record_confirmation_requested':
       return 'Tap to confirm service record';
     default:
@@ -247,7 +278,10 @@ export function notificationActionHint(item) {
   return null;
 }
 
+/** Confirmed appointments / booking lifecycle — not offer drafting. */
 const BOOKING_EVENT_TYPES = new Set([
+  'offer_booked',
+  'offer_booking_cancelled',
   'promotion_booked',
   'promotion_booking_cancelled',
   'repair_scheduled',
@@ -258,26 +292,60 @@ const BOOKING_EVENT_TYPES = new Set([
   'appointment_cancelled',
 ]);
 
-const OFFER_EVENT_TYPES = new Set(['offer_booked', 'offer_booking_cancelled']);
+/** Offer pipeline: new requests needing a quote, offer lifecycle (not booked). */
+const OFFER_EVENT_TYPES = new Set([
+  'new_offer_received',
+  'offer_sent',
+  'offer_viewed',
+  'offer_declined',
+]);
 
 const REPAIR_EVENT_TYPES = new Set([
-  'new_repair_request',
   'vehicle_arrived',
   'client_arrival_reported',
   'direct_request_declined',
   'owner_service_record_confirmation_requested',
   'owner_service_record_confirmation_confirmed',
   'owner_service_record_confirmation_rejected',
+  'vehicle_history_access_approved',
+  'vehicle_history_access_rejected',
+  'vehicle_history_access_blocked',
+  'vehicle_history_access_revoked',
 ]);
+
+/** Title fallback when event_type is missing from older / partial payloads. */
+function categoryFromTitle(item) {
+  const title = String(item?.title || '').toLowerCase();
+  if (!title) return null;
+  if (
+    /schedule confirmed|booking confirmed|appointment scheduled|reschedule|booking cancelled|promotion booked|appointment cancel/i.test(
+      title
+    )
+  ) {
+    return 'bookings';
+  }
+  if (/appointment request/i.test(title)) return 'bookings';
+  if (/new repair request|offer/i.test(title)) return 'offers';
+  if (/vehicle arrived|arrival reported|service record/i.test(title)) return 'repairs';
+  return null;
+}
 
 /** Inbox tab filter for partner notifications. */
 export function shopNotificationCategory(item) {
   const eventType = notificationEventType(item);
-  if (OFFER_EVENT_TYPES.has(eventType)) return 'offers';
   if (BOOKING_EVENT_TYPES.has(eventType)) return 'bookings';
+  if (eventType === 'new_repair_request') {
+    // Direct appointment request → Bookings; marketplace request needing offer → Offers.
+    return isDirectAppointmentNotification(item) ? 'bookings' : 'offers';
+  }
+  if (OFFER_EVENT_TYPES.has(eventType)) return 'offers';
   if (REPAIR_EVENT_TYPES.has(eventType)) return 'repairs';
   if (item?.offer != null) return 'offers';
   if (item?.promotion != null) return 'bookings';
+
+  const fromTitle = categoryFromTitle(item);
+  if (fromTitle) return fromTitle;
+
   if (item?.repair != null) return 'repairs';
   return 'alerts';
 }

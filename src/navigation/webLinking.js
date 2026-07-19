@@ -14,6 +14,7 @@ import { linkingConfig } from './linkingConfig';
 import { syncWebDocumentTitle } from './webDocumentTitle';
 import { storeAuthReturnUrl, syncWebPath } from './authNavigation';
 import { resolveLegacyShopPath } from '../api/seo';
+import { resolveIsPartnerSession } from '../utils/partnerSession';
 import {
   getLegacyRedirectTarget,
   getNavigationStateFromSeoPath,
@@ -65,7 +66,7 @@ import {
   vehicleSpecs,
   vehicles,
 } from './webRoutes';
-import { toCanonicalPublicPath, toCanonicalAppPath, localizeCanonicalPath, getSupportedLanguagePrefixFromPathname } from './localizedRoutes';
+import { toCanonicalPublicPath, toCanonicalAppPath, localizeCanonicalPath } from './localizedRoutes';
 import { STORAGE_KEY_LOCALE, SUPPORTED_LOCALES, getLocale, syncLocaleFromWebPathname } from '../i18n';
 
 function findFocusedRoute(state) {
@@ -189,7 +190,12 @@ export function getCanonicalWebPath(state) {
       if (params.expandSection === 'public_preview') {
         return partnerPublicPreview();
       }
-      return partnerProfile(params);
+      return partnerProfile({
+        requireSetup: params.requireSetup,
+        expandSection: params.expandSection,
+        returnTo: params.returnTo,
+        invoiceId: params.invoiceId,
+      });
     case 'ShopHome':
     case 'ShopDashboard':
       return partnerDashboard();
@@ -596,6 +602,15 @@ export function getPartnerNavigationStateFromPath(path) {
     if (query.requireSetup === 'true' || query.requireSetup === true) {
       params.requireSetup = true;
     }
+    if (query.expandSection) {
+      params.expandSection = String(query.expandSection);
+    }
+    if (query.returnTo) {
+      params.returnTo = String(query.returnTo);
+    }
+    if (query.invoiceId) {
+      params.invoiceId = String(query.invoiceId);
+    }
     return {
       routes: [{ name: 'ShopProfile', params }],
     };
@@ -606,13 +621,24 @@ export function getPartnerNavigationStateFromPath(path) {
     };
   }
   if (pathPart === 'partner/repairs') {
+    const listParams = {};
+    const listTab = query.tab || query.initialTab || query.statusFilter;
+    if (listTab) {
+      listParams.initialTab = String(listTab);
+    }
     return {
       routes: [
         {
           name: 'ShopHome',
           state: {
             index: 1,
-            routes: [{ name: 'ShopDashboard' }, { name: 'RepairsList' }],
+            routes: [
+              { name: 'ShopDashboard' },
+              {
+                name: 'RepairsList',
+                params: Object.keys(listParams).length ? listParams : undefined,
+              },
+            ],
           },
         },
       ],
@@ -634,10 +660,54 @@ export function getPartnerNavigationStateFromPath(path) {
             routes: [{ name: 'ShopDashboard' }, { name: 'RepairsList' }],
           },
         },
-        { name: 'RepairDetail', params: { repairId, returnTo: 'RepairsList' } },
+        {
+          name: 'RepairDetail',
+          params: {
+            repairId,
+            returnTo: 'RepairsList',
+            backLabelKey: 'drawer.partner.repairs',
+          },
+        },
         { name: 'CreateOrUpdateOffer', params: offerParams },
       ],
       index: 2,
+    };
+  }
+  const partnerRepairDetailMatch = pathPart.match(/^partner\/repairs\/(\d+)$/);
+  if (partnerRepairDetailMatch) {
+    const repairId = parseInt(partnerRepairDetailMatch[1], 10);
+    if (!Number.isFinite(repairId)) return null;
+    const listParams = {};
+    const listTab = query.tab || query.initialTab || query.statusFilter;
+    if (listTab) {
+      listParams.initialTab = String(listTab);
+    }
+    return {
+      routes: [
+        {
+          name: 'ShopHome',
+          state: {
+            index: 1,
+            routes: [
+              { name: 'ShopDashboard' },
+              {
+                name: 'RepairsList',
+                params: Object.keys(listParams).length ? listParams : undefined,
+              },
+            ],
+          },
+        },
+        {
+          name: 'RepairDetail',
+          params: {
+            repairId,
+            returnTo: 'RepairsList',
+            backLabelKey: 'drawer.partner.repairs',
+            ...(listParams.initialTab ? { initialTab: listParams.initialTab } : {}),
+          },
+        },
+      ],
+      index: 1,
     };
   }
   if (pathPart === 'partner/calendar') {
@@ -949,30 +1019,39 @@ function localizePathForRedirect(canonicalPath) {
   return localizeCanonicalPath(pathOnly, lang);
 }
 
+function isClientDashboardCanonical(canonicalPath) {
+  const normalized = String(canonicalPath || '')
+    .replace(/\/$/, '')
+    .split('?')[0];
+  return normalized === '/dashboard';
+}
+
+function isLocalizedAppRoot(pathname, root) {
+  const canonical = toCanonicalAppPath(pathname);
+  if (!canonical) return false;
+  return canonical === `/${root}` || canonical.startsWith(`/${root}/`);
+}
+
 async function resolveDashboardRedirectTarget(pathname) {
   const authed = await hasStoredAuthToken();
   if (!authed) {
     return '/';
   }
-  if (getSupportedLanguagePrefixFromPathname(pathname)) {
-    return null;
-  }
-  const isShop = (await AsyncStorage.getItem('@is_shop')) === 'true';
-  if (isShop && (pathname === '/dashboard' || pathname === '/dashboard/')) {
+  const canonical = toCanonicalAppPath(pathname) || pathname;
+  const isShop = await resolveIsPartnerSession();
+  if (isShop && isClientDashboardCanonical(canonical)) {
     return localizePathForRedirect('/partner/dashboard');
   }
-  return localizePathForRedirect(pathname);
+  return localizePathForRedirect(canonical);
 }
 
 async function resolvePartnerRedirectTarget(pathname) {
-  if (getSupportedLanguagePrefixFromPathname(pathname)) {
-    return null;
-  }
   const authed = await hasStoredAuthToken();
   if (!authed) {
     return '/';
   }
-  return localizePathForRedirect(pathname);
+  const canonical = toCanonicalAppPath(pathname) || pathname;
+  return localizePathForRedirect(canonical);
 }
 
 async function localizeAppTargetIfNeeded(rawTarget) {
@@ -980,10 +1059,6 @@ async function localizeAppTargetIfNeeded(rawTarget) {
   const qIndex = rawTarget.indexOf('?');
   const queryPart = qIndex >= 0 ? rawTarget.slice(qIndex) : '';
   const pathPart = qIndex >= 0 ? rawTarget.slice(0, qIndex) : rawTarget;
-
-  if (getSupportedLanguagePrefixFromPathname(pathPart)) {
-    return rawTarget;
-  }
 
   const appCanonical = toCanonicalAppPath(pathPart);
   if (!appCanonical) {
@@ -1001,8 +1076,8 @@ async function localizeAppTargetIfNeeded(rawTarget) {
   }
 
   if (root === 'dashboard') {
-    const isShop = (await AsyncStorage.getItem('@is_shop')) === 'true';
-    if (isShop && (pathPart === '/dashboard' || pathPart === '/dashboard/')) {
+    const isShop = await resolveIsPartnerSession();
+    if (isShop && isClientDashboardCanonical(appCanonical)) {
       return `${localizePathForRedirect('/partner/dashboard')}${queryPart}`;
     }
   }
@@ -1059,7 +1134,14 @@ function legacyCreateOrUpdateOfferNavigationState() {
           routes: [{ name: 'ShopDashboard' }, { name: 'RepairsList' }],
         },
       },
-      { name: 'RepairDetail', params: { repairId, returnTo: 'RepairsList' } },
+      {
+        name: 'RepairDetail',
+        params: {
+          repairId,
+          returnTo: 'RepairsList',
+          backLabelKey: 'drawer.partner.repairs',
+        },
+      },
       { name: 'CreateOrUpdateOffer', params: offerParams },
     ],
     index: 2,
@@ -1185,7 +1267,11 @@ export async function redirectLegacyWebUrl() {
       await storeAuthReturnUrl(`${pathname}${search}`);
       target = '/login';
     }
-  } else if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) {
+  } else if (
+    pathname === '/dashboard' ||
+    pathname.startsWith('/dashboard/') ||
+    isLocalizedAppRoot(pathname, 'dashboard')
+  ) {
     const authed = await hasStoredAuthToken();
     if (!authed) {
       target = '/';
@@ -1195,7 +1281,11 @@ export async function redirectLegacyWebUrl() {
         target = `${dashboardTarget}${search}`;
       }
     }
-  } else if (pathname === '/partner' || pathname.startsWith('/partner/')) {
+  } else if (
+    pathname === '/partner' ||
+    pathname.startsWith('/partner/') ||
+    isLocalizedAppRoot(pathname, 'partner')
+  ) {
     const partnerTarget = await resolvePartnerRedirectTarget(pathname);
     if (partnerTarget && partnerTarget !== pathname) {
       target = `${partnerTarget}${search}`;
@@ -1304,7 +1394,8 @@ export async function redirectLegacyWebUrl() {
 
   if (target) {
     target = await localizeAppTargetIfNeeded(target);
-  } else if (!getSupportedLanguagePrefixFromPathname(pathname)) {
+  } else {
+    // Also rewrite already-localized paths (e.g. /en/dashboard → /en/partner/dashboard).
     const directLocalized = await localizeAppTargetIfNeeded(pathname);
     if (directLocalized && directLocalized !== pathname) {
       target = `${directLocalized}${search}`;

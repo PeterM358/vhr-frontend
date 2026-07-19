@@ -10,11 +10,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
-  Pressable,
   Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { Appbar, Badge } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logout } from '../api/auth';
 import { getRepairs, getShopCalendar } from '../api/repairs';
@@ -30,12 +28,14 @@ import {
 } from '../utils/shopProfileGate';
 import { setCachedShopRepairs } from '../utils/shopRepairsPrefetch';
 import PartnerRepairRequestCard from '../components/shop/PartnerRepairRequestCard';
+import PartnerAppHeader from '../components/partner/PartnerAppHeader';
+import { partnerInAppAlertCopy } from '../utils/partnerInAppAlert';
 import {
   comparePartnerLifecycle,
   countByLifecycle,
   formatLifecycleCounterLine,
 } from '../utils/partnerRepairLifecycle';
-import { navigateToPartnerProfile, navigateToPartnerPublicPreview, navigateToPartnerCalendar, navigateToPartnerNotifications, navigateToPartnerRepairOffer, navigateToPartnerRepairDetail } from '../navigation/webNavigation';
+import { navigateToPartnerProfile, navigateToPartnerPublicPreview, navigateToPartnerCalendar, navigateToPartnerRepairOffer, navigateToPartnerRepairDetail } from '../navigation/webNavigation';
 import ShopProfileSetupBanner from '../components/shop/ShopProfileSetupBanner';
 import { getMyShopProfiles } from '../api/profiles';
 import { formatShopDisplayName } from '../utils/shopDisplayName';
@@ -52,14 +52,14 @@ import PartnerEmptyRequestsState from '../components/dashboard/PartnerEmptyReque
 import {
   canSendPartnerOffers,
   isPartnerSubscriptionActive,
+  isLeadTeaserLocked,
+  FEATURES,
+  upgradeNavigationParams,
 } from '../utils/partnerSubscription';
 import { todayCalendarRange, isScheduledToday } from '../utils/dashboardDate';
 import { showMessage } from '../utils/crossPlatformAlert';
 import { resetShopDrawerRepairs } from '../navigation/drawerNavigation';
 import { useTranslation } from '../i18n';
-import CompactLanguageSelector from '../components/common/CompactLanguageSelector';
-
-const SHOP_TOP_BAR = 'rgba(11,18,32,0.92)';
 
 function asRepairRows(data) {
   if (Array.isArray(data)) return data;
@@ -103,6 +103,7 @@ export default function ShopHomeScreen() {
   const [missingProfileFields, setMissingProfileFields] = useState([]);
 
   const lastRepairNotifIdRef = React.useRef(null);
+  const lastInAppAlertIdRef = React.useRef(null);
 
   const openRepairs = dashboardRepairs;
   const lifecycleCounts = useMemo(() => countByLifecycle(dashboardRepairs), [dashboardRepairs]);
@@ -182,15 +183,28 @@ export default function ShopHomeScreen() {
 
   React.useEffect(() => {
     if (!latestNotificationId) return;
-    if (latestNotificationId === lastRepairNotifIdRef.current) return;
     const latest = notifications[0];
     const eventType = String(
       latest?.data?.event_type || latest?.event_type || latest?.notification_type || ''
     ).toLowerCase();
-    if (!eventType.includes('repair_request')) return;
-    lastRepairNotifIdRef.current = latestNotificationId;
-    loadDashboardRepairs({ background: true });
-  }, [latestNotificationId, notifications, loadDashboardRepairs]);
+
+    if (
+      eventType.includes('repair_request') &&
+      latestNotificationId !== lastRepairNotifIdRef.current
+    ) {
+      lastRepairNotifIdRef.current = latestNotificationId;
+      loadDashboardRepairs({ background: true });
+    }
+
+    if (latestNotificationId !== lastInAppAlertIdRef.current) {
+      const alertCopy = partnerInAppAlertCopy(latest, t);
+      if (alertCopy) {
+        // Global PartnerInAppBannerHost owns CRITICAL/IMPORTANT banners.
+        // Keep this path as a no-op marker so dashboard refresh still keys off arrival events.
+        lastInAppAlertIdRef.current = latestNotificationId;
+      }
+    }
+  }, [latestNotificationId, notifications, loadDashboardRepairs, t]);
 
   const refreshProfileGate = React.useCallback(async () => {
     try {
@@ -266,20 +280,18 @@ export default function ShopHomeScreen() {
     }
     navigateToPartnerRepairDetail(navigation, repairId, {
       returnTo: 'ShopDashboard',
-      backLabel: t('common.home'),
+      backLabelKey: 'navigation.dashboard',
     });
   };
 
   const handleRepairOffer = (repair) => {
     const repairId = repair?.id;
     if (!repairId) return;
-    if (!canSendOffers) {
-      showMessage(
-        t('partnerDashboard.activation.requiredTitle'),
-        t('partnerDashboard.activation.requiredBody'),
-        { variant: 'info' }
+    if (!canSendOffers || isLeadTeaserLocked(repair)) {
+      navigation.navigate(
+        'ShopSubscriptionUpgrade',
+        upgradeNavigationParams({ featureKey: FEATURES.MARKETPLACE_SEND_OFFER })
       );
-      openPartnerProfile(navigation, { requireSetup: true });
       return;
     }
     if (
@@ -465,59 +477,15 @@ export default function ShopHomeScreen() {
 
   return (
     <ScreenBackground safeArea={false}>
-      <Appbar.Header style={{ backgroundColor: SHOP_TOP_BAR }}>
-        <Appbar.Action icon="menu" onPress={() => navigation.openDrawer()} color="#fff" />
-        <View style={styles.languageSelectorWrap}>
-          <CompactLanguageSelector
-            variant="dark"
-            compact
-            presentation={Platform.OS === 'web' ? 'portalDropdown' : 'modal'}
-            style={styles.languageSelector}
-          />
-        </View>
-        <Pressable
-          onPress={() => openPartnerProfile(navigation, { requireSetup: !profileComplete })}
-          style={styles.titlePressable}
-          accessibilityRole="button"
-          accessibilityLabel={t('partnerDashboard.openCenterDetails')}
-        >
-          <Appbar.Content title={shopDisplayName} titleStyle={{ color: '#fff' }} />
-        </Pressable>
-        <View style={styles.iconWithBadge}>
-          <Appbar.Action
-            icon="calendar-month-outline"
-            onPress={() => {
-              if (Platform.OS === 'web') {
-                navigateToPartnerCalendar(navigation);
-                return;
-              }
-              navigation.navigate('ShopCalendar', {
-                returnTo: 'ShopDashboard',
-                backLabel: t('common.home'),
-              });
-            }}
-            color="#fff"
-          />
-          {unscheduledCount > 0 ? (
-            <Badge style={styles.notificationBadge}>{unscheduledCount}</Badge>
-          ) : null}
-        </View>
-        <View style={styles.iconWithBadge}>
-          <Appbar.Action
-            icon="bell-outline"
-            onPress={() => {
-              if (Platform.OS === 'web') {
-                navigateToPartnerNotifications(navigation);
-                return;
-              }
-              navigation.navigate('NotificationsList');
-            }}
-            color="#fff"
-          />
-          {unreadCount > 0 ? <Badge style={styles.notificationBadge}>{unreadCount}</Badge> : null}
-        </View>
-        <Appbar.Action icon="logout" onPress={handleLogout} color="#fff" />
-      </Appbar.Header>
+      <PartnerAppHeader
+        mode="dashboard"
+        title={shopDisplayName}
+        unreadCount={unreadCount}
+        calendarBadgeCount={unscheduledCount}
+        loadCalendarBadge={false}
+        onTitlePress={() => openPartnerProfile(navigation, { requireSetup: !profileComplete })}
+        onLogoutPress={handleLogout}
+      />
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {!profileComplete ? (
@@ -530,7 +498,12 @@ export default function ShopHomeScreen() {
         {!partnerActive ? (
           <PartnerActivationBanner
             openRequestCount={openRepairs.length}
-            onActivatePress={() => openPartnerProfile(navigation, { requireSetup: true })}
+            onActivatePress={() =>
+              navigation.navigate(
+                'ShopSubscriptionUpgrade',
+                upgradeNavigationParams({ featureKey: FEATURES.REPAIRS })
+              )
+            }
           />
         ) : null}
 
@@ -578,29 +551,6 @@ export default function ShopHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  languageSelectorWrap: {
-    justifyContent: 'center',
-    marginLeft: 2,
-    marginRight: 4,
-  },
-  languageSelector: {
-    maxWidth: 92,
-  },
-  titlePressable: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  iconWithBadge: {
-    position: 'relative',
-    marginRight: 8,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: 'red',
-    color: 'white',
-  },
   scroll: {
     paddingHorizontal: 12,
     paddingTop: 12,

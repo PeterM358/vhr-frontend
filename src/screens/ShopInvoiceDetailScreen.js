@@ -9,6 +9,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 import InvoiceDocumentPreview from '../components/shop/InvoiceDocumentPreview';
 import { COLORS } from '../constants/colors';
 import { getInvoiceById, issueInvoice, markInvoicePaid } from '../api/billing';
+import { navigateToPartnerProfile } from '../navigation/webNavigation';
 
 export default function ShopInvoiceDetailScreen() {
   const route = useRoute();
@@ -41,6 +42,14 @@ export default function ShopInvoiceDetailScreen() {
       loadInvoice();
     }, [loadInvoice])
   );
+
+  const openInvoiceSettings = () => {
+    navigateToPartnerProfile(navigation, {
+      expandSection: 'company',
+      returnTo: 'ShopInvoiceDetail',
+      invoiceId,
+    });
+  };
 
   const handleIssue = async () => {
     setIssuing(true);
@@ -83,13 +92,19 @@ export default function ShopInvoiceDetailScreen() {
   const isDraft = invoice.status === 'draft';
   const isIssued = invoice.status === 'issued';
   const isUnpaid = invoice.payment_status !== 'paid';
-  const missingIssuer = !invoice.issuer_vat_number || !invoice.issuer_address_line1;
+  const missingIssuer =
+    !invoice.issuer_address_line1 ||
+    (invoice.issuer_vat_registered !== false
+      ? !invoice.issuer_vat_number
+      : !invoice.issuer_eik_number && !invoice.issuer_vat_number);
 
   return (
     <ScreenBackground>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.screenHint}>
-          Document preview — this is what you share with the client. PDF download comes next.
+          {isDraft
+            ? 'Draft / Proforma — preview only until you issue a numbered tax invoice. Offers stay separate commercial estimates.'
+            : 'Issued tax invoice — fiscal document with a number. Offers remain commercial estimates, not invoices.'}
         </Text>
 
         <InvoiceDocumentPreview invoice={invoice} />
@@ -99,17 +114,22 @@ export default function ShopInvoiceDetailScreen() {
             <Text style={styles.warningTitle}>Complete invoice settings on your center profile</Text>
             <Text style={styles.warningText}>
               Add legal company name, VAT / ДДС number, and invoice address under Center details → Invoice
-              settings, then save and create a new invoice draft.
+              settings, then save. Issuing stays blocked until these are filled.
             </Text>
-            <Button mode="outlined" onPress={() => navigation.navigate('ShopProfile')}>
-              Open center profile
+            <Button mode="outlined" onPress={openInvoiceSettings}>
+              Open invoice settings
             </Button>
           </View>
         ) : null}
 
         <View style={styles.actions}>
           {isDraft ? (
-            <Button mode="contained" onPress={() => setConfirmIssue(true)} loading={issuing}>
+            <Button
+              mode="contained"
+              onPress={() => setConfirmIssue(true)}
+              loading={issuing}
+              disabled={missingIssuer || issuing}
+            >
               Issue tax invoice
             </Button>
           ) : null}
@@ -121,7 +141,7 @@ export default function ShopInvoiceDetailScreen() {
         </View>
 
         <Text style={styles.helpText}>
-          Proforma (draft) → issue for a numbered tax invoice. Mark paid when the customer pays on pickup;
+          Draft / Proforma → Issue for a numbered tax invoice. Mark paid when the customer pays on pickup;
           your accountant can also reconcile from the export later.
         </Text>
       </ScrollView>
@@ -129,7 +149,7 @@ export default function ShopInvoiceDetailScreen() {
       <ConfirmDialog
         visible={confirmIssue}
         title="Issue tax invoice?"
-        message="This assigns a fiscal number and locks supplier/buyer snapshots. Use proforma draft until the client confirms."
+        message="This assigns a fiscal number and locks supplier/buyer snapshots. The draft stays a proforma until you issue. The client is notified when linked to this repair."
         confirmLabel="Issue"
         loading={issuing}
         icon="file-document-check-outline"

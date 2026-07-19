@@ -1,6 +1,6 @@
 import { API_BASE_URL } from './config';
 import { serviceCenterProfilePath } from '../utils/seo/seoPaths';
-import { getLocalizedPath } from '../navigation/localizedRoutes';
+import { getLocalizedPath, localizeCanonicalPath } from '../navigation/localizedRoutes';
 import { getLocale } from '../i18n';
 
 function buildQuery(params = {}) {
@@ -83,17 +83,42 @@ export function resolveShopSeoPath(shopId, locale = 'en') {
   return seoFetch(`/api/public/seo/service-centers/resolve/${shopId}/`, { locale });
 }
 
+/** Temporary numeric profile path — prefer canonical_path from API. */
 export function buildFallbackShopPath(shopId) {
-  return `/service-centers/${shopId}`;
+  return serviceCenterProfilePath(String(shopId));
 }
 
+export function isFallbackShopPublicSlug(slug) {
+  const value = String(slug || '').trim().toLowerCase();
+  if (!value) return false;
+  return /^service-center(?:-\d+)?$/.test(value);
+}
+
+/**
+ * Build the localized public profile path from backend SSoT fields when present.
+ * Canonical format: /{lang}/service-center/{slug} (EN) or /{lang}/avtoserviz/{slug} (BG).
+ * Never uses discovery root (/service-centers / avtoservizi) for profiles.
+ */
 export function buildShopPublicPathFromShop(shop) {
+  const locale = getLocale();
+  if (shop?.canonical_path) {
+    return localizeCanonicalPath(shop.canonical_path, locale);
+  }
+  const localized = shop?.localized_public_paths;
+  if (localized && typeof localized === 'object') {
+    if (localized[locale]) return localized[locale];
+    if (localized.en) {
+      const enPath = String(localized.en);
+      const canonical = enPath.replace(/^\/[a-z]{2}(?=\/)/, '') || enPath;
+      return localizeCanonicalPath(canonical.startsWith('/') ? canonical : `/${canonical}`, locale);
+    }
+  }
   const slug = shop?.public_slug || shop?.slug;
   if (slug) {
-    return getLocalizedPath(getLocale(), 'serviceCenter.profile', { centerSlug: slug });
+    return getLocalizedPath(locale, 'serviceCenter.profile', { centerSlug: slug });
   }
   if (shop?.id != null) {
-    return buildFallbackShopPath(shop.id);
+    return localizeCanonicalPath(buildFallbackShopPath(shop.id), locale);
   }
   return null;
 }
@@ -158,7 +183,9 @@ export function syncShopDetailWebUrl(shop, shopId) {
   if (typeof window === 'undefined') {
     return buildFallbackShopPath(shopId);
   }
-  const path = buildShopPublicPathFromShop(shop) || buildFallbackShopPath(shopId);
+  const path =
+    buildShopPublicPathFromShop(shop) ||
+    localizeCanonicalPath(buildFallbackShopPath(shopId), getLocale());
   window.history.replaceState(window.history.state, '', path);
   return path;
 }
@@ -166,8 +193,9 @@ export function syncShopDetailWebUrl(shop, shopId) {
 export async function resolveLegacyShopPath(shopId, locale = 'en') {
   try {
     const resolved = await resolveShopSeoPath(shopId, locale);
-    return resolved.canonical_path || buildFallbackShopPath(shopId);
+    const canonical = resolved.canonical_path || buildFallbackShopPath(shopId);
+    return localizeCanonicalPath(canonical, locale);
   } catch {
-    return buildFallbackShopPath(shopId);
+    return localizeCanonicalPath(buildFallbackShopPath(shopId), locale);
   }
 }

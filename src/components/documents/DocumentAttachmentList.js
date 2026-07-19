@@ -46,7 +46,7 @@ export function DocumentAttachmentActions({
     <View style={styles.actions}>
       <Button
         mode="outlined"
-        icon="file-document-plus-outline"
+        icon="file-plus-outline"
         onPress={onAddReceipt}
         disabled={disabled}
         style={styles.actionBtn}

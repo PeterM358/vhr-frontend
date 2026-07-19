@@ -29,11 +29,12 @@ import {
   updateServiceMenuItem,
 } from '../api/serviceMenu';
 import { resetFromShopDrawer } from '../navigation/drawerNavigation';
-import { resolveRepairTypeIcon } from '../utils/repairTypeIcons';
+import { getOperationIcon } from '../icons/operationIconRegistry';
 import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 import {
   formatDurationHoursInput,
   formatDurationMinutes,
+  formatTypicalLaborTime,
   parseDurationHoursInput,
 } from '../utils/laborDuration';
 
@@ -58,10 +59,11 @@ function formatPriceRange(from, to) {
 function formatMenuSummary(item) {
   const parts = formatComponentRange(item.parts_from, item.parts_to, 'Parts');
   const labor = formatComponentRange(item.labor_from, item.labor_to, 'Labor');
-  const duration =
-    item.typical_labor_minutes != null && item.typical_labor_minutes > 0
-      ? `~${formatDurationMinutes(item.typical_labor_minutes)} labor`
-      : null;
+  const laborTime = formatTypicalLaborTime(
+    item.typical_labor_minutes,
+    item.typical_labor_minutes_to
+  );
+  const duration = laborTime ? `Typical labor time ${laborTime}` : null;
   const bits = [parts, labor, duration].filter(Boolean);
   const total = formatPriceRange(item.price_from, item.price_to);
   if (bits.length) return `${bits.join(' · ')}`;
@@ -99,7 +101,7 @@ function MenuItemRow({
   togglingPublish,
 }) {
   const { t } = useTranslation();
-  const iconName = resolveRepairTypeIcon(item);
+  const iconName = getOperationIcon(item);
   const rangeLabel = formatMenuSummary(item);
   const totalLabel =
     item.price_from != null || item.price_to != null
@@ -197,13 +199,13 @@ function MenuItemRow({
               style={styles.halfInput}
             />
           </View>
-          <Text style={styles.editSectionTitle}>Labor time (hours)</Text>
+          <Text style={styles.editSectionTitle}>Typical labor time (hours)</Text>
           <Text style={styles.editHint}>
-            Billable normohours for calendar capacity (oil change ~1h). Used when scheduling —
-            not wall-clock from arrival to pickup.
+            Billable labor for capacity planning (oil change ~0.75h). Not estimated vehicle
+            completion or pickup time — set that on the repair schedule separately.
           </Text>
           <TextInput
-            label="Usually takes (hours)"
+            label="Typical labor time (hours)"
             mode="outlined"
             dense
             keyboardType="decimal-pad"
@@ -539,7 +541,7 @@ export default function ShopServiceMenuScreen() {
                     ]}
                   >
                     <MaterialCommunityIcons
-                      name={resolveRepairTypeIcon(type)}
+                      name={getOperationIcon(type)}
                       size={26}
                       color={COLORS.PRIMARY}
                     />

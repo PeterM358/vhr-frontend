@@ -61,6 +61,7 @@ export default function AppNavigationBar({
   largeTitle = false,
   scrolled = false,
   compact = false,
+  iconOnlyBack = false,
   showLanguageSelector = true,
   style,
 }) {
@@ -74,6 +75,7 @@ export default function AppNavigationBar({
   const pillBorder = scrolled ? theme.scrolledBorderColor : theme.borderColor;
   const showShadow = showPill && (scrolled || variant !== 'transparent');
   const useBlur = showPill;
+  const hasRightChrome = showLanguageSelector || !!rightAction;
 
   return (
     <View
@@ -106,14 +108,25 @@ export default function AppNavigationBar({
         ]}
       >
         <View style={[styles.bar, compact && styles.barCompact, largeTitle && styles.barLarge]}>
-          <View style={[styles.sideSlot, compact && styles.sideSlotCompact]}>
+          <View
+            style={[
+              styles.sideSlot,
+              compact && styles.sideSlotCompact,
+              iconOnlyBack && styles.sideSlotIconOnly,
+            ]}
+          >
             {leftAction ??
               (showBack && onBack ? (
                 <BackHeaderButton
                   onPress={onBack}
                   label={backLabel}
                   variant={theme.backVariant}
-                  accessibilityLabel={`Back to ${backLabel}`}
+                  iconOnly={iconOnlyBack}
+                  accessibilityLabel={
+                    iconOnlyBack
+                      ? 'Back'
+                      : `Back to ${backLabel}`
+                  }
                 />
               ) : null)}
           </View>
@@ -136,18 +149,34 @@ export default function AppNavigationBar({
             <View style={styles.largeTitleSpacer} />
           )}
 
-          <View style={[styles.sideSlot, styles.sideSlotRight, compact && styles.sideSlotCompact]}>
-            <View style={styles.rightRow}>
-              {showLanguageSelector ? (
-                <CompactLanguageSelector
-                  variant="dark"
-                compact={compact}
-                presentation="portalDropdown"
-                  style={compact ? styles.languageSelectorCompact : styles.languageSelector}
-                />
-              ) : null}
-              {rightAction ?? null}
-            </View>
+          <View
+            style={[
+              styles.sideSlot,
+              styles.sideSlotRight,
+              compact && styles.sideSlotCompact,
+              iconOnlyBack && !hasRightChrome && styles.sideSlotIconOnly,
+              hasRightChrome && styles.sideSlotRightWide,
+            ]}
+          >
+            {hasRightChrome ? (
+              <View
+                style={[
+                  styles.rightRow,
+                  !rightAction && styles.rightRowLanguageOnly,
+                  rightAction && styles.rightRowWithAction,
+                ]}
+              >
+                {showLanguageSelector ? (
+                  <CompactLanguageSelector
+                    variant="dark"
+                    compact={compact}
+                    presentation="portalDropdown"
+                    style={compact ? styles.languageSelectorCompact : styles.languageSelector}
+                  />
+                ) : null}
+                {rightAction ?? null}
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -230,14 +259,29 @@ const styles = StyleSheet.create({
   sideSlotCompact: {
     width: 96,
   },
+  sideSlotIconOnly: {
+    width: 52,
+  },
   sideSlotRight: {
     alignItems: 'flex-end',
+  },
+  sideSlotRightWide: {
+    width: 'auto',
+    minWidth: 52,
+    maxWidth: 220,
+    flexShrink: 0,
   },
   rightRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
     gap: 8,
+  },
+  rightRowLanguageOnly: {
+    flexWrap: 'nowrap',
+    maxWidth: 120,
+  },
+  rightRowWithAction: {
     flexWrap: 'wrap',
     maxWidth: 220,
   },

@@ -42,7 +42,8 @@ import { confirmMessage, showMessage } from '../utils/crossPlatformAlert';
 import { formatShopDisplayName } from '../utils/shopDisplayName';
 import { navigateToServiceCenters } from '../navigation/webNavigation';
 import { formatMoneyAmount } from '../constants/currency';
-import { resolveRepairTypeIcon } from '../utils/repairTypeIcons';
+import { getOperationIcon } from '../icons/operationIconRegistry';
+import { formatTypicalLaborTime } from '../utils/laborDuration';
 import { useTranslation } from '../i18n';
 import { joinList } from '../i18n/joinLocalizedList';
 import {
@@ -200,18 +201,31 @@ export default function ShopDetailScreen({ route, navigation }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
-  const { returnTo } = route.params || {};
+  const { returnTo, publicPreview, backLabel: backLabelParam, backLabelKey } = route.params || {};
+  const canGoBack = Boolean(navigation.canGoBack?.());
   const handleBack = useCallback(() => {
-    if (returnTo) {
-      navigation.goBack();
-      return;
-    }
+    // Prefer native stack history whenever it exists (Profile → public preview,
+    // discovery → detail, client flows). Only cold-open / deep-link falls back to Map.
     if (navigation.canGoBack?.()) {
       navigation.goBack();
       return;
     }
+    if (returnTo === 'ShopProfile') {
+      navigation.navigate('ShopProfile');
+      return;
+    }
+    if (returnTo) {
+      navigation.navigate(returnTo);
+      return;
+    }
     navigateToServiceCenters(navigation);
   }, [navigation, returnTo]);
+  const backLabel = useMemo(() => {
+    if (backLabelKey) return t(backLabelKey);
+    if (backLabelParam) return backLabelParam;
+    if (returnTo || canGoBack) return t('navigation.back');
+    return t('navigation.map');
+  }, [backLabelKey, backLabelParam, returnTo, canGoBack, t]);
 
   const [shop, setShop] = useState(null);
   const [vehicles, setVehicles] = useState([]);
@@ -619,6 +633,7 @@ export default function ShopDetailScreen({ route, navigation }) {
   const imagesList = Array.isArray(shop.images) ? shop.images : [];
 
   const showClientRequest = !isOwner && !isShopAccount;
+  const showOwnerControls = isOwner && !publicPreview;
 
   const linkRow = [
     { key: 'website', icon: 'web', url: shop.website },
@@ -677,8 +692,9 @@ export default function ShopDetailScreen({ route, navigation }) {
     <ScreenBackground safeArea={false}>
       <AppNavigationBar
         title={navTitle}
-        backLabel={returnTo ? t('navigation.back') : t('navigation.map')}
+        backLabel={backLabel}
         onBack={handleBack}
+        iconOnlyBack={canGoBack || Boolean(returnTo)}
         variant="transparent"
         scrolled={scrolled}
       />
@@ -814,7 +830,7 @@ export default function ShopDetailScreen({ route, navigation }) {
               return (
                 <View key={img.id} style={styles.photoItem}>
                   <Image source={{ uri }} style={styles.photoImage} />
-                  {isOwner ? (
+                  {showOwnerControls ? (
                     <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteImage(img.id)}>
                       <Text style={styles.deleteText}>✕</Text>
                     </TouchableOpacity>
@@ -852,23 +868,37 @@ export default function ShopDetailScreen({ route, navigation }) {
           <>
             <SectionHeading title={t('serviceCenters.profile.publishedPricing')} />
             <FloatingCard>
+              <Text style={styles.menuDisclaimer}>
+                {t('serviceCenters.profile.partsQuotedSeparately')}
+              </Text>
               {shop.service_menu.map((item) => {
                 const label = translateRepairTypeLabel(item, t) || t('common.service');
-                const from = item.price_from;
-                const to = item.price_to;
+                const from = item.labor_from ?? item.price_from;
+                const to = item.labor_to ?? item.price_to;
                 let priceLine = t('serviceCenters.profile.priceOnRequest');
                 if (from != null && to != null && String(from) !== String(to)) {
-                  priceLine = `${formatMoneyAmount(from)} – ${formatMoneyAmount(to)}`;
+                  priceLine = t('serviceCenters.profile.laborPriceRange', {
+                    from: formatMoneyAmount(from),
+                    to: formatMoneyAmount(to),
+                  });
                 } else if (from != null) {
-                  priceLine = t('serviceCenters.profile.priceFrom', { price: formatMoneyAmount(from) });
+                  priceLine = t('serviceCenters.profile.laborPriceFrom', {
+                    price: formatMoneyAmount(from),
+                  });
                 } else if (to != null) {
-                  priceLine = t('serviceCenters.profile.priceFrom', { price: formatMoneyAmount(to) });
+                  priceLine = t('serviceCenters.profile.laborPriceFrom', {
+                    price: formatMoneyAmount(to),
+                  });
                 }
+                const laborTime = formatTypicalLaborTime(
+                  item.typical_labor_minutes,
+                  item.typical_labor_minutes_to
+                );
                 return (
                   <View key={`${item.repair_type_id}-${label}`} style={styles.menuRow}>
                     <View style={styles.menuIconCircle}>
                       <MaterialCommunityIcons
-                        name={resolveRepairTypeIcon(item)}
+                        name={getOperationIcon(item)}
                         size={20}
                         color={COLORS.PRIMARY}
                       />
@@ -876,6 +906,11 @@ export default function ShopDetailScreen({ route, navigation }) {
                     <View style={styles.menuTextCol}>
                       <Text style={styles.menuServiceName}>{label}</Text>
                       <Text style={styles.menuPriceLine}>{priceLine}</Text>
+                      {laborTime ? (
+                        <Text style={styles.menuDisclaimer}>
+                          {t('serviceCenters.profile.typicalLaborTime', { time: laborTime })}
+                        </Text>
+                      ) : null}
                       {item.disclaimer ? (
                         <Text style={styles.menuDisclaimer}>{item.disclaimer}</Text>
                       ) : null}
@@ -905,7 +940,7 @@ export default function ShopDetailScreen({ route, navigation }) {
           </>
         ) : null}
 
-        {isOwner ? (
+        {showOwnerControls ? (
           <Button
             mode="contained-tonal"
             onPress={() => navigation.navigate('ShopProfile')}

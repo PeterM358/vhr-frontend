@@ -1,12 +1,14 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Text } from 'react-native-paper';
+import { useNavigation } from '@react-navigation/native';
 
 import ScreenBackground from '../ScreenBackground';
 import AppNavigationBar from '../common/AppNavigationBar';
 import AppCard from '../ui/AppCard';
 import { useTranslation } from '../../i18n';
 import { getPartnerRouteDeniedReason } from '../../utils/shopErpAccess';
+import { FEATURES, upgradeNavigationParams } from '../../utils/partnerEntitlements';
 
 export default function ErpAccessGate({
   routeName,
@@ -19,6 +21,7 @@ export default function ErpAccessGate({
   children,
 }) {
   const { t } = useTranslation();
+  const navigation = useNavigation();
 
   if (loading) {
     return (
@@ -46,6 +49,31 @@ export default function ErpAccessGate({
 
   const deniedReason = getPartnerRouteDeniedReason(routeName, { profile: shopProfile, membership });
   if (deniedReason) {
+    if (deniedReason === 'subscription') {
+      return (
+        <ScreenBackground>
+          <AppNavigationBar title={title} onBack={onBack} />
+          <View style={styles.body}>
+            <AppCard>
+              <Text variant="titleMedium">{t('subscription.upgradeTitle')}</Text>
+              <Text style={styles.muted}>{t('subscription.upgradeSubtitle')}</Text>
+              <Button
+                mode="contained"
+                style={{ marginTop: 16 }}
+                onPress={() =>
+                  navigation.navigate(
+                    'ShopSubscriptionUpgrade',
+                    upgradeNavigationParams({ featureKey: FEATURES.ERP })
+                  )
+                }
+              >
+                {t('subscription.upgradeCta')}
+              </Button>
+            </AppCard>
+          </View>
+        </ScreenBackground>
+      );
+    }
     const isCapability = deniedReason === 'capability';
     return (
       <ScreenBackground>

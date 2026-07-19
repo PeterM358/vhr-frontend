@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import ScreenBackground from '../components/ScreenBackground';
@@ -15,7 +15,8 @@ import { complaintStatusLabelKey } from '../utils/shopErpAccess';
 import { useTranslation } from '../i18n';
 
 export default function ShopComplaintsScreen() {
-  const onBack = usePartnerDashboardBack();
+  const navigation = useNavigation();
+  const onBack = usePartnerDashboardBack(navigation);
   const { t } = useTranslation();
   const { loading, shopProfile, membership, shopId, error } = useShopErpContext();
   const [rows, setRows] = useState([]);

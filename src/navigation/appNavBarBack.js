@@ -1,8 +1,14 @@
 import { useCallback } from 'react';
 import { Platform } from 'react-native';
+import { useTranslation } from '../i18n';
+import {
+  normalizeReturnToRoute,
+  safeInvokeFallback,
+} from '../utils/partnerNavChrome';
 import { navigateToShopDashboard } from './drawerNavigation';
 import {
   navigateToDashboard,
+  navigateToPartnerCalendar,
   navigateToServiceCenters,
   navigateToVehicleDetail,
   navigateToVehicleList,
@@ -11,11 +17,12 @@ import {
 
 export function useGoBackOr(navigation, fallback) {
   return useCallback(() => {
-    if (navigation.canGoBack?.()) {
+    if (navigation?.canGoBack?.()) {
       navigation.goBack();
       return;
     }
-    fallback?.(navigation);
+    // Callers sometimes pass route params / options by mistake — never invoke those.
+    safeInvokeFallback(fallback, navigation);
   }, [navigation, fallback]);
 }
 
@@ -55,24 +62,50 @@ export function useServiceCentersBack(navigation) {
   return useGoBackOr(navigation, navigateToServiceCenters);
 }
 
-export function useReturnToBack(navigation, returnTo, backLabel) {
+export function useRouteBackLabel(route, fallbackKey = 'common.back') {
+  const { t } = useTranslation();
+  if (route.params?.backLabelKey) {
+    return t(route.params.backLabelKey);
+  }
+  if (route.params?.backLabel) {
+    return route.params.backLabel;
+  }
+  return t(fallbackKey);
+}
+
+export function useReturnToBack(navigation, returnTo, backLabel, returnParams) {
   return useCallback(() => {
-    if (returnTo === 'Home' || returnTo === 'HomeMain') {
+    const routeName = normalizeReturnToRoute(returnTo);
+    if (routeName === 'Home' || routeName === 'HomeMain') {
       if (Platform.OS === 'web') {
         navigateToDashboard(navigation);
         return;
       }
     }
-    if (returnTo === 'ShopDashboard') {
+    if (routeName === 'ShopDashboard') {
       navigateToShopDashboard(navigation);
       return;
     }
-    if (returnTo) {
-      navigation.navigate(returnTo);
+    // ShopCalendar lives inside ShopHome drawer — not a root stack route.
+    // Prefer history (calendar → detail push/reset), else partner calendar helper.
+    if (routeName === 'ShopCalendar') {
+      if (navigation?.canGoBack?.()) {
+        navigation.goBack();
+        return;
+      }
+      navigateToPartnerCalendar(navigation, returnParams || {});
       return;
     }
-    if (navigation.canGoBack?.()) {
+    if (routeName) {
+      if (returnParams && Object.keys(returnParams).length) {
+        navigation.navigate(routeName, returnParams);
+        return;
+      }
+      navigation.navigate(routeName);
+      return;
+    }
+    if (navigation?.canGoBack?.()) {
       navigation.goBack();
     }
-  }, [navigation, returnTo, backLabel]);
+  }, [navigation, returnTo, backLabel, returnParams]);
 }

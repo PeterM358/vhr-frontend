@@ -26,7 +26,7 @@ function filterActionNeeded(repairs) {
 
 export default function ClientActionNeeded({ onChanged, repairs: repairsProp, onRescheduleResponded }) {
   const navigation = useNavigation();
-  const { setNotifications } = useContext(WebSocketContext);
+  const { setNotifications, refreshUnreadFromRest } = useContext(WebSocketContext);
   const [items, setItems] = useState([]);
   const [loadingId, setLoadingId] = useState(null);
 
@@ -67,7 +67,10 @@ export default function ClientActionNeeded({ onChanged, repairs: repairsProp, on
         proposalId: proposal.id,
         action,
       });
-      await markRepairNotificationsRead(repair.id, { setNotifications });
+      await markRepairNotificationsRead(repair.id, {
+        setNotifications,
+        refreshUnreadFromRest,
+      });
       if (repairsProp != null) {
         if (typeof onRescheduleResponded === 'function') {
           await onRescheduleResponded();

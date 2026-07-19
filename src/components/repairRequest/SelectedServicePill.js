@@ -3,14 +3,14 @@ import { View, StyleSheet } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { COLORS } from '../../constants/colors';
-import { resolveRepairTypeIcon } from '../../utils/repairTypeIcons';
+import { getOperationIcon } from '../../icons/operationIconRegistry';
 import { useTranslation } from '../../i18n';
 
 export default function SelectedServicePill({ repairType, onChange }) {
   const { t } = useTranslation();
   if (!repairType) return null;
 
-  const icon = resolveRepairTypeIcon(repairType);
+  const icon = getOperationIcon(repairType);
 
   return (
     <View style={styles.wrap}>

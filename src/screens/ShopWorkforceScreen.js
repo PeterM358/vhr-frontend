@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import ScreenBackground from '../components/ScreenBackground';
@@ -14,7 +14,8 @@ import { listShopDepartments, listShopEmployees } from '../api/erp';
 import { useTranslation } from '../i18n';
 
 export default function ShopWorkforceScreen() {
-  const onBack = usePartnerDashboardBack();
+  const navigation = useNavigation();
+  const onBack = usePartnerDashboardBack(navigation);
   const { t } = useTranslation();
   const { loading, shopProfile, membership, shopId, error } = useShopErpContext();
   const [employees, setEmployees] = useState([]);

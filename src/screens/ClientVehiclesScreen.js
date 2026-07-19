@@ -48,6 +48,16 @@ export default function ClientVehiclesScreen({ navigation }) {
 
   const renderVehicle = ({ item }) => {
     const displayYear = item.registration_year ?? item.year;
+    // Prefer catalog identity (same as VehicleDetailScreen); legacy make/model are often unset.
+    const catalogLabel = [
+      item.catalog_brand_name,
+      item.catalog_model_name,
+      item.catalog_generation_name,
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const legacyLabel = [item.make_name, item.model_name].filter(Boolean).join(' ');
+    const makeModelLabel = catalogLabel || legacyLabel || t('vehicles.unknownVehicle');
     return (
     <TouchableRipple
       style={styles.card}
@@ -72,7 +82,7 @@ export default function ClientVehiclesScreen({ navigation }) {
           </View>
 
           <Text style={styles.makeModel} numberOfLines={1}>
-            {[item.make_name, item.model_name].filter(Boolean).join(' ') || t('vehicles.unknownVehicle')}
+            {makeModelLabel}
           </Text>
 
           {item.kilometers != null && item.kilometers !== '' ? (

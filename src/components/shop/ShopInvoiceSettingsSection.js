@@ -27,6 +27,8 @@ export default function ShopInvoiceSettingsSection({
   onUploadLogo,
   onRemoveLogo,
   uploadingLogo,
+  /** When true, only legal-entity fields (no logo / branch address). */
+  companyOnly = false,
 }) {
   const entity = legalEntity || emptyLegalEntityDraft(profile);
   const companyCountryIso = useMemo(
@@ -60,7 +62,9 @@ export default function ShopInvoiceSettingsSection({
   return (
     <>
       <Text style={styles.helperText}>
-        Company (legal entity) details are shared across centers. Branch address and invoice series stay per center.
+        {companyOnly
+          ? 'Legal entity details for invoices — separate from your public service center profile.'
+          : 'Company (legal entity) details are shared across centers. Branch address and invoice series stay per center.'}
       </Text>
 
       {pickerOptions.length > 0 ? (
@@ -166,80 +170,84 @@ export default function ShopInvoiceSettingsSection({
         />
       </View>
 
-      <Text style={styles.invoiceLogoTitle}>Company logo</Text>
-      <Text style={styles.helperMuted}>PNG, JPG, or SVG — shared on invoices for all linked centers.</Text>
-      {entity.logo_url ? (
-        <View style={styles.invoiceLogoPreviewWrap}>
-          {Platform.OS === 'web' ? (
-            <img
-              src={entity.logo_url}
-              alt="Company logo"
-              style={{ maxHeight: 64, maxWidth: 220, objectFit: 'contain' }}
-            />
+      {!companyOnly ? (
+        <>
+          <Text style={styles.invoiceLogoTitle}>Company logo</Text>
+          <Text style={styles.helperMuted}>PNG, JPG, or SVG — shared on invoices for all linked centers.</Text>
+          {entity.logo_url ? (
+            <View style={styles.invoiceLogoPreviewWrap}>
+              {Platform.OS === 'web' ? (
+                <img
+                  src={entity.logo_url}
+                  alt="Company logo"
+                  style={{ maxHeight: 64, maxWidth: 220, objectFit: 'contain' }}
+                />
+              ) : (
+                <Image source={{ uri: entity.logo_url }} style={styles.invoiceLogoPreview} resizeMode="contain" />
+              )}
+            </View>
           ) : (
-            <Image source={{ uri: entity.logo_url }} style={styles.invoiceLogoPreview} resizeMode="contain" />
+            <View style={styles.invoiceLogoPlaceholder}>
+              <MaterialCommunityIcons name="file-image-outline" size={28} color={COLORS.TEXT_MUTED} />
+              <Text style={styles.helperMuted}>No logo yet — initials used on invoices</Text>
+            </View>
           )}
-        </View>
-      ) : (
-        <View style={styles.invoiceLogoPlaceholder}>
-          <MaterialCommunityIcons name="file-image-outline" size={28} color={COLORS.TEXT_MUTED} />
-          <Text style={styles.helperMuted}>No logo yet — initials used on invoices</Text>
-        </View>
-      )}
-      <View style={styles.invoiceLogoActions}>
-        <Button
-          mode="contained-tonal"
-          icon="upload"
-          onPress={onUploadLogo}
-          loading={uploadingLogo}
-          disabled={uploadingLogo}
-        >
-          Upload logo
-        </Button>
-        {entity.logo_url ? (
-          <Button mode="outlined" onPress={onRemoveLogo} disabled={uploadingLogo}>
-            Remove
-          </Button>
-        ) : null}
-      </View>
+          <View style={styles.invoiceLogoActions}>
+            <Button
+              mode="contained-tonal"
+              icon="upload"
+              onPress={onUploadLogo}
+              loading={uploadingLogo}
+              disabled={uploadingLogo}
+            >
+              Upload logo
+            </Button>
+            {entity.logo_url ? (
+              <Button mode="outlined" onPress={onRemoveLogo} disabled={uploadingLogo}>
+                Remove
+              </Button>
+            ) : null}
+          </View>
 
-      <Text style={[styles.invoiceLogoTitle, { marginTop: 16 }]}>This center (branch)</Text>
-      <Button mode="outlined" onPress={onFillBranchFromPublic} style={styles.invoiceCopyBtn}>
-        Copy branch address from public profile
-      </Button>
-      <TextInput
-        label="Branch name on invoice"
-        mode="outlined"
-        value={profile.invoice_branch_name || profile.name || ''}
-        onChangeText={(text) => setProfile((prev) => ({ ...prev, invoice_branch_name: text }))}
-        style={styles.input}
-      />
-      <TextInput
-        label="Branch address"
-        mode="outlined"
-        value={profile.invoice_address_line1 || ''}
-        onChangeText={(text) => setProfile((prev) => ({ ...prev, invoice_address_line1: text }))}
-        style={styles.input}
-      />
-      <TextInput
-        label="Branch city"
-        mode="outlined"
-        value={profile.invoice_city || ''}
-        onChangeText={(text) => setProfile((prev) => ({ ...prev, invoice_city: text }))}
-        style={styles.input}
-      />
-      <TextInput
-        label="Postal code"
-        mode="outlined"
-        value={profile.invoice_postal_code || ''}
-        onChangeText={(text) => setProfile((prev) => ({ ...prev, invoice_postal_code: text }))}
-        style={styles.input}
-      />
-      <Text style={styles.helperMuted}>
-        {profile.invoice_postal_code
-          ? 'Branch address for this center — copied from map pin or public profile.'
-          : `Use copy from public profile or map pin (${cityLabel || 'city'}).`}
-      </Text>
+          <Text style={[styles.invoiceLogoTitle, { marginTop: 16 }]}>This center (branch)</Text>
+          <Button mode="outlined" onPress={onFillBranchFromPublic} style={styles.invoiceCopyBtn}>
+            Copy branch address from public profile
+          </Button>
+          <TextInput
+            label="Branch name on invoice"
+            mode="outlined"
+            value={profile.invoice_branch_name || profile.name || ''}
+            onChangeText={(text) => setProfile((prev) => ({ ...prev, invoice_branch_name: text }))}
+            style={styles.input}
+          />
+          <TextInput
+            label="Branch address"
+            mode="outlined"
+            value={profile.invoice_address_line1 || ''}
+            onChangeText={(text) => setProfile((prev) => ({ ...prev, invoice_address_line1: text }))}
+            style={styles.input}
+          />
+          <TextInput
+            label="Branch city"
+            mode="outlined"
+            value={profile.invoice_city || ''}
+            onChangeText={(text) => setProfile((prev) => ({ ...prev, invoice_city: text }))}
+            style={styles.input}
+          />
+          <TextInput
+            label="Postal code"
+            mode="outlined"
+            value={profile.invoice_postal_code || ''}
+            onChangeText={(text) => setProfile((prev) => ({ ...prev, invoice_postal_code: text }))}
+            style={styles.input}
+          />
+          <Text style={styles.helperMuted}>
+            {profile.invoice_postal_code
+              ? 'Branch address for this center — copied from map pin or public profile.'
+              : `Use copy from public profile or map pin (${cityLabel || 'city'}).`}
+          </Text>
+        </>
+      ) : null}
     </>
   );
 }

@@ -114,7 +114,13 @@ const ACTION_ICONS = {
 };
 
 export function vehicleDisplayTitle(vehicle, translateFn = t) {
-  const catalog = [vehicle?.catalog_brand_name, vehicle?.catalog_model_name].filter(Boolean).join(' ');
+  const catalog = [
+    vehicle?.catalog_brand_name,
+    vehicle?.catalog_model_name,
+    vehicle?.catalog_generation_name,
+  ]
+    .filter(Boolean)
+    .join(' ');
   if (catalog) return catalog;
   const legacy = [vehicle?.make_name || vehicle?.make, vehicle?.model_name || vehicle?.model]
     .filter(Boolean)

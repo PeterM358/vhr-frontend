@@ -12,6 +12,27 @@ export async function getNotifications(token) {
   return await response.json();
 }
 
+export async function getPartnerNotificationPreferences(token) {
+  const response = await fetch(`${API_BASE_URL}/api/notifications/partner-preferences/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to load notification preferences');
+  return await response.json();
+}
+
+export async function updatePartnerNotificationPreferences(token, patch) {
+  const response = await fetch(`${API_BASE_URL}/api/notifications/partner-preferences/`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(patch || {}),
+  });
+  if (!response.ok) throw new Error('Failed to save notification preferences');
+  return await response.json();
+}
+
 export async function markNotificationRead(token, id) {
   const response = await fetch(`${API_BASE_URL}/api/notifications/${id}/`, {
     method: 'PATCH',
@@ -125,7 +146,10 @@ export async function sendFirebaseTokenToBackend(fcmToken, userId = null, shopPr
   });
 }
 
-export async function markRepairNotificationsRead(repairId, { setNotifications } = {}) {
+export async function markRepairNotificationsRead(
+  repairId,
+  { setNotifications, refreshUnreadFromRest } = {}
+) {
   const token = await AsyncStorage.getItem('@access_token');
   if (!token || repairId == null) return 0;
 
@@ -145,6 +169,10 @@ export async function markRepairNotificationsRead(repairId, { setNotifications }
         Number(n.repair) === Number(repairId) ? { ...n, is_read: true } : n
       )
     );
+  }
+
+  if (typeof refreshUnreadFromRest === 'function') {
+    await refreshUnreadFromRest();
   }
 
   return unread.length;

@@ -9,6 +9,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
@@ -33,6 +34,7 @@ import {
   navigateToDocuments,
   navigateToNotifications,
   navigateToRepairRequests,
+  navigateToRepairDetail,
   navigateToServiceHistory,
   navigateToVehicleAdd,
   navigateToVehicleDetail,
@@ -42,6 +44,9 @@ import {
 import { API_BASE_URL } from '../api/config';
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import { resetToPublicHome } from '../navigation/authNavigation';
+import { resolveIsPartnerSession } from '../utils/partnerSession';
+import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
+import { toCanonicalAppPath } from '../navigation/localizedRoutes';
 import { useTranslation } from '../i18n';
 
 
@@ -102,6 +107,24 @@ export default function HomeScreen({ navigation }) {
         const token = await AsyncStorage.getItem('@access_token');
         const hasToken = !!(token && token !== 'null' && token !== 'undefined');
         if (hasToken) {
+          // Only bounce partner sessions off the client dashboard URL (refresh / deep link).
+          // Do not block intentional dual-role navigation into client Home from elsewhere.
+          const pathOnly =
+            Platform.OS === 'web' && typeof window !== 'undefined'
+              ? String(window.location.pathname || '').split('?')[0]
+              : '';
+          const canonical = toCanonicalAppPath(pathOnly) || pathOnly;
+          const onClientDashboard =
+            !pathOnly ||
+            String(canonical).replace(/\/$/, '') === '/dashboard';
+          if (onClientDashboard) {
+            const isPartner = await resolveIsPartnerSession();
+            if (isPartner) {
+              const route = await resolveShopEntryRoute();
+              navigation.reset(buildShopAuthReset(route));
+              return;
+            }
+          }
           if (!isAuthenticated || !authToken) {
             setAuthToken?.(token);
             setIsAuthenticated?.(true);
@@ -224,7 +247,8 @@ export default function HomeScreen({ navigation }) {
   };
   const goRepairDetail = (repairId) => {
     if (!repairId) return;
-    navigation.navigate('RepairDetail', { repairId, returnTo: 'Home' });
+    const root = navigation.getParent?.() || navigation;
+    navigateToRepairDetail(root, repairId, { returnTo: 'Home' });
   };
 
   const handleRecommendedAction = (item) => {

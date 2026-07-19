@@ -39,6 +39,8 @@ export const linkingScreens = {
     },
   },
   ShopProfile: 'partner/profile',
+  ShopSubscriptionUpgrade: 'partner/upgrade',
+  ShopSubscriptionSuccess: 'shop/subscription/success',
   ShopInvoicing: 'partner/invoicing',
   ShopServiceMenu: 'partner/services',
   PartnerBookings: 'partner/bookings',
@@ -113,6 +115,15 @@ export const linkingScreens = {
   },
   ManageVehicleServiceCenters: {
     path: 'dashboard/vehicles/:vehicleId/service-centers',
+    parse: {
+      vehicleId: (value) => {
+        const id = parseInt(String(value), 10);
+        return Number.isFinite(id) ? id : undefined;
+      },
+    },
+  },
+  VehicleHistoryAccess: {
+    path: 'dashboard/vehicles/:vehicleId/access',
     parse: {
       vehicleId: (value) => {
         const id = parseInt(String(value), 10);

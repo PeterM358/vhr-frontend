@@ -8,6 +8,7 @@ import {
 } from '../../hooks/useServiceCenterDiscovery';
 import { DiscoveryFilterChip } from './DiscoveryFilterChip';
 import { useTranslation } from '../../i18n';
+import { chipIconGlyph } from '../../utils/discoveryFilterTaxonomy';
 
 const RATING_FILTER_KEYS = {
   null: 'any',
@@ -112,7 +113,8 @@ export default function DiscoveryExpandedFiltersPanel({
           {categoryOptions.map((cat) => (
             <DiscoveryFilterChip
               key={cat.slug}
-              label={cat.label}
+              label={cat.display_name || cat.label || cat.name}
+              icon={chipIconGlyph(cat)}
               selected={selectedCategory === cat.slug}
               onPress={() => setSelectedCategory(selectedCategory === cat.slug ? null : cat.slug)}
             />
@@ -130,7 +132,8 @@ export default function DiscoveryExpandedFiltersPanel({
           {repairTypeChipOptions.map((rt) => (
             <DiscoveryFilterChip
               key={rt.slug || rt.id}
-              label={rt.label}
+              label={rt.display_name || rt.label || rt.name}
+              icon={chipIconGlyph(rt)}
               selected={selectedRepairType === rt.slug}
               onPress={() => setSelectedRepairType(selectedRepairType === rt.slug ? '' : rt.slug)}
             />

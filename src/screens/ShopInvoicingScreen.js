@@ -17,7 +17,7 @@ import AppCard from '../components/ui/AppCard';
 import StatusBadge from '../components/ui/StatusBadge';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
 import { COLORS } from '../constants/colors';
-import AppNavigationBar from '../components/common/AppNavigationBar';
+import PartnerAppHeader from '../components/partner/PartnerAppHeader';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import {
@@ -81,12 +81,54 @@ function filterInvoices(invoices, { clientSearch, monthKey }) {
   return rows;
 }
 
+function clampSequenceWidth(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  if (n > 12) return 12;
+  return Math.floor(n);
+}
+
+function formatInvoicePreview(prefix, width, sequence) {
+  const w = clampSequenceWidth(width);
+  const seq = Math.max(1, Number(sequence) || 1);
+  return `${String(prefix || '')}${String(seq).padStart(w, '0')}`;
+}
+
 function SeriesEditor({ series, onSaved, t }) {
+  const locked = Boolean(series && !series.config_editable);
+  const [startingNew, setStartingNew] = useState(false);
+  const editingNew = !series?.id || startingNew;
+  const fieldsEditable = editingNew || !locked;
+
   const [label, setLabel] = useState(series?.label || '');
   const [prefix, setPrefix] = useState(series?.prefix || '01');
   const [width, setWidth] = useState(String(series?.sequence_width ?? 6));
+  const [nextSequence, setNextSequence] = useState(String(series?.next_sequence ?? 1));
   const [saving, setSaving] = useState(false);
-  const locked = series && !series.config_editable;
+
+  const preview = useMemo(
+    () => formatInvoicePreview(prefix, width, nextSequence),
+    [prefix, width, nextSequence]
+  );
+  const activePreview =
+    series?.example_number ||
+    formatInvoicePreview(series?.prefix, series?.sequence_width, series?.next_sequence);
+
+  const beginNewSeries = () => {
+    setStartingNew(true);
+    setLabel('');
+    setPrefix('02');
+    setWidth('10');
+    setNextSequence('1');
+  };
+
+  const cancelNewSeries = () => {
+    setStartingNew(false);
+    setLabel(series?.label || '');
+    setPrefix(series?.prefix || '01');
+    setWidth(String(series?.sequence_width ?? 6));
+    setNextSequence(String(series?.next_sequence ?? 1));
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -95,11 +137,16 @@ function SeriesEditor({ series, onSaved, t }) {
       const payload = {
         label: label.trim(),
         prefix: prefix.trim(),
-        sequence_width: Number(width) || 6,
+        sequence_width: clampSequenceWidth(width),
+        next_sequence: Math.max(1, Number(nextSequence) || 1),
       };
-      const updated = series?.id
-        ? await updateInvoiceSeries(token, series.id, payload)
-        : await createInvoiceSeries(token, payload);
+      let updated;
+      if (editingNew) {
+        updated = await createInvoiceSeries(token, { ...payload, is_active: true });
+        setStartingNew(false);
+      } else {
+        updated = await updateInvoiceSeries(token, series.id, payload);
+      }
       onSaved(updated);
       Alert.alert(t('common.save'), t('partnerDashboard.invoicing.savedNumbering'));
     } catch (err) {
@@ -113,43 +160,80 @@ function SeriesEditor({ series, onSaved, t }) {
     <FloatingCard style={styles.seriesCard}>
       <Text style={styles.sectionTitle}>{t('partnerDashboard.invoicing.numberingSeries')}</Text>
       <Text style={styles.sectionHint}>
-        {locked
-          ? t('partnerDashboard.invoicing.numberingLocked')
-          : t('partnerDashboard.invoicing.numberingOpen')}
+        {startingNew
+          ? t('partnerDashboard.invoicing.numberingNewSeriesHint')
+          : locked
+            ? t('partnerDashboard.invoicing.numberingLocked')
+            : t('partnerDashboard.invoicing.numberingOpen')}
       </Text>
-      <TextInput
-        mode="outlined"
-        label={t('partnerDashboard.invoicing.labelOptional')}
-        value={label}
-        onChangeText={setLabel}
-        style={styles.input}
-        disabled={saving}
-      />
-      <TextInput
-        mode="outlined"
-        label={t('partnerDashboard.invoicing.prefix')}
-        value={prefix}
-        onChangeText={setPrefix}
-        style={styles.input}
-        disabled={locked || saving}
-      />
-      <TextInput
-        mode="outlined"
-        label={t('partnerDashboard.invoicing.sequenceWidth')}
-        keyboardType="number-pad"
-        value={width}
-        onChangeText={setWidth}
-        style={styles.input}
-        disabled={locked || saving}
-      />
-      {series?.next_sequence != null ? (
-        <Text style={styles.metaLine}>
-          {t('partnerDashboard.invoicing.nextSequence', { value: series.next_sequence })}
-        </Text>
-      ) : null}
-      <Button mode="contained" onPress={handleSave} loading={saving} disabled={saving}>
-        {t('partnerDashboard.invoicing.saveNumbering')}
-      </Button>
+
+      {locked && !startingNew ? (
+        <>
+          <Text style={styles.metaLine}>
+            {t('partnerDashboard.invoicing.activeSeriesSummary', {
+              prefix: series?.prefix || '—',
+              width: series?.sequence_width ?? '—',
+              next: series?.next_sequence ?? '—',
+              example: activePreview || '—',
+            })}
+          </Text>
+          <Button mode="contained" onPress={beginNewSeries} disabled={saving}>
+            {t('partnerDashboard.invoicing.startNewSeries')}
+          </Button>
+        </>
+      ) : (
+        <>
+          <TextInput
+            mode="outlined"
+            label={t('partnerDashboard.invoicing.labelOptional')}
+            value={label}
+            onChangeText={setLabel}
+            style={styles.input}
+            disabled={saving}
+          />
+          <TextInput
+            mode="outlined"
+            label={t('partnerDashboard.invoicing.prefix')}
+            value={prefix}
+            onChangeText={setPrefix}
+            style={styles.input}
+            disabled={!fieldsEditable || saving}
+          />
+          <TextInput
+            mode="outlined"
+            label={t('partnerDashboard.invoicing.sequenceWidth')}
+            keyboardType="number-pad"
+            value={width}
+            onChangeText={setWidth}
+            style={styles.input}
+            disabled={!fieldsEditable || saving}
+          />
+          <TextInput
+            mode="outlined"
+            label={t('partnerDashboard.invoicing.startingSequence')}
+            keyboardType="number-pad"
+            value={nextSequence}
+            onChangeText={setNextSequence}
+            style={styles.input}
+            disabled={!fieldsEditable || saving}
+          />
+          <Text style={styles.previewLine}>
+            {t('partnerDashboard.invoicing.exampleNumber', { value: preview })}
+          </Text>
+          <View style={styles.seriesActions}>
+            {startingNew ? (
+              <Button mode="outlined" onPress={cancelNewSeries} disabled={saving}>
+                {t('common.cancel')}
+              </Button>
+            ) : null}
+            <Button mode="contained" onPress={handleSave} loading={saving} disabled={saving}>
+              {startingNew
+                ? t('partnerDashboard.invoicing.createNewSeries')
+                : t('partnerDashboard.invoicing.saveNumbering')}
+            </Button>
+          </View>
+        </>
+      )}
     </FloatingCard>
   );
 }
@@ -193,8 +277,9 @@ export default function ShopInvoicingScreen() {
       getMyShopProfiles().catch(() => []),
     ]);
     setInvoices(Array.isArray(invoiceRows) ? invoiceRows : []);
-    const firstSeries = Array.isArray(seriesRows) && seriesRows.length ? seriesRows[0] : null;
-    setSeries(firstSeries);
+    const rows = Array.isArray(seriesRows) ? seriesRows : [];
+    const activeSeries = rows.find((row) => row?.is_active) || rows[0] || null;
+    setSeries(activeSeries);
 
     const currentId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
     const profile =
@@ -303,7 +388,7 @@ export default function ShopInvoicingScreen() {
             ) : (
               <>
                 <MaterialCommunityIcons
-                  name="file-document-plus-outline"
+                  name="file-plus-outline"
                   size={20}
                   color={COLORS.PRIMARY}
                 />
@@ -318,10 +403,11 @@ export default function ShopInvoicingScreen() {
 
   return (
     <ScreenBackground safeArea={false}>
-      <AppNavigationBar
+      <PartnerAppHeader
         title={t('drawer.partner.invoicing')}
         backLabel={t('navigation.backToDashboard')}
         onBack={handleBack}
+        iconOnlyBack
         scrolled={scrolled}
       />
       <ScrollView
@@ -355,6 +441,7 @@ export default function ShopInvoicingScreen() {
         ) : null}
 
         <SeriesEditor
+          key={series?.id || 'new'}
           series={series}
           t={t}
           onSaved={(updated) => {
@@ -498,6 +585,18 @@ const styles = StyleSheet.create({
   },
   seriesCard: {
     gap: 8,
+  },
+  previewLine: {
+    color: COLORS.TEXT_DARK,
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  seriesActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
   },
   erpCard: {
     gap: 6,

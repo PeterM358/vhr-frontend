@@ -54,13 +54,13 @@ function listPhrase(items) {
 }
 
 function formatPriceSuffix(item) {
-  const from = item?.price_from;
-  const to = item?.price_to;
+  const from = item?.labor_from ?? item?.price_from;
+  const to = item?.labor_to ?? item?.price_to;
   if (from != null && to != null && String(from) !== String(to)) {
-    return ` (${from}–${to} EUR)`;
+    return ` (labor ${from}–${to} EUR)`;
   }
-  if (from != null) return ` (from ${from} EUR)`;
-  if (to != null) return ` (from ${to} EUR)`;
+  if (from != null) return ` (labor from ${from} EUR)`;
+  if (to != null) return ` (labor from ${to} EUR)`;
   return '';
 }
 

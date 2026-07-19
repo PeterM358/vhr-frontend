@@ -34,6 +34,7 @@ import {
   MapLocationPickerScreen,
   AddManualServiceCenterScreen,
   ManageVehicleServiceCentersScreen,
+  VehicleHistoryAccessScreen,
   AddObligationPaymentScreen,
   CreateVehicleScreen,
   CreatePromotionScreen,
@@ -50,6 +51,8 @@ import {
   RepairsList,
   NotificationsWithAppbar,
   ShopProfileScreen,
+  ShopSubscriptionUpgradeScreen,
+  ShopSubscriptionSuccessScreen,
   ShopServiceMenuScreen,
   ShopInvoicingScreen,
   ShopWarehouseReceiveScreen,
@@ -414,6 +417,11 @@ export default function AppNavigator() {
           options={{ ...appNavBarScreenOptions, title: 'Service center access' }}
         />
         <Stack.Screen
+          name="VehicleHistoryAccess"
+          component={VehicleHistoryAccessScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Vehicle history access' }}
+        />
+        <Stack.Screen
           name="AddObligationPayment"
           component={AddObligationPaymentScreen}
           options={{ ...appNavBarScreenOptions, title: t('vehicles.nav.obligation', null, 'Obligation') }}
@@ -504,6 +512,16 @@ export default function AppNavigator() {
           name="ShopProfile"
           component={ShopProfileScreen}
           options={{ ...appNavBarScreenOptions, title: 'Profile' }}
+        />
+        <Stack.Screen
+          name="ShopSubscriptionUpgrade"
+          component={ShopSubscriptionUpgradeScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Upgrade' }}
+        />
+        <Stack.Screen
+          name="ShopSubscriptionSuccess"
+          component={ShopSubscriptionSuccessScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Subscription' }}
         />
         <Stack.Screen
           name="ShopServiceMenu"

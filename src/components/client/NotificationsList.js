@@ -27,6 +27,7 @@ import {
   translateNotificationHint,
   translateNotificationTitle,
 } from '../../utils/translateClientNotification';
+import { formatNotificationTimestamp } from '../../utils/formatNotificationTimestamp';
 import { useTranslation } from '../../i18n';
 
 export default function NotificationsList({
@@ -35,35 +36,49 @@ export default function NotificationsList({
 }) {
   const [loading, setLoading] = useState(true);
   const [remoteNotifications, setRemoteNotifications] = useState([]);
-  const { notifications: liveNotifications = [], setNotifications } =
-    useContext(WebSocketContext);
+  const {
+    notifications: liveNotifications = [],
+    setNotifications,
+    refreshUnreadFromRest,
+  } = useContext(WebSocketContext);
   const navigation = useNavigation();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchNotifications();
-    }, [])
-  );
-
-  const markReadLocally = (id) => {
-    setRemoteNotifications((prev) => patchNotificationReadInList(prev, id));
-    if (typeof setNotifications === 'function') {
-      setNotifications((prev) => patchNotificationReadInList(prev, id));
-    }
-  };
-
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
       const data = await getNotifications(token);
       setRemoteNotifications(Array.isArray(data) ? data : data?.results ?? []);
+      if (typeof refreshUnreadFromRest === 'function') {
+        await refreshUnreadFromRest();
+      }
     } catch (err) {
       console.error('Failed to load notifications', err);
       Alert.alert(t('common.error'), t('notifications.loadError'));
     } finally {
       setLoading(false);
+    }
+  }, [refreshUnreadFromRest, t]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchNotifications();
+      return () => {
+        if (typeof refreshUnreadFromRest === 'function') {
+          refreshUnreadFromRest();
+        }
+      };
+    }, [fetchNotifications, refreshUnreadFromRest])
+  );
+
+  const markReadLocally = async (id) => {
+    setRemoteNotifications((prev) => patchNotificationReadInList(prev, id));
+    if (typeof setNotifications === 'function') {
+      setNotifications((prev) => patchNotificationReadInList(prev, id));
+    }
+    if (typeof refreshUnreadFromRest === 'function') {
+      await refreshUnreadFromRest();
     }
   };
 
@@ -72,7 +87,7 @@ export default function NotificationsList({
       const token = await AsyncStorage.getItem('@access_token');
       if (!item.is_read) {
         await markNotificationRead(token, item.id);
-        markReadLocally(item.id);
+        await markReadLocally(item.id);
       }
 
       if (navigateForClientNotification(navigation, item, { returnTo: activityReturnTo })) {
@@ -123,7 +138,7 @@ export default function NotificationsList({
         {hint ? <Text style={styles.hint}>{hint}</Text> : null}
 
         <Text style={styles.timestamp}>
-          {new Date(item.created_at).toLocaleString()}
+          {formatNotificationTimestamp(item.created_at, locale)}
         </Text>
       </FloatingCard>
     );

@@ -26,7 +26,7 @@ import {
   setCachedShopRepairs,
 } from '../../utils/shopRepairsPrefetch';
 import ScreenBackground from '../ScreenBackground';
-import AppNavigationBar from '../common/AppNavigationBar';
+import PartnerAppHeader from '../partner/PartnerAppHeader';
 import { useScrollShadow } from '../../hooks/useScrollShadow';
 import { usePartnerDashboardBack } from '../../navigation/appNavBarBack';
 import { navigateToShopDashboard } from '../../navigation/drawerNavigation';
@@ -48,6 +48,8 @@ import {
   isRepairPaymentSettled,
   applyDoneTabClientFilters,
 } from '../../utils/repairListUtils';
+import { translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
+import { localizePreferredVisitNote } from '../../utils/shopVisitSlots';
 import { WebSocketContext } from '../../context/WebSocketManager';
 import { useTranslation } from '../../i18n';
 
@@ -79,10 +81,30 @@ export default function RepairsList() {
     ],
     [t]
   );
+  const resolveStatusBadgeLabel = useCallback(
+    (statusKey) => {
+      const key = String(statusKey || '').toLowerCase();
+      const labelKey = {
+        open: 'partnerDashboard.repairsList.status.open',
+        ongoing: 'partnerDashboard.repairsList.status.ongoing',
+        done: 'partnerDashboard.repairsList.status.done',
+        requested: 'partnerDashboard.repairsList.status.requested',
+        booked: 'partnerDashboard.repairsList.status.booked',
+      }[key];
+      return labelKey ? t(labelKey) : undefined;
+    },
+    [t]
+  );
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
+  const navigation = useNavigation();
+  const route = useRoute();
   const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState('open');
+  const [selectedTab, setSelectedTab] = useState(() => {
+    const tab = route?.params?.initialTab || route?.params?.statusFilter || route?.params?.tab;
+    if (tab === 'open' || tab === 'ongoing' || tab === 'done') return tab;
+    return 'open';
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [vehicleFilters, setVehicleFilters] = useState(EMPTY_VEHICLE_FILTERS);
@@ -95,8 +117,7 @@ export default function RepairsList() {
   const [invoiceSelectMode, setInvoiceSelectMode] = useState(false);
   const [selectedRepairIds, setSelectedRepairIds] = useState([]);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
-  const navigation = useNavigation();
-  const route = useRoute();
+  const [invoicingRepairId, setInvoicingRepairId] = useState(null);
   const handlePartnerBack = usePartnerDashboardBack(navigation);
   const handleBack = useCallback(() => {
     const returnTo = route.params?.returnTo;
@@ -150,6 +171,13 @@ export default function RepairsList() {
   useLayoutEffect(() => {
     applyInvoiceIntent(route.params || {});
   }, [route.params, applyInvoiceIntent]);
+
+  useEffect(() => {
+    const tab = route.params?.initialTab || route.params?.statusFilter || route.params?.tab;
+    if (tab === 'open' || tab === 'ongoing' || tab === 'done') {
+      setSelectedTab(tab);
+    }
+  }, [route.params?.initialTab, route.params?.statusFilter, route.params?.tab]);
 
   const hasServerFilters = Boolean(
     debouncedQuery.trim() ||
@@ -394,7 +422,10 @@ export default function RepairsList() {
 
   const toggleRepairSelection = useCallback((item) => {
     if (item.has_issued_invoice) {
-      Alert.alert('Already invoiced', 'This repair is already on an issued platform invoice.');
+      Alert.alert(
+        t('common.notice'),
+        t('partnerDashboard.repairsList.platformInvoiceIssued')
+      );
       return;
     }
     setSelectedRepairIds((prev) => {
@@ -407,16 +438,13 @@ export default function RepairsList() {
         const anchorClient = anchor?.client ?? null;
         const nextClient = item.client ?? null;
         if (anchorClient != null && nextClient != null && Number(anchorClient) !== Number(nextClient)) {
-          Alert.alert(
-            'Same client only',
-            'Combined invoices must be for one client. Finish the current selection or clear it first.'
-          );
+          Alert.alert(t('common.notice'), t('partnerDashboard.repairsList.selectInvoiceHint'));
           return prev;
         }
       }
       return [...prev, id];
     });
-  }, [repairs]);
+  }, [repairs, t]);
 
   const exitInvoiceSelectMode = useCallback(() => {
     setInvoiceSelectMode(false);
@@ -432,11 +460,28 @@ export default function RepairsList() {
       exitInvoiceSelectMode();
       navigation.navigate('ShopInvoiceDetail', { invoiceId: invoice.id });
     } catch (err) {
-      Alert.alert('Error', err.message || 'Could not create invoice draft');
+      Alert.alert(t('common.error'), err.message || t('partnerDashboard.repairsList.createInvoiceError'));
     } finally {
       setCreatingInvoice(false);
     }
-  }, [selectedRepairIds, exitInvoiceSelectMode, navigation]);
+  }, [selectedRepairIds, exitInvoiceSelectMode, navigation, t]);
+
+  const handleInvoiceSingleRepair = useCallback(
+    async (item) => {
+      if (!item?.id || item.has_issued_invoice || invoicingRepairId) return;
+      setInvoicingRepairId(item.id);
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        const invoice = await draftInvoiceFromRepairs(token, [item.id]);
+        navigation.navigate('ShopInvoiceDetail', { invoiceId: invoice.id });
+      } catch (err) {
+        Alert.alert(t('common.error'), err.message || t('partnerDashboard.repairsList.createInvoiceError'));
+      } finally {
+        setInvoicingRepairId(null);
+      }
+    },
+    [invoicingRepairId, navigation, t]
+  );
 
   const handleRepairPress = (repairId) => {
     if (repairId == null || repairId === '') return;
@@ -450,30 +495,60 @@ export default function RepairsList() {
     }
     navigateToPartnerRepairDetail(navigation, repairId, {
       returnTo: 'RepairsList',
-      backLabel: t('drawer.partner.repairs'),
+      backLabelKey: 'drawer.partner.repairs',
+      initialTab: selectedTab,
     });
   };
 
   const renderRepair = ({ item }) => {
-    const title = `${item.vehicle_make ?? ''} ${item.vehicle_model ?? ''}`.trim() || 'Vehicle';
+    const title =
+      `${item.vehicle_make ?? ''} ${item.vehicle_model ?? ''}`.trim() ||
+      t('partnerDashboard.repairsList.vehicleFallback');
     const plate = String(item.vehicle_license_plate || '').trim();
     const showPlate = Boolean(plate);
     const clientName = String(item.client_display_name || '').trim();
-    const serviceType =
+    const serviceTypeName =
       item.final_repair_type_name || item.effective_repair_type_name || null;
+    const serviceTypeLabel = serviceTypeName
+      ? translateRepairTypeLabel(
+          {
+            name: serviceTypeName,
+            repair_type_name: serviceTypeName,
+            slug: item.repair_type_slug || item.effective_repair_type_slug,
+          },
+          t
+        ) || serviceTypeName
+      : null;
+    const statusLower = String(item.status || '').toLowerCase();
+    const isBookedAwaiting =
+      statusLower === 'open' &&
+      (Boolean(item.scheduled_start) ||
+        item.partner_lifecycle_status === 'OFFER_ACCEPTED');
     const sortDate = formatRepairListDate(
       selectedTab === 'done'
         ? item.completed_at || item.created_at
-        : item.created_at || item.completed_at
+        : isBookedAwaiting && item.scheduled_start
+          ? item.scheduled_start
+          : item.created_at || item.completed_at
     );
     const kmValue = repairListKmValue(item, selectedTab);
     const isDirectRequest =
-      item.status === 'open' && item.request_targeting_mode === 'selected_centers';
-    const badgeStatus = isDirectRequest ? 'requested' : item.status;
-    const preferredVisit = String(item.availability_notes || '').trim();
+      statusLower === 'open' &&
+      item.request_targeting_mode === 'selected_centers' &&
+      !isBookedAwaiting;
+    const badgeStatus = isBookedAwaiting
+      ? 'booked'
+      : isDirectRequest
+        ? 'requested'
+        : item.status;
+    const badgeLabel = resolveStatusBadgeLabel(badgeStatus);
+    const dateMetaLabel = isBookedAwaiting
+      ? t('partnerDashboard.repairsList.status.booked')
+      : repairListDateLabel(selectedTab, t);
+    const preferredVisit = localizePreferredVisitNote(item.availability_notes, t);
     const isSelected = selectedRepairIds.includes(item.id);
     const alreadyInvoiced = Boolean(item.has_issued_invoice);
-    const paymentLabel = formatRepairPaymentStatus(item.payment_status);
+    const paymentStatusText = formatRepairPaymentStatus(item.payment_status, t);
     const paymentSettled = isRepairPaymentSettled(item.payment_status);
 
     const onCardPress = () => {
@@ -511,7 +586,7 @@ export default function RepairsList() {
               </Text>
             ) : (
               <Text style={styles.cardPlate} numberOfLines={1}>
-                Plate hidden until booking
+                {t('partnerDashboard.repairsList.plateHiddenUntilBooking')}
               </Text>
             )}
             {clientName ? (
@@ -520,27 +595,53 @@ export default function RepairsList() {
               </Text>
             ) : null}
           </View>
-          <StatusBadge status={badgeStatus} />
+          <StatusBadge status={badgeStatus} label={badgeLabel} />
         </View>
 
         {alreadyInvoiced && selectedTab === 'done' ? (
-          <Text style={styles.invoicedHint}>Platform invoice issued</Text>
+          <Text style={styles.invoicedHint}>
+            {t('partnerDashboard.repairsList.platformInvoiceIssued')}
+          </Text>
         ) : null}
 
-        {selectedTab === 'done' && !alreadyInvoiced && paymentLabel ? (
+        {selectedTab === 'done' && !alreadyInvoiced && paymentStatusText ? (
           <Text
             style={[
               styles.paymentHint,
               paymentSettled ? styles.paymentHintPaid : styles.paymentHintUnpaid,
             ]}
           >
-            Payment: {paymentLabel}
+            {t('partnerDashboard.repairsList.paymentLabel', { status: paymentStatusText })}
           </Text>
         ) : null}
 
-        {serviceType ? (
+        {selectedTab === 'done' && !alreadyInvoiced && !invoiceSelectMode ? (
+          <Pressable
+            onPress={(e) => {
+              e?.stopPropagation?.();
+              handleInvoiceSingleRepair(item);
+            }}
+            disabled={invoicingRepairId === item.id}
+            style={({ pressed }) => [
+              styles.invoiceCta,
+              pressed && { opacity: 0.85 },
+              invoicingRepairId === item.id && { opacity: 0.6 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={t('partnerDashboard.repairsList.createInvoice')}
+          >
+            <MaterialCommunityIcons name="file-plus-outline" size={16} color={PRIMARY} />
+            <Text style={styles.invoiceCtaText}>
+              {invoicingRepairId === item.id
+                ? t('partnerDashboard.repairsList.creatingInvoice')
+                : t('partnerDashboard.repairsList.invoice')}
+            </Text>
+          </Pressable>
+        ) : null}
+
+        {serviceTypeLabel ? (
           <Text style={styles.cardServiceType} numberOfLines={1}>
-            {serviceType}
+            {serviceTypeLabel}
           </Text>
         ) : null}
 
@@ -559,10 +660,10 @@ export default function RepairsList() {
         <View style={styles.cardFooter}>
           {sortDate ? (
             <Text style={styles.cardMeta}>
-              {repairListDateLabel(selectedTab)} · {sortDate}
+              {dateMetaLabel} · {sortDate}
             </Text>
           ) : (
-            <Text style={styles.cardMeta}>Date not recorded</Text>
+            <Text style={styles.cardMeta}>{t('partnerDashboard.repairsList.dateNotRecorded')}</Text>
           )}
           {kmValue != null ? (
             <Text style={styles.cardKm}>{Number(kmValue).toLocaleString()} km</Text>
@@ -587,56 +688,30 @@ export default function RepairsList() {
     vehicleFilters.repairTypeId,
     vehicleFilters.serviceYear,
   ].filter(Boolean).length;
-  const vehicleFiltersLabel = vehicleFiltersOpen
-    ? 'Hide filters'
-    : vehicleFilterCount > 0
-      ? `Filters (${vehicleFilterCount})`
-      : 'Filters';
+  const vehicleFiltersLabel = useMemo(() => {
+    if (vehicleFiltersOpen) return t('partnerDashboard.repairsList.hideFilters');
+    if (vehicleFilterCount > 0) {
+      return t('partnerDashboard.repairsList.filtersCount', { count: vehicleFilterCount });
+    }
+    return t('partnerDashboard.repairsList.filters');
+  }, [t, vehicleFiltersOpen, vehicleFilterCount]);
   const hasPaymentOrClientFilters = hasDoneClientFilters;
 
-  const emptySubtitle = hasSearch || hasVehicleFilters || hasPaymentOrClientFilters
-    ? 'Try another plate (Latin or Cyrillic), client, or vehicle filter.'
-    : "When repairs match this status, they'll show up here.";
+  const emptySubtitle =
+    hasSearch || hasVehicleFilters || hasPaymentOrClientFilters
+      ? t('partnerDashboard.repairsList.emptyFiltered')
+      : t('partnerDashboard.repairsList.emptyDefault');
+  const emptyTitle = t('repairs.emptyTitle');
 
   return (
     <ScreenBackground safeArea={false}>
-      <AppNavigationBar
+      <PartnerAppHeader
         title={t('drawer.partner.repairs')}
-        backLabel="Dashboard"
+        backLabel={t('navigation.backToDashboard')}
         onBack={handleBack}
+        iconOnlyBack
+        compact
         scrolled={scrolled}
-        rightAction={
-          <>
-            {selectedTab === 'done' ? (
-              <Pressable
-                onPress={() => {
-                  if (invoiceSelectMode) {
-                    exitInvoiceSelectMode();
-                  } else {
-                    setInvoiceSelectMode(true);
-                  }
-                }}
-                style={styles.navIconBtn}
-                accessibilityLabel={invoiceSelectMode ? 'Cancel invoice selection' : 'Select repairs to invoice'}
-              >
-                <MaterialCommunityIcons
-                  name={invoiceSelectMode ? 'close' : 'file-document-multiple-outline'}
-                  size={22}
-                  color="#0f172a"
-                />
-              </Pressable>
-            ) : null}
-            {navigation.openDrawer ? (
-              <Pressable
-                onPress={() => navigation.openDrawer()}
-                style={styles.navIconBtn}
-                accessibilityLabel="Open menu"
-              >
-                <MaterialCommunityIcons name="menu" size={22} color="#0f172a" />
-              </Pressable>
-            ) : null}
-          </>
-        }
       />
       <View style={styles.container}>
         {!profileComplete ? (
@@ -646,6 +721,65 @@ export default function RepairsList() {
               navigation.navigate('ShopProfile', { requireSetup: true })
             }
           />
+        ) : null}
+
+        {selectedTab === 'done' ? (
+          <View style={styles.invoiceActionRow}>
+            {invoiceSelectMode ? (
+              <>
+                <Pressable
+                  onPress={exitInvoiceSelectMode}
+                  style={({ pressed }) => [
+                    styles.invoiceActionBtn,
+                    styles.invoiceActionBtnCancel,
+                    pressed && styles.invoiceActionBtnPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('partnerDashboard.repairsList.cancelSelection')}
+                >
+                  <MaterialCommunityIcons name="close" size={18} color="#ffffff" />
+                  <Text style={styles.invoiceActionBtnLabel} numberOfLines={1}>
+                    {t('partnerDashboard.repairsList.cancelSelection')}
+                  </Text>
+                </Pressable>
+                <View style={styles.selectBannerInline}>
+                  <MaterialCommunityIcons
+                    name="file-document-multiple-outline"
+                    size={18}
+                    color="#fff"
+                  />
+                  <Text style={styles.selectBannerText}>
+                    {t('partnerDashboard.repairsList.selectInvoiceHint')}
+                    {selectedRepairIds.length > 0
+                      ? ` (${t('partnerDashboard.repairsList.selectedCount', {
+                          count: selectedRepairIds.length,
+                        })})`
+                      : ''}
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <Pressable
+                onPress={() => setInvoiceSelectMode(true)}
+                style={({ pressed }) => [
+                  styles.invoiceActionBtn,
+                  styles.invoiceActionBtnSelect,
+                  pressed && styles.invoiceActionBtnPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={t('partnerDashboard.repairsList.selectToInvoice')}
+              >
+                <MaterialCommunityIcons
+                  name="file-document-outline"
+                  size={18}
+                  color="#ffffff"
+                />
+                <Text style={styles.invoiceActionBtnLabel} numberOfLines={1}>
+                  {t('partnerDashboard.repairsList.selectToInvoice')}
+                </Text>
+              </Pressable>
+            )}
+          </View>
         ) : null}
 
         <View style={styles.tabRow}>
@@ -713,7 +847,7 @@ export default function RepairsList() {
         {clientFilterId ? (
           <View style={styles.clientFilterRow}>
             <Text style={styles.clientFilterText} numberOfLines={1}>
-              Client: {clientFilterLabel || `ID ${clientFilterId}`}
+              {t('drawer.partner.clients')}: {clientFilterLabel || `ID ${clientFilterId}`}
             </Text>
             <Pressable
               onPress={() => {
@@ -722,13 +856,15 @@ export default function RepairsList() {
               }}
               hitSlop={8}
             >
-              <Text style={styles.clientFilterClear}>Clear</Text>
+              <Text style={styles.clientFilterClear}>
+                {t('partnerDashboard.repairsList.clear')}
+              </Text>
             </Pressable>
           </View>
         ) : null}
 
         <Searchbar
-          placeholder="Plate (Latin or Cyrillic), client, vehicle"
+          placeholder={t('partnerDashboard.repairsList.searchPlaceholder')}
           value={searchQuery}
           onChangeText={setSearchQuery}
           style={styles.searchBar}
@@ -770,16 +906,6 @@ export default function RepairsList() {
           />
         ) : null}
 
-        {selectedTab === 'done' && invoiceSelectMode ? (
-          <View style={styles.selectBanner}>
-            <MaterialCommunityIcons name="file-document-multiple-outline" size={18} color="#fff" />
-            <Text style={styles.selectBannerText}>
-              Tap repairs for the same client, then create one combined invoice.
-              {selectedRepairIds.length > 0 ? ` (${selectedRepairIds.length} selected)` : ''}
-            </Text>
-          </View>
-        ) : null}
-
         {loading ? (
           <ActivityIndicator
             size="large"
@@ -799,11 +925,7 @@ export default function RepairsList() {
             ListEmptyComponent={
               <EmptyStateCard
                 icon="wrench-outline"
-                title={
-                  hasSearch || hasVehicleFilters || hasPaymentOrClientFilters
-                    ? `No ${selectedTab} repairs match your filters`
-                    : `No ${selectedTab} repairs`
-                }
+                title={emptyTitle}
                 subtitle={emptySubtitle}
               />
             }
@@ -812,8 +934,10 @@ export default function RepairsList() {
       </View>
       {invoiceSelectMode && selectedRepairIds.length > 0 ? (
         <FloatingSaveBar
-          label={`Create invoice (${selectedRepairIds.length})`}
-          icon="file-document-plus-outline"
+          label={t('partnerDashboard.repairsList.createInvoiceCount', {
+            count: selectedRepairIds.length,
+          })}
+          icon="file-plus-outline"
           onPress={handleCreateCombinedInvoice}
           loading={creatingInvoice}
         />
@@ -826,25 +950,67 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 12,
-    paddingTop: 12,
+    paddingTop: 4,
     backgroundColor: 'transparent',
   },
-  navIconBtn: {
-    padding: 8,
-    marginLeft: 4,
+  invoiceActionRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+  },
+  invoiceActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.28)',
+  },
+  invoiceActionBtnSelect: {
+    flexGrow: 1,
+    backgroundColor: 'rgba(37, 99, 235, 0.92)',
+  },
+  invoiceActionBtnCancel: {
+    flexShrink: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+  },
+  invoiceActionBtnPressed: {
+    opacity: 0.88,
+  },
+  invoiceActionBtnLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: 0.1,
+  },
+  selectBannerInline: {
+    flex: 1,
+    minWidth: 180,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(37,99,235,0.35)',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   tabRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: 999,
-    margin: 4,
-    minWidth: 76,
+    margin: 3,
+    minWidth: 72,
     alignItems: 'center',
   },
   tabActive: {
@@ -916,15 +1082,6 @@ const styles = StyleSheet.create({
   listContentWithBar: {
     paddingBottom: 96,
   },
-  selectBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: 'rgba(37,99,235,0.35)',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 8,
-  },
   selectBannerText: {
     flex: 1,
     color: '#fff',
@@ -954,6 +1111,20 @@ const styles = StyleSheet.create({
   },
   paymentHintUnpaid: {
     color: '#b45309',
+  },
+  invoiceCta: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  invoiceCtaText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: PRIMARY,
   },
   paymentFilterRow: {
     flexDirection: 'row',

@@ -236,6 +236,73 @@ export async function updateRepairPart(token, repairId, repairPartId, data) {
   return await response.json();
 }
 
+export async function issueRepairPartFromStock(token, repairId, repairPartId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/repairs/repair/${repairId}/parts/${repairPartId}/issue-from-stock/`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    }
+  );
+  if (!response.ok) {
+    const errorText = await response.text();
+    const error = new Error('Failed to issue part from stock');
+    error.responseText = errorText;
+    throw error;
+  }
+  return response.json();
+}
+
+export async function reverseRepairPartStockIssue(token, repairId, repairPartId, notes = '') {
+  const response = await fetch(
+    `${API_BASE_URL}/api/repairs/repair/${repairId}/parts/${repairPartId}/reverse-stock-issue/`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(notes ? { notes } : {}),
+    }
+  );
+  if (!response.ok) {
+    const errorText = await response.text();
+    let message = 'Failed to reverse stock issue';
+    try {
+      message = formatDrfErrorMessage(JSON.parse(errorText), message);
+    } catch {
+      message = messageFromApiResponseText(errorText, message);
+    }
+    const error = new Error(message);
+    error.status = response.status;
+    error.responseText = errorText;
+    throw error;
+  }
+  return response.json();
+}
+
+export function repairPartSourceLabel(sourceType) {
+  switch (sourceType) {
+    case 'inventory':
+    case 'catalog':
+    case 'catalog_pick':
+      return 'Stock-backed';
+    case 'direct_purchase':
+      return 'Direct purchase';
+    case 'customer_supplied':
+      return 'Customer supplied';
+    case 'manual_or_unknown':
+    case 'free_text':
+      return 'Manual / unknown';
+    default:
+      return sourceType || 'Part';
+  }
+}
+
 // ✅ Get or create RepairChat
 export async function getOrCreateRepairChat(token, repairId, shopId = null) {
   if (!shopId) {
@@ -507,4 +574,92 @@ export async function deleteRepairMedia(token, repairId, mediaId) {
     throw new Error('Failed to delete media');
   }
   return true;
+}
+
+export async function getRepairOperations(token, repairId) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair/${repairId}/operations/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    await throwApiError(response, 'Failed to fetch operations');
+  }
+  return response.json();
+}
+
+export async function createRepairOperation(token, repairId, data) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair/${repairId}/operations/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    await throwApiError(response, 'Failed to create operation');
+  }
+  return response.json();
+}
+
+export async function updateRepairOperation(token, repairId, operationId, data) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair/${repairId}/operations/${operationId}/`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    await throwApiError(response, 'Failed to update operation');
+  }
+  return response.json();
+}
+
+async function postRepairOperationAction(token, repairId, operationId, action, body = {}) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/repairs/repair/${repairId}/operations/${operationId}/${action}/`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }
+  );
+  if (!response.ok) {
+    await throwApiError(response, `Failed to ${action.replace(/-/g, ' ')} operation`);
+  }
+  return response.json();
+}
+
+export const startRepairOperation = (token, repairId, operationId) =>
+  postRepairOperationAction(token, repairId, operationId, 'start');
+
+export const completeRepairOperation = (token, repairId, operationId) =>
+  postRepairOperationAction(token, repairId, operationId, 'complete');
+
+export const cancelRepairOperation = (token, repairId, operationId, reason = '') =>
+  postRepairOperationAction(token, repairId, operationId, 'cancel', reason ? { reason } : {});
+
+export function operationStatusLabel(status) {
+  switch (status) {
+    case 'planned':
+      return 'Planned';
+    case 'approved':
+      return 'Approved';
+    case 'in_progress':
+      return 'In progress';
+    case 'waiting_parts':
+      return 'Waiting parts';
+    case 'completed':
+      return 'Completed';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'declined':
+      return 'Declined';
+    default:
+      return status || 'Unknown';
+  }
 }

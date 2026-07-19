@@ -11,6 +11,7 @@ import AuthManager from './context/AuthManager';
 import { I18nProvider } from './i18n';
 import { GarageSceneProvider } from './context/GarageSceneContext';
 import MessageDialogHost from './components/ui/MessageDialog';
+import PartnerInAppBannerHost from './components/partner/PartnerInAppBanner';
 import MobileWebInsetsBridge from './components/MobileWebInsetsBridge';
 import { initializeAnalytics } from './services/analytics';
 
@@ -59,6 +60,7 @@ export default function App() {
                   <MobileWebInsetsBridge>
                     <AppNavigator />
                     <MessageDialogHost />
+                    <PartnerInAppBannerHost />
                   </MobileWebInsetsBridge>
                 </WebSocketProvider>
               </GarageSceneProvider>

@@ -85,6 +85,7 @@ export default function ClientActivityScreen({ navigation }) {
           title={t('notifications.title')}
           backLabel={backLabel}
           onBack={handleBack}
+          iconOnlyBack
           scrolled={scrolled}
         />
 

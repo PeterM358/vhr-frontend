@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useState, useEffect, useMemo } from 'react';
-import { ScrollView, StyleSheet, View, Platform } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Text, TextInput, Button, ActivityIndicator, useTheme } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,25 +12,22 @@ import {
 } from '../navigation/authNavigation';
 import { resetNavigationToCanonicalPath } from '../navigation/webLinking';
 import { AuthContext } from '../context/AuthManager';
-import Logo from '../assets/images/logo.svg';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import BaseStyles from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
 import { COLORS } from '../constants/colors';
 import { shouldEnableGoogleOAuth } from '../components/auth/googleOAuthConfig';
-import { safeError, safeWarn } from '../utils/logger';
+import { safeError } from '../utils/logger';
 import LoginGoogleOAuthBridge from '../components/auth/LoginGoogleOAuthBridge';
 import DashboardCard from '../components/dashboard/DashboardCard';
 import { useTranslation } from '../i18n';
-import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
+import AuthPublicEscape from '../components/auth/AuthPublicEscape';
 
 export default function LoginScreen({ navigation, route }) {
   const theme = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { setIsAuthenticated, setAuthToken, setUserEmailOrPhone } = useContext(AuthContext);
-
-  const headerReserve = insets.top + (Platform.OS === 'ios' ? 52 : 56);
 
   const [loginMethod, setLoginMethod] = useState('email');
   const [email, setEmail] = useState('');
@@ -133,10 +130,14 @@ export default function LoginScreen({ navigation, route }) {
 
         await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.access);
         await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refresh);
-        await AsyncStorage.setItem(STORAGE_KEYS.IS_SHOP, data.is_shop ? 'true' : 'false');
+        const googleShopMode =
+          Boolean(data.is_shop) ||
+          (Array.isArray(data.shop_profiles) && data.shop_profiles.length > 0) ||
+          (Array.isArray(data.shop_memberships) && data.shop_memberships.length > 0);
+        await AsyncStorage.setItem(STORAGE_KEYS.IS_SHOP, googleShopMode ? 'true' : 'false');
         await AsyncStorage.setItem(STORAGE_KEYS.IS_CLIENT, data.is_client ? 'true' : 'false');
 
-        if (data.is_shop) {
+        if (googleShopMode) {
           const shopRoute = await resolveShopEntryRoute();
           await waitForAuthContextCommit();
           navigation.reset(buildShopAuthReset(shopRoute));
@@ -169,12 +170,25 @@ export default function LoginScreen({ navigation, route }) {
       await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.access);
       await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refresh);
       await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, data.user_id.toString());
-      await AsyncStorage.setItem(STORAGE_KEYS.IS_SHOP, data.is_shop ? 'true' : 'false');
+      const shopMode =
+        Boolean(data.is_shop) ||
+        (Array.isArray(data.shop_profiles) && data.shop_profiles.length > 0) ||
+        (Array.isArray(data.shop_memberships) && data.shop_memberships.length > 0);
+      await AsyncStorage.setItem(STORAGE_KEYS.IS_SHOP, shopMode ? 'true' : 'false');
       await AsyncStorage.setItem(STORAGE_KEYS.IS_CLIENT, data.is_client ? 'true' : 'false');
 
       if (data.shop_profiles && data.shop_profiles.length > 0) {
         await AsyncStorage.setItem(STORAGE_KEYS.SHOP_PROFILES, JSON.stringify(data.shop_profiles));
         await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_SHOP_ID, data.shop_profiles[0].id.toString());
+      } else if (data.shop_memberships && data.shop_memberships.length > 0) {
+        await AsyncStorage.removeItem(STORAGE_KEYS.SHOP_PROFILES);
+        const membershipShopId =
+          data.shop_memberships[0]?.shop_id ?? data.shop_memberships[0]?.shopId;
+        if (membershipShopId != null) {
+          await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_SHOP_ID, String(membershipShopId));
+        } else {
+          await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SHOP_ID);
+        }
       } else {
         await AsyncStorage.removeItem(STORAGE_KEYS.SHOP_PROFILES);
         await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SHOP_ID);
@@ -186,7 +200,7 @@ export default function LoginScreen({ navigation, route }) {
         await AsyncStorage.removeItem(STORAGE_KEYS.SHOP_MEMBERSHIPS);
       }
 
-      if (data.is_shop) {
+      if (shopMode) {
         const shopRoute = await resolveShopEntryRoute();
         await waitForAuthContextCommit();
         navigation.reset(buildShopAuthReset(shopRoute));
@@ -223,18 +237,14 @@ export default function LoginScreen({ navigation, route }) {
         contentContainerStyle={[
           styles.scroll,
           {
-            paddingTop: headerReserve + 8,
+            paddingTop: Math.max(insets.top, 12) + 12,
             paddingBottom: Math.max(insets.bottom, 24) + 24,
           },
         ]}
       >
+        <AuthPublicEscape title={t('auth.welcomeBack')} />
         <DashboardCard style={styles.authPanel}>
-          <View style={BaseStyles.logoContainer}>
-            <Logo width={112} height={112} />
-          </View>
-          <AuthLanguageSelector style={styles.langSelector} />
           <Text style={styles.kicker}>{t('auth.signIn')}</Text>
-          <Text style={styles.title}>{t('auth.welcomeBack')}</Text>
           <Text style={styles.subtitle}>
             {googleOAuthEnabled
               ? t('auth.loginSubtitleOAuth')
@@ -384,16 +394,6 @@ const styles = StyleSheet.create({
     color: COLORS.PRIMARY,
     textTransform: 'uppercase',
     textAlign: 'center',
-    marginBottom: 6,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  langSelector: {
     marginBottom: 8,
   },
   subtitle: {

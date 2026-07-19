@@ -1,5 +1,5 @@
 import React, { useContext, useState, useMemo } from 'react';
-import { ScrollView, StyleSheet, View, Pressable, Platform } from 'react-native';
+import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import { Text, TextInput, Button, Portal, Dialog, ActivityIndicator, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,20 +8,18 @@ import { AuthContext } from '../context/AuthManager';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import BaseStyles from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
-import Logo from '../assets/images/logo.svg';
 import { COLORS } from '../constants/colors';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import { resetToClientDashboard } from '../navigation/authNavigation';
 import { safeError } from '../utils/logger';
 import DashboardCard from '../components/dashboard/DashboardCard';
-import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
+import AuthPublicEscape from '../components/auth/AuthPublicEscape';
 import { useTranslation } from '../i18n';
 
 export default function RegisterScreen({ navigation }) {
   const theme = useTheme();
   const { t, locale } = useTranslation();
   const insets = useSafeAreaInsets();
-  const headerReserve = insets.top + (Platform.OS === 'ios' ? 52 : 56);
   const { setIsAuthenticated, setAuthToken, setUserEmailOrPhone } = useContext(AuthContext);
 
   const authInputTheme = useMemo(
@@ -121,19 +119,14 @@ export default function RegisterScreen({ navigation }) {
         contentContainerStyle={[
           styles.scroll,
           {
-            paddingTop: headerReserve + 8,
+            paddingTop: Math.max(insets.top, 12) + 12,
             paddingBottom: Math.max(insets.bottom, 24) + 24,
           },
         ]}
       >
+        <AuthPublicEscape preferLoginBack title={t('auth.signUpTitle')} />
         <DashboardCard style={styles.authPanel}>
-          <View style={BaseStyles.logoContainer}>
-            <Logo width={112} height={112} />
-          </View>
-          <AuthLanguageSelector style={styles.langSelector} />
-
           <Text style={styles.kicker}>{t('auth.signUp')}</Text>
-          <Text style={styles.title}>{t('auth.signUpTitle')}</Text>
           <Text style={styles.subtitle}>{t('auth.signUpSubtitle')}</Text>
 
           <Text style={styles.rolePrompt}>{t('auth.accountType')}</Text>
@@ -270,16 +263,6 @@ const styles = StyleSheet.create({
     color: COLORS.PRIMARY,
     textTransform: 'uppercase',
     textAlign: 'center',
-    marginBottom: 6,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  langSelector: {
     marginBottom: 8,
   },
   subtitle: {

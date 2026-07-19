@@ -54,6 +54,26 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
 
   const canSubmit = isLoggedIn && vehicles.length > 0 && !submitting;
   const repairOptionLabel = (item) => translateRepairTypeLabel(item, t) || item?.name || '';
+  const selectedRepairOption = repairOptions.find((row) => String(row.id) === String(repairTypeId));
+  const isTireService = (() => {
+    const slug = String(
+      selectedRepairOption?.slug ||
+        selectedRepairOption?.repair_type_slug ||
+        repairType ||
+        ''
+    ).toLowerCase();
+    const name = String(selectedRepairOption?.name || selectedRepairOption?.repair_type_name || '').toLowerCase();
+    return (
+      slug.includes('tire') ||
+      slug.includes('tyre') ||
+      name.includes('tire') ||
+      name.includes('tyre') ||
+      name.includes('гуми')
+    );
+  })();
+  const notesPlaceholder = isTireService
+    ? t('serviceCenters.quickRequest.notesPlaceholderTire')
+    : t('serviceCenters.quickRequest.notesPlaceholder');
 
   useEffect(() => {
     onActionStateChange?.({ submitting, canSubmit });
@@ -311,7 +331,7 @@ const ShopQuickRequestCard = forwardRef(function ShopQuickRequestCard(
         label={t('serviceCenters.quickRequest.notesLabel')}
         value={note}
         onChangeText={setNote}
-        placeholder={t('serviceCenters.quickRequest.notesPlaceholder')}
+        placeholder={notesPlaceholder}
         style={styles.noteInput}
         multiline
       />

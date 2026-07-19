@@ -2,7 +2,7 @@
 /**
  * Shared Google Maps-style discovery UI (list + map) for public and partner explore.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -64,7 +64,8 @@ import {
   navigateToServiceCenterDetail,
 } from '../navigation/serviceCentersNavigation';
 import { navigateToPartnerDashboard, navigateToVehicleServiceRecordNew, navigateToRepairRequestNew } from '../navigation/webNavigation';
-import { navigateToSignIn } from '../navigation/authNavigation';
+import { navigateToSignIn, resetToPublicHome } from '../navigation/authNavigation';
+import { AuthContext } from '../context/AuthManager';
 import {
   loadServiceRecordFormDraft,
   saveServiceRecordFormDraft,
@@ -119,10 +120,13 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   const navigation = useNavigation();
   const route = useRoute();
   const { t } = useTranslation();
-  const { width } = useWindowDimensions();
+  const { isAuthenticated } = useContext(AuthContext) || {};
+  const { width, height: windowHeight } = useWindowDimensions();
   const isDesktop = width >= 960;
   const isMobileWeb = !isDesktop;
+  const isNarrowMobile = width < 400;
   const listBottomPadding = useScrollContentBottomPadding(24);
+  const mobileMapMinHeight = Math.max(280, Math.round(windowHeight * 0.48));
 
   const discovery = useServiceCenterDiscovery({
     initialCitySlug: route.params?.citySlug || null,
@@ -401,6 +405,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     );
 
     const slug = shop.public_slug || shop.slug;
+    // Prefer backend canonical slug; never open discovery (/avtoservizi) for a profile.
     const profileParams = {
       returnTo: route.params?.returnTo,
       vehicleId: route.params?.vehicleId,
@@ -526,8 +531,10 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     </ScrollView>
   );
 
+  const showPublicHeaderActions = isMobileWeb && !partnerMode && !authorizeMode && !isAuthenticated;
+
   const stickyToolbar = (
-    <View style={styles.stickyToolbar}>
+    <View style={[styles.stickyToolbar, isMobileWeb && styles.stickyToolbarMobile]}>
       <View style={[styles.header, isMobileWeb && styles.headerMobile]}>
         <BackHeaderButton
           onPress={() => {
@@ -545,13 +552,42 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
           variant={isMobileWeb ? 'light' : 'glass'}
           iconOnly={isMobileWeb}
         />
-        <Text style={[styles.title, isMobileWeb && styles.titleMobile]} numberOfLines={1}>
+        <Text
+          style={[styles.title, isMobileWeb && styles.titleMobile, isNarrowMobile && styles.titleNarrow]}
+          numberOfLines={1}
+        >
           {authorizeMode
             ? t('serviceCenters.authorizeTitle')
             : partnerMode
               ? t('serviceCenters.exploreTitle')
               : seoMeta?.h1 || t('serviceCenters.findTitle')}
         </Text>
+        {showPublicHeaderActions ? (
+          <View style={styles.headerActionsMobile}>
+            <Pressable
+              onPress={() => resetToPublicHome(navigation)}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.home')}
+              hitSlop={6}
+              style={({ pressed }) => [styles.headerActionBtn, pressed && styles.headerActionPressed]}
+            >
+              <MaterialCommunityIcons name="home-outline" size={20} color="#334155" />
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                navigateToSignIn(navigation).catch(() => {});
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('auth.signIn')}
+              hitSlop={6}
+              style={({ pressed }) => [styles.headerSignInBtn, pressed && styles.headerActionPressed]}
+            >
+              <Text style={styles.headerSignInText} numberOfLines={1}>
+                {t('auth.signIn')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
         {isDesktop ? (
           <CompactLanguageSelector
             variant="light"
@@ -566,11 +602,15 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
         <View style={[styles.searchInputWrap, isMobileWeb && styles.searchInputWrapMobile]}>
           <MaterialCommunityIcons name="magnify" size={18} color="#64748b" style={styles.searchIcon} />
           <TextInput
-            placeholder={t('serviceCenters.searchPlaceholder')}
+            placeholder={
+              isNarrowMobile
+                ? t('serviceCenters.searchPlaceholderShort', null, 'Search centers…')
+                : t('serviceCenters.searchPlaceholder')
+            }
             value={addressQuery}
             onChangeText={setAddressQuery}
             onSubmitEditing={() => handleSearch().catch(() => {})}
-            style={styles.searchInput}
+            style={[styles.searchInput, isMobileWeb && styles.searchInputMobile]}
             returnKeyType="search"
             placeholderTextColor="#94a3b8"
           />
@@ -607,7 +647,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
         ) : null}
       </View>
 
-      <View style={styles.filterChrome}>{quickChipsRow}</View>
+      <View style={[styles.filterChrome, isMobileWeb && styles.filterChromeMobile]}>{quickChipsRow}</View>
 
       {isDesktop ? (
         <AnimatedExpandedFilters visible={filtersOpen}>
@@ -734,12 +774,19 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     </View>
   );
 
+  const mapStyle = {
+    flex: 1,
+    height: '100%',
+    width: '100%',
+    minHeight: isMobileWeb ? mobileMapMinHeight : 320,
+  };
+
   const mapPanel = !mapReady ? (
-    <View style={[styles.map, styles.mapLoading]}>
+    <View style={[mapStyle, styles.mapLoading]}>
       <ActivityIndicator size="large" color="#fff" />
     </View>
   ) : (
-    <MapContainer center={center} zoom={zoom} style={styles.map} zoomControl={false}>
+    <MapContainer center={center} zoom={zoom} style={mapStyle} zoomControl={false}>
       <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <ChangeView center={center} zoom={zoom} />
       {selectedShop ? (
@@ -817,7 +864,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   return (
     <ScreenBackground safeArea={false} contentMaxWidth={false}>
       <View style={styles.container}>
-        {!partnerMode && !authorizeMode ? (
+        {!partnerMode && !authorizeMode && isDesktop ? (
           <DiscoverySeoBreadcrumbs trail={seoMeta?.breadcrumb_trail} />
         ) : null}
         {stickyToolbar}
@@ -831,15 +878,21 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
           </Text>
         </View>
       ) : null}
-      {geoHint ? <Text style={styles.geoHint}>{geoHint}</Text> : null}
-        {userLocatedExplicitly ? (
-          <Text style={styles.locationHint}>{t('serviceCenters.locationHintNear')}</Text>
-        ) : (
-          <Text style={styles.locationHint}>{t('serviceCenters.locationHintTap')}</Text>
-        )}
+      {geoHint ? <Text style={[styles.geoHint, isMobileWeb && styles.geoHintMobile]}>{geoHint}</Text> : null}
+        {!isMobileWeb || mobileTab === 'list' ? (
+          userLocatedExplicitly ? (
+            <Text style={[styles.locationHint, isMobileWeb && styles.locationHintMobile]}>
+              {t('serviceCenters.locationHintNear')}
+            </Text>
+          ) : (
+            <Text style={[styles.locationHint, isMobileWeb && styles.locationHintMobile]}>
+              {t('serviceCenters.locationHintTap')}
+            </Text>
+          )
+        ) : null}
 
         {!isDesktop ? (
-          <View style={styles.mobileChrome}>
+          <View style={[styles.mobileChrome, mobileTab === 'map' && styles.mobileChromeMap]}>
             <DiscoveryViewToggle
               value={mobileTab}
               onChange={setMobileTab}
@@ -847,17 +900,32 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
               mapLabel={t('serviceCenters.mapTab')}
               style={styles.mobileTabs}
             />
-            <View style={styles.mobileMetaRow}>
-              <Text style={styles.mobileResultsCount}>{resultsLabel}</Text>
-              <DiscoverySortTrigger label={activeSortLabel} onPress={() => setSortOpen(true)} />
-            </View>
+            {mobileTab === 'list' ? (
+              <View style={styles.mobileMetaRow}>
+                <Text style={styles.mobileResultsCount}>{resultsLabel}</Text>
+                <DiscoverySortTrigger label={activeSortLabel} onPress={() => setSortOpen(true)} />
+              </View>
+            ) : null}
           </View>
         ) : null}
 
-        <View style={[styles.body, isDesktop && styles.bodyDesktop]}>
+        <View
+          style={[
+            styles.body,
+            isDesktop && styles.bodyDesktop,
+            isMobileWeb && styles.bodyMobile,
+            isMobileWeb && mobileTab === 'map' && styles.bodyMobileMap,
+          ]}
+        >
           {(!isDesktop && mobileTab === 'list') || isDesktop ? listPanel : null}
           {(!isDesktop && mobileTab === 'map') || isDesktop ? (
-            <View style={[styles.mapWrap, isDesktop && styles.mapWrapDesktop]}>
+            <View
+              style={[
+                styles.mapWrap,
+                isDesktop && styles.mapWrapDesktop,
+                isMobileWeb && { minHeight: mobileMapMinHeight, flex: 1 },
+              ]}
+            >
               {mapPanel}
               {filtersOpen ? <View style={styles.mapDimOverlay} pointerEvents="none" /> : null}
             </View>
@@ -889,7 +957,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, minHeight: 0 },
   stickyToolbar: {
     position: 'sticky',
     top: 0,
@@ -900,6 +968,9 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
     backdropFilter: 'blur(8px)',
   },
+  stickyToolbarMobile: {
+    paddingBottom: 2,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -909,12 +980,49 @@ const styles = StyleSheet.create({
   },
   headerMobile: {
     paddingHorizontal: DISCOVERY_MOBILE.space.screenX,
-    paddingTop: 10,
-    gap: 8,
+    paddingTop: 8,
+    gap: 6,
   },
-  title: { flex: 1, fontSize: 18, fontWeight: '700', color: '#0f172a' },
+  title: { flex: 1, fontSize: 18, fontWeight: '700', color: '#0f172a', minWidth: 0 },
   titleMobile: {
     fontSize: DISCOVERY_MOBILE.type.title,
+  },
+  titleNarrow: {
+    fontSize: 15,
+  },
+  headerActionsMobile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+  },
+  headerActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: DISCOVERY_MOBILE.color.border,
+    cursor: 'pointer',
+  },
+  headerSignInBtn: {
+    minHeight: 36,
+    paddingHorizontal: 10,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    cursor: 'pointer',
+  },
+  headerSignInText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  headerActionPressed: {
+    opacity: 0.88,
   },
   serviceCentersLangSelector: {
     maxWidth: 220,
@@ -929,6 +1037,7 @@ const styles = StyleSheet.create({
   searchRowMobile: {
     paddingHorizontal: DISCOVERY_MOBILE.space.screenX,
     gap: DISCOVERY_MOBILE.space.rowGap,
+    paddingTop: 6,
   },
   searchInputWrap: {
     flex: 1,
@@ -957,6 +1066,10 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     outlineStyle: 'none',
   },
+  searchInputMobile: {
+    fontSize: discoveryMinFont(14),
+    paddingVertical: 6,
+  },
   searchButton: {
     backgroundColor: COLORS.primary,
     paddingHorizontal: 14,
@@ -968,6 +1081,11 @@ const styles = StyleSheet.create({
   },
   searchButtonText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   filterChrome: { paddingHorizontal: 16, paddingTop: 6 },
+  filterChromeMobile: {
+    paddingHorizontal: DISCOVERY_MOBILE.space.screenX,
+    paddingTop: 4,
+    paddingBottom: 2,
+  },
   filterRow: { maxHeight: DISCOVERY_MOBILE.height.chip + 4 },
   filterRowContent: {
     alignItems: 'center',
@@ -1009,13 +1127,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   geoHint: { marginHorizontal: 16, marginTop: 4, color: '#b45309', fontSize: 12 },
+  geoHintMobile: {
+    marginHorizontal: DISCOVERY_MOBILE.space.screenX,
+    fontSize: discoveryMinFont(11),
+  },
   locationHint: {
     marginHorizontal: 16,
     marginTop: 4,
     color: '#64748b',
     fontSize: discoveryMinFont(12),
   },
-  body: { flex: 1, marginTop: 6 },
+  locationHintMobile: {
+    marginHorizontal: DISCOVERY_MOBILE.space.screenX,
+    marginTop: 2,
+    marginBottom: 0,
+    fontSize: discoveryMinFont(11),
+  },
+  body: { flex: 1, marginTop: 6, minHeight: 0 },
+  bodyMobile: {
+    marginTop: 4,
+  },
+  bodyMobileMap: {
+    marginTop: 2,
+  },
   bodyDesktop: {
     flexDirection: 'row',
     gap: 0,
@@ -1077,6 +1211,11 @@ const styles = StyleSheet.create({
     marginHorizontal: DISCOVERY_MOBILE.space.screenX,
     marginTop: 8,
     gap: 8,
+  },
+  mobileChromeMap: {
+    marginTop: 6,
+    gap: 0,
+    marginBottom: 2,
   },
   mobileTabs: {},
   mobileMetaRow: {

@@ -1,134 +1,268 @@
-import React from 'react';
-import { View, Image, ScrollView, TouchableOpacity, StyleSheet, Text } from 'react-native';
-import { COLORS } from '../../constants/colors';
+import React, { useMemo, useState } from 'react';
+import {
+  View,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+  Text,
+  Pressable,
+  Platform,
+} from 'react-native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { Button } from 'react-native-paper';
 
-const MAX_VISIBLE_STACK = 5;
+import { COLORS } from '../../constants/colors';
+import { useTranslation } from '../../i18n';
 
 /**
- * Photo gallery with stacked preview (up to 5) + horizontal scroll for all.
+ * Compact partner photo gallery: toolbar, thumbnail grid, cover = first photo.
+ * Reorder is client-side (ShopImage has no sort_order API yet).
  */
-export default function ShopPhotoGallery({ images = [], onDelete, maxPhotos = 6 }) {
+export default function ShopPhotoGallery({
+  images = [],
+  onDelete,
+  onReorder,
+  onAddPhoto,
+  maxPhotos = 6,
+  uploading = false,
+}) {
+  const { t } = useTranslation();
   const list = Array.isArray(images) ? images : [];
-  const stackItems = list.slice(0, MAX_VISIBLE_STACK);
-  const remaining = list.length - stackItems.length;
+  const [draggingId, setDraggingId] = useState(null);
 
-  if (!list.length) return null;
+  const canAdd = list.length < maxPhotos;
+
+  const movePhoto = (fromIndex, toIndex) => {
+    if (!onReorder) return;
+    if (toIndex < 0 || toIndex >= list.length || fromIndex === toIndex) return;
+    const next = [...list];
+    const [item] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, item);
+    onReorder(next);
+  };
+
+  const setAsCover = (index) => {
+    if (index <= 0) return;
+    movePhoto(index, 0);
+  };
+
+  const webDragHandlers = useMemo(() => {
+    if (Platform.OS !== 'web' || !onReorder) return () => ({});
+    return (img, index) => ({
+      draggable: true,
+      onDragStart: () => setDraggingId(img.id),
+      onDragOver: (e) => {
+        if (e?.preventDefault) e.preventDefault();
+      },
+      onDrop: () => {
+        if (draggingId == null) return;
+        const fromIndex = list.findIndex((row) => row.id === draggingId);
+        if (fromIndex >= 0) movePhoto(fromIndex, index);
+        setDraggingId(null);
+      },
+      onDragEnd: () => setDraggingId(null),
+    });
+  }, [draggingId, list, onReorder]);
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.stackRow}>
-        {stackItems.map((img, index) => (
-          <View
-            key={img.id}
-            style={[
-              styles.stackCard,
-              {
-                marginLeft: index === 0 ? 0 : -28,
-                zIndex: stackItems.length - index,
-              },
-            ]}
+      <View style={styles.toolbar}>
+        <Text style={styles.toolbarTitle}>
+          {t('partnerProfile.photosCount', { count: list.length, max: maxPhotos })}
+        </Text>
+        {onAddPhoto ? (
+          <Button
+            mode="contained-tonal"
+            compact
+            icon="plus"
+            onPress={onAddPhoto}
+            loading={uploading}
+            disabled={!canAdd || uploading}
           >
-            <Image source={{ uri: img.thumbnail_url || img.image_url }} style={styles.stackImage} />
-          </View>
-        ))}
-        {remaining > 0 ? (
-          <View style={[styles.stackCard, styles.stackMore, { marginLeft: -28, zIndex: 0 }]}>
-            <Text style={styles.stackMoreText}>+{remaining}</Text>
-          </View>
+            {t('partnerProfile.addPhoto')}
+          </Button>
         ) : null}
       </View>
 
-      <Text style={styles.countHint}>
-        {list.length} / {maxPhotos} photos
-      </Text>
+      {list.length === 0 ? (
+        <Text style={styles.emptyHint}>{t('partnerProfile.photosEmptyHint')}</Text>
+      ) : (
+        <View style={styles.grid}>
+          {list.map((img, index) => (
+            <View
+              key={img.id}
+              style={[styles.tile, draggingId === img.id && styles.tileDragging]}
+              {...(Platform.OS === 'web' ? webDragHandlers(img, index) : {})}
+            >
+              <Image
+                source={{ uri: img.thumbnail_url || img.image_url }}
+                style={styles.thumb}
+              />
+              {index === 0 ? (
+                <View style={styles.coverBadge}>
+                  <Text style={styles.coverBadgeText}>{t('partnerProfile.coverPhoto')}</Text>
+                </View>
+              ) : null}
+              <View style={styles.tileActions}>
+                {index > 0 ? (
+                  <TouchableOpacity
+                    style={styles.iconBtn}
+                    onPress={() => setAsCover(index)}
+                    accessibilityLabel={t('partnerProfile.setAsCover')}
+                  >
+                    <MaterialCommunityIcons name="image-frame" size={14} color="#fff" />
+                  </TouchableOpacity>
+                ) : null}
+                {index > 0 ? (
+                  <TouchableOpacity
+                    style={styles.iconBtn}
+                    onPress={() => movePhoto(index, index - 1)}
+                    accessibilityLabel={t('partnerProfile.movePhotoLeft')}
+                  >
+                    <MaterialCommunityIcons name="chevron-left" size={16} color="#fff" />
+                  </TouchableOpacity>
+                ) : null}
+                {index < list.length - 1 ? (
+                  <TouchableOpacity
+                    style={styles.iconBtn}
+                    onPress={() => movePhoto(index, index + 1)}
+                    accessibilityLabel={t('partnerProfile.movePhotoRight')}
+                  >
+                    <MaterialCommunityIcons name="chevron-right" size={16} color="#fff" />
+                  </TouchableOpacity>
+                ) : null}
+                {onDelete ? (
+                  <TouchableOpacity
+                    style={[styles.iconBtn, styles.deleteBtn]}
+                    onPress={() => onDelete(img.id)}
+                    accessibilityLabel={t('partnerProfile.deletePhoto')}
+                  >
+                    <MaterialCommunityIcons name="close" size={14} color="#fff" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+          ))}
+          {canAdd && onAddPhoto ? (
+            <Pressable
+              onPress={onAddPhoto}
+              disabled={uploading}
+              style={({ pressed }) => [styles.addTile, pressed && styles.addTilePressed]}
+            >
+              <MaterialCommunityIcons name="camera-plus-outline" size={28} color={COLORS.PRIMARY} />
+              <Text style={styles.addTileText}>{t('partnerProfile.addPhoto')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      )}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroller}>
-        {list.map((img) => (
-          <View key={img.id} style={styles.thumbItem}>
-            <Image source={{ uri: img.image_url }} style={styles.thumbImage} />
-            {onDelete ? (
-              <TouchableOpacity style={styles.deleteBtn} onPress={() => onDelete(img.id)}>
-                <Text style={styles.deleteText}>✕</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        ))}
-      </ScrollView>
+      {list.length > 0 ? (
+        <Text style={styles.helper}>{t('partnerProfile.photosReorderHint')}</Text>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    marginBottom: 12,
+    gap: 10,
   },
-  stackRow: {
+  toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 88,
-    marginBottom: 8,
-    paddingLeft: 4,
+    justifyContent: 'space-between',
+    gap: 8,
   },
-  stackCard: {
-    width: 72,
-    height: 72,
-    borderRadius: 12,
-    borderWidth: 3,
-    borderColor: '#fff',
-    backgroundColor: '#e5e7eb',
+  toolbarTitle: {
+    color: COLORS.TEXT_DARK,
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  emptyHint: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tile: {
+    width: '31%',
+    minWidth: 96,
+    aspectRatio: 1,
+    borderRadius: 10,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    backgroundColor: '#e5e7eb',
+    position: 'relative',
   },
-  stackImage: {
+  tileDragging: {
+    opacity: 0.55,
+  },
+  thumb: {
     width: '100%',
     height: '100%',
   },
-  stackMore: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.PRIMARY,
-  },
-  stackMoreText: {
-    color: '#fff',
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  countHint: {
-    fontSize: 12,
-    color: COLORS.TEXT_MUTED,
-    marginBottom: 8,
-  },
-  scroller: {
-    marginHorizontal: -4,
-  },
-  thumbItem: {
-    marginRight: 10,
-    position: 'relative',
-  },
-  thumbImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 10,
-    backgroundColor: '#e5e7eb',
-  },
-  deleteBtn: {
+  coverBadge: {
     position: 'absolute',
-    top: 4,
+    left: 6,
+    top: 6,
+    backgroundColor: COLORS.PRIMARY,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  coverBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  tileActions: {
+    position: 'absolute',
     right: 4,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 12,
+    bottom: 4,
+    flexDirection: 'row',
+    gap: 4,
+  },
+  iconBtn: {
     width: 24,
     height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deleteText: {
-    color: '#fff',
-    fontSize: 12,
+  deleteBtn: {
+    backgroundColor: 'rgba(185,28,28,0.85)',
+  },
+  addTile: {
+    width: '31%',
+    minWidth: 96,
+    aspectRatio: 1,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(37,99,235,0.45)',
+    backgroundColor: 'rgba(37,99,235,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    padding: 8,
+  },
+  addTilePressed: {
+    opacity: 0.85,
+  },
+  addTileText: {
+    color: COLORS.PRIMARY,
+    fontSize: 11,
     fontWeight: '700',
+    textAlign: 'center',
+  },
+  helper: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

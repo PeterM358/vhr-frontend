@@ -39,21 +39,38 @@ export function dayLoadUsesLaborCapacity(row) {
   return row != null && row.availableLaborMinutes != null && row.availableLaborMinutes > 0;
 }
 
-/** Group calendar `scheduled` rows by local calendar day. */
+const MAX_OCCUPANCY_SPAN_DAYS = 366;
+
+/** Group calendar `scheduled` rows by local calendar day (spans bring→ready). */
 export function buildScheduledByDayMap(scheduled = []) {
   const map = new Map();
   (scheduled || []).forEach((item) => {
     const startIso = item.display_start || item.scheduled_start || item.client_preferred_start;
     if (!startIso) return;
-    const key = dateKeyLocal(new Date(startIso));
-    if (!key) return;
-    if (!map.has(key)) map.set(key, []);
-    map.get(key).push(item);
+    const startDay = new Date(startIso);
+    if (Number.isNaN(startDay.getTime())) return;
+    startDay.setHours(0, 0, 0, 0);
+    // Null scheduled_end → treat as same-day so expansion cannot hang.
+    const endIso = item.display_end || item.scheduled_end || item.client_preferred_end || startIso;
+    let endDay = new Date(endIso);
+    if (Number.isNaN(endDay.getTime())) endDay = new Date(startDay);
+    endDay.setHours(0, 0, 0, 0);
+    if (endDay < startDay) endDay = new Date(startDay);
+    const maxEnd = new Date(startDay);
+    maxEnd.setDate(maxEnd.getDate() + MAX_OCCUPANCY_SPAN_DAYS - 1);
+    if (endDay > maxEnd) endDay = maxEnd;
+
+    for (let cursor = new Date(startDay); cursor <= endDay; cursor.setDate(cursor.getDate() + 1)) {
+      const key = dateKeyLocal(cursor);
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(item);
+    }
   });
   map.forEach((items, key) => {
     items.sort((a, b) => {
-      const aT = new Date(a.display_start || a.scheduled_start || 0).getTime();
-      const bT = new Date(b.display_start || b.scheduled_start || 0).getTime();
+      const aT = new Date(a.display_start || a.scheduled_start || a.client_preferred_start || 0).getTime();
+      const bT = new Date(b.display_start || b.scheduled_start || b.client_preferred_start || 0).getTime();
       return aT - bT;
     });
     map.set(key, items);

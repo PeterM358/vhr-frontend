@@ -1,9 +1,12 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
 import { Text } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
-export default function ShopProfileMissingAlert({ fields = [] }) {
+/**
+ * "Still needed to go live" chips. Optional onFieldPress scrolls/expands the matching section.
+ */
+export default function ShopProfileMissingAlert({ fields = [], onFieldPress }) {
   if (!fields.length) return null;
 
   return (
@@ -12,11 +15,21 @@ export default function ShopProfileMissingAlert({ fields = [] }) {
       <View style={styles.content}>
         <Text style={styles.title}>Still needed to go live</Text>
         <View style={styles.chips}>
-          {fields.map((field) => (
-            <View key={field} style={styles.chip}>
-              <Text style={styles.chipText}>{field}</Text>
-            </View>
-          ))}
+          {fields.map((field) => {
+            const pressable = typeof onFieldPress === 'function';
+            const ChipWrap = pressable ? Pressable : View;
+            return (
+              <ChipWrap
+                key={field}
+                style={styles.chip}
+                onPress={pressable ? () => onFieldPress(field) : undefined}
+                accessibilityRole={pressable ? 'button' : undefined}
+                accessibilityLabel={pressable ? `Go to ${field}` : undefined}
+              >
+                <Text style={styles.chipText}>{field}</Text>
+              </ChipWrap>
+            );
+          })}
         </View>
       </View>
     </View>
