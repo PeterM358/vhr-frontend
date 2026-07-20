@@ -2042,6 +2042,16 @@
     "apiDocs": "API Documentation",
     "languageRegion": "Language/Region selector"
   },
+  "serviceMenu": {
+    "allVehicles": "All vehicles",
+    "allVehiclesDefault": "All vehicles (default)",
+    "vehiclePricingHint": "Set a price per vehicle type you service. \"All vehicles\" is the fallback used when a type has no specific price.",
+    "noSupportedVehicles": "Add supported vehicle types in your profile to set per-vehicle prices.",
+    "pricesCount": "{count} vehicle price(s)",
+    "hasPrice": "priced",
+    "notPricedYet": "no price yet",
+    "editingScope": "Editing: {scope}"
+  },
   "vehicleTypes": {
     "car": "Car",
     "truck": "Truck",

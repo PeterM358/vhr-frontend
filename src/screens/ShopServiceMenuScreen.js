@@ -28,15 +28,59 @@ import {
   refreshServiceMenuFromHistory,
   updateServiceMenuItem,
 } from '../api/serviceMenu';
+import { getVehicleTypes } from '../api/vehicles';
+import { getMyShopProfiles } from '../api/profiles';
 import { resetFromShopDrawer } from '../navigation/drawerNavigation';
 import { getOperationIcon } from '../icons/operationIconRegistry';
 import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
+import { vehicleTypeEmoji } from '../utils/vehicleTypeIcons';
 import {
   formatDurationHoursInput,
-  formatDurationMinutes,
   formatTypicalLaborTime,
   parseDurationHoursInput,
 } from '../utils/laborDuration';
+
+const DEFAULT_SCOPE = 'default';
+
+function scopeKeyForItem(item) {
+  return item?.vehicle_type != null ? String(item.vehicle_type) : DEFAULT_SCOPE;
+}
+
+function compositeKey(repairTypeId, scope) {
+  return `${repairTypeId}::${scope}`;
+}
+
+function emptyDraft() {
+  return {
+    parts_from: '',
+    parts_to: '',
+    labor_from: '',
+    labor_to: '',
+    typical_labor_hours: '',
+    disclaimer: '',
+    is_published: false,
+  };
+}
+
+function itemToDraft(item) {
+  return {
+    parts_from: item.parts_from != null ? String(item.parts_from) : '',
+    parts_to: item.parts_to != null ? String(item.parts_to) : '',
+    labor_from: item.labor_from != null ? String(item.labor_from) : '',
+    labor_to: item.labor_to != null ? String(item.labor_to) : '',
+    typical_labor_hours: formatDurationHoursInput(item.typical_labor_minutes),
+    disclaimer: item.disclaimer || '',
+    is_published: Boolean(item.is_published),
+  };
+}
+
+function toIdArray(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => (entry && typeof entry === 'object' ? entry.id : entry))
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id));
+}
 
 function formatComponentRange(from, to, label) {
   if (from != null && to != null && String(from) !== String(to)) {
@@ -57,6 +101,7 @@ function formatPriceRange(from, to) {
 }
 
 function formatMenuSummary(item) {
+  if (!item) return 'Set parts & labor';
   const parts = formatComponentRange(item.parts_from, item.parts_to, 'Parts');
   const labor = formatComponentRange(item.labor_from, item.labor_to, 'Labor');
   const laborTime = formatTypicalLaborTime(
@@ -65,9 +110,8 @@ function formatMenuSummary(item) {
   );
   const duration = laborTime ? `Typical labor time ${laborTime}` : null;
   const bits = [parts, labor, duration].filter(Boolean);
-  const total = formatPriceRange(item.price_from, item.price_to);
-  if (bits.length) return `${bits.join(' · ')}`;
-  return total;
+  if (bits.length) return bits.join(' · ');
+  return formatPriceRange(item.price_from, item.price_to);
 }
 
 function computeTotalFromDraft(draft) {
@@ -81,158 +125,10 @@ function computeTotalFromDraft(draft) {
   const pt = parse(draft?.parts_to);
   const lf = parse(draft?.labor_from);
   const lt = parse(draft?.labor_to);
-  const from =
-    pf != null || lf != null ? (pf ?? 0) + (lf ?? 0) : null;
-  const to =
-    pt != null || lt != null ? (pt ?? pf ?? 0) + (lt ?? lf ?? 0) : null;
+  const from = pf != null || lf != null ? (pf ?? 0) + (lf ?? 0) : null;
+  const to = pt != null || lt != null ? (pt ?? pf ?? 0) + (lt ?? lf ?? 0) : null;
   if (from == null && to == null) return null;
   return formatPriceRange(from, to);
-}
-
-function MenuItemRow({
-  item,
-  draft,
-  expanded,
-  onToggle,
-  onUpdateDraft,
-  onSave,
-  onTogglePublish,
-  saving,
-  togglingPublish,
-}) {
-  const { t } = useTranslation();
-  const iconName = getOperationIcon(item);
-  const rangeLabel = formatMenuSummary(item);
-  const totalLabel =
-    item.price_from != null || item.price_to != null
-      ? formatPriceRange(item.price_from, item.price_to)
-      : null;
-  const draftTotalLabel = expanded ? computeTotalFromDraft(draft) : null;
-  const isPublished = Boolean(draft?.is_published);
-
-  return (
-    <FloatingCard style={[styles.menuRow, isPublished && styles.menuRowPublished]}>
-      <View style={styles.menuRowHeader}>
-        <Pressable onPress={onToggle} style={styles.menuRowMain}>
-          <View style={styles.iconCircle}>
-            <MaterialCommunityIcons name={iconName} size={22} color={COLORS.PRIMARY} />
-          </View>
-          <View style={styles.menuRowBody}>
-            <Text style={styles.menuRowTitle}>
-              {translateRepairTypeLabel(item, t) || t('common.service')}
-            </Text>
-            {item.category_name ? (
-              <Text style={styles.menuRowCategory}>{item.category_name}</Text>
-            ) : null}
-            <Text style={styles.menuRowRange}>{rangeLabel}</Text>
-            {totalLabel ? <Text style={styles.menuRowTotal}>{totalLabel}</Text> : null}
-          </View>
-          <MaterialCommunityIcons
-            name={expanded ? 'chevron-up' : 'chevron-down'}
-            size={22}
-            color={COLORS.TEXT_MUTED}
-          />
-        </Pressable>
-        <View style={styles.publishToggleCol}>
-          <Text style={styles.publishToggleLabel}>{isPublished ? 'Published' : 'Hidden'}</Text>
-          <Switch
-            value={isPublished}
-            onValueChange={onTogglePublish}
-            disabled={togglingPublish || saving}
-          />
-        </View>
-      </View>
-
-      {expanded ? (
-        <View style={styles.editBlock}>
-          <Text style={styles.editSectionTitle}>Parts (EUR)</Text>
-          <Text style={styles.editHint}>
-            Typical parts cost for this service. Used to pre-fill offers and shown as part of the
-            public total when published.
-          </Text>
-          <View style={styles.priceRow}>
-            <TextInput
-              label="Parts from"
-              mode="outlined"
-              dense
-              keyboardType="decimal-pad"
-              placeholder="e.g. 30"
-              value={draft?.parts_from ?? ''}
-              onChangeText={(t) => onUpdateDraft('parts_from', t)}
-              style={styles.halfInput}
-            />
-            <TextInput
-              label="Parts to"
-              mode="outlined"
-              dense
-              keyboardType="decimal-pad"
-              placeholder="e.g. 80"
-              value={draft?.parts_to ?? ''}
-              onChangeText={(t) => onUpdateDraft('parts_to', t)}
-              style={styles.halfInput}
-            />
-          </View>
-          <Text style={styles.editSectionTitle}>Labor (EUR)</Text>
-          <Text style={styles.editHint}>
-            Workshop labor price for this service. Same job can cost more on premium cars
-            (diagnostics, tools) — adjust labor EUR here, not the time below.
-          </Text>
-          <View style={styles.priceRow}>
-            <TextInput
-              label="Labor from"
-              mode="outlined"
-              dense
-              keyboardType="decimal-pad"
-              placeholder="e.g. 40"
-              value={draft?.labor_from ?? ''}
-              onChangeText={(t) => onUpdateDraft('labor_from', t)}
-              style={styles.halfInput}
-            />
-            <TextInput
-              label="Labor to"
-              mode="outlined"
-              dense
-              keyboardType="decimal-pad"
-              placeholder="e.g. 90"
-              value={draft?.labor_to ?? ''}
-              onChangeText={(t) => onUpdateDraft('labor_to', t)}
-              style={styles.halfInput}
-            />
-          </View>
-          <Text style={styles.editSectionTitle}>Typical labor time (hours)</Text>
-          <Text style={styles.editHint}>
-            Billable labor for capacity planning (oil change ~0.75h). Not estimated vehicle
-            completion or pickup time — set that on the repair schedule separately.
-          </Text>
-          <TextInput
-            label="Typical labor time (hours)"
-            mode="outlined"
-            dense
-            keyboardType="decimal-pad"
-            placeholder="e.g. 1 or 1.5"
-            value={draft?.typical_labor_hours ?? ''}
-            onChangeText={(t) => onUpdateDraft('typical_labor_hours', t)}
-            style={styles.fullInput}
-          />
-          {draftTotalLabel ? (
-            <Text style={styles.computedTotal}>Clients see: {draftTotalLabel}</Text>
-          ) : null}
-          <TextInput
-            label="Note for clients (optional)"
-            mode="outlined"
-            dense
-            multiline
-            value={draft?.disclaimer ?? ''}
-            onChangeText={(t) => onUpdateDraft('disclaimer', t)}
-            style={styles.fullInput}
-          />
-          <Button mode="contained" onPress={onSave} loading={saving} disabled={saving}>
-            Save prices
-          </Button>
-        </View>
-      ) : null}
-    </FloatingCard>
-  );
 }
 
 export default function ShopServiceMenuScreen() {
@@ -243,28 +139,22 @@ export default function ShopServiceMenuScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [addingTypeId, setAddingTypeId] = useState(null);
-  const [savingId, setSavingId] = useState(null);
-  const [togglingPublishId, setTogglingPublishId] = useState(null);
+  const [savingKey, setSavingKey] = useState(null);
+  const [togglingPublishKey, setTogglingPublishKey] = useState(null);
   const [items, setItems] = useState([]);
   const [repairTypes, setRepairTypes] = useState([]);
+  const [supportedVehicleTypes, setSupportedVehicleTypes] = useState([]);
   const [shopProfileId, setShopProfileId] = useState(null);
   const [drafts, setDrafts] = useState({});
-  const [expandedId, setExpandedId] = useState(null);
+  const [expandedTypeId, setExpandedTypeId] = useState(null);
+  const [activeScope, setActiveScope] = useState({});
   const [showAddPanel, setShowAddPanel] = useState(false);
   const [addSearch, setAddSearch] = useState('');
 
   const buildDrafts = (rows) => {
     const next = {};
     (rows || []).forEach((item) => {
-      next[item.id] = {
-        parts_from: item.parts_from != null ? String(item.parts_from) : '',
-        parts_to: item.parts_to != null ? String(item.parts_to) : '',
-        labor_from: item.labor_from != null ? String(item.labor_from) : '',
-        labor_to: item.labor_to != null ? String(item.labor_to) : '',
-        typical_labor_hours: formatDurationHoursInput(item.typical_labor_minutes),
-        disclaimer: item.disclaimer || '',
-        is_published: Boolean(item.is_published),
-      };
+      next[compositeKey(item.repair_type, scopeKeyForItem(item))] = itemToDraft(item);
     });
     return next;
   };
@@ -278,17 +168,29 @@ export default function ShopServiceMenuScreen() {
       if (!token || !shopId) {
         setItems([]);
         setRepairTypes([]);
+        setSupportedVehicleTypes([]);
         return;
       }
-      const [menuData, typesRes] = await Promise.all([
+      const [menuData, typesRes, vehicleTypes, myProfiles] = await Promise.all([
         getServiceMenu(token, shopId),
         fetch(`${API_BASE_URL}/api/repairs/types/`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
+        getVehicleTypes().catch(() => []),
+        getMyShopProfiles().catch(() => []),
       ]);
       const typesJson = typesRes.ok ? await typesRes.json() : [];
+      const profile = Array.isArray(myProfiles)
+        ? myProfiles.find((p) => String(p.id) === String(shopId)) || myProfiles[0]
+        : null;
+      const supportedIds = new Set(toIdArray(profile?.supported_vehicle_types));
+      const supported = (Array.isArray(vehicleTypes) ? vehicleTypes : [])
+        .filter((v) => supportedIds.has(Number(v.id)))
+        .map((v) => ({ id: Number(v.id), name: v.name, code: v.code }));
+
       setItems(Array.isArray(menuData) ? menuData : []);
       setRepairTypes(Array.isArray(typesJson) ? typesJson : []);
+      setSupportedVehicleTypes(supported);
       setDrafts(buildDrafts(menuData));
     } catch (err) {
       Alert.alert('Error', err.message || 'Failed to load price list');
@@ -303,24 +205,101 @@ export default function ShopServiceMenuScreen() {
     }, [loadMenu])
   );
 
+  const repairTypeById = useMemo(() => {
+    const map = new Map();
+    repairTypes.forEach((rt) => map.set(Number(rt.id), rt));
+    return map;
+  }, [repairTypes]);
+
+  const groups = useMemo(() => {
+    const byType = new Map();
+    items.forEach((item) => {
+      const rtId = Number(item.repair_type);
+      if (!byType.has(rtId)) {
+        byType.set(rtId, { repairTypeId: rtId, byScope: {}, sample: item });
+      }
+      byType.get(rtId).byScope[scopeKeyForItem(item)] = item;
+    });
+    const list = Array.from(byType.values()).map((group) => {
+      const meta = repairTypeById.get(group.repairTypeId) || group.sample;
+      const anyPublished = Object.values(group.byScope).some((it) => it.is_published);
+      return { ...group, meta, anyPublished };
+    });
+    list.sort((a, b) => {
+      if (a.anyPublished !== b.anyPublished) return a.anyPublished ? -1 : 1;
+      const an = a.meta?.name || a.sample?.repair_type_name || '';
+      const bn = b.meta?.name || b.sample?.repair_type_name || '';
+      return an.localeCompare(bn);
+    });
+    return list;
+  }, [items, repairTypeById]);
+
   const existingTypeIds = useMemo(
-    () => new Set(items.map((item) => item.repair_type)),
+    () => new Set(items.map((item) => Number(item.repair_type))),
     [items]
   );
 
   const addableTypes = useMemo(() => {
     const q = addSearch.trim().toLowerCase();
     return repairTypes
-      .filter((t) => !existingTypeIds.has(t.id))
-      .filter((t) => {
+      .filter((rt) => !existingTypeIds.has(Number(rt.id)))
+      .filter((rt) => {
         if (!q) return true;
         return (
-          (t.name || '').toLowerCase().includes(q) ||
-          (t.category_name || '').toLowerCase().includes(q)
+          (rt.name || '').toLowerCase().includes(q) ||
+          (rt.category_name || '').toLowerCase().includes(q)
         );
       })
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   }, [repairTypes, existingTypeIds, addSearch]);
+
+  const parseMoney = (raw) => {
+    const s = String(raw ?? '').trim().replace(',', '.');
+    if (s === '') return null;
+    const n = parseFloat(s);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const updateDraft = (key, field, value) => {
+    setDrafts((prev) => ({
+      ...prev,
+      [key]: { ...(prev[key] || emptyDraft()), [field]: value },
+    }));
+  };
+
+  const compatibleVehicleTypes = useCallback(
+    (meta) => {
+      const compatIds = new Set(toIdArray(meta?.vehicle_types));
+      if (compatIds.size === 0) return supportedVehicleTypes;
+      return supportedVehicleTypes.filter((v) => compatIds.has(Number(v.id)));
+    },
+    [supportedVehicleTypes]
+  );
+
+  const scopesForGroup = useCallback(
+    (group) => {
+      const scopes = [{ key: DEFAULT_SCOPE, label: t('serviceMenu.allVehicles'), code: null }];
+      compatibleVehicleTypes(group.meta).forEach((v) => {
+        scopes.push({ key: String(v.id), label: v.name, code: v.code });
+      });
+      return scopes;
+    },
+    [compatibleVehicleTypes, t]
+  );
+
+  const upsertItem = (updated) => {
+    setItems((prev) => {
+      const idx = prev.findIndex((row) => row.id === updated.id);
+      if (idx === -1) return [...prev, updated];
+      const copy = [...prev];
+      copy[idx] = updated;
+      return copy;
+    });
+    setDrafts((prev) => ({
+      ...prev,
+      [compositeKey(updated.repair_type, scopeKeyForItem(updated))]: itemToDraft(updated),
+    }));
+  };
 
   const handleRefreshFromHistory = async () => {
     if (!shopProfileId) return;
@@ -342,97 +321,64 @@ export default function ShopServiceMenuScreen() {
     }
   };
 
-  const parseMoney = (raw) => {
-    const t = String(raw ?? '').trim().replace(',', '.');
-    if (t === '') return null;
-    const n = parseFloat(t);
-    return Number.isFinite(n) ? n : null;
-  };
+  const buildPayload = (draft, scope) => ({
+    parts_from: parseMoney(draft.parts_from),
+    parts_to: parseMoney(draft.parts_to),
+    labor_from: parseMoney(draft.labor_from),
+    labor_to: parseMoney(draft.labor_to),
+    typical_labor_minutes: parseDurationHoursInput(draft.typical_labor_hours),
+    disclaimer: draft.disclaimer || '',
+    is_published: Boolean(draft.is_published),
+    vehicle_type: scope === DEFAULT_SCOPE ? null : Number(scope),
+  });
 
-  const updateDraft = (itemId, field, value) => {
-    setDrafts((prev) => ({
-      ...prev,
-      [itemId]: { ...prev[itemId], [field]: value },
-    }));
-  };
-
-  const sortedItems = useMemo(() => {
-    return [...items].sort((a, b) => {
-      if (Boolean(a.is_published) !== Boolean(b.is_published)) {
-        return a.is_published ? -1 : 1;
-      }
-      return (a.repair_type_name || '').localeCompare(b.repair_type_name || '');
-    });
-  }, [items]);
-
-  const patchMenuItem = async (item, patch) => {
-    const token = await AsyncStorage.getItem('@access_token');
-    if (!token || !shopProfileId) throw new Error('Not signed in');
-    const draft = drafts[item.id] || {};
-    return updateServiceMenuItem(token, shopProfileId, item.id, {
-      parts_from: parseMoney(draft.parts_from ?? item.parts_from),
-      parts_to: parseMoney(draft.parts_to ?? item.parts_to),
-      labor_from: parseMoney(draft.labor_from ?? item.labor_from),
-      labor_to: parseMoney(draft.labor_to ?? item.labor_to),
-      typical_labor_minutes: parseDurationHoursInput(
-        draft.typical_labor_hours ?? formatDurationHoursInput(item.typical_labor_minutes)
-      ),
-      disclaimer: draft.disclaimer ?? item.disclaimer ?? '',
-      is_published: Boolean(draft.is_published),
-      ...patch,
-    });
-  };
-
-  const applyMenuItemUpdate = (updated) => {
-    setItems((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
-    setDrafts((prev) => ({
-      ...prev,
-      [updated.id]: {
-        parts_from: updated.parts_from != null ? String(updated.parts_from) : '',
-        parts_to: updated.parts_to != null ? String(updated.parts_to) : '',
-        labor_from: updated.labor_from != null ? String(updated.labor_from) : '',
-        labor_to: updated.labor_to != null ? String(updated.labor_to) : '',
-        typical_labor_hours: formatDurationHoursInput(updated.typical_labor_minutes),
-        disclaimer: updated.disclaimer || '',
-        is_published: Boolean(updated.is_published),
-      },
-    }));
-  };
-
-  const handleTogglePublish = async (item, nextPublished) => {
-    updateDraft(item.id, 'is_published', nextPublished);
-    setTogglingPublishId(item.id);
-    try {
-      const updated = await patchMenuItem(item, { is_published: nextPublished });
-      applyMenuItemUpdate(updated);
-    } catch (err) {
-      updateDraft(item.id, 'is_published', !nextPublished);
-      Alert.alert('Error', err.message || 'Could not update price list visibility');
-    } finally {
-      setTogglingPublishId(null);
-    }
-  };
-
-  const handleSaveItem = async (item) => {
-    const draft = drafts[item.id];
-    if (!draft || !shopProfileId) return;
-    setSavingId(item.id);
+  const handleSaveScope = async (group, scope) => {
+    if (!shopProfileId) return;
+    const key = compositeKey(group.repairTypeId, scope);
+    const draft = drafts[key] || emptyDraft();
+    setSavingKey(key);
     try {
       const token = await AsyncStorage.getItem('@access_token');
-      const updated = await patchMenuItem(item, {
-        parts_from: parseMoney(draft.parts_from),
-        parts_to: parseMoney(draft.parts_to),
-        labor_from: parseMoney(draft.labor_from),
-        labor_to: parseMoney(draft.labor_to),
-        typical_labor_minutes: parseDurationHoursInput(draft.typical_labor_hours),
-        disclaimer: draft.disclaimer || '',
-        is_published: Boolean(draft.is_published),
-      });
-      applyMenuItemUpdate(updated);
+      const existing = group.byScope[scope];
+      const payload = buildPayload(draft, scope);
+      const saved = existing
+        ? await updateServiceMenuItem(token, shopProfileId, existing.id, payload)
+        : await createServiceMenuItem(token, shopProfileId, {
+            repair_type: group.repairTypeId,
+            ...payload,
+          });
+      upsertItem(saved);
     } catch (err) {
       Alert.alert('Error', err.message || 'Failed to save price list item');
     } finally {
-      setSavingId(null);
+      setSavingKey(null);
+    }
+  };
+
+  const handleTogglePublish = async (group, scope, nextPublished) => {
+    const key = compositeKey(group.repairTypeId, scope);
+    updateDraft(key, 'is_published', nextPublished);
+    const existing = group.byScope[scope];
+    if (!existing) {
+      // No saved row yet — the toggle is captured in the draft and persisted on save.
+      return;
+    }
+    setTogglingPublishKey(key);
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      const draft = { ...(drafts[key] || itemToDraft(existing)), is_published: nextPublished };
+      const saved = await updateServiceMenuItem(
+        token,
+        shopProfileId,
+        existing.id,
+        buildPayload(draft, scope)
+      );
+      upsertItem(saved);
+    } catch (err) {
+      updateDraft(key, 'is_published', !nextPublished);
+      Alert.alert('Error', err.message || 'Could not update price list visibility');
+    } finally {
+      setTogglingPublishKey(null);
     }
   };
 
@@ -446,22 +392,8 @@ export default function ShopServiceMenuScreen() {
         is_published: false,
         typical_labor_minutes: repairType.default_labor_minutes || null,
       });
-      setItems((prev) => [...prev, created].sort((a, b) =>
-        (a.repair_type_name || '').localeCompare(b.repair_type_name || '')
-      ));
-      setDrafts((prev) => ({
-        ...prev,
-        [created.id]: {
-          parts_from: '',
-          parts_to: '',
-          labor_from: '',
-          labor_to: '',
-          typical_labor_hours: formatDurationHoursInput(created.typical_labor_minutes),
-          disclaimer: '',
-          is_published: false,
-        },
-      }));
-      setExpandedId(created.id);
+      upsertItem(created);
+      setExpandedTypeId(Number(created.repair_type));
       setShowAddPanel(false);
       setAddSearch('');
     } catch (err) {
@@ -469,6 +401,203 @@ export default function ShopServiceMenuScreen() {
     } finally {
       setAddingTypeId(null);
     }
+  };
+
+  const renderGroup = (group) => {
+    const { meta } = group;
+    const rtId = group.repairTypeId;
+    const expanded = expandedTypeId === rtId;
+    const scopes = scopesForGroup(group);
+    const scope = activeScope[rtId] || DEFAULT_SCOPE;
+    const key = compositeKey(rtId, scope);
+    const existing = group.byScope[scope];
+    const draft = drafts[key] || (existing ? itemToDraft(existing) : emptyDraft());
+    const iconName = getOperationIcon(meta || group.sample);
+    const defaultItem = group.byScope[DEFAULT_SCOPE];
+    const vehiclePriced = Object.keys(group.byScope).filter((k) => k !== DEFAULT_SCOPE).length;
+    const summaryBase = formatMenuSummary(defaultItem);
+    const summary = vehiclePriced
+      ? `${summaryBase} · ${t('serviceMenu.pricesCount', { count: vehiclePriced })}`
+      : summaryBase;
+    const draftTotalLabel = expanded ? computeTotalFromDraft(draft) : null;
+    const isPublished = Boolean(draft.is_published);
+    const compatible = compatibleVehicleTypes(meta);
+
+    return (
+      <FloatingCard
+        key={rtId}
+        style={[styles.menuRow, group.anyPublished && styles.menuRowPublished]}
+      >
+        <Pressable
+          onPress={() => setExpandedTypeId((id) => (id === rtId ? null : rtId))}
+          style={styles.menuRowMain}
+        >
+          <View style={styles.iconCircle}>
+            <MaterialCommunityIcons name={iconName} size={22} color={COLORS.PRIMARY} />
+          </View>
+          <View style={styles.menuRowBody}>
+            <Text style={styles.menuRowTitle}>
+              {translateRepairTypeLabel(meta || group.sample, t) || t('common.service')}
+            </Text>
+            {meta?.category_name ? (
+              <Text style={styles.menuRowCategory}>{meta.category_name}</Text>
+            ) : null}
+            <Text style={styles.menuRowRange}>{summary}</Text>
+          </View>
+          <MaterialCommunityIcons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={22}
+            color={COLORS.TEXT_MUTED}
+          />
+        </Pressable>
+
+        {expanded ? (
+          <View style={styles.editBlock}>
+            <Text style={styles.editHint}>{t('serviceMenu.vehiclePricingHint')}</Text>
+
+            {compatible.length === 0 ? (
+              <Text style={styles.noVehiclesHint}>{t('serviceMenu.noSupportedVehicles')}</Text>
+            ) : (
+              <View style={styles.scopeChipRow}>
+                {scopes.map((s) => {
+                  const active = s.key === scope;
+                  const priced = Boolean(group.byScope[s.key]);
+                  return (
+                    <Pressable
+                      key={s.key}
+                      onPress={() =>
+                        setActiveScope((prev) => ({ ...prev, [rtId]: s.key }))
+                      }
+                      style={[styles.scopeChip, active && styles.scopeChipActive]}
+                    >
+                      <Text style={styles.scopeChipEmoji}>
+                        {s.key === DEFAULT_SCOPE ? '🚗' : vehicleTypeEmoji(s.code, s.label)}
+                      </Text>
+                      <Text
+                        style={[styles.scopeChipLabel, active && styles.scopeChipLabelActive]}
+                        numberOfLines={1}
+                      >
+                        {s.label}
+                      </Text>
+                      {priced ? <View style={styles.scopeChipDot} /> : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+
+            <Text style={styles.editSectionTitle}>Parts (EUR)</Text>
+            <Text style={styles.editHint}>
+              Typical parts cost for this service. Used to pre-fill offers and shown as part of the
+              public total when published.
+            </Text>
+            <View style={styles.priceRow}>
+              <TextInput
+                label="Parts from"
+                mode="outlined"
+                dense
+                keyboardType="decimal-pad"
+                placeholder="e.g. 30"
+                value={draft.parts_from ?? ''}
+                onChangeText={(v) => updateDraft(key, 'parts_from', v)}
+                style={styles.halfInput}
+              />
+              <TextInput
+                label="Parts to"
+                mode="outlined"
+                dense
+                keyboardType="decimal-pad"
+                placeholder="e.g. 80"
+                value={draft.parts_to ?? ''}
+                onChangeText={(v) => updateDraft(key, 'parts_to', v)}
+                style={styles.halfInput}
+              />
+            </View>
+
+            <Text style={styles.editSectionTitle}>Labor (EUR)</Text>
+            <Text style={styles.editHint}>
+              Workshop labor price for this service. Same job can cost more on premium cars
+              (diagnostics, tools) — adjust labor EUR here, not the time below.
+            </Text>
+            <View style={styles.priceRow}>
+              <TextInput
+                label="Labor from"
+                mode="outlined"
+                dense
+                keyboardType="decimal-pad"
+                placeholder="e.g. 40"
+                value={draft.labor_from ?? ''}
+                onChangeText={(v) => updateDraft(key, 'labor_from', v)}
+                style={styles.halfInput}
+              />
+              <TextInput
+                label="Labor to"
+                mode="outlined"
+                dense
+                keyboardType="decimal-pad"
+                placeholder="e.g. 90"
+                value={draft.labor_to ?? ''}
+                onChangeText={(v) => updateDraft(key, 'labor_to', v)}
+                style={styles.halfInput}
+              />
+            </View>
+
+            <Text style={styles.editSectionTitle}>Typical labor time (hours)</Text>
+            <Text style={styles.editHint}>
+              Billable labor for capacity planning (oil change ~0.75h). Not estimated vehicle
+              completion or pickup time — set that on the repair schedule separately.
+            </Text>
+            <TextInput
+              label="Typical labor time (hours)"
+              mode="outlined"
+              dense
+              keyboardType="decimal-pad"
+              placeholder="e.g. 1 or 1.5"
+              value={draft.typical_labor_hours ?? ''}
+              onChangeText={(v) => updateDraft(key, 'typical_labor_hours', v)}
+              style={styles.fullInput}
+            />
+            {draftTotalLabel ? (
+              <Text style={styles.computedTotal}>Clients see: {draftTotalLabel}</Text>
+            ) : null}
+            <TextInput
+              label="Note for clients (optional)"
+              mode="outlined"
+              dense
+              multiline
+              value={draft.disclaimer ?? ''}
+              onChangeText={(v) => updateDraft(key, 'disclaimer', v)}
+              style={styles.fullInput}
+            />
+
+            <View style={styles.publishRow}>
+              <Text style={styles.publishLabel}>
+                {isPublished ? 'Published' : 'Hidden'}
+                {scope !== DEFAULT_SCOPE
+                  ? ` · ${t('serviceMenu.editingScope', {
+                      scope: scopes.find((s) => s.key === scope)?.label || '',
+                    })}`
+                  : ''}
+              </Text>
+              <Switch
+                value={isPublished}
+                onValueChange={(v) => handleTogglePublish(group, scope, v)}
+                disabled={togglingPublishKey === key || savingKey === key}
+              />
+            </View>
+
+            <Button
+              mode="contained"
+              onPress={() => handleSaveScope(group, scope)}
+              loading={savingKey === key}
+              disabled={savingKey === key}
+            >
+              Save prices
+            </Button>
+          </View>
+        ) : null}
+      </FloatingCard>
+    );
   };
 
   return (
@@ -488,7 +617,7 @@ export default function ShopServiceMenuScreen() {
           <Text style={styles.heroTitle}>{t('drawer.partner.priceList')}</Text>
           <Text style={styles.heroSubtitle}>
             All your services are listed here. Toggle Published to show prices on your public profile
-            — expand a row to edit parts and labor.
+            — expand a row to set parts, labor, and per-vehicle prices.
           </Text>
           <View style={styles.heroActions}>
             <Button
@@ -557,7 +686,7 @@ export default function ShopServiceMenuScreen() {
 
         {loading ? (
           <ActivityIndicator style={styles.loader} color={COLORS.PRIMARY} />
-        ) : items.length === 0 ? (
+        ) : groups.length === 0 ? (
           <FloatingCard>
             <Text style={styles.emptyTitle}>No services on your price list yet</Text>
             <Text style={styles.emptyText}>
@@ -566,20 +695,7 @@ export default function ShopServiceMenuScreen() {
             </Text>
           </FloatingCard>
         ) : (
-          sortedItems.map((item) => (
-            <MenuItemRow
-              key={item.id}
-              item={item}
-              draft={drafts[item.id]}
-              expanded={expandedId === item.id}
-              onToggle={() => setExpandedId((id) => (id === item.id ? null : item.id))}
-              onUpdateDraft={(field, value) => updateDraft(item.id, field, value)}
-              onTogglePublish={(v) => handleTogglePublish(item, v)}
-              onSave={() => handleSaveItem(item)}
-              saving={savingId === item.id}
-              togglingPublish={togglingPublishId === item.id}
-            />
-          ))
+          groups.map((group) => renderGroup(group))
         )}
 
         <Button
@@ -693,29 +809,10 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#10B981',
   },
-  menuRowHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   menuRowMain: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  publishToggleCol: {
-    alignItems: 'center',
-    paddingLeft: 4,
-    minWidth: 72,
-  },
-  publishToggleLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.TEXT_MUTED,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    marginBottom: 2,
   },
   iconCircle: {
     width: 44,
@@ -746,11 +843,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 3,
   },
-  menuRowTotal: {
-    fontSize: 12,
-    color: COLORS.TEXT_MUTED,
-    marginTop: 2,
-  },
   computedTotal: {
     fontSize: 13,
     fontWeight: '600',
@@ -763,6 +855,52 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E2E8F0',
     gap: 8,
+  },
+  scopeChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
+  },
+  scopeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+  },
+  scopeChipActive: {
+    backgroundColor: 'rgba(37,99,235,0.12)',
+    borderColor: COLORS.PRIMARY,
+  },
+  scopeChipEmoji: {
+    fontSize: 14,
+  },
+  scopeChipLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.TEXT_DARK,
+    maxWidth: 120,
+  },
+  scopeChipLabelActive: {
+    color: COLORS.PRIMARY,
+  },
+  scopeChipDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  noVehiclesHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: COLORS.TEXT_MUTED,
+    fontStyle: 'italic',
+    marginBottom: 4,
   },
   editSectionTitle: {
     fontSize: 13,
