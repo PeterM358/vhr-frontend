@@ -31,7 +31,7 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useTranslation } from '../i18n';
 import {
   getShopEntitlements,
-  planDisplayLabel,
+  getCurrentPlanDisplay,
   accountStateDisplayLabel,
   getListingMessage,
   isAcceptingRequests,
@@ -172,14 +172,15 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   );
 
   const ents = useMemo(() => getShopEntitlements(profile), [profile]);
-  const planLabel = planDisplayLabel(ents, t);
+  const currentPlan = useMemo(() => getCurrentPlanDisplay(profile, t), [profile, t]);
+  const planLabel = currentPlan.label;
   const stateLabel = accountStateDisplayLabel(ents, t);
   const listingMessage = getListingMessage(profile, t);
   const accepting = isAcceptingRequests(profile);
   const completion = ents?.profile_completion;
   const expiresAt = ents?.expires_at;
   const cancelAtPeriodEnd = Boolean(optionsPayload?.cancel_at_period_end);
-  const planKeyLower = String(ents?.plan_key || '').toLowerCase();
+  const planKeyLower = currentPlan.isAssigned ? String(currentPlan.key || '').toLowerCase() : '';
   const isActive =
     (ents?.account_state || ents?.subscription_state) === 'active';
   const bank = optionsPayload?.bank || {};
@@ -193,7 +194,11 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
       ? t(FEATURE_LABEL_KEYS[featureKey])
       : null);
 
-  const currentTagline = t(PLAN_TAGLINE_KEYS[planKeyLower] || 'subscription.planTaglinePro');
+  const currentTagline = t(
+    currentPlan.isAssigned
+      ? PLAN_TAGLINE_KEYS[planKeyLower] || 'subscription.planTaglinePro'
+      : 'subscription.planTaglineNone'
+  );
   const expiryLine = useMemo(() => {
     if (!expiresAt) return null;
     const date = String(expiresAt).slice(0, 10);

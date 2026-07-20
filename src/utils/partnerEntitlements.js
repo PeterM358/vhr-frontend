@@ -141,11 +141,17 @@ export function isAcceptingRequests(profile) {
 
 export function getListingMessage(profile, t) {
   const ents = getShopEntitlements(profile);
-  if (ents?.listing_message) return ents.listing_message;
   const state = ents?.account_state || ents?.subscription_state;
+  // Prefer our localized copy over the raw (English) API listing_message so the
+  // BG UI never shows mixed English text for a known restricted state.
   if (state === ACCOUNT_STATES.INACTIVE_LISTING || state === 'limited' || state === 'cancelled') {
-    return t?.('subscription.notAcceptingRequests') || 'Not currently accepting requests through Veversal.';
+    return (
+      t?.('subscription.notAcceptingRequests') ||
+      ents?.listing_message ||
+      'Not currently accepting requests through Veversal.'
+    );
   }
+  if (ents?.listing_message) return ents.listing_message;
   return null;
 }
 
@@ -189,10 +195,10 @@ export function upgradeNavigationParams({ featureKey, featureLabel } = {}) {
   };
 }
 
-/** Human-readable plan label for display only — never use for gating. */
-export function planDisplayLabel(ents, t) {
-  const key = ents?.plan_key || ents?.plan_label;
-  if (!key) return t?.('subscription.planPro') || 'PRO';
+/** Real customer-facing commercial plans (Presence is not a plan). */
+const REAL_PLAN_KEYS = ['trial', 'pro', 'premium', 'enterprise'];
+
+function planKeyLabel(key, t) {
   const map = {
     trial: t?.('subscription.planTrial') || 'Trial',
     pro: t?.('subscription.planPro') || 'PRO',
@@ -201,7 +207,53 @@ export function planDisplayLabel(ents, t) {
     // Legacy display fallback (Presence is no longer a plan)
     presence: t?.('subscription.planInactiveListing') || 'Inactive listing',
   };
-  return map[String(key).toLowerCase()] || ents?.plan_label || key;
+  return map[String(key).toLowerCase()] || key;
+}
+
+/** Human-readable plan label for display only — never use for gating. */
+export function planDisplayLabel(ents, t) {
+  const key = ents?.plan_key || ents?.plan_label;
+  if (!key) return t?.('subscription.planNone') || 'No active plan';
+  return planKeyLabel(key, t) || ents?.plan_label || key;
+}
+
+/**
+ * Current plan for DISPLAY on the upgrade / hero card.
+ *
+ * Uses the RAW stored `subscription_plan_key` from the shop profile so an unset
+ * plan is never shown as "PRO". The backend infers PRO for feature-gating legacy
+ * shops (so they stay unlocked), but that inferred tier must not be presented as
+ * a purchased plan on the "current plan" label.
+ *
+ * Returns { key, label, isAssigned } where isAssigned is false when the shop has
+ * no real commercial plan (blank / null / legacy `presence`).
+ */
+export function getCurrentPlanDisplay(profile, t) {
+  const ents = getShopEntitlements(profile);
+  const state = ents?.account_state || ents?.subscription_state || null;
+  const rawKey = String(
+    profile?.subscription_plan_key ?? ents?.subscription_plan_key ?? ''
+  )
+    .trim()
+    .toLowerCase();
+
+  // Explicitly assigned commercial plan → show it as-is.
+  if (REAL_PLAN_KEYS.includes(rawKey)) {
+    return { key: rawKey, label: planKeyLabel(rawKey, t), isAssigned: true };
+  }
+
+  // Trial is a legitimate (unpaid) experience even without a stored plan key.
+  if (state === ACCOUNT_STATES.TRIAL) {
+    return { key: 'trial', label: planKeyLabel('trial', t), isAssigned: true };
+  }
+
+  // No stored plan (blank / null / legacy presence) and not on trial:
+  // the shop has not subscribed — never present this as PRO.
+  return {
+    key: null,
+    label: t?.('subscription.planNone') || 'No active plan',
+    isAssigned: false,
+  };
 }
 
 /** Human-readable account state for display only. */

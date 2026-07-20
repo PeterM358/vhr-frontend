@@ -2471,6 +2471,8 @@
     "planPremium": "Premium",
     "planEnterprise": "Enterprise",
     "planInactiveListing": "Inactive listing",
+    "planNone": "No active plan",
+    "planTaglineNone": "You don't have an active plan yet. Your profile stays visible, but you won't receive new requests until you choose a plan below.",
     "planTaglineTrial": "You're exploring Veversal. Upgrade to keep accepting jobs when your trial ends.",
     "planTaglinePro": "Everything you need to run your workshop.",
     "planTaglinePremium": "Grow your workshop with more visibility.",
