@@ -15,6 +15,11 @@ import {
   parsePublicSeoPath,
   serviceCentersDiscoveryPath,
 } from '../utils/seo/seoPaths';
+import {
+  categoryKeyForSlug,
+  isBusinessCategorySlug,
+  localizedCategorySlug,
+} from '../utils/seo/businessCategoryCatalog';
 
 export const SUPPORTED_LANGUAGES = ['bg', 'en', 'de', 'it', 'fr', 'es'];
 export const DEFAULT_LANGUAGE = 'en';
@@ -250,6 +255,13 @@ export function toCanonicalPublicPath(localizedPath) {
     return joinSegments(['service-center', ...rest]);
   }
 
+  // Business category-context pages: canonical form uses the EN category slug.
+  if (isBusinessCategorySlug(first)) {
+    const categoryKey = categoryKeyForSlug(first);
+    const enSlug = localizedCategorySlug(categoryKey, 'en') || first;
+    return joinSegments([enSlug, ...rest]);
+  }
+
   return joinSegments(segments);
 }
 
@@ -276,6 +288,13 @@ export function localizeCanonicalPath(canonicalPath, langInput) {
     const prefix =
       SERVICE_CENTER_PROFILE_PREFIX[lang] || SERVICE_CENTER_PROFILE_PREFIX[DEFAULT_LANGUAGE];
     return joinSegments([lang, prefix, ...rest]);
+  }
+
+  // Category-context pages: swap the EN category slug for the target locale slug.
+  if (isBusinessCategorySlug(first)) {
+    const categoryKey = categoryKeyForSlug(first);
+    const localizedSlug = localizedCategorySlug(categoryKey, lang) || first;
+    return joinSegments([lang, localizedSlug, ...rest]);
   }
 
   const seoParsed = parsePublicSeoPath(segments.join('/'));
@@ -390,7 +409,11 @@ export function getRouteKeyFromLocalizedPath(pathname) {
     case 'repair_first_city':
       return 'serviceCenters.repairFirst';
     case 'service_center_profile':
+    case 'category_center':
       return 'serviceCenter.profile';
+    case 'category_discovery':
+    case 'category_city':
+      return 'serviceCenters.category';
     default:
       return null;
   }

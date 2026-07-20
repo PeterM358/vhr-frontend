@@ -3,6 +3,11 @@
  */
 
 import { classifySegment } from './seoSlugCatalog';
+import {
+  categoryKeyForSlug,
+  isBusinessCategorySlug,
+  localizedCategorySlug,
+} from './businessCategoryCatalog';
 
 export const VEHICLE_TYPE_ROUTE_PREFIXES = {
   'car-service-centers': 'car',
@@ -111,6 +116,37 @@ export function repairFirstPath(repairSlug, citySlug) {
 
 export function serviceCenterProfilePath(slug) {
   return `/service-center/${String(slug || '').trim().toLowerCase()}`;
+}
+
+// --- Business category-context URLs -----------------------------------------
+// `/{categorySlug}` · `/{categorySlug}/{city}` · `/{categorySlug}/{city}/{shop}`
+// The category slug is already localized; the `/{lang}` prefix is added by the
+// localizedRoutes layer. Shared builder utility for category-aware links.
+
+export function categoryDiscoveryPath(categorySlug) {
+  const category = String(categorySlug || '').trim().toLowerCase();
+  return category ? `/${category}` : serviceCentersPath();
+}
+
+export function categoryCityPath(categorySlug, citySlug) {
+  const category = String(categorySlug || '').trim().toLowerCase();
+  const city = String(citySlug || '').trim().toLowerCase();
+  if (category && city) return `/${category}/${city}`;
+  return categoryDiscoveryPath(category);
+}
+
+export function categoryCenterPath(categorySlug, citySlug, centerSlug) {
+  const category = String(categorySlug || '').trim().toLowerCase();
+  const city = String(citySlug || '').trim().toLowerCase();
+  const center = String(centerSlug || '').trim().toLowerCase();
+  if (category && city && center) return `/${category}/${city}/${center}`;
+  if (center) return serviceCenterProfilePath(center);
+  return categoryCityPath(category, city);
+}
+
+/** Build a localized category URL segment for a category key. */
+export function categorySlugForKey(categoryKey, locale) {
+  return localizedCategorySlug(categoryKey, locale);
 }
 
 function normalizePathParts(path) {
@@ -253,6 +289,33 @@ export function parsePublicSeoPath(path) {
     return null;
   }
 
+  // Business category-context pages (primary OR secondary category listing +
+  // category-scoped shop profile). Detected across every localized slug.
+  if (isBusinessCategorySlug(parts[0])) {
+    const categoryKey = categoryKeyForSlug(parts[0]);
+    if (parts.length === 1) {
+      return { type: 'category_discovery', categorySlug: parts[0], categoryKey };
+    }
+    if (parts.length === 2) {
+      return {
+        type: 'category_city',
+        categorySlug: parts[0],
+        categoryKey,
+        citySlug: parts[1],
+      };
+    }
+    if (parts.length === 3) {
+      return {
+        type: 'category_center',
+        categorySlug: parts[0],
+        categoryKey,
+        citySlug: parts[1],
+        centerSlug: parts[2],
+      };
+    }
+    return null;
+  }
+
   if (parts.length === 1) {
     return { type: 'repair_first', repairSlug: parts[0] };
   }
@@ -314,6 +377,20 @@ export function buildPathFromSeoParams(params = {}) {
   }
   if (type === 'service_center_profile' && params.centerSlug) {
     return serviceCenterProfilePath(params.centerSlug);
+  }
+  if (type === 'category_discovery' && params.categorySlug) {
+    return categoryDiscoveryPath(params.categorySlug);
+  }
+  if (type === 'category_city' && params.categorySlug && params.citySlug) {
+    return categoryCityPath(params.categorySlug, params.citySlug);
+  }
+  if (
+    type === 'category_center'
+    && params.categorySlug
+    && params.citySlug
+    && params.centerSlug
+  ) {
+    return categoryCenterPath(params.categorySlug, params.citySlug, params.centerSlug);
   }
   return null;
 }
@@ -378,6 +455,47 @@ export function getNavigationStateFromSeoPath(path) {
     };
   }
 
+  // Category-scoped shop profile → shop detail (category context preserved).
+  if (parsed.type === 'category_center') {
+    return {
+      routes: [
+        {
+          name: 'ShopMap',
+          params: {
+            businessCategory: parsed.categoryKey || null,
+            businessCategorySlug: parsed.categorySlug || null,
+            citySlug: parsed.citySlug || null,
+          },
+        },
+        {
+          name: 'ShopDetail',
+          params: {
+            centerSlug: parsed.centerSlug,
+            businessCategory: parsed.categoryKey || null,
+            businessCategorySlug: parsed.categorySlug || null,
+          },
+        },
+      ],
+      index: 1,
+    };
+  }
+
+  // Category listing (primary OR secondary) → discovery map with category filter.
+  if (parsed.type === 'category_discovery' || parsed.type === 'category_city') {
+    return {
+      routes: [
+        {
+          name: 'ShopMap',
+          params: {
+            businessCategory: parsed.categoryKey || null,
+            businessCategorySlug: parsed.categorySlug || null,
+            citySlug: parsed.citySlug || null,
+          },
+        },
+      ],
+    };
+  }
+
   if (
     parsed.type === 'discovery_root' ||
     parsed.type === 'city' ||
@@ -416,14 +534,25 @@ export function getSeoPathFromNavigationState(state) {
   if (!route) return null;
 
   if (route.name === 'ShopDetail') {
-    if (route.params?.centerSlug) {
-      return serviceCenterProfilePath(route.params.centerSlug);
+    const { centerSlug, businessCategorySlug, citySlug } = route.params || {};
+    if (centerSlug && businessCategorySlug && citySlug) {
+      return categoryCenterPath(businessCategorySlug, citySlug, centerSlug);
+    }
+    if (centerSlug) {
+      return serviceCenterProfilePath(centerSlug);
     }
     return null;
   }
 
   if (route.name === 'ShopMap') {
-    const { citySlug, vehicleType, repairType, brandSlug } = route.params || {};
+    const {
+      citySlug, vehicleType, repairType, brandSlug, businessCategorySlug,
+    } = route.params || {};
+    if (businessCategorySlug) {
+      return citySlug
+        ? categoryCityPath(businessCategorySlug, citySlug)
+        : categoryDiscoveryPath(businessCategorySlug);
+    }
     if (vehicleType && citySlug && repairType) {
       return vehicleServiceCentersPath(vehicleType, citySlug, repairType);
     }

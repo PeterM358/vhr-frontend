@@ -19,6 +19,9 @@ export async function getServiceCenters(filters = {}, init = {}) {
   else if (filters.address) params.append('search', filters.address);
   if (filters.vehicle_type) params.append('vehicle_type', filters.vehicle_type);
   if (filters.category) params.append('category', filters.category);
+  // Business taxonomy filters (PK, key, or localized slug — matched by backend).
+  if (filters.business_category) params.append('business_category', String(filters.business_category));
+  if (filters.business_service) params.append('business_service', String(filters.business_service));
   if (filters.repair_type) params.append('repair_type', filters.repair_type);
   if (filters.city_slug) params.append('city_slug', filters.city_slug);
   if (filters.locale) params.append('locale', filters.locale);

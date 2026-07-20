@@ -16,6 +16,9 @@ export function buildShopProfileSaveSnapshot({
   workingHoursPayload,
   preferredContactMethods,
   legalEntity,
+  primaryCategoryId,
+  secondaryCategoryIds,
+  businessServiceIds,
 }) {
   if (!profile) return null;
 
@@ -48,6 +51,9 @@ export function buildShopProfileSaveSnapshot({
     instagram_url: profile.instagram_url || '',
     supported_vehicle_types: sanitizeArray(selectedVehicleTypes),
     available_repairs: sanitizeArray(selectedServices),
+    primary_business_category_id: primaryCategoryId != null ? Number(primaryCategoryId) : null,
+    secondary_business_category_ids: sanitizeArray(secondaryCategoryIds).sort((a, b) => a - b),
+    business_service_ids: sanitizeArray(businessServiceIds).sort((a, b) => a - b),
     daily_vehicle_capacity: profile.daily_vehicle_capacity ?? null,
     warehouse_enabled: Boolean(profile.warehouse_enabled),
     invoice_branch_name: profile.invoice_branch_name || '',

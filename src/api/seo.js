@@ -127,6 +127,36 @@ export function fetchSeoTaxonomy(locale = 'en') {
   return seoFetch('/api/public/seo/taxonomy/', { locale });
 }
 
+/** BusinessCategory + BusinessService taxonomy for edit + discovery filters. */
+export function fetchBusinessTaxonomy(locale = 'en', { includeInactive = false } = {}) {
+  return seoFetch('/api/public/seo/business-taxonomy/', {
+    locale,
+    ...(includeInactive ? { include_inactive: 'true' } : {}),
+  });
+}
+
+/** Category listing page: /{locale}/{categorySlug}/{citySlug}. */
+export function fetchSeoCategoryCity(locale, categorySlug, citySlug) {
+  return seoFetch(
+    `/api/public/seo/categories/${encodeURIComponent(locale)}/${encodeURIComponent(categorySlug)}/${encodeURIComponent(citySlug)}/`
+  );
+}
+
+/** Category-scoped profile page: /{locale}/{categorySlug}/{citySlug}/{shopSlug}. */
+export function fetchSeoCategoryCenter(locale, categorySlug, citySlug, centerSlug) {
+  return seoFetch(
+    `/api/public/seo/categories/${encodeURIComponent(locale)}/${encodeURIComponent(categorySlug)}/${encodeURIComponent(citySlug)}/${encodeURIComponent(centerSlug)}/`
+  );
+}
+
+/** Sitemap source for valid, indexable category pages (no redirects/empties). */
+export function fetchCategorySitemap({ locale = 'en', allLocales = false } = {}) {
+  return seoFetch('/api/public/seo/sitemap/categories/', {
+    locale,
+    ...(allLocales ? { all_locales: 'true' } : {}),
+  });
+}
+
 function isNumericSegment(value) {
   return /^\d+$/.test(String(value || '').trim());
 }

@@ -49,6 +49,12 @@ import { uploadShopImage, deleteShopImage } from '../api/shops';
 import { getMakes } from '../api/vehicles';
 import SearchableChipSelector from '../components/ui/SearchableChipSelector';
 import { vehicleTypeEmoji } from '../utils/vehicleTypeIcons';
+import { fetchBusinessTaxonomy } from '../api/seo';
+import {
+  hydrateBusinessCategoryCatalog,
+  mapPinKeyForCategoryKey,
+} from '../utils/seo/businessCategoryCatalog';
+import { getMapPinDefinition } from '../utils/pinRegistry';
 
 import AppCard from '../components/ui/AppCard';
 import { COLORS } from '../constants/colors';
@@ -102,7 +108,7 @@ import {
 } from '../api/serviceMenu';
 import ShopInvoiceSettingsSection from '../components/shop/ShopInvoiceSettingsSection';
 import FloatingSaveBar from '../components/ui/FloatingSaveBar';
-import { useTranslation } from '../i18n';
+import { useTranslation, getLocale } from '../i18n';
 import { pickVehiclePhotoAttachment, pickInvoiceLogoAttachment } from '../utils/pickDocumentFile';
 import { emptyLegalEntityDraft } from '../utils/invoiceTaxLabels';
 import { attachLunchBreak, parseLunchBreak } from '../utils/shopWorkingHours';
@@ -286,6 +292,11 @@ export default function ShopProfileScreen({ navigation, route }) {
 
   const [selectedServices, setSelectedServices] = useState([]);
   const [selectedVehicleTypes, setSelectedVehicleTypes] = useState([]);
+  const [businessCategoryOptions, setBusinessCategoryOptions] = useState([]);
+  const [businessServiceOptions, setBusinessServiceOptions] = useState([]);
+  const [primaryCategoryId, setPrimaryCategoryId] = useState(null);
+  const [secondaryCategoryIds, setSecondaryCategoryIds] = useState([]);
+  const [businessServiceIds, setBusinessServiceIds] = useState([]);
   const [selectedBrandIds, setSelectedBrandIds] = useState([]);
   const [allBrandsServiced, setAllBrandsServiced] = useState(false);
   const [hoursRows, setHoursRows] = useState(DEFAULT_HOURS);
@@ -505,6 +516,9 @@ export default function ShopProfileScreen({ navigation, route }) {
         workingHoursPayload,
         preferredContactMethods,
         legalEntity,
+        primaryCategoryId,
+        secondaryCategoryIds,
+        businessServiceIds,
       }),
     [
       profile,
@@ -515,6 +529,9 @@ export default function ShopProfileScreen({ navigation, route }) {
       workingHoursPayload,
       preferredContactMethods,
       legalEntity,
+      primaryCategoryId,
+      secondaryCategoryIds,
+      businessServiceIds,
     ]
   );
 
@@ -567,6 +584,67 @@ export default function ShopProfileScreen({ navigation, route }) {
     () => makeOptions.map((item) => ({ id: item.id, label: item.name })),
     [makeOptions]
   );
+
+  const categoryLabel = useCallback(
+    (cat) => cat?.localized_name || cat?.name_en || cat?.name || cat?.key || '',
+    []
+  );
+
+  // Secondary business categories = every category except the chosen primary.
+  const secondaryCategoryChipItems = useMemo(
+    () =>
+      businessCategoryOptions
+        .filter((cat) => Number(cat.id) !== Number(primaryCategoryId))
+        .map((cat) => ({ id: cat.id, label: categoryLabel(cat) })),
+    [businessCategoryOptions, primaryCategoryId, categoryLabel]
+  );
+
+  // Services offered are filtered to the shop's selected categories (primary +
+  // secondary). A service with no declared compatibility is always eligible.
+  const selectedCategoryKeys = useMemo(() => {
+    const ids = new Set(
+      [primaryCategoryId, ...secondaryCategoryIds].filter((v) => v != null).map(Number)
+    );
+    return new Set(
+      businessCategoryOptions.filter((c) => ids.has(Number(c.id))).map((c) => c.key)
+    );
+  }, [businessCategoryOptions, primaryCategoryId, secondaryCategoryIds]);
+
+  const businessServiceChipItems = useMemo(() => {
+    const hasCategories = selectedCategoryKeys.size > 0;
+    return businessServiceOptions
+      .filter((svc) => {
+        if (!hasCategories) return true;
+        const compat = Array.isArray(svc.category_keys) ? svc.category_keys : [];
+        if (!compat.length) return true;
+        return compat.some((key) => selectedCategoryKeys.has(key));
+      })
+      .map((svc) => ({
+        id: svc.id,
+        label: svc.localized_name || svc.name_en || svc.name || svc.key,
+      }));
+  }, [businessServiceOptions, selectedCategoryKeys]);
+
+  // Drop selected services that are no longer compatible with the categories.
+  useEffect(() => {
+    if (!businessServiceOptions.length) return;
+    const eligible = new Set(businessServiceChipItems.map((i) => Number(i.id)));
+    setBusinessServiceIds((prev) => {
+      const next = prev.filter((id) => eligible.has(Number(id)));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [businessServiceChipItems, businessServiceOptions.length]);
+
+  // Live map-pin preview follows the PRIMARY business category.
+  const primaryPinDefinition = useMemo(() => {
+    const primary = businessCategoryOptions.find(
+      (c) => Number(c.id) === Number(primaryCategoryId)
+    );
+    const pinKey = primary
+      ? primary.map_pin_key || mapPinKeyForCategoryKey(primary.key)
+      : profile?.primary_map_category;
+    return getMapPinDefinition(pinKey);
+  }, [businessCategoryOptions, primaryCategoryId, profile?.primary_map_category]);
 
   useEffect(() => {
     if (loading) return;
@@ -674,6 +752,21 @@ export default function ShopProfileScreen({ navigation, route }) {
     const repairTypes = await res.json();
     setRepairTypeOptions(toSafeArray(repairTypes));
 
+    // Business categories & services (public taxonomy — drives business type /
+    // services offered selectors and keeps the frontend catalog fresh).
+    try {
+      const taxonomy = await fetchBusinessTaxonomy(getLocale());
+      const categories = toSafeArray(taxonomy?.business_categories);
+      const services = toSafeArray(taxonomy?.business_services);
+      if (categories.length) {
+        setBusinessCategoryOptions(categories);
+        hydrateBusinessCategoryCatalog(categories);
+      }
+      if (services.length) setBusinessServiceOptions(services);
+    } catch (e) {
+      console.warn('Could not load business taxonomy', e);
+    }
+
     try {
       const direct = await fetch(`${API_BASE_URL}/api/vehicles/types/`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -752,6 +845,16 @@ export default function ShopProfileScreen({ navigation, route }) {
         );
         const loadedServices = sanitizeArray(p.available_repairs);
         const loadedVehicleTypes = sanitizeArray(p.supported_vehicle_types);
+        const loadedPrimaryCategoryId = p.primary_business_category?.id ?? null;
+        const loadedSecondaryCategoryIds = sanitizeArray(
+          (Array.isArray(p.business_categories) ? p.business_categories : [])
+            .filter((link) => !link?.is_primary)
+            .map((link) => link?.category?.id)
+        );
+        const loadedBusinessServiceIds = sanitizeArray(
+          (Array.isArray(p.business_services) ? p.business_services : [])
+            .map((link) => link?.service?.id)
+        );
         const loadedBrandIds = sanitizeArray(p.brands);
         const loadedAllBrands = !!p.all_brands_serviced;
         const loadedHours =
@@ -768,6 +871,9 @@ export default function ShopProfileScreen({ navigation, route }) {
         setLegalEntity(loadedLegal);
         setSelectedServices(loadedServices);
         setSelectedVehicleTypes(loadedVehicleTypes);
+        setPrimaryCategoryId(loadedPrimaryCategoryId);
+        setSecondaryCategoryIds(loadedSecondaryCategoryIds);
+        setBusinessServiceIds(loadedBusinessServiceIds);
         setSelectedBrandIds(loadedBrandIds);
         setAllBrandsServiced(loadedAllBrands);
         setHoursRows(loadedHours);
@@ -788,6 +894,9 @@ export default function ShopProfileScreen({ navigation, route }) {
             ),
             preferredContactMethods: loadedContact,
             legalEntity: loadedLegal,
+            primaryCategoryId: loadedPrimaryCategoryId,
+            secondaryCategoryIds: loadedSecondaryCategoryIds,
+            businessServiceIds: loadedBusinessServiceIds,
           })
         );
 
@@ -1007,6 +1116,13 @@ export default function ShopProfileScreen({ navigation, route }) {
       instagram_url: profile.instagram_url,
       supported_vehicle_types: selectedVehicleTypes,
       available_repairs: selectedServices,
+      ...(primaryCategoryId != null
+        ? {
+            primary_business_category_id: primaryCategoryId,
+            secondary_business_category_ids: secondaryCategoryIds,
+            business_service_ids: businessServiceIds,
+          }
+        : {}),
       daily_vehicle_capacity: profile.daily_vehicle_capacity
         ? parseInt(String(profile.daily_vehicle_capacity), 10)
         : null,
@@ -1050,6 +1166,9 @@ export default function ShopProfileScreen({ navigation, route }) {
           workingHoursPayload,
           preferredContactMethods,
           legalEntity: updated.legal_entity_detail || legalEntity,
+          primaryCategoryId,
+          secondaryCategoryIds,
+          businessServiceIds,
         })
       );
       const returnTo = route.params?.returnTo;
@@ -1565,7 +1684,82 @@ export default function ShopProfileScreen({ navigation, route }) {
             onChangeText={(text) => setProfile((prev) => ({ ...prev, description: text }))}
             style={styles.input}
           />
-          <Text style={styles.label}>Vehicle types you service</Text>
+          <Text style={styles.label}>{t('partnerProfile.businessType')}</Text>
+          <Text style={styles.helperText}>{t('partnerProfile.businessTypeHelper')}</Text>
+          <View style={styles.pickerWrap}>
+            <Picker
+              style={styles.picker}
+              selectedValue={primaryCategoryId != null ? Number(primaryCategoryId) : ''}
+              onValueChange={(value) => {
+                const next = value === '' || value == null ? null : Number(value);
+                setPrimaryCategoryId(next);
+                setSecondaryCategoryIds((prev) =>
+                  prev.filter((id) => Number(id) !== Number(next))
+                );
+              }}
+            >
+              <Picker.Item label={t('partnerProfile.businessTypeSelect')} value="" />
+              {businessCategoryOptions.map((cat) => (
+                <Picker.Item key={cat.id} label={categoryLabel(cat)} value={Number(cat.id)} />
+              ))}
+            </Picker>
+          </View>
+          {!businessCategoryOptions.length && (
+            <Text style={styles.helperMuted}>
+              {t('partnerProfile.businessTypeLoading')}
+            </Text>
+          )}
+          {primaryPinDefinition && (
+            <View style={styles.pinPreviewRow}>
+              <MaterialCommunityIcons
+                name={primaryPinDefinition.icon || 'map-marker'}
+                size={22}
+                color={primaryPinDefinition.color || COLORS.primary}
+              />
+              <Text style={styles.pinPreviewText}>
+                {t('partnerProfile.mapPinPreview')}
+              </Text>
+            </View>
+          )}
+
+          {!!businessCategoryOptions.length && (
+            <>
+              <Text style={[styles.label, { marginTop: 12 }]}>
+                {t('partnerProfile.secondaryBusinessTypes')}
+              </Text>
+              <Text style={styles.helperText}>
+                {t('partnerProfile.secondaryBusinessTypesHelper')}
+              </Text>
+              <SearchableChipSelector
+                items={secondaryCategoryChipItems}
+                selectedIds={secondaryCategoryIds}
+                onChangeSelectedIds={setSecondaryCategoryIds}
+                searchPlaceholder={t('partnerProfile.searchBusinessTypes')}
+                emptyHint={t('partnerProfile.noBusinessTypesMatch')}
+              />
+
+              <Text style={[styles.label, { marginTop: 12 }]}>
+                {t('partnerProfile.servicesOffered')}
+              </Text>
+              <Text style={styles.helperText}>
+                {t('partnerProfile.servicesOfferedHelper')}
+              </Text>
+              <SearchableChipSelector
+                items={businessServiceChipItems}
+                selectedIds={businessServiceIds}
+                onChangeSelectedIds={setBusinessServiceIds}
+                searchPlaceholder={t('partnerProfile.searchServices')}
+                emptyHint={t('partnerProfile.noServicesMatch')}
+              />
+              {primaryCategoryId == null && (
+                <Text style={styles.helperMuted}>
+                  {t('partnerProfile.selectBusinessTypeFirst')}
+                </Text>
+              )}
+            </>
+          )}
+
+          <Text style={[styles.label, { marginTop: 12 }]}>Vehicle types you service</Text>
           <Text style={styles.helperText}>
             Full-service centers can tap Select all. Required for map discovery.
           </Text>
@@ -2247,6 +2441,16 @@ const styles = StyleSheet.create({
   },
   picker: {
     backgroundColor: 'rgba(255,255,255,0.96)',
+  },
+  pinPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  pinPreviewText: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 13,
   },
   chipWrap: {
     flexDirection: 'row',
