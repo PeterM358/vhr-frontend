@@ -2510,6 +2510,7 @@
     "annualSavingsShort": "Save {{amount}} {{currency}} ({{percent}}%) a year",
     "selectLabel": "Select",
     "selectedLabel": "Selected",
+    "continueToPayment": "Continue to payment",
     "proTagline": "Everything you need to run your workshop.",
     "proFeaturesTitle": "Includes",
     "proFeatureRepairs": "Repair requests",

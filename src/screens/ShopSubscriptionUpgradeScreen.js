@@ -3,7 +3,7 @@
  * Gates must use entitlements from the API, not plan-name hardcoding.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -131,6 +131,15 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   const [selected, setSelected] = useState({ planKey: 'premium', billingInterval: 'annual' });
   const [payment, setPayment] = useState(null);
   const [error, setError] = useState(null);
+  const scrollRef = useRef(null);
+  const paymentSectionY = useRef(0);
+
+  const scrollToPayment = useCallback(() => {
+    scrollRef.current?.scrollTo({
+      y: Math.max(paymentSectionY.current - 12, 0),
+      animated: true,
+    });
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -270,7 +279,11 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
         title={t('subscription.upgradeTitle')}
         onBack={() => navigation.goBack()}
       />
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
         {loading ? (
           <ActivityIndicator style={{ marginTop: 48 }} color={COLORS.PRIMARY} />
         ) : (
@@ -404,6 +417,11 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
             </View>
 
             {/* Payment */}
+            <View
+              onLayout={(e) => {
+                paymentSectionY.current = e.nativeEvent.layout.y;
+              }}
+            />
             <View style={styles.paymentSummary}>
               <MaterialCommunityIcons name="cart-outline" size={18} color={COLORS.PRIMARY_DARK} />
               <Text style={styles.paymentSummaryText}>
@@ -542,6 +560,29 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
           </>
         )}
       </ScrollView>
+
+      {!loading && selectedOption ? (
+        <View style={styles.stickyBar} pointerEvents="box-none">
+          <Pressable
+            onPress={scrollToPayment}
+            style={({ pressed }) => [styles.stickyBtn, pressed && { opacity: 0.9 }]}
+            accessibilityRole="button"
+          >
+            <View style={styles.stickyTextWrap}>
+              <Text style={styles.stickyBtnLabel}>{t('subscription.continueToPayment')}</Text>
+              <Text style={styles.stickyBtnSub}>
+                {`${selectedPlanName} · ${selectedIntervalName}`}
+              </Text>
+            </View>
+            <View style={styles.stickyPriceWrap}>
+              <Text style={styles.stickyBtnPrice}>
+                {`${selectedOption.amount} ${selectedOption.currency}`}
+              </Text>
+              <MaterialCommunityIcons name="arrow-down" size={20} color="#fff" />
+            </View>
+          </Pressable>
+        </View>
+      ) : null}
     </ScreenBackground>
   );
 }
@@ -676,8 +717,54 @@ function CopyRow({ label, value, onCopy, emphasize }) {
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingBottom: 48,
+    paddingBottom: 120,
     paddingHorizontal: 20,
+  },
+  stickyBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 26 : 14,
+    backgroundColor: COLORS.CARD_DARK,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.16)',
+  },
+  stickyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    backgroundColor: COLORS.PRIMARY,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+  },
+  stickyTextWrap: {
+    flex: 1,
+  },
+  stickyBtnLabel: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  stickyBtnSub: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  stickyPriceWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stickyBtnPrice: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
   },
   hero: {
     borderRadius: 20,
@@ -864,7 +951,9 @@ const styles = StyleSheet.create({
   planCardSelected: {
     borderColor: COLORS.PRIMARY,
     borderWidth: 2,
-    backgroundColor: 'rgba(37,99,235,0.04)',
+    // Solid opaque surface so the dark garage background never bleeds through
+    // and washes out the dark card text when a plan is selected.
+    backgroundColor: '#EEF2FF',
   },
   planBadge: {
     flexDirection: 'row',

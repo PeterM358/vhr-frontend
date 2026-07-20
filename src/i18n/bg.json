@@ -2485,6 +2485,7 @@
     "annualSavingsShort": "Спестявате {{amount}} {{currency}} ({{percent}}%) на година",
     "selectLabel": "Изберете",
     "selectedLabel": "Избрано",
+    "continueToPayment": "Към плащане",
     "proTagline": "Всичко необходимо, за да управлявате сервиза си.",
     "proFeaturesTitle": "Включва",
     "proFeatureRepairs": "Заявки за ремонт",
