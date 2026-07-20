@@ -55,8 +55,8 @@ export default function ErpAccessGate({
           <AppNavigationBar title={title} onBack={onBack} />
           <View style={styles.body}>
             <AppCard>
-              <Text variant="titleMedium">{t('subscription.upgradeTitle')}</Text>
-              <Text style={styles.muted}>{t('subscription.upgradeSubtitle')}</Text>
+              <Text variant="titleMedium">{t('subscription.gateLockedTitle')}</Text>
+              <Text style={styles.muted}>{t('subscription.gateLockedBody')}</Text>
               <Button
                 mode="contained"
                 style={{ marginTop: 16 }}

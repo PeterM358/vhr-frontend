@@ -51,17 +51,56 @@ const FEATURE_LABEL_KEYS = {
   [FEATURES.DOCUMENTS]: 'subscription.featureDocuments',
 };
 
-const PLAN_OPTIONS = [
-  { planKey: 'pro', billingInterval: 'monthly' },
-  { planKey: 'pro', billingInterval: 'annual' },
-  { planKey: 'premium', billingInterval: 'monthly' },
-  { planKey: 'premium', billingInterval: 'annual' },
+// PRO value checklist (business language, never limitations).
+const PRO_FEATURE_KEYS = [
+  'subscription.proFeatureRepairs',
+  'subscription.proFeatureOffers',
+  'subscription.proFeatureCalendar',
+  'subscription.proFeatureErp',
+  'subscription.proFeatureDocuments',
+  'subscription.proFeatureCustomerHistory',
+  'subscription.proFeatureVehicleHistory',
+  'subscription.proFeatureNotifications',
+  'subscription.proFeatureChat',
+  'subscription.proFeatureAi',
 ];
+
+// Premium growth benefits (everything in PRO, plus these).
+const PREMIUM_BENEFIT_KEYS = [
+  'subscription.premiumBenefitFeatured',
+  'subscription.premiumBenefitRanking',
+  'subscription.premiumBenefitMap',
+  'subscription.premiumBenefitBadge',
+  'subscription.premiumBenefitHomepage',
+  'subscription.premiumBenefitVisibility',
+  'subscription.premiumBenefitInsights',
+  'subscription.premiumBenefitSupport',
+];
+
+const PLAN_TAGLINE_KEYS = {
+  trial: 'subscription.planTaglineTrial',
+  pro: 'subscription.planTaglinePro',
+  premium: 'subscription.planTaglinePremium',
+  enterprise: 'subscription.planTaglineEnterprise',
+};
 
 function findOption(options, planKey, billingInterval) {
   return (options || []).find(
     (o) => o.plan_key === planKey && o.billing_interval === billingInterval
   );
+}
+
+function fmtMoney(value) {
+  const num = Number(value);
+  if (!isFinite(num)) return '';
+  return Number.isInteger(num) ? String(num) : num.toFixed(2);
+}
+
+function savingsPercent(annualOpt) {
+  const total = Number(annualOpt?.monthly_equivalent_annual_total);
+  const save = Number(annualOpt?.annual_savings);
+  if (!total || !save) return null;
+  return Math.round((save / total) * 100);
 }
 
 async function copyText(value) {
@@ -89,7 +128,7 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
   const [profile, setProfile] = useState(null);
   const [optionsPayload, setOptionsPayload] = useState(null);
-  const [selected, setSelected] = useState({ planKey: 'pro', billingInterval: 'annual' });
+  const [selected, setSelected] = useState({ planKey: 'premium', billingInterval: 'annual' });
   const [payment, setPayment] = useState(null);
   const [error, setError] = useState(null);
 
@@ -130,8 +169,13 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   const accepting = isAcceptingRequests(profile);
   const completion = ents?.profile_completion;
   const expiresAt = ents?.expires_at;
+  const cancelAtPeriodEnd = Boolean(optionsPayload?.cancel_at_period_end);
+  const planKeyLower = String(ents?.plan_key || '').toLowerCase();
+  const isActive =
+    (ents?.account_state || ents?.subscription_state) === 'active';
   const bank = optionsPayload?.bank || {};
   const stripe = optionsPayload?.stripe || {};
+  const options = optionsPayload?.options;
   const bankIncomplete = Boolean(bank.incomplete || bank.configured === false);
   const stripeIncomplete = Boolean(stripe.incomplete || stripe.configured === false);
   const featureRequested =
@@ -140,11 +184,24 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
       ? t(FEATURE_LABEL_KEYS[featureKey])
       : null);
 
-  const selectedOption = findOption(
-    optionsPayload?.options,
-    selected.planKey,
-    selected.billingInterval
-  );
+  const currentTagline = t(PLAN_TAGLINE_KEYS[planKeyLower] || 'subscription.planTaglinePro');
+  const expiryLine = useMemo(() => {
+    if (!expiresAt) return null;
+    const date = String(expiresAt).slice(0, 10);
+    if (cancelAtPeriodEnd) return t('subscription.accessUntil', { date });
+    if (isActive) return t('subscription.renewsOn', { date });
+    return `${t('subscription.expiresAt')}: ${date}`;
+  }, [expiresAt, cancelAtPeriodEnd, isActive, t]);
+
+  const isAnnual = selected.billingInterval === 'annual';
+  const annualBadgePercent = useMemo(() => {
+    const pcts = ['pro', 'premium']
+      .map((k) => savingsPercent(findOption(options, k, 'annual')))
+      .filter((n) => n != null);
+    return pcts.length ? Math.max(...pcts) : null;
+  }, [options]);
+
+  const selectedOption = findOption(options, selected.planKey, selected.billingInterval);
 
   const requestPayment = async () => {
     if (!profile?.id || bankIncomplete) return;
@@ -192,6 +249,21 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
     }
   };
 
+  const contactSales = () => {
+    const subject = encodeURIComponent(t('subscription.enterpriseEmailSubject'));
+    const body = encodeURIComponent(
+      t('subscription.enterpriseEmailBody', { shop: profile?.name || '' })
+    );
+    Linking.openURL(`mailto:partners@veversal.com?subject=${subject}&body=${body}`);
+  };
+
+  const selectedPlanName = t(
+    selected.planKey === 'premium' ? 'subscription.planPremium' : 'subscription.planPro'
+  );
+  const selectedIntervalName = t(
+    isAnnual ? 'subscription.billingAnnual' : 'subscription.billingMonthly'
+  );
+
   return (
     <ScreenBackground>
       <PartnerAppHeader
@@ -203,34 +275,39 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
           <ActivityIndicator style={{ marginTop: 48 }} color={COLORS.PRIMARY} />
         ) : (
           <>
+            {/* Current plan */}
             <View style={styles.hero}>
               <Text style={styles.heroEyebrow}>{t('subscription.currentPlan')}</Text>
               <Text style={styles.heroPlan}>{planLabel}</Text>
-              {stateLabel ? (
-                <Text style={styles.heroState}>
-                  {t('subscription.accountState')}: {stateLabel}
-                </Text>
-              ) : null}
-              {expiresAt ? (
-                <Text style={styles.heroState}>
-                  {t('subscription.expiresAt')}: {String(expiresAt).slice(0, 10)}
-                </Text>
-              ) : null}
-              {!accepting && listingMessage ? (
+              <Text style={styles.heroTagline}>{currentTagline}</Text>
+              <View style={styles.heroMetaRow}>
+                {stateLabel ? (
+                  <View style={styles.statusChip}>
+                    <View style={[styles.statusDot, accepting ? styles.statusDotOk : styles.statusDotWarn]} />
+                    <Text style={styles.statusChipText}>{stateLabel}</Text>
+                  </View>
+                ) : null}
+                {expiryLine ? <Text style={styles.heroState}>{expiryLine}</Text> : null}
+              </View>
+              {!accepting ? (
                 <View style={styles.inactiveBanner}>
-                  <MaterialCommunityIcons name="store-off-outline" size={16} color="#fff" />
-                  <Text style={styles.inactiveBannerText}>{listingMessage}</Text>
+                  <MaterialCommunityIcons name="store-alert-outline" size={18} color="#fff" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inactiveBannerText}>
+                      {listingMessage || t('subscription.notAcceptingRequests')}
+                    </Text>
+                    <Text style={styles.inactiveBannerHelp}>{t('subscription.inactiveHelp')}</Text>
+                  </View>
                 </View>
               ) : null}
               {featureRequested ? (
                 <View style={styles.featurePill}>
-                  <MaterialCommunityIcons name="lock-outline" size={16} color="#fff" />
+                  <MaterialCommunityIcons name="lock-open-variant-outline" size={16} color="#fff" />
                   <Text style={styles.featurePillText}>
                     {t('subscription.featureRequested', { feature: featureRequested })}
                   </Text>
                 </View>
               ) : null}
-              <Text style={styles.heroSub}>{t('subscription.upgradeSubtitle')}</Text>
             </View>
 
             {completion && !completion.ready_for_paid_plan ? (
@@ -252,38 +329,90 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
               </View>
             ) : null}
 
+            {/* Billing interval toggle */}
             <Text style={styles.sectionTitle}>{t('subscription.choosePlan')}</Text>
-            <View style={styles.optionGrid}>
-              {PLAN_OPTIONS.map((row) => {
-                const opt = findOption(optionsPayload?.options, row.planKey, row.billingInterval);
-                const active =
-                  selected.planKey === row.planKey &&
-                  selected.billingInterval === row.billingInterval;
-                const savings =
-                  row.billingInterval === 'annual' && opt?.annual_savings
-                    ? t('subscription.annualSavings', {
-                        amount: opt.annual_savings,
-                        currency: opt.currency || 'EUR',
-                      })
-                    : null;
-                return (
-                  <Pressable
-                    key={`${row.planKey}-${row.billingInterval}`}
-                    onPress={() => setSelected(row)}
-                    style={[styles.optionCard, active && styles.optionCardActive]}
-                  >
-                    <Text style={styles.optionTitle}>
-                      {t(`subscription.planOption.${row.planKey}_${row.billingInterval}`)}
+            <View style={styles.toggle}>
+              <Pressable
+                onPress={() => setSelected((s) => ({ ...s, billingInterval: 'monthly' }))}
+                style={[styles.toggleBtn, !isAnnual && styles.toggleBtnActive]}
+              >
+                <Text style={[styles.toggleText, !isAnnual && styles.toggleTextActive]}>
+                  {t('subscription.billingMonthly')}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setSelected((s) => ({ ...s, billingInterval: 'annual' }))}
+                style={[styles.toggleBtn, isAnnual && styles.toggleBtnActive]}
+              >
+                <Text style={[styles.toggleText, isAnnual && styles.toggleTextActive]}>
+                  {t('subscription.billingAnnual')}
+                </Text>
+                {annualBadgePercent ? (
+                  <View style={styles.toggleSaveBadge}>
+                    <Text style={styles.toggleSaveBadgeText}>
+                      {t('subscription.billingAnnualSave', { percent: annualBadgePercent })}
                     </Text>
-                    <Text style={styles.optionPrice}>
-                      {opt
-                        ? `${opt.amount} ${opt.currency}`
-                        : t('subscription.priceUnavailable')}
-                    </Text>
-                    {savings ? <Text style={styles.optionSavings}>{savings}</Text> : null}
-                  </Pressable>
-                );
-              })}
+                  </View>
+                ) : null}
+              </Pressable>
+            </View>
+
+            {/* PRO */}
+            <PlanCard
+              planKey="pro"
+              title={t('subscription.planPro')}
+              tagline={t('subscription.proTagline')}
+              options={options}
+              isAnnual={isAnnual}
+              selected={selected.planKey === 'pro'}
+              onSelect={() => setSelected((s) => ({ ...s, planKey: 'pro' }))}
+              featuresTitle={t('subscription.proFeaturesTitle')}
+              features={PRO_FEATURE_KEYS.map((k) => t(k))}
+              selectLabel={t('subscription.selectLabel')}
+              selectedLabel={t('subscription.selectedLabel')}
+              t={t}
+            />
+
+            {/* Premium — visual standout */}
+            <PlanCard
+              planKey="premium"
+              title={t('subscription.planPremium')}
+              tagline={t('subscription.premiumTagline')}
+              options={options}
+              isAnnual={isAnnual}
+              selected={selected.planKey === 'premium'}
+              onSelect={() => setSelected((s) => ({ ...s, planKey: 'premium' }))}
+              featuresTitle={t('subscription.premiumEverythingInPro')}
+              features={PREMIUM_BENEFIT_KEYS.map((k) => t(k))}
+              badge={t('subscription.premiumBadge')}
+              highlight
+              selectLabel={t('subscription.selectLabel')}
+              selectedLabel={t('subscription.selectedLabel')}
+              t={t}
+            />
+
+            {/* Enterprise — small, contact sales */}
+            <View style={styles.enterpriseCard}>
+              <View style={styles.enterpriseHeader}>
+                <MaterialCommunityIcons name="office-building-outline" size={20} color={COLORS.PRIMARY_DARK} />
+                <Text style={styles.enterpriseTitle}>{t('subscription.enterpriseTitle')}</Text>
+              </View>
+              <Text style={styles.enterpriseBody}>{t('subscription.enterpriseTagline')}</Text>
+              <Button mode="outlined" onPress={contactSales} style={{ marginTop: 10, alignSelf: 'flex-start' }}>
+                {t('subscription.enterpriseCta')}
+              </Button>
+            </View>
+
+            {/* Payment */}
+            <View style={styles.paymentSummary}>
+              <MaterialCommunityIcons name="cart-outline" size={18} color={COLORS.PRIMARY_DARK} />
+              <Text style={styles.paymentSummaryText}>
+                {t('subscription.selectedSummary', {
+                  plan: selectedPlanName,
+                  interval: selectedIntervalName,
+                })}
+                {selectedOption ? `  ·  ${selectedOption.amount} ${selectedOption.currency}` : ''}
+              </Text>
             </View>
 
             <Text style={styles.sectionTitle}>{t('subscription.payByCard')}</Text>
@@ -322,6 +451,14 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
 
             <Text style={styles.sectionTitle}>{t('subscription.payByBankTransfer')}</Text>
             <Text style={styles.sectionBody}>{t('subscription.bankTransferIntro')}</Text>
+
+            <View style={styles.stepsCard}>
+              <Text style={styles.stepsTitle}>{t('subscription.bankStepsTitle')}</Text>
+              <StepRow index={1} text={t('subscription.bankStep1')} />
+              <StepRow index={2} text={t('subscription.bankStep2')} />
+              <StepRow index={3} text={t('subscription.bankStep3')} />
+              <Text style={styles.stepsNote}>{t('subscription.bankAccountingNote')}</Text>
+            </View>
 
             {bankIncomplete ? (
               <View style={styles.warnCard}>
@@ -396,6 +533,7 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
                 <Text style={styles.metaLine}>
                   {t('subscription.paymentStatus')}: {payment.status}
                 </Text>
+                <Text style={styles.footnote}>{t('subscription.bankAccountingNote')}</Text>
                 <Text style={styles.footnote}>{t('subscription.notAnInvoice')}</Text>
               </View>
             ) : null}
@@ -405,6 +543,121 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
         )}
       </ScrollView>
     </ScreenBackground>
+  );
+}
+
+function PlanCard({
+  planKey,
+  title,
+  tagline,
+  options,
+  isAnnual,
+  selected,
+  onSelect,
+  featuresTitle,
+  features,
+  badge,
+  highlight,
+  selectLabel,
+  selectedLabel,
+  t,
+}) {
+  const monthlyOpt = findOption(options, planKey, 'monthly');
+  const annualOpt = findOption(options, planKey, 'annual');
+  const activeOpt = isAnnual ? annualOpt : monthlyOpt;
+  const currency = activeOpt?.currency || monthlyOpt?.currency || 'EUR';
+
+  let priceMain = t('subscription.priceUnavailable');
+  let priceSub = null;
+  let savingsText = null;
+  if (activeOpt) {
+    if (isAnnual) {
+      const perMonth = fmtMoney(Number(activeOpt.amount) / 12);
+      priceMain = `${perMonth} ${currency}`;
+      priceSub = t('subscription.billedAnnually', { amount: activeOpt.amount, currency });
+      const pct = savingsPercent(activeOpt);
+      if (activeOpt.annual_savings && pct != null) {
+        savingsText = t('subscription.annualSavingsShort', {
+          amount: activeOpt.annual_savings,
+          currency,
+          percent: pct,
+        });
+      }
+    } else {
+      priceMain = `${activeOpt.amount} ${currency}`;
+      priceSub = t('subscription.billedMonthly');
+    }
+  }
+
+  return (
+    <Pressable
+      onPress={onSelect}
+      style={[
+        styles.planCard,
+        highlight && styles.planCardHighlight,
+        selected && styles.planCardSelected,
+      ]}
+    >
+      {badge ? (
+        <View style={styles.planBadge}>
+          <MaterialCommunityIcons name="star-four-points" size={12} color="#fff" />
+          <Text style={styles.planBadgeText}>{badge}</Text>
+        </View>
+      ) : null}
+
+      <View style={styles.planHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.planName}>{title}</Text>
+          <Text style={styles.planTagline}>{tagline}</Text>
+        </View>
+        <View style={[styles.radio, selected && styles.radioOn]}>
+          {selected ? <MaterialCommunityIcons name="check" size={14} color="#fff" /> : null}
+        </View>
+      </View>
+
+      <View style={styles.priceRow}>
+        <Text style={styles.priceMain}>{priceMain}</Text>
+        <Text style={styles.priceUnit}>{t('subscription.perMonth')}</Text>
+      </View>
+      {priceSub ? <Text style={styles.priceSub}>{priceSub}</Text> : null}
+      {savingsText ? (
+        <View style={styles.savingsPill}>
+          <MaterialCommunityIcons name="tag-outline" size={13} color={COLORS.PRIMARY_DARK} />
+          <Text style={styles.savingsPillText}>{savingsText}</Text>
+        </View>
+      ) : null}
+
+      <Text style={styles.featuresTitle}>{featuresTitle}</Text>
+      <View style={styles.featureList}>
+        {features.map((label) => (
+          <View key={label} style={styles.featureRow}>
+            <MaterialCommunityIcons
+              name="check-circle"
+              size={16}
+              color={highlight ? COLORS.PRIMARY : COLORS.PRIMARY_DARK}
+            />
+            <Text style={styles.featureText}>{label}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={[styles.selectBtn, selected && styles.selectBtnOn, highlight && !selected && styles.selectBtnHighlight]}>
+        <Text style={[styles.selectBtnText, selected && styles.selectBtnTextOn]}>
+          {selected ? selectedLabel : selectLabel}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function StepRow({ index, text }) {
+  return (
+    <View style={styles.stepRow}>
+      <View style={styles.stepNum}>
+        <Text style={styles.stepNumText}>{index}</Text>
+      </View>
+      <Text style={styles.stepText}>{text}</Text>
+    </View>
   );
 }
 
@@ -448,33 +701,65 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif-medium', default: 'system-ui' }),
   },
+  heroTagline: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 15,
+    marginTop: 6,
+    lineHeight: 21,
+  },
+  heroMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 14,
+  },
+  statusChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusDotOk: { backgroundColor: '#4ade80' },
+  statusDotWarn: { backgroundColor: '#fbbf24' },
+  statusChipText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   heroState: {
     color: 'rgba(255,255,255,0.8)',
     fontSize: 13,
     fontWeight: '600',
-    marginTop: 6,
   },
   inactiveBanner: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(180,60,40,0.55)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginTop: 12,
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: 'rgba(180,60,40,0.5)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    marginTop: 14,
   },
   inactiveBannerText: {
     color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
   },
-  heroSub: {
+  inactiveBannerHelp: {
     color: 'rgba(255,255,255,0.9)',
-    fontSize: 15,
-    marginTop: 12,
-    lineHeight: 22,
+    fontSize: 13,
+    marginTop: 4,
+    lineHeight: 18,
   },
   featurePill: {
     flexDirection: 'row',
@@ -483,7 +768,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(0,0,0,0.22)',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 20,
     marginTop: 14,
   },
@@ -516,60 +801,251 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.TEXT_DARK,
-    marginBottom: 8,
+    color: '#fff',
+    marginBottom: 10,
     marginTop: 8,
   },
   sectionBody: {
     fontSize: 14,
-    color: COLORS.TEXT_MUTED,
+    color: 'rgba(255,255,255,0.85)',
     marginBottom: 14,
     lineHeight: 20,
   },
-  optionGrid: {
-    gap: 10,
+  toggle: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 14,
+    padding: 4,
     marginBottom: 16,
   },
-  optionCard: {
+  toggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 11,
+  },
+  toggleBtnActive: {
     backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.08)',
   },
-  optionCardActive: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(37,99,235,0.06)',
-  },
-  optionTitle: {
+  toggleText: {
     fontSize: 15,
     fontWeight: '700',
+    color: '#fff',
+  },
+  toggleTextActive: {
+    color: COLORS.PRIMARY_DARK,
+  },
+  toggleSaveBadge: {
+    backgroundColor: COLORS.PRIMARY,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  toggleSaveBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  planCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(15,23,42,0.1)',
+  },
+  planCardHighlight: {
+    borderColor: COLORS.PRIMARY,
+    borderWidth: 2,
+  },
+  planCardSelected: {
+    borderColor: COLORS.PRIMARY,
+    borderWidth: 2,
+    backgroundColor: 'rgba(37,99,235,0.04)',
+  },
+  planBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.PRIMARY,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 12,
+  },
+  planBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  planHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  planName: {
+    fontSize: 22,
+    fontWeight: '800',
     color: COLORS.TEXT_DARK,
   },
-  optionPrice: {
-    marginTop: 4,
-    fontSize: 16,
+  planTagline: {
+    fontSize: 14,
+    color: COLORS.TEXT_MUTED,
+    marginTop: 2,
+    lineHeight: 19,
+  },
+  radio: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(15,23,42,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioOn: {
+    backgroundColor: COLORS.PRIMARY,
+    borderColor: COLORS.PRIMARY,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+    marginTop: 16,
+  },
+  priceMain: {
+    fontSize: 30,
     fontWeight: '800',
     color: COLORS.PRIMARY_DARK,
   },
-  optionSavings: {
-    marginTop: 4,
+  priceUnit: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.TEXT_MUTED,
+    marginBottom: 5,
+  },
+  priceSub: {
     fontSize: 13,
     color: COLORS.TEXT_MUTED,
+    marginTop: 2,
+  },
+  savingsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(37,99,235,0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    marginTop: 10,
+  },
+  savingsPillText: {
+    color: COLORS.PRIMARY_DARK,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  featuresTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.TEXT_DARK,
+    marginTop: 18,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  featureList: {
+    gap: 9,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  featureText: {
+    fontSize: 14,
+    color: COLORS.TEXT_DARK,
+    flex: 1,
+  },
+  selectBtn: {
+    marginTop: 18,
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: 'rgba(15,23,42,0.06)',
+  },
+  selectBtnHighlight: {
+    backgroundColor: 'rgba(37,99,235,0.12)',
+  },
+  selectBtnOn: {
+    backgroundColor: COLORS.PRIMARY,
+  },
+  selectBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.PRIMARY_DARK,
+  },
+  selectBtnTextOn: {
+    color: '#fff',
+  },
+  enterpriseCard: {
+    backgroundColor: COLORS.CARD_FLOATING,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.08)',
+  },
+  enterpriseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  enterpriseTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.TEXT_DARK,
+  },
+  enterpriseBody: {
+    fontSize: 13,
+    color: COLORS.TEXT_MUTED,
+    marginTop: 6,
+    lineHeight: 19,
+  },
+  paymentSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: COLORS.CARD_FLOATING,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 18,
+  },
+  paymentSummaryText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.TEXT_DARK,
   },
   warnCard: {
     padding: 14,
     borderRadius: 14,
-    backgroundColor: 'rgba(180,60,40,0.08)',
+    backgroundColor: 'rgba(180,60,40,0.12)',
     marginBottom: 16,
   },
   warnTitle: {
     fontWeight: '700',
-    color: COLORS.TEXT_DARK,
+    color: '#fff',
   },
   warnBody: {
     marginTop: 4,
-    color: COLORS.TEXT_MUTED,
+    color: 'rgba(255,255,255,0.85)',
     lineHeight: 20,
   },
   cta: {
@@ -597,6 +1073,50 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
     fontSize: 13,
     marginTop: 4,
+  },
+  stepsCard: {
+    backgroundColor: COLORS.CARD_FLOATING,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    gap: 10,
+  },
+  stepsTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.TEXT_DARK,
+    marginBottom: 2,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  stepNum: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: COLORS.PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  stepNumText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  stepText: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.TEXT_DARK,
+    lineHeight: 20,
+  },
+  stepsNote: {
+    fontSize: 13,
+    color: COLORS.TEXT_MUTED,
+    lineHeight: 18,
+    marginTop: 2,
   },
   instructions: {
     backgroundColor: '#fff',
@@ -651,7 +1171,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     marginTop: 12,
-    color: '#b91c1c',
+    color: '#fecaca',
     fontSize: 13,
   },
 });
