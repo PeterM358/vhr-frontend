@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
-import { Text, TextInput, Button, Portal, Dialog, Switch } from 'react-native-paper';
+import { Text, Button, Portal, Dialog } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 
@@ -9,16 +9,11 @@ import { useTranslation } from '../../i18n';
 import { navigateToPartnerServices } from '../../navigation/webNavigation';
 import { getOperationIcon } from '../../icons/operationIconRegistry';
 import { translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
+import ShopServicePricingFields from './ShopServicePricingFields';
 import {
-  DURATION_PRESETS_MINUTES,
-  DURATION_STEP_MINUTES,
-  adjustDurationMinutes,
-  formatDurationPresetLabel,
-  formatDurationRangeMinutes,
-  formatLaborHoursCompact,
-  formatTypicalLaborTime,
-  parseDurationMinutesInput,
-} from '../../utils/laborDuration';
+  serviceMenuSummaryLine,
+  parsePricingMoney,
+} from '../../utils/servicePricingSummary';
 
 function menuItemForType(menuItems, repairTypeId) {
   return (menuItems || []).find((row) => Number(row.repair_type) === Number(repairTypeId));
@@ -40,100 +35,17 @@ function resolveInitialMinutes(existing, row) {
   return 30;
 }
 
-function laborPriceSummary(item, t) {
-  if (!item) return t('partnerProfile.priceMissing');
-  // Published menu amounts are labor only.
-  const from = item.labor_from ?? item.price_from;
-  const to = item.labor_to ?? item.price_to;
-  const laborTime = formatTypicalLaborTime(
-    item.typical_labor_minutes,
-    item.typical_labor_minutes_to
-  );
-  const priceBits = [];
-  if (from != null && to != null && String(from) !== String(to)) {
-    priceBits.push(t('partnerProfile.laborPriceRange', { from, to }));
-  } else if (from != null) {
-    priceBits.push(t('partnerProfile.laborPriceFrom', { price: from }));
-  } else if (to != null) {
-    priceBits.push(t('partnerProfile.laborPriceFrom', { price: to }));
-  } else {
-    priceBits.push(t('partnerProfile.priceMissing'));
-  }
-  if (laborTime) priceBits.unshift(laborTime);
-  return priceBits.join(' · ');
-}
-
-function DurationStepper({ label, value, onChange, t }) {
-  const minutes = Math.max(0, Math.round(Number(value) || 0));
-  const selectedPreset = DURATION_PRESETS_MINUTES.includes(minutes) ? minutes : null;
-
-  return (
-    <View style={styles.durationBlock}>
-      {label ? <Text style={styles.durationLabel}>{label}</Text> : null}
-      <View style={styles.presetWrap}>
-        {DURATION_PRESETS_MINUTES.map((preset) => {
-          const selected = selectedPreset === preset;
-          return (
-            <Pressable
-              key={preset}
-              onPress={() => onChange(preset)}
-              style={[styles.presetChip, selected && styles.presetChipSelected]}
-            >
-              <Text style={[styles.presetChipText, selected && styles.presetChipTextSelected]}>
-                {formatDurationPresetLabel(preset)}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      <View style={styles.stepperRow}>
-        <Pressable
-          onPress={() => onChange(adjustDurationMinutes(minutes, -DURATION_STEP_MINUTES))}
-          style={styles.stepperBtn}
-          accessibilityLabel={t('partnerProfile.durationMinus15')}
-        >
-          <MaterialCommunityIcons name="minus" size={20} color={COLORS.TEXT_DARK} />
-          <Text style={styles.stepperBtnText}>15</Text>
-        </Pressable>
-        <TextInput
-          label={t('partnerProfile.customMinutes')}
-          mode="outlined"
-          keyboardType="number-pad"
-          value={minutes > 0 ? String(minutes) : ''}
-          onChangeText={(text) => {
-            const digits = String(text || '').replace(/[^\d]/g, '');
-            if (digits === '') {
-              onChange(0);
-              return;
-            }
-            const parsed = parseInt(digits, 10);
-            onChange(Number.isFinite(parsed) ? parsed : 0);
-          }}
-          style={styles.customMinutesInput}
-          dense
-        />
-        <Pressable
-          onPress={() => onChange(adjustDurationMinutes(minutes, DURATION_STEP_MINUTES))}
-          style={styles.stepperBtn}
-          accessibilityLabel={t('partnerProfile.durationPlus15')}
-        >
-          <MaterialCommunityIcons name="plus" size={20} color={COLORS.TEXT_DARK} />
-          <Text style={styles.stepperBtnText}>15</Text>
-        </Pressable>
-      </View>
-      {minutes > 0 ? (
-        <Text style={styles.durationPreview}>
-          {formatLaborHoursCompact(minutes) || `${minutes} min`}
-        </Text>
-      ) : null}
-    </View>
-  );
+function chipPriceSummary(item, t) {
+  if (!itemHasPrice(item)) return t('partnerProfile.priceMissing');
+  return serviceMenuSummaryLine(item, t);
 }
 
 /**
- * Operations & Pricing: select repair types and capture typical labor time + price range.
- * Writes via onUpsertOperationPricing (labor_from/to + typical_labor_minutes[_to]).
- * Typical labor is not estimated vehicle completion time.
+ * Operations & Pricing: select repair types and capture parts + labor + typical
+ * labor time. Uses the shared ShopServicePricingFields editor so this modal and
+ * the full Price List (ShopServiceMenuScreen) share identical pricing logic.
+ * Writes via onUpsertOperationPricing (parts_from/to + labor_from/to +
+ * typical_labor_minutes[_to]). Typical labor is not vehicle-ready completion time.
  */
 export default function ShopOperationsPricingSection({
   styles: parentStyles,
@@ -147,13 +59,8 @@ export default function ShopOperationsPricingSection({
   const { t } = useTranslation();
   const navigation = useNavigation();
   const [pricingTarget, setPricingTarget] = useState(null);
-  const [useDurationRange, setUseDurationRange] = useState(false);
-  const [durationMin, setDurationMin] = useState(30);
-  const [durationFrom, setDurationFrom] = useState(30);
-  const [durationTo, setDurationTo] = useState(45);
-  const [durationError, setDurationError] = useState('');
-  const [priceFrom, setPriceFrom] = useState('');
-  const [priceTo, setPriceTo] = useState('');
+  const [pricingValue, setPricingValue] = useState(null);
+  const [saveError, setSaveError] = useState('');
 
   const openPricing = (row, { ensureSelected = false } = {}) => {
     const existing = menuItemForType(serviceMenuItems, row.id);
@@ -162,84 +69,64 @@ export default function ShopOperationsPricingSection({
       existing?.typical_labor_minutes != null &&
       existing?.typical_labor_minutes_to != null &&
       Number(existing.typical_labor_minutes_to) !== Number(existing.typical_labor_minutes);
+    // Legacy labor-only rows have price_* but no parts_*; only fall back to
+    // price_* for labor when there are no parts (so parts are never double-counted).
+    const partsAbsent = existing?.parts_from == null && existing?.parts_to == null;
+    const laborFromVal = existing?.labor_from ?? (partsAbsent ? existing?.price_from : null);
+    const laborToVal = existing?.labor_to ?? (partsAbsent ? existing?.price_to : null);
     setPricingTarget({ row, ensureSelected });
-    setUseDurationRange(hasRange);
-    setDurationMin(initial);
-    setDurationFrom(initial);
-    setDurationTo(
-      hasRange
-        ? Number(existing.typical_labor_minutes_to)
-        : Math.max(initial, initial + DURATION_STEP_MINUTES)
-    );
-    setDurationError('');
-    const from = existing?.labor_from ?? existing?.price_from;
-    const to = existing?.labor_to ?? existing?.price_to;
-    setPriceFrom(from != null ? String(from) : '');
-    setPriceTo(to != null ? String(to) : '');
+    setPricingValue({
+      parts_from: existing?.parts_from != null ? String(existing.parts_from) : '',
+      parts_to: existing?.parts_to != null ? String(existing.parts_to) : '',
+      labor_from: laborFromVal != null ? String(laborFromVal) : '',
+      labor_to: laborToVal != null ? String(laborToVal) : '',
+      typical_labor_minutes: existing?.typical_labor_minutes != null ? Number(existing.typical_labor_minutes) : initial,
+      typical_labor_minutes_to: hasRange ? Number(existing.typical_labor_minutes_to) : null,
+    });
+    setSaveError('');
   };
 
+  const closePricing = () => {
+    setPricingTarget(null);
+    setPricingValue(null);
+    setSaveError('');
+  };
+
+  // Tapping a chip opens the pricing editor and (for a not-yet-offered service)
+  // marks it as offered on save. It must NOT toggle an offered service off —
+  // removing an operation is a separate action (the trailing remove button).
   const handleChipPress = (row) => {
     const id = Number(row.id);
     const selected = selectedServices.includes(id);
-    if (selected) {
-      onToggleService(id);
-      return;
-    }
-    openPricing(row, { ensureSelected: true });
-  };
-
-  const handleToggleDurationRange = (enabled) => {
-    setDurationError('');
-    if (enabled) {
-      const base = durationMin > 0 ? durationMin : 30;
-      setDurationFrom(base);
-      setDurationTo(Math.max(base, base + DURATION_STEP_MINUTES));
-    } else {
-      setDurationMin(durationFrom > 0 ? durationFrom : 30);
-    }
-    setUseDurationRange(enabled);
+    openPricing(row, { ensureSelected: !selected });
   };
 
   const handleSavePricing = async () => {
-    if (!pricingTarget || !onUpsertOperationPricing) return;
+    if (!pricingTarget || !onUpsertOperationPricing || !pricingValue) return;
 
-    let typicalMinutes = null;
-    let typicalMinutesTo = null;
-    if (useDurationRange) {
-      const fromRaw = Math.round(Number(durationFrom) || 0);
-      const toRaw = Math.round(Number(durationTo) || 0);
-      const from = fromRaw > 0 ? fromRaw : null;
-      const to = toRaw > 0 ? toRaw : null;
-      if (from != null && to != null && to < from) {
-        setDurationError(t('partnerProfile.durationRangeInvalid'));
-        return;
-      }
-      if ((from == null) !== (to == null)) {
-        setDurationError(t('partnerProfile.durationRequired'));
-        return;
-      }
-      typicalMinutes = from;
-      typicalMinutesTo = to != null && to !== from ? to : null;
-    } else {
-      typicalMinutes = parseDurationMinutesInput(durationMin);
-      typicalMinutesTo = null;
+    const fromMin = Math.round(Number(pricingValue.typical_labor_minutes) || 0);
+    const hasRange = pricingValue.typical_labor_minutes_to != null;
+    const toMin = hasRange ? Math.round(Number(pricingValue.typical_labor_minutes_to) || 0) : null;
+    if (toMin != null && fromMin > 0 && toMin > 0 && toMin < fromMin) {
+      setSaveError(t('servicePricingForm.rangeInvalid'));
+      return;
     }
-    setDurationError('');
+    const typicalMinutes = fromMin > 0 ? fromMin : null;
+    const typicalMinutesTo = toMin != null && toMin > 0 && toMin !== fromMin ? toMin : null;
+    setSaveError('');
 
-    const from = String(priceFrom || '').trim().replace(',', '.');
-    const to = String(priceTo || '').trim().replace(',', '.');
-    const fromNum = from === '' ? null : parseFloat(from);
-    const toNum = to === '' ? null : parseFloat(to);
     try {
       await onUpsertOperationPricing({
         repairType: pricingTarget.row,
         ensureSelected: pricingTarget.ensureSelected,
         typical_labor_minutes: typicalMinutes,
         typical_labor_minutes_to: typicalMinutesTo,
-        labor_from: Number.isFinite(fromNum) ? fromNum : null,
-        labor_to: Number.isFinite(toNum) ? toNum : null,
+        parts_from: parsePricingMoney(pricingValue.parts_from),
+        parts_to: parsePricingMoney(pricingValue.parts_to),
+        labor_from: parsePricingMoney(pricingValue.labor_from),
+        labor_to: parsePricingMoney(pricingValue.labor_to),
       });
-      setPricingTarget(null);
+      closePricing();
     } catch {
       // Keep modal open; parent already surfaced the error.
     }
@@ -251,11 +138,6 @@ export default function ShopOperationsPricingSection({
       return !itemHasPrice(item);
     }).length;
   }, [selectedServices, serviceMenuItems]);
-
-  const rangePreview =
-    useDurationRange && durationFrom > 0 && durationTo > 0
-      ? formatDurationRangeMinutes(durationFrom, durationTo)
-      : null;
 
   return (
     <View>
@@ -316,23 +198,40 @@ export default function ShopOperationsPricingSection({
                         {translateRepairTypeLabel(row, t)}
                       </Text>
                       {selected ? (
-                        <Text style={styles.priceLine}>{laborPriceSummary(item, t)}</Text>
+                        <Text style={styles.priceLine}>{chipPriceSummary(item, t)}</Text>
                       ) : null}
                     </View>
                     {selected ? (
-                      <Pressable
-                        onPress={(e) => {
-                          e?.stopPropagation?.();
-                          openPricing(row);
-                        }}
-                        hitSlop={8}
-                      >
-                        <MaterialCommunityIcons
-                          name="pencil-outline"
-                          size={16}
-                          color={COLORS.PRIMARY}
-                        />
-                      </Pressable>
+                      <View style={styles.chipActions}>
+                        <Pressable
+                          onPress={(e) => {
+                            e?.stopPropagation?.();
+                            openPricing(row);
+                          }}
+                          hitSlop={8}
+                          accessibilityLabel={t('partnerProfile.editPricing')}
+                        >
+                          <MaterialCommunityIcons
+                            name="pencil-outline"
+                            size={16}
+                            color={COLORS.PRIMARY}
+                          />
+                        </Pressable>
+                        <Pressable
+                          onPress={(e) => {
+                            e?.stopPropagation?.();
+                            onToggleService(Number(row.id));
+                          }}
+                          hitSlop={8}
+                          accessibilityLabel={t('partnerProfile.removeOperation')}
+                        >
+                          <MaterialCommunityIcons
+                            name="close-circle-outline"
+                            size={16}
+                            color={COLORS.TEXT_MUTED}
+                          />
+                        </Pressable>
+                      </View>
                     ) : null}
                   </View>
                 </Pressable>
@@ -349,7 +248,7 @@ export default function ShopOperationsPricingSection({
       ) : null}
 
       <Portal>
-        <Dialog visible={!!pricingTarget} onDismiss={() => setPricingTarget(null)}>
+        <Dialog visible={!!pricingTarget} onDismiss={closePricing}>
           <Dialog.Title>
             {pricingTarget
               ? translateRepairTypeLabel(pricingTarget.row, t)
@@ -358,81 +257,22 @@ export default function ShopOperationsPricingSection({
           <Dialog.ScrollArea style={styles.dialogScroll}>
             <View style={styles.dialogBody}>
               <Text style={styles.dialogHint}>{t('partnerProfile.operationsPricingHint')}</Text>
-              <Text style={styles.dialogHint}>{t('partnerProfile.operationsPartsHint')}</Text>
 
-              <View style={styles.switchRow}>
-                <View style={styles.switchCopy}>
-                  <Text style={styles.switchLabel}>{t('partnerProfile.useDurationRange')}</Text>
-                  <Text style={styles.switchHint}>{t('partnerProfile.useDurationRangeHint')}</Text>
-                </View>
-                <Switch value={useDurationRange} onValueChange={handleToggleDurationRange} />
-              </View>
-
-              {useDurationRange ? (
-                <>
-                  <DurationStepper
-                    label={t('partnerProfile.durationFrom')}
-                    value={durationFrom}
-                    onChange={(next) => {
-                      setDurationError('');
-                      setDurationFrom(next);
-                    }}
-                    t={t}
-                  />
-                  <DurationStepper
-                    label={t('partnerProfile.durationTo')}
-                    value={durationTo}
-                    onChange={(next) => {
-                      setDurationError('');
-                      setDurationTo(next);
-                    }}
-                    t={t}
-                  />
-                  {rangePreview ? (
-                    <Text style={styles.rangePreview}>
-                      {t('partnerProfile.durationRangePreview', { range: rangePreview })}
-                    </Text>
-                  ) : null}
-                </>
-              ) : (
-                <DurationStepper
-                  label={t('partnerProfile.typicalLaborTime')}
-                  value={durationMin}
-                  onChange={(next) => {
-                    setDurationError('');
-                    setDurationMin(next);
+              {pricingValue ? (
+                <ShopServicePricingFields
+                  value={pricingValue}
+                  onChange={(patch) => {
+                    setSaveError('');
+                    setPricingValue((prev) => ({ ...(prev || {}), ...patch }));
                   }}
-                  t={t}
                 />
-              )}
+              ) : null}
 
-              {durationError ? <Text style={styles.durationError}>{durationError}</Text> : null}
-
-              <Text style={styles.durationLabel}>{t('partnerProfile.laborPriceSection')}</Text>
-              <View style={styles.priceRow}>
-                <TextInput
-                  label={t('partnerProfile.laborFrom')}
-                  mode="outlined"
-                  keyboardType="decimal-pad"
-                  value={priceFrom}
-                  onChangeText={setPriceFrom}
-                  style={[styles.dialogInput, styles.priceInput]}
-                  placeholder="40"
-                />
-                <TextInput
-                  label={t('partnerProfile.laborTo')}
-                  mode="outlined"
-                  keyboardType="decimal-pad"
-                  value={priceTo}
-                  onChangeText={setPriceTo}
-                  style={[styles.dialogInput, styles.priceInput]}
-                  placeholder="70"
-                />
-              </View>
+              {saveError ? <Text style={styles.durationError}>{saveError}</Text> : null}
             </View>
           </Dialog.ScrollArea>
           <Dialog.Actions>
-            <Button onPress={() => setPricingTarget(null)}>{t('common.cancel')}</Button>
+            <Button onPress={closePricing}>{t('common.cancel')}</Button>
             <Button loading={savingPricing} disabled={savingPricing} onPress={handleSavePricing}>
               {t('common.save')}
             </Button>
@@ -505,6 +345,11 @@ const styles = StyleSheet.create({
   },
   chipTextCol: {
     flexShrink: 1,
+  },
+  chipActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   chipText: {
     color: COLORS.TEXT_DARK,

@@ -4,12 +4,28 @@ import { Platform } from 'react-native';
 import { API_BASE_URL } from './config';
 import { safeWarn } from '../utils/logger';
 
+// In-flight dedup: the unread badge is derived from this full list by several
+// consumers (header chrome + dashboard + WS refresh) that often fire on the same
+// focus tick. Concurrent callers share one request; cleared on settle so a call
+// after a mutation still fetches fresh data.
+const notificationsInFlight = new Map();
+
 export async function getNotifications(token) {
-  const response = await fetch(`${API_BASE_URL}/api/notifications/`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const key = token || '';
+  const pending = notificationsInFlight.get(key);
+  if (pending) return pending;
+
+  const request = (async () => {
+    const response = await fetch(`${API_BASE_URL}/api/notifications/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Failed to fetch notifications');
+    return await response.json();
+  })().finally(() => {
+    notificationsInFlight.delete(key);
   });
-  if (!response.ok) throw new Error('Failed to fetch notifications');
-  return await response.json();
+  notificationsInFlight.set(key, request);
+  return request;
 }
 
 export async function getPartnerNotificationPreferences(token) {

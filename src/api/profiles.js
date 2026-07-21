@@ -128,13 +128,25 @@ export async function createShopProfile(payload) {
 }
 
 // 🔹 Load *my* shop profiles (those user is linked to)
-export async function getMyShopProfiles() {
+// In-flight dedup: concurrent callers (e.g. dashboard focus fans out multiple
+// loaders) share a single request. Cleared on settle so mutations still refetch.
+let myShopProfilesInFlight = null;
+
+async function fetchMyShopProfiles() {
   const token = await AsyncStorage.getItem('@access_token');
   const res = await fetch(`${API_BASE_URL}/api/profiles/shop-profiles/`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Failed to load shop profiles');
   return res.json();
+}
+
+export function getMyShopProfiles() {
+  if (myShopProfilesInFlight) return myShopProfilesInFlight;
+  myShopProfilesInFlight = fetchMyShopProfiles().finally(() => {
+    myShopProfilesInFlight = null;
+  });
+  return myShopProfilesInFlight;
 }
 
 // 🔹 Update a shop profile

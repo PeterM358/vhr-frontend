@@ -2,17 +2,16 @@ import { API_BASE_URL } from './config';
 import { formatDrfErrorMessage, messageFromApiResponseText } from '../utils/apiErrorMessage';
 import { safeWarn } from '../utils/logger';
 
-const repairsListCache = {
-  key: null,
-  data: null,
-  fetchedAt: 0,
-};
+// Per-filter short-TTL cache + in-flight dedup. Keyed by query string so the
+// dashboard's parallel status fetches (open/ongoing/done/denied) no longer
+// thrash a single slot, and concurrent identical requests share one fetch.
+const repairsListCache = new Map();
+const repairsListInFlight = new Map();
 const REPAIRS_LIST_CACHE_TTL_MS = 60_000;
 
 export function invalidateRepairsListCache() {
-  repairsListCache.key = null;
-  repairsListCache.data = null;
-  repairsListCache.fetchedAt = 0;
+  repairsListCache.clear();
+  repairsListInFlight.clear();
 }
 
 async function throwApiError(response, fallback) {
@@ -77,23 +76,27 @@ export async function getRepairs(token, filtersOrStatus = null, options = {}) {
   const qs = params.toString();
   const cacheKey = qs || '__all__';
   const now = Date.now();
-  if (
-    !options.force &&
-    repairsListCache.key === cacheKey &&
-    repairsListCache.data &&
-    now - repairsListCache.fetchedAt < REPAIRS_LIST_CACHE_TTL_MS
-  ) {
-    return repairsListCache.data;
+  if (!options.force) {
+    const cached = repairsListCache.get(cacheKey);
+    if (cached && now - cached.fetchedAt < REPAIRS_LIST_CACHE_TTL_MS) {
+      return cached.data;
+    }
+    const inFlight = repairsListInFlight.get(cacheKey);
+    if (inFlight) return inFlight;
   }
 
   const url = `${API_BASE_URL}/api/repairs/repair/${qs ? `?${qs}` : ''}`;
-  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!response.ok) throw new Error('Failed to fetch repairs');
-  const data = await response.json();
-  repairsListCache.key = cacheKey;
-  repairsListCache.data = data;
-  repairsListCache.fetchedAt = now;
-  return data;
+  const request = (async () => {
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) throw new Error('Failed to fetch repairs');
+    const data = await response.json();
+    repairsListCache.set(cacheKey, { data, fetchedAt: Date.now() });
+    return data;
+  })().finally(() => {
+    repairsListInFlight.delete(cacheKey);
+  });
+  repairsListInFlight.set(cacheKey, request);
+  return request;
 }
 
 // ✅ Create a new repair
@@ -393,12 +396,16 @@ export async function uploadRepairMedia(token, repairId, mediaItem) {
   return response.json();
 }
 
-export async function getShopCalendar(token, { from, to, shopId, badgeOnly } = {}) {
+export async function getShopCalendar(
+  token,
+  { from, to, shopId, badgeOnly, badge_only: badgeOnlySnake } = {}
+) {
   const params = new URLSearchParams();
+  const isBadgeOnly = badgeOnly ?? badgeOnlySnake;
   if (from) params.set('from', from);
   if (to) params.set('to', to);
   if (shopId != null && shopId !== '') params.set('shop_id', String(shopId));
-  if (badgeOnly) params.set('badge_only', '1');
+  if (isBadgeOnly) params.set('badge_only', '1');
   const qs = params.toString();
   const response = await fetch(
     `${API_BASE_URL}/api/repairs/shop-calendar/${qs ? `?${qs}` : ''}`,

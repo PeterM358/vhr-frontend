@@ -1370,6 +1370,8 @@ export default function ShopProfileScreen({ navigation, route }) {
     ensureSelected,
     typical_labor_minutes,
     typical_labor_minutes_to,
+    parts_from,
+    parts_to,
     labor_from,
     labor_to,
   }) => {
@@ -1384,13 +1386,13 @@ export default function ShopProfileScreen({ navigation, route }) {
     try {
       const typeId = Number(repairType.id);
       const existing = serviceMenuItems.find((row) => Number(row.repair_type) === typeId);
-      // Operations & Pricing UI is labor-only — clear any stale parts ranges so
-      // published totals and offer draft do not keep old parts+labor sums.
+      // Profile pricing now shares the Price List logic: persist parts + labor +
+      // typical labor time so published totals and offer drafts stay consistent.
       const payload = {
+        parts_from: parts_from != null ? parts_from : null,
+        parts_to: parts_to != null ? parts_to : null,
         labor_from,
         labor_to,
-        parts_from: null,
-        parts_to: null,
         typical_labor_minutes,
         typical_labor_minutes_to:
           typical_labor_minutes_to != null ? typical_labor_minutes_to : null,

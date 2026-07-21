@@ -9,7 +9,6 @@ import {
   Searchbar,
   Switch,
   Text,
-  TextInput,
 } from 'react-native-paper';
 
 import ScreenBackground from '../components/ScreenBackground';
@@ -20,7 +19,6 @@ import { COLORS } from '../constants/colors';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import { useTranslation } from '../i18n';
-import { formatMoneyAmount } from '../constants/currency';
 import { API_BASE_URL } from '../api/config';
 import {
   createServiceMenuItem,
@@ -34,11 +32,11 @@ import { resetFromShopDrawer } from '../navigation/drawerNavigation';
 import { getOperationIcon } from '../icons/operationIconRegistry';
 import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 import { vehicleTypeEmoji } from '../utils/vehicleTypeIcons';
+import ShopServicePricingFields from '../components/shop/ShopServicePricingFields';
 import {
-  formatDurationHoursInput,
-  formatTypicalLaborTime,
-  parseDurationHoursInput,
-} from '../utils/laborDuration';
+  serviceMenuSummaryLine,
+  parsePricingMoney,
+} from '../utils/servicePricingSummary';
 
 const DEFAULT_SCOPE = 'default';
 
@@ -56,7 +54,8 @@ function emptyDraft() {
     parts_to: '',
     labor_from: '',
     labor_to: '',
-    typical_labor_hours: '',
+    typical_labor_minutes: null,
+    typical_labor_minutes_to: null,
     disclaimer: '',
     is_published: false,
   };
@@ -68,7 +67,10 @@ function itemToDraft(item) {
     parts_to: item.parts_to != null ? String(item.parts_to) : '',
     labor_from: item.labor_from != null ? String(item.labor_from) : '',
     labor_to: item.labor_to != null ? String(item.labor_to) : '',
-    typical_labor_hours: formatDurationHoursInput(item.typical_labor_minutes),
+    typical_labor_minutes:
+      item.typical_labor_minutes != null ? Number(item.typical_labor_minutes) : null,
+    typical_labor_minutes_to:
+      item.typical_labor_minutes_to != null ? Number(item.typical_labor_minutes_to) : null,
     disclaimer: item.disclaimer || '',
     is_published: Boolean(item.is_published),
   };
@@ -80,55 +82,6 @@ function toIdArray(value) {
     .map((entry) => (entry && typeof entry === 'object' ? entry.id : entry))
     .map((id) => Number(id))
     .filter((id) => Number.isFinite(id));
-}
-
-function formatComponentRange(from, to, label) {
-  if (from != null && to != null && String(from) !== String(to)) {
-    return `${label} ${formatMoneyAmount(from)}–${formatMoneyAmount(to)}`;
-  }
-  if (from != null) return `${label} from ${formatMoneyAmount(from)}`;
-  if (to != null) return `${label} from ${formatMoneyAmount(to)}`;
-  return null;
-}
-
-function formatPriceRange(from, to) {
-  if (from != null && to != null && String(from) !== String(to)) {
-    return `Total ${formatMoneyAmount(from)} – ${formatMoneyAmount(to)}`;
-  }
-  if (from != null) return `Total from ${formatMoneyAmount(from)}`;
-  if (to != null) return `Total from ${formatMoneyAmount(to)}`;
-  return 'Set parts & labor';
-}
-
-function formatMenuSummary(item) {
-  if (!item) return 'Set parts & labor';
-  const parts = formatComponentRange(item.parts_from, item.parts_to, 'Parts');
-  const labor = formatComponentRange(item.labor_from, item.labor_to, 'Labor');
-  const laborTime = formatTypicalLaborTime(
-    item.typical_labor_minutes,
-    item.typical_labor_minutes_to
-  );
-  const duration = laborTime ? `Typical labor time ${laborTime}` : null;
-  const bits = [parts, labor, duration].filter(Boolean);
-  if (bits.length) return bits.join(' · ');
-  return formatPriceRange(item.price_from, item.price_to);
-}
-
-function computeTotalFromDraft(draft) {
-  const parse = (v) => {
-    const t = String(v ?? '').trim().replace(',', '.');
-    if (!t) return null;
-    const n = parseFloat(t);
-    return Number.isFinite(n) ? n : null;
-  };
-  const pf = parse(draft?.parts_from);
-  const pt = parse(draft?.parts_to);
-  const lf = parse(draft?.labor_from);
-  const lt = parse(draft?.labor_to);
-  const from = pf != null || lf != null ? (pf ?? 0) + (lf ?? 0) : null;
-  const to = pt != null || lt != null ? (pt ?? pf ?? 0) + (lt ?? lf ?? 0) : null;
-  if (from == null && to == null) return null;
-  return formatPriceRange(from, to);
 }
 
 export default function ShopServiceMenuScreen() {
@@ -253,17 +206,17 @@ export default function ShopServiceMenuScreen() {
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   }, [repairTypes, existingTypeIds, addSearch]);
 
-  const parseMoney = (raw) => {
-    const s = String(raw ?? '').trim().replace(',', '.');
-    if (s === '') return null;
-    const n = parseFloat(s);
-    return Number.isFinite(n) ? n : null;
-  };
-
   const updateDraft = (key, field, value) => {
     setDrafts((prev) => ({
       ...prev,
       [key]: { ...(prev[key] || emptyDraft()), [field]: value },
+    }));
+  };
+
+  const patchDraft = (key, patch) => {
+    setDrafts((prev) => ({
+      ...prev,
+      [key]: { ...(prev[key] || emptyDraft()), ...patch },
     }));
   };
 
@@ -322,11 +275,18 @@ export default function ShopServiceMenuScreen() {
   };
 
   const buildPayload = (draft, scope) => ({
-    parts_from: parseMoney(draft.parts_from),
-    parts_to: parseMoney(draft.parts_to),
-    labor_from: parseMoney(draft.labor_from),
-    labor_to: parseMoney(draft.labor_to),
-    typical_labor_minutes: parseDurationHoursInput(draft.typical_labor_hours),
+    parts_from: parsePricingMoney(draft.parts_from),
+    parts_to: parsePricingMoney(draft.parts_to),
+    labor_from: parsePricingMoney(draft.labor_from),
+    labor_to: parsePricingMoney(draft.labor_to),
+    typical_labor_minutes:
+      draft.typical_labor_minutes != null && Number(draft.typical_labor_minutes) > 0
+        ? Number(draft.typical_labor_minutes)
+        : null,
+    typical_labor_minutes_to:
+      draft.typical_labor_minutes_to != null && Number(draft.typical_labor_minutes_to) > 0
+        ? Number(draft.typical_labor_minutes_to)
+        : null,
     disclaimer: draft.disclaimer || '',
     is_published: Boolean(draft.is_published),
     vehicle_type: scope === DEFAULT_SCOPE ? null : Number(scope),
@@ -415,11 +375,10 @@ export default function ShopServiceMenuScreen() {
     const iconName = getOperationIcon(meta || group.sample);
     const defaultItem = group.byScope[DEFAULT_SCOPE];
     const vehiclePriced = Object.keys(group.byScope).filter((k) => k !== DEFAULT_SCOPE).length;
-    const summaryBase = formatMenuSummary(defaultItem);
+    const summaryBase = serviceMenuSummaryLine(defaultItem, t);
     const summary = vehiclePriced
       ? `${summaryBase} · ${t('serviceMenu.pricesCount', { count: vehiclePriced })}`
       : summaryBase;
-    const draftTotalLabel = expanded ? computeTotalFromDraft(draft) : null;
     const isPublished = Boolean(draft.is_published);
     const compatible = compatibleVehicleTypes(meta);
 
@@ -486,88 +445,10 @@ export default function ShopServiceMenuScreen() {
               </View>
             )}
 
-            <Text style={styles.editSectionTitle}>Parts (EUR)</Text>
-            <Text style={styles.editHint}>
-              Typical parts cost for this service. Used to pre-fill offers and shown as part of the
-              public total when published.
-            </Text>
-            <View style={styles.priceRow}>
-              <TextInput
-                label="Parts from"
-                mode="outlined"
-                dense
-                keyboardType="decimal-pad"
-                placeholder="e.g. 30"
-                value={draft.parts_from ?? ''}
-                onChangeText={(v) => updateDraft(key, 'parts_from', v)}
-                style={styles.halfInput}
-              />
-              <TextInput
-                label="Parts to"
-                mode="outlined"
-                dense
-                keyboardType="decimal-pad"
-                placeholder="e.g. 80"
-                value={draft.parts_to ?? ''}
-                onChangeText={(v) => updateDraft(key, 'parts_to', v)}
-                style={styles.halfInput}
-              />
-            </View>
-
-            <Text style={styles.editSectionTitle}>Labor (EUR)</Text>
-            <Text style={styles.editHint}>
-              Workshop labor price for this service. Same job can cost more on premium cars
-              (diagnostics, tools) — adjust labor EUR here, not the time below.
-            </Text>
-            <View style={styles.priceRow}>
-              <TextInput
-                label="Labor from"
-                mode="outlined"
-                dense
-                keyboardType="decimal-pad"
-                placeholder="e.g. 40"
-                value={draft.labor_from ?? ''}
-                onChangeText={(v) => updateDraft(key, 'labor_from', v)}
-                style={styles.halfInput}
-              />
-              <TextInput
-                label="Labor to"
-                mode="outlined"
-                dense
-                keyboardType="decimal-pad"
-                placeholder="e.g. 90"
-                value={draft.labor_to ?? ''}
-                onChangeText={(v) => updateDraft(key, 'labor_to', v)}
-                style={styles.halfInput}
-              />
-            </View>
-
-            <Text style={styles.editSectionTitle}>Typical labor time (hours)</Text>
-            <Text style={styles.editHint}>
-              Billable labor for capacity planning (oil change ~0.75h). Not estimated vehicle
-              completion or pickup time — set that on the repair schedule separately.
-            </Text>
-            <TextInput
-              label="Typical labor time (hours)"
-              mode="outlined"
-              dense
-              keyboardType="decimal-pad"
-              placeholder="e.g. 1 or 1.5"
-              value={draft.typical_labor_hours ?? ''}
-              onChangeText={(v) => updateDraft(key, 'typical_labor_hours', v)}
-              style={styles.fullInput}
-            />
-            {draftTotalLabel ? (
-              <Text style={styles.computedTotal}>Clients see: {draftTotalLabel}</Text>
-            ) : null}
-            <TextInput
-              label="Note for clients (optional)"
-              mode="outlined"
-              dense
-              multiline
-              value={draft.disclaimer ?? ''}
-              onChangeText={(v) => updateDraft(key, 'disclaimer', v)}
-              style={styles.fullInput}
+            <ShopServicePricingFields
+              value={draft}
+              onChange={(patch) => patchDraft(key, patch)}
+              showDisclaimer
             />
 
             <View style={styles.publishRow}>

@@ -147,10 +147,14 @@ export default function ShopHomeScreen() {
       });
       const rows = [...merged.values()];
       setDashboardRepairs(rows);
+      // Reuse the ongoing rows already fetched here for the "active" tile count
+      // instead of firing a separate getRepairs('ongoing') from loadDashboardMetrics.
+      setOngoingRepairs(ongoingRows);
       setCachedShopRepairs('open', openRows);
     } catch (err) {
       console.error('Failed to load dashboard repairs', err);
       setDashboardRepairs([]);
+      setOngoingRepairs([]);
     } finally {
       if (!background) setRepairsLoading(false);
     }
@@ -163,13 +167,13 @@ export default function ShopHomeScreen() {
       const shopId = await AsyncStorage.getItem('@current_shop_id');
       const { from, to } = todayCalendarRange();
 
-      const [ongoing, offers, calendar] = await Promise.all([
-        getRepairs(token, 'ongoing').then(asRepairRows).catch(() => []),
+      // Ongoing repairs are loaded by loadDashboardRepairs (which also feeds the
+      // open-requests list), so we only fetch offers + today's calendar here.
+      const [offers, calendar] = await Promise.all([
         getMyOffers(token).catch(() => []),
         getShopCalendar(token, { from, to, shopId }).catch(() => ({ scheduled: [] })),
       ]);
 
-      setOngoingRepairs(asRepairRows(ongoing));
       const offerRows = Array.isArray(offers) ? offers : [];
       setPendingOffers(offerRows.filter((o) => !o.is_booked));
       const scheduled = Array.isArray(calendar?.scheduled) ? calendar.scheduled : [];

@@ -9,8 +9,8 @@ import { COLORS } from '../../constants/colors';
 import { useTranslation } from '../../i18n';
 import { joinLocalizedList } from '../../i18n/joinLocalizedList';
 import { translateRepairTypeLabels, translateVehicleTypePublicLabels, translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
-import { formatMoneyAmount } from '../../constants/currency';
 import { getOperationIcon } from '../../icons/operationIconRegistry';
+import { describeServicePricing } from '../../utils/servicePricingSummary';
 import { openShopInMaps, resolveShopMapsUrl } from '../../utils/shopMapsLink';
 import { formatDayHoursWithLunch, parseLunchBreak } from '../../utils/shopWorkingHours';
 
@@ -193,27 +193,21 @@ export default function ShopPublicPagePreview({
           <SectionHeading title={t('serviceCenters.profile.publishedPricing')} />
           <FloatingCard>
             <Text style={styles.menuDisclaimer}>
-              {t('serviceCenters.profile.partsQuotedSeparately')}
+              {publishedMenuItems.some(
+                (item) => item?.parts_from != null || item?.parts_to != null
+              )
+                ? t('serviceCenters.profile.partsIncludedNote')
+                : t('serviceCenters.profile.partsQuotedSeparately')}
             </Text>
             {publishedMenuItems.map((item) => {
               const label = translateRepairTypeLabel(item, t) || t('common.service');
-              const from = item.labor_from ?? item.price_from;
-              const to = item.labor_to ?? item.price_to;
-              let priceLine = t('serviceCenters.profile.priceOnRequest');
-              if (from != null && to != null && String(from) !== String(to)) {
-                priceLine = t('serviceCenters.profile.laborPriceRange', {
-                  from: formatMoneyAmount(from),
-                  to: formatMoneyAmount(to),
-                });
-              } else if (from != null) {
-                priceLine = t('serviceCenters.profile.laborPriceFrom', {
-                  price: formatMoneyAmount(from),
-                });
-              } else if (to != null) {
-                priceLine = t('serviceCenters.profile.laborPriceFrom', {
-                  price: formatMoneyAmount(to),
-                });
-              }
+              const { parts, labor, total, time, hasParts } =
+                describeServicePricing(item, t);
+              const priceLine =
+                (hasParts && total) || labor || t('serviceCenters.profile.priceOnRequest');
+              const breakdown = hasParts
+                ? [parts, labor].filter(Boolean).join(' · ')
+                : null;
               return (
                 <View key={`${item.id || label}-${label}`} style={styles.menuRow}>
                   <View style={styles.menuIconCircle}>
@@ -226,6 +220,10 @@ export default function ShopPublicPagePreview({
                   <View style={styles.menuTextCol}>
                     <Text style={styles.menuServiceName}>{label}</Text>
                     <Text style={styles.menuPriceLine}>{priceLine}</Text>
+                    {breakdown ? (
+                      <Text style={styles.menuDisclaimer}>{breakdown}</Text>
+                    ) : null}
+                    {time ? <Text style={styles.menuDisclaimer}>{time}</Text> : null}
                   </View>
                 </View>
               );
