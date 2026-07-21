@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Pressable, StyleSheet } from 'react-native';
+import { View, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { Text, Button, Portal, Dialog } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
@@ -255,7 +255,11 @@ export default function ShopOperationsPricingSection({
               : t('partnerProfile.operationsPricingTitle')}
           </Dialog.Title>
           <Dialog.ScrollArea style={styles.dialogScroll}>
-            <View style={styles.dialogBody}>
+            <ScrollView
+              contentContainerStyle={styles.dialogBody}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+            >
               <Text style={styles.dialogHint}>{t('partnerProfile.operationsPricingHint')}</Text>
 
               {pricingValue ? (
@@ -269,7 +273,7 @@ export default function ShopOperationsPricingSection({
               ) : null}
 
               {saveError ? <Text style={styles.durationError}>{saveError}</Text> : null}
-            </View>
+            </ScrollView>
           </Dialog.ScrollArea>
           <Dialog.Actions>
             <Button onPress={closePricing}>{t('common.cancel')}</Button>
@@ -365,12 +369,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   dialogScroll: {
-    maxHeight: 420,
+    maxHeight: 460,
     paddingHorizontal: 0,
   },
   dialogBody: {
     paddingHorizontal: 24,
-    paddingBottom: 8,
+    paddingTop: 4,
+    paddingBottom: 24,
   },
   dialogHint: {
     color: COLORS.TEXT_MUTED,
