@@ -6,6 +6,7 @@ import {
   isShopProfileEssentialsComplete,
   SHOP_PROFILE_BUILD_SECTIONS,
 } from './shopProfileCompleteness';
+import { openPartnerCenter } from './partnerSetupGate';
 
 export const SHOP_PROFILE_SECTION_KEYS = [
   ...SHOP_PROFILE_BUILD_SECTIONS,
@@ -83,7 +84,8 @@ export function showShopProfileGateAlert(navigation, missingFields = []) {
     { text: 'Cancel', style: 'cancel' },
     {
       text: 'Complete profile',
-      onPress: () => navigation.navigate('ShopProfile', { requireSetup: true }),
+      // Essentials missing => not publish-ready => guided wizard.
+      onPress: () => openPartnerCenter(navigation, null),
     },
   ]);
 }

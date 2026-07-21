@@ -13,13 +13,19 @@
 
 import React, { useMemo } from 'react';
 import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
-import { Text, TextInput, ProgressBar } from 'react-native-paper';
+import { useNavigation } from '@react-navigation/native';
+import { Text, TextInput, ProgressBar, Button, Switch } from 'react-native-paper';
 
 import FloatingCard from '../../components/ui/FloatingCard';
 import SearchableChipSelector from '../../components/ui/SearchableChipSelector';
 import { COLORS } from '../../constants/colors';
 import { useTranslation } from '../../i18n';
 import { useWizard } from '../../wizard';
+import {
+  WEEKDAYS_MON_FIRST,
+  DAY_KEY,
+  normalizeWorkingHoursObject,
+} from '../../utils/shopWorkingHours';
 
 function categoryLabel(cat) {
   return cat.localized_name || cat.name_en || cat.name || cat.key || `#${cat.id}`;
@@ -179,7 +185,185 @@ export function PartnerServicesStep() {
   );
 }
 
-/* ----------------------------- Step 4: readiness -------------------------- */
+/* ----------------------------- Step 4: working hours ---------------------- */
+
+function hoursRowsFromValue(value) {
+  const src = normalizeWorkingHoursObject(value);
+  return WEEKDAYS_MON_FIRST.map((day) => {
+    const row = src[DAY_KEY[day]] || src[day.toLowerCase()] || null;
+    if (!row || typeof row !== 'object') {
+      const weekend = day === 'Saturday' || day === 'Sunday';
+      return { day, start: weekend ? '' : '09:00', end: weekend ? '' : '18:00', closed: weekend };
+    }
+    const start = row.start != null ? String(row.start) : '';
+    const end = row.end != null ? String(row.end) : '';
+    const closed = !!row.closed || (!start && !end);
+    return { day, start, end, closed };
+  });
+}
+
+function hoursValueFromRows(rows) {
+  const out = {};
+  rows.forEach((r) => {
+    const key = DAY_KEY[r.day] || r.day.toLowerCase();
+    const start = (r.start || '').trim();
+    const end = (r.end || '').trim();
+    out[key] = r.closed || (!start && !end) ? { closed: true } : { start, end };
+  });
+  return out;
+}
+
+export function hasAnyOpenDay(value) {
+  const rows = hoursRowsFromValue(value);
+  return rows.some((r) => !r.closed && r.start && r.end);
+}
+
+export function PartnerHoursStep() {
+  const { t } = useTranslation();
+  const { values, setValues } = useWizard();
+  const rows = useMemo(() => hoursRowsFromValue(values.working_hours), [values.working_hours]);
+
+  const commit = (nextRows) => setValues({ working_hours: hoursValueFromRows(nextRows) });
+
+  const setWeekdayDefaults = () => {
+    commit(
+      rows.map((r) => {
+        const weekend = r.day === 'Saturday' || r.day === 'Sunday';
+        return weekend
+          ? { ...r, closed: true, start: '', end: '' }
+          : { ...r, closed: false, start: '09:00', end: '18:00' };
+      })
+    );
+  };
+
+  const updateRow = (idx, patch) =>
+    commit(rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+
+  return (
+    <View>
+      <FloatingCard>
+        <Text style={styles.cardTitle}>{t('partnerOnboarding.hoursTitle', null, 'Working hours')}</Text>
+        <Text style={styles.hint}>
+          {t('partnerOnboarding.hoursHint', null, 'Set the days and times you are open. Customers see these on your public page.')}
+        </Text>
+        <Button
+          mode="outlined"
+          compact
+          onPress={setWeekdayDefaults}
+          style={styles.hoursQuickBtn}
+        >
+          {t('partnerOnboarding.hoursWeekdayQuickFill', null, 'Weekdays 09:00–18:00 (Sat–Sun closed)')}
+        </Button>
+        {rows.map((row, idx) => (
+          <View key={row.day} style={styles.hoursRow}>
+            <Text style={styles.dayLabel}>
+              {t(`partnerOnboarding.day.${row.day.toLowerCase()}`, null, row.day)}
+            </Text>
+            <View style={styles.hoursInputsWrap}>
+              <TextInput
+                mode="outlined"
+                dense
+                placeholder="09:00"
+                value={row.start}
+                onChangeText={(text) => updateRow(idx, { start: text, closed: false })}
+                style={styles.hourInput}
+              />
+              <Text style={styles.hoursSeparator}>-</Text>
+              <TextInput
+                mode="outlined"
+                dense
+                placeholder="18:00"
+                value={row.end}
+                onChangeText={(text) => updateRow(idx, { end: text, closed: false })}
+                style={styles.hourInput}
+              />
+              <Pressable
+                onPress={() =>
+                  updateRow(
+                    idx,
+                    row.closed
+                      ? { closed: false, start: row.start || '09:00', end: row.end || '18:00' }
+                      : { closed: true, start: '', end: '' }
+                  )
+                }
+                style={[styles.closedToggle, row.closed && styles.closedToggleActive]}
+              >
+                <Text style={[styles.closedToggleText, row.closed && styles.closedToggleTextActive]}>
+                  {row.closed
+                    ? t('partnerOnboarding.closed', null, 'Closed')
+                    : t('partnerOnboarding.open', null, 'Open')}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ))}
+      </FloatingCard>
+    </View>
+  );
+}
+
+/* ----------------------------- Step 5: legal ------------------------------ */
+
+export function PartnerLegalStep() {
+  const { t } = useTranslation();
+  const { values, setValues } = useWizard();
+  const vatRegistered = values.vat_registered !== false;
+
+  return (
+    <View>
+      <FloatingCard>
+        <Text style={styles.cardTitle}>{t('partnerOnboarding.legalTitle', null, 'Company & invoicing')}</Text>
+        <Text style={styles.hint}>
+          {t('partnerOnboarding.legalHint', null, 'Used on invoices. Kept separate from your public profile.')}
+        </Text>
+        <TextInput
+          mode="outlined"
+          label={t('partnerOnboarding.legalName', null, 'Registered company name')}
+          value={values.legal_name || ''}
+          onChangeText={(v) => setValues({ legal_name: v })}
+          style={styles.input}
+        />
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>{t('partnerOnboarding.vatRegistered', null, 'VAT registered')}</Text>
+          <Switch value={vatRegistered} onValueChange={(v) => setValues({ vat_registered: v })} />
+        </View>
+        {vatRegistered ? (
+          <TextInput
+            mode="outlined"
+            label={t('partnerOnboarding.vatNumber', null, 'VAT number')}
+            value={values.vat_number || ''}
+            onChangeText={(v) => setValues({ vat_number: v })}
+            style={styles.input}
+          />
+        ) : (
+          <TextInput
+            mode="outlined"
+            label={t('partnerOnboarding.eikNumber', null, 'Company ID (EIK)')}
+            value={values.eik_number || ''}
+            onChangeText={(v) => setValues({ eik_number: v })}
+            style={styles.input}
+          />
+        )}
+        <TextInput
+          mode="outlined"
+          label={t('partnerOnboarding.invoiceAddress', null, 'Invoice address')}
+          value={values.invoice_address_line1 || ''}
+          onChangeText={(v) => setValues({ invoice_address_line1: v })}
+          style={styles.input}
+        />
+        <TextInput
+          mode="outlined"
+          label={t('partnerOnboarding.invoiceCity', null, 'Invoice city')}
+          value={values.invoice_city || ''}
+          onChangeText={(v) => setValues({ invoice_city: v })}
+          style={styles.input}
+        />
+      </FloatingCard>
+    </View>
+  );
+}
+
+/* ----------------------------- Step 6: readiness -------------------------- */
 
 const SECTION_LABEL_KEYS = {
   business: 'partnerOnboarding.section.business',
@@ -191,12 +375,43 @@ const SECTION_LABEL_KEYS = {
   legal: 'partnerOnboarding.section.legal',
 };
 
+// Backend section -> in-wizard step id (or deep-link into ShopProfile section).
+const SECTION_TO_STEP_ID = {
+  business: 'business',
+  vehicles: 'vehicles',
+  services: 'services',
+  hours: 'hours',
+  legal: 'legal',
+};
+const SECTION_TO_PROFILE_EXPAND = {
+  location: 'contact_location',
+  media: 'photos',
+  legal: 'company',
+};
+
 export function PartnerReadinessStep() {
   const { t } = useTranslation();
-  const { context, progress, progressPercent } = useWizard();
+  const navigation = useNavigation();
+  const { context, progress, progressPercent, goTo, findStepIndexById } = useWizard();
   const completion = context.getCompletion ? context.getCompletion() : null;
   const sections = completion?.sections || [];
   const readyToPublish = completion?.ready_to_publish;
+
+  const handleSectionPress = (section) => {
+    if (section.complete) return;
+    const stepId = SECTION_TO_STEP_ID[section.key];
+    if (stepId) {
+      const idx = findStepIndexById(stepId);
+      if (idx >= 0) {
+        goTo(idx);
+        return;
+      }
+    }
+    const expand = SECTION_TO_PROFILE_EXPAND[section.key];
+    if (expand) {
+      navigation.navigate('ShopProfile', { requireSetup: true, expandSection: expand });
+    }
+  };
 
   return (
     <View>
@@ -220,29 +435,52 @@ export function PartnerReadinessStep() {
       <FloatingCard>
         <Text style={styles.cardTitle}>{t('partnerOnboarding.checklist', null, 'Setup checklist')}</Text>
         <ScrollView>
-          {sections.map((section) => (
-            <View key={section.key} style={styles.sectionRow}>
-              <Text style={[styles.sectionDot, section.complete ? styles.dotDone : styles.dotTodo]}>
-                {section.complete ? '✓' : '•'}
-              </Text>
-              <Text style={styles.sectionLabel}>
-                {t(SECTION_LABEL_KEYS[section.key] || '', null, section.key)}
-              </Text>
-              <Text style={[styles.sectionStatus, section.complete ? styles.statusDone : styles.statusTodo]}>
-                {section.complete
-                  ? t('partnerOnboarding.done', null, 'Done')
-                  : t('partnerOnboarding.todo', null, 'To do')}
-              </Text>
-            </View>
-          ))}
+          {sections.map((section) => {
+            const actionable = !section.complete;
+            return (
+              <Pressable
+                key={section.key}
+                onPress={() => handleSectionPress(section)}
+                disabled={!actionable}
+                style={styles.sectionRow}
+              >
+                <Text style={[styles.sectionDot, section.complete ? styles.dotDone : styles.dotTodo]}>
+                  {section.complete ? '✓' : '•'}
+                </Text>
+                <Text style={styles.sectionLabel}>
+                  {t(SECTION_LABEL_KEYS[section.key] || '', null, section.key)}
+                </Text>
+                <Text
+                  style={[
+                    styles.sectionStatus,
+                    section.complete ? styles.statusDone : styles.statusTodo,
+                  ]}
+                >
+                  {section.complete
+                    ? t('partnerOnboarding.done', null, 'Done')
+                    : t('partnerOnboarding.fix', null, 'Fix')}
+                </Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
         <Text style={styles.hint}>
           {t(
             'partnerOnboarding.remainingHint',
             null,
-            'Legal details, working hours, photos and the full price list can be completed in your shop profile.'
+            'Tap a to-do above. Location, photos and the full price list open in your shop profile.'
           )}
         </Text>
+        <Button
+          mode={readyToPublish ? 'contained' : 'outlined'}
+          icon="store-cog-outline"
+          onPress={() => navigation.navigate('ShopProfile', { requireSetup: !readyToPublish })}
+          style={styles.readinessCta}
+        >
+          {readyToPublish
+            ? t('partnerOnboarding.openProfile', null, 'Open shop profile')
+            : t('partnerOnboarding.finishInProfile', null, 'Finish remaining in profile')}
+        </Button>
       </FloatingCard>
     </View>
   );
@@ -340,5 +578,70 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   statusDone: { color: '#16A34A' },
-  statusTodo: { color: COLORS.TEXT_MUTED },
+  statusTodo: { color: COLORS.PRIMARY, fontWeight: '800' },
+  readinessCta: {
+    marginTop: 12,
+    borderRadius: 12,
+  },
+  hoursQuickBtn: {
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+  },
+  hoursRow: {
+    marginBottom: 10,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(15,23,42,0.12)',
+  },
+  dayLabel: {
+    color: COLORS.TEXT_DARK,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  hoursInputsWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  hourInput: {
+    width: 100,
+    backgroundColor: '#fff',
+  },
+  hoursSeparator: {
+    color: COLORS.TEXT_DARK,
+    fontWeight: '700',
+  },
+  closedToggle: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(100,116,139,0.35)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(241,245,249,0.8)',
+  },
+  closedToggleActive: {
+    backgroundColor: 'rgba(100,116,139,0.18)',
+    borderColor: 'rgba(100,116,139,0.6)',
+  },
+  closedToggleText: {
+    color: '#334155',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  closedToggleTextActive: {
+    color: '#475569',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginVertical: 8,
+  },
+  switchLabel: {
+    color: COLORS.TEXT_DARK,
+    fontWeight: '600',
+    fontSize: 14,
+  },
 });

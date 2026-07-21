@@ -27,7 +27,6 @@ import {
   navigateToPartnerClients,
   navigateToPartnerInvoicing,
   navigateToPartnerNotifications,
-  navigateToPartnerProfile,
   navigateToPartnerPromotions,
   navigateToPartnerServiceCenters,
   navigateToPartnerServices,
@@ -41,6 +40,7 @@ import {
   navigateToPartnerStorageLocations,
 } from './webNavigation';
 import { readCachedUnscheduledCount } from '../utils/shopCalendarBadge';
+import { openPartnerCenter } from '../utils/partnerSetupGate';
 import {
   canAccessPartnerRoute,
   readShopMemberships,
@@ -144,11 +144,10 @@ function CustomDrawerContent(props) {
         <DrawerItem
           label={t('drawer.partner.centerDetails')}
           onPress={() => {
-            if (Platform.OS === 'web') {
-              navigateToPartnerProfile(navigation);
-            } else {
-              resetFromShopDrawer(navigation, 'ShopProfile');
-            }
+            props.navigation.closeDrawer();
+            // Incomplete shops go into the guided wizard; ready shops edit the
+            // full profile.
+            openPartnerCenter(navigation, shopProfile);
           }}
           icon={({ color, size }) => <DrawerMenuIcon name="store-outline" color={color} size={size} />}
           {...itemProps}

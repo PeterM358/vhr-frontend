@@ -374,9 +374,10 @@
       "body": "Your Veversal public page helps customers find your service center in every supported language. Complete your profile, publish services and opening hours to start receiving requests."
     },
     "profileSetup": {
-      "title": "Complete your service center profile to open repair requests from clients near you",
+      "title": "Finish setting up your service center to go live and receive repair requests",
       "missing": "Still needed: {fields}",
-      "completeButton": "Complete profile"
+      "completeButton": "Complete profile",
+      "continueButton": "Continue setup"
     },
     "comingSoonDialog": {
       "title": "Coming soon",
@@ -1132,11 +1133,38 @@
     "checklist": "Setup checklist",
     "done": "Done",
     "todo": "To do",
-    "remainingHint": "Legal details, working hours, photos and the full price list can be completed in your shop profile.",
+    "fix": "Fix",
+    "openProfile": "Open shop profile",
+    "finishInProfile": "Finish remaining in profile",
+    "remainingHint": "Tap a to-do above. Location, photos and the full price list open in your shop profile.",
+    "hoursTitle": "Working hours",
+    "hoursHint": "Set the days and times you are open. Customers see these on your public page.",
+    "hoursWeekdayQuickFill": "Weekdays 09:00–18:00 (Sat–Sun closed)",
+    "open": "Open",
+    "closed": "Closed",
+    "day": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "sunday": "Sunday"
+    },
+    "legalTitle": "Company & invoicing",
+    "legalHint": "Used on invoices. Kept separate from your public profile.",
+    "legalName": "Registered company name",
+    "vatRegistered": "VAT registered",
+    "vatNumber": "VAT number",
+    "eikNumber": "Company ID (EIK)",
+    "invoiceAddress": "Invoice address",
+    "invoiceCity": "Invoice city",
     "step": {
       "business": "Business type",
       "vehicles": "Vehicles",
       "services": "Services",
+      "hours": "Working hours",
+      "legal": "Company & invoicing",
       "readiness": "Readiness"
     },
     "section": {
@@ -1151,7 +1179,11 @@
     "errors": {
       "nameRequired": "Enter your business name.",
       "categoryRequired": "Choose your business type.",
-      "vehicleRequired": "Select at least one vehicle type."
+      "vehicleRequired": "Select at least one vehicle type.",
+      "hoursRequired": "Set opening hours for at least one day.",
+      "legalNameRequired": "Enter your registered company name.",
+      "taxIdRequired": "Enter your VAT number or company ID.",
+      "invoiceAddressRequired": "Enter an invoice address."
     }
   },
   "createVehicle": {

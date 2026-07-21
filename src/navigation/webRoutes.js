@@ -236,6 +236,9 @@ export function normalizeWebPath(input) {
   if (raw === 'ShopHome/ShopDashboard' || raw === 'ShopHome' || raw.startsWith('ShopHome/')) {
     return `${PARTNER}/dashboard${query}`;
   }
+  if (raw === 'PartnerOnboarding' || raw.startsWith('PartnerOnboarding')) {
+    return `${PARTNER}/onboarding${query}`;
+  }
 
   if (raw === 'partner/RepairsList' || raw.endsWith('/partner/RepairsList')) {
     return `${PARTNER}/repairs${query}`;
@@ -516,6 +519,14 @@ export function partnerProfile(params = {}) {
 
 export function partnerPublicPreview(params = {}) {
   return buildPathWithQuery(`${PARTNER}/public-preview`, params);
+}
+
+export function partnerOnboarding(params = {}) {
+  const query = {};
+  if (params.shopId != null && params.shopId !== '') {
+    query.shopId = String(normalizeId(params.shopId));
+  }
+  return buildPathWithQuery(`${PARTNER}/onboarding`, query);
 }
 
 export function partnerRepairs(params = {}) {

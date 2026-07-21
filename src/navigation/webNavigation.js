@@ -32,6 +32,7 @@ import {
   partnerDashboard,
   partnerProfile,
   partnerPublicPreview,
+  partnerOnboarding,
   partnerRepairs,
   partnerRepairOffer,
   repairDetailWebPath,
@@ -566,6 +567,17 @@ export function navigateToPartnerProfile(navigation, params = {}) {
     return;
   }
   root.navigate('ShopProfile', params);
+}
+
+export function navigateToPartnerOnboarding(navigation, params = {}) {
+  const root = getRootNavigation(navigation);
+  if (Platform.OS === 'web') {
+    root.navigate('PartnerOnboarding', params);
+    syncWebPath(partnerOnboarding(params));
+    requestAnimationFrame(() => syncWebPath(partnerOnboarding(params)));
+    return;
+  }
+  root.navigate('PartnerOnboarding', params);
 }
 
 export function navigateToPartnerPublicPreview(navigation, params = {}) {

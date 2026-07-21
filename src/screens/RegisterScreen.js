@@ -93,7 +93,8 @@ export default function RegisterScreen({ navigation }) {
       await applyAuthSession(result, identifier);
 
       if (result.is_shop) {
-        const route = await resolveShopEntryRoute();
+        // New partners go straight into the guided setup wizard.
+        const route = await resolveShopEntryRoute({ wizardWhenIncomplete: true });
         navigation.reset(buildShopAuthReset(route));
       } else if (result.is_client) {
         resetToClientDashboard(navigation);

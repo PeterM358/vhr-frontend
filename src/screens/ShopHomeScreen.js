@@ -35,7 +35,12 @@ import {
   countByLifecycle,
   formatLifecycleCounterLine,
 } from '../utils/partnerRepairLifecycle';
-import { navigateToPartnerProfile, navigateToPartnerPublicPreview, navigateToPartnerCalendar, navigateToPartnerRepairOffer, navigateToPartnerRepairDetail } from '../navigation/webNavigation';
+import { navigateToPartnerPublicPreview, navigateToPartnerCalendar, navigateToPartnerRepairOffer, navigateToPartnerRepairDetail } from '../navigation/webNavigation';
+import {
+  isPartnerSetupComplete,
+  partnerSetupPercent,
+  openPartnerCenter,
+} from '../utils/partnerSetupGate';
 import ShopProfileSetupBanner from '../components/shop/ShopProfileSetupBanner';
 import { getMyShopProfiles } from '../api/profiles';
 import { formatShopDisplayName } from '../utils/shopDisplayName';
@@ -67,14 +72,6 @@ function asRepairRows(data) {
   return [];
 }
 
-function openPartnerProfile(navigation, params = {}) {
-  if (Platform.OS === 'web') {
-    navigateToPartnerProfile(navigation, params);
-    return;
-  }
-  navigation.navigate('ShopProfile', params);
-}
-
 function openPartnerPublicPreview(navigation, params = {}) {
   if (Platform.OS === 'web') {
     navigateToPartnerPublicPreview(navigation, params);
@@ -101,6 +98,9 @@ export default function ShopHomeScreen() {
   const [unscheduledCount, setUnscheduledCount] = useState(0);
   const [profileComplete, setProfileComplete] = useState(true);
   const [missingProfileFields, setMissingProfileFields] = useState([]);
+  // Publish-ready gate (wizard owns the profile until this is true).
+  const [setupComplete, setSetupComplete] = useState(true);
+  const [setupPercent, setSetupPercent] = useState(100);
 
   const lastRepairNotifIdRef = React.useRef(null);
   const lastInAppAlertIdRef = React.useRef(null);
@@ -227,6 +227,8 @@ export default function ShopHomeScreen() {
           const profiles = await getMyShopProfiles();
           const profile = profiles?.[0] || null;
           setShopProfile(profile);
+          setSetupComplete(isPartnerSetupComplete(profile));
+          setSetupPercent(partnerSetupPercent(profile));
           const shopName = profile?.name?.trim();
           if (shopName) {
             setShopDisplayName(formatShopDisplayName(shopName));
@@ -320,6 +322,13 @@ export default function ShopHomeScreen() {
     await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
   };
 
+  // Route "open my center" intents through the setup gate: wizard while
+  // incomplete, full profile editor once publish-ready.
+  const openCenter = useCallback(
+    (params = {}) => openPartnerCenter(navigation, shopProfile, params),
+    [navigation, shopProfile]
+  );
+
   const operationsTiles = useMemo(
     () => [
       {
@@ -365,10 +374,7 @@ export default function ShopHomeScreen() {
         icon: 'store-cog-outline',
         title: t('partnerDashboard.serviceCenterProfileTitle'),
         subtitle: t('partnerDashboard.serviceCenterProfileSubtitle'),
-        onPress: () =>
-          openPartnerProfile(navigation, {
-            requireSetup: !profileComplete,
-          }),
+        onPress: () => openCenter(),
       },
       {
         key: 'public-preview',
@@ -376,9 +382,9 @@ export default function ShopHomeScreen() {
         title: t('partnerDashboard.publicPagePreviewTitle'),
         subtitle: t('partnerDashboard.publicPagePreviewSubtitle'),
         onPress: () =>
-          openPartnerPublicPreview(navigation, {
-            requireSetup: !profileComplete,
-          }),
+          setupComplete
+            ? openPartnerPublicPreview(navigation)
+            : openCenter(),
       },
     ],
     [
@@ -387,7 +393,8 @@ export default function ShopHomeScreen() {
       todayBookings.length,
       ongoingRepairs.length,
       unscheduledCount,
-      profileComplete,
+      setupComplete,
+      openCenter,
       t,
     ]
   );
@@ -487,15 +494,16 @@ export default function ShopHomeScreen() {
         unreadCount={unreadCount}
         calendarBadgeCount={unscheduledCount}
         loadCalendarBadge={false}
-        onTitlePress={() => openPartnerProfile(navigation, { requireSetup: !profileComplete })}
+        onTitlePress={() => openCenter()}
         onLogoutPress={handleLogout}
       />
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        {!profileComplete ? (
+        {!setupComplete ? (
           <ShopProfileSetupBanner
             missingFields={missingProfileFields}
-            onCompletePress={() => openPartnerProfile(navigation, { requireSetup: true })}
+            percent={setupPercent}
+            onCompletePress={() => openCenter()}
           />
         ) : null}
 

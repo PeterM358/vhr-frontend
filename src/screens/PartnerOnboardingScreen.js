@@ -22,7 +22,10 @@ import {
   PartnerBusinessTypeStep,
   PartnerVehiclesStep,
   PartnerServicesStep,
+  PartnerHoursStep,
+  PartnerLegalStep,
   PartnerReadinessStep,
+  hasAnyOpenDay,
 } from './partner/PartnerOnboardingSteps';
 
 export default function PartnerOnboardingScreen({ navigation }) {
@@ -69,6 +72,49 @@ export default function PartnerOnboardingScreen({ navigation }) {
         Component: PartnerServicesStep,
       },
       {
+        id: 'hours',
+        titleKey: 'partnerOnboarding.step.hours',
+        validate: (v) => {
+          if (!hasAnyOpenDay(v.working_hours)) {
+            return {
+              ok: false,
+              message: t('partnerOnboarding.errors.hoursRequired', null, 'Set opening hours for at least one day.'),
+            };
+          }
+          return { ok: true };
+        },
+        Component: PartnerHoursStep,
+      },
+      {
+        id: 'legal',
+        titleKey: 'partnerOnboarding.step.legal',
+        validate: (v) => {
+          if (!String(v.legal_name || '').trim()) {
+            return {
+              ok: false,
+              message: t('partnerOnboarding.errors.legalNameRequired', null, 'Enter your registered company name.'),
+            };
+          }
+          const hasTaxId = v.vat_registered !== false
+            ? String(v.vat_number || '').trim()
+            : String(v.eik_number || '').trim() || String(v.vat_number || '').trim();
+          if (!hasTaxId) {
+            return {
+              ok: false,
+              message: t('partnerOnboarding.errors.taxIdRequired', null, 'Enter your VAT number or company ID.'),
+            };
+          }
+          if (!String(v.invoice_address_line1 || '').trim()) {
+            return {
+              ok: false,
+              message: t('partnerOnboarding.errors.invoiceAddressRequired', null, 'Enter an invoice address.'),
+            };
+          }
+          return { ok: true };
+        },
+        Component: PartnerLegalStep,
+      },
+      {
         id: 'readiness',
         titleKey: 'partnerOnboarding.step.readiness',
         Component: PartnerReadinessStep,
@@ -78,8 +124,8 @@ export default function PartnerOnboardingScreen({ navigation }) {
   );
 
   const onFinish = useCallback(() => {
-    // Hand off to the full profile editor to finish remaining steps / publish.
-    navigation.navigate('ShopProfile');
+    // Back to the dashboard; the profile tile opens ShopProfile once ready.
+    navigation.reset({ index: 0, routes: [{ name: 'ShopHome' }] });
   }, [navigation]);
 
   const onExit = useCallback(() => {
