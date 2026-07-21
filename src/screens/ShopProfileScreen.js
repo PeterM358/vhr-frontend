@@ -1385,7 +1385,12 @@ export default function ShopProfileScreen({ navigation, route }) {
     setSavingPricing(true);
     try {
       const typeId = Number(repairType.id);
-      const existing = serviceMenuItems.find((row) => Number(row.repair_type) === typeId);
+      // Profile pricing edits the DEFAULT (all-vehicles) row only. Match the row
+      // with no vehicle_type so we never accidentally PATCH a vehicle-specific
+      // price (Truck/Car) or POST a duplicate default that the DB would reject.
+      const existing = serviceMenuItems.find(
+        (row) => Number(row.repair_type) === typeId && row.vehicle_type == null
+      );
       // Profile pricing now shares the Price List logic: persist parts + labor +
       // typical labor time so published totals and offer drafts stay consistent.
       const payload = {
