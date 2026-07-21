@@ -24,6 +24,7 @@
     "number": "Number",
     "allClear": "All clear",
     "service": "Service",
+    "success": "Success",
     "validation": "Validation"
   },
   "language": {
@@ -1081,6 +1082,77 @@
     "reminderSaved": "Reminder saved",
     "expenseFailed": "Expense could not be recorded — check the API or try again later.",
     "documentFailed": "Document could not be uploaded — try again from Documents & photos on the vehicle screen."
+  },
+  "wizard": {
+    "stepXofY": "Step {current} of {total}",
+    "back": "Back",
+    "skip": "Skip",
+    "saveContinue": "Save and continue",
+    "finish": "Finish",
+    "finishLater": "Finish later",
+    "noSteps": "Nothing to show yet."
+  },
+  "vehicleWizard": {
+    "identityTitle": "Your vehicle",
+    "detailsTitle": "Registration & details",
+    "reviewTitle": "Review & create",
+    "createButton": "Create vehicle",
+    "reviewLead": "Check the details below, then create your vehicle.",
+    "reviewVehicle": "Vehicle",
+    "reviewYear": "Year",
+    "reviewFuel": "Fuel",
+    "reviewPlate": "License plate",
+    "reviewVin": "VIN",
+    "reviewMileage": "Mileage",
+    "reviewNotSet": "Not set",
+    "contextClientLead": "You are adding this vehicle for {name}."
+  },
+  "partnerOnboarding": {
+    "title": "Set up your shop",
+    "finish": "Go to profile",
+    "businessName": "Business name",
+    "businessNamePlaceholder": "e.g. Veversal Auto Service",
+    "businessType": "Business type",
+    "businessTypeHint": "Choose your primary business type.",
+    "services": "Services offered",
+    "servicesHint": "Filtered to your selected business type.",
+    "searchServices": "Search services…",
+    "noServices": "No services for this business type.",
+    "vehicleTypes": "Vehicle types you service",
+    "vehicleTypesHint": "These drive which operations you can price.",
+    "searchVehicleTypes": "Search vehicle types…",
+    "noVehicleTypes": "No vehicle types found.",
+    "operations": "Operations you offer",
+    "operationsHint": "Filtered to the vehicle types you service. Add prices in the full price list.",
+    "searchOperations": "Search operations…",
+    "noOperations": "Select vehicle types first to see operations.",
+    "readinessTitle": "Profile readiness",
+    "readyToPublish": "Your profile is ready to publish.",
+    "notReady": "A few things are left before you can publish.",
+    "checklist": "Setup checklist",
+    "done": "Done",
+    "todo": "To do",
+    "remainingHint": "Legal details, working hours, photos and the full price list can be completed in your shop profile.",
+    "step": {
+      "business": "Business type",
+      "vehicles": "Vehicles",
+      "services": "Services",
+      "readiness": "Readiness"
+    },
+    "section": {
+      "business": "Business type & description",
+      "location": "Location & contact",
+      "vehicles": "Vehicle types",
+      "services": "Services & pricing",
+      "hours": "Working hours",
+      "media": "Photos / logo",
+      "legal": "Legal & invoicing"
+    },
+    "errors": {
+      "nameRequired": "Enter your business name.",
+      "categoryRequired": "Choose your business type.",
+      "vehicleRequired": "Select at least one vehicle type."
+    }
   },
   "createVehicle": {
     "title": "Add vehicle",
