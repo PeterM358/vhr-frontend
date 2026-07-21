@@ -3,7 +3,7 @@
  * Veversal partner platform dashboard — open work first, ERP modules as tiles.
  */
 
-import React, { useContext, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useMemo, useState } from 'react';
 import {
   View,
   Text,
