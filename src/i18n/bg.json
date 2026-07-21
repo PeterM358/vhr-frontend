@@ -1058,6 +1058,57 @@
     "expenseFailed": "Разходът не беше записан — провери API или опитай по-късно.",
     "documentFailed": "Документът не беше качен — опитай отново от Документи и снимки на екрана на автомобила."
   },
+  "wizard": {
+    "stepXofY": "Стъпка {current} от {total}",
+    "back": "Назад",
+    "skip": "Пропусни",
+    "saveContinue": "Запази и продължи",
+    "finish": "Завърши",
+    "finishLater": "Продължи по-късно",
+    "noSteps": "Все още няма какво да се покаже."
+  },
+  "chipSelector": {
+    "selectAll": "Избери всички",
+    "selectShown": "Избери показаните",
+    "clear": "Изчисти",
+    "selectedCount": "{count} избрани",
+    "shownCount": "{count} показани",
+    "searchPlaceholder": "Търсене…",
+    "noMatches": "Няма съвпадения.",
+    "all": "Всички"
+  },
+  "businessCategories": {
+    "car_repair": "Автосервиз",
+    "tire_shop": "Сервиз за гуми",
+    "roadside_assistance": "Пътна помощ",
+    "car_wash": "Автомивка",
+    "detailing": "Авто детайлинг",
+    "body_shop": "Автотенекеджийство",
+    "auto_electrician": "Авто електро",
+    "auto_locksmith": "Автоключар",
+    "ev_charging": "Зарядна станция",
+    "vehicle_inspection": "Технически преглед",
+    "motorcycle_repair": "Мотосервиз",
+    "truck_repair": "Сервиз за камиони"
+  },
+  "businessServices": {
+    "towing": "Репатриране",
+    "jump_start": "Стартиране с кабели",
+    "flat_tire_assistance": "Помощ при спукана гума",
+    "replacement_vehicle": "Заместващ автомобил",
+    "pickup_service": "Взимане и връщане",
+    "tire_storage": "Съхранение на гуми",
+    "exterior_wash": "Външно измиване",
+    "interior_cleaning": "Вътрешно почистване",
+    "exterior_detailing": "Външен детайлинг",
+    "ceramic_coating": "Керамично покритие",
+    "polishing": "Полиране",
+    "key_cutting": "Изработка на ключове",
+    "key_programming": "Програмиране на ключове",
+    "lockout_service": "Отключване",
+    "ac_charging": "Променливотоково зареждане",
+    "dc_fast_charging": "Бързо зареждане"
+  },
   "partnerOnboarding": {
     "title": "Настройте сервиза си",
     "finish": "Към профила",

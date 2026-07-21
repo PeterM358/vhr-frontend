@@ -38,11 +38,35 @@ export default function WizardChrome({
     saving,
     error,
     restored,
+    adapterProgress,
     goNext,
     goBack,
     skip,
     finishLater,
   } = useWizard();
+
+  // Prefer the backend-reported completion percent (e.g. partner onboarding's
+  // profile_completion.percent) for the header % and progress bar so the chrome
+  // never disagrees with the readiness card. "Step X of Y" still reflects the
+  // navigation position. Falls back to the engine's step-based progress when no
+  // adapter percent is available (e.g. the vehicle wizard).
+  const backendPercentRaw =
+    adapterProgress && typeof adapterProgress.percent === 'number'
+      ? adapterProgress.percent
+      : null;
+  const backendPercent =
+    backendPercentRaw == null
+      ? null
+      : backendPercentRaw > 1
+        ? backendPercentRaw
+        : backendPercentRaw * 100;
+  const displayedPercent = backendPercent != null ? Math.round(backendPercent) : progressPercent;
+  const displayedProgress =
+    backendPercent != null
+      ? Math.max(0, Math.min(1, backendPercent / 100))
+      : Number.isFinite(progress)
+        ? progress
+        : 0;
 
   if (!restored) {
     return (
@@ -77,11 +101,11 @@ export default function WizardChrome({
           <Text style={styles.stepCounter}>
             {t('wizard.stepXofY', { current: index + 1, total }, `Step ${index + 1} of ${total}`)}
           </Text>
-          <Text style={styles.percent}>{progressPercent}%</Text>
+          <Text style={styles.percent}>{displayedPercent}%</Text>
         </View>
         {stepTitle ? <Text style={styles.stepTitle}>{stepTitle}</Text> : null}
         <ProgressBar
-          progress={Number.isFinite(progress) ? progress : 0}
+          progress={displayedProgress}
           color={COLORS.PRIMARY}
           style={styles.progressBar}
         />

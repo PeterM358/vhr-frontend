@@ -1108,6 +1108,48 @@
     "reviewNotSet": "Not set",
     "contextClientLead": "You are adding this vehicle for {name}."
   },
+  "chipSelector": {
+    "selectAll": "Select all",
+    "selectShown": "Select shown",
+    "clear": "Clear",
+    "selectedCount": "{count} selected",
+    "shownCount": "{count} shown",
+    "searchPlaceholder": "Search…",
+    "noMatches": "No matches.",
+    "all": "All"
+  },
+  "businessCategories": {
+    "car_repair": "Auto repair",
+    "tire_shop": "Tyre shop",
+    "roadside_assistance": "Roadside assistance",
+    "car_wash": "Car wash",
+    "detailing": "Car detailing",
+    "body_shop": "Body shop",
+    "auto_electrician": "Auto electrician",
+    "auto_locksmith": "Car locksmith",
+    "ev_charging": "EV charging",
+    "vehicle_inspection": "Vehicle inspection",
+    "motorcycle_repair": "Motorcycle repair",
+    "truck_repair": "Truck repair"
+  },
+  "businessServices": {
+    "towing": "Towing",
+    "jump_start": "Jump start",
+    "flat_tire_assistance": "Flat tyre assistance",
+    "replacement_vehicle": "Replacement vehicle",
+    "pickup_service": "Pickup & delivery",
+    "tire_storage": "Tyre storage",
+    "exterior_wash": "Exterior wash",
+    "interior_cleaning": "Interior cleaning",
+    "exterior_detailing": "Exterior detailing",
+    "ceramic_coating": "Ceramic coating",
+    "polishing": "Polishing",
+    "key_cutting": "Key cutting",
+    "key_programming": "Key programming",
+    "lockout_service": "Lockout service",
+    "ac_charging": "AC charging",
+    "dc_fast_charging": "DC fast charging"
+  },
   "partnerOnboarding": {
     "title": "Set up your shop",
     "finish": "Go to profile",

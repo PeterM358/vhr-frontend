@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Text, TextInput, Button } from 'react-native-paper';
 import { COLORS } from '../../constants/colors';
+import { useTranslation } from '../../i18n';
 
 /**
  * Searchable multi-select chip list with select-all / clear.
@@ -10,15 +11,20 @@ export default function SearchableChipSelector({
   items = [],
   selectedIds = [],
   onChangeSelectedIds,
-  searchPlaceholder = 'Search…',
-  emptyHint = 'No matches.',
+  searchPlaceholder,
+  emptyHint,
   showSelectAll = true,
   allMode = false,
-  allModeLabel = 'All',
+  allModeLabel,
   onToggleAllMode,
   allModeHint,
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
+  const resolvedSearchPlaceholder =
+    searchPlaceholder ?? t('chipSelector.searchPlaceholder', null, 'Search…');
+  const resolvedEmptyHint = emptyHint ?? t('chipSelector.noMatches', null, 'No matches.');
+  const resolvedAllModeLabel = allModeLabel ?? t('chipSelector.all', null, 'All');
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -62,7 +68,7 @@ export default function SearchableChipSelector({
           onPress={() => onToggleAllMode(!allMode)}
           style={[styles.allModeChip, allMode && styles.allModeChipSelected]}
         >
-          <Text style={[styles.allModeText, allMode && styles.allModeTextSelected]}>{allModeLabel}</Text>
+          <Text style={[styles.allModeText, allMode && styles.allModeTextSelected]}>{resolvedAllModeLabel}</Text>
         </Pressable>
       ) : null}
       {allModeHint && allMode ? (
@@ -74,7 +80,7 @@ export default function SearchableChipSelector({
           <TextInput
             mode="outlined"
             dense
-            placeholder={searchPlaceholder}
+            placeholder={resolvedSearchPlaceholder}
             value={query}
             onChangeText={setQuery}
             style={styles.search}
@@ -84,20 +90,22 @@ export default function SearchableChipSelector({
           {showSelectAll ? (
             <View style={styles.actionRow}>
               <Button compact mode="text" onPress={selectAllItems} disabled={!items.length}>
-                Select all
+                {t('chipSelector.selectAll', null, 'Select all')}
               </Button>
               <Button compact mode="text" onPress={selectAllFiltered} disabled={!filtered.length}>
-                Select shown
+                {t('chipSelector.selectShown', null, 'Select shown')}
               </Button>
               <Button compact mode="text" onPress={clearAll} disabled={!selectedIds.length}>
-                Clear
+                {t('chipSelector.clear', null, 'Clear')}
               </Button>
             </View>
           ) : null}
 
           <Text style={styles.countHint}>
-            {selectedIds.length} selected
-            {query.trim() ? ` · ${filtered.length} shown` : ''}
+            {t('chipSelector.selectedCount', { count: selectedIds.length }, `${selectedIds.length} selected`)}
+            {query.trim()
+              ? ` · ${t('chipSelector.shownCount', { count: filtered.length }, `${filtered.length} shown`)}`
+              : ''}
           </Text>
 
           <View style={styles.chipWrap}>
@@ -118,7 +126,7 @@ export default function SearchableChipSelector({
             })}
           </View>
 
-          {!filtered.length ? <Text style={styles.emptyHint}>{emptyHint}</Text> : null}
+          {!filtered.length ? <Text style={styles.emptyHint}>{resolvedEmptyHint}</Text> : null}
         </>
       ) : null}
     </View>

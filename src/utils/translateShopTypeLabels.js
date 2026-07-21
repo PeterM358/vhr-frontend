@@ -228,6 +228,45 @@ export function translateServiceCategoryLabel(value, t) {
   return String(rawName || '').trim() || humanizeSlugLabel(slug) || String(value).trim();
 }
 
+/**
+ * Business CATEGORY (business type) label — localized from the stable `key`
+ * (car_repair, tire_shop, …) via the `businessCategories.<key>` i18n namespace,
+ * independent of the API's `name_en` / `localized_name`. Falls back to any
+ * API-provided localized/EN name, then the key.
+ */
+export function translateBusinessCategoryLabel(value, t) {
+  if (!value) return '';
+  const v = typeof value === 'string' ? { key: value } : value;
+  const key = v.key || v.category_key || v.slug;
+  const rawName =
+    v.localized_name || v.name_en || v.name || v.category_name || v.key || '';
+  if (key) {
+    const sentinel = '__MISSING_BUSINESS_CATEGORY__';
+    const translated = t(`businessCategories.${key}`, null, sentinel);
+    if (translated !== sentinel) return translated;
+  }
+  return String(rawName || '').trim() || String(value).trim();
+}
+
+/**
+ * Business SERVICE (non-repair offering) label — localized from the stable
+ * `key` (towing, replacement_vehicle, …) via `businessServices.<key>`. Falls
+ * back to any API-provided localized/EN name, then the key.
+ */
+export function translateBusinessServiceLabel(value, t) {
+  if (!value) return '';
+  const v = typeof value === 'string' ? { key: value } : value;
+  const key = v.key || v.service_key || v.slug;
+  const rawName =
+    v.localized_name || v.name_en || v.name || v.service_name || v.key || '';
+  if (key) {
+    const sentinel = '__MISSING_BUSINESS_SERVICE__';
+    const translated = t(`businessServices.${key}`, null, sentinel);
+    if (translated !== sentinel) return translated;
+  }
+  return String(rawName || '').trim() || String(value).trim();
+}
+
 export function translateVehicleTypeLabels(values, t, options) {
   return (values || []).map((v) => translateVehicleTypeLabel(v, t, options)).filter(Boolean);
 }

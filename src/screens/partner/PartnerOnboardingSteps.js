@@ -26,10 +26,12 @@ import {
   DAY_KEY,
   normalizeWorkingHoursObject,
 } from '../../utils/shopWorkingHours';
-
-function categoryLabel(cat) {
-  return cat.localized_name || cat.name_en || cat.name || cat.key || `#${cat.id}`;
-}
+import {
+  translateBusinessCategoryLabel,
+  translateBusinessServiceLabel,
+  translateVehicleTypeLabel,
+  translateRepairTypeLabel,
+} from '../../utils/translateShopTypeLabels';
 
 /* --------------------------- Step 1: business type ------------------------ */
 
@@ -60,9 +62,9 @@ export function PartnerBusinessTypeStep() {
       })
       .map((svc) => ({
         id: svc.id,
-        label: svc.localized_name || svc.name_en || svc.name || svc.key,
+        label: translateBusinessServiceLabel(svc, t),
       }));
-  }, [context.businessServices, selectedKeys]);
+  }, [context.businessServices, selectedKeys, t]);
 
   return (
     <View>
@@ -92,7 +94,7 @@ export function PartnerBusinessTypeStep() {
                 style={[styles.chip, active && styles.chipActive]}
               >
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                  {categoryLabel(cat)}
+                  {translateBusinessCategoryLabel(cat, t)}
                 </Text>
               </Pressable>
             );
@@ -124,7 +126,10 @@ export function PartnerBusinessTypeStep() {
 export function PartnerVehiclesStep() {
   const { t } = useTranslation();
   const { values, setValues, context } = useWizard();
-  const items = (context.vehicleTypes || []).map((vt) => ({ id: vt.id, label: vt.name }));
+  const items = (context.vehicleTypes || []).map((vt) => ({
+    id: vt.id,
+    label: translateVehicleTypeLabel(vt, t),
+  }));
 
   return (
     <View>
@@ -163,8 +168,11 @@ export function PartnerServicesStep() {
         if (!selectedVt.size) return true;
         return vts.some((id) => selectedVt.has(id));
       })
-      .map((rt) => ({ id: rt.id, label: rt.name || rt.slug || `#${rt.id}` }));
-  }, [context.repairTypes, values.supported_vehicle_types]);
+      .map((rt) => ({
+        id: rt.id,
+        label: translateRepairTypeLabel(rt, t) || rt.name || rt.slug || `#${rt.id}`,
+      }));
+  }, [context.repairTypes, values.supported_vehicle_types, t]);
 
   return (
     <View>
