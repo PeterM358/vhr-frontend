@@ -37,6 +37,7 @@ import {
   VehicleHistoryAccessScreen,
   AddObligationPaymentScreen,
   CreateVehicleScreen,
+  PartnerOnboardingScreen,
   CreatePromotionScreen,
   ShopRegisterClientScreen,
   ChooseShopScreen,
@@ -430,6 +431,11 @@ export default function AppNavigator() {
           name="CreateVehicle"
           component={CreateVehicleScreen}
           options={{ ...appNavBarScreenOptions, title: 'Add vehicle' }}
+        />
+        <Stack.Screen
+          name="PartnerOnboarding"
+          component={PartnerOnboardingScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Set up your shop' }}
         />
         <Stack.Screen name="CreatePromotion" component={CreatePromotionScreen} options={{ title: 'Create Promotion' }}/>
         <Stack.Screen name="ShopRegisterClient" component={ShopRegisterClientScreen} options={{ title: 'Register Client' }}/>

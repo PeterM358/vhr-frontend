@@ -26,6 +26,7 @@ export { default as ManageVehicleServiceCentersScreen } from '../screens/ManageV
 export { default as VehicleHistoryAccessScreen } from '../screens/VehicleHistoryAccessScreen';
 export { default as AddObligationPaymentScreen } from '../screens/AddObligationPaymentScreen';
 export { default as CreateVehicleScreen } from '../screens/CreateVehicleScreen';
+export { default as PartnerOnboardingScreen } from '../screens/PartnerOnboardingScreen';
 export { default as CreatePromotionScreen } from '../screens/CreatePromotionScreen';
 export { default as ShopRegisterClientScreen } from '../screens/ShopRegisterClientScreen';
 export { default as ChooseShopScreen } from '../screens/ChooseShopScreen';

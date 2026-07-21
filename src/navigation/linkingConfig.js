@@ -77,6 +77,7 @@ export const linkingScreens = {
   PasswordConfirmReset: 'reset-password/:uid/:token',
   ClientVehicles: 'dashboard/vehicles',
   CreateVehicle: 'dashboard/vehicles/add',
+  PartnerOnboarding: 'partner/onboarding',
   VehicleDetail: {
     path: 'dashboard/vehicles/:vehicleId',
     parse: {
