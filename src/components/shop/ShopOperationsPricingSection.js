@@ -11,7 +11,7 @@ import { getOperationIcon } from '../../icons/operationIconRegistry';
 import { translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
 import ShopServicePricingFields from './ShopServicePricingFields';
 import {
-  serviceMenuSummaryLine,
+  describeServicePricing,
   parsePricingMoney,
 } from '../../utils/servicePricingSummary';
 
@@ -35,10 +35,36 @@ function resolveInitialMinutes(existing, row) {
   return 30;
 }
 
-function chipPriceSummary(item, t) {
-  if (!itemHasPrice(item)) return t('partnerProfile.priceMissing');
-  return serviceMenuSummaryLine(item, t);
+/**
+ * Semantic status for a selected operation chip. Drives high-contrast colours:
+ *  - missing  (red)   → no labor price published (the essential price is absent)
+ *  - partial  (amber) → labor priced but parts not yet set
+ *  - complete (green)  → labor + parts both priced
+ * Text is always dark-on-light so it stays readable (never white-on-white or
+ * blue-on-blue like the previous solid-blue selected chip).
+ */
+function getChipStatus(item, t) {
+  const { parts, labor, time } = describeServicePricing(item, t);
+  const laborPriced = !!labor;
+  const partsPriced = !!parts;
+  const status = !laborPriced ? 'missing' : !partsPriced ? 'partial' : 'complete';
+  const summary = laborPriced
+    ? [parts, labor, time].filter(Boolean).join(' · ')
+    : t('partnerProfile.priceMissing');
+  return { status, summary };
 }
+
+const CHIP_STATUS_STYLES = {
+  missing: { chip: 'chipMissing', text: 'chipTextMissing', price: 'priceLineMissing' },
+  partial: { chip: 'chipPartial', text: 'chipTextPartial', price: 'priceLinePartial' },
+  complete: { chip: 'chipComplete', text: 'chipTextComplete', price: 'priceLineComplete' },
+};
+
+const CHIP_STATUS_ICON = {
+  missing: '#b91c1c',
+  partial: '#b45309',
+  complete: '#15803d',
+};
 
 /**
  * Operations & Pricing: select repair types and capture parts + labor + typical
@@ -170,7 +196,11 @@ export default function ShopOperationsPricingSection({
             {rows.map((row) => {
               const selected = selectedServices.includes(Number(row.id));
               const item = menuItemForType(serviceMenuItems, row.id);
-              const priced = itemHasPrice(item);
+              const { status, summary } = selected
+                ? getChipStatus(item, t)
+                : { status: null, summary: '' };
+              const statusStyle = status ? CHIP_STATUS_STYLES[status] : null;
+              const iconColor = selected ? CHIP_STATUS_ICON[status] : COLORS.TEXT_MUTED;
               return (
                 <Pressable
                   key={row.id}
@@ -178,27 +208,29 @@ export default function ShopOperationsPricingSection({
                   onLongPress={() => openPricing(row)}
                   style={[
                     parentStyles?.chip || styles.chip,
-                    selected && (parentStyles?.chipSelected || styles.chipSelected),
-                    selected && !priced && styles.chipNeedsPrice,
+                    selected && styles.chipSelectedBase,
+                    statusStyle && styles[statusStyle.chip],
                   ]}
                 >
                   <View style={parentStyles?.serviceChipInner || styles.serviceChipInner}>
                     <MaterialCommunityIcons
                       name={getOperationIcon(row)}
                       size={16}
-                      color={selected ? COLORS.PRIMARY : COLORS.TEXT_MUTED}
+                      color={iconColor}
                     />
                     <View style={styles.chipTextCol}>
                       <Text
                         style={[
                           parentStyles?.chipText || styles.chipText,
-                          selected && (parentStyles?.chipTextSelected || styles.chipTextSelected),
+                          statusStyle && styles[statusStyle.text],
                         ]}
                       >
                         {translateRepairTypeLabel(row, t)}
                       </Text>
                       {selected ? (
-                        <Text style={styles.priceLine}>{chipPriceSummary(item, t)}</Text>
+                        <Text style={[styles.priceLine, statusStyle && styles[statusStyle.price]]}>
+                          {summary}
+                        </Text>
                       ) : null}
                     </View>
                     {selected ? (
@@ -214,7 +246,7 @@ export default function ShopOperationsPricingSection({
                           <MaterialCommunityIcons
                             name="pencil-outline"
                             size={16}
-                            color={COLORS.PRIMARY}
+                            color={iconColor}
                           />
                         </Pressable>
                         <Pressable
@@ -228,7 +260,7 @@ export default function ShopOperationsPricingSection({
                           <MaterialCommunityIcons
                             name="close-circle-outline"
                             size={16}
-                            color={COLORS.TEXT_MUTED}
+                            color="#475569"
                           />
                         </Pressable>
                       </View>
@@ -334,13 +366,47 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     maxWidth: '100%',
   },
-  chipSelected: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(37,99,235,0.08)',
+  // Neutral base for a selected chip so the parent's solid-blue selected look
+  // is reset before a semantic status colour is layered on top.
+  chipSelectedBase: {
+    borderWidth: 1,
+    backgroundColor: '#fff',
+    borderColor: 'rgba(15,23,42,0.14)',
   },
-  chipNeedsPrice: {
-    borderColor: '#f59e0b',
-    backgroundColor: '#fffbeb',
+  // --- Semantic status chips (dark text on light fill, WCAG-friendly) ---
+  chipComplete: {
+    backgroundColor: '#dcfce7',
+    borderColor: '#16a34a',
+  },
+  chipPartial: {
+    backgroundColor: '#fef3c7',
+    borderColor: '#d97706',
+  },
+  chipMissing: {
+    backgroundColor: '#fee2e2',
+    borderColor: '#dc2626',
+  },
+  chipTextComplete: {
+    color: '#14532d',
+    fontWeight: '700',
+  },
+  chipTextPartial: {
+    color: '#7c2d12',
+    fontWeight: '700',
+  },
+  chipTextMissing: {
+    color: '#7f1d1d',
+    fontWeight: '700',
+  },
+  priceLineComplete: {
+    color: '#166534',
+  },
+  priceLinePartial: {
+    color: '#92400e',
+  },
+  priceLineMissing: {
+    color: '#b91c1c',
+    fontWeight: '600',
   },
   serviceChipInner: {
     flexDirection: 'row',
