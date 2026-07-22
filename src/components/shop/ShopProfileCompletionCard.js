@@ -21,7 +21,7 @@ const SECTION_LABEL_KEYS = {
 
 /**
  * Profile readiness dashboard card. Shows completion %, required vs recommended
- * gaps, and a Continue setup CTA into the guided wizard.
+ * gaps (clickable → wizard step), and a Continue setup CTA into the guided wizard.
  */
 export default function ShopProfileCompletionCard({
   percent = 0,
@@ -29,6 +29,7 @@ export default function ShopProfileCompletionCard({
   encourageText = null,
   completion = null,
   onContinueSetup = null,
+  onSectionPress = null,
 }) {
   const { t } = useTranslation();
   const complete = percent >= 100 || completion?.ready_to_publish;
@@ -40,11 +41,48 @@ export default function ShopProfileCompletionCard({
     sections.forEach((s) => {
       if (s.complete) return;
       const label = t(SECTION_LABEL_KEYS[s.key] || '', null, s.key);
-      if (s.required) required.push(label);
-      else recommended.push(label);
+      const row = { key: s.key, label };
+      if (s.required) required.push(row);
+      else recommended.push(row);
     });
     return { requiredMissing: required, recommendedMissing: recommended };
   }, [completion, t]);
+
+  const handleSectionPress = (sectionKey) => {
+    if (typeof onSectionPress === 'function') {
+      onSectionPress(sectionKey);
+      return;
+    }
+    if (typeof onContinueSetup === 'function') {
+      onContinueSetup(sectionKey);
+    }
+  };
+
+  const renderGapRow = (row) => {
+    const clickable = typeof onSectionPress === 'function' || typeof onContinueSetup === 'function';
+    const content = (
+      <Text style={styles.listItem}>
+        • {row.label}
+        {clickable ? (
+          <Text style={styles.listItemAction}>
+            {' '}
+            {t('partnerProfile.tapToFix', null, '· Fix')}
+          </Text>
+        ) : null}
+      </Text>
+    );
+    if (!clickable) return <View key={`gap-${row.key}`}>{content}</View>;
+    return (
+      <Pressable
+        key={`gap-${row.key}`}
+        onPress={() => handleSectionPress(row.key)}
+        accessibilityRole="button"
+        style={({ pressed }) => [pressed && styles.listItemPressed]}
+      >
+        {content}
+      </Pressable>
+    );
+  };
 
   return (
     <AppCard variant="dark" contentStyle={styles.inner}>
@@ -68,11 +106,7 @@ export default function ShopProfileCompletionCard({
       {!complete && requiredMissing.length ? (
         <View style={styles.listBlock}>
           <Text style={styles.listTitle}>{t('partnerProfile.requiredGaps', null, 'Required')}</Text>
-          {requiredMissing.map((label) => (
-            <Text key={`req-${label}`} style={styles.listItem}>
-              • {label}
-            </Text>
-          ))}
+          {requiredMissing.map(renderGapRow)}
         </View>
       ) : null}
 
@@ -81,11 +115,7 @@ export default function ShopProfileCompletionCard({
           <Text style={styles.listTitle}>
             {t('partnerProfile.recommendedGaps', null, 'Recommended')}
           </Text>
-          {recommendedMissing.map((label) => (
-            <Text key={`rec-${label}`} style={styles.listItem}>
-              • {label}
-            </Text>
-          ))}
+          {recommendedMissing.map(renderGapRow)}
         </View>
       ) : null}
 
@@ -101,13 +131,13 @@ export default function ShopProfileCompletionCard({
       ) : null}
 
       {!complete && typeof onContinueSetup === 'function' ? (
-        <Button mode="contained" onPress={onContinueSetup} style={styles.cta}>
+        <Button mode="contained" onPress={() => onContinueSetup()} style={styles.cta}>
           {t('partnerProfile.continueSetup', null, 'Continue setup')}
         </Button>
       ) : null}
 
       {complete ? (
-        <Pressable onPress={onContinueSetup} disabled={!onContinueSetup}>
+        <Pressable onPress={() => onContinueSetup && onContinueSetup()} disabled={!onContinueSetup}>
           <Text style={styles.manageHint}>
             {t('partnerProfile.editViaWizard', null, 'Edit profile details in guided setup')}
           </Text>
@@ -157,7 +187,14 @@ const styles = StyleSheet.create({
   listItem: {
     color: 'rgba(255,255,255,0.75)',
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 20,
+  },
+  listItemAction: {
+    color: COLORS.PRIMARY,
+    fontWeight: '700',
+  },
+  listItemPressed: {
+    opacity: 0.7,
   },
   readyText: {
     color: 'rgba(255,255,255,0.82)',

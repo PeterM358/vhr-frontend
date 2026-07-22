@@ -11,6 +11,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
+import { useRoute } from '@react-navigation/native';
 
 import ScreenBackground from '../components/ScreenBackground';
 import AppNavigationBar from '../components/common/AppNavigationBar';
@@ -34,10 +35,15 @@ import {
 
 export default function PartnerOnboardingScreen({ navigation }) {
   const { t } = useTranslation();
-  const { ready, error, adapter, initialValues, taxonomy, getCompletion } =
-    usePartnerOnboardingData();
+  const route = useRoute();
+  const preferredStepId = route?.params?.stepId || null;
+  const { ready, error, adapter, initialValues, taxonomy, getCompletion, refreshProfile } =
+    usePartnerOnboardingData({ preferredStepId });
 
-  const context = useMemo(() => ({ ...taxonomy, getCompletion }), [taxonomy, getCompletion]);
+  const context = useMemo(
+    () => ({ ...taxonomy, getCompletion, refreshProfile }),
+    [taxonomy, getCompletion, refreshProfile]
+  );
 
   const steps = useMemo(
     () => [

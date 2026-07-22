@@ -18,6 +18,7 @@ import {
   fetchShopProfileCompleteness,
   gateRepairNavigation,
 } from '../../utils/shopProfileGate';
+import { openPartnerCenter } from '../../utils/partnerSetupGate';
 import { navigateToPartnerRepairDetail } from '../../navigation/webNavigation';
 import ShopProfileSetupBanner from './ShopProfileSetupBanner';
 import {
@@ -717,9 +718,7 @@ export default function RepairsList() {
         {!profileComplete ? (
           <ShopProfileSetupBanner
             missingFields={missingProfileFields}
-            onCompletePress={() =>
-              navigation.navigate('ShopProfile', { requireSetup: true })
-            }
+            onCompletePress={() => openPartnerCenter(navigation, null)}
           />
         ) : null}
 

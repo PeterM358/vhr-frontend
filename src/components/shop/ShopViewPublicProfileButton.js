@@ -17,13 +17,15 @@ function resolvePublicSlug(shop) {
 
 /**
  * Owner CTA to open the customer-facing public service center profile.
- * Pushes ShopDetail on the same stack so back returns to Profile (no new-tab cold open).
+ * Pushes ShopDetail on the same stack so back returns to the caller.
  */
 export default function ShopViewPublicProfileButton({
   shop,
   navigation,
   compact = false,
   style,
+  returnTo = 'ShopProfile',
+  backLabelKey = 'drawer.partner.centerDetails',
 }) {
   const { t } = useTranslation();
 
@@ -41,8 +43,8 @@ export default function ShopViewPublicProfileButton({
 
     const previewParams = {
       publicPreview: true,
-      returnTo: 'ShopProfile',
-      backLabelKey: 'drawer.partner.centerDetails',
+      returnTo,
+      backLabelKey,
     };
 
     let routeParams;

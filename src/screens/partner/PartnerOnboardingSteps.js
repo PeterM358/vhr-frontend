@@ -6,21 +6,28 @@
 // adapter — no duplicate profile API. State lives in the engine's shared
 // `values`; taxonomy + completion come from the wizard `context`.
 //
-// Shipped in this pass: Business type, Vehicles, Services (smart taxonomy
-// filtering), Readiness. Remaining partner steps (Legal identity, Working hours,
-// Photos, Guided price list, Publish) are handled today in ShopProfileScreen and
-// are surfaced from the Readiness step until migrated — see docs/wizard-engine.md.
+// Full guided flow (all editable in-wizard): Business → Location → Vehicles →
+// Services → Prices → Hours → Photos → About → Legal → Preview → Publish.
+// Never hand incomplete partners off to ShopProfileScreen to finish sections.
 
-import React, { useMemo } from 'react';
-import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, StyleSheet, Pressable, ScrollView, Platform, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Text, TextInput, ProgressBar, Button, Switch } from 'react-native-paper';
+import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import FloatingCard from '../../components/ui/FloatingCard';
 import SearchableChipSelector from '../../components/ui/SearchableChipSelector';
+import ShopPhotoGallery from '../../components/shop/ShopPhotoGallery';
+import ShopPublicPreviewTabs from '../../components/shop/ShopPublicPreviewTabs';
+import ShopViewPublicProfileButton from '../../components/shop/ShopViewPublicProfileButton';
 import { COLORS } from '../../constants/colors';
 import { useTranslation } from '../../i18n';
 import { useWizard } from '../../wizard';
+import { uploadShopImage, deleteShopImage } from '../../api/shops';
+import { pickVehiclePhotoAttachment } from '../../utils/pickDocumentFile';
+import { formatShopDisplayName } from '../../utils/shopDisplayName';
 import {
   WEEKDAYS_MON_FIRST,
   DAY_KEY,
@@ -33,6 +40,7 @@ import {
   translateRepairTypeLabel,
 } from '../../utils/translateShopTypeLabels';
 
+const MAX_SHOP_PHOTOS = 6;
 /* --------------------------- Step 1: business type ------------------------ */
 
 export function PartnerBusinessTypeStep() {
@@ -553,10 +561,104 @@ export function PartnerPricesStep() {
 
 export function PartnerPhotosStep() {
   const { t } = useTranslation();
-  const navigation = useNavigation();
-  const { context } = useWizard();
-  const completion = context.getCompletion ? context.getCompletion() : null;
-  const photosDone = (completion?.sections || []).find((s) => s.key === 'photos')?.complete;
+  const { values, setValues, context } = useWizard();
+  const [uploading, setUploading] = useState(false);
+  const images = Array.isArray(values.images) ? values.images : [];
+  const profileId = values.profileId;
+
+  const syncImagesFromProfile = async () => {
+    if (typeof context.refreshProfile === 'function') {
+      const profile = await context.refreshProfile();
+      if (profile) {
+        setValues({ images: Array.isArray(profile.images) ? profile.images : [] });
+        return;
+      }
+    }
+  };
+
+  const handleAddPhoto = async () => {
+    if (!profileId) return;
+    try {
+      if (images.length >= MAX_SHOP_PHOTOS) {
+        Alert.alert(
+          t('partnerOnboarding.photosLimitTitle', null, 'Photo limit'),
+          t(
+            'partnerOnboarding.photosLimitBody',
+            { max: MAX_SHOP_PHOTOS },
+            `You can upload up to ${MAX_SHOP_PHOTOS} photos.`
+          )
+        );
+        return;
+      }
+
+      let uri = null;
+      let file = null;
+      if (Platform.OS === 'web') {
+        const attachment = await pickVehiclePhotoAttachment();
+        if (!attachment) return;
+        uri = attachment.uri;
+        file = attachment.file;
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            t('partnerOnboarding.photosPermissionTitle', null, 'Permission required'),
+            t('partnerOnboarding.photosPermissionBody', null, 'Allow access to photos to upload.')
+          );
+          return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          quality: 0.7,
+        });
+        if (result.canceled || !result.assets.length) return;
+        uri = result.assets[0].uri;
+      }
+
+      const token = await AsyncStorage.getItem('@access_token');
+      if (!token) {
+        Alert.alert(
+          t('common.error', null, 'Error'),
+          t('partnerOnboarding.notLoggedIn', null, 'You are not logged in.')
+        );
+        return;
+      }
+
+      setUploading(true);
+      await uploadShopImage(profileId, token, uri, file);
+      await syncImagesFromProfile();
+    } catch (err) {
+      Alert.alert(
+        t('common.error', null, 'Error'),
+        err?.message || t('partnerOnboarding.photosUploadFailed', null, 'Upload failed')
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteImage = async (imageId) => {
+    if (!profileId || imageId == null) return;
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      if (!token) return;
+      setUploading(true);
+      await deleteShopImage(profileId, imageId, token);
+      await syncImagesFromProfile();
+    } catch (err) {
+      Alert.alert(
+        t('common.error', null, 'Error'),
+        err?.message || t('partnerOnboarding.photosDeleteFailed', null, 'Delete failed')
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleReorderImages = (nextImages) => {
+    setValues({ images: nextImages });
+  };
 
   return (
     <View>
@@ -571,19 +673,14 @@ export function PartnerPhotosStep() {
             'A logo or shop photo builds trust. You can skip and add these later.'
           )}
         </Text>
-        <Text style={[styles.sectionStatus, photosDone ? styles.statusDone : styles.statusTodo]}>
-          {photosDone
-            ? t('partnerOnboarding.photosReady', null, 'Photos added')
-            : t('partnerOnboarding.photosMissing', null, 'No photos yet')}
-        </Text>
-        <Button
-          mode="outlined"
-          icon="camera"
-          style={{ marginTop: 12 }}
-          onPress={() => navigation.navigate('ShopProfile', { expandSection: 'photos' })}
-        >
-          {t('partnerOnboarding.managePhotos', null, 'Manage photos')}
-        </Button>
+        <ShopPhotoGallery
+          images={images}
+          onDelete={handleDeleteImage}
+          onReorder={handleReorderImages}
+          onAddPhoto={handleAddPhoto}
+          maxPhotos={MAX_SHOP_PHOTOS}
+          uploading={uploading}
+        />
       </FloatingCard>
     </View>
   );
@@ -637,6 +734,31 @@ export function PartnerPreviewStep() {
   const { values, context } = useWizard();
   const completion = context.getCompletion ? context.getCompletion() : null;
 
+  const vehicleTypeNames = useMemo(() => {
+    const selected = new Set((values.supported_vehicle_types || []).map(Number));
+    return (context.vehicleTypes || [])
+      .filter((vt) => selected.has(Number(vt.id)))
+      .map((vt) => translateVehicleTypeLabel(vt, t));
+  }, [context.vehicleTypes, values.supported_vehicle_types, t]);
+
+  const repairTypeNames = useMemo(() => {
+    const selected = new Set((values.available_repairs || []).map(Number));
+    return (context.repairTypes || [])
+      .filter((rt) => selected.has(Number(rt.id)))
+      .map((rt) => translateRepairTypeLabel(rt, t));
+  }, [context.repairTypes, values.available_repairs, t]);
+
+  const previewShop = useMemo(
+    () => ({
+      id: values.profileId,
+      name: values.name,
+      public_slug: values.public_slug,
+      slug: values.public_slug,
+      is_fallback_public_slug: values.is_fallback_public_slug,
+    }),
+    [values.profileId, values.name, values.public_slug, values.is_fallback_public_slug]
+  );
+
   return (
     <View>
       <FloatingCard>
@@ -651,18 +773,42 @@ export function PartnerPreviewStep() {
           )}
         </Text>
         <Text style={styles.readinessLead}>{values.name || '—'}</Text>
-        <Text style={styles.hint}>{values.address || t('partnerOnboarding.previewNoAddress', null, 'Address not set')}</Text>
-        <Text style={[styles.hint, { marginTop: 4 }]}>
-          {t('partnerOnboarding.previewCompletion', { percent: completion?.percent ?? 0 }, `${completion?.percent ?? 0}% complete`)}
+        <Text style={styles.hint}>
+          {values.address || t('partnerOnboarding.previewNoAddress', null, 'Address not set')}
         </Text>
-        <Button
-          mode="contained"
-          icon="eye"
-          style={{ marginTop: 12 }}
-          onPress={() => navigation.navigate('ShopProfile', { expandSection: 'public_preview' })}
-        >
-          {t('partnerOnboarding.openPublicPreview', null, 'Open public preview')}
-        </Button>
+        <Text style={[styles.hint, { marginTop: 4 }]}>
+          {t(
+            'partnerOnboarding.previewCompletion',
+            { percent: completion?.percent ?? 0 },
+            `${completion?.percent ?? 0}% complete`
+          )}
+        </Text>
+        <ShopViewPublicProfileButton
+          shop={previewShop}
+          navigation={navigation}
+          returnTo="PartnerOnboarding"
+          backLabelKey="partnerOnboarding.title"
+          compact
+        />
+        <ShopPublicPreviewTabs
+          shopName={formatShopDisplayName(values.name)}
+          vehicleTypeNames={vehicleTypeNames}
+          repairTypeNames={repairTypeNames}
+          address={values.address}
+          cityName={values.city_name || ''}
+          countryName={values.country_name || ''}
+          googleMapsUrl={values.google_maps_url}
+          latitude={values.latitude}
+          longitude={values.longitude}
+          phone={values.phone}
+          generatedSummary=""
+          userDescription={values.description}
+          workingHours={values.working_hours}
+          publishedMenuItems={[]}
+          offersGuarantee={values.offers_guarantee === true}
+          images={values.images}
+          brandNames={[]}
+        />
       </FloatingCard>
     </View>
   );

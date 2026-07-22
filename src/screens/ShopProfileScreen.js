@@ -56,7 +56,6 @@ import {
 } from '../utils/seo/businessCategoryCatalog';
 import { getMapPinDefinition } from '../utils/pinRegistry';
 
-import AppCard from '../components/ui/AppCard';
 import { COLORS } from '../constants/colors';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { AuthContext } from '../context/AuthManager';
@@ -67,7 +66,6 @@ import {
   getShopProfileCompletionPercent,
   getShopProfileStrengthHints,
   getShopProfileSectionStatus,
-  hasShopMapPin,
   isShopProfileEssentialsComplete,
 } from '../utils/shopProfileCompleteness';
 import {
@@ -1537,14 +1535,16 @@ export default function ShopProfileScreen({ navigation, route }) {
   const strengthHints = getShopProfileStrengthHints(profile, completenessOptions);
   const sectionStatus = (key) =>
     getShopProfileSectionStatus(key, profileForCompleteness, completenessOptions);
-  const showSetupBanner = (requireSetup || !isEssentialsComplete) && !isEssentialsComplete;
-  const mapPinSet = hasShopMapPin(profile);
-  const pickedLat = parseOptionalCoordinate(profile.latitude);
-  const pickedLon = parseOptionalCoordinate(profile.longitude);
-
-  const continueSetup = useCallback(() => {
-    openPartnerCenter(navigation, profile);
-  }, [navigation, profile]);
+  const continueSetup = useCallback(
+    (stepId = null) => {
+      const params = {};
+      if (stepId && typeof stepId === 'string') {
+        params.stepId = stepId;
+      }
+      openPartnerCenter(navigation, profile, params);
+    },
+    [navigation, profile]
+  );
 
   const publicPagePreviewSection = (
     <ShopProfileAccordionSection
@@ -1605,81 +1605,26 @@ export default function ShopProfileScreen({ navigation, route }) {
           encourageText={t('partnerProfile.profileEncourage')}
           completion={backendCompletion}
           onContinueSetup={continueSetup}
+          onSectionPress={continueSetup}
         />
-
-        <ShopViewPublicProfileButton shop={profile} navigation={navigation} compact />
-
-        {!isEssentialsComplete ? (
-          <AppCard variant="dark" contentStyle={styles.setupBannerInner}>
-            <Text style={styles.setupBannerTitle}>
-              {t('partnerProfile.continueSetupTitle', null, 'Finish setup in the wizard')}
-            </Text>
-            <Text style={styles.setupBannerText}>
-              {t(
-                'partnerProfile.continueSetupBody',
-                null,
-                'Profile editing happens in guided setup. Use Continue setup for location, services, prices, hours, and publish.'
-              )}
-            </Text>
-            <Button mode="contained" onPress={continueSetup} style={{ marginTop: 8 }}>
-              {t('partnerProfile.continueSetup', null, 'Continue setup')}
-            </Button>
-          </AppCard>
-        ) : null}
 
         {!isEssentialsComplete ? (
           <ShopProfileMissingAlert
             fields={gateMissing.length ? gateMissing : missingFields}
-            onFieldPress={() => {
-              // Prefer jumping into the wizard over scrolling the giant editor.
-              continueSetup();
-            }}
+            onFieldPress={() => continueSetup()}
           />
-        ) : missingFields.length ? (
-          <ShopProfileMissingAlert fields={missingFields} onFieldPress={scrollToMissingField} />
         ) : null}
 
-        {!isEssentialsComplete ? (
+        {/* Incomplete partners edit ONLY in the wizard — Profile is a readiness dashboard. */}
+        {isEssentialsComplete ? (
           <>
-            <Pressable
-              onPress={openMapPicker}
-              style={({ pressed }) => [
-                styles.mapCtaCard,
-                (gateMissing.includes('map pin') || missingFields.includes('address')) &&
-                  styles.mapCtaCardAttention,
-                pressed && styles.mapCtaCardPressed,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Place pin on map"
-            >
-              <View style={styles.mapCtaIconWrap}>
-                <MaterialCommunityIcons name="map-marker-radius" size={28} color="#fff" />
-              </View>
-              <View style={styles.mapCtaTextWrap}>
-                <Text style={styles.mapCtaTitle}>Place pin on map</Text>
-                <Text style={styles.mapCtaBody}>
-                  Drop a pin to fill street address, country, city, phone prefix, and coordinates.
-                </Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={24} color={COLORS.PRIMARY} />
-            </Pressable>
-            {mapPinSet && pickedLat != null && pickedLon != null ? (
-              <View style={styles.mapSummaryRow}>
-                <MaterialCommunityIcons
-                  name="check-circle"
-                  size={18}
-                  color={gateMissing.includes('map pin') || missingFields.includes('address') ? '#fbbf24' : COLORS.PRIMARY}
-                />
-                <Text style={styles.mapPickSummary}>
-                  Location set · {pickedLat.toFixed(5)}, {pickedLon.toFixed(5)}
-                  {resolvingMapLocation ? ' · matching city…' : ''}
-                </Text>
-              </View>
-            ) : null}
-          </>
-        ) : null}
+            <ShopViewPublicProfileButton shop={profile} navigation={navigation} compact />
 
-        {publicPagePreviewSection}
+            {missingFields.length ? (
+              <ShopProfileMissingAlert fields={missingFields} onFieldPress={scrollToMissingField} />
+            ) : null}
+
+            {publicPagePreviewSection}
 
         <View onLayout={(e) => recordSectionOffset('business', e.nativeEvent.layout.y)}>
         <ShopProfileAccordionSection
@@ -2283,6 +2228,9 @@ export default function ShopProfileScreen({ navigation, route }) {
         </ShopProfileAccordionSection>
         </View>
 
+          </>
+        ) : null}
+
       </ScrollView>
 
       <Portal>
@@ -2297,7 +2245,7 @@ export default function ShopProfileScreen({ navigation, route }) {
         </Dialog>
       </Portal>
 
-      {isDirty || saving ? (
+      {isEssentialsComplete && (isDirty || saving) ? (
         <FloatingSaveBar
           onPress={handleSave}
           loading={saving}

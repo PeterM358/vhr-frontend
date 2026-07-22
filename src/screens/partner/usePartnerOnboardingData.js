@@ -106,9 +106,16 @@ function profileToValues(profile) {
     longitude: profile.longitude ?? null,
     country: profile.country ?? profile.country_id ?? null,
     city: profile.city ?? profile.city_id ?? null,
+    city_name: profile.city_name || '',
+    country_name: profile.country_name || '',
     postal_code: profile.postal_code || '',
     description: profile.description || '',
     short_description: profile.short_description || '',
+    google_maps_url: profile.google_maps_url || '',
+    offers_guarantee: profile.offers_guarantee === true,
+    images: Array.isArray(profile.images) ? profile.images : [],
+    public_slug: profile.public_slug || profile.slug || '',
+    is_fallback_public_slug: profile.is_fallback_public_slug === true,
     legalEntityId: legal?.id ?? null,
     legal_name: legal?.legal_name || '',
     vat_registered: legal?.vat_registered !== false,
@@ -174,7 +181,12 @@ function sectionMissingWizardField(section) {
   return !section.complete;
 }
 
-function computeResumeStepId(completion, savedStepId) {
+function computeResumeStepId(completion, savedStepId, preferredStepId = null) {
+  // Explicit jump target (e.g. readiness hub tapped a section).
+  if (preferredStepId && WIZARD_STEP_IDS.includes(preferredStepId)) {
+    return preferredStepId;
+  }
+
   // Prefer backend first_missing_required / current_step when it names a wizard step.
   const backendStep = completion?.first_missing_required || completion?.current_step;
   if (backendStep && WIZARD_STEP_IDS.includes(backendStep)) {
@@ -207,7 +219,7 @@ function computeResumeStepId(completion, savedStepId) {
   return savedStepId || null;
 }
 
-export function usePartnerOnboardingData() {
+export function usePartnerOnboardingData({ preferredStepId = null } = {}) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(null);
   const [initialValues, setInitialValues] = useState({});
@@ -222,6 +234,8 @@ export function usePartnerOnboardingData() {
   const completedRef = useRef(new Set());
   const latestCompletionRef = useRef(null);
   const legalEntityIdRef = useRef(null);
+  const preferredStepIdRef = useRef(preferredStepId);
+  preferredStepIdRef.current = preferredStepId;
 
   useEffect(() => {
     let active = true;
@@ -312,7 +326,8 @@ export function usePartnerOnboardingData() {
             },
             currentStepId: computeResumeStepId(
               latestCompletionRef.current,
-              progress.current_step_id
+              progress.current_step_id,
+              preferredStepIdRef.current
             ),
             completedStepIds: Array.from(completedRef.current),
           };
@@ -375,7 +390,17 @@ export function usePartnerOnboardingData() {
 
   const getCompletion = () => latestCompletionRef.current;
 
-  return { ready, error, adapter, initialValues, taxonomy, getCompletion };
+  const refreshProfile = async () => {
+    const profiles = await getMyShopProfiles().catch(() => []);
+    const profile = Array.isArray(profiles) && profiles.length ? profiles[0] : null;
+    if (!profile) return null;
+    profileRef.current = profile;
+    latestCompletionRef.current = profile.profile_completion || latestCompletionRef.current;
+    legalEntityIdRef.current = profile.legal_entity_detail?.id ?? legalEntityIdRef.current;
+    return profile;
+  };
+
+  return { ready, error, adapter, initialValues, taxonomy, getCompletion, refreshProfile };
 }
 
 export default usePartnerOnboardingData;
