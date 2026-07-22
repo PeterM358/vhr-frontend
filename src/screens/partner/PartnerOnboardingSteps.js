@@ -90,7 +90,23 @@ export function PartnerBusinessTypeStep() {
             return (
               <Pressable
                 key={cat.id}
-                onPress={() => setValues({ primary_business_category_id: cat.id })}
+                onPress={() => {
+                  // Drop services that are incompatible with the new primary
+                  // category so Save doesn't 400 on taxonomy validation.
+                  const nextKeys = new Set([cat.key]);
+                  const services = context.businessServices || [];
+                  const kept = (values.business_service_ids || []).filter((id) => {
+                    const svc = services.find((s) => Number(s.id) === Number(id));
+                    if (!svc) return false;
+                    const compat = Array.isArray(svc.category_keys) ? svc.category_keys : [];
+                    if (!compat.length) return true;
+                    return compat.some((k) => nextKeys.has(k));
+                  });
+                  setValues({
+                    primary_business_category_id: cat.id,
+                    business_service_ids: kept,
+                  });
+                }}
                 style={[styles.chip, active && styles.chipActive]}
               >
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>

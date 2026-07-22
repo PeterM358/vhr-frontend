@@ -53,20 +53,45 @@ function toIdArray(rows) {
     .filter((n) => Number.isFinite(n));
 }
 
+// Pull the nested taxonomy id out of a shop link row. The profile serializer
+// returns business_categories / business_services as *link* objects shaped like
+// { id: <linkId>, category|service: { id: <taxonomyId> } }. We must persist the
+// taxonomy id (BusinessCategory / BusinessService pk), NOT the link id — sending
+// link ids makes the PATCH fail serializer validation (invalid pk / incompatible
+// service) with a 400.
+function linkedTaxonomyId(row, nestedKey) {
+  if (row == null) return NaN;
+  if (typeof row === 'object') {
+    const nested = row[nestedKey];
+    if (nested && typeof nested === 'object' && nested.id != null) return Number(nested.id);
+    return Number(row.id);
+  }
+  return Number(row);
+}
+
+function toLinkedIdArray(rows, nestedKey) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((r) => linkedTaxonomyId(r, nestedKey))
+    .filter((n) => Number.isFinite(n));
+}
+
 function profileToValues(profile) {
   if (!profile) return {};
   const legal = profile.legal_entity_detail || null;
+  const primaryCategoryId =
+    profile.primary_business_category?.id ?? profile.primary_business_category_id ?? null;
   return {
     profileId: profile.id,
     name: profile.name || '',
-    primary_business_category_id:
-      profile.primary_business_category?.id ?? profile.primary_business_category_id ?? null,
-    secondary_business_category_ids: toIdArray(
-      (profile.business_categories || []).filter(
-        (c) => !c.is_primary && Number(c.id) !== Number(profile.primary_business_category?.id)
-      )
-    ),
-    business_service_ids: toIdArray(profile.business_services),
+    primary_business_category_id: primaryCategoryId,
+    // business_categories rows are LINK objects ({ id: linkId, category: {...} });
+    // read the nested category id and drop the primary so we only keep secondaries.
+    secondary_business_category_ids: toLinkedIdArray(
+      (profile.business_categories || []).filter((c) => !c.is_primary),
+      'category'
+    ).filter((id) => Number(id) !== Number(primaryCategoryId)),
+    // business_services rows are LINK objects ({ id: linkId, service: {...} }).
+    business_service_ids: toLinkedIdArray(profile.business_services, 'service'),
     supported_vehicle_types: toIdArray(profile.supported_vehicle_types),
     available_repairs: toIdArray(profile.available_repairs),
     working_hours: normalizeWorkingHoursObject(profile.working_hours),
@@ -83,11 +108,63 @@ function profileToValues(profile) {
 }
 
 // Resume the wizard on the first incomplete required step that the wizard can
-// actually edit. Sections handled only via deep-link (location, media) fall
-// through to the readiness hub, which surfaces those handoffs.
+// actually edit. Sections handled only via deep-link (location, media,
+// description, pricing) fall through to the readiness hub.
 const EDITABLE_STEP_SECTION_KEYS = ['business', 'vehicles', 'services', 'hours', 'legal'];
 
+// Map profile_completion.required_missing / missing field keys → wizard step ids.
+// Fields the wizard never collects (description, location, pricing, photos)
+// intentionally have no mapping so resume skips them.
+const REQUIRED_FIELD_TO_STEP = {
+  business_name: 'business',
+  business_category: 'business',
+  vehicle_types: 'vehicles',
+  operations: 'services',
+  working_hours: 'hours',
+  legal_name: 'legal',
+  invoice_address: 'legal',
+};
+
+// Per section, the backend field keys the WIZARD can actually complete. Used
+// when required_missing is absent but sections[] is present (older payloads).
+const WIZARD_SECTION_FIELDS = {
+  business: ['business_name', 'business_category'],
+  vehicles: ['vehicle_types'],
+  services: ['operations'],
+  hours: ['working_hours'],
+  legal: ['legal_name', 'invoice_address'],
+};
+
+function sectionMissingWizardField(section) {
+  if (!section) return false;
+  const relevant = WIZARD_SECTION_FIELDS[section.key] || [];
+  if (Array.isArray(section.fields) && section.fields.length) {
+    return section.fields.some((f) => relevant.includes(f.key) && !f.complete);
+  }
+  // No per-field detail: fall back to the section-level flag.
+  return !section.complete;
+}
+
 function computeResumeStepId(completion, savedStepId) {
+  // Prefer required_missing (alias of missing) — ordered publish-blocking fields.
+  const missing = completion?.required_missing || completion?.missing;
+  if (Array.isArray(missing) && missing.length) {
+    for (const fieldKey of missing) {
+      const stepId = REQUIRED_FIELD_TO_STEP[fieldKey];
+      if (stepId && EDITABLE_STEP_SECTION_KEYS.includes(stepId)) return stepId;
+    }
+    // Remaining required gaps are outside the wizard (location, description, …).
+    return 'readiness';
+  }
+
+  // Fall back: backend current_step when it names an editable wizard step.
+  // (Backend may report `location` before `vehicles`; skip non-editable keys.)
+  const backendStep = completion?.current_step;
+  if (backendStep && EDITABLE_STEP_SECTION_KEYS.includes(backendStep)) {
+    return backendStep;
+  }
+
+  // Fall back: walk sections with wizard-editable field checks.
   const sections = completion?.sections;
   if (Array.isArray(sections) && sections.length) {
     const byKey = {};
@@ -96,10 +173,11 @@ function computeResumeStepId(completion, savedStepId) {
     });
     for (const key of EDITABLE_STEP_SECTION_KEYS) {
       const section = byKey[key];
-      if (section && section.required && !section.complete) return key;
+      if (section && section.required && sectionMissingWizardField(section)) return key;
     }
     return 'readiness';
   }
+
   return savedStepId || null;
 }
 

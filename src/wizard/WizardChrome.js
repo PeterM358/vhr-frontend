@@ -39,6 +39,7 @@ export default function WizardChrome({
     error,
     restored,
     adapterProgress,
+    isDirty,
     goNext,
     goBack,
     skip,
@@ -91,7 +92,9 @@ export default function WizardChrome({
 
   const nextLabel = isLast
     ? t(finishLabelKey || 'wizard.finish', null, 'Finish')
-    : t(nextLabelKey || 'wizard.saveContinue', null, 'Save and continue');
+    : isDirty
+      ? t(nextLabelKey || 'wizard.saveContinue', null, 'Save and continue')
+      : t('wizard.continue', null, 'Continue');
 
   return (
     <View style={styles.host}>

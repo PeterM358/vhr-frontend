@@ -40,6 +40,12 @@ export default function PartnerOnboardingScreen({ navigation }) {
       {
         id: 'business',
         titleKey: 'partnerOnboarding.step.business',
+        dirtyFields: [
+          'name',
+          'primary_business_category_id',
+          'secondary_business_category_ids',
+          'business_service_ids',
+        ],
         validate: (v) => {
           if (!String(v.name || '').trim()) {
             return { ok: false, message: t('partnerOnboarding.errors.nameRequired', null, 'Enter your business name.') };
@@ -54,6 +60,7 @@ export default function PartnerOnboardingScreen({ navigation }) {
       {
         id: 'vehicles',
         titleKey: 'partnerOnboarding.step.vehicles',
+        dirtyFields: ['supported_vehicle_types'],
         validate: (v) => {
           if (!(v.supported_vehicle_types || []).length) {
             return {
@@ -69,11 +76,13 @@ export default function PartnerOnboardingScreen({ navigation }) {
         id: 'services',
         titleKey: 'partnerOnboarding.step.services',
         optional: true,
+        dirtyFields: ['available_repairs'],
         Component: PartnerServicesStep,
       },
       {
         id: 'hours',
         titleKey: 'partnerOnboarding.step.hours',
+        dirtyFields: ['working_hours'],
         validate: (v) => {
           if (!hasAnyOpenDay(v.working_hours)) {
             return {
@@ -88,6 +97,15 @@ export default function PartnerOnboardingScreen({ navigation }) {
       {
         id: 'legal',
         titleKey: 'partnerOnboarding.step.legal',
+        dirtyFields: [
+          'legal_name',
+          'vat_registered',
+          'vat_number',
+          'eik_number',
+          'invoice_branch_name',
+          'invoice_address_line1',
+          'invoice_city',
+        ],
         validate: (v) => {
           if (!String(v.legal_name || '').trim()) {
             return {
@@ -117,6 +135,7 @@ export default function PartnerOnboardingScreen({ navigation }) {
       {
         id: 'readiness',
         titleKey: 'partnerOnboarding.step.readiness',
+        dirtyFields: [],
         Component: PartnerReadinessStep,
       },
     ],

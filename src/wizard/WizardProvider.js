@@ -17,6 +17,65 @@ import { WizardContext } from './WizardContext';
 import { normalizeValidation } from './validation';
 import { createMemoryAdapter } from './adapters/memoryAdapter';
 
+// Structural equality good enough for wizard values (primitives, arrays and
+// plain objects of them). Used for per-step dirty tracking so we only PATCH
+// when the user actually changed something.
+function valuesEqual(a, b) {
+  if (a === b) return true;
+  if (a == null || b == null) return a === b;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((v, i) => valuesEqual(v, b[i]));
+  }
+  if (typeof a === 'object' && typeof b === 'object') {
+    const ak = Object.keys(a);
+    const bk = Object.keys(b);
+    if (ak.length !== bk.length) return false;
+    return ak.every((k) => valuesEqual(a[k], b[k]));
+  }
+  return false;
+}
+
+// A step is dirty when any field it owns differs from the last saved/loaded
+// baseline. Steps declare their fields via `dirtyFields`; without it we compare
+// the whole value bag (safe default for flows that don't opt in).
+function isStepDirty(step, values, baseline) {
+  if (!step) return false;
+  const fields = Array.isArray(step.dirtyFields) ? step.dirtyFields : null;
+  if (!fields) return !valuesEqual(values, baseline);
+  return fields.some((key) => !valuesEqual(values?.[key], baseline?.[key]));
+}
+
+// Turn API / adapter errors into a short inline message. updateShopProfile
+// often throws JSON.stringify(serializerErrors) — surface the first field
+// message instead of a raw JSON blob.
+function formatWizardError(err) {
+  const raw = err && err.message != null ? String(err.message) : '';
+  if (!raw) return null;
+  if (raw.startsWith('{') || raw.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed === 'string') return parsed;
+      if (parsed && typeof parsed === 'object') {
+        if (typeof parsed.detail === 'string') return parsed.detail;
+        const firstKey = Object.keys(parsed)[0];
+        if (firstKey) {
+          const val = parsed[firstKey];
+          const text = Array.isArray(val) ? val[0] : val;
+          if (text != null && text !== '') {
+            return firstKey === 'non_field_errors' || firstKey === 'detail'
+              ? String(text)
+              : `${firstKey}: ${text}`;
+          }
+        }
+      }
+    } catch {
+      // fall through
+    }
+  }
+  return raw;
+}
+
 /**
  * @param {object[]} steps    Step definitions: { id, titleKey, title?, optional?, validate?, save?, Component }
  * @param {object}   adapter  Persistence adapter (see adapters/index.js). Defaults to in-memory.
@@ -53,6 +112,11 @@ export function WizardProvider({
   const valuesRef = useRef(values);
   valuesRef.current = values;
 
+  // Baseline = last persisted/loaded values. Per-step dirty tracking diffs the
+  // live values against this so we can navigate without a forced PATCH when
+  // nothing changed, and only save the steps the user actually edited.
+  const savedValuesRef = useRef({ ...initialValues });
+
   const total = steps.length;
 
   const findStepIndexById = useCallback(
@@ -72,6 +136,7 @@ export function WizardProvider({
             const merged = { ...initialValues, ...state.values };
             setValuesState(merged);
             valuesRef.current = merged;
+            savedValuesRef.current = { ...merged };
           }
           if (Array.isArray(state.completedStepIds)) {
             setCompletedStepIds(state.completedStepIds);
@@ -132,6 +197,24 @@ export function WizardProvider({
   const isFirst = index <= 0;
   const isLast = index >= total - 1;
 
+  const isCurrentStepDirty = isStepDirty(currentStep, values, savedValuesRef.current);
+
+  // Fold a just-saved step's values into the baseline so it reads clean again
+  // (and later steps' unsaved edits stay dirty until they too are saved).
+  const markStepSaved = useCallback((step, savedValues) => {
+    const source = savedValues || {};
+    const fields = Array.isArray(step?.dirtyFields) ? step.dirtyFields : null;
+    if (!fields) {
+      savedValuesRef.current = { ...source };
+      return;
+    }
+    const nextBaseline = { ...savedValuesRef.current };
+    fields.forEach((key) => {
+      nextBaseline[key] = source[key];
+    });
+    savedValuesRef.current = nextBaseline;
+  }, []);
+
   // Local progress: completed required steps / required steps. Optional steps
   // still count toward the denominator once visited so the bar feels honest.
   const localProgress = useMemo(() => {
@@ -187,10 +270,24 @@ export function WizardProvider({
     goTo(index - 1);
   }, [isFirst, index, goTo]);
 
-  // Validate + persist current step, then advance (or finish on the last step).
+  // "Save and continue":
+  //   - clean, non-final step -> just advance (no validation, no PATCH)
+  //   - dirty step            -> validate, then persist only if valid
+  //   - last step             -> validate + save (when dirty) then finish
+  // A failed save never strands the user on a clean step, matching the
+  // free Back/Next navigation the wizard now supports.
   const goNext = useCallback(async () => {
     if (!currentStep) return { ok: false };
     setError(null);
+
+    const dirty = isStepDirty(currentStep, valuesRef.current, savedValuesRef.current);
+
+    // Nothing changed on a non-final step: move on without touching the API.
+    if (!dirty && !isLast) {
+      goTo(index + 1);
+      return { ok: true };
+    }
+
     setStatus('saving');
     try {
       if (typeof currentStep.validate === 'function') {
@@ -203,9 +300,12 @@ export function WizardProvider({
         }
       }
 
-      await persistStep(currentStep, valuesRef.current);
-      markCompleted(currentStep.id);
-      refreshAdapterProgress();
+      if (dirty) {
+        await persistStep(currentStep, valuesRef.current);
+        markStepSaved(currentStep, valuesRef.current);
+        markCompleted(currentStep.id);
+        refreshAdapterProgress();
+      }
 
       if (isLast) {
         setStatus('idle');
@@ -218,7 +318,7 @@ export function WizardProvider({
       return { ok: true };
     } catch (e) {
       setStatus('error');
-      const message = (e && e.message) || 'Something went wrong. Please try again.';
+      const message = formatWizardError(e) || 'Something went wrong. Please try again.';
       setError(message);
       return { ok: false, message };
     }
@@ -226,6 +326,7 @@ export function WizardProvider({
     currentStep,
     context,
     persistStep,
+    markStepSaved,
     markCompleted,
     refreshAdapterProgress,
     isLast,
@@ -247,15 +348,20 @@ export function WizardProvider({
   const finishLater = useCallback(async () => {
     try {
       setStatus('saving');
-      // Best-effort save of the current step so nothing is lost.
-      if (currentStep) await persistStep(currentStep, valuesRef.current);
+      // Best-effort save of the current step so nothing is lost — but only when
+      // the user actually changed something, so exiting a clean step never
+      // triggers (and gets blocked by) a needless PATCH.
+      if (currentStep && isStepDirty(currentStep, valuesRef.current, savedValuesRef.current)) {
+        await persistStep(currentStep, valuesRef.current);
+        markStepSaved(currentStep, valuesRef.current);
+      }
     } catch {
       // ignore — exiting anyway
     } finally {
       setStatus('idle');
       if (onExit) onExit(valuesRef.current);
     }
-  }, [currentStep, persistStep, onExit]);
+  }, [currentStep, persistStep, markStepSaved, onExit]);
 
   const api = useMemo(
     () => ({
@@ -282,6 +388,7 @@ export function WizardProvider({
       error,
       restored,
       setError,
+      isDirty: isCurrentStepDirty,
       // navigation
       goNext,
       goBack,
@@ -308,6 +415,7 @@ export function WizardProvider({
       status,
       error,
       restored,
+      isCurrentStepDirty,
       goNext,
       goBack,
       goTo,
