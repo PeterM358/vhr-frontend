@@ -70,7 +70,18 @@ export default function PartnerOnboardingScreen({ navigation }) {
       {
         id: 'location',
         titleKey: 'partnerOnboarding.step.location',
-        dirtyFields: ['address', 'phone', 'latitude', 'longitude', 'country', 'city', 'postal_code'],
+        dirtyFields: [
+          'address',
+          'phone',
+          'phone_country_code',
+          'phone_national',
+          'phone_e164',
+          'latitude',
+          'longitude',
+          'country',
+          'city',
+          'postal_code',
+        ],
         validate: (v) => {
           if (!String(v.address || '').trim()) {
             return {
@@ -78,7 +89,24 @@ export default function PartnerOnboardingScreen({ navigation }) {
               message: t('partnerOnboarding.errors.addressRequired', null, 'Enter your street address.'),
             };
           }
-          if (!String(v.phone || '').trim()) {
+          if (v.country == null || v.country === '') {
+            return {
+              ok: false,
+              message: t('partnerOnboarding.errors.countryRequired', null, 'Choose your country.'),
+            };
+          }
+          if (v.city == null || v.city === '') {
+            return {
+              ok: false,
+              message: t('partnerOnboarding.errors.cityRequired', null, 'Choose your city.'),
+            };
+          }
+          const hasPhone =
+            String(v.phone_e164 || '').trim() ||
+            String(v.phone || '').trim() ||
+            (String(v.phone_national || '').trim() &&
+              String(v.phone_country_code || '').trim());
+          if (!hasPhone) {
             return {
               ok: false,
               message: t('partnerOnboarding.errors.phoneRequired', null, 'Enter a contact phone.'),

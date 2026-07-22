@@ -10,10 +10,11 @@
 // Services → Prices → Hours → Photos → About → Legal → Preview → Publish.
 // Never hand incomplete partners off to ShopProfileScreen to finish sections.
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Pressable, ScrollView, Platform, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Text, TextInput, ProgressBar, Button, Switch } from 'react-native-paper';
+import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -25,9 +26,17 @@ import ShopViewPublicProfileButton from '../../components/shop/ShopViewPublicPro
 import { COLORS } from '../../constants/colors';
 import { useTranslation } from '../../i18n';
 import { useWizard } from '../../wizard';
+import { getCountries, getCitiesForCountry } from '../../api/profiles';
 import { uploadShopImage, deleteShopImage } from '../../api/shops';
 import { pickVehiclePhotoAttachment } from '../../utils/pickDocumentFile';
 import { formatShopDisplayName } from '../../utils/shopDisplayName';
+import { roundCoordinateForApi } from '../../utils/manualServiceCenter';
+import { buildE164Phone, dialPrefixForCountry } from '../../utils/phoneE164';
+import {
+  dedupeRepeatedAddressText,
+  resolveCountryCityFromCoords,
+} from '../../utils/reverseGeocodeLocation';
+import { sortCitiesForPicker } from '../../utils/sortCitiesForPicker';
 import {
   WEEKDAYS_MON_FIRST,
   DAY_KEY,
@@ -397,63 +406,235 @@ export function PartnerLegalStep() {
 
 /* ----------------------------- Step: location ----------------------------- */
 
+function ensureSelectedRow(list, selectedId, selectedName, fallbackLabel) {
+  const rows = Array.isArray(list) ? list : [];
+  if (selectedId == null || selectedId === '') return rows;
+  if (rows.some((row) => Number(row.id) === Number(selectedId))) return rows;
+  return [{ id: selectedId, name: selectedName || fallbackLabel }, ...rows];
+}
+
+function syncPhoneFields(patch) {
+  const prefix = patch.phone_country_code;
+  const national = patch.phone_national;
+  if (prefix == null && national == null) return patch;
+  const e164 = buildE164Phone(
+    prefix != null ? prefix : '',
+    national != null ? national : ''
+  );
+  return {
+    ...patch,
+    phone_e164: e164,
+    phone: e164 || [prefix, national].filter(Boolean).join(' ').trim(),
+  };
+}
+
 export function PartnerLocationStep() {
   const { t } = useTranslation();
   const navigation = useNavigation();
   const route = useRoute();
   const { values, setValues } = useWizard();
+  const [countries, setCountries] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [resolvingMapLocation, setResolvingMapLocation] = useState(false);
+  const mapPickHandledRef = useRef(null);
 
-  // Map picker returns here with latitude/longitude merge params.
-  React.useEffect(() => {
+  useEffect(() => {
     let cancelled = false;
     (async () => {
-      const lat = route?.params?.latitude;
-      const lon = route?.params?.longitude;
-      if (lat == null || lon == null) return;
-      const nLat = Number(lat);
-      const nLon = Number(lon);
-      if (!Number.isFinite(nLat) || !Number.isFinite(nLon)) return;
-
-      const patch = { latitude: nLat, longitude: nLon };
       try {
-        const {
-          resolveCountryCityFromCoords,
-          dedupeRepeatedAddressText,
-        } = await import('../../utils/reverseGeocodeLocation');
-        const { getCountries, getCitiesForCountry } = await import('../../api/profiles');
-        const countries = await getCountries().catch(() => []);
-        const resolved = await resolveCountryCityFromCoords({
-          latitude: nLat,
-          longitude: nLon,
-          countries: Array.isArray(countries) ? countries : [],
-          getCitiesForCountry,
-        });
+        const rows = await getCountries();
         if (cancelled) return;
-        if (resolved?.addressHint && !String(values.address || '').trim()) {
-          patch.address = dedupeRepeatedAddressText(resolved.addressHint);
-        }
-        if (resolved?.countryId != null) patch.country = resolved.countryId;
-        if (resolved?.cityId != null) patch.city = resolved.cityId;
-        if (resolved?.postalCode) patch.postal_code = resolved.postalCode;
+        setCountries(
+          ensureSelectedRow(
+            Array.isArray(rows) ? rows : [],
+            values.country,
+            values.country_name,
+            t('partnerOnboarding.selectedCountry', null, 'Selected country')
+          )
+        );
       } catch {
-        // Keep pin even if reverse-geocode fails.
-      }
-      if (!cancelled) {
-        setValues(patch);
-        navigation.setParams?.({ latitude: undefined, longitude: undefined });
+        // Country list is best-effort; map reverse-geocode can still fill IDs.
       }
     })();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to map return coords
-  }, [route?.params?.latitude, route?.params?.longitude]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once; seed selection from initial values
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (values.country == null || values.country === '') {
+        setCities([]);
+        return;
+      }
+      try {
+        const rows = await getCitiesForCountry(values.country);
+        if (cancelled) return;
+        const countryRow = countries.find((c) => Number(c.id) === Number(values.country));
+        const sorted = sortCitiesForPicker(
+          Array.isArray(rows) ? rows : [],
+          countryRow?.name || values.country_name
+        );
+        setCities(
+          ensureSelectedRow(
+            sorted,
+            values.city,
+            values.city_name,
+            t('partnerOnboarding.selectedCity', null, 'Selected city')
+          )
+        );
+      } catch {
+        if (!cancelled) setCities([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [values.country, values.city, values.city_name, values.country_name, countries, t]);
+
+  const applyMapPick = useCallback(
+    async (pick) => {
+      const lat = Number(pick?.latitude);
+      const lon = Number(pick?.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+      const roundedLat = roundCoordinateForApi(lat);
+      const roundedLon = roundCoordinateForApi(lon);
+      setValues({ latitude: roundedLat, longitude: roundedLon });
+      setResolvingMapLocation(true);
+
+      try {
+        let countryRows = countries;
+        if (!countryRows.length) {
+          const fetched = await getCountries().catch(() => []);
+          countryRows = Array.isArray(fetched) ? fetched : [];
+          if (countryRows.length) setCountries(countryRows);
+        }
+
+        const resolved = await resolveCountryCityFromCoords({
+          latitude: lat,
+          longitude: lon,
+          countries: countryRows,
+          getCitiesForCountry,
+        });
+
+        const patch = {
+          latitude: roundedLat,
+          longitude: roundedLon,
+        };
+        if (resolved?.addressHint) {
+          patch.address = dedupeRepeatedAddressText(resolved.addressHint);
+        }
+        if (resolved?.postalCode) patch.postal_code = resolved.postalCode;
+        if (resolved?.countryId != null) {
+          patch.country = resolved.countryId;
+          const countryRow = countryRows.find(
+            (c) => Number(c.id) === Number(resolved.countryId)
+          );
+          if (countryRow?.name) patch.country_name = countryRow.name;
+          const prefix = dialPrefixForCountry(countryRow);
+          if (prefix && !String(values.phone_country_code || '').trim()) {
+            Object.assign(patch, syncPhoneFields({
+              phone_country_code: prefix,
+              phone_national: values.phone_national || '',
+            }));
+          }
+        }
+        if (resolved?.cityId != null) {
+          patch.city = resolved.cityId;
+        }
+
+        setValues(patch);
+
+        if (resolved?.countryId) {
+          const cityList = Array.isArray(resolved.cities)
+            ? resolved.cities
+            : await getCitiesForCountry(resolved.countryId);
+          const countryRow = countryRows.find(
+            (c) => Number(c.id) === Number(resolved.countryId)
+          );
+          setCities(
+            ensureSelectedRow(
+              sortCitiesForPicker(Array.isArray(cityList) ? cityList : [], countryRow?.name),
+              resolved.cityId,
+              null,
+              t('partnerOnboarding.selectedCity', null, 'Selected city')
+            )
+          );
+        }
+      } catch (e) {
+        console.warn('Partner location: could not resolve map pin', e);
+      } finally {
+        setResolvingMapLocation(false);
+      }
+    },
+    [countries, setValues, t, values.phone_country_code, values.phone_national]
+  );
+
+  // MapLocationPicker returns { mapPick: { latitude, longitude } } (same as Profile).
+  useEffect(() => {
+    const pick = route?.params?.mapPick;
+    if (!pick) return;
+    const pickKey = `${pick.latitude},${pick.longitude}`;
+    if (mapPickHandledRef.current === pickKey) return;
+    mapPickHandledRef.current = pickKey;
+
+    let cancelled = false;
+    (async () => {
+      await applyMapPick(pick);
+      if (!cancelled) {
+        navigation.setParams?.({ mapPick: undefined });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [route?.params?.mapPick, applyMapPick, navigation]);
+
+  const handleCountryChange = async (value) => {
+    const countryId = value === '' || value == null ? null : Number(value);
+    const countryRow = countries.find((c) => Number(c.id) === Number(countryId));
+    const prefix = dialPrefixForCountry(countryRow);
+    const phonePatch = prefix
+      ? syncPhoneFields({
+          phone_country_code: prefix,
+          phone_national: values.phone_national || '',
+        })
+      : {};
+    setValues({
+      country: countryId,
+      country_name: countryRow?.name || '',
+      city: null,
+      city_name: '',
+      ...phonePatch,
+    });
+    if (countryId == null) {
+      setCities([]);
+      return;
+    }
+    try {
+      const cityList = await getCitiesForCountry(countryId);
+      setCities(sortCitiesForPicker(Array.isArray(cityList) ? cityList : [], countryRow?.name));
+    } catch {
+      setCities([]);
+    }
+  };
 
   const hasPin =
     values.latitude != null &&
     values.longitude != null &&
     Number.isFinite(Number(values.latitude)) &&
     Number.isFinite(Number(values.longitude));
+
+  const openMapPicker = () => {
+    navigation.navigate('MapLocationPicker', {
+      returnScreen: 'PartnerOnboarding',
+      initialLatitude: values.latitude,
+      initialLongitude: values.longitude,
+    });
+  };
 
   return (
     <View>
@@ -468,6 +649,47 @@ export function PartnerLocationStep() {
             'Address and map pin power discovery, SEO, and incoming requests.'
           )}
         </Text>
+
+        <Button mode="contained" icon="map-marker" onPress={openMapPicker} style={{ marginBottom: 8 }}>
+          {hasPin
+            ? t('partnerOnboarding.editMapPin', null, 'Edit map pin')
+            : t('partnerOnboarding.setMapPin', null, 'Set map pin')}
+        </Button>
+        {hasPin ? (
+          <Text style={[styles.hint, { marginBottom: 8 }]}>
+            {t('partnerOnboarding.coordinates', null, 'Coordinates')}:{' '}
+            {Number(values.latitude).toFixed(5)}, {Number(values.longitude).toFixed(5)}
+            {resolvingMapLocation
+              ? ` · ${t('partnerOnboarding.matchingCity', null, 'matching city…')}`
+              : ''}
+          </Text>
+        ) : (
+          <Text style={[styles.hint, { marginBottom: 8 }]}>
+            {t(
+              'partnerOnboarding.mapPinHint',
+              null,
+              'Drop a pin — we fill street, country, city, and phone prefix.'
+            )}
+          </Text>
+        )}
+
+        <View style={styles.coordinatesRow}>
+          <TextInput
+            mode="outlined"
+            label={t('partnerOnboarding.latitude', null, 'Latitude')}
+            value={values.latitude != null ? String(values.latitude) : ''}
+            editable={false}
+            style={[styles.input, styles.coordinatesInput]}
+          />
+          <TextInput
+            mode="outlined"
+            label={t('partnerOnboarding.longitude', null, 'Longitude')}
+            value={values.longitude != null ? String(values.longitude) : ''}
+            editable={false}
+            style={[styles.input, styles.coordinatesInput]}
+          />
+        </View>
+
         <TextInput
           mode="outlined"
           label={t('partnerOnboarding.address', null, 'Street address')}
@@ -477,33 +699,87 @@ export function PartnerLocationStep() {
         />
         <TextInput
           mode="outlined"
-          label={t('partnerOnboarding.phone', null, 'Phone')}
-          value={values.phone || ''}
-          onChangeText={(v) => setValues({ phone: v })}
+          label={t('partnerOnboarding.postalCode', null, 'Postal code')}
+          value={values.postal_code || ''}
+          onChangeText={(v) => setValues({ postal_code: v })}
+          style={styles.input}
+        />
+
+        <Text style={styles.fieldLabel}>{t('partnerOnboarding.country', null, 'Country')}</Text>
+        <View style={styles.pickerWrap}>
+          <Picker
+            selectedValue={values.country != null ? Number(values.country) : null}
+            onValueChange={handleCountryChange}
+            style={styles.picker}
+          >
+            <Picker.Item
+              label={t('partnerOnboarding.selectCountry', null, 'Select country…')}
+              value={null}
+            />
+            {countries.map((c) => (
+              <Picker.Item key={c.id} label={c.name} value={Number(c.id)} />
+            ))}
+          </Picker>
+        </View>
+
+        <Text style={styles.fieldLabel}>{t('partnerOnboarding.city', null, 'City')}</Text>
+        <View style={styles.pickerWrap}>
+          <Picker
+            selectedValue={values.city != null ? Number(values.city) : null}
+            onValueChange={(val) => {
+              const cityId = val === '' || val == null ? null : Number(val);
+              const cityRow = cities.find((c) => Number(c.id) === Number(cityId));
+              setValues({ city: cityId, city_name: cityRow?.name || '' });
+            }}
+            style={styles.picker}
+            enabled={values.country != null && values.country !== ''}
+          >
+            <Picker.Item
+              label={
+                values.country
+                  ? t('partnerOnboarding.selectCity', null, 'Select city…')
+                  : t('partnerOnboarding.chooseCountryFirst', null, 'Choose country first')
+              }
+              value={null}
+            />
+            {cities.map((c) => (
+              <Picker.Item key={c.id} label={c.name} value={Number(c.id)} />
+            ))}
+          </Picker>
+        </View>
+
+        <TextInput
+          mode="outlined"
+          label={t('partnerOnboarding.phonePrefix', null, 'Country prefix')}
+          value={values.phone_country_code || ''}
+          onChangeText={(text) =>
+            setValues(
+              syncPhoneFields({
+                phone_country_code: text,
+                phone_national: values.phone_national || '',
+              })
+            )
+          }
           style={styles.input}
           keyboardType="phone-pad"
+          placeholder="+359"
         />
-        <Button
-          mode="contained"
-          icon="map-marker"
-          onPress={() =>
-            navigation.navigate('MapLocationPicker', {
-              returnScreen: 'PartnerOnboarding',
-              initialLatitude: values.latitude,
-              initialLongitude: values.longitude,
-            })
+        <TextInput
+          mode="outlined"
+          label={t('partnerOnboarding.phoneNational', null, 'Phone number')}
+          value={values.phone_national || ''}
+          onChangeText={(text) =>
+            setValues(
+              syncPhoneFields({
+                phone_country_code: values.phone_country_code || '',
+                phone_national: text,
+              })
+            )
           }
-          style={{ marginTop: 8 }}
-        >
-          {hasPin
-            ? t('partnerOnboarding.editMapPin', null, 'Edit map pin')
-            : t('partnerOnboarding.setMapPin', null, 'Set map pin')}
-        </Button>
-        {hasPin ? (
-          <Text style={[styles.hint, { marginTop: 8 }]}>
-            {Number(values.latitude).toFixed(5)}, {Number(values.longitude).toFixed(5)}
-          </Text>
-        ) : null}
+          style={styles.input}
+          keyboardType="phone-pad"
+          placeholder="888123456"
+        />
       </FloatingCard>
     </View>
   );
@@ -936,6 +1212,34 @@ const styles = StyleSheet.create({
   input: {
     marginBottom: 4,
     backgroundColor: '#fff',
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.TEXT_DARK,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  pickerWrap: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 12,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.12)',
+  },
+  picker: {
+    width: '100%',
+    color: COLORS.TEXT_DARK,
+  },
+  coordinatesRow: {
+    flexDirection: 'row',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  coordinatesInput: {
+    flex: 1,
+    minWidth: Platform.OS === 'web' ? 220 : 140,
   },
   chipWrap: {
     flexDirection: 'row',

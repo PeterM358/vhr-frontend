@@ -18,6 +18,7 @@ import { createLegalEntity, updateLegalEntity } from '../../api/billing';
 import { getVehicleTypes } from '../../api/vehicles';
 import { fetchBusinessTaxonomy } from '../../api/seo';
 import { getLocale } from '../../i18n';
+import { buildE164Phone, parseStoredPhone } from '../../utils/phoneE164';
 import { normalizeWorkingHoursObject } from '../../utils/shopWorkingHours';
 import { createApiAdapter } from '../../wizard';
 
@@ -33,16 +34,25 @@ const STEP_PATCH_BUILDERS = {
         }
       : {}),
   }),
-  location: (v) => ({
-    address: v.address || '',
-    phone: v.phone || '',
-    ...(v.latitude != null && v.longitude != null
-      ? { latitude: Number(v.latitude), longitude: Number(v.longitude) }
-      : {}),
-    ...(v.country != null ? { country: v.country } : {}),
-    ...(v.city != null ? { city: v.city } : {}),
-    ...(v.postal_code ? { postal_code: v.postal_code } : {}),
-  }),
+  location: (v) => {
+    const e164 =
+      String(v.phone_e164 || '').trim() ||
+      buildE164Phone(v.phone_country_code || '', v.phone_national || '') ||
+      String(v.phone || '').trim();
+    return {
+      address: v.address || '',
+      postal_code: v.postal_code || '',
+      phone: e164,
+      phone_country_code: v.phone_country_code || '',
+      phone_national: v.phone_national || '',
+      phone_e164: e164,
+      ...(v.latitude != null && v.longitude != null
+        ? { latitude: Number(v.latitude), longitude: Number(v.longitude) }
+        : {}),
+      ...(v.country != null ? { country: v.country } : {}),
+      ...(v.city != null ? { city: v.city } : {}),
+    };
+  },
   vehicles: (v) => ({ supported_vehicle_types: v.supported_vehicle_types || [] }),
   services: (v) => ({ available_repairs: v.available_repairs || [] }),
   prices: () => ({}),
@@ -102,6 +112,15 @@ function profileToValues(profile) {
     working_hours: normalizeWorkingHoursObject(profile.working_hours),
     address: profile.address || '',
     phone: profile.phone_e164 || profile.phone || '',
+    phone_country_code:
+      profile.phone_country_code ||
+      parseStoredPhone(profile.phone_e164 || profile.phone).prefix ||
+      '',
+    phone_national:
+      profile.phone_national ||
+      parseStoredPhone(profile.phone_e164 || profile.phone).national ||
+      '',
+    phone_e164: profile.phone_e164 || profile.phone || '',
     latitude: profile.latitude ?? null,
     longitude: profile.longitude ?? null,
     country: profile.country ?? profile.country_id ?? null,

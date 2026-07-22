@@ -10,7 +10,7 @@
 // Callers can replace this entirely and drive the wizard from useWizard().
 
 import React, { useMemo } from 'react';
-import { View, StyleSheet, Platform, Pressable, ScrollView } from 'react-native';
+import { View, StyleSheet, Platform, Pressable } from 'react-native';
 import { Text, Button, ProgressBar, ActivityIndicator } from 'react-native-paper';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,14 +23,24 @@ const STATE_COLORS = {
   completed: '#22C55E',
   started: '#EAB308',
   required_incomplete: '#EF4444',
-  optional_untouched: 'rgba(255,255,255,0.45)',
-  current: '#fff',
+  optional_untouched: '#94A3B8',
+  current: '#FFFFFF',
 };
+
+const STATE_FILLS = {
+  completed: 'rgba(34,197,94,0.28)',
+  started: 'rgba(234,179,8,0.28)',
+  required_incomplete: 'rgba(239,68,68,0.28)',
+  optional_untouched: 'rgba(148,163,184,0.28)',
+  current: '#FFFFFF',
+};
+
+const KNOWN_STATES = new Set(Object.keys(STATE_COLORS));
 
 function resolveStepVisualState(step, index, currentIndex, completedStepIds, stepStatesById) {
   if (index === currentIndex) return 'current';
   const fromBackend = stepStatesById[step.id];
-  if (fromBackend) return fromBackend;
+  if (fromBackend && KNOWN_STATES.has(fromBackend)) return fromBackend;
   if (completedStepIds.includes(step.id)) return 'completed';
   if (step.optional) return 'optional_untouched';
   return 'required_incomplete';
@@ -41,18 +51,16 @@ function WizardStepBar({ steps, index, completedStepIds, adapterProgress, goTo, 
     const map = {};
     const rows = adapterProgress?.step_states || adapterProgress?.sections || [];
     (Array.isArray(rows) ? rows : []).forEach((row) => {
-      if (row?.key) map[row.key] = row.state || (row.complete ? 'completed' : null);
+      if (!row?.key) return;
+      const state = row.state || (row.complete ? 'completed' : null);
+      if (state && KNOWN_STATES.has(state)) map[row.key] = state;
     });
     return map;
   }, [adapterProgress]);
 
+  // Wrap (not nested horizontal ScrollView) so numbered steps stay visible on web + native.
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.stepBarContent}
-      style={styles.stepBar}
-    >
+    <View style={styles.stepBar} accessibilityRole="tablist">
       {steps.map((step, i) => {
         const state = resolveStepVisualState(
           step,
@@ -62,37 +70,38 @@ function WizardStepBar({ steps, index, completedStepIds, adapterProgress, goTo, 
           stepStatesById
         );
         const color = STATE_COLORS[state] || STATE_COLORS.optional_untouched;
+        const fill = STATE_FILLS[state] || STATE_FILLS.optional_untouched;
         const isCurrent = i === index;
+        const title = step.title || step.id;
         return (
-          <View key={step.id} style={styles.stepItem}>
-            {i > 0 ? <View style={[styles.stepConnector, { backgroundColor: color }]} /> : null}
-            <Pressable
-              onPress={() => !disabled && goTo(i)}
-              disabled={disabled}
-              accessibilityRole="button"
-              accessibilityState={{ selected: isCurrent }}
-              style={({ pressed }) => [
-                styles.stepDot,
-                {
-                  borderColor: color,
-                  backgroundColor: isCurrent ? color : 'transparent',
-                  opacity: pressed ? 0.75 : 1,
-                },
+          <Pressable
+            key={step.id}
+            onPress={() => !disabled && goTo(i)}
+            disabled={disabled}
+            accessibilityRole="button"
+            accessibilityLabel={`Step ${i + 1}: ${title}`}
+            accessibilityState={{ selected: isCurrent }}
+            style={({ pressed }) => [
+              styles.stepDot,
+              {
+                borderColor: color,
+                backgroundColor: fill,
+                opacity: pressed ? 0.8 : 1,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.stepDotText,
+                { color: isCurrent ? '#0F172A' : color },
               ]}
             >
-              <Text
-                style={[
-                  styles.stepDotText,
-                  { color: isCurrent ? '#0F172A' : color },
-                ]}
-              >
-                {i + 1}
-              </Text>
-            </Pressable>
-          </View>
+              {i + 1}
+            </Text>
+          </Pressable>
         );
       })}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -187,7 +196,6 @@ export default function WizardChrome({
           </Text>
           <Text style={styles.percent}>{displayedPercent}%</Text>
         </View>
-        {stepTitle ? <Text style={styles.stepTitle}>{stepTitle}</Text> : null}
         {showStepBar && steps.length > 1 ? (
           <WizardStepBar
             steps={steps}
@@ -198,6 +206,7 @@ export default function WizardChrome({
             disabled={saving}
           />
         ) : null}
+        {stepTitle ? <Text style={styles.stepTitle}>{stepTitle}</Text> : null}
         <ProgressBar
           progress={displayedProgress}
           color={COLORS.PRIMARY}
@@ -329,28 +338,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   stepBar: {
-    marginBottom: 10,
-    maxHeight: 44,
-  },
-  stepBarContent: {
-    alignItems: 'center',
-    paddingVertical: 4,
-    paddingRight: 8,
-  },
-  stepItem: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-  },
-  stepConnector: {
-    width: 14,
-    height: 2,
-    marginHorizontal: 2,
-    opacity: 0.7,
+    marginTop: 10,
+    marginBottom: 8,
+    gap: 6,
   },
   stepDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
