@@ -116,6 +116,7 @@ import { pickVehiclePhotoAttachment, pickInvoiceLogoAttachment } from '../utils/
 import { emptyLegalEntityDraft } from '../utils/invoiceTaxLabels';
 import { attachLunchBreak, parseLunchBreak } from '../utils/shopWorkingHours';
 import { buildShopProfileSaveSnapshot } from '../utils/shopProfileSaveSnapshot';
+import { filterRepairTypesForShop } from '../utils/repairTypeShopCompatibility';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const DAY_KEY = {
@@ -738,14 +739,30 @@ export default function ShopProfileScreen({ navigation, route }) {
   ]);
 
   const repairTypesByCategory = useMemo(() => {
+    const categoryIds = new Set(
+      [primaryCategoryId, ...secondaryCategoryIds].filter((v) => v != null).map(Number)
+    );
+    const businessKeys = businessCategoryOptions
+      .filter((c) => categoryIds.has(Number(c.id)))
+      .map((c) => c.key)
+      .filter(Boolean);
     const grouped = {};
-    repairTypeOptions.forEach((item) => {
+    filterRepairTypesForShop(repairTypeOptions, {
+      businessCategoryKeys: businessKeys,
+      supportedVehicleTypeIds: selectedVehicleTypes,
+    }).forEach((item) => {
       const cat = item.category_name || 'Other';
       if (!grouped[cat]) grouped[cat] = [];
       grouped[cat].push(item);
     });
     return Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [repairTypeOptions]);
+  }, [
+    repairTypeOptions,
+    businessCategoryOptions,
+    primaryCategoryId,
+    secondaryCategoryIds,
+    selectedVehicleTypes,
+  ]);
 
   async function loadTaxonomy(token) {
     const res = await fetch(`${API_BASE_URL}/api/repairs/types/`, {
@@ -1471,6 +1488,20 @@ export default function ShopProfileScreen({ navigation, route }) {
     });
   };
 
+  // Must stay above any conditional return — loadData() sets loading=true on every
+  // focus, so a hook after `if (loading)` caused React #310 when returning from
+  // price list / remounting Profile (and broke Continue setup → wizard).
+  const continueSetup = useCallback(
+    (stepId = null) => {
+      const params = {};
+      if (stepId && typeof stepId === 'string') {
+        params.stepId = stepId;
+      }
+      openPartnerCenter(navigation, profile, params);
+    },
+    [navigation, profile]
+  );
+
   if (loading) {
     return (
       <ScreenBackground safeArea={false}>
@@ -1535,16 +1566,6 @@ export default function ShopProfileScreen({ navigation, route }) {
   const strengthHints = getShopProfileStrengthHints(profile, completenessOptions);
   const sectionStatus = (key) =>
     getShopProfileSectionStatus(key, profileForCompleteness, completenessOptions);
-  const continueSetup = useCallback(
-    (stepId = null) => {
-      const params = {};
-      if (stepId && typeof stepId === 'string') {
-        params.stepId = stepId;
-      }
-      openPartnerCenter(navigation, profile, params);
-    },
-    [navigation, profile]
-  );
 
   const publicPagePreviewSection = (
     <ShopProfileAccordionSection

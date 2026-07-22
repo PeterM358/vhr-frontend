@@ -41,8 +41,21 @@ import {
   serviceMenuSummaryLine,
   parsePricingMoney,
 } from '../utils/servicePricingSummary';
+import { filterRepairTypesForShop } from '../utils/repairTypeShopCompatibility';
 
 const DEFAULT_SCOPE = 'default';
+
+function shopBusinessCategoryKeys(profile) {
+  const keys = [];
+  const primary = profile?.primary_business_category;
+  if (primary?.key) keys.push(primary.key);
+  const links = Array.isArray(profile?.business_categories) ? profile.business_categories : [];
+  links.forEach((row) => {
+    const key = row?.key || row?.category?.key || row?.category_key;
+    if (key) keys.push(key);
+  });
+  return keys;
+}
 
 function scopeKeyForItem(item) {
   return item?.vehicle_type != null ? String(item.vehicle_type) : DEFAULT_SCOPE;
@@ -101,6 +114,7 @@ export default function ShopServiceMenuScreen() {
   const [items, setItems] = useState([]);
   const [repairTypes, setRepairTypes] = useState([]);
   const [supportedVehicleTypes, setSupportedVehicleTypes] = useState([]);
+  const [businessCategoryKeys, setBusinessCategoryKeys] = useState([]);
   const [shopProfileId, setShopProfileId] = useState(null);
   const [drafts, setDrafts] = useState({});
   const [expandedTypeId, setExpandedTypeId] = useState(null);
@@ -126,6 +140,7 @@ export default function ShopServiceMenuScreen() {
         setItems([]);
         setRepairTypes([]);
         setSupportedVehicleTypes([]);
+        setBusinessCategoryKeys([]);
         return;
       }
       const [menuData, typesRes, vehicleTypes, myProfiles] = await Promise.all([
@@ -148,6 +163,7 @@ export default function ShopServiceMenuScreen() {
       setItems(Array.isArray(menuData) ? menuData : []);
       setRepairTypes(Array.isArray(typesJson) ? typesJson : []);
       setSupportedVehicleTypes(supported);
+      setBusinessCategoryKeys(shopBusinessCategoryKeys(profile));
       setDrafts(buildDrafts(menuData));
     } catch (err) {
       Alert.alert(t('common.error'), err.message || t('serviceMenu.loadFailed'));
@@ -198,7 +214,11 @@ export default function ShopServiceMenuScreen() {
 
   const addableTypes = useMemo(() => {
     const q = addSearch.trim().toLowerCase();
-    return repairTypes
+    const supportedIds = supportedVehicleTypes.map((v) => v.id);
+    return filterRepairTypesForShop(repairTypes, {
+      businessCategoryKeys,
+      supportedVehicleTypeIds: supportedIds,
+    })
       .filter((rt) => !existingTypeIds.has(Number(rt.id)))
       .filter((rt) => {
         if (!q) return true;
@@ -211,7 +231,7 @@ export default function ShopServiceMenuScreen() {
         return label.includes(q) || category.includes(q);
       })
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-  }, [repairTypes, existingTypeIds, addSearch, t]);
+  }, [repairTypes, existingTypeIds, addSearch, t, businessCategoryKeys, supportedVehicleTypes]);
 
   const updateDraft = (key, field, value) => {
     setDrafts((prev) => ({

@@ -48,6 +48,7 @@ import {
   translateVehicleTypeLabel,
   translateRepairTypeLabel,
 } from '../../utils/translateShopTypeLabels';
+import { filterRepairTypesForShop } from '../../utils/repairTypeShopCompatibility';
 
 const MAX_SHOP_PHOTOS = 6;
 /* --------------------------- Step 1: business type ------------------------ */
@@ -189,30 +190,45 @@ export function PartnerServicesStep() {
   const { t } = useTranslation();
   const { values, setValues, context } = useWizard();
 
-  // Smart taxonomy filtering: only show RepairTypes compatible with the
-  // vehicle types the shop selected (empty rt.vehicle_types = applies to all).
+  // Filter by BusinessCategory (e.g. tyre ops need tire_shop) AND VehicleType.
   const items = useMemo(() => {
-    const selectedVt = new Set((values.supported_vehicle_types || []).map(Number));
-    const repairTypes = context.repairTypes || [];
-    return repairTypes
-      .filter((rt) => {
-        const vts = Array.isArray(rt.vehicle_types) ? rt.vehicle_types.map(Number) : [];
-        if (!vts.length) return true;
-        if (!selectedVt.size) return true;
-        return vts.some((id) => selectedVt.has(id));
-      })
-      .map((rt) => ({
-        id: rt.id,
-        label: translateRepairTypeLabel(rt, t) || rt.name || rt.slug || `#${rt.id}`,
-      }));
-  }, [context.repairTypes, values.supported_vehicle_types, t]);
+    const categories = context.businessCategories || [];
+    const selectedCatIds = new Set(
+      [values.primary_business_category_id, ...(values.secondary_business_category_ids || [])]
+        .filter((v) => v != null)
+        .map(Number)
+    );
+    const businessCategoryKeys = categories
+      .filter((c) => selectedCatIds.has(Number(c.id)))
+      .map((c) => c.key)
+      .filter(Boolean);
+
+    return filterRepairTypesForShop(context.repairTypes || [], {
+      businessCategoryKeys,
+      supportedVehicleTypeIds: values.supported_vehicle_types || [],
+    }).map((rt) => ({
+      id: rt.id,
+      label: translateRepairTypeLabel(rt, t) || rt.name || rt.slug || `#${rt.id}`,
+    }));
+  }, [
+    context.repairTypes,
+    context.businessCategories,
+    values.supported_vehicle_types,
+    values.primary_business_category_id,
+    values.secondary_business_category_ids,
+    t,
+  ]);
 
   return (
     <View>
       <FloatingCard>
         <Text style={styles.cardTitle}>{t('partnerOnboarding.operations', null, 'Operations you offer')}</Text>
         <Text style={styles.hint}>
-          {t('partnerOnboarding.operationsHint', null, 'Filtered to the vehicle types you service. Add prices in the full price list.')}
+          {t(
+            'partnerOnboarding.operationsHint',
+            null,
+            'Filtered to your business type and vehicle types. Add prices in the full price list.'
+          )}
         </Text>
         <SearchableChipSelector
           items={items}

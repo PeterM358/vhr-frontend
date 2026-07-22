@@ -1167,7 +1167,7 @@
     "searchVehicleTypes": "Search vehicle types…",
     "noVehicleTypes": "No vehicle types found.",
     "operations": "Operations you offer",
-    "operationsHint": "Filtered to the vehicle types you service. Add prices in the full price list.",
+    "operationsHint": "Filtered to your business type and vehicle types. Add prices in the full price list.",
     "searchOperations": "Search operations…",
     "noOperations": "Select vehicle types first to see operations.",
     "readinessTitle": "Profile readiness",
