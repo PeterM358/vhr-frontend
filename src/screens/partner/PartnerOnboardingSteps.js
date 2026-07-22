@@ -13,7 +13,7 @@
 
 import React, { useMemo } from 'react';
 import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Text, TextInput, ProgressBar, Button, Switch } from 'react-native-paper';
 
 import FloatingCard from '../../components/ui/FloatingCard';
@@ -387,60 +387,332 @@ export function PartnerLegalStep() {
   );
 }
 
-/* ----------------------------- Step 6: readiness -------------------------- */
+/* ----------------------------- Step: location ----------------------------- */
+
+export function PartnerLocationStep() {
+  const { t } = useTranslation();
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { values, setValues } = useWizard();
+
+  // Map picker returns here with latitude/longitude merge params.
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const lat = route?.params?.latitude;
+      const lon = route?.params?.longitude;
+      if (lat == null || lon == null) return;
+      const nLat = Number(lat);
+      const nLon = Number(lon);
+      if (!Number.isFinite(nLat) || !Number.isFinite(nLon)) return;
+
+      const patch = { latitude: nLat, longitude: nLon };
+      try {
+        const {
+          resolveCountryCityFromCoords,
+          dedupeRepeatedAddressText,
+        } = await import('../../utils/reverseGeocodeLocation');
+        const { getCountries, getCitiesForCountry } = await import('../../api/profiles');
+        const countries = await getCountries().catch(() => []);
+        const resolved = await resolveCountryCityFromCoords({
+          latitude: nLat,
+          longitude: nLon,
+          countries: Array.isArray(countries) ? countries : [],
+          getCitiesForCountry,
+        });
+        if (cancelled) return;
+        if (resolved?.addressHint && !String(values.address || '').trim()) {
+          patch.address = dedupeRepeatedAddressText(resolved.addressHint);
+        }
+        if (resolved?.countryId != null) patch.country = resolved.countryId;
+        if (resolved?.cityId != null) patch.city = resolved.cityId;
+        if (resolved?.postalCode) patch.postal_code = resolved.postalCode;
+      } catch {
+        // Keep pin even if reverse-geocode fails.
+      }
+      if (!cancelled) {
+        setValues(patch);
+        navigation.setParams?.({ latitude: undefined, longitude: undefined });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to map return coords
+  }, [route?.params?.latitude, route?.params?.longitude]);
+
+  const hasPin =
+    values.latitude != null &&
+    values.longitude != null &&
+    Number.isFinite(Number(values.latitude)) &&
+    Number.isFinite(Number(values.longitude));
+
+  return (
+    <View>
+      <FloatingCard>
+        <Text style={styles.cardTitle}>
+          {t('partnerOnboarding.locationTitle', null, 'Where customers find you')}
+        </Text>
+        <Text style={styles.hint}>
+          {t(
+            'partnerOnboarding.locationHint',
+            null,
+            'Address and map pin power discovery, SEO, and incoming requests.'
+          )}
+        </Text>
+        <TextInput
+          mode="outlined"
+          label={t('partnerOnboarding.address', null, 'Street address')}
+          value={values.address || ''}
+          onChangeText={(v) => setValues({ address: v })}
+          style={styles.input}
+        />
+        <TextInput
+          mode="outlined"
+          label={t('partnerOnboarding.phone', null, 'Phone')}
+          value={values.phone || ''}
+          onChangeText={(v) => setValues({ phone: v })}
+          style={styles.input}
+          keyboardType="phone-pad"
+        />
+        <Button
+          mode="contained"
+          icon="map-marker"
+          onPress={() =>
+            navigation.navigate('MapLocationPicker', {
+              returnScreen: 'PartnerOnboarding',
+              initialLatitude: values.latitude,
+              initialLongitude: values.longitude,
+            })
+          }
+          style={{ marginTop: 8 }}
+        >
+          {hasPin
+            ? t('partnerOnboarding.editMapPin', null, 'Edit map pin')
+            : t('partnerOnboarding.setMapPin', null, 'Set map pin')}
+        </Button>
+        {hasPin ? (
+          <Text style={[styles.hint, { marginTop: 8 }]}>
+            {Number(values.latitude).toFixed(5)}, {Number(values.longitude).toFixed(5)}
+          </Text>
+        ) : null}
+      </FloatingCard>
+    </View>
+  );
+}
+
+/* ------------------------------ Step: prices ------------------------------ */
+
+export function PartnerPricesStep() {
+  const { t } = useTranslation();
+  const navigation = useNavigation();
+  const { values, context } = useWizard();
+  const completion = context.getCompletion ? context.getCompletion() : null;
+  const pricesSection = (completion?.sections || []).find((s) => s.key === 'prices');
+  const priced = pricesSection?.complete;
+  const opCount = (values.available_repairs || []).length;
+
+  return (
+    <View>
+      <FloatingCard>
+        <Text style={styles.cardTitle}>
+          {t('partnerOnboarding.pricesTitle', null, 'Publish your prices')}
+        </Text>
+        <Text style={styles.hint}>
+          {t(
+            'partnerOnboarding.pricesHint',
+            null,
+            'Customers need at least one published operation price before your profile can go live.'
+          )}
+        </Text>
+        <Text style={styles.readinessLead}>
+          {opCount
+            ? t('partnerOnboarding.pricesSelectedOps', { count: opCount }, `${opCount} operations selected`)
+            : t('partnerOnboarding.pricesNoOps', null, 'Select operations in the Services step first.')}
+        </Text>
+        <Text style={[styles.sectionStatus, priced ? styles.statusDone : styles.statusTodo, { marginTop: 8 }]}>
+          {priced
+            ? t('partnerOnboarding.pricesReady', null, 'At least one price is published')
+            : t('partnerOnboarding.pricesMissing', null, 'No published prices yet')}
+        </Text>
+        <Button
+          mode="contained"
+          icon="currency-usd"
+          style={{ marginTop: 12 }}
+          onPress={() => navigation.navigate('ShopServiceMenu')}
+          disabled={!opCount}
+        >
+          {t('partnerOnboarding.openPriceList', null, 'Open price list')}
+        </Button>
+      </FloatingCard>
+    </View>
+  );
+}
+
+/* ------------------------------ Step: photos ------------------------------ */
+
+export function PartnerPhotosStep() {
+  const { t } = useTranslation();
+  const navigation = useNavigation();
+  const { context } = useWizard();
+  const completion = context.getCompletion ? context.getCompletion() : null;
+  const photosDone = (completion?.sections || []).find((s) => s.key === 'photos')?.complete;
+
+  return (
+    <View>
+      <FloatingCard>
+        <Text style={styles.cardTitle}>
+          {t('partnerOnboarding.photosTitle', null, 'Photos (optional)')}
+        </Text>
+        <Text style={styles.hint}>
+          {t(
+            'partnerOnboarding.photosHint',
+            null,
+            'A logo or shop photo builds trust. You can skip and add these later.'
+          )}
+        </Text>
+        <Text style={[styles.sectionStatus, photosDone ? styles.statusDone : styles.statusTodo]}>
+          {photosDone
+            ? t('partnerOnboarding.photosReady', null, 'Photos added')
+            : t('partnerOnboarding.photosMissing', null, 'No photos yet')}
+        </Text>
+        <Button
+          mode="outlined"
+          icon="camera"
+          style={{ marginTop: 12 }}
+          onPress={() => navigation.navigate('ShopProfile', { expandSection: 'photos' })}
+        >
+          {t('partnerOnboarding.managePhotos', null, 'Manage photos')}
+        </Button>
+      </FloatingCard>
+    </View>
+  );
+}
+
+/* ------------------------------ Step: about ------------------------------- */
+
+export function PartnerAboutStep() {
+  const { t } = useTranslation();
+  const { values, setValues } = useWizard();
+
+  return (
+    <View>
+      <FloatingCard>
+        <Text style={styles.cardTitle}>
+          {t('partnerOnboarding.aboutTitle', null, 'About your business')}
+        </Text>
+        <Text style={styles.hint}>
+          {t(
+            'partnerOnboarding.aboutHint',
+            null,
+            'A short description helps customers choose you. Optional for publish.'
+          )}
+        </Text>
+        <TextInput
+          mode="outlined"
+          label={t('partnerOnboarding.shortDescription', null, 'Short tagline')}
+          value={values.short_description || ''}
+          onChangeText={(v) => setValues({ short_description: v })}
+          style={styles.input}
+        />
+        <TextInput
+          mode="outlined"
+          label={t('partnerOnboarding.description', null, 'Description')}
+          value={values.description || ''}
+          onChangeText={(v) => setValues({ description: v })}
+          style={styles.input}
+          multiline
+          numberOfLines={5}
+        />
+      </FloatingCard>
+    </View>
+  );
+}
+
+/* ----------------------------- Step: preview ------------------------------ */
+
+export function PartnerPreviewStep() {
+  const { t } = useTranslation();
+  const navigation = useNavigation();
+  const { values, context } = useWizard();
+  const completion = context.getCompletion ? context.getCompletion() : null;
+
+  return (
+    <View>
+      <FloatingCard>
+        <Text style={styles.cardTitle}>
+          {t('partnerOnboarding.previewTitle', null, 'Public preview')}
+        </Text>
+        <Text style={styles.hint}>
+          {t(
+            'partnerOnboarding.previewHint',
+            null,
+            'One preview of how customers will see your service center.'
+          )}
+        </Text>
+        <Text style={styles.readinessLead}>{values.name || '—'}</Text>
+        <Text style={styles.hint}>{values.address || t('partnerOnboarding.previewNoAddress', null, 'Address not set')}</Text>
+        <Text style={[styles.hint, { marginTop: 4 }]}>
+          {t('partnerOnboarding.previewCompletion', { percent: completion?.percent ?? 0 }, `${completion?.percent ?? 0}% complete`)}
+        </Text>
+        <Button
+          mode="contained"
+          icon="eye"
+          style={{ marginTop: 12 }}
+          onPress={() => navigation.navigate('ShopProfile', { expandSection: 'public_preview' })}
+        >
+          {t('partnerOnboarding.openPublicPreview', null, 'Open public preview')}
+        </Button>
+      </FloatingCard>
+    </View>
+  );
+}
+
+/* ----------------------------- Step: publish ------------------------------ */
 
 const SECTION_LABEL_KEYS = {
   business: 'partnerOnboarding.section.business',
   location: 'partnerOnboarding.section.location',
   vehicles: 'partnerOnboarding.section.vehicles',
   services: 'partnerOnboarding.section.services',
+  prices: 'partnerOnboarding.section.prices',
   hours: 'partnerOnboarding.section.hours',
-  media: 'partnerOnboarding.section.media',
+  photos: 'partnerOnboarding.section.photos',
+  about: 'partnerOnboarding.section.about',
   legal: 'partnerOnboarding.section.legal',
 };
 
-// Backend section -> in-wizard step id (or deep-link into ShopProfile section).
 const SECTION_TO_STEP_ID = {
   business: 'business',
+  location: 'location',
   vehicles: 'vehicles',
   services: 'services',
+  prices: 'prices',
   hours: 'hours',
+  photos: 'photos',
+  about: 'about',
   legal: 'legal',
 };
-const SECTION_TO_PROFILE_EXPAND = {
-  location: 'contact_location',
-  media: 'photos',
-  legal: 'company',
-};
 
-export function PartnerReadinessStep() {
+export function PartnerPublishStep() {
   const { t } = useTranslation();
-  const navigation = useNavigation();
   const { context, progress, progressPercent, goTo, findStepIndexById } = useWizard();
   const completion = context.getCompletion ? context.getCompletion() : null;
-  const sections = completion?.sections || [];
+  const sections = completion?.step_states || completion?.sections || [];
   const readyToPublish = completion?.ready_to_publish;
 
   const handleSectionPress = (section) => {
     if (section.complete) return;
     const stepId = SECTION_TO_STEP_ID[section.key];
-    if (stepId) {
-      const idx = findStepIndexById(stepId);
-      if (idx >= 0) {
-        goTo(idx);
-        return;
-      }
-    }
-    const expand = SECTION_TO_PROFILE_EXPAND[section.key];
-    if (expand) {
-      navigation.navigate('ShopProfile', { requireSetup: true, expandSection: expand });
-    }
+    if (!stepId) return;
+    const idx = findStepIndexById(stepId);
+    if (idx >= 0) goTo(idx);
   };
 
   return (
     <View>
       <FloatingCard>
-        <Text style={styles.cardTitle}>{t('partnerOnboarding.readinessTitle', null, 'Profile readiness')}</Text>
+        <Text style={styles.cardTitle}>{t('partnerOnboarding.publishTitle', null, 'Publish checklist')}</Text>
         <View style={styles.readinessHeader}>
           <Text style={styles.percentBig}>{completion?.percent ?? progressPercent}%</Text>
           <Text style={styles.readinessLead}>
@@ -489,25 +761,18 @@ export function PartnerReadinessStep() {
           })}
         </ScrollView>
         <Text style={styles.hint}>
-          {t(
-            'partnerOnboarding.remainingHint',
-            null,
-            'Tap a to-do above. Location, photos and the full price list open in your shop profile.'
-          )}
-        </Text>
-        <Button
-          mode={readyToPublish ? 'contained' : 'outlined'}
-          icon="store-cog-outline"
-          onPress={() => navigation.navigate('ShopProfile', { requireSetup: !readyToPublish })}
-          style={styles.readinessCta}
-        >
           {readyToPublish
-            ? t('partnerOnboarding.openProfile', null, 'Open shop profile')
-            : t('partnerOnboarding.finishInProfile', null, 'Finish remaining in profile')}
-        </Button>
+            ? t('partnerOnboarding.publishReadyHint', null, 'Finish to open your profile dashboard.')
+            : t('partnerOnboarding.publishMissingHint', null, 'Tap a missing item to jump to its wizard step.')}
+        </Text>
       </FloatingCard>
     </View>
   );
+}
+
+/** @deprecated Prefer PartnerPublishStep — kept for older imports. */
+export function PartnerReadinessStep() {
+  return <PartnerPublishStep />;
 }
 
 const styles = StyleSheet.create({

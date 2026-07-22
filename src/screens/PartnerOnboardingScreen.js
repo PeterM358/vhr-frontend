@@ -1,13 +1,12 @@
 // PATH: src/screens/PartnerOnboardingScreen.js
 //
-// Guided partner onboarding, built on the reusable Wizard Engine (src/wizard).
+// Guided partner onboarding — PRIMARY profile setup experience.
+// Built on the reusable Wizard Engine (src/wizard).
 //
-// Ships: Business type -> Vehicles -> Services -> Readiness. Each step auto-saves
-// to the backend via PATCH /api/profiles/shop-profiles/{id}/ (existing endpoint),
-// progress is restored from ShopProfile.onboarding_progress, and the readiness
-// card reads the backend-computed profile_completion summary. Remaining partner
-// steps (legal identity, working hours, photos, guided price list, publish) live
-// in ShopProfileScreen today and are surfaced from the Readiness step.
+// Full flow: Business → Location → Vehicles → Services → Prices → Hours →
+// Photos → About → Legal → Preview → Publish.
+// Each editable step autosaves via PATCH /api/profiles/shop-profiles/{id}/.
+// Resume uses backend profile_completion.first_missing_required / current_step.
 
 import React, { useCallback, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -20,11 +19,16 @@ import { WizardEngine } from '../wizard';
 import { usePartnerOnboardingData } from './partner/usePartnerOnboardingData';
 import {
   PartnerBusinessTypeStep,
+  PartnerLocationStep,
   PartnerVehiclesStep,
   PartnerServicesStep,
+  PartnerPricesStep,
   PartnerHoursStep,
+  PartnerPhotosStep,
+  PartnerAboutStep,
   PartnerLegalStep,
-  PartnerReadinessStep,
+  PartnerPreviewStep,
+  PartnerPublishStep,
   hasAnyOpenDay,
 } from './partner/PartnerOnboardingSteps';
 
@@ -58,6 +62,33 @@ export default function PartnerOnboardingScreen({ navigation }) {
         Component: PartnerBusinessTypeStep,
       },
       {
+        id: 'location',
+        titleKey: 'partnerOnboarding.step.location',
+        dirtyFields: ['address', 'phone', 'latitude', 'longitude', 'country', 'city', 'postal_code'],
+        validate: (v) => {
+          if (!String(v.address || '').trim()) {
+            return {
+              ok: false,
+              message: t('partnerOnboarding.errors.addressRequired', null, 'Enter your street address.'),
+            };
+          }
+          if (!String(v.phone || '').trim()) {
+            return {
+              ok: false,
+              message: t('partnerOnboarding.errors.phoneRequired', null, 'Enter a contact phone.'),
+            };
+          }
+          if (v.latitude == null || v.longitude == null) {
+            return {
+              ok: false,
+              message: t('partnerOnboarding.errors.mapPinRequired', null, 'Set your map pin.'),
+            };
+          }
+          return { ok: true };
+        },
+        Component: PartnerLocationStep,
+      },
+      {
         id: 'vehicles',
         titleKey: 'partnerOnboarding.step.vehicles',
         dirtyFields: ['supported_vehicle_types'],
@@ -75,9 +106,24 @@ export default function PartnerOnboardingScreen({ navigation }) {
       {
         id: 'services',
         titleKey: 'partnerOnboarding.step.services',
-        optional: true,
         dirtyFields: ['available_repairs'],
+        validate: (v) => {
+          if (!(v.available_repairs || []).length) {
+            return {
+              ok: false,
+              message: t('partnerOnboarding.errors.operationsRequired', null, 'Select at least one operation.'),
+            };
+          }
+          return { ok: true };
+        },
         Component: PartnerServicesStep,
+      },
+      {
+        id: 'prices',
+        titleKey: 'partnerOnboarding.step.prices',
+        optional: true,
+        dirtyFields: [],
+        Component: PartnerPricesStep,
       },
       {
         id: 'hours',
@@ -93,6 +139,20 @@ export default function PartnerOnboardingScreen({ navigation }) {
           return { ok: true };
         },
         Component: PartnerHoursStep,
+      },
+      {
+        id: 'photos',
+        titleKey: 'partnerOnboarding.step.photos',
+        optional: true,
+        dirtyFields: [],
+        Component: PartnerPhotosStep,
+      },
+      {
+        id: 'about',
+        titleKey: 'partnerOnboarding.step.about',
+        optional: true,
+        dirtyFields: ['description', 'short_description'],
+        Component: PartnerAboutStep,
       },
       {
         id: 'legal',
@@ -133,22 +193,28 @@ export default function PartnerOnboardingScreen({ navigation }) {
         Component: PartnerLegalStep,
       },
       {
-        id: 'readiness',
-        titleKey: 'partnerOnboarding.step.readiness',
+        id: 'preview',
+        titleKey: 'partnerOnboarding.step.preview',
+        optional: true,
         dirtyFields: [],
-        Component: PartnerReadinessStep,
+        Component: PartnerPreviewStep,
+      },
+      {
+        id: 'publish',
+        titleKey: 'partnerOnboarding.step.publish',
+        dirtyFields: [],
+        Component: PartnerPublishStep,
       },
     ],
     [t]
   );
 
   const onFinish = useCallback(() => {
-    // Back to the dashboard; the profile tile opens ShopProfile once ready.
     navigation.reset({ index: 0, routes: [{ name: 'ShopHome' }] });
   }, [navigation]);
 
   const onExit = useCallback(() => {
-    navigation.goBack();
+    navigation.navigate('ShopHome');
   }, [navigation]);
 
   if (!ready) {
@@ -170,7 +236,7 @@ export default function PartnerOnboardingScreen({ navigation }) {
       <View style={{ flex: 1 }}>
         <AppNavigationBar
           title={t('partnerOnboarding.title', null, 'Set up your shop')}
-          onBack={() => navigation.goBack()}
+          onBack={() => navigation.navigate('ShopHome')}
         />
         <WizardEngine
           steps={steps}

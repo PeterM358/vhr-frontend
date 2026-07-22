@@ -4,11 +4,10 @@
 // adapter onto the EXISTING shop-profile API — no duplicate endpoints:
 //   - loadState()  -> getMyShopProfiles()[0] (+ restored onboarding_progress)
 //   - saveStep()   -> updateShopProfile(id, <patch for that step> + progress)
-//   - getProgress()-> backend-computed profile_completion.percent
+//   - getProgress()-> backend-computed profile_completion (percent + step_states)
 //
 // Taxonomy (business categories/services, vehicle types, repair types) is loaded
-// once and handed to the steps via the wizard `context`, so the guided services
-// step can do smart taxonomy filtering (VehicleType -> RepairType).
+// once and handed to the steps via the wizard `context`.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,8 +22,6 @@ import { normalizeWorkingHoursObject } from '../../utils/shopWorkingHours';
 import { createApiAdapter } from '../../wizard';
 
 // Which profile fields each wizard step persists via the shared PATCH endpoint.
-// The `legal` step also creates/updates a LegalEntity (billing API) inside
-// saveStep before patching `legal_entity` onto the profile.
 const STEP_PATCH_BUILDERS = {
   business: (v) => ({
     name: v.name,
@@ -36,15 +33,32 @@ const STEP_PATCH_BUILDERS = {
         }
       : {}),
   }),
+  location: (v) => ({
+    address: v.address || '',
+    phone: v.phone || '',
+    ...(v.latitude != null && v.longitude != null
+      ? { latitude: Number(v.latitude), longitude: Number(v.longitude) }
+      : {}),
+    ...(v.country != null ? { country: v.country } : {}),
+    ...(v.city != null ? { city: v.city } : {}),
+    ...(v.postal_code ? { postal_code: v.postal_code } : {}),
+  }),
   vehicles: (v) => ({ supported_vehicle_types: v.supported_vehicle_types || [] }),
   services: (v) => ({ available_repairs: v.available_repairs || [] }),
+  prices: () => ({}),
   hours: (v) => ({ working_hours: v.working_hours || {} }),
+  photos: () => ({}),
+  about: (v) => ({
+    description: v.description || '',
+    short_description: v.short_description || '',
+  }),
   legal: (v) => ({
     invoice_branch_name: v.invoice_branch_name || v.name || '',
     invoice_address_line1: v.invoice_address_line1 || '',
     invoice_city: v.invoice_city || '',
   }),
-  readiness: () => ({}),
+  preview: () => ({}),
+  publish: () => ({}),
 };
 
 function toIdArray(rows) {
@@ -53,12 +67,6 @@ function toIdArray(rows) {
     .filter((n) => Number.isFinite(n));
 }
 
-// Pull the nested taxonomy id out of a shop link row. The profile serializer
-// returns business_categories / business_services as *link* objects shaped like
-// { id: <linkId>, category|service: { id: <taxonomyId> } }. We must persist the
-// taxonomy id (BusinessCategory / BusinessService pk), NOT the link id — sending
-// link ids makes the PATCH fail serializer validation (invalid pk / incompatible
-// service) with a 400.
 function linkedTaxonomyId(row, nestedKey) {
   if (row == null) return NaN;
   if (typeof row === 'object') {
@@ -84,18 +92,23 @@ function profileToValues(profile) {
     profileId: profile.id,
     name: profile.name || '',
     primary_business_category_id: primaryCategoryId,
-    // business_categories rows are LINK objects ({ id: linkId, category: {...} });
-    // read the nested category id and drop the primary so we only keep secondaries.
     secondary_business_category_ids: toLinkedIdArray(
       (profile.business_categories || []).filter((c) => !c.is_primary),
       'category'
     ).filter((id) => Number(id) !== Number(primaryCategoryId)),
-    // business_services rows are LINK objects ({ id: linkId, service: {...} }).
     business_service_ids: toLinkedIdArray(profile.business_services, 'service'),
     supported_vehicle_types: toIdArray(profile.supported_vehicle_types),
     available_repairs: toIdArray(profile.available_repairs),
     working_hours: normalizeWorkingHoursObject(profile.working_hours),
-    // Legal identity (persisted via billing LegalEntity + invoice fields).
+    address: profile.address || '',
+    phone: profile.phone_e164 || profile.phone || '',
+    latitude: profile.latitude ?? null,
+    longitude: profile.longitude ?? null,
+    country: profile.country ?? profile.country_id ?? null,
+    city: profile.city ?? profile.city_id ?? null,
+    postal_code: profile.postal_code || '',
+    description: profile.description || '',
+    short_description: profile.short_description || '',
     legalEntityId: legal?.id ?? null,
     legal_name: legal?.legal_name || '',
     vat_registered: legal?.vat_registered !== false,
@@ -107,31 +120,48 @@ function profileToValues(profile) {
   };
 }
 
-// Resume the wizard on the first incomplete required step that the wizard can
-// actually edit. Sections handled only via deep-link (location, media,
-// description, pricing) fall through to the readiness hub.
-const EDITABLE_STEP_SECTION_KEYS = ['business', 'vehicles', 'services', 'hours', 'legal'];
+// All wizard step ids in order (matches PartnerOnboardingScreen).
+const WIZARD_STEP_IDS = [
+  'business',
+  'location',
+  'vehicles',
+  'services',
+  'prices',
+  'hours',
+  'photos',
+  'about',
+  'legal',
+  'preview',
+  'publish',
+];
 
-// Map profile_completion.required_missing / missing field keys → wizard step ids.
-// Fields the wizard never collects (description, location, pricing, photos)
-// intentionally have no mapping so resume skips them.
 const REQUIRED_FIELD_TO_STEP = {
   business_name: 'business',
   business_category: 'business',
+  address: 'location',
+  city: 'location',
+  country: 'location',
+  map_pin: 'location',
+  phone: 'location',
   vehicle_types: 'vehicles',
   operations: 'services',
+  operation_pricing: 'prices',
   working_hours: 'hours',
+  photos: 'photos',
+  description: 'about',
   legal_name: 'legal',
   invoice_address: 'legal',
 };
 
-// Per section, the backend field keys the WIZARD can actually complete. Used
-// when required_missing is absent but sections[] is present (older payloads).
 const WIZARD_SECTION_FIELDS = {
   business: ['business_name', 'business_category'],
+  location: ['address', 'city', 'country', 'map_pin', 'phone'],
   vehicles: ['vehicle_types'],
   services: ['operations'],
+  prices: ['operation_pricing'],
   hours: ['working_hours'],
+  photos: ['photos'],
+  about: ['description'],
   legal: ['legal_name', 'invoice_address'],
 };
 
@@ -141,41 +171,37 @@ function sectionMissingWizardField(section) {
   if (Array.isArray(section.fields) && section.fields.length) {
     return section.fields.some((f) => relevant.includes(f.key) && !f.complete);
   }
-  // No per-field detail: fall back to the section-level flag.
   return !section.complete;
 }
 
 function computeResumeStepId(completion, savedStepId) {
-  // Prefer required_missing (alias of missing) — ordered publish-blocking fields.
+  // Prefer backend first_missing_required / current_step when it names a wizard step.
+  const backendStep = completion?.first_missing_required || completion?.current_step;
+  if (backendStep && WIZARD_STEP_IDS.includes(backendStep)) {
+    return backendStep;
+  }
+
   const missing = completion?.required_missing || completion?.missing;
   if (Array.isArray(missing) && missing.length) {
     for (const fieldKey of missing) {
       const stepId = REQUIRED_FIELD_TO_STEP[fieldKey];
-      if (stepId && EDITABLE_STEP_SECTION_KEYS.includes(stepId)) return stepId;
+      if (stepId && WIZARD_STEP_IDS.includes(stepId)) return stepId;
     }
-    // Remaining required gaps are outside the wizard (location, description, …).
-    return 'readiness';
+    return 'publish';
   }
 
-  // Fall back: backend current_step when it names an editable wizard step.
-  // (Backend may report `location` before `vehicles`; skip non-editable keys.)
-  const backendStep = completion?.current_step;
-  if (backendStep && EDITABLE_STEP_SECTION_KEYS.includes(backendStep)) {
-    return backendStep;
-  }
-
-  // Fall back: walk sections with wizard-editable field checks.
-  const sections = completion?.sections;
+  const sections = completion?.step_states || completion?.sections;
   if (Array.isArray(sections) && sections.length) {
     const byKey = {};
     sections.forEach((s) => {
       byKey[s.key] = s;
     });
-    for (const key of EDITABLE_STEP_SECTION_KEYS) {
+    for (const key of WIZARD_STEP_IDS) {
+      if (key === 'preview' || key === 'publish') continue;
       const section = byKey[key];
       if (section && section.required && sectionMissingWizardField(section)) return key;
     }
-    return 'readiness';
+    return 'publish';
   }
 
   return savedStepId || null;
@@ -192,7 +218,6 @@ export function usePartnerOnboardingData() {
     repairTypes: [],
   });
 
-  // Mutable cross-render state for the adapter closures.
   const profileRef = useRef(null);
   const completedRef = useRef(new Set());
   const latestCompletionRef = useRef(null);
@@ -251,8 +276,6 @@ export function usePartnerOnboardingData() {
     };
   }, []);
 
-  // Create or update the shop's LegalEntity from the legal wizard step, reusing
-  // the same billing API the full profile editor uses. Returns the entity id.
   const ensureLegalEntity = async (values) => {
     const token = await AsyncStorage.getItem('@access_token');
     if (!token) throw new Error('You are not logged in.');
@@ -287,8 +310,6 @@ export function usePartnerOnboardingData() {
               ...profileToValues(profile),
               ...(progress.values && typeof progress.values === 'object' ? progress.values : {}),
             },
-            // Resume from the first incomplete required step (backend-driven),
-            // falling back to the last saved step if completion is unavailable.
             currentStepId: computeResumeStepId(
               latestCompletionRef.current,
               progress.current_step_id
@@ -311,16 +332,23 @@ export function usePartnerOnboardingData() {
             },
           };
 
-          // Legal step: upsert the LegalEntity (billing) then link it + persist
-          // invoice fields on the profile in the same save.
           if (stepId === 'legal') {
             try {
               const entityId = await ensureLegalEntity(payload);
               if (entityId != null) patch.legal_entity = entityId;
             } catch (e) {
-              // Surface as a step error so the wizard shows it inline.
               throw new Error(e?.message || 'Could not save company details.');
             }
+          }
+
+          // No-op steps (prices/photos/preview/publish) still record progress.
+          if (Object.keys(builder(payload)).length === 0 && stepId !== 'legal') {
+            const updated = await updateShopProfile(profile.id, {
+              onboarding_progress: patch.onboarding_progress,
+            });
+            profileRef.current = updated;
+            latestCompletionRef.current = updated?.profile_completion || latestCompletionRef.current;
+            return updated;
           }
 
           const updated = await updateShopProfile(profile.id, patch);
@@ -333,6 +361,12 @@ export function usePartnerOnboardingData() {
           if (!completion) return null;
           return {
             percent: typeof completion.percent === 'number' ? completion.percent : null,
+            completedStepIds: Array.isArray(completion.completed_steps)
+              ? completion.completed_steps
+              : [],
+            step_states: completion.step_states || completion.sections || [],
+            sections: completion.sections || [],
+            first_missing_required: completion.first_missing_required || completion.current_step,
           };
         },
       }),

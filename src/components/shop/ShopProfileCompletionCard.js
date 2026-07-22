@@ -1,19 +1,50 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, ProgressBar } from 'react-native-paper';
+import React, { useMemo } from 'react';
+import { View, StyleSheet, Pressable } from 'react-native';
+import { Text, ProgressBar, Button } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import AppCard from '../ui/AppCard';
 import { COLORS } from '../../constants/colors';
 import { useTranslation } from '../../i18n';
 
+const SECTION_LABEL_KEYS = {
+  business: 'partnerOnboarding.section.business',
+  location: 'partnerOnboarding.section.location',
+  vehicles: 'partnerOnboarding.section.vehicles',
+  services: 'partnerOnboarding.section.services',
+  prices: 'partnerOnboarding.section.prices',
+  hours: 'partnerOnboarding.section.hours',
+  photos: 'partnerOnboarding.section.photos',
+  about: 'partnerOnboarding.section.about',
+  legal: 'partnerOnboarding.section.legal',
+};
+
+/**
+ * Profile readiness dashboard card. Shows completion %, required vs recommended
+ * gaps, and a Continue setup CTA into the guided wizard.
+ */
 export default function ShopProfileCompletionCard({
   percent = 0,
   strengthHints = [],
   encourageText = null,
+  completion = null,
+  onContinueSetup = null,
 }) {
   const { t } = useTranslation();
-  const complete = percent >= 100;
+  const complete = percent >= 100 || completion?.ready_to_publish;
+
+  const { requiredMissing, recommendedMissing } = useMemo(() => {
+    const sections = completion?.step_states || completion?.sections || [];
+    const required = [];
+    const recommended = [];
+    sections.forEach((s) => {
+      if (s.complete) return;
+      const label = t(SECTION_LABEL_KEYS[s.key] || '', null, s.key);
+      if (s.required) required.push(label);
+      else recommended.push(label);
+    });
+    return { requiredMissing: required, recommendedMissing: recommended };
+  }, [completion, t]);
 
   return (
     <AppCard variant="dark" contentStyle={styles.inner}>
@@ -29,13 +60,37 @@ export default function ShopProfileCompletionCard({
         <Text style={[styles.percent, complete && styles.percentComplete]}>{percent}%</Text>
       </View>
       <ProgressBar
-        progress={percent / 100}
+        progress={Math.max(0, Math.min(1, percent / 100))}
         color={complete ? '#4ade80' : COLORS.PRIMARY}
         style={styles.bar}
       />
-      {!complete && encourageText ? (
-        <Text style={styles.readyText}>{encourageText}</Text>
+
+      {!complete && requiredMissing.length ? (
+        <View style={styles.listBlock}>
+          <Text style={styles.listTitle}>{t('partnerProfile.requiredGaps', null, 'Required')}</Text>
+          {requiredMissing.map((label) => (
+            <Text key={`req-${label}`} style={styles.listItem}>
+              • {label}
+            </Text>
+          ))}
+        </View>
       ) : null}
+
+      {!complete && recommendedMissing.length ? (
+        <View style={styles.listBlock}>
+          <Text style={styles.listTitle}>
+            {t('partnerProfile.recommendedGaps', null, 'Recommended')}
+          </Text>
+          {recommendedMissing.map((label) => (
+            <Text key={`rec-${label}`} style={styles.listItem}>
+              • {label}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+
+      {!complete && encourageText ? <Text style={styles.readyText}>{encourageText}</Text> : null}
+
       {complete ? (
         <Text style={styles.readyText}>
           {t('partnerProfile.profileReadyBody')}
@@ -43,6 +98,20 @@ export default function ShopProfileCompletionCard({
             ? t('partnerProfile.profileReadyPolish', { hints: strengthHints.join(', ') })
             : t('partnerProfile.profileReadyAddMore')}
         </Text>
+      ) : null}
+
+      {!complete && typeof onContinueSetup === 'function' ? (
+        <Button mode="contained" onPress={onContinueSetup} style={styles.cta}>
+          {t('partnerProfile.continueSetup', null, 'Continue setup')}
+        </Button>
+      ) : null}
+
+      {complete ? (
+        <Pressable onPress={onContinueSetup} disabled={!onContinueSetup}>
+          <Text style={styles.manageHint}>
+            {t('partnerProfile.editViaWizard', null, 'Edit profile details in guided setup')}
+          </Text>
+        </Pressable>
       ) : null}
     </AppCard>
   );
@@ -76,9 +145,33 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: 'rgba(255,255,255,0.15)',
   },
+  listBlock: {
+    marginTop: 4,
+  },
+  listTitle: {
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '700',
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  listItem: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 13,
+    lineHeight: 18,
+  },
   readyText: {
     color: 'rgba(255,255,255,0.82)',
     fontSize: 13,
     lineHeight: 18,
+  },
+  cta: {
+    marginTop: 6,
+    borderRadius: 12,
+  },
+  manageHint: {
+    color: COLORS.PRIMARY,
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4,
   },
 });

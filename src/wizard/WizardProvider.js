@@ -270,23 +270,19 @@ export function WizardProvider({
     goTo(index - 1);
   }, [isFirst, index, goTo]);
 
-  // "Save and continue":
-  //   - clean, non-final step -> just advance (no validation, no PATCH)
-  //   - dirty step            -> validate, then persist only if valid
-  //   - last step             -> validate + save (when dirty) then finish
-  // A failed save never strands the user on a clean step, matching the
-  // free Back/Next navigation the wizard now supports.
+  // "Save and continue" / "Continue" / "Finish":
+  //   - Always run step.validate when present (blocks Continue with bad data).
+  //     Context-driven flows (vehicle create) keep state outside `values`, so
+  //     dirty-tracking alone must not skip validation.
+  //   - clean, non-final step -> advance without PATCH after validation
+  //   - dirty step            -> validate, then persist
+  //   - last step             -> validate + save (when dirty) then onFinish
+  // Free jump without validation uses goTo() (step bar); Back never saves.
   const goNext = useCallback(async () => {
     if (!currentStep) return { ok: false };
     setError(null);
 
     const dirty = isStepDirty(currentStep, valuesRef.current, savedValuesRef.current);
-
-    // Nothing changed on a non-final step: move on without touching the API.
-    if (!dirty && !isLast) {
-      goTo(index + 1);
-      return { ok: true };
-    }
 
     setStatus('saving');
     try {
@@ -298,6 +294,13 @@ export function WizardProvider({
           setError(norm.message || null);
           return { ok: false, message: norm.message, errors: norm.errors };
         }
+      }
+
+      // Nothing changed on a non-final step: advance without touching the API.
+      if (!dirty && !isLast) {
+        setStatus('idle');
+        goTo(index + 1);
+        return { ok: true };
       }
 
       if (dirty) {

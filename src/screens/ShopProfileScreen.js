@@ -70,6 +70,11 @@ import {
   hasShopMapPin,
   isShopProfileEssentialsComplete,
 } from '../utils/shopProfileCompleteness';
+import {
+  getProfileCompletion,
+  isPartnerSetupComplete,
+  openPartnerCenter,
+} from '../utils/partnerSetupGate';
 import { profileSectionForField } from '../utils/shopProfileSectionMap';
 import ShopProfileCompletionCard from '../components/shop/ShopProfileCompletionCard';
 import ShopProfileMissingAlert from '../components/shop/ShopProfileMissingAlert';
@@ -1522,11 +1527,13 @@ export default function ShopProfileScreen({ navigation, route }) {
   };
   const missingFields = getShopProfileIncompleteFields(profileForCompleteness, completenessOptions);
   const gateMissing = getShopProfileGateIncompleteFields(profileForCompleteness, completenessOptions);
-  const isEssentialsComplete = gateMissing.length === 0;
-  const completionPercent = getShopProfileCompletionPercent(
-    profileForCompleteness,
-    completenessOptions
-  );
+  const backendCompletion = getProfileCompletion(profile);
+  const isEssentialsComplete =
+    isPartnerSetupComplete(profile) || gateMissing.length === 0;
+  const completionPercent =
+    typeof backendCompletion?.percent === 'number'
+      ? backendCompletion.percent
+      : getShopProfileCompletionPercent(profileForCompleteness, completenessOptions);
   const strengthHints = getShopProfileStrengthHints(profile, completenessOptions);
   const sectionStatus = (key) =>
     getShopProfileSectionStatus(key, profileForCompleteness, completenessOptions);
@@ -1534,6 +1541,10 @@ export default function ShopProfileScreen({ navigation, route }) {
   const mapPinSet = hasShopMapPin(profile);
   const pickedLat = parseOptionalCoordinate(profile.latitude);
   const pickedLon = parseOptionalCoordinate(profile.longitude);
+
+  const continueSetup = useCallback(() => {
+    openPartnerCenter(navigation, profile);
+  }, [navigation, profile]);
 
   const publicPagePreviewSection = (
     <ShopProfileAccordionSection
@@ -1592,27 +1603,40 @@ export default function ShopProfileScreen({ navigation, route }) {
           percent={completionPercent}
           strengthHints={strengthHints}
           encourageText={t('partnerProfile.profileEncourage')}
+          completion={backendCompletion}
+          onContinueSetup={continueSetup}
         />
 
         <ShopViewPublicProfileButton shop={profile} navigation={navigation} compact />
 
         {!isEssentialsComplete ? (
+          <AppCard variant="dark" contentStyle={styles.setupBannerInner}>
+            <Text style={styles.setupBannerTitle}>
+              {t('partnerProfile.continueSetupTitle', null, 'Finish setup in the wizard')}
+            </Text>
+            <Text style={styles.setupBannerText}>
+              {t(
+                'partnerProfile.continueSetupBody',
+                null,
+                'Profile editing happens in guided setup. Use Continue setup for location, services, prices, hours, and publish.'
+              )}
+            </Text>
+            <Button mode="contained" onPress={continueSetup} style={{ marginTop: 8 }}>
+              {t('partnerProfile.continueSetup', null, 'Continue setup')}
+            </Button>
+          </AppCard>
+        ) : null}
+
+        {!isEssentialsComplete ? (
           <ShopProfileMissingAlert
             fields={gateMissing.length ? gateMissing : missingFields}
-            onFieldPress={scrollToMissingField}
+            onFieldPress={() => {
+              // Prefer jumping into the wizard over scrolling the giant editor.
+              continueSetup();
+            }}
           />
         ) : missingFields.length ? (
           <ShopProfileMissingAlert fields={missingFields} onFieldPress={scrollToMissingField} />
-        ) : null}
-
-        {showSetupBanner ? (
-          <AppCard variant="dark" contentStyle={styles.setupBannerInner}>
-            <Text style={styles.setupBannerTitle}>Complete your center details</Text>
-            <Text style={styles.setupBannerText}>
-              Place your shop on the map, add a name and address, and pick vehicle types so clients
-              can find you nearby. Phone is optional if you prefer chat-only contact.
-            </Text>
-          </AppCard>
         ) : null}
 
         {!isEssentialsComplete ? (

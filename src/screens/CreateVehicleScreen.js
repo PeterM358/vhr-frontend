@@ -36,28 +36,39 @@ export default function CreateVehicleScreen({ navigation, route }) {
 
   const form = useVehicleCreateForm({ clientEmail, clientPhone });
 
+  // Keep validators/submit stable across form re-renders so the step registry
+  // identity does not churn (which previously interacted badly with dirty-skip).
+  const validateIdentity = form.validateIdentity;
+  const validateDetails = form.validateDetails;
+  const submitVehicle = form.submit;
+
   const steps = useMemo(
     () => [
       {
         id: 'identity',
         titleKey: 'vehicleWizard.identityTitle',
-        validate: () => form.validateIdentity(),
+        validate: () => validateIdentity(),
         Component: VehicleIdentityStep,
       },
       {
         id: 'details',
         titleKey: 'vehicleWizard.detailsTitle',
         optional: true,
-        validate: () => form.validateDetails(),
+        validate: () => validateDetails(),
         Component: VehicleDetailsStep,
       },
       {
         id: 'review',
         titleKey: 'vehicleWizard.reviewTitle',
+        validate: () => {
+          const identity = validateIdentity();
+          if (!identity.ok) return identity;
+          return validateDetails();
+        },
         Component: VehicleReviewStep,
       },
     ],
-    [form]
+    [validateIdentity, validateDetails]
   );
 
   // Single-shot create: no cross-session persistence needed.
@@ -65,7 +76,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
 
   const onFinish = useCallback(async () => {
     // submit() throws on validation/network failure -> engine surfaces the error.
-    await form.submit();
+    await submitVehicle();
     showMessage(
       t('common.success', null, 'Success'),
       t('createVehicle.errors.createdSuccess'),
@@ -74,7 +85,7 @@ export default function CreateVehicleScreen({ navigation, route }) {
     setTimeout(() => {
       navigation.goBack();
     }, 600);
-  }, [form, navigation, t]);
+  }, [submitVehicle, navigation, t]);
 
   const onExit = useCallback(() => {
     handleBack();

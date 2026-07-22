@@ -2,15 +2,15 @@
 //
 // Default UI chrome for the Wizard Engine. Web + React Native compatible
 // (react-native-paper + RN primitives, matching the Veversal design system):
-//   - Progress header: "Step X of Y" + title + ProgressBar
+//   - Interactive step bar (clickable; completed/started/required/optional)
 //   - Scrollable step body (keyboard-aware)
 //   - Sticky bottom action bar: Back / Skip / Save & continue (Finish on last)
 //   - "Finish later" affordance + inline loading / error
 //
 // Callers can replace this entirely and drive the wizard from useWizard().
 
-import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, StyleSheet, Platform, Pressable, ScrollView } from 'react-native';
 import { Text, Button, ProgressBar, ActivityIndicator } from 'react-native-paper';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,15 +19,94 @@ import { COLORS } from '../constants/colors';
 import { useTranslation } from '../i18n';
 import { useWizard } from './WizardContext';
 
+const STATE_COLORS = {
+  completed: '#22C55E',
+  started: '#EAB308',
+  required_incomplete: '#EF4444',
+  optional_untouched: 'rgba(255,255,255,0.45)',
+  current: '#fff',
+};
+
+function resolveStepVisualState(step, index, currentIndex, completedStepIds, stepStatesById) {
+  if (index === currentIndex) return 'current';
+  const fromBackend = stepStatesById[step.id];
+  if (fromBackend) return fromBackend;
+  if (completedStepIds.includes(step.id)) return 'completed';
+  if (step.optional) return 'optional_untouched';
+  return 'required_incomplete';
+}
+
+function WizardStepBar({ steps, index, completedStepIds, adapterProgress, goTo, disabled }) {
+  const stepStatesById = useMemo(() => {
+    const map = {};
+    const rows = adapterProgress?.step_states || adapterProgress?.sections || [];
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      if (row?.key) map[row.key] = row.state || (row.complete ? 'completed' : null);
+    });
+    return map;
+  }, [adapterProgress]);
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.stepBarContent}
+      style={styles.stepBar}
+    >
+      {steps.map((step, i) => {
+        const state = resolveStepVisualState(
+          step,
+          i,
+          index,
+          completedStepIds,
+          stepStatesById
+        );
+        const color = STATE_COLORS[state] || STATE_COLORS.optional_untouched;
+        const isCurrent = i === index;
+        return (
+          <View key={step.id} style={styles.stepItem}>
+            {i > 0 ? <View style={[styles.stepConnector, { backgroundColor: color }]} /> : null}
+            <Pressable
+              onPress={() => !disabled && goTo(i)}
+              disabled={disabled}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isCurrent }}
+              style={({ pressed }) => [
+                styles.stepDot,
+                {
+                  borderColor: color,
+                  backgroundColor: isCurrent ? color : 'transparent',
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.stepDotText,
+                  { color: isCurrent ? '#0F172A' : color },
+                ]}
+              >
+                {i + 1}
+              </Text>
+            </Pressable>
+          </View>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
 export default function WizardChrome({
   showFinishLater = true,
   contentContainerStyle,
   nextLabelKey,
   finishLabelKey,
+  showStepBar = true,
 }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const {
+    steps,
     currentStep,
     index,
     total,
@@ -40,8 +119,10 @@ export default function WizardChrome({
     restored,
     adapterProgress,
     isDirty,
+    completedStepIds,
     goNext,
     goBack,
+    goTo,
     skip,
     finishLater,
   } = useWizard();
@@ -98,7 +179,7 @@ export default function WizardChrome({
 
   return (
     <View style={styles.host}>
-      {/* Progress header */}
+      {/* Progress header + interactive step bar */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <Text style={styles.stepCounter}>
@@ -107,6 +188,16 @@ export default function WizardChrome({
           <Text style={styles.percent}>{displayedPercent}%</Text>
         </View>
         {stepTitle ? <Text style={styles.stepTitle}>{stepTitle}</Text> : null}
+        {showStepBar && steps.length > 1 ? (
+          <WizardStepBar
+            steps={steps}
+            index={index}
+            completedStepIds={completedStepIds || []}
+            adapterProgress={adapterProgress}
+            goTo={goTo}
+            disabled={saving}
+          />
+        ) : null}
         <ProgressBar
           progress={displayedProgress}
           color={COLORS.PRIMARY}
@@ -236,6 +327,37 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 4,
     marginBottom: 8,
+  },
+  stepBar: {
+    marginBottom: 10,
+    maxHeight: 44,
+  },
+  stepBarContent: {
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingRight: 8,
+  },
+  stepItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stepConnector: {
+    width: 14,
+    height: 2,
+    marginHorizontal: 2,
+    opacity: 0.7,
+  },
+  stepDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepDotText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
   progressBar: {
     height: 6,

@@ -476,13 +476,26 @@ export function useVehicleCreateForm({ clientEmail = null, clientPhone = null } 
     setSaving(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
+      if (!token) {
+        throw new Error(t('createVehicle.errors.submitFailed'));
+      }
       const payload = {
         kilometers: km,
         ...built.payload,
       };
 
+      // Prefer explicit first-registration month/year; otherwise seed from the
+      // required catalog year so the API retains a registration year (serializer
+      // treats `year` as read-only and pops it on create).
       const fr = String(firstRegIso ?? '').trim();
-      if (fr) payload.first_registration_date = fr;
+      if (fr) {
+        payload.first_registration_date = fr;
+      } else if (selectedYear) {
+        const y = parseInt(String(selectedYear), 10);
+        if (Number.isFinite(y) && y >= 1900) {
+          payload.first_registration_date = `${y}-01-01`;
+        }
+      }
       const rc = String(regCountryIso ?? '').trim().toUpperCase();
       if (rc) payload.registration_country = rc;
 
@@ -528,6 +541,7 @@ export function useVehicleCreateForm({ clientEmail = null, clientPhone = null } 
     optionalStrings,
     optionalBools,
     firstRegIso,
+    selectedYear,
     regCountryIso,
     licensePlate,
     vin,
