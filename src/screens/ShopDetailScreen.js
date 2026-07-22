@@ -41,12 +41,10 @@ import {
 import { confirmMessage, showMessage } from '../utils/crossPlatformAlert';
 import { formatShopDisplayName } from '../utils/shopDisplayName';
 import { navigateToServiceCenters } from '../navigation/webNavigation';
-import { getOperationIcon } from '../icons/operationIconRegistry';
-import { describeServicePricing } from '../utils/servicePricingSummary';
+import PublishedServiceMenu from '../components/shop/PublishedServiceMenu';
 import { useTranslation } from '../i18n';
 import { joinList } from '../i18n/joinLocalizedList';
 import {
-  translateRepairTypeLabel,
   translateRepairTypeLabels,
   translateVehicleTypePublicLabels,
 } from '../utils/translateShopTypeLabels';
@@ -867,45 +865,7 @@ export default function ShopDetailScreen({ route, navigation }) {
           <>
             <SectionHeading title={t('serviceCenters.profile.publishedPricing')} />
             <FloatingCard>
-              <Text style={styles.menuDisclaimer}>
-                {shop.service_menu.some(
-                  (item) => item?.parts_from != null || item?.parts_to != null
-                )
-                  ? t('serviceCenters.profile.partsIncludedNote')
-                  : t('serviceCenters.profile.partsQuotedSeparately')}
-              </Text>
-              {shop.service_menu.map((item) => {
-                const label = translateRepairTypeLabel(item, t) || t('common.service');
-                const { parts, labor, total, time, hasParts } =
-                  describeServicePricing(item, t);
-                const priceLine =
-                  (hasParts && total) || labor || t('serviceCenters.profile.priceOnRequest');
-                const breakdown = hasParts
-                  ? [parts, labor].filter(Boolean).join(' · ')
-                  : null;
-                return (
-                  <View key={`${item.repair_type_id}-${label}`} style={styles.menuRow}>
-                    <View style={styles.menuIconCircle}>
-                      <MaterialCommunityIcons
-                        name={getOperationIcon(item)}
-                        size={20}
-                        color={COLORS.PRIMARY}
-                      />
-                    </View>
-                    <View style={styles.menuTextCol}>
-                      <Text style={styles.menuServiceName}>{label}</Text>
-                      <Text style={styles.menuPriceLine}>{priceLine}</Text>
-                      {breakdown ? (
-                        <Text style={styles.menuDisclaimer}>{breakdown}</Text>
-                      ) : null}
-                      {time ? <Text style={styles.menuDisclaimer}>{time}</Text> : null}
-                      {item.disclaimer ? (
-                        <Text style={styles.menuDisclaimer}>{item.disclaimer}</Text>
-                      ) : null}
-                    </View>
-                  </View>
-                );
-              })}
+              <PublishedServiceMenu items={shop.service_menu} />
             </FloatingCard>
           </>
         ) : null}

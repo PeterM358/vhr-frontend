@@ -57,7 +57,7 @@ function resolveStepState(stepId, completion) {
 
 /**
  * Profile readiness hub card: completion %, numbered wizard steps 1–11
- * (colored by step_states), Continue setup CTA into PartnerOnboarding.
+ * (always visible — even when ready_to_publish), Continue setup CTA.
  */
 export default function ShopProfileCompletionCard({
   percent = 0,
@@ -68,7 +68,10 @@ export default function ShopProfileCompletionCard({
   onSectionPress = null,
 }) {
   const { t } = useTranslation();
-  const complete = percent >= 100 || completion?.ready_to_publish;
+  const safePercent = Math.max(0, Math.min(100, Number(percent) || 0));
+  // Visual "ready" only at 100%. ready_to_publish can be true earlier (optional polish left).
+  const fullyReady = safePercent >= 100;
+  const publishReady = Boolean(completion?.ready_to_publish);
 
   const steps = useMemo(
     () =>
@@ -100,28 +103,39 @@ export default function ShopProfileCompletionCard({
     return t('partnerOnboarding.fix', null, 'Fix');
   };
 
+  const clickable =
+    typeof onSectionPress === 'function' || typeof onContinueSetup === 'function';
+
   return (
-    <AppCard variant="dark" contentStyle={styles.inner}>
+    <AppCard variant="dark" style={styles.card} contentStyle={styles.inner}>
       <View style={styles.headerRow}>
         <MaterialCommunityIcons
-          name={complete ? 'check-decagram' : 'progress-clock'}
+          name={fullyReady || publishReady ? 'check-decagram' : 'progress-clock'}
           size={22}
-          color={complete ? '#4ade80' : COLORS.PRIMARY}
+          color={fullyReady || publishReady ? '#4ade80' : COLORS.PRIMARY}
         />
         <Text style={styles.title}>
-          {complete ? t('partnerProfile.profileReady') : t('partnerProfile.profileCompletion')}
+          {publishReady || fullyReady
+            ? t('partnerProfile.profileReady')
+            : t('partnerProfile.profileCompletion')}
         </Text>
-        <Text style={[styles.percent, complete && styles.percentComplete]}>{percent}%</Text>
+        <Text
+          style={[styles.percent, (fullyReady || publishReady) && styles.percentComplete]}
+        >
+          {safePercent}%
+        </Text>
       </View>
       <ProgressBar
-        progress={Math.max(0, Math.min(1, percent / 100))}
-        color={complete ? '#4ade80' : COLORS.PRIMARY}
+        progress={safePercent / 100}
+        color={fullyReady || publishReady ? '#4ade80' : COLORS.PRIMARY}
         style={styles.bar}
       />
 
-      {!complete && encourageText ? <Text style={styles.readyText}>{encourageText}</Text> : null}
+      {!publishReady && encourageText ? (
+        <Text style={styles.readyText}>{encourageText}</Text>
+      ) : null}
 
-      {complete ? (
+      {publishReady ? (
         <Text style={styles.readyText}>
           {t('partnerProfile.profileReadyBody')}
           {strengthHints.length
@@ -130,6 +144,7 @@ export default function ShopProfileCompletionCard({
         </Text>
       ) : null}
 
+      {/* Always show steps 1–11 — never blank when ready_to_publish. */}
       <Text style={styles.listTitle}>
         {t('partnerProfile.setupSteps', null, 'Setup steps')}
       </Text>
@@ -138,8 +153,6 @@ export default function ShopProfileCompletionCard({
         {steps.map((step) => {
           const color = STATE_COLORS[step.state] || STATE_COLORS.optional_untouched;
           const fill = STATE_FILLS[step.state] || STATE_FILLS.optional_untouched;
-          const clickable =
-            typeof onSectionPress === 'function' || typeof onContinueSetup === 'function';
           return (
             <Pressable
               key={step.id}
@@ -164,19 +177,19 @@ export default function ShopProfileCompletionCard({
                 {step.title}
               </Text>
               <Text style={[styles.stepStatus, { color }]}>{statusLabel(step.state)}</Text>
-              <MaterialCommunityIcons name="chevron-right" size={20} color="rgba(255,255,255,0.45)" />
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={20}
+                color="rgba(255,255,255,0.45)"
+              />
             </Pressable>
           );
         })}
       </View>
 
       {typeof onContinueSetup === 'function' ? (
-        <Button
-          mode="contained"
-          onPress={() => onContinueSetup()}
-          style={styles.cta}
-        >
-          {complete
+        <Button mode="contained" onPress={() => onContinueSetup()} style={styles.cta}>
+          {publishReady || fullyReady
             ? t('partnerProfile.editViaWizard', null, 'Edit profile details in guided setup')
             : t('partnerProfile.continueSetup', null, 'Continue setup')}
         </Button>
@@ -186,6 +199,9 @@ export default function ShopProfileCompletionCard({
 }
 
 const styles = StyleSheet.create({
+  card: {
+    overflow: 'visible',
+  },
   inner: {
     gap: 8,
   },

@@ -25,11 +25,13 @@ import { useTranslation } from '../i18n';
 /**
  * Partner Profile readiness hub.
  *
- * Editing lives in PartnerOnboarding (wizard). This screen only shows:
+ * Editing lives in PartnerOnboarding (wizard). This screen always shows:
  *   - readiness %
  *   - numbered steps 1–11 (colored by profile_completion.step_states)
- *   - Continue setup → first incomplete required step
+ *   - Continue / Edit setup → PartnerOnboarding (even when ready_to_publish)
  *   - View public profile
+ *
+ * Never blank the page when publish-ready — the step list is the edit entry point.
  */
 export default function ShopProfileScreen({ navigation, route }) {
   const { t } = useTranslation();
