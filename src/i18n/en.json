@@ -1996,10 +1996,13 @@
     "saveAndContinue": "Save and continue",
     "profileReady": "Profile ready for clients",
     "profileCompletion": "Profile completion",
+    "hubStatusReady": "Ready for clients",
+    "hubStatusInProgress": "Finish the steps below to go live",
     "profileReadyBody": "Clients can find you on the map and open repair requests.",
     "profileReadyPolish": " Optional polish: {hints}.",
     "profileReadyAddMore": " Add photos and services to strengthen your page.",
     "profileEncourage": "Continue guided setup so customers can find and trust your service center.",
+
     "continueSetup": "Continue setup",
     "continueSetupTitle": "Finish setup in the wizard",
     "continueSetupBody": "Guided setup owns location, services, prices, hours, photos, and publish.",

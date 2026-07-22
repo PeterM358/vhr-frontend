@@ -56,22 +56,22 @@ function resolveStepState(stepId, completion) {
 }
 
 /**
- * Profile readiness hub card: completion %, numbered wizard steps 1–11
- * (always visible — even when ready_to_publish), Continue setup CTA.
+ * Profile readiness hub card: compact % + status, optional public-profile CTA,
+ * then numbered wizard steps 1–11 (always visible).
  */
 export default function ShopProfileCompletionCard({
   percent = 0,
-  strengthHints = [],
-  encourageText = null,
   completion = null,
   onContinueSetup = null,
   onSectionPress = null,
+  publicProfileAction = null,
 }) {
   const { t } = useTranslation();
   const safePercent = Math.max(0, Math.min(100, Number(percent) || 0));
   // Visual "ready" only at 100%. ready_to_publish can be true earlier (optional polish left).
   const fullyReady = safePercent >= 100;
   const publishReady = Boolean(completion?.ready_to_publish);
+  const readyLook = fullyReady || publishReady;
 
   const steps = useMemo(
     () =>
@@ -103,48 +103,35 @@ export default function ShopProfileCompletionCard({
     return t('partnerOnboarding.fix', null, 'Fix');
   };
 
+  const statusLine = readyLook
+    ? t('partnerProfile.hubStatusReady', null, 'Ready for clients')
+    : t('partnerProfile.hubStatusInProgress', null, 'Finish the steps below to go live');
+
   const clickable =
     typeof onSectionPress === 'function' || typeof onContinueSetup === 'function';
 
   return (
-    <AppCard variant="dark" style={styles.card} contentStyle={styles.inner}>
+    <AppCard variant="dark" contentStyle={styles.inner}>
       <View style={styles.headerRow}>
-        <MaterialCommunityIcons
-          name={fullyReady || publishReady ? 'check-decagram' : 'progress-clock'}
-          size={22}
-          color={fullyReady || publishReady ? '#4ade80' : COLORS.PRIMARY}
-        />
-        <Text style={styles.title}>
-          {publishReady || fullyReady
-            ? t('partnerProfile.profileReady')
-            : t('partnerProfile.profileCompletion')}
-        </Text>
-        <Text
-          style={[styles.percent, (fullyReady || publishReady) && styles.percentComplete]}
-        >
+        <Text style={[styles.percent, readyLook && styles.percentComplete]}>
           {safePercent}%
         </Text>
+        <View style={styles.statusBlock}>
+          <Text style={styles.statusLine} numberOfLines={2}>
+            {statusLine}
+          </Text>
+          <ProgressBar
+            progress={safePercent / 100}
+            color={readyLook ? '#4ade80' : COLORS.PRIMARY}
+            style={styles.bar}
+          />
+        </View>
       </View>
-      <ProgressBar
-        progress={safePercent / 100}
-        color={fullyReady || publishReady ? '#4ade80' : COLORS.PRIMARY}
-        style={styles.bar}
-      />
 
-      {!publishReady && encourageText ? (
-        <Text style={styles.readyText}>{encourageText}</Text>
+      {publicProfileAction ? (
+        <View style={styles.publicAction}>{publicProfileAction}</View>
       ) : null}
 
-      {publishReady ? (
-        <Text style={styles.readyText}>
-          {t('partnerProfile.profileReadyBody')}
-          {strengthHints.length
-            ? t('partnerProfile.profileReadyPolish', { hints: strengthHints.join(', ') })
-            : t('partnerProfile.profileReadyAddMore')}
-        </Text>
-      ) : null}
-
-      {/* Always show steps 1–11 — never blank when ready_to_publish. */}
       <Text style={styles.listTitle}>
         {t('partnerProfile.setupSteps', null, 'Setup steps')}
       </Text>
@@ -189,7 +176,7 @@ export default function ShopProfileCompletionCard({
 
       {typeof onContinueSetup === 'function' ? (
         <Button mode="contained" onPress={() => onContinueSetup()} style={styles.cta}>
-          {publishReady || fullyReady
+          {readyLook
             ? t('partnerProfile.editViaWizard', null, 'Edit profile details in guided setup')
             : t('partnerProfile.continueSetup', null, 'Continue setup')}
         </Button>
@@ -199,41 +186,47 @@ export default function ShopProfileCompletionCard({
 }
 
 const styles = StyleSheet.create({
-  card: {
-    overflow: 'visible',
-  },
   inner: {
-    gap: 8,
+    gap: 10,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  title: {
-    flex: 1,
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
+    gap: 12,
   },
   percent: {
     color: COLORS.PRIMARY,
     fontWeight: '800',
-    fontSize: 15,
+    fontSize: 28,
+    letterSpacing: -0.5,
+    minWidth: 64,
   },
   percentComplete: {
     color: '#4ade80',
+  },
+  statusBlock: {
+    flex: 1,
+    gap: 6,
+  },
+  statusLine: {
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 18,
   },
   bar: {
     height: 8,
     borderRadius: 4,
     backgroundColor: 'rgba(255,255,255,0.15)',
   },
+  publicAction: {
+    marginTop: 2,
+  },
   listTitle: {
     color: 'rgba(255,255,255,0.9)',
     fontWeight: '700',
     fontSize: 13,
-    marginTop: 4,
+    marginTop: 2,
   },
   stepList: {
     gap: 4,
@@ -270,11 +263,6 @@ const styles = StyleSheet.create({
   stepStatus: {
     fontSize: 12,
     fontWeight: '700',
-  },
-  readyText: {
-    color: 'rgba(255,255,255,0.82)',
-    fontSize: 13,
-    lineHeight: 18,
   },
   cta: {
     marginTop: 8,

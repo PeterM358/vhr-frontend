@@ -17,7 +17,6 @@ import {
   openPartnerWizard,
   partnerSetupPercent,
 } from '../utils/partnerSetupGate';
-import { getShopProfileStrengthHints } from '../utils/shopProfileCompleteness';
 import ShopProfileCompletionCard from '../components/shop/ShopProfileCompletionCard';
 import ShopViewPublicProfileButton from '../components/shop/ShopViewPublicProfileButton';
 import { useTranslation } from '../i18n';
@@ -25,13 +24,8 @@ import { useTranslation } from '../i18n';
 /**
  * Partner Profile readiness hub.
  *
- * Editing lives in PartnerOnboarding (wizard). This screen always shows:
- *   - readiness %
- *   - numbered steps 1–11 (colored by profile_completion.step_states)
- *   - Continue / Edit setup → PartnerOnboarding (even when ready_to_publish)
- *   - View public profile
- *
- * Never blank the page when publish-ready — the step list is the edit entry point.
+ * Compact top: % + status, View public profile, then numbered steps 1–11.
+ * Editing lives in PartnerOnboarding (wizard). No embedded public preview.
  */
 export default function ShopProfileScreen({ navigation, route }) {
   const { t } = useTranslation();
@@ -131,9 +125,6 @@ export default function ShopProfileScreen({ navigation, route }) {
 
   const backendCompletion = getProfileCompletion(profile);
   const completionPercent = partnerSetupPercent(profile);
-  const strengthHints = getShopProfileStrengthHints(profile, {
-    photoCount: Array.isArray(profile?.images) ? profile.images.length : 0,
-  });
 
   return (
     <ScreenBackground safeArea={false}>
@@ -154,14 +145,19 @@ export default function ShopProfileScreen({ navigation, route }) {
       >
         <ShopProfileCompletionCard
           percent={completionPercent}
-          strengthHints={strengthHints}
-          encourageText={t('partnerProfile.profileEncourage')}
           completion={backendCompletion}
           onContinueSetup={openWizard}
           onSectionPress={openWizard}
+          publicProfileAction={
+            <ShopViewPublicProfileButton
+              shop={profile}
+              navigation={navigation}
+              showPathHint={false}
+              onDark
+              mode="contained"
+            />
+          }
         />
-
-        <ShopViewPublicProfileButton shop={profile} navigation={navigation} />
       </ScrollView>
     </ScreenBackground>
   );

@@ -26,6 +26,11 @@ export default function ShopViewPublicProfileButton({
   style,
   returnTo = 'ShopProfile',
   backLabelKey = 'drawer.partner.centerDetails',
+  /** Hide URL path under the button (hub uses a compact CTA only). */
+  showPathHint = true,
+  /** Use light hint colors on dark cards. */
+  onDark = false,
+  mode = 'outlined',
 }) {
   const { t } = useTranslation();
 
@@ -70,10 +75,13 @@ export default function ShopViewPublicProfileButton({
     }
   };
 
+  const pathColor = onDark ? 'rgba(255,255,255,0.55)' : COLORS.TEXT_MUTED;
+  const warnColor = onDark ? '#FCD34D' : '#92400e';
+
   return (
     <View style={[styles.wrap, style]}>
       <Button
-        mode="outlined"
+        mode={mode}
         icon={({ size, color }) => (
           <MaterialCommunityIcons name="open-in-new" size={size} color={color} />
         )}
@@ -85,18 +93,24 @@ export default function ShopViewPublicProfileButton({
         {t('partnerProfile.viewPublicProfile')}
       </Button>
       {!canOpen ? (
-        <Text style={styles.disabledHint}>{t('partnerProfile.viewPublicProfileUnavailable')}</Text>
-      ) : isFallback ? (
+        <Text style={[styles.disabledHint, { color: warnColor }]}>
+          {t('partnerProfile.viewPublicProfileUnavailable')}
+        </Text>
+      ) : null}
+      {canOpen && showPathHint && isFallback ? (
         <>
           {publicPath ? (
-            <Text style={styles.pathHint} numberOfLines={1}>
+            <Text style={[styles.pathHint, { color: pathColor }]} numberOfLines={1}>
               {publicPath}
             </Text>
           ) : null}
-          <Text style={styles.fallbackHint}>{t('partnerProfile.publicUrlIncomplete')}</Text>
+          <Text style={[styles.fallbackHint, { color: warnColor }]}>
+            {t('partnerProfile.publicUrlIncomplete')}
+          </Text>
         </>
-      ) : publicPath ? (
-        <Text style={styles.pathHint} numberOfLines={1}>
+      ) : null}
+      {canOpen && showPathHint && !isFallback && publicPath ? (
+        <Text style={[styles.pathHint, { color: pathColor }]} numberOfLines={1}>
           {publicPath}
         </Text>
       ) : null}
@@ -107,23 +121,19 @@ export default function ShopViewPublicProfileButton({
 const styles = StyleSheet.create({
   wrap: {
     gap: 6,
-    marginBottom: 10,
   },
   button: {
-    alignSelf: 'flex-start',
+    alignSelf: 'stretch',
   },
   disabledHint: {
-    color: '#92400e',
     fontSize: 12,
     lineHeight: 16,
   },
   fallbackHint: {
-    color: '#92400e',
     fontSize: 12,
     lineHeight: 16,
   },
   pathHint: {
-    color: COLORS.TEXT_MUTED,
     fontSize: 11,
     lineHeight: 15,
   },
