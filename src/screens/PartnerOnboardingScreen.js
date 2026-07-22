@@ -248,6 +248,10 @@ export default function PartnerOnboardingScreen({ navigation }) {
   }, [navigation]);
 
   const onExit = useCallback(() => {
+    if (typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
     navigation.navigate('ShopHome');
   }, [navigation]);
 
@@ -270,7 +274,7 @@ export default function PartnerOnboardingScreen({ navigation }) {
       <View style={{ flex: 1 }}>
         <AppNavigationBar
           title={t('partnerOnboarding.title', null, 'Set up your shop')}
-          onBack={() => navigation.navigate('ShopHome')}
+          onBack={onExit}
         />
         <WizardEngine
           steps={steps}

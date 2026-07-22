@@ -1,12 +1,11 @@
 /**
  * Single source of truth for the "is this partner still in guided setup?" gate.
  *
- * While a shop is NOT publish-ready the guided Wizard (PartnerOnboarding) owns
- * the profile experience: every "open my center / profile" intent is routed
- * into the wizard, resuming from the first incomplete required step. Once the
- * backend reports `profile_completion.ready_to_publish` (no required fields
- * missing) the wizard disappears and Profile becomes normal management
- * (ShopProfileScreen).
+ * While a shop is NOT publish-ready, "open my center / profile" intents route
+ * into the guided Wizard (PartnerOnboarding), resuming from the first incomplete
+ * required step. Once `profile_completion.ready_to_publish` is true, those
+ * intents land on ShopProfileScreen — a readiness hub (percent + numbered
+ * wizard steps) that still opens PartnerOnboarding for editing.
  *
  * Prefer the backend-computed `profile_completion` (authoritative, shared with
  * web + card + wizard). Fall back to the client-side essentials gate only when
@@ -75,6 +74,24 @@ export function partnerCenterTargetScreen(profile) {
 }
 
 /**
+ * Always open the guided wizard (optionally at a specific step).
+ * Used by the Profile readiness hub — even after publish-ready.
+ */
+export function openPartnerWizard(navigation, profile, params = {}) {
+  const onboardingParams = { ...params };
+  delete onboardingParams.requireSetup;
+  if (profile?.id != null && onboardingParams.shopId == null) {
+    onboardingParams.shopId = profile.id;
+  }
+  if (Platform.OS === 'web') {
+    navigateToPartnerOnboarding(navigation, onboardingParams);
+  } else {
+    navigation.navigate('PartnerOnboarding', onboardingParams);
+  }
+  return 'PartnerOnboarding';
+}
+
+/**
  * Navigate to the correct center experience for the current completion state.
  * Handles web (canonical URLs) + native. Returns the resolved screen name.
  */
@@ -88,15 +105,5 @@ export function openPartnerCenter(navigation, profile, params = {}) {
     return 'ShopProfile';
   }
 
-  const onboardingParams = { ...params };
-  delete onboardingParams.requireSetup;
-  if (profile?.id != null && onboardingParams.shopId == null) {
-    onboardingParams.shopId = profile.id;
-  }
-  if (Platform.OS === 'web') {
-    navigateToPartnerOnboarding(navigation, onboardingParams);
-  } else {
-    navigation.navigate('PartnerOnboarding', onboardingParams);
-  }
-  return 'PartnerOnboarding';
+  return openPartnerWizard(navigation, profile, params);
 }

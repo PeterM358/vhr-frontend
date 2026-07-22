@@ -21,6 +21,9 @@ import { getLocale } from '../../i18n';
 import { buildE164Phone, parseStoredPhone } from '../../utils/phoneE164';
 import { normalizeWorkingHoursObject } from '../../utils/shopWorkingHours';
 import { createApiAdapter } from '../../wizard';
+import { WIZARD_STEP_IDS } from '../../utils/partnerWizardSteps';
+
+export { WIZARD_STEP_IDS };
 
 // Which profile fields each wizard step persists via the shared PATCH endpoint.
 const STEP_PATCH_BUILDERS = {
@@ -145,21 +148,6 @@ function profileToValues(profile) {
     invoice_city: profile.invoice_city || profile.city_name || '',
   };
 }
-
-// All wizard step ids in order (matches PartnerOnboardingScreen).
-const WIZARD_STEP_IDS = [
-  'business',
-  'location',
-  'vehicles',
-  'services',
-  'prices',
-  'hours',
-  'photos',
-  'about',
-  'legal',
-  'preview',
-  'publish',
-];
 
 const REQUIRED_FIELD_TO_STEP = {
   business_name: 'business',

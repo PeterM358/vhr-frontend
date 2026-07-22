@@ -2101,7 +2101,10 @@
     "loadError": "Error loading profile data",
     "saveError": "Error saving profile",
     "missingFields": "Please add {fields} before continuing.",
-    "notificationSettings": "Notification settings"
+    "notificationSettings": "Notification settings",
+    "setupSteps": "Setup steps",
+    "stepStarted": "In progress",
+    "stepOptional": "Optional"
   },
   "public": {
     "findServiceCenters": "Find Service Centers",
