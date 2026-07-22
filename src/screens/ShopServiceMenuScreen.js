@@ -30,7 +30,11 @@ import { getVehicleTypes } from '../api/vehicles';
 import { getMyShopProfiles } from '../api/profiles';
 import { resetFromShopDrawer } from '../navigation/drawerNavigation';
 import { getOperationIcon } from '../icons/operationIconRegistry';
-import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
+import {
+  translateRepairTypeLabel,
+  translateServiceCategoryLabel,
+  translateVehicleTypeLabel,
+} from '../utils/translateShopTypeLabels';
 import { vehicleTypeEmoji } from '../utils/vehicleTypeIcons';
 import ShopServicePricingFields from '../components/shop/ShopServicePricingFields';
 import {
@@ -146,11 +150,11 @@ export default function ShopServiceMenuScreen() {
       setSupportedVehicleTypes(supported);
       setDrafts(buildDrafts(menuData));
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to load price list');
+      Alert.alert(t('common.error'), err.message || t('serviceMenu.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -198,13 +202,16 @@ export default function ShopServiceMenuScreen() {
       .filter((rt) => !existingTypeIds.has(Number(rt.id)))
       .filter((rt) => {
         if (!q) return true;
-        return (
-          (rt.name || '').toLowerCase().includes(q) ||
-          (rt.category_name || '').toLowerCase().includes(q)
-        );
+        const label = (translateRepairTypeLabel(rt, t) || rt.name || '').toLowerCase();
+        const category = (
+          translateServiceCategoryLabel(rt.category_name || rt.category_slug, t) ||
+          rt.category_name ||
+          ''
+        ).toLowerCase();
+        return label.includes(q) || category.includes(q);
       })
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-  }, [repairTypes, existingTypeIds, addSearch]);
+  }, [repairTypes, existingTypeIds, addSearch, t]);
 
   const updateDraft = (key, field, value) => {
     setDrafts((prev) => ({
@@ -231,9 +238,15 @@ export default function ShopServiceMenuScreen() {
 
   const scopesForGroup = useCallback(
     (group) => {
-      const scopes = [{ key: DEFAULT_SCOPE, label: t('serviceMenu.allVehicles'), code: null }];
+      const scopes = [
+        { key: DEFAULT_SCOPE, label: t('serviceMenu.allVehicles'), code: null },
+      ];
       compatibleVehicleTypes(group.meta).forEach((v) => {
-        scopes.push({ key: String(v.id), label: v.name, code: v.code });
+        scopes.push({
+          key: String(v.id),
+          label: translateVehicleTypeLabel(v, t) || v.name,
+          code: v.code,
+        });
       });
       return scopes;
     },
@@ -264,11 +277,13 @@ export default function ShopServiceMenuScreen() {
       setItems(nextItems);
       setDrafts(buildDrafts(nextItems));
       Alert.alert(
-        'Updated',
-        `Refreshed ${result?.updated ?? nextItems.length} item(s) from completed jobs.`
+        t('serviceMenu.updatedTitle'),
+        t('serviceMenu.refreshedFromHistory', {
+          count: result?.updated ?? nextItems.length,
+        })
       );
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to refresh from history');
+      Alert.alert(t('common.error'), err.message || t('serviceMenu.refreshFailed'));
     } finally {
       setRefreshing(false);
     }
@@ -309,7 +324,7 @@ export default function ShopServiceMenuScreen() {
           });
       upsertItem(saved);
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to save price list item');
+      Alert.alert(t('common.error'), err.message || t('serviceMenu.saveFailed'));
     } finally {
       setSavingKey(null);
     }
@@ -336,7 +351,7 @@ export default function ShopServiceMenuScreen() {
       upsertItem(saved);
     } catch (err) {
       updateDraft(key, 'is_published', !nextPublished);
-      Alert.alert('Error', err.message || 'Could not update price list visibility');
+      Alert.alert(t('common.error'), err.message || t('serviceMenu.visibilityFailed'));
     } finally {
       setTogglingPublishKey(null);
     }
@@ -357,7 +372,7 @@ export default function ShopServiceMenuScreen() {
       setShowAddPanel(false);
       setAddSearch('');
     } catch (err) {
-      Alert.alert('Error', err.message || 'Could not add service');
+      Alert.alert(t('common.error'), err.message || t('serviceMenu.addFailed'));
     } finally {
       setAddingTypeId(null);
     }
@@ -399,7 +414,12 @@ export default function ShopServiceMenuScreen() {
               {translateRepairTypeLabel(meta || group.sample, t) || t('common.service')}
             </Text>
             {meta?.category_name ? (
-              <Text style={styles.menuRowCategory}>{meta.category_name}</Text>
+              <Text style={styles.menuRowCategory}>
+                {translateServiceCategoryLabel(
+                  meta.category_slug || meta.category_name,
+                  t
+                ) || meta.category_name}
+              </Text>
             ) : null}
             <Text style={styles.menuRowRange}>{summary}</Text>
           </View>
@@ -453,7 +473,7 @@ export default function ShopServiceMenuScreen() {
 
             <View style={styles.publishRow}>
               <Text style={styles.publishLabel}>
-                {isPublished ? 'Published' : 'Hidden'}
+                {isPublished ? t('serviceMenu.published') : t('serviceMenu.hidden')}
                 {scope !== DEFAULT_SCOPE
                   ? ` · ${t('serviceMenu.editingScope', {
                       scope: scopes.find((s) => s.key === scope)?.label || '',
@@ -473,7 +493,7 @@ export default function ShopServiceMenuScreen() {
               loading={savingKey === key}
               disabled={savingKey === key}
             >
-              Save prices
+              {t('serviceMenu.savePrices')}
             </Button>
           </View>
         ) : null}
@@ -496,10 +516,7 @@ export default function ShopServiceMenuScreen() {
       >
         <AppCard variant="dark" style={styles.heroCard}>
           <Text style={styles.heroTitle}>{t('drawer.partner.priceList')}</Text>
-          <Text style={styles.heroSubtitle}>
-            All your services are listed here. Toggle Published to show prices on your public profile
-            — expand a row to set parts, labor, and per-vehicle prices.
-          </Text>
+          <Text style={styles.heroSubtitle}>{t('serviceMenu.intro')}</Text>
           <View style={styles.heroActions}>
             <Button
               mode="contained"
@@ -507,7 +524,7 @@ export default function ShopServiceMenuScreen() {
               onPress={() => setShowAddPanel((v) => !v)}
               disabled={!shopProfileId}
             >
-              Add service
+              {t('serviceMenu.addService')}
             </Button>
             <Button
               mode="outlined"
@@ -516,16 +533,16 @@ export default function ShopServiceMenuScreen() {
               loading={refreshing}
               disabled={refreshing || !shopProfileId}
             >
-              Learn from history
+              {t('serviceMenu.learnFromHistory')}
             </Button>
           </View>
         </AppCard>
 
         {showAddPanel ? (
           <FloatingCard style={styles.addPanel}>
-            <Text style={styles.addPanelTitle}>Pick a service type</Text>
+            <Text style={styles.addPanelTitle}>{t('serviceMenu.pickServiceType')}</Text>
             <Searchbar
-              placeholder="Oil, brakes, diagnostics…"
+              placeholder={t('serviceMenu.searchPlaceholder')}
               value={addSearch}
               onChangeText={setAddSearch}
               style={styles.searchBar}
@@ -535,8 +552,8 @@ export default function ShopServiceMenuScreen() {
               {addableTypes.length === 0 ? (
                 <Text style={styles.addEmpty}>
                   {addSearch.trim()
-                    ? 'No matching types — try another search.'
-                    : 'All common service types are already on your price list.'}
+                    ? t('serviceMenu.noMatchingTypes')
+                    : t('serviceMenu.allTypesAlreadyAdded')}
                 </Text>
               ) : (
                 addableTypes.slice(0, 24).map((type) => (
@@ -556,7 +573,7 @@ export default function ShopServiceMenuScreen() {
                       color={COLORS.PRIMARY}
                     />
                     <Text style={styles.typeTileLabel} numberOfLines={2}>
-                      {type.name}
+                      {translateRepairTypeLabel(type, t) || type.name}
                     </Text>
                   </Pressable>
                 ))
@@ -569,11 +586,8 @@ export default function ShopServiceMenuScreen() {
           <ActivityIndicator style={styles.loader} color={COLORS.PRIMARY} />
         ) : groups.length === 0 ? (
           <FloatingCard>
-            <Text style={styles.emptyTitle}>No services on your price list yet</Text>
-            <Text style={styles.emptyText}>
-              Tap Add service to pick oil change, brakes, diagnostics, and more — or learn price
-              ranges automatically from completed jobs.
-            </Text>
+            <Text style={styles.emptyTitle}>{t('serviceMenu.emptyTitle')}</Text>
+            <Text style={styles.emptyText}>{t('serviceMenu.emptyBody')}</Text>
           </FloatingCard>
         ) : (
           groups.map((group) => renderGroup(group))
@@ -585,7 +599,7 @@ export default function ShopServiceMenuScreen() {
           style={styles.backLink}
           textColor="#fff"
         >
-          Back to center details
+          {t('serviceMenu.backToCenterDetails')}
         </Button>
       </ScrollView>
     </ScreenBackground>
