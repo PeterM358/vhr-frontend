@@ -12,11 +12,16 @@ import DashboardCard from '../dashboard/DashboardCard';
 import AuthLanguageSelector from './AuthLanguageSelector';
 import BrandLogo from '../BrandLogo';
 import BaseStyles from '../../styles/base';
+import { BRAND_LOCKUP_ASPECT, IMAGES } from '../../constants/images';
 import {
   leaveAuthToPublic,
   resolveAuthPublicEscape,
 } from '../../navigation/authNavigation';
 import { useTranslation } from '../../i18n';
+
+/** Full brand lockup width; height follows 512×720 intrinsic ratio. */
+const LOGIN_BRAND_WIDTH = 220;
+const LOGIN_BRAND_HEIGHT = Math.round(LOGIN_BRAND_WIDTH * BRAND_LOCKUP_ASPECT);
 
 export default function AuthPublicEscape({ preferLoginBack = false, title }) {
   const navigation = useNavigation();
@@ -57,7 +62,12 @@ export default function AuthPublicEscape({ preferLoginBack = false, title }) {
       </View>
 
       <View style={BaseStyles.logoContainer}>
-        <BrandLogo width={112} height={112} />
+        <BrandLogo
+          source={IMAGES.brandLogin}
+          width={LOGIN_BRAND_WIDTH}
+          height={LOGIN_BRAND_HEIGHT}
+          accessibilityLabel="Veversal"
+        />
       </View>
 
       <AuthLanguageSelector style={styles.langSelector} />

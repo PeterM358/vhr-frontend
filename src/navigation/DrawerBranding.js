@@ -7,8 +7,13 @@ import { View, StyleSheet, Platform } from 'react-native';
 import { Text } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import BrandLogo from '../components/BrandLogo';
+import { BRAND_LOCKUP_ASPECT, IMAGES } from '../constants/images';
 import { COLORS } from '../constants/colors';
 import { APP_NAV_PILL_BORDER_RADIUS } from '../components/common/appNavBarMetrics';
+
+/** Drawer footer lockup width; height follows 512×720 intrinsic ratio. */
+const DRAWER_BRAND_WIDTH = 132;
+const DRAWER_BRAND_HEIGHT = Math.round(DRAWER_BRAND_WIDTH * BRAND_LOCKUP_ASPECT);
 
 export const DRAWER_ICON_SIZE = 22;
 export const DRAWER_ICON_COLUMN_WIDTH = 30;
@@ -68,7 +73,12 @@ export function DrawerLabelWithBadge({ label, badge, color }) {
 export function DrawerVeversalLogoFooter() {
   return (
     <View style={styles.logoFooter} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <BrandLogo width={52} height={52} />
+      <BrandLogo
+        source={IMAGES.brandDrawer}
+        width={DRAWER_BRAND_WIDTH}
+        height={DRAWER_BRAND_HEIGHT}
+        accessibilityLabel="Veversal"
+      />
     </View>
   );
 }
