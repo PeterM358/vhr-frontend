@@ -72,7 +72,7 @@ export default {
       name: "Veversal",
       shortName: "Veversal",
       description: "Your vehicle service universe.",
-      favicon: "./src/assets/icons/icon.png",
+      favicon: "./src/assets/icons/favicon.png",
       bundler: "metro",
       output: "single",
       meta: {
