@@ -674,6 +674,7 @@
       "vehicleTypeMissing": "Вид превозно средство: не е избран",
       "noDateYet": "Без дата",
       "noDateYetHint": "Отворени заявки, чакащи да изберете ден и час",
+      "unscheduledBanner": "{count} без час — натиснете Насрочи когато сте готови",
       "schedule": "Насрочи",
       "notNow": "Не сега",
       "vehicleAtCenter": "Автомобилът е в сервиза",

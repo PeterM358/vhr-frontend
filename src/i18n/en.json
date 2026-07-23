@@ -675,6 +675,7 @@
       "vehicleTypeMissing": "Vehicle type: not selected",
       "noDateYet": "No date yet",
       "noDateYetHint": "Open requests waiting for you to pick a day and time",
+      "unscheduledBanner": "{count} unscheduled — tap Schedule when ready",
       "schedule": "Schedule",
       "notNow": "Not now",
       "vehicleAtCenter": "Vehicle at center",

@@ -67,9 +67,14 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useTranslation } from '../i18n';
 import { isCalendarNotification } from '../utils/shopNotificationRouting';
 import { normalizeNotification } from '../utils/normalizeNotification';
+import {
+  sameCalendarDay,
+  scheduleModalStatusKey,
+} from '../utils/shopCalendarScheduleModal';
 
 const CALENDAR_DAY_COUNT = 14;
-const CALENDAR_POLL_MS = 12_000;
+/** Backup poll; realtime accepts refresh via WS calendar notifications. */
+const CALENDAR_POLL_MS = 30_000;
 
 function localeTag(locale) {
   const key = String(locale || '').trim().toLowerCase();
@@ -597,6 +602,10 @@ export default function ShopCalendarScreen() {
   const loadGenerationRef = useRef(0);
   const lastCalendarNotifRef = useRef(null);
   const mountedRef = useRef(true);
+  const loadCalendarRef = useRef(null);
+  /** repairId → statusKey dismissed for this screen session (Cancel). */
+  const sessionDismissedFocusRef = useRef(new Map());
+  const consumedDeepLinkRef = useRef(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -667,15 +676,19 @@ export default function ShopCalendarScreen() {
     }
   }, [weekStart, rangeEnd, t]);
 
+  loadCalendarRef.current = loadCalendar;
+
   useFocusEffect(
     useCallback(() => {
-      loadCalendar({ force: true });
+      // Stable focus subscription — avoid re-subscribing when loadCalendar identity changes
+      // (weekStart/t), which previously stacked force fetches into a request storm.
+      loadCalendarRef.current?.({ force: true });
       const pollId = setInterval(() => {
-        invalidateShopCalendarCache();
-        loadCalendar({ force: true, quiet: true });
+        // Quiet backup poll uses cache TTL (no invalidate) so in-flight requests dedupe.
+        loadCalendarRef.current?.({ force: false, quiet: true });
       }, CALENDAR_POLL_MS);
       return () => clearInterval(pollId);
-    }, [loadCalendar])
+    }, [])
   );
 
   useEffect(() => {
@@ -688,19 +701,32 @@ export default function ShopCalendarScreen() {
     // Seed on first observation so an existing calendar notif does not race the
     // focus load with a quiet refetch (which previously stuck loading forever).
     if (prevId == null) return;
+    // Client accept / schedule updates: refresh immediately (WS path).
     invalidateShopCalendarCache();
-    loadCalendar({ force: true, quiet: true });
-  }, [notifications, loadCalendar]);
+    loadCalendarRef.current?.({ force: true, quiet: true });
+  }, [notifications]);
 
+  // Apply deep-link focusDate once; clear sticky focusRepairId so drawer re-opens
+  // do not keep forcing the schedule modal (React Navigation merges params).
   useEffect(() => {
+    const focusRepairId = route.params?.focusRepairId;
     const focusDate = route.params?.focusDate;
+    if (focusRepairId == null && !focusDate) return;
+
+    const token = `${focusRepairId ?? ''}|${focusDate ?? ''}`;
+    if (consumedDeepLinkRef.current === token) return;
+    consumedDeepLinkRef.current = token;
+
     if (focusDate) {
       const parsed = new Date(focusDate);
       if (!Number.isNaN(parsed.getTime())) {
-        setWeekStart(startOfWeek(parsed));
+        const next = startOfWeek(parsed);
+        setWeekStart((prev) => (sameCalendarDay(prev, next) ? prev : next));
       }
     }
-  }, [route.params?.focusDate]);
+
+    navigation.setParams({ focusRepairId: undefined, focusDate: undefined });
+  }, [route.params?.focusRepairId, route.params?.focusDate, navigation]);
 
   const syncBringPickerMeta = (nextBring) => {
     const offset = dayOffsetFromToday(nextBring);
@@ -775,20 +801,17 @@ export default function ShopCalendarScreen() {
     syncPickupPickerMeta(basePickup, baseBring);
   };
 
-  useEffect(() => {
-    const focusRepairId = route.params?.focusRepairId;
-    if (!focusRepairId) return;
-    const job =
-      calendar.scheduled?.find((row) => Number(row.id) === Number(focusRepairId)) ||
-      calendar.unscheduled?.find((row) => Number(row.id) === Number(focusRepairId));
-    if (!job) return;
-    if (job.schedule_confirmed === false || (!job.scheduled_start && job.client_preferred_start)) {
-      openMoveModal(job);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- open once when focus/job list resolves
-  }, [route.params?.focusRepairId, calendar.scheduled, calendar.unscheduled]);
-
   const closeMoveModal = () => {
+    // Session dismiss: Cancel must not re-force the modal for this job status.
+    if (selectedJob?.id != null) {
+      const statusKey = scheduleModalStatusKey(selectedJob);
+      if (statusKey) {
+        sessionDismissedFocusRef.current.set(Number(selectedJob.id), statusKey);
+      }
+    }
+    if (route.params?.focusRepairId != null) {
+      navigation.setParams({ focusRepairId: undefined });
+    }
     setSelectedJob(null);
     setSaving(false);
     setAndroidPickerTarget(null);
@@ -1103,6 +1126,14 @@ export default function ShopCalendarScreen() {
         </Button>
       </View>
 
+      {unscheduledCount > 0 ? (
+        <View style={styles.unscheduledBanner} accessibilityRole="text">
+          <Text style={styles.unscheduledBannerText}>
+            {t('partnerDashboard.calendar.unscheduledBanner', { count: unscheduledCount })}
+          </Text>
+        </View>
+      ) : null}
+
       {loading ? (
         <ActivityIndicator style={styles.loader} color="#fff" />
       ) : (
@@ -1395,6 +1426,22 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   weekLabel: { color: '#fff', fontSize: 15, fontWeight: '600', flex: 1, textAlign: 'center' },
+  unscheduledBanner: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(220, 38, 38, 0.18)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(252, 165, 165, 0.45)',
+  },
+  unscheduledBannerText: {
+    color: '#FEE2E2',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   loader: { marginTop: 24 },
   scroll: { paddingHorizontal: 12, paddingBottom: 24 },
   section: { marginBottom: 16 },
