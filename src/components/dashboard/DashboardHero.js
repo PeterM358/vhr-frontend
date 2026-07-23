@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Button, Text } from 'react-native-paper';
-import Logo from '../../assets/images/logo.svg';
+import BrandLogo from '../BrandLogo';
 import { COLORS } from '../../constants/colors';
 
 export default function DashboardHero({
@@ -17,7 +17,7 @@ export default function DashboardHero({
 }) {
   return (
     <View style={[styles.card, compact && styles.cardCompact]}>
-      <Logo width={compact ? 56 : 72} height={compact ? 56 : 72} style={styles.logo} />
+      <BrandLogo width={compact ? 56 : 72} height={compact ? 56 : 72} style={styles.logo} />
       <Text style={[styles.title, compact && styles.titleCompact]}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
 

@@ -8,7 +8,7 @@ import { requestPasswordReset } from '../api/auth';
 import ScreenBackground from '../components/ScreenBackground';
 import DashboardCard from '../components/dashboard/DashboardCard';
 import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
-import Logo from '../assets/images/logo.svg';
+import BrandLogo from '../components/BrandLogo';
 import BaseStyles from '../styles/base';
 import { COLORS } from '../constants/colors';
 import { useTranslation } from '../i18n';
@@ -75,7 +75,7 @@ export default function PasswordRequestResetScreen({ navigation }) {
       >
         <DashboardCard style={styles.authPanel}>
           <View style={BaseStyles.logoContainer}>
-            <Logo width={112} height={112} />
+            <BrandLogo width={112} height={112} />
           </View>
           <AuthLanguageSelector style={styles.langSelector} />
           <Text style={styles.kicker}>{t('auth.resetPasswordTitle')}</Text>

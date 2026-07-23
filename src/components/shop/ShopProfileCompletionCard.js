@@ -177,7 +177,7 @@ export default function ShopProfileCompletionCard({
       {typeof onContinueSetup === 'function' ? (
         <Button mode="contained" onPress={() => onContinueSetup()} style={styles.cta}>
           {readyLook
-            ? t('partnerProfile.editViaWizard', null, 'Edit profile details in guided setup')
+            ? t('partnerProfile.editViaWizard', null, 'Edit')
             : t('partnerProfile.continueSetup', null, 'Continue setup')}
         </Button>
       ) : null}

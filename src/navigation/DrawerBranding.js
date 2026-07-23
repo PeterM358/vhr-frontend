@@ -6,7 +6,7 @@ import React from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { Text } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import Logo from '../assets/images/logo.svg';
+import BrandLogo from '../components/BrandLogo';
 import { COLORS } from '../constants/colors';
 import { APP_NAV_PILL_BORDER_RADIUS } from '../components/common/appNavBarMetrics';
 
@@ -68,7 +68,7 @@ export function DrawerLabelWithBadge({ label, badge, color }) {
 export function DrawerVeversalLogoFooter() {
   return (
     <View style={styles.logoFooter} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <Logo width={52} height={52} />
+      <BrandLogo width={52} height={52} />
     </View>
   );
 }

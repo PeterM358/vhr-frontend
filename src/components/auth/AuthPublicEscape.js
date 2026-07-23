@@ -10,7 +10,7 @@ import { useNavigation } from '@react-navigation/native';
 import BackHeaderButton from '../navigation/BackHeaderButton';
 import DashboardCard from '../dashboard/DashboardCard';
 import AuthLanguageSelector from './AuthLanguageSelector';
-import Logo from '../../assets/images/logo.svg';
+import BrandLogo from '../BrandLogo';
 import BaseStyles from '../../styles/base';
 import {
   leaveAuthToPublic,
@@ -57,7 +57,7 @@ export default function AuthPublicEscape({ preferLoginBack = false, title }) {
       </View>
 
       <View style={BaseStyles.logoContainer}>
-        <Logo width={112} height={112} />
+        <BrandLogo width={112} height={112} />
       </View>
 
       <AuthLanguageSelector style={styles.langSelector} />

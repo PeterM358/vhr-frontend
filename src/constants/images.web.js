@@ -9,5 +9,6 @@ export const ICONS = {
 };
 
 export const IMAGES = {
+  logo: require('../assets/images/logo.png'),
   mainText: require('../assets/images/main-text.png'),
 };

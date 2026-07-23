@@ -25,7 +25,7 @@ import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavi
 import { resetToClientDashboard } from '../navigation/authNavigation';
 import { safeError } from '../utils/logger';
 import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
-import Logo from '../assets/images/logo.svg';
+import BrandLogo from '../components/BrandLogo';
 import { COLORS } from '../constants/colors';
 import { useTranslation } from '../i18n';
 
@@ -125,7 +125,7 @@ export default function PasswordConfirmResetScreen({ route, navigation }) {
         >
           <DashboardCard style={styles.authPanel}>
             <View style={BaseStyles.logoContainer}>
-              <Logo width={112} height={112} />
+              <BrandLogo width={112} height={112} />
             </View>
             <AuthLanguageSelector style={styles.langSelector} />
             <Text style={styles.kicker}>{t('auth.resetPasswordTitle')}</Text>

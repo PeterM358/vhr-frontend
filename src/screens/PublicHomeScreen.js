@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Text } from 'react-native-paper';
 import BaseStyles from '../styles/base';
-import Logo from '../assets/images/logo.svg';
+import BrandLogo from '../components/BrandLogo';
 import ScreenBackground from '../components/ScreenBackground';
 import DashboardCard from '../components/dashboard/DashboardCard';
 
@@ -69,7 +69,7 @@ export default function PublicHomeScreen({ navigation }) {
         <DashboardCard style={styles.authPanel} contentStyle={styles.cardContent}>
           <Text style={styles.title}>{t('auth.welcomeToVeversal')}</Text>
           <View style={BaseStyles.logoContainer}>
-            <Logo width={160} height={160} />
+            <BrandLogo width={160} height={160} />
           </View>
           <AuthLanguageSelector style={styles.langSelector} />
           <Text style={styles.subtitle}>{t('auth.publicSubtitle')}</Text>
