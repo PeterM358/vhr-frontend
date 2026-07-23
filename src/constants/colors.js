@@ -8,8 +8,17 @@ import { COLORS as PALETTE } from '../styles/colors';
 /** Grouped export — prefer `COLORS.PRIMARY`, `COLORS.CARD_FLOATING`, … */
 export const COLORS = {
   PRIMARY: PALETTE.primary,
+  PRIMARY_HOVER: PALETTE.primaryHover,
+  PRIMARY_PRESSED: PALETTE.primaryPressed,
   PRIMARY_DARK: PALETTE.primaryDark,
   PRIMARY_LIGHT: PALETTE.primaryLight,
+  ACCENT: PALETTE.accent,
+  PRIMARY_SOFT: PALETTE.primarySoft,
+  PRIMARY_GLASS: PALETTE.primaryGlass,
+  ACCENT_SOFT: PALETTE.accentSoft,
+  ON_PRIMARY: PALETTE.onPrimary,
+  DISABLED: PALETTE.disabled,
+  DISABLED_SURFACE: PALETTE.disabledSurface,
   CARD_FLOATING: 'rgba(245,247,250,0.94)',
   CARD_DARK: 'rgba(5,15,30,0.78)',
   TEXT_DARK: '#0F172A',
@@ -19,8 +28,11 @@ export const COLORS = {
 
 // Flat exports (backward compatible with older imports)
 export const PRIMARY = COLORS.PRIMARY;
+export const PRIMARY_HOVER = COLORS.PRIMARY_HOVER;
+export const PRIMARY_PRESSED = COLORS.PRIMARY_PRESSED;
 export const PRIMARY_DARK = COLORS.PRIMARY_DARK;
 export const PRIMARY_LIGHT = COLORS.PRIMARY_LIGHT;
+export const ACCENT = COLORS.ACCENT;
 export const CARD_LIGHT = COLORS.CARD_FLOATING;
 export const CARD_DARK = COLORS.CARD_DARK;
 export const TEXT_DARK = COLORS.TEXT_DARK;

@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '700', color: TEXT_DARK },
   meta: { fontSize: 12, color: TEXT_MUTED, marginTop: 2 },
   statusChip: { backgroundColor: '#dbeafe', maxWidth: 120 },
-  statusChipText: { fontSize: 10, color: '#1d4ed8' },
+  statusChipText: { fontSize: 10, color: '#0F4C81' },
   message: { fontSize: 13, color: TEXT_DARK, lineHeight: 18, marginBottom: 10 },
   previewFrame: { marginBottom: 10 },
   previewLoading: { alignItems: 'center', paddingVertical: 24, gap: 8 },

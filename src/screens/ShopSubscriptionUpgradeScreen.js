@@ -877,7 +877,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: 'rgba(37,99,235,0.2)',
+    borderColor: 'rgba(15,76,129,0.2)',
   },
   completeTitle: {
     fontSize: 16,
@@ -1033,7 +1033,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(37,99,235,0.1)',
+    backgroundColor: 'rgba(15,76,129,0.1)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 16,
@@ -1074,7 +1074,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15,23,42,0.06)',
   },
   selectBtnHighlight: {
-    backgroundColor: 'rgba(37,99,235,0.12)',
+    backgroundColor: 'rgba(15,76,129,0.12)',
   },
   selectBtnOn: {
     backgroundColor: COLORS.PRIMARY,

@@ -3,10 +3,12 @@
  * TODO(backend): replace with API-driven vehicle health, reminders, offers, and notification center.
  */
 
+import { COLORS } from './colors';
+
 export const NOTIFICATION_SEVERITY = {
   critical: { label: 'Critical', color: '#dc2626', bg: 'rgba(220,38,38,0.12)' },
   warning: { label: 'Attention', color: '#d97706', bg: 'rgba(217,119,6,0.12)' },
-  info: { label: 'Info', color: '#2563eb', bg: 'rgba(37,99,235,0.12)' },
+  info: { label: 'Info', color: COLORS.ACCENT, bg: COLORS.ACCENT_SOFT },
   success: { label: 'Update', color: '#059669', bg: 'rgba(5,150,105,0.12)' },
 };
 

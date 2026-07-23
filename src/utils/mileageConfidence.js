@@ -11,7 +11,7 @@ const CATEGORY_PILL = {
   low: { bg: 'rgba(100,116,139,0.35)', fg: '#E2E8F0', border: 'rgba(148,163,184,0.5)' },
   medium: { bg: 'rgba(245,158,11,0.28)', fg: '#FEF3C7', border: 'rgba(251,191,36,0.45)' },
   high: { bg: 'rgba(22,163,74,0.32)', fg: '#DCFCE7', border: 'rgba(74,222,128,0.4)' },
-  verified_history: { bg: 'rgba(37,99,235,0.38)', fg: '#DBEAFE', border: 'rgba(96,165,250,0.5)' },
+  verified_history: { bg: 'rgba(15,76,129,0.38)', fg: '#DBEAFE', border: 'rgba(63,169,245,0.5)' },
 };
 
 export function mileageConfidenceCategoryHint(category, translateFn) {

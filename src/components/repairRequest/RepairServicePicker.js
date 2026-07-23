@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
   },
   browseBtn: {
     borderRadius: 12,
-    borderColor: 'rgba(37,99,235,0.35)',
+    borderColor: 'rgba(15,76,129,0.35)',
   },
   browseBtnContent: {
     flexDirection: 'row-reverse',
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   typeRowSelected: {
-    backgroundColor: 'rgba(37,99,235,0.12)',
+    backgroundColor: 'rgba(15,76,129,0.12)',
   },
   typeName: {
     fontSize: 14,

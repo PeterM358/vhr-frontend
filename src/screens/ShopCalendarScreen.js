@@ -1415,7 +1415,7 @@ const styles = StyleSheet.create({
   laborBarFill: {
     height: '100%',
     borderRadius: 999,
-    backgroundColor: 'rgba(96,165,250,0.9)',
+    backgroundColor: 'rgba(63,169,245,0.9)',
   },
   laborBarBusy: { backgroundColor: '#f59e0b' },
   laborBarFull: { backgroundColor: '#ef4444' },
@@ -1507,7 +1507,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(217,119,6,0.16)',
   },
   kindPillBooked: {
-    backgroundColor: 'rgba(37,99,235,0.1)',
+    backgroundColor: 'rgba(15,76,129,0.1)',
   },
   kindPillText: {
     fontSize: 10,
@@ -1593,7 +1593,7 @@ const styles = StyleSheet.create({
   },
   chipSelected: {
     borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(37,99,235,0.08)',
+    backgroundColor: 'rgba(15,76,129,0.08)',
   },
   chipText: { fontSize: 13, color: '#334155' },
   chipTextSelected: { color: COLORS.PRIMARY, fontWeight: '600' },

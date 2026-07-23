@@ -9,7 +9,7 @@ export const DEFAULT_MAP_PIN_KEY = 'general_service';
 export const PIN_REGISTRY = {
   general_service: {
     icon: 'wrench',
-    color: '#2563eb',
+    color: '#0F4C81',
     label: 'Service',
     webGlyph: '🔧',
   },
@@ -87,7 +87,7 @@ export const PIN_REGISTRY = {
   },
   truck_service: {
     icon: 'truck',
-    color: '#1d4ed8',
+    color: '#0F4C81',
     label: 'Truck',
     webGlyph: '🚚',
   },

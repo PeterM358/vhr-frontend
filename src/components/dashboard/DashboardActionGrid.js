@@ -13,7 +13,7 @@ function ActionTile({ icon, title, subtitle, count, onPress }) {
     >
       <View style={styles.iconRow}>
         <View style={styles.iconWrap}>
-          <MaterialCommunityIcons name={icon} size={22} color="#93c5fd" />
+          <MaterialCommunityIcons name={icon} size={22} color={COLORS.ACCENT} />
         </View>
         {count != null && count > 0 ? (
           <Badge style={styles.badge}>{count > 99 ? '99+' : count}</Badge>
@@ -91,10 +91,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(37,99,235,0.16)',
+    backgroundColor: COLORS.PRIMARY_GLASS,
   },
   badge: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: COLORS.ACCENT,
   },
   title: {
     fontSize: 15,

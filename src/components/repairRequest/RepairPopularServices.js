@@ -61,8 +61,8 @@ const styles = StyleSheet.create({
   chip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(37,99,235,0.25)',
-    backgroundColor: 'rgba(37,99,235,0.07)',
+    borderColor: 'rgba(15,76,129,0.25)',
+    backgroundColor: 'rgba(15,76,129,0.07)',
     paddingHorizontal: 12,
     paddingVertical: 8,
   },

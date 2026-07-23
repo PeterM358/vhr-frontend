@@ -27,7 +27,7 @@ export default function RegisterScreen({ navigation }) {
       ...theme,
       colors: {
         ...theme.colors,
-        primary: '#60a5fa',
+        primary: COLORS.ACCENT,
         background: '#07111f',
         placeholder: 'rgba(226,232,240,0.65)',
         text: '#ffffff',
@@ -179,7 +179,7 @@ export default function RegisterScreen({ navigation }) {
             mode="outlined"
             theme={authInputTheme}
             outlineColor="rgba(148,163,184,0.45)"
-            activeOutlineColor="#60a5fa"
+            activeOutlineColor={COLORS.ACCENT}
             textColor="#ffffff"
             outlineStyle={styles.inputOutline}
             value={emailOrPhone}
@@ -194,7 +194,7 @@ export default function RegisterScreen({ navigation }) {
             mode="outlined"
             theme={authInputTheme}
             outlineColor="rgba(148,163,184,0.45)"
-            activeOutlineColor="#60a5fa"
+            activeOutlineColor={COLORS.ACCENT}
             textColor="#ffffff"
             outlineStyle={styles.inputOutline}
             secureTextEntry
@@ -204,7 +204,7 @@ export default function RegisterScreen({ navigation }) {
           />
 
           {saving ? (
-            <ActivityIndicator animating size="large" color={COLORS.PRIMARY} style={styles.loading} />
+            <ActivityIndicator animating size="large" color={COLORS.ACCENT} style={styles.loading} />
           ) : (
             <Button
               mode="contained"
@@ -212,7 +212,8 @@ export default function RegisterScreen({ navigation }) {
               style={[BaseStyles.loginButton, styles.createButton]}
               contentStyle={BaseStyles.loginButtonContent}
               labelStyle={BaseStyles.loginButtonLabel}
-              buttonColor={theme.colors.primary}
+              buttonColor={COLORS.PRIMARY}
+              textColor={COLORS.ON_PRIMARY}
             >
               {t('auth.registerSubmit')}
             </Button>
@@ -221,7 +222,7 @@ export default function RegisterScreen({ navigation }) {
           <Button
             mode="text"
             onPress={() => navigation.navigate('Login')}
-            textColor={COLORS.PRIMARY}
+            textColor={COLORS.ACCENT}
             style={styles.backBtn}
           >
             {t('auth.backToLogin')}
@@ -261,7 +262,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.8,
-    color: COLORS.PRIMARY,
+    color: COLORS.ACCENT,
     textTransform: 'uppercase',
     textAlign: 'center',
     marginBottom: 8,
@@ -312,7 +313,7 @@ const styles = StyleSheet.create({
   },
   roleButtonSelected: {
     borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(37,99,235,0.28)',
+    backgroundColor: 'rgba(15,76,129,0.28)',
     opacity: 1,
   },
   roleButtonPressed: {

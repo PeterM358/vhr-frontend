@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   link: {
-    color: '#2563eb',
+    color: '#0F4C81',
     fontSize: 12,
     fontWeight: '600',
     cursor: 'pointer',

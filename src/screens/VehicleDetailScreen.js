@@ -2039,7 +2039,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginTop: 6,
     marginBottom: 4,
-    backgroundColor: 'rgba(37,99,235,0.1)',
+    backgroundColor: 'rgba(15,76,129,0.1)',
   },
   repairDesc: {
     fontSize: 13,
@@ -2116,8 +2116,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   placeholderChip: {
-    backgroundColor: 'rgba(37,99,235,0.08)',
-    borderColor: 'rgba(37,99,235,0.2)',
+    backgroundColor: 'rgba(15,76,129,0.08)',
+    borderColor: 'rgba(15,76,129,0.2)',
   },
   authorizedList: {
     gap: 8,

@@ -101,7 +101,7 @@ export function calendarJobKindLabel(kind) {
  * Index by (bayNumber - 1) % length — stable per bay slot, not per job forever.
  */
 export const BAY_ACCENT_PALETTE = [
-  { border: '#2563EB', bg: 'rgba(37,99,235,0.10)', text: '#1D4ED8' },
+  { border: '#0F4C81', bg: 'rgba(15,76,129,0.10)', text: '#0F4C81' },
   { border: '#0D9488', bg: 'rgba(13,148,136,0.12)', text: '#0F766E' },
   { border: '#C2410C', bg: 'rgba(194,65,12,0.10)', text: '#9A3412' },
   { border: '#7C3AED', bg: 'rgba(124,58,237,0.10)', text: '#6D28D9' },

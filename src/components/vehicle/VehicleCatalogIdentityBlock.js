@@ -236,9 +236,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     padding: 12,
     borderRadius: 10,
-    backgroundColor: 'rgba(37,99,235,0.06)',
+    backgroundColor: 'rgba(15,76,129,0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(37,99,235,0.15)',
+    borderColor: 'rgba(15,76,129,0.15)',
     gap: 10,
   },
   catalogGapText: {

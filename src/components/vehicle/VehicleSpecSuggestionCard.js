@@ -77,7 +77,7 @@ export default function VehicleSpecSuggestionCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderColor: 'rgba(37,99,235,0.2)',
+    borderColor: 'rgba(15,76,129,0.2)',
   },
   emptyCard: {
     borderColor: 'rgba(15,23,42,0.08)',

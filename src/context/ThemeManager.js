@@ -12,7 +12,18 @@ export function ThemeProvider({ children }) {
   const toggleTheme = () => setIsDark(prev => !prev);
 
   const theme = isDark
-    ? { ...PaperDarkTheme, colors: { ...PaperDarkTheme.colors, primary: COLORS.primary } }
+    ? {
+        ...PaperDarkTheme,
+        colors: {
+          ...PaperDarkTheme.colors,
+          primary: COLORS.primary,
+          onPrimary: COLORS.onPrimary,
+          secondary: COLORS.primaryPressed,
+          tertiary: COLORS.accent,
+          notification: COLORS.accent,
+          disabled: COLORS.disabled,
+        },
+      }
     : AppTheme;
 
   return (

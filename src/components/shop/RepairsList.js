@@ -972,7 +972,7 @@ const styles = StyleSheet.create({
   },
   invoiceActionBtnSelect: {
     flexGrow: 1,
-    backgroundColor: 'rgba(37, 99, 235, 0.92)',
+    backgroundColor: 'rgba(15,76,129, 0.92)',
   },
   invoiceActionBtnCancel: {
     flexShrink: 0,
@@ -993,7 +993,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    backgroundColor: 'rgba(37,99,235,0.35)',
+    backgroundColor: 'rgba(15,76,129,0.35)',
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 12,

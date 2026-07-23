@@ -32,8 +32,8 @@ export default function PartnerActivationBanner({
 
 const styles = StyleSheet.create({
   banner: {
-    backgroundColor: 'rgba(37,99,235,0.18)',
-    borderColor: 'rgba(147,197,253,0.45)',
+    backgroundColor: COLORS.PRIMARY_GLASS,
+    borderColor: COLORS.ACCENT_SOFT,
     borderWidth: 1,
     borderRadius: 16,
     padding: 16,

@@ -31,7 +31,7 @@ export const DRAWER_TINT = {
   active: COLORS.PRIMARY,
   inactive: 'rgba(255, 255, 255, 0.92)',
   title: 'rgba(255, 255, 255, 0.55)',
-  activeBackground: 'rgba(37, 99, 235, 0.18)',
+  activeBackground: COLORS.PRIMARY_GLASS,
 };
 
 export const drawerScreenOptions = {

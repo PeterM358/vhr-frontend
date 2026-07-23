@@ -1524,7 +1524,7 @@ const styles = StyleSheet.create({
   },
   oilIntervalChipOn: {
     borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(37,99,235,0.08)',
+    backgroundColor: 'rgba(15,76,129,0.08)',
   },
   oilIntervalChipText: {
     color: COLORS.TEXT_DARK,

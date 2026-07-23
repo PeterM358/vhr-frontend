@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   chipLabel: { fontSize: 13, fontWeight: '600', color: TEXT_DARK },
   chipLabelActive: { color: PRIMARY },
   chipMeta: { fontSize: 11, color: TEXT_MUTED, marginTop: 2 },
-  chipMetaActive: { color: '#1d4ed8' },
+  chipMetaActive: { color: '#0F4C81' },
   createRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 },
   createText: { fontSize: 13, color: PRIMARY, fontWeight: '600', flex: 1 },
 });

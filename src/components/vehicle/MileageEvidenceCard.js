@@ -200,13 +200,13 @@ const styles = StyleSheet.create({
   },
   factorRowTappable: {
     borderRadius: 10,
-    backgroundColor: 'rgba(37,99,235,0.04)',
+    backgroundColor: 'rgba(15,76,129,0.04)',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(37,99,235,0.12)',
+    borderColor: 'rgba(15,76,129,0.12)',
     marginBottom: 2,
   },
   factorRowPressed: {
-    backgroundColor: 'rgba(37,99,235,0.1)',
+    backgroundColor: 'rgba(15,76,129,0.1)',
   },
   factorIcon: {
     marginRight: 4,

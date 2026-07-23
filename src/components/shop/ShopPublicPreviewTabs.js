@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
   },
   tabSelected: {
     borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(37,99,235,0.08)',
+    backgroundColor: 'rgba(15,76,129,0.08)',
   },
   tabDisabled: {
     opacity: 0.72,

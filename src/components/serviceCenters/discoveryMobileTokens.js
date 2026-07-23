@@ -39,7 +39,7 @@ export const DISCOVERY_MOBILE = {
     panelTint: '#EFF6FF',
     panelBorder: 'rgba(148,163,184,0.35)',
     selectedTint: '#EFF6FF',
-    selectedBorder: 'rgba(37,99,235,0.22)',
+    selectedBorder: 'rgba(15,76,129,0.22)',
     primary: COLORS.primary,
   },
   type: {

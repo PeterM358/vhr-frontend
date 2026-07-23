@@ -234,9 +234,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     padding: 14,
     borderRadius: 10,
-    backgroundColor: 'rgba(37,99,235,0.06)',
+    backgroundColor: 'rgba(15,76,129,0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(37,99,235,0.15)',
+    borderColor: 'rgba(15,76,129,0.15)',
     gap: 10,
   },
   gapTitle: {

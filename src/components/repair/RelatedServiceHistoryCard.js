@@ -27,7 +27,7 @@ function AccessScopeBadge({ scope }) {
       <MaterialCommunityIcons
         name={isAuthorized ? 'shield-check' : 'briefcase-outline'}
         size={14}
-        color={isAuthorized ? '#166534' : '#1d4ed8'}
+        color={isAuthorized ? '#166534' : '#0F4C81'}
       />
       <Text style={[styles.badgeText, isAuthorized ? styles.badgeTextAuthorized : styles.badgeTextJob]}>
         {level?.badgeLabel || formatAccessScopeLabel(scope)}
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   badgeTextJob: {
-    color: '#1d4ed8',
+    color: '#0F4C81',
   },
   badgeTextAuthorized: {
     color: '#166534',

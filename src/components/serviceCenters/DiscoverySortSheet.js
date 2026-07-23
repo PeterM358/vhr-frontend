@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     cursor: 'pointer',
   },
   optionActive: {
-    backgroundColor: 'rgba(37,99,235,0.06)',
+    backgroundColor: 'rgba(15,76,129,0.06)',
   },
   optionPressed: {
     opacity: 0.92,

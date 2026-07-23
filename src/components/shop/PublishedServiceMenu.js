@@ -110,9 +110,9 @@ export default function PublishedServiceMenu({ items = [], dark = false }) {
   const textMuted = dark ? 'rgba(255,255,255,0.7)' : COLORS.TEXT_MUTED;
   const textMain = dark ? '#fff' : COLORS.TEXT_DARK;
   const chipBorder = dark ? 'rgba(255,255,255,0.28)' : 'rgba(15,23,42,0.16)';
-  const chipActiveBg = dark ? 'rgba(37,99,235,0.35)' : 'rgba(37,99,235,0.12)';
+  const chipActiveBg = dark ? 'rgba(15,76,129,0.35)' : 'rgba(15,76,129,0.12)';
   const badgeBg = dark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.06)';
-  const iconBg = dark ? 'rgba(96,165,250,0.18)' : 'rgba(37,99,235,0.1)';
+  const iconBg = dark ? 'rgba(63,169,245,0.18)' : 'rgba(15,76,129,0.1)';
   const rowBorder = dark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)';
 
   return (

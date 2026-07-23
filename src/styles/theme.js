@@ -14,26 +14,31 @@ export const AppTheme = {
   colors: {
     ...DefaultTheme.colors,
 
-    // ── Premium automotive blue ───────────────────────────────────────────
-    primary: COLORS.primary,            // Main accent (buttons, Appbar, icons)
-    onPrimary: COLORS.onPrimary,        // Text/icons on primary
+    // ── Veversal brand blues ──────────────────────────────────────────────
+    primary: COLORS.primary,            // Buttons, active tabs, selected
+    onPrimary: COLORS.onPrimary,        // White text/icons on primary
 
-    // Use the deep blue as a strong "pressed/active" accent
-    secondary: COLORS.primaryDark,
+    // Deep primary for secondary / pressed accents
+    secondary: COLORS.primaryPressed,
     onSecondary: COLORS.onPrimary,
+
+    // Accent for badges / tertiary emphasis (Paper "notification" badge)
+    tertiary: COLORS.accent,
+    onTertiary: COLORS.onPrimary,
 
     // Surface roles
     background: COLORS.background,
     surface: COLORS.surface,
     onSurface: COLORS.text,
+    onSurfaceDisabled: COLORS.disabled,
 
     error: COLORS.error,
     onError: '#ffffff',
 
     text: COLORS.text,
-    disabled: '#cccccc',
+    disabled: COLORS.disabled,
     placeholder: '#999999',
-    notification: COLORS.danger,
+    notification: COLORS.accent,
     backdrop: 'rgba(0,0,0,0.5)',
   },
 

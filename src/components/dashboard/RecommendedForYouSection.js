@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_DARK,
   },
   badge: {
-    backgroundColor: 'rgba(37,99,235,0.12)',
+    backgroundColor: COLORS.ACCENT_SOFT,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: COLORS.PRIMARY,
+    color: COLORS.ACCENT,
   },
   reason: {
     fontSize: 13,

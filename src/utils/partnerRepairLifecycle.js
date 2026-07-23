@@ -29,8 +29,8 @@ const LIFECYCLE_PILL_STYLE = {
     labelKey: 'partnerDashboard.status.waitingForOffer',
   },
   [PARTNER_LIFECYCLE.OFFER_SENT]: {
-    bg: 'rgba(37,99,235,0.16)',
-    fg: '#1D4ED8',
+    bg: 'rgba(15,76,129,0.16)',
+    fg: '#0F4C81',
     labelKey: 'partnerDashboard.status.offerSent',
   },
   [PARTNER_LIFECYCLE.OFFER_ACCEPTED]: {

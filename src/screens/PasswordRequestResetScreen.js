@@ -28,7 +28,7 @@ export default function PasswordRequestResetScreen({ navigation }) {
       ...theme,
       colors: {
         ...theme.colors,
-        primary: '#60a5fa',
+        primary: COLORS.ACCENT,
         background: '#07111f',
         placeholder: 'rgba(226,232,240,0.65)',
         text: '#ffffff',
@@ -91,7 +91,7 @@ export default function PasswordRequestResetScreen({ navigation }) {
             mode="outlined"
             theme={authInputTheme}
             outlineColor="rgba(148,163,184,0.45)"
-            activeOutlineColor="#60a5fa"
+            activeOutlineColor={COLORS.ACCENT}
             textColor="#ffffff"
             outlineStyle={styles.inputOutline}
             value={email}
@@ -102,7 +102,7 @@ export default function PasswordRequestResetScreen({ navigation }) {
           />
 
           {loading ? (
-            <ActivityIndicator size="large" style={BaseStyles.loginLoading} color={COLORS.PRIMARY} />
+            <ActivityIndicator size="large" style={BaseStyles.loginLoading} color={COLORS.ACCENT} />
           ) : (
             <Button
               mode="contained"
@@ -110,7 +110,8 @@ export default function PasswordRequestResetScreen({ navigation }) {
               style={[BaseStyles.loginButton, styles.fullBtn]}
               contentStyle={BaseStyles.loginButtonContent}
               labelStyle={BaseStyles.loginButtonLabel}
-              buttonColor={theme.colors.primary}
+              buttonColor={COLORS.PRIMARY}
+              textColor={COLORS.ON_PRIMARY}
             >
               {t('auth.sendResetEmail')}
             </Button>
@@ -119,7 +120,7 @@ export default function PasswordRequestResetScreen({ navigation }) {
           <Button
             mode="text"
             onPress={() => navigation.navigate('Login')}
-            textColor={COLORS.PRIMARY}
+            textColor={COLORS.ACCENT}
             style={styles.backBtn}
           >
             {t('auth.backToLogin')}
@@ -148,7 +149,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.8,
-    color: COLORS.PRIMARY,
+    color: COLORS.ACCENT,
     textTransform: 'uppercase',
     textAlign: 'center',
     marginBottom: 6,

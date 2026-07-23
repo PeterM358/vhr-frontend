@@ -33,7 +33,7 @@ export default function MessageDialogHost() {
       ? 'rgba(21,128,61,0.12)'
       : variant === 'error'
         ? 'rgba(220,38,38,0.1)'
-        : 'rgba(37,99,235,0.1)';
+        : 'rgba(15,76,129,0.1)';
 
   return (
     <Portal>

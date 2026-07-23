@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#0f172a',
   },
-  stateNew: { backgroundColor: 'rgba(37,99,235,0.15)' },
+  stateNew: { backgroundColor: 'rgba(15,76,129,0.15)' },
   stateBooked: { backgroundColor: 'rgba(245,158,11,0.2)' },
   stateInService: { backgroundColor: 'rgba(59,130,246,0.2)' },
 });

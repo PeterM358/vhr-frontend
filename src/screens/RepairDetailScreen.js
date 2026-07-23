@@ -3785,7 +3785,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   counterChipActive: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#0F4C81',
   },
   counterChipText: {
     color: '#334155',
@@ -3823,9 +3823,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    backgroundColor: 'rgba(37,99,235,0.1)',
+    backgroundColor: 'rgba(15,76,129,0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(37,99,235,0.25)',
+    borderColor: 'rgba(15,76,129,0.25)',
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -4007,12 +4007,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(37,99,235,0.22)',
+    borderColor: 'rgba(15,76,129,0.22)',
   },
   lightActionCard: {
     backgroundColor: '#ffffff',
     borderWidth: 2,
-    borderColor: 'rgba(37,99,235,0.4)',
+    borderColor: 'rgba(15,76,129,0.4)',
   },
   lightActionCardError: {
     borderColor: '#b91c1c',
@@ -4059,7 +4059,7 @@ const styles = StyleSheet.create({
   },
   paymentChipSelected: {
     borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(37,99,235,0.12)',
+    backgroundColor: 'rgba(15,76,129,0.12)',
   },
   paymentChipDisabled: {
     opacity: 0.55,
@@ -4221,7 +4221,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: 'rgba(37,99,235,0.12)',
+    backgroundColor: 'rgba(15,76,129,0.12)',
   },
   serviceStateChipText: {
     color: '#1e3a8a',
@@ -4267,9 +4267,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     padding: 10,
     borderRadius: 10,
-    backgroundColor: 'rgba(37,99,235,0.07)',
+    backgroundColor: 'rgba(15,76,129,0.07)',
     borderWidth: 1,
-    borderColor: 'rgba(37,99,235,0.2)',
+    borderColor: 'rgba(15,76,129,0.2)',
     gap: 6,
   },
   confirmationTitle: {

@@ -1192,7 +1192,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(37,99,235,0.1)',
+    backgroundColor: 'rgba(15,76,129,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1283,11 +1283,11 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: 'rgba(37,99,235,0.08)',
+    backgroundColor: 'rgba(15,76,129,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(37,99,235,0.2)',
+    borderColor: 'rgba(15,76,129,0.2)',
   },
   linkIconBtnPressed: {
     opacity: 0.75,
@@ -1306,9 +1306,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   vehicleRowHighlighted: {
-    backgroundColor: 'rgba(37,99,235,0.08)',
+    backgroundColor: 'rgba(15,76,129,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(37,99,235,0.25)',
+    borderColor: 'rgba(15,76,129,0.25)',
     marginBottom: 4,
   },
   vehicleRowHeader: {
@@ -1348,8 +1348,8 @@ const styles = StyleSheet.create({
   },
   authorizeScrollCard: {
     marginTop: 10,
-    borderColor: 'rgba(37,99,235,0.2)',
-    backgroundColor: 'rgba(37,99,235,0.04)',
+    borderColor: 'rgba(15,76,129,0.2)',
+    backgroundColor: 'rgba(15,76,129,0.04)',
   },
   authorizeScrollHint: {
     color: COLORS.TEXT_DARK,

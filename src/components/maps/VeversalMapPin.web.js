@@ -36,7 +36,7 @@ export function createVeversalLeafletPinIcon(shop, { selected = false, size = BA
         ? '<span style="position:absolute;left:0;bottom:2px;width:10px;height:10px;border-radius:50%;background:#94a3b8;border:1.5px solid #fff;"></span>'
         : '';
   const verifiedBadge = verified
-    ? '<span style="position:absolute;right:0;top:0;width:16px;height:16px;border-radius:50%;background:#2563eb;color:#fff;font-size:10px;line-height:14px;text-align:center;border:1px solid #fff;">✓</span>'
+    ? '<span style="position:absolute;right:0;top:0;width:16px;height:16px;border-radius:50%;background:#0F4C81;color:#fff;font-size:10px;line-height:14px;text-align:center;border:1px solid #fff;">✓</span>'
     : '';
 
   const html = `

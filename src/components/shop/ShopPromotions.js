@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   priceTag: {
-    backgroundColor: 'rgba(37,99,235,0.14)',
+    backgroundColor: 'rgba(15,76,129,0.14)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,

@@ -684,7 +684,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   typeTilePressed: {
-    backgroundColor: 'rgba(37,99,235,0.08)',
+    backgroundColor: 'rgba(15,76,129,0.08)',
     borderColor: COLORS.PRIMARY,
   },
   typeTileDisabled: {
@@ -733,7 +733,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(37,99,235,0.1)',
+    backgroundColor: 'rgba(15,76,129,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -789,7 +789,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   scopeChipActive: {
-    backgroundColor: 'rgba(37,99,235,0.12)',
+    backgroundColor: 'rgba(15,76,129,0.12)',
     borderColor: COLORS.PRIMARY,
   },
   scopeChipEmoji: {

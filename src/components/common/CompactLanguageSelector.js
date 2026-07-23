@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   dropdownItemActive: {
-    backgroundColor: 'rgba(37, 99, 235, 0.55)',
+    backgroundColor: 'rgba(15,76,129, 0.55)',
   },
   dropdownItemPressed: {
     opacity: 0.9,

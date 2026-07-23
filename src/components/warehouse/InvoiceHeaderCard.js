@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   issueRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
   issueChip: { backgroundColor: '#fee2e2' },
   issueChipText: { fontSize: 11, color: '#b91c1c', fontWeight: '600' },
-  autoFillHint: { fontSize: 12, color: '#1d4ed8', marginBottom: 10, lineHeight: 17 },
+  autoFillHint: { fontSize: 12, color: '#0F4C81', marginBottom: 10, lineHeight: 17 },
   field: { marginBottom: 8, backgroundColor: '#fff' },
   fieldError: { backgroundColor: '#fff1f2' },
   row2: { flexDirection: 'row', gap: 8 },
