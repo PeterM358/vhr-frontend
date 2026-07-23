@@ -26,8 +26,13 @@ import { resetToClientDashboard } from '../navigation/authNavigation';
 import { safeError } from '../utils/logger';
 import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
 import BrandLogo from '../components/BrandLogo';
+import { BRAND_LOCKUP_ASPECT, IMAGES } from '../constants/images';
 import { COLORS } from '../constants/colors';
 import { useTranslation } from '../i18n';
+
+/** Full brand lockup width; height follows 512×720 intrinsic ratio. */
+const AUTH_BRAND_WIDTH = 220;
+const AUTH_BRAND_HEIGHT = Math.round(AUTH_BRAND_WIDTH * BRAND_LOCKUP_ASPECT);
 
 export default function PasswordConfirmResetScreen({ route, navigation }) {
   const theme = useTheme();
@@ -125,7 +130,12 @@ export default function PasswordConfirmResetScreen({ route, navigation }) {
         >
           <DashboardCard style={styles.authPanel}>
             <View style={BaseStyles.logoContainer}>
-              <BrandLogo width={112} height={112} />
+              <BrandLogo
+                source={IMAGES.brandLogin}
+                width={AUTH_BRAND_WIDTH}
+                height={AUTH_BRAND_HEIGHT}
+                accessibilityLabel="Veversal"
+              />
             </View>
             <AuthLanguageSelector style={styles.langSelector} />
             <Text style={styles.kicker}>{t('auth.resetPasswordTitle')}</Text>
