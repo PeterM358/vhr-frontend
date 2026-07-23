@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
+import { COLORS } from '../../constants/colors';
 import { useTranslation } from '../../i18n';
 
 export default function PartnerActivationBanner({
