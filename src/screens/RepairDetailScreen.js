@@ -26,6 +26,7 @@ import {
   getRepairById,
   getRepairParts,
   createRepairOperation,
+  updateRepairOperation,
   startRepairOperation,
   completeRepairOperation,
   cancelRepairOperation,
@@ -113,7 +114,9 @@ import { uploadRepairDocument } from '../api/documents';
 import { showMessage } from '../utils/crossPlatformAlert';
 import { messageFromApiError } from '../utils/apiErrorMessage';
 import { safeError } from '../utils/logger';
-import { getPartsExport } from '../api/serviceMenu';
+import { getPartsExport, getServiceMenu } from '../api/serviceMenu';
+import OperationTypePickerSheet from '../components/repair/OperationTypePickerSheet';
+import { buildOperationTypePickerOptions } from '../utils/operationTypePickerOptions';
 import { presentPartsExportShareSheet } from '../utils/partsExportShare';
 import { computePartsTotals } from '../utils/repairPartsTotals';
 import {
@@ -286,6 +289,12 @@ export default function RepairDetailScreen({ route, navigation }) {
   const totalManuallyEditedRef = useRef(false);
   const [offers, setOffers] = useState([]);
   const [repairTypes, setRepairTypes] = useState([]);
+  const [shopProfile, setShopProfile] = useState(null);
+  const [shopServiceMenu, setShopServiceMenu] = useState([]);
+  const [operationTypePickerVisible, setOperationTypePickerVisible] = useState(false);
+  const [operationTypePickerMode, setOperationTypePickerMode] = useState('create');
+  const [operationTypePickerTargetId, setOperationTypePickerTargetId] = useState(null);
+  const [operationTypePickerSelectedId, setOperationTypePickerSelectedId] = useState('');
   const [finalRepairTypeId, setFinalRepairTypeId] = useState('');
   const [selectedImageUri, setSelectedImageUri] = useState(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
@@ -601,9 +610,10 @@ export default function RepairDetailScreen({ route, navigation }) {
       setCurrentUserId(storedUserId ? Number(storedUserId) : null);
 
       // Fetch shop profile id if isShop
+      let parsedShopId = null;
       if (shopFlag === 'true') {
         const currentShopId = await AsyncStorage.getItem('@current_shop_id');
-        const parsedShopId = parseInt(currentShopId, 10);
+        parsedShopId = parseInt(currentShopId, 10);
         setShopProfileId(parsedShopId);
         const [profilesRaw, memberships] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.SHOP_PROFILES),
@@ -618,11 +628,14 @@ export default function RepairDetailScreen({ route, navigation }) {
             profile = null;
           }
         }
+        setShopProfile(profile);
         const membership = shopMembershipFor(memberships, parsedShopId);
         setShopUsesInventory(shopCapabilityEnabled(profile, 'uses_inventory'));
         setCanIssueStock(shopHasPermission(membership, 'move_stock'));
       } else {
         setShopProfileId(null);
+        setShopProfile(null);
+        setShopServiceMenu([]);
         setShopUsesInventory(false);
         setCanIssueStock(false);
       }
@@ -630,19 +643,24 @@ export default function RepairDetailScreen({ route, navigation }) {
       try {
         let repairData;
         let repairTypesData = [];
+        let serviceMenuData = [];
         if (shopFlag === 'true') {
-          const [r, partsData, shopPartsData, repairTypesRes] = await Promise.all([
+          const [r, partsData, shopPartsData, repairTypesRes, serviceMenuRes] = await Promise.all([
             getRepairById(token, repairId),
             getRepairParts(token, repairId),
             getShopParts(token),
             fetch(`${API_BASE_URL}/api/repairs/types/`, {
               headers: { Authorization: `Bearer ${token}` },
             }),
+            Number.isFinite(parsedShopId)
+              ? getServiceMenu(token, parsedShopId).catch(() => [])
+              : Promise.resolve([]),
           ]);
           repairData = r;
           if (repairTypesRes.ok) {
             repairTypesData = await repairTypesRes.json();
           }
+          serviceMenuData = Array.isArray(serviceMenuRes) ? serviceMenuRes : [];
           setRepairParts(partsData);
           setAvailableShopParts(shopPartsData);
         } else {
@@ -670,6 +688,7 @@ export default function RepairDetailScreen({ route, navigation }) {
               : ''
         );
         setRepairTypes(Array.isArray(repairTypesData) ? repairTypesData : []);
+        setShopServiceMenu(serviceMenuData);
         const offersData = await getOffersForRepair(token, repairId);
         setOffers(offersData);
 
@@ -828,20 +847,70 @@ export default function RepairDetailScreen({ route, navigation }) {
     setRepairParts(parts);
   };
 
-  const handleAddOperation = async () => {
-    if (!isMyShopRepair || !repairTypes.length) return;
-    const defaultType = repairTypes[0];
+  const handleAddOperation = () => {
+    if (!isMyShopRepair) return;
+    const defaultTypeId = resolveEffectiveServiceTypeId(finalRepairTypeId, repair);
+    setOperationTypePickerMode('create');
+    setOperationTypePickerTargetId(null);
+    setOperationTypePickerSelectedId(defaultTypeId || '');
+    setOperationTypePickerVisible(true);
+  };
+
+  const handleEditOperationType = (operation) => {
+    if (!isMyShopRepair || !operation?.id) return;
+    const currentTypeId =
+      operation.repair_type_id ??
+      operation.operation_type_id ??
+      '';
+    setOperationTypePickerMode('edit');
+    setOperationTypePickerTargetId(operation.id);
+    setOperationTypePickerSelectedId(currentTypeId ? String(currentTypeId) : '');
+    setOperationTypePickerVisible(true);
+  };
+
+  const closeOperationTypePicker = () => {
+    if (operationActionId != null) return;
+    setOperationTypePickerVisible(false);
+    setOperationTypePickerTargetId(null);
+  };
+
+  const handleConfirmOperationType = async (selectedTypeId) => {
+    if (!isMyShopRepair || !selectedTypeId) {
+      showMessage(
+        t('repairs.detail.operationsPicker.title'),
+        t('repairs.detail.operationsPicker.serviceTypeRequired')
+      );
+      return;
+    }
+    const parsedTypeId = parseInt(selectedTypeId, 10);
+    if (Number.isNaN(parsedTypeId)) return;
+
     try {
-      setOperationActionId('create');
       const token = await AsyncStorage.getItem('@access_token');
-      const nextSequence = (operations.reduce((max, row) => Math.max(max, Number(row.sequence) || 0), 0) || 0) + 10;
-      await createRepairOperation(token, repairId, {
-        repair_type_id: defaultType.id,
-        sequence: nextSequence,
-      });
+      if (operationTypePickerMode === 'edit' && operationTypePickerTargetId != null) {
+        setOperationActionId(operationTypePickerTargetId);
+        await updateRepairOperation(token, repairId, operationTypePickerTargetId, {
+          repair_type_id: parsedTypeId,
+        });
+      } else {
+        setOperationActionId('create');
+        const nextSequence =
+          (operations.reduce((max, row) => Math.max(max, Number(row.sequence) || 0), 0) || 0) + 10;
+        await createRepairOperation(token, repairId, {
+          repair_type_id: parsedTypeId,
+          sequence: nextSequence,
+        });
+      }
+      setOperationTypePickerVisible(false);
+      setOperationTypePickerTargetId(null);
       await refreshRepair();
     } catch (err) {
-      showMessage('Could not add operation', messageFromApiError(err, 'Please try again.'));
+      showMessage(
+        operationTypePickerMode === 'edit'
+          ? t('repairs.detail.operationsPicker.couldNotUpdate')
+          : t('repairs.detail.operationsPicker.couldNotAdd'),
+        messageFromApiError(err, 'Please try again.')
+      );
     } finally {
       setOperationActionId(null);
     }
@@ -983,6 +1052,18 @@ export default function RepairDetailScreen({ route, navigation }) {
                       <Text style={styles.mutedText}>Mechanics: {op.assigned_mechanics.join(', ')}</Text>
                     ) : null}
                     {op.notes ? <Text style={styles.mutedText}>{op.notes}</Text> : null}
+                    {['planned', 'approved', 'in_progress', 'waiting_parts'].includes(
+                      String(op.status || '').toLowerCase()
+                    ) ? (
+                      <Button
+                        compact
+                        mode="text"
+                        disabled={operationActionId != null || !canPickOperationTypes}
+                        onPress={() => handleEditOperationType(op)}
+                      >
+                        {t('repairs.detail.operationsPicker.changeType')}
+                      </Button>
+                    ) : null}
                     {op.status !== 'completed' && op.status !== 'cancelled' && op.status !== 'declined' ? (
                       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                         {op.status !== 'in_progress' ? (
@@ -1028,10 +1109,10 @@ export default function RepairDetailScreen({ route, navigation }) {
           icon="plus"
           style={{ marginTop: 12 }}
           loading={operationActionId === 'create'}
-          disabled={operationActionId != null || !repairTypes.length}
+          disabled={operationActionId != null || !canPickOperationTypes}
           onPress={handleAddOperation}
         >
-          Add operation
+          {t('repairs.detail.operationsPicker.addOperation')}
         </Button>
       </FloatingCard>
     );
@@ -1041,6 +1122,18 @@ export default function RepairDetailScreen({ route, navigation }) {
     if (!isShop || !repair || shopProfileId == null) return false;
     return Number(repair.shop_profile) === Number(shopProfileId);
   }, [isShop, repair, shopProfileId]);
+
+  const operationTypePickerOptions = useMemo(
+    () =>
+      buildOperationTypePickerOptions({
+        repairTypes,
+        serviceMenuItems: shopServiceMenu,
+        shopProfile,
+      }),
+    [repairTypes, shopServiceMenu, shopProfile]
+  );
+
+  const canPickOperationTypes = operationTypePickerOptions.length > 0;
 
   const handleSavePaymentStatus = async (nextStatus) => {
     const statusToSave = nextStatus ?? paymentStatus;
@@ -3626,6 +3719,29 @@ export default function RepairDetailScreen({ route, navigation }) {
         </View>
       </View>
     </Modal>
+    <OperationTypePickerSheet
+      visible={operationTypePickerVisible}
+      onClose={closeOperationTypePicker}
+      options={operationTypePickerOptions}
+      selectedTypeId={operationTypePickerSelectedId}
+      onConfirm={handleConfirmOperationType}
+      loading={operationActionId != null}
+      title={
+        operationTypePickerMode === 'edit'
+          ? t('repairs.detail.operationsPicker.editTitle')
+          : t('repairs.detail.operationsPicker.title')
+      }
+      subtitle={
+        operationTypePickerMode === 'edit'
+          ? t('repairs.detail.operationsPicker.editSubtitle')
+          : t('repairs.detail.operationsPicker.subtitle')
+      }
+      confirmLabel={
+        operationTypePickerMode === 'edit'
+          ? t('repairs.detail.operationsPicker.confirmEdit')
+          : t('repairs.detail.operationsPicker.confirm')
+      }
+    />
     <FinalizeOdometerEvidenceSheet
       visible={Boolean(odometerEvidenceSheet?.visible)}
       onDismiss={() => setOdometerEvidenceSheet(null)}

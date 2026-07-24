@@ -1717,6 +1717,22 @@
         "partially_paid": "Partially paid",
         "paid": "Paid",
         "included_in_invoice": "Included in invoice"
+      },
+      "operationsPicker": {
+        "title": "Choose service type",
+        "subtitle": "Pick the work line for this operation. Defaults to the repair's final service type.",
+        "editTitle": "Change service type",
+        "editSubtitle": "Update this operation line before work starts.",
+        "search": "Search services…",
+        "confirm": "Add operation",
+        "confirmEdit": "Save type",
+        "changeType": "Change service type",
+        "empty": "No matching services. Try another search.",
+        "error": "Could not load service types. Check your connection and try again.",
+        "addOperation": "Add operation",
+        "serviceTypeRequired": "Select a service type to continue.",
+        "couldNotAdd": "Could not add operation",
+        "couldNotUpdate": "Could not update operation type"
       }
     }
   },
@@ -2003,7 +2019,6 @@
     "profileReadyPolish": " Optional polish: {hints}.",
     "profileReadyAddMore": " Add photos and services to strengthen your page.",
     "profileEncourage": "Continue guided setup so customers can find and trust your service center.",
-
     "continueSetup": "Continue setup",
     "continueSetupTitle": "Finish setup in the wizard",
     "continueSetupBody": "Guided setup owns location, services, prices, hours, photos, and publish.",
