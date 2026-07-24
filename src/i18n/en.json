@@ -123,7 +123,13 @@
     "emailOrPhone": "Email or Phone",
     "emailOrPhoneRequired": "Email or phone is required.",
     "registerFailed": "Failed to register",
-    "registerSubmit": "Create account"
+    "registerSubmit": "Create account",
+    "verifyEmailTitle": "Verify your email",
+    "verifyEmailPending": "Confirming your email address…",
+    "verifyEmailSuccess": "Email verified. Signing you in…",
+    "invalidVerifyLink": "This verification link is invalid or incomplete.",
+    "verifyFailed": "Could not verify email. Request a new verification message.",
+    "goToLogin": "Go to login"
   },
   "dashboard": {
     "heroSubtitle": "Your vehicles, service history, and repairs — in one control center.",
@@ -1732,7 +1738,14 @@
         "addOperation": "Add operation",
         "serviceTypeRequired": "Select a service type to continue.",
         "couldNotAdd": "Could not add operation",
-        "couldNotUpdate": "Could not update operation type"
+        "couldNotUpdate": "Could not update operation type",
+        "removeOperation": "Remove operation",
+        "removeOperationConfirm": "Remove this operation from the repair? This cannot be undone.",
+        "cancelAndHideConfirm": "Cancel this operation and hide it from the list?",
+        "couldNotRemove": "Could not remove operation",
+        "showCancelled": "Show cancelled",
+        "hideCancelled": "Hide cancelled",
+        "cancelledHiddenCount": "{count} cancelled hidden"
       }
     }
   },
@@ -1972,7 +1985,18 @@
     "phoneRequired": "Enter your phone number (digits after the country prefix).",
     "phonePrefixMissingNoCountry": "Select a country to set the prefix automatically, or enter a country code (e.g. +359) in the prefix field.",
     "phonePrefixMissing": "Enter a country prefix (e.g. +359). Your selected country did not provide one — fill the prefix field manually.",
-    "phoneInvalid": "Check the country prefix and number — the full phone could not be built."
+    "phoneInvalid": "Check the country prefix and number — the full phone could not be built.",
+    "accountSection": "Account",
+    "deleteAccount": "Delete account",
+    "deleteAccountHelper": "Permanently deactivates your login and anonymizes personal data. Vehicle service history (VIN and repairs) is preserved for workshops that performed work.",
+    "deleteAccountConfirmTitle": "Delete your account?",
+    "deleteAccountConfirmBody": "This cannot be undone. You will be signed out. Vehicles stay in the system as orphaned history records; shops keep their own past job records. Enter your password and type DELETE to confirm.",
+    "deleteAccountConfirmAction": "Delete permanently",
+    "deleteAccountPassword": "Current password",
+    "deleteAccountTypeDelete": "Type DELETE to confirm",
+    "deleteAccountReauthRequired": "Enter your password and type DELETE (or ИЗТРИЙ) to confirm.",
+    "deleteAccountSuccess": "Your account has been deleted.",
+    "deleteAccountError": "Could not delete account. Please try again or contact support."
   },
   "servicePricing": {
     "partsRange": "Parts {from}–{to}",
@@ -2287,7 +2311,9 @@
       "descriptionAtShop": "{service} at {shop}",
       "requestAtShop": "Request at {shop}",
       "defaultServiceLabel": "Service"
-    }
+    },
+    "showInactive": "Show inactive",
+    "showClosed": "Show closed"
   },
   "footer": {
     "copyright": "© Veversal",
@@ -2927,5 +2953,39 @@
     "successBackHome": "Back to shop home",
     "successRefresh": "Refresh status",
     "successPollNote": "Status checks: {{polls}}"
+  },
+  "cookieConsent": {
+    "message": "We use cookies and similar technologies for essential site functions and, with your consent, analytics (Google Analytics). You can accept or reject non-essential analytics cookies.",
+    "accept": "Accept analytics",
+    "reject": "Reject analytics",
+    "manage": "Manage preferences",
+    "savePreferences": "Save preferences",
+    "necessaryAlways": "Necessary storage is always on. Analytics is optional.",
+    "analyticsOn": "Analytics: On",
+    "analyticsOff": "Analytics: Off"
+  },
+  "promotions": {
+    "create": {
+      "screenTitle": "Create promotion",
+      "basics": "Promotion details",
+      "title": "Title",
+      "description": "Description",
+      "repairType": "Repair / service type",
+      "price": "Promotional price",
+      "validity": "Validity",
+      "validFrom": "Valid from",
+      "validUntil": "Valid until",
+      "maxBookings": "Booking limit (optional)",
+      "preview": "Preview",
+      "titleRequired": "Title is required.",
+      "priceRequired": "Enter a valid non-negative price.",
+      "repairTypeRequired": "Select a repair type.",
+      "dateOrder": "End date must be on or after the start date.",
+      "bookingLimitInvalid": "Booking limit must be zero or a positive number.",
+      "loadTypesError": "Could not load repair types.",
+      "noRepairTypes": "No repair types available.",
+      "saveFailed": "Failed to save promotion.",
+      "success": "Promotion created."
+    }
   }
 }

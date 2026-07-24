@@ -18,6 +18,7 @@ import {
   Text,
   TextInput,
   Button,
+  Switch,
   useTheme,
 } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
@@ -27,6 +28,7 @@ import {
   getRepairParts,
   createRepairOperation,
   updateRepairOperation,
+  deleteRepairOperation,
   startRepairOperation,
   completeRepairOperation,
   cancelRepairOperation,
@@ -252,6 +254,7 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [repairParts, setRepairParts] = useState([]);
   const [operations, setOperations] = useState([]);
   const [operationsExpanded, setOperationsExpanded] = useState({});
+  const [showCancelledOperations, setShowCancelledOperations] = useState(false);
   const [operationActionId, setOperationActionId] = useState(null);
   const [selectedParts, setSelectedParts] = useState([]);
   const [availableShopParts, setAvailableShopParts] = useState([]);
@@ -983,33 +986,151 @@ export default function RepairDetailScreen({ route, navigation }) {
     setOperationsExpanded((prev) => ({ ...prev, [operationId]: !prev[operationId] }));
   };
 
+  const isClosedOperationStatus = (status) => {
+    const normalized = String(status || '').toLowerCase();
+    return normalized === 'cancelled' || normalized === 'declined';
+  };
+
+  const operationCanHardDelete = (operation) => {
+    const status = String(operation?.status || '').toLowerCase();
+    if (status === 'completed') return false;
+    if (status === 'in_progress' || status === 'waiting_parts') return false;
+    if (isClosedOperationStatus(status)) return true;
+    const partsCount = Number(operation?.parts_count);
+    const laborCount = Number(operation?.labor_count);
+    const assignmentCount = Array.isArray(operation?.assigned_mechanics)
+      ? operation.assigned_mechanics.length
+      : 0;
+    const linkedParts = Number.isFinite(partsCount)
+      ? partsCount
+      : repairParts.filter((part) => Number(part.service_order_operation_id) === Number(operation?.id)).length;
+    return linkedParts === 0 && (Number.isFinite(laborCount) ? laborCount : 0) === 0 && assignmentCount === 0;
+  };
+
+  const operationCanCancelForHide = (operation) => {
+    const status = String(operation?.status || '').toLowerCase();
+    return !['completed', 'cancelled', 'declined'].includes(status);
+  };
+
+  const handleRemoveOperation = (operation) => {
+    if (!isMyShopRepair || !operation?.id) return;
+
+    const runDelete = async () => {
+      try {
+        setOperationActionId(operation.id);
+        const token = await AsyncStorage.getItem('@access_token');
+        await deleteRepairOperation(token, repairId, operation.id);
+        await refreshRepair();
+        await refreshParts();
+      } catch (err) {
+        showMessage(
+          t('repairs.detail.operationsPicker.couldNotRemove'),
+          messageFromApiError(err, 'Please try again.')
+        );
+      } finally {
+        setOperationActionId(null);
+      }
+    };
+
+    const runCancel = async () => {
+      try {
+        setOperationActionId(operation.id);
+        const token = await AsyncStorage.getItem('@access_token');
+        await cancelRepairOperation(token, repairId, operation.id);
+        await refreshRepair();
+        await refreshParts();
+      } catch (err) {
+        showMessage(
+          t('repairs.detail.operationsPicker.couldNotRemove'),
+          messageFromApiError(err, 'Please try again.')
+        );
+      } finally {
+        setOperationActionId(null);
+      }
+    };
+
+    if (operationCanHardDelete(operation)) {
+      Alert.alert(
+        t('repairs.detail.operationsPicker.removeOperation'),
+        t('repairs.detail.operationsPicker.removeOperationConfirm'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('repairs.detail.operationsPicker.removeOperation'), style: 'destructive', onPress: runDelete },
+        ]
+      );
+      return;
+    }
+
+    if (operationCanCancelForHide(operation)) {
+      Alert.alert(
+        t('repairs.detail.operationsPicker.removeOperation'),
+        t('repairs.detail.operationsPicker.cancelAndHideConfirm'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('repairs.detail.operationsPicker.removeOperation'), style: 'destructive', onPress: runCancel },
+        ]
+      );
+    }
+  };
+
   const renderOperationsSection = () => {
     if (!isShop || !isMyShopRepair || String(repair?.status || '').toLowerCase() === 'done') {
       return null;
     }
-    const progress = repair?.operations_progress;
+    const hiddenCancelledCount = operations.filter((op) => isClosedOperationStatus(op.status)).length;
+    const visibleOperations = operations.filter(
+      (op) => showCancelledOperations || !isClosedOperationStatus(op.status)
+    );
+    const visibleCompletedCount = visibleOperations.filter(
+      (op) => String(op.status || '').toLowerCase() === 'completed'
+    ).length;
     return (
       <FloatingCard style={styles.lightActionCard}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={styles.cardTitle}>Operations</Text>
-          {progress ? (
+          {visibleOperations.length ? (
             <Text style={styles.mutedText}>
-              {progress.completed}/{progress.total} completed
+              {visibleCompletedCount}/{visibleOperations.length} completed
             </Text>
           ) : null}
         </View>
         <Text style={styles.mutedText}>
           Split work into job lines. One default operation is enough for simple repairs.
         </Text>
-        {operations.length === 0 ? (
+        {hiddenCancelledCount > 0 ? (
+          <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              <Text style={styles.mutedText}>
+                {showCancelledOperations
+                  ? t('repairs.detail.operationsPicker.hideCancelled')
+                  : t('repairs.detail.operationsPicker.showCancelled')}
+              </Text>
+              {!showCancelledOperations ? (
+                <Text style={styles.mutedText}>
+                  {t('repairs.detail.operationsPicker.cancelledHiddenCount', {
+                    count: hiddenCancelledCount,
+                  })}
+                </Text>
+              ) : null}
+            </View>
+            <Switch
+              value={showCancelledOperations}
+              onValueChange={setShowCancelledOperations}
+              disabled={operationActionId != null}
+            />
+          </View>
+        ) : null}
+        {visibleOperations.length === 0 ? (
           <Text style={styles.mutedText}>No operations yet — add one to organize parts and labor.</Text>
         ) : (
-          operations.map((op) => {
+          visibleOperations.map((op) => {
             const expanded = operationsExpanded[op.id];
             const opParts = repairParts.filter(
               (part) => Number(part.service_order_operation_id) === Number(op.id)
             );
             const opTotals = computeOperationSubtotals(op.id);
+            const canRemove =
+              operationCanHardDelete(op) || operationCanCancelForHide(op);
             return (
               <View key={op.id} style={{ marginTop: 12, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#ddd' }}>
                 <Pressable onPress={() => toggleOperationExpanded(op.id)}>
@@ -1025,7 +1146,24 @@ export default function RepairDetailScreen({ route, navigation }) {
                         {op.operation_name || 'Work performed'}
                       </Text>
                     </View>
-                    <StatusBadge status={op.status} label={operationStatusLabel(op.status)} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <StatusBadge status={op.status} label={operationStatusLabel(op.status)} />
+                      {canRemove ? (
+                        <Button
+                          compact
+                          mode="text"
+                          icon="delete-outline"
+                          textColor={COLORS.ERROR || '#b91c1c'}
+                          loading={operationActionId === op.id}
+                          disabled={operationActionId != null}
+                          onPress={(event) => {
+                            event?.stopPropagation?.();
+                            handleRemoveOperation(op);
+                          }}
+                          accessibilityLabel={t('repairs.detail.operationsPicker.removeOperation')}
+                        />
+                      ) : null}
+                    </View>
                   </View>
                   <Text style={styles.mutedText}>
                     Parts {formatMoneyAmount(opTotals.partsSum, DEFAULT_CURRENCY)} · Labor{' '}

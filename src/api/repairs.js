@@ -623,6 +623,16 @@ export async function updateRepairOperation(token, repairId, operationId, data) 
   return response.json();
 }
 
+export async function deleteRepairOperation(token, repairId, operationId) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair/${repairId}/operations/${operationId}/`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    await throwApiError(response, 'Failed to remove operation');
+  }
+}
+
 async function postRepairOperationAction(token, repairId, operationId, action, body = {}) {
   const response = await fetch(
     `${API_BASE_URL}/api/repairs/repair/${repairId}/operations/${operationId}/${action}/`,
