@@ -18,7 +18,6 @@ import {
   Text,
   TextInput,
   Button,
-  Switch,
   useTheme,
 } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
@@ -31,7 +30,6 @@ import {
   deleteRepairOperation,
   startRepairOperation,
   completeRepairOperation,
-  cancelRepairOperation,
   operationStatusLabel,
   addRepairPart,
   deleteRepairPart,
@@ -141,6 +139,27 @@ function resolveEffectiveServiceTypeId(finalRepairTypeId, repair) {
     return String(repair.repair_type);
   }
   return '';
+}
+
+function isClosedOperationStatus(status) {
+  const normalized = String(status || '').toLowerCase();
+  return normalized === 'cancelled' || normalized === 'declined';
+}
+
+function operationCanHardDelete(operation, repairParts = []) {
+  const status = String(operation?.status || '').toLowerCase();
+  if (status === 'completed') return false;
+  if (status === 'in_progress' || status === 'waiting_parts') return false;
+  if (isClosedOperationStatus(status)) return true;
+  const partsCount = Number(operation?.parts_count);
+  const laborCount = Number(operation?.labor_count);
+  const assignmentCount = Array.isArray(operation?.assigned_mechanics)
+    ? operation.assigned_mechanics.length
+    : 0;
+  const linkedParts = Number.isFinite(partsCount)
+    ? partsCount
+    : repairParts.filter((part) => Number(part.service_order_operation_id) === Number(operation?.id)).length;
+  return linkedParts === 0 && (Number.isFinite(laborCount) ? laborCount : 0) === 0 && assignmentCount === 0;
 }
 
 function formatEvidenceLevel(level) {
@@ -254,7 +273,6 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [repairParts, setRepairParts] = useState([]);
   const [operations, setOperations] = useState([]);
   const [operationsExpanded, setOperationsExpanded] = useState({});
-  const [showCancelledOperations, setShowCancelledOperations] = useState(false);
   const [operationActionId, setOperationActionId] = useState(null);
   const [selectedParts, setSelectedParts] = useState([]);
   const [availableShopParts, setAvailableShopParts] = useState([]);
@@ -290,6 +308,8 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [paymentStatusSaving, setPaymentStatusSaving] = useState(false);
   const [warrantyMonths, setWarrantyMonths] = useState('');
   const totalManuallyEditedRef = useRef(false);
+  const laborManuallyEditedRef = useRef(false);
+  const partsManuallyEditedRef = useRef(false);
   const [offers, setOffers] = useState([]);
   const [repairTypes, setRepairTypes] = useState([]);
   const [shopProfile, setShopProfile] = useState(null);
@@ -352,6 +372,7 @@ export default function RepairDetailScreen({ route, navigation }) {
 
   const handleLaborChange = useCallback(
     (text) => {
+      laborManuallyEditedRef.current = true;
       setLaborPrice(text);
       syncTotalFromLaborParts(text, partsPrice);
     },
@@ -360,6 +381,7 @@ export default function RepairDetailScreen({ route, navigation }) {
 
   const handlePartsChange = useCallback(
     (text) => {
+      partsManuallyEditedRef.current = true;
       setPartsPrice(text);
       syncTotalFromLaborParts(laborPrice, text);
     },
@@ -369,6 +391,52 @@ export default function RepairDetailScreen({ route, navigation }) {
   const handleTotalChange = useCallback((text) => {
     totalManuallyEditedRef.current = true;
     setTotalPrice(text);
+  }, []);
+
+  const applyFinancialFieldsFromRepair = useCallback((repairData) => {
+    if (!repairData) return;
+    laborManuallyEditedRef.current = repairData.labor_price != null;
+    partsManuallyEditedRef.current = repairData.parts_price != null;
+    totalManuallyEditedRef.current = repairData.total_price != null;
+
+    const derivedLabor =
+      repairData.total_labor_customer != null ? parseFloat(repairData.total_labor_customer) : null;
+    const derivedParts =
+      repairData.total_parts_customer != null ? parseFloat(repairData.total_parts_customer) : null;
+    const derivedGrand =
+      repairData.total_repair_customer != null ? parseFloat(repairData.total_repair_customer) : null;
+
+    if (repairData.labor_price != null) {
+      setLaborPrice(String(repairData.labor_price));
+    } else if (derivedLabor != null && derivedLabor > 0) {
+      setLaborPrice(String(derivedLabor));
+    } else {
+      setLaborPrice('');
+    }
+
+    if (repairData.parts_price != null) {
+      setPartsPrice(String(repairData.parts_price));
+    } else if (derivedParts != null && derivedParts > 0) {
+      setPartsPrice(String(derivedParts));
+    } else {
+      setPartsPrice('');
+    }
+
+    if (repairData.total_price != null) {
+      setTotalPrice(String(repairData.total_price));
+    } else if (derivedGrand != null && derivedGrand > 0) {
+      setTotalPrice(String(derivedGrand));
+    } else if (derivedLabor != null || derivedParts != null) {
+      const labor = Number.isFinite(derivedLabor) ? derivedLabor : 0;
+      const parts = Number.isFinite(derivedParts) ? derivedParts : 0;
+      if (labor > 0 || parts > 0) {
+        setTotalPrice(formatSumTotal(labor, parts));
+      } else {
+        setTotalPrice('');
+      }
+    } else {
+      setTotalPrice('');
+    }
   }, []);
 
   const runFinalizeMileageGate = useCallback(
@@ -496,14 +564,22 @@ export default function RepairDetailScreen({ route, navigation }) {
       }
       const parsedLaborPrice = partsToSend.length
         ? partsTotals.laborSum
-        : String(laborPrice || '').trim()
+        : laborManuallyEditedRef.current && String(laborPrice || '').trim()
           ? parseFloat(laborPrice)
-          : null;
+          : repair?.total_labor_customer != null
+            ? parseFloat(repair.total_labor_customer)
+            : String(laborPrice || '').trim()
+              ? parseFloat(laborPrice)
+              : null;
       const parsedPartsPrice = partsToSend.length
         ? partsTotals.partsSum
-        : String(partsPrice || '').trim()
+        : partsManuallyEditedRef.current && String(partsPrice || '').trim()
           ? parseFloat(partsPrice)
-          : null;
+          : repair?.total_parts_customer != null
+            ? parseFloat(repair.total_parts_customer)
+            : String(partsPrice || '').trim()
+              ? parseFloat(partsPrice)
+              : null;
       let parsedTotalPrice = String(totalPrice || '').trim() ? parseFloat(totalPrice) : null;
       if (partsToSend.length > 0) {
         parsedTotalPrice = partsTotals.total;
@@ -647,6 +723,7 @@ export default function RepairDetailScreen({ route, navigation }) {
         let repairData;
         let repairTypesData = [];
         let serviceMenuData = [];
+        let loadedRepairParts = [];
         if (shopFlag === 'true') {
           const [r, partsData, shopPartsData, repairTypesRes, serviceMenuRes] = await Promise.all([
             getRepairById(token, repairId),
@@ -660,6 +737,7 @@ export default function RepairDetailScreen({ route, navigation }) {
               : Promise.resolve([]),
           ]);
           repairData = r;
+          loadedRepairParts = Array.isArray(partsData) ? partsData : [];
           if (repairTypesRes.ok) {
             repairTypesData = await repairTypesRes.json();
           }
@@ -668,18 +746,31 @@ export default function RepairDetailScreen({ route, navigation }) {
           setAvailableShopParts(shopPartsData);
         } else {
           repairData = await getRepairById(token, repairId);
-          setRepairParts(repairData.repair_parts || []);
+          loadedRepairParts = Array.isArray(repairData.repair_parts) ? repairData.repair_parts : [];
+          setRepairParts(loadedRepairParts);
         }
 
         setRepair(repairData);
-        setOperations(Array.isArray(repairData.operations) ? repairData.operations : []);
+        const loadedOperations = Array.isArray(repairData.operations) ? repairData.operations : [];
+        setOperations(loadedOperations);
+        if (shopFlag === 'true') {
+          const emptyClosed = loadedOperations.filter(
+            (op) => isClosedOperationStatus(op.status) && operationCanHardDelete(op, loadedRepairParts)
+          );
+          if (emptyClosed.length > 0) {
+            await Promise.all(
+              emptyClosed.map((op) => deleteRepairOperation(token, repairId, op.id).catch(() => null))
+            );
+            const refreshed = await getRepairById(token, repairId);
+            setRepair(refreshed);
+            setOperations(Array.isArray(refreshed.operations) ? refreshed.operations : []);
+            repairData = refreshed;
+          }
+        }
         setEditDescription(repairData.description || '');
         setShopDescription(repairData.shop_description || '');
         setFinalKilometers(initialFinalKilometersInput(repairData));
-        setLaborPrice(repairData.labor_price != null ? String(repairData.labor_price) : '');
-        setPartsPrice(repairData.parts_price != null ? String(repairData.parts_price) : '');
-        setTotalPrice(repairData.total_price != null ? String(repairData.total_price) : '');
-        totalManuallyEditedRef.current = repairData.total_price != null;
+        applyFinancialFieldsFromRepair(repairData);
         setCurrency(repairData.currency || DEFAULT_CURRENCY);
         setPaymentStatus(repairData.payment_status || 'unpaid');
         setWarrantyMonths(repairData.warranty_months != null ? String(repairData.warranty_months) : '');
@@ -753,6 +844,8 @@ export default function RepairDetailScreen({ route, navigation }) {
       setLaborPrice(String(totals.laborSum));
       setPartsPrice(String(totals.partsSum));
       setTotalPrice(String(totals.total));
+      laborManuallyEditedRef.current = false;
+      partsManuallyEditedRef.current = false;
       totalManuallyEditedRef.current = false;
 
       const ok = await handleUpdateRepair({
@@ -790,16 +883,28 @@ export default function RepairDetailScreen({ route, navigation }) {
 
   const refreshRepair = async () => {
     const token = await AsyncStorage.getItem('@access_token');
-    const repairData = await getRepairById(token, repairId);
+    let repairData = await getRepairById(token, repairId);
+    let loadedOperations = Array.isArray(repairData.operations) ? repairData.operations : [];
+    const isShopFlag = (await AsyncStorage.getItem('@is_shop')) === 'true';
+    if (isShopFlag) {
+      const partsData = await getRepairParts(token, repairId).catch(() => []);
+      const emptyClosed = loadedOperations.filter(
+        (op) => isClosedOperationStatus(op.status) && operationCanHardDelete(op, partsData)
+      );
+      if (emptyClosed.length > 0) {
+        await Promise.all(
+          emptyClosed.map((op) => deleteRepairOperation(token, repairId, op.id).catch(() => null))
+        );
+        repairData = await getRepairById(token, repairId);
+        loadedOperations = Array.isArray(repairData.operations) ? repairData.operations : [];
+      }
+    }
     setRepair(repairData);
-    setOperations(Array.isArray(repairData.operations) ? repairData.operations : []);
+    setOperations(loadedOperations);
     setEditDescription(repairData.description || '');
     setShopDescription(repairData.shop_description || '');
     setFinalKilometers(initialFinalKilometersInput(repairData));
-    setLaborPrice(repairData.labor_price != null ? String(repairData.labor_price) : '');
-    setPartsPrice(repairData.parts_price != null ? String(repairData.parts_price) : '');
-    setTotalPrice(repairData.total_price != null ? String(repairData.total_price) : '');
-    totalManuallyEditedRef.current = repairData.total_price != null;
+    applyFinancialFieldsFromRepair(repairData);
     setCurrency(repairData.currency || DEFAULT_CURRENCY);
     setPaymentStatus(repairData.payment_status || 'unpaid');
     setWarrantyMonths(repairData.warranty_months != null ? String(repairData.warranty_months) : '');
@@ -846,8 +951,14 @@ export default function RepairDetailScreen({ route, navigation }) {
 
   const refreshParts = async () => {
     const token = await AsyncStorage.getItem('@access_token');
-    const parts = await getRepairParts(token, repairId);
+    const [parts, repairData] = await Promise.all([
+      getRepairParts(token, repairId),
+      getRepairById(token, repairId),
+    ]);
     setRepairParts(parts);
+    setRepair(repairData);
+    setOperations(Array.isArray(repairData.operations) ? repairData.operations : []);
+    applyFinancialFieldsFromRepair(repairData);
   };
 
   const handleAddOperation = () => {
@@ -928,8 +1039,6 @@ export default function RepairDetailScreen({ route, navigation }) {
         await startRepairOperation(token, repairId, operationId);
       } else if (action === 'complete') {
         await completeRepairOperation(token, repairId, operationId);
-      } else if (action === 'cancel') {
-        await cancelRepairOperation(token, repairId, operationId);
       }
       await refreshRepair();
       await refreshParts();
@@ -986,32 +1095,6 @@ export default function RepairDetailScreen({ route, navigation }) {
     setOperationsExpanded((prev) => ({ ...prev, [operationId]: !prev[operationId] }));
   };
 
-  const isClosedOperationStatus = (status) => {
-    const normalized = String(status || '').toLowerCase();
-    return normalized === 'cancelled' || normalized === 'declined';
-  };
-
-  const operationCanHardDelete = (operation) => {
-    const status = String(operation?.status || '').toLowerCase();
-    if (status === 'completed') return false;
-    if (status === 'in_progress' || status === 'waiting_parts') return false;
-    if (isClosedOperationStatus(status)) return true;
-    const partsCount = Number(operation?.parts_count);
-    const laborCount = Number(operation?.labor_count);
-    const assignmentCount = Array.isArray(operation?.assigned_mechanics)
-      ? operation.assigned_mechanics.length
-      : 0;
-    const linkedParts = Number.isFinite(partsCount)
-      ? partsCount
-      : repairParts.filter((part) => Number(part.service_order_operation_id) === Number(operation?.id)).length;
-    return linkedParts === 0 && (Number.isFinite(laborCount) ? laborCount : 0) === 0 && assignmentCount === 0;
-  };
-
-  const operationCanCancelForHide = (operation) => {
-    const status = String(operation?.status || '').toLowerCase();
-    return !['completed', 'cancelled', 'declined'].includes(status);
-  };
-
   const handleRemoveOperation = (operation) => {
     if (!isMyShopRepair || !operation?.id) return;
 
@@ -1032,55 +1115,29 @@ export default function RepairDetailScreen({ route, navigation }) {
       }
     };
 
-    const runCancel = async () => {
-      try {
-        setOperationActionId(operation.id);
-        const token = await AsyncStorage.getItem('@access_token');
-        await cancelRepairOperation(token, repairId, operation.id);
-        await refreshRepair();
-        await refreshParts();
-      } catch (err) {
-        showMessage(
-          t('repairs.detail.operationsPicker.couldNotRemove'),
-          messageFromApiError(err, 'Please try again.')
-        );
-      } finally {
-        setOperationActionId(null);
-      }
-    };
-
-    if (operationCanHardDelete(operation)) {
-      Alert.alert(
+    if (!operationCanHardDelete(operation, repairParts)) {
+      showMessage(
         t('repairs.detail.operationsPicker.removeOperation'),
-        t('repairs.detail.operationsPicker.removeOperationConfirm'),
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          { text: t('repairs.detail.operationsPicker.removeOperation'), style: 'destructive', onPress: runDelete },
-        ]
+        t('repairs.detail.operationsPicker.removeOperationBlocked')
       );
       return;
     }
 
-    if (operationCanCancelForHide(operation)) {
-      Alert.alert(
-        t('repairs.detail.operationsPicker.removeOperation'),
-        t('repairs.detail.operationsPicker.cancelAndHideConfirm'),
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          { text: t('repairs.detail.operationsPicker.removeOperation'), style: 'destructive', onPress: runCancel },
-        ]
-      );
-    }
+    Alert.alert(
+      t('repairs.detail.operationsPicker.removeOperation'),
+      t('repairs.detail.operationsPicker.removeOperationConfirm'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('repairs.detail.operationsPicker.removeOperation'), style: 'destructive', onPress: runDelete },
+      ]
+    );
   };
 
   const renderOperationsSection = () => {
     if (!isShop || !isMyShopRepair || String(repair?.status || '').toLowerCase() === 'done') {
       return null;
     }
-    const hiddenCancelledCount = operations.filter((op) => isClosedOperationStatus(op.status)).length;
-    const visibleOperations = operations.filter(
-      (op) => showCancelledOperations || !isClosedOperationStatus(op.status)
-    );
+    const visibleOperations = operations.filter((op) => !isClosedOperationStatus(op.status));
     const visibleCompletedCount = visibleOperations.filter(
       (op) => String(op.status || '').toLowerCase() === 'completed'
     ).length;
@@ -1097,29 +1154,6 @@ export default function RepairDetailScreen({ route, navigation }) {
         <Text style={styles.mutedText}>
           Split work into job lines. One default operation is enough for simple repairs.
         </Text>
-        {hiddenCancelledCount > 0 ? (
-          <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View style={{ flex: 1, paddingRight: 8 }}>
-              <Text style={styles.mutedText}>
-                {showCancelledOperations
-                  ? t('repairs.detail.operationsPicker.hideCancelled')
-                  : t('repairs.detail.operationsPicker.showCancelled')}
-              </Text>
-              {!showCancelledOperations ? (
-                <Text style={styles.mutedText}>
-                  {t('repairs.detail.operationsPicker.cancelledHiddenCount', {
-                    count: hiddenCancelledCount,
-                  })}
-                </Text>
-              ) : null}
-            </View>
-            <Switch
-              value={showCancelledOperations}
-              onValueChange={setShowCancelledOperations}
-              disabled={operationActionId != null}
-            />
-          </View>
-        ) : null}
         {visibleOperations.length === 0 ? (
           <Text style={styles.mutedText}>No operations yet — add one to organize parts and labor.</Text>
         ) : (
@@ -1129,48 +1163,53 @@ export default function RepairDetailScreen({ route, navigation }) {
               (part) => Number(part.service_order_operation_id) === Number(op.id)
             );
             const opTotals = computeOperationSubtotals(op.id);
-            const canRemove =
-              operationCanHardDelete(op) || operationCanCancelForHide(op);
+            const canRemove = operationCanHardDelete(op, repairParts);
+            const removeDisabled = operationActionId != null || !canRemove;
             return (
               <View key={op.id} style={{ marginTop: 12, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#ddd' }}>
-                <Pressable onPress={() => toggleOperationExpanded(op.id)}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8, paddingRight: 8 }}>
-                      <MaterialCommunityIcons
-                        name={getOperationIcon(op)}
-                        size={20}
-                        color={COLORS.PRIMARY}
-                      />
-                      <Text style={{ fontWeight: '600', flexShrink: 1 }}>
-                        {op.sequence != null ? `${op.sequence} · ` : ''}
-                        {op.operation_name || 'Work performed'}
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <StatusBadge status={op.status} label={operationStatusLabel(op.status)} />
-                      {canRemove ? (
-                        <Button
-                          compact
-                          mode="text"
-                          icon="delete-outline"
-                          textColor={COLORS.ERROR || '#b91c1c'}
-                          loading={operationActionId === op.id}
-                          disabled={operationActionId != null}
-                          onPress={(event) => {
-                            event?.stopPropagation?.();
-                            handleRemoveOperation(op);
-                          }}
-                          accessibilityLabel={t('repairs.detail.operationsPicker.removeOperation')}
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}>
+                  <Pressable style={{ flex: 1 }} onPress={() => toggleOperationExpanded(op.id)}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8, paddingRight: 8 }}>
+                        <MaterialCommunityIcons
+                          name={getOperationIcon(op)}
+                          size={20}
+                          color={COLORS.PRIMARY}
                         />
-                      ) : null}
+                        <Text style={{ fontWeight: '600', flexShrink: 1 }}>
+                          {op.sequence != null ? `${op.sequence} · ` : ''}
+                          {op.operation_name || 'Work performed'}
+                        </Text>
+                      </View>
+                      <StatusBadge status={op.status} label={operationStatusLabel(op.status)} />
                     </View>
-                  </View>
-                  <Text style={styles.mutedText}>
-                    Parts {formatMoneyAmount(opTotals.partsSum, DEFAULT_CURRENCY)} · Labor{' '}
-                    {formatMoneyAmount(opTotals.laborSum, DEFAULT_CURRENCY)} · Total{' '}
-                    {formatMoneyAmount(opTotals.total, DEFAULT_CURRENCY)}
-                  </Text>
-                </Pressable>
+                    <Text style={styles.mutedText}>
+                      Parts {formatMoneyAmount(opTotals.partsSum, DEFAULT_CURRENCY)} · Labor{' '}
+                      {formatMoneyAmount(opTotals.laborSum, DEFAULT_CURRENCY)} · Total{' '}
+                      {formatMoneyAmount(opTotals.total, DEFAULT_CURRENCY)}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('repairs.detail.operationsPicker.removeOperation')}
+                    disabled={removeDisabled}
+                    onPress={() => handleRemoveOperation(op)}
+                    style={{
+                      padding: 6,
+                      opacity: removeDisabled ? 0.35 : 1,
+                    }}
+                  >
+                    {operationActionId === op.id ? (
+                      <ActivityIndicator size="small" color={COLORS.ERROR || '#b91c1c'} />
+                    ) : (
+                      <MaterialCommunityIcons
+                        name="trash-can-outline"
+                        size={22}
+                        color={canRemove ? COLORS.ERROR || '#b91c1c' : COLORS.TEXT_MUTED || '#888'}
+                      />
+                    )}
+                  </Pressable>
+                </View>
                 {expanded ? (
                   <View style={{ marginTop: 8, gap: 6 }}>
                     {opParts.length ? (
@@ -1223,16 +1262,6 @@ export default function RepairDetailScreen({ route, navigation }) {
                           onPress={() => handleOperationLifecycle(op.id, 'complete')}
                         >
                           Complete
-                        </Button>
-                        <Button
-                          compact
-                          mode="outlined"
-                          textColor={COLORS.ERROR || '#b91c1c'}
-                          loading={operationActionId === op.id}
-                          disabled={operationActionId != null}
-                          onPress={() => handleOperationLifecycle(op.id, 'cancel')}
-                        >
-                          Cancel
                         </Button>
                       </View>
                     ) : null}
@@ -3544,6 +3573,12 @@ export default function RepairDetailScreen({ route, navigation }) {
                               <Text style={styles.mutedText}>
                                 Total updates from labor + parts unless you edit it directly.
                               </Text>
+                              {repairDerivedTotals &&
+                              (repairDerivedTotals.partsSum > 0 || repairDerivedTotals.laborSum > 0) ? (
+                                <Text style={styles.mutedText}>
+                                  {t('repairs.detail.operationsFinancialHint')}
+                                </Text>
+                              ) : null}
                             </>
                           )}
                           <Text style={styles.mutedText}>All amounts are in {DEFAULT_CURRENCY}.</Text>

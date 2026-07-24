@@ -1724,6 +1724,7 @@
         "paid": "Paid",
         "included_in_invoice": "Included in invoice"
       },
+      "operationsFinancialHint": "Labor and parts totals are filled from your operation lines unless you edit them here.",
       "operationsPicker": {
         "title": "Choose service type",
         "subtitle": "Pick the work line for this operation. Defaults to the repair's final service type.",
@@ -1741,11 +1742,8 @@
         "couldNotUpdate": "Could not update operation type",
         "removeOperation": "Remove operation",
         "removeOperationConfirm": "Remove this operation from the repair? This cannot be undone.",
-        "cancelAndHideConfirm": "Cancel this operation and hide it from the list?",
-        "couldNotRemove": "Could not remove operation",
-        "showCancelled": "Show cancelled",
-        "hideCancelled": "Hide cancelled",
-        "cancelledHiddenCount": "{count} cancelled hidden"
+        "removeOperationBlocked": "Remove parts, labor, and mechanic assignments from this operation before deleting it.",
+        "couldNotRemove": "Could not remove operation"
       }
     }
   },
