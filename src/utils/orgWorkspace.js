@@ -170,3 +170,15 @@ export function resolvePartnerEntryRoute(data) {
   }
   return null;
 }
+
+/** Org member with no active shop profile — fleet lives under /api/organizations/{id}/fleet/. */
+export async function resolveIsOrgOnlySession() {
+  const data = await readStoredAuthRoutingData();
+  const hasShop =
+    Boolean(data.is_shop) ||
+    (Array.isArray(data.shop_profiles) && data.shop_profiles.length > 0) ||
+    (Array.isArray(data.shop_memberships) && data.shop_memberships.length > 0);
+  const hasOrg =
+    Array.isArray(data.organization_memberships) && data.organization_memberships.length > 0;
+  return hasOrg && !hasShop;
+}

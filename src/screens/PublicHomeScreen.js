@@ -13,6 +13,7 @@ import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import { navigateToSignIn, resetToClientDashboard, resetToSignIn } from '../navigation/authNavigation';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import { resolveIsPartnerSession } from '../utils/partnerSession';
+import { resolveIsOrgOnlySession } from '../utils/orgWorkspace';
 import { useTranslation } from '../i18n';
 import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
 
@@ -30,7 +31,7 @@ export default function PublicHomeScreen({ navigation }) {
         if (token && token !== 'null' && token !== 'undefined') {
           const isPartner = await resolveIsPartnerSession();
           if (cancelled) return;
-          if (isPartner) {
+          if (isPartner || (await resolveIsOrgOnlySession())) {
             const route = await resolveShopEntryRoute();
             if (cancelled) return;
             navigation.reset(buildShopAuthReset(route));

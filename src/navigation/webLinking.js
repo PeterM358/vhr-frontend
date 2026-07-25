@@ -15,6 +15,7 @@ import { syncWebDocumentTitle } from './webDocumentTitle';
 import { storeAuthReturnUrl, syncWebPath } from './authNavigation';
 import { resolveLegacyShopPath } from '../api/seo';
 import { resolveIsPartnerSession } from '../utils/partnerSession';
+import { resolveIsOrgOnlySession } from '../utils/orgWorkspace';
 import {
   getLegacyRedirectTarget,
   getNavigationStateFromSeoPath,
@@ -1192,9 +1193,14 @@ async function resolveDashboardRedirectTarget(pathname) {
     return '/';
   }
   const canonical = toCanonicalAppPath(pathname) || pathname;
-  const isShop = await resolveIsPartnerSession();
-  if (isShop && isClientDashboardCanonical(canonical)) {
-    return localizePathForRedirect('/partner/dashboard');
+  if (isClientDashboardCanonical(canonical)) {
+    const isShop = await resolveIsPartnerSession();
+    if (isShop) {
+      return localizePathForRedirect('/partner/dashboard');
+    }
+    if (await resolveIsOrgOnlySession()) {
+      return localizePathForRedirect('/partner/organization');
+    }
   }
   return localizePathForRedirect(canonical);
 }
@@ -1229,10 +1235,13 @@ async function localizeAppTargetIfNeeded(rawTarget) {
     return rawTarget;
   }
 
-  if (root === 'dashboard') {
+  if (root === 'dashboard' && isClientDashboardCanonical(appCanonical)) {
     const isShop = await resolveIsPartnerSession();
-    if (isShop && isClientDashboardCanonical(appCanonical)) {
+    if (isShop) {
       return `${localizePathForRedirect('/partner/dashboard')}${queryPart}`;
+    }
+    if (await resolveIsOrgOnlySession()) {
+      return `${localizePathForRedirect('/partner/organization')}${queryPart}`;
     }
   }
 

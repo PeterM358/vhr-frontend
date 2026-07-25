@@ -45,6 +45,7 @@ import { API_BASE_URL } from '../api/config';
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import { resetToPublicHome } from '../navigation/authNavigation';
 import { resolveIsPartnerSession } from '../utils/partnerSession';
+import { resolveIsOrgOnlySession } from '../utils/orgWorkspace';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import { toCanonicalAppPath } from '../navigation/localizedRoutes';
 import { useTranslation } from '../i18n';
@@ -119,7 +120,8 @@ export default function HomeScreen({ navigation }) {
             String(canonical).replace(/\/$/, '') === '/dashboard';
           if (onClientDashboard) {
             const isPartner = await resolveIsPartnerSession();
-            if (isPartner) {
+            const isOrgOnly = !isPartner && (await resolveIsOrgOnlySession());
+            if (isPartner || isOrgOnly) {
               const route = await resolveShopEntryRoute();
               navigation.reset(buildShopAuthReset(route));
               return;
@@ -146,6 +148,7 @@ export default function HomeScreen({ navigation }) {
 
       const loadDashboard = async () => {
         if (!hasSession) return;
+        if (await resolveIsOrgOnlySession()) return;
         setDashboardLoading(true);
         try {
           const token = await AsyncStorage.getItem('@access_token');
