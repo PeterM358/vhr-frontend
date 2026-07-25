@@ -9,13 +9,26 @@ import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
 import OrgAppHeader from '../components/org/OrgAppHeader';
 import { getOrgFleetVehicle } from '../api/fleet';
-import { useTranslation } from '../i18n';
+import { translateRepairStatus, useTranslation } from '../i18n';
 import {
   fleetVehicleTitle,
   maintenanceStatusLabel,
   mapFleetReadiness,
   provenanceLabel,
 } from '../utils/fleetReadinessStatus';
+
+function formatRepairDate(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatRepairPrice(price, currency) {
+  if (price == null || price === '') return null;
+  const cur = currency || 'EUR';
+  return `${price} ${cur}`;
+}
 
 export default function OrgFleetVehicleDetailScreen({ navigation, route }) {
   const { t } = useTranslation();
@@ -123,6 +136,37 @@ export default function OrgFleetVehicleDetailScreen({ navigation, route }) {
                   <Divider style={styles.divider} />
                 </View>
               ))}
+            </AppCard>
+
+            <AppCard>
+              <Text variant="titleMedium">{t('fleet.detail.serviceHistoryTitle')}</Text>
+              {(vehicle.repairs || []).length ? (
+                (vehicle.repairs || []).map((repair) => {
+                  const dateLabel =
+                    formatRepairDate(repair.completed_at) || formatRepairDate(repair.created_at);
+                  const priceLabel = formatRepairPrice(repair.total_price, repair.currency);
+                  return (
+                    <View key={repair.id} style={styles.itemRow}>
+                      <Text style={styles.itemTitle}>
+                        {repair.repair_type_name || t('fleet.detail.serviceHistoryUntitled')}
+                      </Text>
+                      <Text style={styles.meta}>
+                        {[
+                          dateLabel,
+                          repair.shop_profile_name,
+                          translateRepairStatus(repair.status, t),
+                          priceLabel,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </Text>
+                      <Divider style={styles.divider} />
+                    </View>
+                  );
+                })
+              ) : (
+                <Text style={styles.meta}>{t('fleet.detail.serviceHistoryEmpty')}</Text>
+              )}
             </AppCard>
 
             {vehicle.out_of_service ? (
