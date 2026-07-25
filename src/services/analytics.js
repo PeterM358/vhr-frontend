@@ -9,6 +9,7 @@
 
 import { Platform } from 'react-native';
 import ReactGA from 'react-ga4';
+import { hasAnalyticsConsent, loadConsentState } from './cookieConsent';
 
 let initialized = false;
 let lastTrackedPagePath = null;
@@ -48,11 +49,20 @@ function resolvePagePath(path) {
 }
 
 /**
- * Initialize GA4 once. Safe to call multiple times; no-ops when disabled or already initialized.
+ * Initialize GA4 once after analytics consent. Safe to call multiple times.
+ * @param {{ analytics?: boolean } | null} [consent]
  */
-export function initializeAnalytics() {
+export async function initializeAnalytics(consent) {
   if (initialized || !isAnalyticsEnabled()) {
-    return;
+    return false;
+  }
+
+  let state = consent;
+  if (state == null) {
+    state = await loadConsentState();
+  }
+  if (!hasAnalyticsConsent(state)) {
+    return false;
   }
 
   const measurementId = envValue(
@@ -62,6 +72,18 @@ export function initializeAnalytics() {
 
   ReactGA.initialize(measurementId);
   initialized = true;
+  return true;
+}
+
+/** Test/helper: whether GA has been initialized in this session. */
+export function isAnalyticsInitialized() {
+  return initialized;
+}
+
+/** Reset init flag (tests only). */
+export function __resetAnalyticsForTests() {
+  initialized = false;
+  lastTrackedPagePath = null;
 }
 
 /**

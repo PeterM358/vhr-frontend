@@ -1,66 +1,107 @@
 import React, { useMemo } from 'react';
-import { Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Linking, Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+
 import { useTranslation } from '../../i18n';
+import { FOOTER_POLICY_LINKS, localizedPolicyPath, openPolicyPath } from '../../policies/policyPaths';
+import { POLICY_SLUGS } from '../../policies/policySlugs';
+
+const CONTACT_HREF = 'mailto:[SUPPORT_EMAIL_PLACEHOLDER]';
 
 /**
  * Lightweight, authenticated-only app footer.
- *
- * Notes for future expansion:
- * - All entries are plain text placeholders (no navigation logic).
- * - Grouping is done via arrays so you can later swap Text for Link components
- *   without changing the footer's layout structure.
+ * Policy links open in-app public policy pages (web navigation + deep paths).
  */
 export default function AppFooter() {
+  const navigation = useNavigation();
   const { width } = useWindowDimensions();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const isMobile = width < 768;
+
+  const openHref = (href, { internalPolicySlug } = {}) => {
+    if (internalPolicySlug) {
+      openPolicyPath(internalPolicySlug, navigation);
+      return;
+    }
+    if (!href) return;
+    if (Platform.OS === 'web' && href.startsWith('/')) {
+      window.location.assign(localizedPolicyPath(href.replace(/^\//, ''), locale));
+      return;
+    }
+    Linking.openURL(href).catch(() => {});
+  };
 
   const desktopMain = useMemo(
     () => [
-      t('footer.copyright'),
-      t('footer.privacy'),
-      t('footer.terms'),
-      t('footer.contact'),
-      t('footer.support'),
-      t('footer.version'),
+      { label: t('footer.copyright') },
+      { label: t('footer.privacy'), policySlug: POLICY_SLUGS.privacy },
+      { label: t('footer.terms'), policySlug: POLICY_SLUGS.terms },
+      { label: t('footer.cookiePolicy'), policySlug: POLICY_SLUGS.cookies },
+      { label: t('footer.contact'), href: CONTACT_HREF },
+      { label: t('footer.support'), policySlug: POLICY_SLUGS.support },
+      { label: t('footer.version') },
     ],
     [t]
   );
 
   const mobileMain = useMemo(
     () => [
-      t('footer.privacy'),
-      t('footer.terms'),
-      t('footer.support'),
-      t('footer.versionMobile'),
+      { label: t('footer.privacy'), policySlug: POLICY_SLUGS.privacy },
+      { label: t('footer.terms'), policySlug: POLICY_SLUGS.terms },
+      { label: t('footer.cookiePolicy'), policySlug: POLICY_SLUGS.cookies },
+      { label: t('footer.support'), policySlug: POLICY_SLUGS.support },
+      { label: t('footer.versionMobile') },
     ],
     [t]
   );
 
   const placeholderLinks = useMemo(
     () => [
-      t('footer.privacyPolicy'),
-      t('footer.termsOfService'),
-      t('footer.cookiePolicy'),
-      t('footer.contact'),
-      t('footer.helpCenter'),
-      t('footer.faq'),
-      t('footer.careers'),
-      t('footer.about'),
-      t('footer.twitter'),
-      t('footer.instagram'),
-      t('footer.linkedin'),
-      t('footer.facebook'),
-      t('footer.youtube'),
-      t('footer.github'),
-      t('footer.blog'),
-      t('footer.apiDocs'),
-      t('footer.languageRegion'),
+      { label: t('footer.privacyPolicy'), policySlug: POLICY_SLUGS.privacy },
+      { label: t('footer.termsOfService'), policySlug: POLICY_SLUGS.terms },
+      { label: t('footer.cookiePolicy'), policySlug: POLICY_SLUGS.cookies },
+      { label: t('footer.contact'), href: CONTACT_HREF },
+      { label: t('footer.helpCenter'), policySlug: POLICY_SLUGS.support },
+      { label: t('footer.faq') },
+      { label: t('footer.careers') },
+      { label: t('footer.about') },
+      { label: t('footer.twitter') },
+      { label: t('footer.instagram') },
+      { label: t('footer.linkedin') },
+      { label: t('footer.facebook') },
+      { label: t('footer.youtube') },
+      { label: t('footer.github') },
+      { label: t('footer.blog') },
+      { label: t('footer.apiDocs') },
+      { label: t('footer.languageRegion') },
     ],
     [t]
   );
 
   const mainItems = isMobile ? mobileMain : desktopMain;
+
+  const renderItem = (item, idx, items, textStyle) => {
+    const isLink = Boolean(item.href || item.policySlug);
+    return (
+      <React.Fragment key={`${item.label}-${idx}`}>
+        <Text
+          style={[textStyle, isLink ? styles.linkText : null]}
+          onPress={
+            isLink
+              ? () =>
+                  openHref(item.href, {
+                    internalPolicySlug: item.policySlug,
+                  })
+              : undefined
+          }
+          accessibilityRole={isLink ? 'link' : undefined}
+        >
+          {item.label}
+        </Text>
+        {idx < items.length - 1 ? <Text style={styles.separator}>|</Text> : null}
+      </React.Fragment>
+    );
+  };
 
   return (
     <View
@@ -73,21 +114,13 @@ export default function AppFooter() {
     >
       <View style={styles.inner}>
         <View style={styles.mainRow}>
-          {mainItems.map((label, idx) => (
-            <React.Fragment key={`${label}-${idx}`}>
-              <Text style={styles.mainText}>{label}</Text>
-              {idx < mainItems.length - 1 ? <Text style={styles.separator}>|</Text> : null}
-            </React.Fragment>
-          ))}
+          {mainItems.map((item, idx) => renderItem(item, idx, mainItems, styles.mainText))}
         </View>
 
         <View style={styles.placeholderRow}>
-          {placeholderLinks.map((label, idx) => (
-            <React.Fragment key={`${label}-${idx}`}>
-              <Text style={styles.placeholderText}>{label}</Text>
-              {idx < placeholderLinks.length - 1 ? <Text style={styles.separator}>|</Text> : null}
-            </React.Fragment>
-          ))}
+          {placeholderLinks.map((item, idx) =>
+            renderItem(item, idx, placeholderLinks, styles.placeholderText)
+          )}
         </View>
       </View>
     </View>
@@ -125,6 +158,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     lineHeight: 16,
+  },
+  linkText: {
+    textDecorationLine: 'underline',
+    cursor: 'pointer',
   },
   separator: {
     color: 'rgba(255,255,255,0.35)',

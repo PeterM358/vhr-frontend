@@ -3,14 +3,15 @@ import { ActivityIndicator, View, StyleSheet, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ScreenBackground from '../components/ScreenBackground';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
-import { resolveIsPartnerSession } from '../utils/partnerSession';
 import {
   resetToClientDashboard,
   resetToSignIn,
   storeAuthReturnUrl,
+  consumeAuthReturnUrl,
 } from '../navigation/authNavigation';
 import { isProtectedWebPath, resetNavigationToCanonicalPath } from '../navigation/webLinking';
 import { toCanonicalAppPath } from '../navigation/localizedRoutes';
+import { readOrganizationMemberships } from '../utils/orgWorkspace';
 
 function isClientDashboardPath(path) {
   const pathOnly = String(path || '').split('?')[0];
@@ -19,11 +20,32 @@ function isClientDashboardPath(path) {
   return normalized === '/dashboard';
 }
 
+async function resolveSessionKind() {
+  const token = await AsyncStorage.getItem('@access_token');
+  if (!token) {
+    return { token: null, isPartner: false, isOrgOnly: false };
+  }
+  const isShop = await AsyncStorage.getItem('@is_shop');
+  const shopProfiles = await AsyncStorage.getItem('@shop_profiles');
+  const shopMemberships = await AsyncStorage.getItem('@shop_memberships');
+  const orgMemberships = await readOrganizationMemberships();
+  const flaggedShop = String(isShop || '').trim().toLowerCase() === 'true';
+  const hasShopLinks =
+    flaggedShop ||
+    (shopProfiles && shopProfiles !== '[]') ||
+    (shopMemberships && shopMemberships !== '[]');
+  const hasOrg = orgMemberships.length > 0;
+  return {
+    token,
+    isPartner: hasShopLinks,
+    isOrgOnly: hasOrg && !hasShopLinks,
+  };
+}
+
 export default function AuthLoadingScreen({ navigation }) {
   useEffect(() => {
     const checkAuth = async () => {
-      const token = await AsyncStorage.getItem('@access_token');
-      const isPartner = token ? await resolveIsPartnerSession() : false;
+      const { token, isPartner, isOrgOnly } = await resolveSessionKind();
 
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         const currentPath = `${window.location.pathname}${window.location.search}`;
@@ -42,7 +64,7 @@ export default function AuthLoadingScreen({ navigation }) {
           }
 
           // Shop users must not land in the client Home shell via /dashboard.
-          if (isPartner && isClientDashboardPath(currentPath)) {
+          if ((isPartner || isOrgOnly) && isClientDashboardPath(currentPath)) {
             const route = await resolveShopEntryRoute();
             navigation.reset(buildShopAuthReset(route));
             return;
@@ -55,7 +77,11 @@ export default function AuthLoadingScreen({ navigation }) {
       }
 
       if (token) {
-        if (isPartner) {
+        if (isPartner || isOrgOnly) {
+          const returnPath = await consumeAuthReturnUrl();
+          if (returnPath && resetNavigationToCanonicalPath(navigation, returnPath)) {
+            return;
+          }
           const route = await resolveShopEntryRoute();
           navigation.reset(buildShopAuthReset(route));
         } else {

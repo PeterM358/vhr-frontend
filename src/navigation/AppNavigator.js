@@ -18,6 +18,7 @@ import {
   RegisterScreen,
   PublicHomeScreen,
   PublicSeoPageScreen,
+  PublicPolicyPageScreen,
   ClientVehiclesScreen,
   ShopMapScreen,
   VehicleDetailScreen,
@@ -37,6 +38,9 @@ import {
   VehicleHistoryAccessScreen,
   AddObligationPaymentScreen,
   CreateVehicleScreen,
+  FleetRegisterImportScreen,
+  FleetDashboardScreen,
+  OrgFleetVehicleDetailScreen,
   PartnerOnboardingScreen,
   CreatePromotionScreen,
   ShopRegisterClientScreen,
@@ -91,7 +95,12 @@ import {
   SelectOfferPartsScreen,
   PasswordRequestResetScreen,
   PasswordConfirmResetScreen,
+  VerifyEmailScreen,
+  OrganizationMembershipInviteScreen,
+  OrganizationOnboardingScreen,
 } from './lazyScreens';
+
+import OrganizationDrawer from './OrganizationDrawer';
 
 // Screens
 import LoginErrorBoundary from '../components/auth/LoginErrorBoundary';
@@ -338,7 +347,13 @@ export default function AppNavigator() {
         <Stack.Screen name="PublicHome" component={PublicHomeScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Login" component={LoginScreenRoute} options={authScreenOptions} />
         <Stack.Screen name="Register" component={RegisterScreen} options={authScreenOptions} />
+        <Stack.Screen
+          name="OrgOnboarding"
+          component={OrganizationOnboardingScreen}
+          options={authScreenOptions}
+        />
         <Stack.Screen name="Home" component={HomeDrawer} options={{ headerShown: false }} />
+        <Stack.Screen name="OrgHome" component={OrganizationDrawer} options={{ headerShown: false, title: 'Organization' }} />
         <Stack.Screen name="ShopHome" component={ShopDrawer} options={{ headerShown: false, title: 'Home' }} />
 
         <Stack.Screen
@@ -369,6 +384,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="PublicSeoPage"
           component={PublicSeoPageScreen}
+          options={{ title: 'Veversal' }}
+        />
+        <Stack.Screen
+          name="PublicPolicyPage"
+          component={PublicPolicyPageScreen}
           options={{ title: 'Veversal' }}
         />
         <Stack.Screen
@@ -431,6 +451,21 @@ export default function AppNavigator() {
           name="CreateVehicle"
           component={CreateVehicleScreen}
           options={{ ...appNavBarScreenOptions, title: 'Add vehicle' }}
+        />
+        <Stack.Screen
+          name="FleetRegisterImport"
+          component={FleetRegisterImportScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Import fleet register' }}
+        />
+        <Stack.Screen
+          name="FleetDashboard"
+          component={FleetDashboardScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Fleet' }}
+        />
+        <Stack.Screen
+          name="OrgFleetVehicleDetail"
+          component={OrgFleetVehicleDetailScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Fleet vehicle' }}
         />
         <Stack.Screen
           name="PartnerOnboarding"
@@ -690,6 +725,16 @@ export default function AppNavigator() {
         <Stack.Screen
           name="PasswordConfirmReset"
           component={PasswordConfirmResetScreen}
+          options={authScreenOptions}
+        />
+        <Stack.Screen
+          name="VerifyEmail"
+          component={VerifyEmailScreen}
+          options={authScreenOptions}
+        />
+        <Stack.Screen
+          name="OrganizationMembershipInvite"
+          component={OrganizationMembershipInviteScreen}
           options={authScreenOptions}
         />
 

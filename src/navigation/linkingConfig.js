@@ -10,11 +10,21 @@ export const linkingScreens = {
   PublicHome: '',
   Login: 'login',
   Register: 'sign-up',
+  OrgOnboarding: 'partner/organization/onboarding',
   PasswordRequestReset: 'forgot-password',
   Home: {
     path: 'dashboard',
     screens: {
       HomeMain: '',
+    },
+  },
+  OrgHome: {
+    path: 'partner/organization',
+    screens: {
+      OrgOverview: '',
+      OrgFleet: 'fleet',
+      OrgNetwork: 'network',
+      ChooseShop: 'switch-center',
     },
   },
   ShopHome: {
@@ -32,6 +42,12 @@ export const linkingScreens = {
     },
   },
   ShopMap: 'service-centers',
+  PublicBusinessProfile: {
+    path: 'business/:orgSlug',
+    parse: {
+      orgSlug: (value) => String(value || '').trim().toLowerCase(),
+    },
+  },
   ShopDetail: {
     path: 'service-center/:centerSlug',
     parse: {
@@ -62,7 +78,10 @@ export const linkingScreens = {
   ShopPurchaseOrderDetail: 'partner/purchase-orders/:poId',
   ShopGoodsReceipt: 'partner/goods-receipt',
   ShopStorageLocations: 'partner/storage-locations',
-  NetworkOrganization: 'partner/business-network',
+  NetworkOrganization: 'partner/organization/network',
+  FleetDashboard: 'partner/organization/fleet',
+  FleetRegisterImport: 'partner/organization/fleet/import',
+  OrgFleetVehicleDetail: 'partner/organization/fleet/vehicle/:vehicleId',
   NetworkRoles: 'partner/business-network/roles',
   NetworkPartners: 'partner/business-network/partners',
   NetworkInvitePartner: 'partner/business-network/invite',
@@ -75,6 +94,13 @@ export const linkingScreens = {
   NetworkClaimDetail: 'partner/business-network/claims/:claimId',
   NetworkIncomingClaims: 'partner/business-network/claims/incoming',
   PasswordConfirmReset: 'reset-password/:uid/:token',
+  VerifyEmail: 'verify-email/:uid/:token',
+  OrganizationMembershipInvite: {
+    path: 'organization-invite/:token',
+    parse: {
+      token: (value) => decodeURIComponent(String(value || '').trim()),
+    },
+  },
   ClientVehicles: 'dashboard/vehicles',
   CreateVehicle: 'dashboard/vehicles/add',
   PartnerOnboarding: 'partner/onboarding',

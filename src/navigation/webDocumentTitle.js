@@ -47,6 +47,13 @@ const PATH_TITLE_KEYS = {
   '/dashboard/bookings': 'bookings',
   '/dashboard/documents': 'documents',
   '/dashboard/profile': 'profile',
+  '/privacy': 'privacyPolicy',
+  '/terms': 'termsOfUse',
+  '/cookies': 'cookiePolicy',
+  '/support': 'support',
+  '/partner-terms': 'partnerTerms',
+  '/dpa': 'dpa',
+  '/subprocessors': 'subprocessors',
 };
 
 function vehicleDetailTitleKey(pathname) {

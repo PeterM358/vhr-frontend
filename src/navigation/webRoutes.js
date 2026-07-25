@@ -656,6 +656,30 @@ export function partnerStorageLocations(params = {}) {
   return buildPathWithQuery(`${PARTNER}/storage-locations`, params);
 }
 
+export function partnerFleet(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/organization/fleet`, params);
+}
+
+export function partnerFleetImport(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/organization/fleet/import`, params);
+}
+
+export function partnerFleetVehicleDetail(vehicleId, params = {}) {
+  return buildPathWithQuery(`${PARTNER}/organization/fleet/vehicle/${normalizeId(vehicleId)}`, params);
+}
+
+export function partnerOrganizationHome(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/organization`, params);
+}
+
+export function partnerOrganizationNetwork(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/organization/network`, params);
+}
+
+export function publicBusinessProfile(slug, params = {}) {
+  return buildPathWithQuery(`/business/${String(slug || '').trim().toLowerCase()}`, params);
+}
+
 function buildPathWithQuery(base, params = {}) {
   const qs = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {

@@ -25,7 +25,95 @@
     "allClear": "All clear",
     "service": "Service",
     "success": "Success",
-    "validation": "Validation"
+    "validation": "Validation",
+    "continue": "Continue",
+    "done": "Done"
+  },
+  "fleet": {
+    "dashboard": {
+      "title": "Fleet",
+      "searchPlaceholder": "Search plate, VIN, chassis, internal #",
+      "allDepartments": "All departments",
+      "allStatuses": "All readiness statuses",
+      "noDepartment": "No department",
+      "empty": "No fleet vehicles match your filters.",
+      "error": "Could not load fleet."
+    },
+    "readiness": {
+      "ready": "Ready",
+      "expiringSoon": "Expiring soon",
+      "notReady": "Not ready",
+      "unknown": "Unknown"
+    },
+    "maintenance": {
+      "overdue": "Overdue",
+      "dueSoon": "Due soon",
+      "completed": "Completed",
+      "noData": "No data"
+    },
+    "provenance": {
+      "imported": "Imported from fleet register",
+      "manual": "Entered manually",
+      "document": "Confirmed document",
+      "service": "Service record"
+    },
+    "detail": {
+      "readinessTitle": "Work readiness",
+      "mandatoryItems": "Mandatory items",
+      "maintenanceTitle": "Maintenance",
+      "nextDeadline": "Next deadline",
+      "internalNumber": "Internal #",
+      "noDate": "No date",
+      "backToFleet": "Back to fleet",
+      "outOfServiceWarning": "This asset is marked out of service.",
+      "error": "Could not load vehicle.",
+      "state": {
+        "valid": "Valid",
+        "expiring": "Expiring",
+        "expired": "Expired",
+        "missing": "Missing"
+      }
+    },
+    "openFleet": "View fleet"
+  },
+  "fleetImport": {
+    "title": "Import fleet register",
+    "selectOrganization": "Select organization",
+    "chooseOrganization": "Choose organization",
+    "continue": "Continue",
+    "done": "Done",
+    "uploadTitle": "Upload spreadsheet",
+    "uploadHelper": "Upload an XLS or XLSX fleet register (ZPT-style headers).",
+    "uploadAction": "Choose file and upload",
+    "fileRetainedWarning": "The original file is stored privately for audit after import.",
+    "previewTitle": "Review rows",
+    "previewSummary": "{{count}} rows staged · {{unresolved}} unresolved",
+    "overrideReason": "Override reason (required for ambiguous duplicates)",
+    "defaultOverrideReason": "Reviewed manually in import wizard",
+    "duplicateStatus": "Duplicate",
+    "resolution": "Decision",
+    "decisionCreate": "Create",
+    "decisionLink": "Link existing",
+    "decisionSkip": "Skip",
+    "confirmAction": "Confirm import",
+    "unresolvedBlocked": "Resolve every row before confirming.",
+    "resultTitle": "Import result",
+    "resultSummary": "Created {{created}} · updated {{updated}} · skipped {{skipped}} · rejected {{rejected}}",
+    "downloadErrors": "Download error report",
+    "noOrganizations": "No organization membership with fleet import permission.",
+    "stepLabel": "Step {{step}} of {{total}}",
+    "uploadReplayTitle": "File already imported",
+    "uploadReplayBody": "This file hash was already processed for the organization.",
+    "openAction": "Import fleet register",
+    "errors": {
+      "loadOrganizations": "Could not load organizations",
+      "uploadFailed": "Upload failed",
+      "rowDecisionFailed": "Could not save row decision",
+      "confirmFailed": "Confirm failed",
+      "downloadFailed": "Could not download error report",
+      "uploadWebOnlyTitle": "Upload on web",
+      "uploadWebOnlyBody": "Fleet register upload is available on the web app for now."
+    }
   },
   "language": {
     "label": "Language",
@@ -65,11 +153,59 @@
       "complaints": "Complaints",
       "purchaseOrders": "Purchase orders",
       "businessNetwork": "Business network",
+      "organizationWorkspace": "Organization workspace",
+      "fleet": "Fleet",
       "storageLocations": "Storage locations",
       "priceList": "Price list",
       "notifications": "Notifications",
       "switchCenter": "Switch service center",
       "explore": "Explore"
+    }
+  },
+  "org": {
+    "drawer": {
+      "title": "Organization",
+      "serviceCenter": "Service center",
+      "switchCenter": "Switch service center"
+    },
+    "home": {
+      "title": "Organization",
+      "subtitle": "Shared workforce, fleet, documents, and operations for your company.",
+      "modules": "Workspace",
+      "openServiceCenter": "Open service center workspace"
+    },
+    "switcher": {
+      "label": "Organization"
+    },
+    "nav": {
+      "overview": "Overview",
+      "locations": "Locations",
+      "fleet": "Fleet",
+      "workOrders": "Work orders",
+      "warehouse": "Warehouse",
+      "workforce": "Workforce",
+      "documents": "Documents",
+      "ledger": "Ledger",
+      "network": "Business network",
+      "transport": "Transport",
+      "construction": "Construction",
+      "publicProfile": "Public profile",
+      "invoicing": "Invoicing"
+    },
+    "onboarding": {
+      "title": "Create your organization",
+      "subtitle": "Set up your company workspace to manage fleet, workforce, and documents.",
+      "companyName": "Company name",
+      "businessType": "Business type",
+      "create": "Create organization",
+      "nameRequired": "Enter your company name.",
+      "failed": "Could not create organization.",
+      "types": {
+        "transport": "Transport company",
+        "construction": "Construction",
+        "serviceCenter": "Service center",
+        "other": "Other business"
+      }
     }
   },
   "auth": {
@@ -130,6 +266,35 @@
     "invalidVerifyLink": "This verification link is invalid or incomplete.",
     "verifyFailed": "Could not verify email. Request a new verification message.",
     "goToLogin": "Go to login"
+  },
+  "orgInvite": {
+    "title": "Organization invitation",
+    "organization": "Organization",
+    "role": "Role",
+    "recipient": "Invited as",
+    "recipientHidden": "Hidden recipient",
+    "accept": "Accept invitation",
+    "verifyEmailFirst": "Verify your email before accepting this invitation.",
+    "openProfile": "Open profile",
+    "invalid": "This invitation link is invalid, expired, or already used.",
+    "expired": "This invitation has expired.",
+    "wrongUser": "This invitation was sent to a different account.",
+    "alreadyUsed": "This invitation has already been accepted.",
+    "acceptFailed": "Could not accept the invitation.",
+    "sendVerificationEmail": "Send verification email",
+    "verificationSent": "Verification email sent. Check your inbox and return here after confirming.",
+    "resendFailed": "Could not send verification email.",
+    "resendNeedsEmail": "Sign in with the email address this invitation was sent to.",
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "purchasing": "Purchasing",
+      "sales": "Sales",
+      "warehouse": "Warehouse",
+      "transport": "Transport",
+      "accounting": "Accounting",
+      "viewer": "Viewer"
+    }
   },
   "dashboard": {
     "heroSubtitle": "Your vehicles, service history, and repairs — in one control center.",
@@ -1311,6 +1476,44 @@
     "useCatalogInstead": "Use catalog selection instead",
     "registrationMileage": "Registration & mileage",
     "kilometers": "Kilometers",
+    "catalogLead": "Select your vehicle type, brand, model, year, and fuel type from our catalog.",
+    "vehicleTypeLabel": "Vehicle type *",
+    "makeBrandLabel": "Make / brand *",
+    "modelLabel": "Model *",
+    "yearLabel": "Year *",
+    "engineVariantLabel": "Engine / variant",
+    "registrationNumberLabel": "Registration number",
+    "registrationNumberPlaceholder": "e.g. CA1234AB",
+    "registrationCountryLabel": "Registration country (ISO)",
+    "registrationCountryPlaceholder": "e.g. BG",
+    "vinLabel": "VIN / chassis",
+    "vinLabelRoad": "VIN (17 characters)",
+    "chassisLabel": "Chassis / frame number",
+    "chassisLabelOptional": "Chassis / frame number (optional)",
+    "chassisHintRoad": "Supplemental only — stamped on the frame (door pillar or engine bay). Does not replace the VIN.",
+    "chassisHintMachinery": "Primary identity when no standard VIN — usually on the main frame rail.",
+    "chassisHintOptional": "Optional frame or chassis reference.",
+    "serialLabel": "Manufacturer serial number",
+    "serialHintMachinery": "Found on the manufacturer plate — use when there is no chassis number.",
+    "vinHintRoad": "17-character VIN required before repairs or bookings. Usually on the windshield or door pillar. You can save a draft without it.",
+    "vinHintMachinery": "Road vehicles need a VIN here — use chassis or serial fields below for equipment.",
+    "vinHintOptional": "Optional — improves parts and service matching.",
+    "noModelsTitle": "No models found for this brand and type",
+    "noModelsBody": "Enter your model manually — we will not guess from unrelated catalog data.",
+    "addModelManually": "Other model / enter manually",
+    "otherModelFallback": "Can't find your model? Enter manually",
+    "registrationScan": {
+      "title": "Registration document (preview)",
+      "lead": "Scan or upload your registration document to preview recognized fields. You always confirm before anything is applied — documents never change ownership automatically.",
+      "scanButton": "Scan registration document",
+      "previewTitle": "Recognized fields (confirm to apply)",
+      "previewHint": "Review each value. An existing VIN in our system will start a transfer/claim flow later — we never create duplicates silently.",
+      "fieldVin": "VIN",
+      "fieldPlate": "Registration number",
+      "fieldMake": "Make",
+      "fieldModel": "Model",
+      "confirmApply": "Apply to form"
+    },
     "errors": {
       "selectTypeFirst": "Select a vehicle type first.",
       "selectBrandFirst": "Select a brand first.",
@@ -2585,6 +2788,13 @@
     "serviceHistory": "{app} Service History",
     "documents": "{app} Documents",
     "profile": "{app} Profile",
+    "privacyPolicy": "{app} Privacy Policy",
+    "termsOfUse": "{app} Terms of Use",
+    "cookiePolicy": "{app} Cookie Policy",
+    "support": "{app} Support",
+    "partnerTerms": "{app} Partner Terms",
+    "dpa": "{app} Data Processing Addendum",
+    "subprocessors": "{app} Subprocessors",
     "vehicleDetails": "{app} Details",
     "vehicleSpecs": "{app} Vehicle Specs",
     "chooseServiceCenter": "{app} Choose Service Center",
@@ -2729,6 +2939,17 @@
       "vatNumber": "VAT number",
       "send": "Send invitation",
       "sent": "Invitation sent"
+    },
+    "membershipInvite": {
+      "title": "Invite team member",
+      "email": "Member email",
+      "role": "Organization role",
+      "send": "Create invite link",
+      "linkReady": "Share this link once — it will not be shown again.",
+      "copyLink": "Copy link",
+      "shareLink": "Share link",
+      "copied": "Invite link copied.",
+      "created": "Invite link created."
     },
     "incomingOrders": {
       "title": "Incoming orders",
@@ -2984,6 +3205,29 @@
       "noRepairTypes": "No repair types available.",
       "saveFailed": "Failed to save promotion.",
       "success": "Promotion created."
+    }
+  },
+  "policies": {
+    "notFound": "Policy page not found.",
+    "backToHome": "Back to Veversal",
+    "betaNoticeTitle": "Beta preview",
+    "betaNoticeBody": "This is a test environment. Content and data handling may change before production legal sign-off. Keep your own copies of important documents.",
+    "lawyerReviewBadge": "Pending legal review",
+    "versionLabel": "Version",
+    "effectiveDateLabel": "Effective",
+    "checksumLabel": "Checksum",
+    "draftStatus": "Draft beta text — not final legal advice.",
+    "relatedPolicies": "Related policies",
+    "alternateLocale": "Read in",
+    "seoDescription": "Veversal {title} — beta preview.",
+    "pageTitles": {
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Use",
+      "cookies": "Cookie Policy",
+      "support": "Support",
+      "partner-terms": "Business & Partner Terms",
+      "dpa": "Data Processing Addendum",
+      "subprocessors": "Subprocessors"
     }
   }
 }

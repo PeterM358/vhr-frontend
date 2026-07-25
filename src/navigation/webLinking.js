@@ -68,6 +68,7 @@ import {
 } from './webRoutes';
 import { toCanonicalPublicPath, toCanonicalAppPath, localizeCanonicalPath } from './localizedRoutes';
 import { STORAGE_KEY_LOCALE, SUPPORTED_LOCALES, getLocale, syncLocaleFromWebPathname } from '../i18n';
+import { isPolicySlug, policyPath } from '../policies/policySlugs';
 
 function findFocusedRoute(state) {
   if (!state?.routes?.length) return null;
@@ -244,6 +245,10 @@ export function getCanonicalWebPath(state) {
         });
       }
       return partnerRepairs();
+    }
+    case 'PublicPolicyPage': {
+      const key = params.policyKey || params.policySlug;
+      return isPolicySlug(key) ? policyPath(key) : policyPath('privacy');
     }
     default:
       return null;
@@ -485,6 +490,18 @@ export function resetNavigationToCanonicalPath(navigation, path) {
   return true;
 }
 
+/** Parse public policy page paths (/privacy, /terms, …) into navigation state. */
+export function getPolicyNavigationStateFromPath(path) {
+  const trimmed = String(path || '').replace(/^\//, '').replace(/\/$/, '');
+  const segment = trimmed.split('?')[0].split('/')[0];
+  if (!isPolicySlug(segment)) {
+    return null;
+  }
+  return {
+    routes: [{ name: 'PublicPolicyPage', params: { policyKey: segment } }],
+  };
+}
+
 /** Resolve a canonical absolute web path into a navigation state (web deep links). */
 export function resolveNavigationStateFromCanonicalPath(input) {
   const normalized = normalizeWebLinkingPath(String(input || '').replace(/^\//, ''));
@@ -512,6 +529,10 @@ export function resolveNavigationStateFromCanonicalPath(input) {
   const dashboardState = getDashboardNavigationStateFromPath(normalized);
   if (dashboardState) {
     return dashboardState;
+  }
+  const policyState = getPolicyNavigationStateFromPath(normalized);
+  if (policyState) {
+    return policyState;
   }
   return getStateFromPathDefault(normalized, linkingConfig);
 }
@@ -566,6 +587,13 @@ function parseVehicleIdFromQuery(query = {}) {
   return Number.isFinite(id) ? id : null;
 }
 
+function parseOrganizationIdFromQuery(query = {}) {
+  const raw = query.organizationId || query.organization_id;
+  if (raw == null || raw === '') return null;
+  const id = parseInt(String(raw), 10);
+  return Number.isFinite(id) ? id : null;
+}
+
 function mergeVehicleAuthorizeContext(state, vehicleContext) {
   if (!vehicleContext || !Object.keys(vehicleContext).length) {
     return state;
@@ -590,6 +618,10 @@ export function getPartnerNavigationStateFromPath(path) {
   const partnerHome = {
     name: 'ShopHome',
     state: { routes: [{ name: 'ShopDashboard' }], index: 0 },
+  };
+  const orgHome = {
+    name: 'OrgHome',
+    state: { routes: [{ name: 'OrgOverview' }], index: 0 },
   };
 
   if (pathPart === 'partner/dashboard') {
@@ -832,6 +864,89 @@ export function getPartnerNavigationStateFromPath(path) {
   }
   if (pathPart === 'partner/complaints') {
     return { routes: [partnerHome, { name: 'ShopComplaints' }], index: 1 };
+  }
+  if (pathPart === 'partner/organization' || pathPart === 'partner/organization/') {
+    return { routes: [orgHome], index: 0 };
+  }
+  if (pathPart === 'partner/organization/network') {
+    return { routes: [orgHome, { name: 'NetworkOrganization' }], index: 1 };
+  }
+  if (pathPart === 'partner/organization/fleet') {
+    const params = {};
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) {
+      params.organizationId = organizationId;
+    }
+    return {
+      routes: [orgHome, { name: 'FleetDashboard', params: Object.keys(params).length ? params : undefined }],
+      index: 1,
+    };
+  }
+  if (pathPart === 'partner/organization/fleet/import') {
+    return {
+      routes: [orgHome, { name: 'FleetRegisterImport' }],
+      index: 1,
+    };
+  }
+  const orgFleetVehicleMatch = pathPart.match(/^partner\/organization\/fleet\/vehicle\/(\d+)$/);
+  if (orgFleetVehicleMatch) {
+    const vehicleId = parseInt(orgFleetVehicleMatch[1], 10);
+    if (!Number.isFinite(vehicleId)) {
+      return null;
+    }
+    const params = { vehicleId };
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) {
+      params.organizationId = organizationId;
+    }
+    return {
+      routes: [
+        orgHome,
+        { name: 'FleetDashboard', params: organizationId ? { organizationId } : undefined },
+        { name: 'OrgFleetVehicleDetail', params },
+      ],
+      index: 2,
+    };
+  }
+  if (pathPart === 'partner/fleet') {
+    const params = {};
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) {
+      params.organizationId = organizationId;
+    }
+    return {
+      routes: [orgHome, { name: 'FleetDashboard', params: Object.keys(params).length ? params : undefined }],
+      index: 1,
+    };
+  }
+  if (pathPart === 'partner/fleet/import') {
+    return {
+      routes: [orgHome, { name: 'FleetRegisterImport' }],
+      index: 1,
+    };
+  }
+  const fleetVehicleMatch = pathPart.match(/^partner\/fleet\/vehicle\/(\d+)$/);
+  if (fleetVehicleMatch) {
+    const vehicleId = parseInt(fleetVehicleMatch[1], 10);
+    if (!Number.isFinite(vehicleId)) {
+      return null;
+    }
+    const params = { vehicleId };
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) {
+      params.organizationId = organizationId;
+    }
+    return {
+      routes: [
+        orgHome,
+        { name: 'FleetDashboard', params: organizationId ? { organizationId } : undefined },
+        { name: 'OrgFleetVehicleDetail', params },
+      ],
+      index: 2,
+    };
+  }
+  if (pathPart === 'partner/business-network') {
+    return { routes: [orgHome, { name: 'NetworkOrganization' }], index: 1 };
   }
 
   return null;
@@ -1233,6 +1348,10 @@ export async function redirectLegacyWebUrl() {
     target = authed
       ? pathname.replace(/^\/Home\/HomeMain/, '/dashboard')
       : '/';
+  } else if (pathname === '/partner/fleet' || pathname.startsWith('/partner/fleet/')) {
+    target = pathname.replace('/partner/fleet', '/partner/organization/fleet');
+  } else if (pathname === '/partner/business-network' || pathname.startsWith('/partner/business-network/')) {
+    target = pathname.replace('/partner/business-network', '/partner/organization/network');
   } else if (pathname === '/CreateRepair' || pathname.startsWith('/CreateRepair')) {
     const query = parseRouteQuery(search);
     const serviceCenter = query.shopId || query.shop_id || query.serviceCenter || query.serviceCenterId;

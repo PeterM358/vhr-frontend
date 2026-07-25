@@ -33,6 +33,15 @@ const APP_ROUTE_ROOTS = new Set([
   'sign-in',
   'forgot-password',
   'reset-password',
+  'verify-email',
+  'organization-invite',
+  'privacy',
+  'terms',
+  'cookies',
+  'support',
+  'partner-terms',
+  'dpa',
+  'subprocessors',
 ]);
 
 const PARTNER_ROUTE_SEGMENTS = new Set([

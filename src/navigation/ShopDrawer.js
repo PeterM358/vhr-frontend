@@ -38,7 +38,9 @@ import {
   navigateToPartnerComplaints,
   navigateToPartnerPurchaseOrders,
   navigateToPartnerStorageLocations,
+  navigateToOrgHome,
 } from './webNavigation';
+import { readOrganizationMemberships } from '../utils/orgWorkspace';
 import { readCachedUnscheduledCount } from '../utils/shopCalendarBadge';
 import { openPartnerCenter } from '../utils/partnerSetupGate';
 import {
@@ -68,21 +70,26 @@ function CustomDrawerContent(props) {
   const [unscheduledCount, setUnscheduledCount] = useState(0);
   const [shopProfile, setShopProfile] = useState(null);
   const [membership, setMembership] = useState(null);
+  const [hasOrganizations, setHasOrganizations] = useState(false);
 
   const loadErpContext = useCallback(async () => {
     try {
-      const [shopId, memberships, profiles] = await Promise.all([
+      const [shopId, memberships, profiles, token] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID),
         readShopMemberships(),
         getMyShopProfiles(),
+        AsyncStorage.getItem('@access_token'),
       ]);
       const profile =
         profiles?.find((row) => String(row.id) === String(shopId)) || profiles?.[0] || null;
       setShopProfile(profile);
       setMembership(shopMembershipFor(memberships, profile?.id ?? shopId));
+      const orgRows = await readOrganizationMemberships();
+      setHasOrganizations(Array.isArray(orgRows) && orgRows.length > 0);
     } catch {
       setShopProfile(null);
       setMembership(null);
+      setHasOrganizations(false);
     }
   }, []);
 
@@ -287,6 +294,15 @@ function CustomDrawerContent(props) {
           <DrawerItem
             label={t('drawer.partner.businessNetwork')}
             onPress={() => openStackRoute(() => {}, 'NetworkOrganization')}
+            icon={({ color, size }) => <DrawerMenuIcon name="domain" color={color} size={size} />}
+            {...itemProps}
+          />
+        ) : null}
+
+        {hasOrganizations ? (
+          <DrawerItem
+            label={t('drawer.partner.organizationWorkspace', null, 'Organization workspace')}
+            onPress={() => openStackRoute(navigateToOrgHome, 'OrgHome')}
             icon={({ color, size }) => <DrawerMenuIcon name="domain" color={color} size={size} />}
             {...itemProps}
           />

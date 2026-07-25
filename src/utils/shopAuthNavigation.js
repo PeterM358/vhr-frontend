@@ -4,6 +4,12 @@ import { isPartnerSetupComplete } from './partnerSetupGate';
 import { PARTNER_DASHBOARD_PATH, syncWebPath } from '../navigation/authNavigation';
 import { partnerOnboarding } from '../navigation/webRoutes';
 
+import {
+  readStoredAuthRoutingData,
+  resolveOrgOnboardingRoute,
+  resolvePartnerEntryRoute,
+} from './orgWorkspace';
+
 /**
  * Resolve where a shop user should land after auth.
  *
@@ -15,7 +21,16 @@ import { partnerOnboarding } from '../navigation/webRoutes';
  *
  * On error we fail safe to the dashboard.
  */
-export async function resolveShopEntryRoute({ wizardWhenIncomplete = false } = {}) {
+export async function resolveShopEntryRoute({ wizardWhenIncomplete = false, authData = null } = {}) {
+  const data = authData || (await readStoredAuthRoutingData());
+  const orgRoute = resolvePartnerEntryRoute(data);
+  if (orgRoute) {
+    return orgRoute;
+  }
+  const onboardingRoute = resolveOrgOnboardingRoute(data);
+  if (onboardingRoute) {
+    return onboardingRoute;
+  }
   try {
     const profiles = await getMyShopProfiles();
     const profile = profiles?.[0];
@@ -35,6 +50,12 @@ export async function resolveShopEntryRoute({ wizardWhenIncomplete = false } = {
 }
 
 export function buildShopAuthReset(route) {
+  if (route.name === 'OrgHome') {
+    return { index: 0, routes: [{ name: 'OrgHome', params: route.params }] };
+  }
+  if (route.name === 'OrgOnboarding') {
+    return { index: 0, routes: [{ name: 'OrgOnboarding', params: route.params }] };
+  }
   if (route.name === 'PartnerOnboarding') {
     if (Platform.OS === 'web') {
       syncWebPath(partnerOnboarding(route.params || {}));

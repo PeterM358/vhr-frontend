@@ -2,10 +2,8 @@ import React, { useContext, useState, useMemo } from 'react';
 import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import { Text, TextInput, Button, Portal, Dialog, ActivityIndicator, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { register } from '../api/auth';
 import { AuthContext } from '../context/AuthManager';
-import { STORAGE_KEYS } from '../constants/storageKeys';
 import BaseStyles from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
 import { COLORS } from '../constants/colors';
@@ -15,6 +13,7 @@ import { safeError } from '../utils/logger';
 import DashboardCard from '../components/dashboard/DashboardCard';
 import AuthPublicEscape from '../components/auth/AuthPublicEscape';
 import { useTranslation } from '../i18n';
+import { applyAuthSession } from '../utils/authSession';
 
 export default function RegisterScreen({ navigation }) {
   const theme = useTheme();
@@ -43,33 +42,12 @@ export default function RegisterScreen({ navigation }) {
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
 
-  const applyAuthSession = async (data, identifier) => {
-    setAuthToken(data.access);
-    setIsAuthenticated(true);
-    setUserEmailOrPhone(identifier);
-
-    await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.access);
-    await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refresh);
-    await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, data.user_id?.toString() || '');
-    await AsyncStorage.setItem(STORAGE_KEYS.IS_SHOP, data.is_shop ? 'true' : 'false');
-    await AsyncStorage.setItem(STORAGE_KEYS.IS_CLIENT, data.is_client ? 'true' : 'false');
-
-    if (data.shop_profiles && data.shop_profiles.length > 0) {
-      await AsyncStorage.setItem(STORAGE_KEYS.SHOP_PROFILES, JSON.stringify(data.shop_profiles));
-      await AsyncStorage.setItem(
-        STORAGE_KEYS.CURRENT_SHOP_ID,
-        data.shop_profiles[0].id.toString()
-      );
-    } else {
-      await AsyncStorage.removeItem(STORAGE_KEYS.SHOP_PROFILES);
-      await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SHOP_ID);
-    }
-
-    if (data.shop_memberships && data.shop_memberships.length > 0) {
-      await AsyncStorage.setItem(STORAGE_KEYS.SHOP_MEMBERSHIPS, JSON.stringify(data.shop_memberships));
-    } else {
-      await AsyncStorage.removeItem(STORAGE_KEYS.SHOP_MEMBERSHIPS);
-    }
+  const applyLocalAuthSession = async (data, identifier) => {
+    await applyAuthSession(data, identifier, {
+      setAuthToken,
+      setIsAuthenticated,
+      setUserEmailOrPhone,
+    });
   };
 
   const saveRegistration = async () => {
@@ -90,11 +68,13 @@ export default function RegisterScreen({ navigation }) {
         locale
       );
 
-      await applyAuthSession(result, identifier);
+      await applyLocalAuthSession(result, identifier);
 
-      if (result.is_shop) {
-        // New partners go straight into the guided setup wizard.
-        const route = await resolveShopEntryRoute({ wizardWhenIncomplete: true });
+      const route = await resolveShopEntryRoute({
+        wizardWhenIncomplete: true,
+        authData: result,
+      });
+      if (route.name === 'OrgHome' || route.name === 'OrgOnboarding' || result.is_shop) {
         navigation.reset(buildShopAuthReset(route));
       } else if (result.is_client) {
         resetToClientDashboard(navigation);

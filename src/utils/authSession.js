@@ -17,6 +17,21 @@ export function resolvePasswordResetParams(route) {
   return { uid, token };
 }
 
+export function resolveEmailVerifyParams(route) {
+  const params = route?.params || {};
+  let { uid, token } = params;
+
+  if ((!uid || !token) && Platform.OS === 'web' && typeof window !== 'undefined') {
+    const match = window.location.pathname.match(/verify-email\/([^/]+)\/([^/]+)/);
+    if (match) {
+      uid = decodeURIComponent(match[1]);
+      token = decodeURIComponent(match[2]);
+    }
+  }
+
+  return { uid, token };
+}
+
 export async function applyAuthSession(data, identifier, authContext) {
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = authContext;
 
@@ -34,6 +49,10 @@ export async function applyAuthSession(data, identifier, authContext) {
   await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, data.user_id?.toString() || '');
   await AsyncStorage.setItem(STORAGE_KEYS.IS_SHOP, shopMode ? 'true' : 'false');
   await AsyncStorage.setItem(STORAGE_KEYS.IS_CLIENT, data.is_client ? 'true' : 'false');
+  await AsyncStorage.setItem(
+    STORAGE_KEYS.EMAIL_VERIFIED,
+    data.email_verified ? 'true' : 'false',
+  );
 
   if (hasShopProfiles) {
     await AsyncStorage.setItem(STORAGE_KEYS.SHOP_PROFILES, JSON.stringify(data.shop_profiles));
@@ -61,6 +80,23 @@ export async function applyAuthSession(data, identifier, authContext) {
     );
   } else {
     await AsyncStorage.removeItem(STORAGE_KEYS.SHOP_MEMBERSHIPS);
+  }
+
+  const orgMemberships = Array.isArray(data.organization_memberships)
+    ? data.organization_memberships
+    : [];
+  if (orgMemberships.length) {
+    await AsyncStorage.setItem(
+      STORAGE_KEYS.ORGANIZATION_MEMBERSHIPS,
+      JSON.stringify(orgMemberships),
+    );
+    await AsyncStorage.setItem(
+      STORAGE_KEYS.CURRENT_ORGANIZATION_ID,
+      String(orgMemberships[0].id),
+    );
+  } else {
+    await AsyncStorage.removeItem(STORAGE_KEYS.ORGANIZATION_MEMBERSHIPS);
+    await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_ORGANIZATION_ID);
   }
 }
 

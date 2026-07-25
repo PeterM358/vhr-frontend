@@ -8,6 +8,7 @@ export function shouldShowAppFooter(isAuthenticated, routeName) {
     routeName === 'AuthLoading' ||
     routeName === 'PublicHome' ||
     routeName === 'PublicSeoPage' ||
+    routeName === 'PublicPolicyPage' ||
     routeName === 'Login' ||
     routeName === 'Register' ||
     routeName === 'PasswordRequestReset' ||

@@ -56,6 +56,9 @@ import {
   partnerPurchaseOrderDetail,
   partnerGoodsReceipt,
   partnerStorageLocations,
+  partnerFleet,
+  partnerOrganizationHome,
+  partnerOrganizationNetwork,
 } from './webRoutes';
 
 const PARTNER_HOME_ROUTE = {
@@ -970,4 +973,44 @@ export function navigateToPartnerStorageLocations(navigation) {
     return;
   }
   navigation.navigate('ShopStorageLocations');
+}
+
+export function navigateToPartnerFleet(navigation, params = {}) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'FleetDashboard', params }], partnerFleet(params));
+    return;
+  }
+  navigation.navigate('FleetDashboard', params);
+}
+
+export function navigateToOrgHome(navigation, params = {}) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [{ name: 'OrgHome', params }], partnerOrganizationHome(params));
+    return;
+  }
+  navigation.navigate('OrgHome', params);
+}
+
+export function navigateToOrgFleet(navigation, params = {}) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(
+      navigation,
+      [{ name: 'OrgHome' }, { name: 'FleetDashboard', params }],
+      partnerFleet(params),
+    );
+    return;
+  }
+  navigation.navigate('FleetDashboard', params);
+}
+
+export function navigateToOrgNetwork(navigation, params = {}) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(
+      navigation,
+      [{ name: 'OrgHome' }, { name: 'NetworkOrganization', params }],
+      partnerOrganizationNetwork(params),
+    );
+    return;
+  }
+  navigation.navigate('NetworkOrganization', params);
 }

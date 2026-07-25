@@ -24,7 +24,95 @@
     "number": "Номер",
     "allClear": "Всичко е наред",
     "service": "Услуга",
-    "validation": "Валидация"
+    "validation": "Валидация",
+    "continue": "Напред",
+    "done": "Готово"
+  },
+  "fleet": {
+    "dashboard": {
+      "title": "Автопарк",
+      "searchPlaceholder": "Търсене по рег. №, VIN, шаси, вътр. №",
+      "allDepartments": "Всички отдели",
+      "allStatuses": "Всички статуси",
+      "noDepartment": "Без отдел",
+      "empty": "Няма превозни средства по избраните филтри.",
+      "error": "Автопаркът не може да се зареди."
+    },
+    "readiness": {
+      "ready": "Готов",
+      "expiringSoon": "Изтича скоро",
+      "notReady": "Не е готов",
+      "unknown": "Неизвестен"
+    },
+    "maintenance": {
+      "overdue": "Просрочено",
+      "dueSoon": "Скоро",
+      "completed": "Изпълнено",
+      "noData": "Няма данни"
+    },
+    "provenance": {
+      "imported": "Импортирано от регистър",
+      "manual": "Въведено ръчно",
+      "document": "Потвърден документ",
+      "service": "Сервизен запис"
+    },
+    "detail": {
+      "readinessTitle": "Готовност за работа",
+      "mandatoryItems": "Задължителни документи",
+      "maintenanceTitle": "Поддръжка",
+      "nextDeadline": "Следващ срок",
+      "internalNumber": "Вътр. №",
+      "noDate": "Без дата",
+      "backToFleet": "Към автопарка",
+      "outOfServiceWarning": "Активът е маркиран като извън експлоатация.",
+      "error": "Превозното средство не може да се зареди.",
+      "state": {
+        "valid": "Валиден",
+        "expiring": "Изтича",
+        "expired": "Изтекъл",
+        "missing": "Липсва"
+      }
+    },
+    "openFleet": "Автопарк"
+  },
+  "fleetImport": {
+    "title": "Импорт на автопарк",
+    "selectOrganization": "Изберете организация",
+    "chooseOrganization": "Изберете организация",
+    "continue": "Напред",
+    "done": "Готово",
+    "uploadTitle": "Качване на таблица",
+    "uploadHelper": "Качете XLS или XLSX регистър на автопарк (ZPT заглавия).",
+    "uploadAction": "Изберете файл и качете",
+    "fileRetainedWarning": "Оригиналният файл се съхранява поверително за одит след импорта.",
+    "previewTitle": "Преглед на редове",
+    "previewSummary": "{{count}} реда · {{unresolved}} нерешени",
+    "overrideReason": "Причина при неясни дублирания",
+    "defaultOverrideReason": "Ръчен преглед в импорт съветника",
+    "duplicateStatus": "Дублиране",
+    "resolution": "Решение",
+    "decisionCreate": "Създай",
+    "decisionLink": "Вържи съществуващ",
+    "decisionSkip": "Пропусни",
+    "confirmAction": "Потвърди импорт",
+    "unresolvedBlocked": "Решете всички редове преди потвърждение.",
+    "resultTitle": "Резултат от импорт",
+    "resultSummary": "Създадени {{created}} · обновени {{updated}} · пропуснати {{skipped}} · отхвърлени {{rejected}}",
+    "downloadErrors": "Изтегли отчет за грешки",
+    "noOrganizations": "Нямате организация с право за импорт на автопарк.",
+    "stepLabel": "Стъпка {{step}} от {{total}}",
+    "uploadReplayTitle": "Файлът вече е импортиран",
+    "uploadReplayBody": "Този файл вече е обработен за организацията.",
+    "openAction": "Импорт на автопарк",
+    "errors": {
+      "loadOrganizations": "Организациите не можаха да се заредят",
+      "uploadFailed": "Качването не успя",
+      "rowDecisionFailed": "Решението за реда не бе запазено",
+      "confirmFailed": "Потвърждението не успя",
+      "downloadFailed": "Отчетът за грешки не можа да се изтегли",
+      "uploadWebOnlyTitle": "Качване в уеб",
+      "uploadWebOnlyBody": "Импортът на автопарк засега е достъпен през уеб приложението."
+    }
   },
   "language": {
     "label": "Език",
@@ -64,11 +152,59 @@
       "complaints": "Оплаквания",
       "purchaseOrders": "Поръчки за доставка",
       "businessNetwork": "Бизнес мрежа",
+      "organizationWorkspace": "Организационно пространство",
+      "fleet": "Автопарк",
       "storageLocations": "Складови адреси",
       "priceList": "Ценоразпис",
       "notifications": "Известия",
       "switchCenter": "Смени сервиз",
       "explore": "Разгледай"
+    }
+  },
+  "org": {
+    "drawer": {
+      "title": "Организация",
+      "serviceCenter": "Сервиз",
+      "switchCenter": "Смени сервиз"
+    },
+    "home": {
+      "title": "Организация",
+      "subtitle": "Споделен персонал, автопарк, документи и операции за вашата фирма.",
+      "modules": "Работно пространство",
+      "openServiceCenter": "Отвори сервизното пространство"
+    },
+    "switcher": {
+      "label": "Организация"
+    },
+    "nav": {
+      "overview": "Преглед",
+      "locations": "Локации",
+      "fleet": "Автопарк",
+      "workOrders": "Работни поръчки",
+      "warehouse": "Склад",
+      "workforce": "Персонал",
+      "documents": "Документи",
+      "ledger": "Счетоводство",
+      "network": "Бизнес мрежа",
+      "transport": "Транспорт",
+      "construction": "Строителство",
+      "publicProfile": "Публичен профил",
+      "invoicing": "Фактуриране"
+    },
+    "onboarding": {
+      "title": "Създайте организация",
+      "subtitle": "Настройте работното пространство на фирмата за автопарк, персонал и документи.",
+      "companyName": "Име на фирмата",
+      "businessType": "Тип бизнес",
+      "create": "Създай организация",
+      "nameRequired": "Въведете име на фирмата.",
+      "failed": "Организацията не бе създадена.",
+      "types": {
+        "transport": "Транспортна фирма",
+        "construction": "Строителство",
+        "serviceCenter": "Автосервиз",
+        "other": "Друг бизнес"
+      }
     }
   },
   "auth": {
@@ -129,6 +265,35 @@
     "invalidVerifyLink": "Линкът за потвърждение е невалиден или непълен.",
     "verifyFailed": "Имейлът не можа да бъде потвърден. Заявете ново съобщение.",
     "goToLogin": "Към вход"
+  },
+  "orgInvite": {
+    "title": "Покана към организация",
+    "organization": "Организация",
+    "role": "Роля",
+    "recipient": "Поканен като",
+    "recipientHidden": "Скрит получател",
+    "accept": "Приеми поканата",
+    "verifyEmailFirst": "Потвърдете имейла си, преди да приемете поканата.",
+    "openProfile": "Отвори профила",
+    "invalid": "Линкът е невалиден, изтекъл или вече използван.",
+    "expired": "Поканата е изтекла.",
+    "wrongUser": "Поканата е изпратена към друг акаунт.",
+    "alreadyUsed": "Поканата вече е приета.",
+    "acceptFailed": "Поканата не можа да бъде приета.",
+    "sendVerificationEmail": "Изпрати имейл за потвърждение",
+    "verificationSent": "Изпратихме имейл за потвърждение. Проверете пощата и се върнете тук след потвърждение.",
+    "resendFailed": "Имейлът за потвърждение не можа да бъде изпратен.",
+    "resendNeedsEmail": "Влезте с имейла, на който е изпратена поканата.",
+    "roles": {
+      "owner": "Собственик",
+      "admin": "Администратор",
+      "purchasing": "Покупки",
+      "sales": "Продажби",
+      "warehouse": "Склад",
+      "transport": "Транспорт",
+      "accounting": "Счетоводство",
+      "viewer": "Преглед"
+    }
   },
   "dashboard": {
     "heroSubtitle": "Автомобили, сервизна история и ремонти — на едно място.",
@@ -1268,6 +1433,44 @@
     "useCatalogInstead": "Използвай избор от каталог",
     "registrationMileage": "Регистрация и пробег",
     "kilometers": "Пробег",
+    "catalogLead": "Избери тип, марка, модел, година и гориво от каталога.",
+    "vehicleTypeLabel": "Тип превозно средство *",
+    "makeBrandLabel": "Марка *",
+    "modelLabel": "Модел *",
+    "yearLabel": "Година *",
+    "engineVariantLabel": "Двигател / вариант",
+    "registrationNumberLabel": "Регистрационен номер",
+    "registrationNumberPlaceholder": "напр. CA1234AB",
+    "registrationCountryLabel": "Държава на регистрация (ISO)",
+    "registrationCountryPlaceholder": "напр. BG",
+    "vinLabel": "VIN / шаси",
+    "vinLabelRoad": "VIN (17 символа)",
+    "chassisLabel": "Номер на шаси / рама",
+    "chassisLabelOptional": "Номер на шаси / рама (по избор)",
+    "chassisHintRoad": "Допълнителен — обикновено на рамата (стълб на вратата или моторното отделение). Не замества VIN.",
+    "chassisHintMachinery": "Основен идентификатор без стандартен VIN — обикновено на основната рама.",
+    "chassisHintOptional": "По избор — номер на рама или шаси.",
+    "serialLabel": "Сериен номер на производителя",
+    "serialHintMachinery": "От табелата на производителя — използвай, когато няма номер на шаси.",
+    "vinHintRoad": "Нужен е 17-символен VIN преди ремонти или резервации. Обикновено на стъклото или стълба на вратата. Можеш да запазиш чернова без него.",
+    "vinHintMachinery": "За пътни превозни средства VIN е в отделно поле — за техника използвай шаси или сериен номер.",
+    "vinHintOptional": "По избор — подобрява съвпаденията за части и сервиз.",
+    "noModelsTitle": "Няма модели за тази марка и тип",
+    "noModelsBody": "Въведи модела ръчно — няма да отгатваме от несвързани каталожни данни.",
+    "addModelManually": "Друг модел / ръчно",
+    "otherModelFallback": "Не намираш модела? Въведи ръчно",
+    "registrationScan": {
+      "title": "Регистрационен документ (преглед)",
+      "lead": "Сканирай или качи свидетелство за регистрация, за да прегледаш разпознатите полета. Винаги потвърждаваш преди прилагане — документът никога не сменя собствеността автоматично.",
+      "scanButton": "Сканирай регистрационен документ",
+      "previewTitle": "Разпознати полета (потвърди за прилагане)",
+      "previewHint": "Прегледай всяка стойност. Съществуващ VIN в системата ще стартира процедура по прехвърляне/заявка — без тихи дубликати.",
+      "fieldVin": "VIN",
+      "fieldPlate": "Регистрационен номер",
+      "fieldMake": "Марка",
+      "fieldModel": "Модел",
+      "confirmApply": "Приложи към формата"
+    },
     "errors": {
       "selectTypeFirst": "Първо избери тип превозно средство.",
       "selectBrandFirst": "Първо избери марка.",
@@ -2278,7 +2481,7 @@
     "version": "Версия",
     "versionMobile": "Версия x.x.x",
     "privacyPolicy": "Политика за поверителност",
-    "termsOfService": "Общи условия",
+    "termsOfService": "Условия за ползване",
     "cookiePolicy": "Политика за бисквитки",
     "helpCenter": "Център за помощ",
     "faq": "ЧЗВ",
@@ -2541,6 +2744,13 @@
     "serviceHistory": "{app} — Сервизна история",
     "documents": "{app} — Документи",
     "profile": "{app} — Профил",
+    "privacyPolicy": "{app} — Политика за поверителност",
+    "termsOfUse": "{app} — Условия за ползване",
+    "cookiePolicy": "{app} — Политика за бисквитки",
+    "support": "{app} — Поддръжка",
+    "partnerTerms": "{app} — Бизнес условия",
+    "dpa": "{app} — DPA",
+    "subprocessors": "{app} — Subprocessors",
     "vehicleDetails": "{app} — Детайли",
     "vehicleSpecs": "{app} — Спецификации",
     "chooseServiceCenter": "{app} — Избери сервиз",
@@ -2685,6 +2895,17 @@
       "vatNumber": "ДДС номер",
       "send": "Изпрати покана",
       "sent": "Поканата е изпратена"
+    },
+    "membershipInvite": {
+      "title": "Покани член на екипа",
+      "email": "Имейл на член",
+      "role": "Роля в организацията",
+      "send": "Създай линк за покана",
+      "linkReady": "Споделете този линк веднъж — няма да се покаже отново.",
+      "copyLink": "Копирай линка",
+      "shareLink": "Сподели линка",
+      "copied": "Линкът е копиран.",
+      "created": "Линкът за покана е създаден."
     },
     "incomingOrders": {
       "title": "Incoming orders",
@@ -2955,6 +3176,29 @@
       "noRepairTypes": "Няма налични типове ремонти.",
       "saveFailed": "Промоцията не можа да се запише.",
       "success": "Промоцията е създадена."
+    }
+  },
+  "policies": {
+    "notFound": "Страницата с политика не е намерена.",
+    "backToHome": "Към Veversal",
+    "betaNoticeTitle": "Бета преглед",
+    "betaNoticeBody": "Това е тестова среда. Съдържанието и обработката на данни могат да се променят преди production правен sign-off. Запазвайте собствени копия на важни документи.",
+    "lawyerReviewBadge": "Очаква правен преглед",
+    "versionLabel": "Версия",
+    "effectiveDateLabel": "В сила от",
+    "checksumLabel": "Checksum",
+    "draftStatus": "Бета чернова — не е финален правен текст.",
+    "relatedPolicies": "Свързани политики",
+    "alternateLocale": "Прочети на",
+    "seoDescription": "Veversal {title} — бета преглед.",
+    "pageTitles": {
+      "privacy": "Политика за поверителност",
+      "terms": "Условия за ползване",
+      "cookies": "Политика за бисквитките",
+      "support": "Поддръжка",
+      "partner-terms": "Условия за бизнес и partners",
+      "dpa": "Споразумение за обработка на данни",
+      "subprocessors": "Subprocessors"
     }
   }
 }

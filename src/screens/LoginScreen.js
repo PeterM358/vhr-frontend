@@ -136,6 +136,10 @@ export default function LoginScreen({ navigation, route }) {
           (Array.isArray(data.shop_memberships) && data.shop_memberships.length > 0);
         await AsyncStorage.setItem(STORAGE_KEYS.IS_SHOP, googleShopMode ? 'true' : 'false');
         await AsyncStorage.setItem(STORAGE_KEYS.IS_CLIENT, data.is_client ? 'true' : 'false');
+        await AsyncStorage.setItem(
+          STORAGE_KEYS.EMAIL_VERIFIED,
+          data.email_verified ? 'true' : 'false',
+        );
 
         if (googleShopMode) {
           const shopRoute = await resolveShopEntryRoute();
@@ -176,6 +180,10 @@ export default function LoginScreen({ navigation, route }) {
         (Array.isArray(data.shop_memberships) && data.shop_memberships.length > 0);
       await AsyncStorage.setItem(STORAGE_KEYS.IS_SHOP, shopMode ? 'true' : 'false');
       await AsyncStorage.setItem(STORAGE_KEYS.IS_CLIENT, data.is_client ? 'true' : 'false');
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.EMAIL_VERIFIED,
+        data.email_verified ? 'true' : 'false',
+      );
 
       if (data.shop_profiles && data.shop_profiles.length > 0) {
         await AsyncStorage.setItem(STORAGE_KEYS.SHOP_PROFILES, JSON.stringify(data.shop_profiles));
@@ -200,8 +208,29 @@ export default function LoginScreen({ navigation, route }) {
         await AsyncStorage.removeItem(STORAGE_KEYS.SHOP_MEMBERSHIPS);
       }
 
-      if (shopMode) {
-        const shopRoute = await resolveShopEntryRoute();
+      const orgMemberships = Array.isArray(data.organization_memberships)
+        ? data.organization_memberships
+        : [];
+      if (orgMemberships.length) {
+        await AsyncStorage.setItem(
+          STORAGE_KEYS.ORGANIZATION_MEMBERSHIPS,
+          JSON.stringify(orgMemberships),
+        );
+        await AsyncStorage.setItem(
+          STORAGE_KEYS.CURRENT_ORGANIZATION_ID,
+          String(orgMemberships[0].id),
+        );
+      } else {
+        await AsyncStorage.removeItem(STORAGE_KEYS.ORGANIZATION_MEMBERSHIPS);
+        await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_ORGANIZATION_ID);
+      }
+
+      const shopRoute = await resolveShopEntryRoute({ authData: data });
+      if (shopRoute.name === 'OrgHome' || shopRoute.name === 'OrgOnboarding' || shopMode) {
+        const returnPath = await consumeAuthReturnUrl();
+        if (returnPath && resetNavigationToCanonicalPath(navigation, returnPath)) {
+          return;
+        }
         await waitForAuthContextCommit();
         navigation.reset(buildShopAuthReset(shopRoute));
       } else {

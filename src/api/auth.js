@@ -87,6 +87,9 @@ export const login = async (emailOrPhone, password) => {
   }
 };
 
+import { STORAGE_KEYS } from '../constants/storageKeys';
+import { writeOrganizationMemberships } from '../utils/orgWorkspace';
+
 // ✅ Store Login Data Helper
 const storeLoginData = async (data, fallbackDisplay) => {
   const {
@@ -99,6 +102,8 @@ const storeLoginData = async (data, fallbackDisplay) => {
     phone,
     shop_profiles,
     shop_memberships,
+    organization_memberships,
+    email_verified,
   } = data;
 
   let userDisplay = '';
@@ -120,6 +125,7 @@ const storeLoginData = async (data, fallbackDisplay) => {
     ['@user_email_or_phone', userDisplay],
     ['@login_email', email && String(email).trim() ? String(email).trim() : ''],
     ['@login_phone', phone && String(phone).trim() ? String(phone).trim() : ''],
+    [STORAGE_KEYS.EMAIL_VERIFIED, email_verified ? 'true' : 'false'],
   ];
 
   if (shopMode && hasShopProfiles) {
@@ -137,6 +143,9 @@ const storeLoginData = async (data, fallbackDisplay) => {
   if (shopMode && hasShopMemberships) {
     itemsToStore.push(['@shop_memberships', JSON.stringify(shop_memberships)]);
   }
+
+  const orgMemberships = Array.isArray(organization_memberships) ? organization_memberships : [];
+  await writeOrganizationMemberships(orgMemberships);
 
   await AsyncStorage.multiSet(itemsToStore);
 };
@@ -178,6 +187,33 @@ export const logout = async (
   resetToPublicHome(navigation);
 };
 
+// ✅ Resend email verification link
+export const resendEmailVerification = async (email, language = getLocale()) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/api/users/email/verify/resend/`, {
+      email: String(email || '').trim().toLowerCase(),
+      language: normalizeAuthLanguage(language),
+    });
+    return response.data;
+  } catch (error) {
+    safeError('Email verification resend failed', error);
+    throw new Error(messageFromApiError(error, 'Failed to send verification email.'));
+  }
+};
+
+// ✅ Refresh authenticated session flags (email_verified, etc.)
+export const fetchAuthSession = async (accessToken) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/users/session/`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return response.data;
+  } catch (error) {
+    safeError('Auth session fetch failed', error);
+    throw new Error(messageFromApiError(error, 'Failed to refresh account status.'));
+  }
+};
+
 // ✅ Request Password Reset (send email)
 export const requestPasswordReset = async (email, language = getLocale()) => {
   try {
@@ -189,6 +225,29 @@ export const requestPasswordReset = async (email, language = getLocale()) => {
   } catch (error) {
     safeError('Password reset request failed', error);
     throw new Error('Failed to send password reset email.');
+  }
+};
+
+// ✅ Confirm email verification (returns login tokens when successful)
+export const confirmEmailVerification = async (uid, token) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/api/users/email/verify/confirm/`, {
+      uid,
+      token,
+    });
+    const data = response.data;
+    if (data?.access) {
+      const identifier =
+        (data.email && String(data.email).trim()) ||
+        (data.phone && String(data.phone).trim()) ||
+        '';
+      await storeLoginData(data, identifier);
+      await syncPushDeviceToken(data.access);
+    }
+    return data;
+  } catch (error) {
+    safeError('Email verification confirm failed', error);
+    throw new Error(messageFromApiError(error, 'Failed to verify email.'));
   }
 };
 

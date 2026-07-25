@@ -13,21 +13,27 @@ import { GarageSceneProvider } from './context/GarageSceneContext';
 import MessageDialogHost from './components/ui/MessageDialog';
 import PartnerInAppBannerHost from './components/partner/PartnerInAppBanner';
 import MobileWebInsetsBridge from './components/MobileWebInsetsBridge';
-import { initializeAnalytics } from './services/analytics';
+import CookieConsentBanner from './components/common/CookieConsentBanner';
 
 const handleDeepLink = ({ url }) => {
   if (!url) return;
   // https://host/reset-password/uid/token or service1001://reset-password/uid/token
-  const match = url.match(/reset-password\/([^/?#]+)\/([^/?#]+)/);
-  if (match) {
-    const [, uid, token] = match;
+  const resetMatch = url.match(/reset-password\/([^/?#]+)\/([^/?#]+)/);
+  if (resetMatch) {
+    const [, uid, token] = resetMatch;
     Linking.openURL(`service1001://reset-password/${uid}/${token}`);
+    return;
+  }
+  const verifyMatch = url.match(/verify-email\/([^/?#]+)\/([^/?#]+)/);
+  if (verifyMatch) {
+    const [, uid, token] = verifyMatch;
+    Linking.openURL(`service1001://verify-email/${uid}/${token}`);
   }
 };
 
 export default function App() {
   useEffect(() => {
-    initializeAnalytics();
+    // Analytics init is gated by cookie/analytics consent (see CookieConsentBanner).
   }, []);
 
   useEffect(() => {
@@ -61,6 +67,7 @@ export default function App() {
                     <AppNavigator />
                     <MessageDialogHost />
                     <PartnerInAppBannerHost />
+                    <CookieConsentBanner />
                   </MobileWebInsetsBridge>
                 </WebSocketProvider>
               </GarageSceneProvider>

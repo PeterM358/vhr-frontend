@@ -213,3 +213,40 @@ export async function listProductMappingsAsBuyer(token, organizationId) {
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load product mappings'));
   return response.json();
 }
+
+export async function previewOrganizationMembershipInvite(token) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/network/memberships/invites/preview/${encodeURIComponent(token)}/`,
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Invite expired or not found.'));
+  return response.json();
+}
+
+export async function acceptOrganizationMembershipInvite(accessToken, inviteToken) {
+  const response = await fetch(`${API_BASE_URL}/api/network/memberships/invites/accept/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ token: inviteToken }),
+  });
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to accept invite'));
+  return response.json();
+}
+
+export async function createOrganizationMembershipInvite(accessToken, organizationId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/network/memberships/invites/${orgQuery(organizationId)}`,
+    {
+      method: 'POST',
+      headers: {
+        ...(await shopScopedHeaders(accessToken)),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to create invite'));
+  return response.json();
+}
