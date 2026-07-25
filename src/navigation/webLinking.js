@@ -869,7 +869,18 @@ export function getPartnerNavigationStateFromPath(path) {
     return { routes: [orgHome], index: 0 };
   }
   if (pathPart === 'partner/organization/network') {
-    return { routes: [orgHome, { name: 'NetworkOrganization' }], index: 1 };
+    return {
+      routes: [
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [{ name: 'OrgOverview' }, { name: 'OrgNetwork' }],
+          },
+        },
+      ],
+      index: 0,
+    };
   }
   if (pathPart === 'partner/organization/fleet') {
     const params = {};
@@ -878,13 +889,33 @@ export function getPartnerNavigationStateFromPath(path) {
       params.organizationId = organizationId;
     }
     return {
-      routes: [orgHome, { name: 'FleetDashboard', params: Object.keys(params).length ? params : undefined }],
-      index: 1,
+      routes: [
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [
+              { name: 'OrgOverview' },
+              { name: 'OrgFleet', params: Object.keys(params).length ? params : undefined },
+            ],
+          },
+        },
+      ],
+      index: 0,
     };
   }
   if (pathPart === 'partner/organization/fleet/import') {
     return {
-      routes: [orgHome, { name: 'FleetRegisterImport' }],
+      routes: [
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [{ name: 'OrgOverview' }, { name: 'OrgFleet' }],
+          },
+        },
+        { name: 'FleetRegisterImport' },
+      ],
       index: 1,
     };
   }
@@ -901,11 +932,19 @@ export function getPartnerNavigationStateFromPath(path) {
     }
     return {
       routes: [
-        orgHome,
-        { name: 'FleetDashboard', params: organizationId ? { organizationId } : undefined },
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [
+              { name: 'OrgOverview' },
+              { name: 'OrgFleet', params: organizationId ? { organizationId } : undefined },
+            ],
+          },
+        },
         { name: 'OrgFleetVehicleDetail', params },
       ],
-      index: 2,
+      index: 1,
     };
   }
   if (pathPart === 'partner/fleet') {
@@ -915,13 +954,13 @@ export function getPartnerNavigationStateFromPath(path) {
       params.organizationId = organizationId;
     }
     return {
-      routes: [orgHome, { name: 'FleetDashboard', params: Object.keys(params).length ? params : undefined }],
+      routes: [partnerHome, { name: 'FleetDashboard', params: Object.keys(params).length ? params : undefined }],
       index: 1,
     };
   }
   if (pathPart === 'partner/fleet/import') {
     return {
-      routes: [orgHome, { name: 'FleetRegisterImport' }],
+      routes: [partnerHome, { name: 'FleetRegisterImport' }],
       index: 1,
     };
   }
@@ -938,7 +977,7 @@ export function getPartnerNavigationStateFromPath(path) {
     }
     return {
       routes: [
-        orgHome,
+        partnerHome,
         { name: 'FleetDashboard', params: organizationId ? { organizationId } : undefined },
         { name: 'OrgFleetVehicleDetail', params },
       ],
@@ -946,7 +985,7 @@ export function getPartnerNavigationStateFromPath(path) {
     };
   }
   if (pathPart === 'partner/business-network') {
-    return { routes: [orgHome, { name: 'NetworkOrganization' }], index: 1 };
+    return { routes: [partnerHome, { name: 'NetworkOrganization' }], index: 1 };
   }
 
   return null;
@@ -1350,8 +1389,8 @@ export async function redirectLegacyWebUrl() {
       : '/';
   } else if (pathname === '/partner/fleet' || pathname.startsWith('/partner/fleet/')) {
     target = pathname.replace('/partner/fleet', '/partner/organization/fleet');
-  } else if (pathname === '/partner/business-network' || pathname.startsWith('/partner/business-network/')) {
-    target = pathname.replace('/partner/business-network', '/partner/organization/network');
+  } else if (pathname === '/partner/business-network') {
+    target = '/partner/organization/network';
   } else if (pathname === '/CreateRepair' || pathname.startsWith('/CreateRepair')) {
     const query = parseRouteQuery(search);
     const serviceCenter = query.shopId || query.shop_id || query.serviceCenter || query.serviceCenterId;

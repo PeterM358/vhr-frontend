@@ -656,6 +656,10 @@ export function partnerStorageLocations(params = {}) {
   return buildPathWithQuery(`${PARTNER}/storage-locations`, params);
 }
 
+export function partnerLegacyFleet(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/fleet`, params);
+}
+
 export function partnerFleet(params = {}) {
   return buildPathWithQuery(`${PARTNER}/organization/fleet`, params);
 }
@@ -670,6 +674,10 @@ export function partnerFleetVehicleDetail(vehicleId, params = {}) {
 
 export function partnerOrganizationHome(params = {}) {
   return buildPathWithQuery(`${PARTNER}/organization`, params);
+}
+
+export function partnerBusinessNetwork(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/business-network`, params);
 }
 
 export function partnerOrganizationNetwork(params = {}) {

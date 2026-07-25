@@ -57,8 +57,10 @@ import {
   partnerGoodsReceipt,
   partnerStorageLocations,
   partnerFleet,
+  partnerLegacyFleet,
   partnerOrganizationHome,
   partnerOrganizationNetwork,
+  partnerBusinessNetwork,
 } from './webRoutes';
 
 const PARTNER_HOME_ROUTE = {
@@ -977,10 +979,26 @@ export function navigateToPartnerStorageLocations(navigation) {
 
 export function navigateToPartnerFleet(navigation, params = {}) {
   if (Platform.OS === 'web') {
-    resetPartnerStackWebRoutes(navigation, [{ name: 'FleetDashboard', params }], partnerFleet(params));
+    resetPartnerStackWebRoutes(
+      navigation,
+      [PARTNER_HOME_ROUTE, { name: 'FleetDashboard', params }],
+      partnerLegacyFleet(params),
+    );
     return;
   }
   navigation.navigate('FleetDashboard', params);
+}
+
+export function navigateToPartnerNetworkOrganization(navigation, params = {}) {
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(
+      navigation,
+      [PARTNER_HOME_ROUTE, { name: 'NetworkOrganization', params }],
+      partnerBusinessNetwork(params),
+    );
+    return;
+  }
+  navigation.navigate('NetworkOrganization', params);
 }
 
 export function navigateToOrgHome(navigation, params = {}) {
@@ -992,25 +1010,39 @@ export function navigateToOrgHome(navigation, params = {}) {
 }
 
 export function navigateToOrgFleet(navigation, params = {}) {
+  const routeParams = params.orgId != null ? { organizationId: params.orgId, ...params } : params;
+  const orgFleetRoute = {
+    name: 'OrgHome',
+    state: {
+      index: 1,
+      routes: [
+        { name: 'OrgOverview' },
+        { name: 'OrgFleet', params: Object.keys(routeParams).length ? routeParams : undefined },
+      ],
+    },
+  };
   if (Platform.OS === 'web') {
-    resetPartnerStackWebRoutes(
-      navigation,
-      [{ name: 'OrgHome' }, { name: 'FleetDashboard', params }],
-      partnerFleet(params),
-    );
+    resetPartnerStackWebRoutes(navigation, [orgFleetRoute], partnerFleet(params));
     return;
   }
-  navigation.navigate('FleetDashboard', params);
+  navigation.navigate('OrgHome', { screen: 'OrgFleet', params: routeParams });
 }
 
 export function navigateToOrgNetwork(navigation, params = {}) {
+  const routeParams = params.orgId != null ? { organizationId: params.orgId, ...params } : params;
+  const orgNetworkRoute = {
+    name: 'OrgHome',
+    state: {
+      index: 1,
+      routes: [
+        { name: 'OrgOverview' },
+        { name: 'OrgNetwork', params: Object.keys(routeParams).length ? routeParams : undefined },
+      ],
+    },
+  };
   if (Platform.OS === 'web') {
-    resetPartnerStackWebRoutes(
-      navigation,
-      [{ name: 'OrgHome' }, { name: 'NetworkOrganization', params }],
-      partnerOrganizationNetwork(params),
-    );
+    resetPartnerStackWebRoutes(navigation, [orgNetworkRoute], partnerOrganizationNetwork(params));
     return;
   }
-  navigation.navigate('NetworkOrganization', params);
+  navigation.navigate('OrgHome', { screen: 'OrgNetwork', params: routeParams });
 }

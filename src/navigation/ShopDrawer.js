@@ -38,6 +38,7 @@ import {
   navigateToPartnerComplaints,
   navigateToPartnerPurchaseOrders,
   navigateToPartnerStorageLocations,
+  navigateToPartnerNetworkOrganization,
   navigateToOrgHome,
 } from './webNavigation';
 import { readOrganizationMemberships } from '../utils/orgWorkspace';
@@ -293,7 +294,7 @@ function CustomDrawerContent(props) {
         {showBusinessNetwork ? (
           <DrawerItem
             label={t('drawer.partner.businessNetwork')}
-            onPress={() => openStackRoute(() => {}, 'NetworkOrganization')}
+            onPress={() => openStackRoute(navigateToPartnerNetworkOrganization, 'NetworkOrganization')}
             icon={({ color, size }) => <DrawerMenuIcon name="domain" color={color} size={size} />}
             {...itemProps}
           />
