@@ -7,7 +7,7 @@ import { View, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import AppNavigationBar from '../common/AppNavigationBar';
-import GlassNavIconButton from '../../navigation/GlassNavIconButton';
+import GlassNavIconButton from '../navigation/GlassNavIconButton';
 import { AuthContext } from '../../context/AuthManager';
 import { logout } from '../../api/auth';
 import { useTranslation } from '../../i18n';
