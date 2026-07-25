@@ -71,6 +71,19 @@ export async function patchFleetImportRow(token, organizationId, batchId, rowId,
   return response.json();
 }
 
+export async function bulkDecideFleetImportRows(token, organizationId, batchId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/fleet-import/${batchId}/rows/bulk-decide/`,
+    {
+      method: 'POST',
+      headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to apply bulk decisions'));
+  return response.json();
+}
+
 export async function confirmFleetImport(token, organizationId, batchId) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/fleet-import/${batchId}/confirm/`,

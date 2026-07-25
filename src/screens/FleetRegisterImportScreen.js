@@ -16,6 +16,7 @@ import AppNavigationBar from '../components/common/AppNavigationBar';
 import AppCard from '../components/ui/AppCard';
 import { useTranslation } from '../i18n';
 import {
+  bulkDecideFleetImportRows,
   confirmFleetImport,
   fleetImportErrorReportUrl,
   getFleetImportRows,
@@ -28,6 +29,21 @@ import { showMessage } from '../utils/crossPlatformAlert';
 
 const STEPS = ['organization', 'upload', 'preview', 'result'];
 
+const STATUSES_NEEDING_REASON = new Set([
+  'ambiguous',
+  'plate_vin_conflict',
+  'invalid_vin',
+  'needs_review',
+  'foreign_conflict',
+  'personal_match',
+]);
+
+function rowStatusLabel(t, status) {
+  const key = `fleetImport.status.${status}`;
+  const translated = t(key);
+  return translated === key ? status : translated;
+}
+
 export default function FleetRegisterImportScreen({ navigation }) {
   const { t, locale } = useTranslation();
   const [step, setStep] = useState('organization');
@@ -37,6 +53,7 @@ export default function FleetRegisterImportScreen({ navigation }) {
   const [batch, setBatch] = useState(null);
   const [rows, setRows] = useState([]);
   const [confirming, setConfirming] = useState(false);
+  const [bulkWorking, setBulkWorking] = useState(false);
   const [result, setResult] = useState(null);
   const [menuVisible, setMenuVisible] = useState(false);
   const [overrideReason, setOverrideReason] = useState('');
@@ -120,7 +137,7 @@ export default function FleetRegisterImportScreen({ navigation }) {
   const applyRowDecision = async (row, resolution) => {
     if (!selectedOrg || !batch) return;
     const payload = { resolution };
-    if (['ambiguous', 'plate_vin_conflict', 'invalid_vin', 'needs_review'].includes(row.duplicate_status)) {
+    if (STATUSES_NEEDING_REASON.has(row.duplicate_status) && resolution !== 'skip') {
       payload.reason = overrideReason.trim() || t('fleetImport.defaultOverrideReason');
     }
     if (resolution === 'link_existing' && row.duplicate_candidates?.[0]?.vehicle_id) {
@@ -132,6 +149,57 @@ export default function FleetRegisterImportScreen({ navigation }) {
       await refreshRows(selectedOrg.id, batch.batch_id);
     } catch (error) {
       showMessage(t('fleetImport.errors.rowDecisionFailed'), error.message);
+    }
+  };
+
+  const applyBulkDecision = async (resolution, { onlyStatuses } = {}) => {
+    if (!selectedOrg || !batch || unresolvedCount === 0) return;
+    const needsReason =
+      resolution !== 'skip' &&
+      rows.some(
+        (row) =>
+          row.resolution === 'unresolved' &&
+          (!onlyStatuses || onlyStatuses.includes(row.duplicate_status)) &&
+          STATUSES_NEEDING_REASON.has(row.duplicate_status),
+      );
+    const reason = overrideReason.trim() || t('fleetImport.defaultOverrideReason');
+    if (needsReason && !overrideReason.trim() && resolution === 'create') {
+      // Still send default reason so bulk create covers identity-review rows.
+    }
+    setBulkWorking(true);
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      const payload = {
+        resolution,
+        unresolved_only: true,
+      };
+      if (resolution !== 'skip') {
+        payload.reason = reason;
+      }
+      if (onlyStatuses?.length) {
+        payload.only_statuses = onlyStatuses;
+      }
+      const data = await bulkDecideFleetImportRows(
+        token,
+        selectedOrg.id,
+        batch.batch_id,
+        payload,
+      );
+      setBatch(data.batch || null);
+      await refreshRows(selectedOrg.id, batch.batch_id);
+      if (data.skipped_need_reason_count > 0) {
+        showMessage(
+          t('fleetImport.bulkPartialTitle'),
+          t('fleetImport.bulkPartialBody', {
+            updated: data.updated_count,
+            skipped: data.skipped_need_reason_count,
+          }),
+        );
+      }
+    } catch (error) {
+      showMessage(t('fleetImport.errors.bulkDecisionFailed'), error.message);
+    } finally {
+      setBulkWorking(false);
     }
   };
 
@@ -257,20 +325,50 @@ export default function FleetRegisterImportScreen({ navigation }) {
                 unresolved: unresolvedCount,
               })}
             </Text>
+            <Text style={styles.helper}>{t('fleetImport.identityReviewHint')}</Text>
             <TextInput
               label={t('fleetImport.overrideReason')}
               value={overrideReason}
               onChangeText={setOverrideReason}
               style={styles.input}
             />
+            {unresolvedCount > 0 ? (
+              <View style={styles.bulkRow}>
+                <Button
+                  mode="contained-tonal"
+                  disabled={bulkWorking}
+                  loading={bulkWorking}
+                  onPress={() => applyBulkDecision('create')}
+                  style={styles.bulkButton}
+                >
+                  {t('fleetImport.bulkCreateAll')}
+                </Button>
+                <Button
+                  mode="outlined"
+                  disabled={bulkWorking}
+                  onPress={() => applyBulkDecision('skip')}
+                  style={styles.bulkButton}
+                >
+                  {t('fleetImport.bulkSkipAll')}
+                </Button>
+                <Button
+                  mode="text"
+                  disabled={bulkWorking}
+                  onPress={() => applyBulkDecision('create', { onlyStatuses: ['needs_review'] })}
+                  style={styles.bulkButton}
+                >
+                  {t('fleetImport.bulkCreateIdentityReview')}
+                </Button>
+              </View>
+            ) : null}
             {rows.map((row) => (
               <View key={row.id} style={styles.rowCard}>
                 <Text style={styles.rowTitle}>
                   #{row.row_number} {row.normalized?.license_plate || row.normalized?.display_name || '—'}
                 </Text>
                 <Text style={styles.rowMeta}>
-                  {t('fleetImport.duplicateStatus')}: {row.duplicate_status} · {t('fleetImport.resolution')}:{' '}
-                  {row.resolution}
+                  {t('fleetImport.rowStatus')}: {rowStatusLabel(t, row.duplicate_status)} ·{' '}
+                  {t('fleetImport.resolution')}: {row.resolution}
                 </Text>
                 {row.result_error_message ? (
                   <Text style={styles.rowError}>{row.result_error_message}</Text>
@@ -340,6 +438,8 @@ const styles = StyleSheet.create({
   helper: { marginTop: 8, opacity: 0.85 },
   warning: { marginTop: 8, color: '#b45309' },
   input: { marginTop: 12, backgroundColor: 'transparent' },
+  bulkRow: { marginTop: 12, gap: 8 },
+  bulkButton: { alignSelf: 'stretch' },
   rowCard: { marginTop: 12 },
   rowTitle: { fontWeight: '600' },
   rowMeta: { opacity: 0.8, marginTop: 4 },
