@@ -74,10 +74,30 @@ export function messageFromApiResponseText(rawText, fallback = 'Request failed')
     return extractHtmlExceptionMessage(raw) || fallback;
   }
   try {
-    return formatDrfErrorMessage(JSON.parse(raw), fallback);
+    const parsed = JSON.parse(raw);
+    if (parsed?.code === 'fleet_import_unavailable') {
+      return parsed.detail || fallback;
+    }
+    return formatDrfErrorMessage(parsed, fallback);
   } catch {
-    return raw.length > 280 ? `${raw.slice(0, 280)}…` : raw;
+    if (raw.length > 280) return fallback;
+    return raw;
   }
+}
+
+/** Map fleet upload HTTP status + parsed body to a friendly localized message. */
+export function fleetUploadErrorMessage({ status, bodyText, locale = 'en', fallback }) {
+  const isBg = String(locale || '').startsWith('bg');
+  const parsedText = messageFromApiResponseText(bodyText, '');
+  if (parsedText && !parsedText.startsWith('<!')) {
+    return parsedText;
+  }
+  if (status === 503 || status >= 500) {
+    return isBg
+      ? 'Качването е временно недостъпно. Системата може да се актуализира — опитайте отново след малко.'
+      : 'Upload is temporarily unavailable. The system may be updating — try again shortly.';
+  }
+  return fallback;
 }
 
 export function messageFromApiError(error, fallback = 'Request failed.') {

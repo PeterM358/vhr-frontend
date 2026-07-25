@@ -1,9 +1,15 @@
 import { API_BASE_URL } from './config';
-import { messageFromApiResponseText } from '../utils/apiErrorMessage';
+import { fleetUploadErrorMessage, messageFromApiResponseText } from '../utils/apiErrorMessage';
+import { getLocale } from '../i18n';
 
 async function parseError(response, fallback) {
   const text = await response.text();
-  return messageFromApiResponseText(text, fallback);
+  return fleetUploadErrorMessage({
+    status: response.status,
+    bodyText: text,
+    locale: getLocale(),
+    fallback: messageFromApiResponseText(text, fallback),
+  });
 }
 
 function authHeaders(token) {

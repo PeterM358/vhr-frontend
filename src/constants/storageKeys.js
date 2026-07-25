@@ -13,6 +13,8 @@ export const STORAGE_KEYS = {
   WORKSPACE_MODE: '@workspace_mode',
   AUTH_RETURN_URL: '@auth_return_url',
   EMAIL_VERIFIED: '@email_verified',
+  /** 'person' | 'company' — set at sign-up to route company users to org onboarding */
+  SIGNUP_ACCOUNT_KIND: '@signup_account_kind',
   LOCALE: '@veversal_locale',
   /** 'accepted' | 'rejected' — web analytics/cookie consent choice */
   COOKIE_CONSENT: '@cookie_consent',

@@ -6,8 +6,12 @@
 
 const assert = require('assert');
 
+function isCompanySignupIntent(authData) {
+  return authData?.signup_account_kind === 'company';
+}
+
 function resolveOrgOnboardingRoute(authData) {
-  if (!authData?.email_verified) return null;
+  if (!authData?.email_verified && !isCompanySignupIntent(authData)) return null;
   const hasShop =
     Boolean(authData.is_shop) ||
     (Array.isArray(authData.shop_profiles) && authData.shop_profiles.length > 0) ||
@@ -40,6 +44,26 @@ assert.deepStrictEqual(
     organization_memberships: [],
   }),
   { name: 'OrgOnboarding' },
+);
+
+assert.deepStrictEqual(
+  resolveOrgOnboardingRoute({
+    email_verified: false,
+    signup_account_kind: 'company',
+    is_shop: false,
+    organization_memberships: [],
+  }),
+  { name: 'OrgOnboarding' },
+);
+
+assert.strictEqual(
+  resolveOrgOnboardingRoute({
+    email_verified: false,
+    signup_account_kind: 'person',
+    is_shop: false,
+    organization_memberships: [],
+  }),
+  null,
 );
 
 assert.strictEqual(

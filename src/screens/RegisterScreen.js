@@ -2,11 +2,13 @@ import React, { useContext, useState, useMemo } from 'react';
 import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import { Text, TextInput, Button, Portal, Dialog, ActivityIndicator, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { register } from '../api/auth';
 import { AuthContext } from '../context/AuthManager';
 import BaseStyles from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
 import { COLORS } from '../constants/colors';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import { resetToClientDashboard } from '../navigation/authNavigation';
 import { safeError } from '../utils/logger';
@@ -37,7 +39,7 @@ export default function RegisterScreen({ navigation }) {
 
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('client');
+  const [accountKind, setAccountKind] = useState('person');
   const [saving, setSaving] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
@@ -60,15 +62,27 @@ export default function RegisterScreen({ navigation }) {
     setSaving(true);
     try {
       const identifier = emailOrPhone.trim();
+      const isPerson = accountKind === 'person';
       const result = await register(
         identifier,
         password,
-        role === 'client',
-        role === 'shop',
+        isPerson,
+        false,
         locale
       );
 
       await applyLocalAuthSession(result, identifier);
+      await AsyncStorage.setItem(STORAGE_KEYS.SIGNUP_ACCOUNT_KIND, accountKind);
+
+      if (accountKind === 'company') {
+        navigation.reset(buildShopAuthReset({ name: 'OrgOnboarding' }));
+        return;
+      }
+
+      if (result.is_client) {
+        resetToClientDashboard(navigation);
+        return;
+      }
 
       const route = await resolveShopEntryRoute({
         wizardWhenIncomplete: true,
@@ -76,8 +90,6 @@ export default function RegisterScreen({ navigation }) {
       });
       if (route.name === 'OrgHome' || route.name === 'OrgOnboarding' || result.is_shop) {
         navigation.reset(buildShopAuthReset(route));
-      } else if (result.is_client) {
-        resetToClientDashboard(navigation);
       } else {
         navigation.reset({
           index: 0,
@@ -110,46 +122,46 @@ export default function RegisterScreen({ navigation }) {
           <Text style={styles.kicker}>{t('auth.signUp')}</Text>
           <Text style={styles.subtitle}>{t('auth.signUpSubtitle')}</Text>
 
-          <Text style={styles.rolePrompt}>{t('auth.accountType')}</Text>
+          <Text style={styles.rolePrompt}>{t('auth.accountKind')}</Text>
 
           <View style={styles.roleContainer}>
             <Pressable
-              onPress={() => setRole('client')}
+              onPress={() => setAccountKind('person')}
               style={({ pressed }) => [
                 styles.roleButton,
-                role === 'client' && styles.roleButtonSelected,
+                accountKind === 'person' && styles.roleButtonSelected,
                 pressed && styles.roleButtonPressed,
               ]}
             >
               <Text
-                style={[styles.roleTitle, role === 'client' && styles.roleTitleSelected]}
+                style={[styles.roleTitle, accountKind === 'person' && styles.roleTitleSelected]}
               >
-                {t('auth.clientRole')}
+                {t('auth.personRole')}
               </Text>
               <Text
-                style={[styles.roleSub, role === 'client' && styles.roleSubSelected]}
+                style={[styles.roleSub, accountKind === 'person' && styles.roleSubSelected]}
               >
-                {t('auth.clientRoleDescription')}
+                {t('auth.personRoleDescription')}
               </Text>
             </Pressable>
 
             <Pressable
-              onPress={() => setRole('shop')}
+              onPress={() => setAccountKind('company')}
               style={({ pressed }) => [
                 styles.roleButton,
-                role === 'shop' && styles.roleButtonSelected,
+                accountKind === 'company' && styles.roleButtonSelected,
                 pressed && styles.roleButtonPressed,
               ]}
             >
               <Text
-                style={[styles.roleTitle, role === 'shop' && styles.roleTitleSelected]}
+                style={[styles.roleTitle, accountKind === 'company' && styles.roleTitleSelected]}
               >
-                {t('auth.serviceCenterRole')}
+                {t('auth.companyRole')}
               </Text>
               <Text
-                style={[styles.roleSub, role === 'shop' && styles.roleSubSelected]}
+                style={[styles.roleSub, accountKind === 'company' && styles.roleSubSelected]}
               >
-                {t('auth.serviceCenterRoleDescription')}
+                {t('auth.companyRoleDescription')}
               </Text>
             </Pressable>
           </View>

@@ -108,6 +108,7 @@
     "errors": {
       "loadOrganizations": "Could not load organizations",
       "uploadFailed": "Upload failed",
+      "serviceUnavailable": "Upload is temporarily unavailable. The system may be updating — try again shortly.",
       "rowDecisionFailed": "Could not save row decision",
       "confirmFailed": "Confirm failed",
       "downloadFailed": "Could not download error report",
@@ -172,7 +173,8 @@
       "title": "Organization",
       "subtitle": "Shared workforce, fleet, documents, and operations for your company.",
       "modules": "Workspace",
-      "openServiceCenter": "Open service center workspace"
+      "openServiceCenter": "Open service center workspace",
+      "importFleetLater": "Import fleet later"
     },
     "switcher": {
       "label": "Organization"
@@ -194,12 +196,13 @@
     },
     "onboarding": {
       "title": "Create your organization",
-      "subtitle": "Set up your company workspace to manage fleet, workforce, and documents.",
+      "subtitle": "Set up your company workspace. You can import a fleet later when you are ready.",
       "companyName": "Company name",
       "businessType": "Business type",
       "create": "Create organization",
       "nameRequired": "Enter your company name.",
       "failed": "Could not create organization.",
+      "verifyEmailFirst": "Verify your email before creating the organization. Check your inbox for the confirmation link.",
       "types": {
         "transport": "Transport company",
         "construction": "Construction",
@@ -250,7 +253,12 @@
     "phoneNumber": "Phone number",
     "phoneLoginHelper": "Use the phone number linked to your account.",
     "signUpTitle": "Create your account",
-    "signUpSubtitle": "Choose client or service center, then add your sign-in details.",
+    "signUpSubtitle": "Choose individual or company, then add your sign-in details.",
+    "accountKind": "Who is signing up?",
+    "personRole": "Individual",
+    "personRoleDescription": "Personal garage & repair history",
+    "companyRole": "Company",
+    "companyRoleDescription": "Organization workspace for your business",
     "accountType": "Account type",
     "clientRole": "Client",
     "clientRoleDescription": "Vehicles & repair history",

@@ -22,7 +22,13 @@ import {
  * On error we fail safe to the dashboard.
  */
 export async function resolveShopEntryRoute({ wizardWhenIncomplete = false, authData = null } = {}) {
-  const data = authData || (await readStoredAuthRoutingData());
+  let data = authData || (await readStoredAuthRoutingData());
+  if (authData) {
+    const stored = await readStoredAuthRoutingData();
+    if (!data.signup_account_kind && stored.signup_account_kind) {
+      data = { ...data, signup_account_kind: stored.signup_account_kind };
+    }
+  }
   const orgRoute = resolvePartnerEntryRoute(data);
   if (orgRoute) {
     return orgRoute;

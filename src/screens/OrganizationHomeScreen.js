@@ -104,6 +104,12 @@ export default function OrganizationHomeScreen() {
             {t('org.home.openServiceCenter', null, 'Open service center workspace')}
           </Button>
         ) : null}
+
+        {org?.manage_fleet ? (
+          <Button mode="contained-tonal" onPress={() => navigation.navigate('FleetRegisterImport')}>
+            {t('org.home.importFleetLater', null, 'Import fleet later')}
+          </Button>
+        ) : null}
       </ScrollView>
     </ScreenBackground>
   );

@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
@@ -24,9 +24,10 @@ export default function OrganizationOnboardingScreen({ navigation }) {
   const { t } = useTranslation();
   const { authToken } = useContext(AuthContext);
   const [companyName, setCompanyName] = useState('');
-  const [businessType, setBusinessType] = useState('transport');
+  const [businessType, setBusinessType] = useState('other');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [emailVerified, setEmailVerified] = useState(true);
 
   const typeLabels = useMemo(
     () => ({
@@ -38,8 +39,15 @@ export default function OrganizationOnboardingScreen({ navigation }) {
     [t],
   );
 
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEYS.EMAIL_VERIFIED).then((raw) => {
+      setEmailVerified(String(raw || '').trim().toLowerCase() === 'true');
+    });
+  }, [authToken]);
+
   const finishToOrgHome = async (org) => {
     await setCurrentOrganizationId(org.id);
+    await AsyncStorage.removeItem(STORAGE_KEYS.SIGNUP_ACCOUNT_KIND);
     navigation.reset(buildShopAuthReset({ name: 'OrgHome' }));
   };
 
@@ -77,9 +85,19 @@ export default function OrganizationOnboardingScreen({ navigation }) {
             {t(
               'org.onboarding.subtitle',
               null,
-              'Set up your company workspace to manage fleet, workforce, and documents.',
+              'Set up your company workspace. You can import a fleet later when you are ready.',
             )}
           </Text>
+
+          {!emailVerified ? (
+            <Text style={styles.verifyNotice}>
+              {t(
+                'org.onboarding.verifyEmailFirst',
+                null,
+                'Verify your email before creating the organization. Check your inbox for the confirmation link.',
+              )}
+            </Text>
+          ) : null}
 
           <TextInput
             label={t('org.onboarding.companyName', null, 'Company name')}
@@ -123,6 +141,7 @@ export default function OrganizationOnboardingScreen({ navigation }) {
             <Button
               mode="contained"
               onPress={handleCreate}
+              disabled={!emailVerified}
               style={[BaseStyles.loginButton, styles.submit]}
               buttonColor={COLORS.PRIMARY}
               textColor={COLORS.ON_PRIMARY}
@@ -193,6 +212,11 @@ const styles = StyleSheet.create({
   error: {
     color: '#b91c1c',
     marginBottom: 12,
+  },
+  verifyNotice: {
+    color: '#b45309',
+    marginBottom: 12,
+    lineHeight: 20,
   },
   spinner: {
     marginVertical: 12,

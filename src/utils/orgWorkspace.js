@@ -111,6 +111,7 @@ export async function readStoredAuthRoutingData() {
     STORAGE_KEYS.SHOP_MEMBERSHIPS,
     STORAGE_KEYS.ORGANIZATION_MEMBERSHIPS,
     STORAGE_KEYS.EMAIL_VERIFIED,
+    STORAGE_KEYS.SIGNUP_ACCOUNT_KIND,
   ]);
   const byKey = Object.fromEntries(pairs);
   let shopProfiles = [];
@@ -134,18 +135,24 @@ export async function readStoredAuthRoutingData() {
   const isShopFlag = String(byKey[STORAGE_KEYS.IS_SHOP] || '').trim().toLowerCase() === 'true';
   const hasShopProfiles = Array.isArray(shopProfiles) && shopProfiles.length > 0;
   const hasShopMemberships = Array.isArray(shopMemberships) && shopMemberships.length > 0;
+  const signupAccountKind = String(byKey[STORAGE_KEYS.SIGNUP_ACCOUNT_KIND] || '').trim().toLowerCase();
   return {
     is_shop: isShopFlag || hasShopProfiles || hasShopMemberships,
     shop_profiles: hasShopProfiles ? shopProfiles : [],
     shop_memberships: hasShopMemberships ? shopMemberships : [],
     organization_memberships: Array.isArray(organizationMemberships) ? organizationMemberships : [],
     email_verified: String(byKey[STORAGE_KEYS.EMAIL_VERIFIED] || '').trim().toLowerCase() === 'true',
+    signup_account_kind: signupAccountKind === 'company' ? 'company' : signupAccountKind === 'person' ? 'person' : null,
   };
 }
 
-/** Verified user with no shop and no org should create an organization first. */
+export function isCompanySignupIntent(authData) {
+  return authData?.signup_account_kind === 'company';
+}
+
+/** Verified user (or company sign-up intent) with no shop and no org should create an organization first. */
 export function resolveOrgOnboardingRoute(authData) {
-  if (!authData?.email_verified) return null;
+  if (!authData?.email_verified && !isCompanySignupIntent(authData)) return null;
   const hasShop =
     Boolean(authData.is_shop) ||
     (Array.isArray(authData.shop_profiles) && authData.shop_profiles.length > 0) ||
