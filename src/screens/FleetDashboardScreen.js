@@ -1,16 +1,15 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, Button, Chip, Menu, Searchbar, Text, TouchableRipple } from 'react-native-paper';
+import { ActivityIndicator, Button, Menu, Searchbar, Text, TouchableRipple } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useFocusEffect } from '@react-navigation/native';
 
 import ScreenBackground from '../components/ScreenBackground';
-import AppCard from '../components/ui/AppCard';
-import AppNavigationBar from '../components/common/AppNavigationBar';
+import OrgAppHeader from '../components/org/OrgAppHeader';
 import { listOrgFleet, listOrganizations } from '../api/fleet';
 import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
-import { readOrganizationMemberships } from '../utils/orgWorkspace';
+import { readOrganizationMemberships, resolveIsOrgOnlySession } from '../utils/orgWorkspace';
 import { resolveIsPartnerSession } from '../utils/partnerSession';
 import { navigateToOrgHome } from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
@@ -136,9 +135,20 @@ export default function FleetDashboardScreen({ navigation, route }) {
     ? mapFleetReadiness({ status: readinessStatus }, t).label
     : t('fleet.dashboard.allStatuses');
 
+  const goRequestRepair = async () => {
+    const orgId = selectedOrg?.id || initialOrgId;
+    const isOrgOnly = await resolveIsOrgOnlySession();
+    navigation.navigate('CreateRepair', {
+      mode: 'request',
+      ...(orgId ? { organizationId: orgId } : {}),
+      returnTo: isOrgOnly ? 'OrgFleet' : 'FleetDashboard',
+      origin: 'FleetDashboard',
+    });
+  };
+
   return (
     <ScreenBackground>
-      <AppNavigationBar title={t('fleet.dashboard.title')} onBack={onBack} />
+      <OrgAppHeader mode="nested" title={t('fleet.dashboard.title')} onBack={onBack} />
       <View style={styles.toolbar}>
         <Menu
           visible={orgMenuVisible}
@@ -217,6 +227,9 @@ export default function FleetDashboardScreen({ navigation, route }) {
         </Menu>
         <Button mode="contained-tonal" onPress={() => navigation.navigate('FleetRegisterImport')}>
           {t('fleetImport.openAction')}
+        </Button>
+        <Button mode="outlined" onPress={goRequestRepair}>
+          {t('org.home.requestRepair', null, 'Request repair')}
         </Button>
       </View>
 

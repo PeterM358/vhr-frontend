@@ -6,10 +6,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
-import AppNavigationBar from '../components/common/AppNavigationBar';
+import OrgAppHeader from '../components/org/OrgAppHeader';
 import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import { createOrganizationMembershipInvite, getMyOrganization } from '../api/network';
-import { resolveActiveOrganizationId, resolveIsOrgOnlySession } from '../utils/orgWorkspace';
+import {
+  isFleetFocusedOrg,
+  resolveActiveOrganizationId,
+  resolveIsOrgOnlySession,
+} from '../utils/orgWorkspace';
 import { navigateToOrgFleet, navigateToOrgHome } from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 
@@ -33,6 +37,7 @@ export default function NetworkOrganizationScreen({ navigation, route }) {
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
   const [inviteMessage, setInviteMessage] = useState('');
+  const [orgOnly, setOrgOnly] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,7 +45,9 @@ export default function NetworkOrganizationScreen({ navigation, route }) {
     try {
       const token = await AsyncStorage.getItem('@access_token');
       const orgId = await resolveActiveOrganizationId(routeOrgId);
-      if (!orgId && (await resolveIsOrgOnlySession())) {
+      const isOrgOnly = await resolveIsOrgOnlySession();
+      setOrgOnly(isOrgOnly);
+      if (!orgId && isOrgOnly) {
         setOrg(null);
         setError(t('network.common.error'));
         return;
@@ -56,6 +63,9 @@ export default function NetworkOrganizationScreen({ navigation, route }) {
   }, [routeOrgId, t]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const fleetFocused = isFleetFocusedOrg(org) || orgOnly;
+  const showShopB2b = Boolean(org) && !fleetFocused;
 
   const createInvite = async () => {
     if (!org?.id || !inviteEmail.trim()) return;
@@ -114,9 +124,20 @@ export default function NetworkOrganizationScreen({ navigation, route }) {
     navigation.navigate('FleetDashboard', { organizationId: orgId });
   };
 
+  const goRequestRepair = async () => {
+    const orgId = org?.id || (await resolveActiveOrganizationId(routeOrgId));
+    navigation.navigate('CreateRepair', {
+      mode: 'request',
+      organizationId: orgId,
+      returnTo: 'OrgNetwork',
+      origin: 'OrgNetwork',
+    });
+  };
+
   return (
     <ScreenBackground>
-      <AppNavigationBar
+      <OrgAppHeader
+        mode="nested"
         title={t('network.organization.title')}
         onBack={async () => {
           if (await resolveIsOrgOnlySession()) {
@@ -170,36 +191,47 @@ export default function NetworkOrganizationScreen({ navigation, route }) {
             {inviteMessage ? <Text style={styles.success}>{inviteMessage}</Text> : null}
           </AppCard>
         ) : null}
-        <Button mode="contained" onPress={() => navigation.navigate('NetworkRoles')}>
-          {t('network.roles.title')}
-        </Button>
-        <Button mode="outlined" onPress={() => navigation.navigate('NetworkPartners')}>
-          {t('network.partners.title')}
-        </Button>
-        <Button mode="outlined" onPress={() => navigation.navigate('NetworkInvitePartner')}>
-          {t('network.invite.title')}
-        </Button>
-        <Button mode="outlined" onPress={() => navigation.navigate('NetworkIncomingOrders')}>
-          {t('network.incomingOrders.title')}
-        </Button>
-        <Button mode="outlined" onPress={() => navigation.navigate('NetworkProductMapping')}>
-          {t('network.mapping.title')}
-        </Button>
-        <Button mode="outlined" onPress={() => navigation.navigate('NetworkPackaging')}>
-          {t('network.packaging.title')}
-        </Button>
-        <Button mode="outlined" onPress={() => navigation.navigate('NetworkClaimsList')}>
-          {t('network.claims.myClaims')}
-        </Button>
-        <Button mode="outlined" onPress={() => navigation.navigate('NetworkIncomingClaims')}>
-          {t('network.claims.incoming')}
-        </Button>
+
+        {showShopB2b ? (
+          <>
+            <Button mode="contained" onPress={() => navigation.navigate('NetworkRoles')}>
+              {t('network.roles.title')}
+            </Button>
+            <Button mode="outlined" onPress={() => navigation.navigate('NetworkPartners')}>
+              {t('network.partners.title')}
+            </Button>
+            <Button mode="outlined" onPress={() => navigation.navigate('NetworkInvitePartner')}>
+              {t('network.invite.title')}
+            </Button>
+            <Button mode="outlined" onPress={() => navigation.navigate('NetworkIncomingOrders')}>
+              {t('network.incomingOrders.title')}
+            </Button>
+            <Button mode="outlined" onPress={() => navigation.navigate('NetworkProductMapping')}>
+              {t('network.mapping.title')}
+            </Button>
+            <Button mode="outlined" onPress={() => navigation.navigate('NetworkPackaging')}>
+              {t('network.packaging.title')}
+            </Button>
+            <Button mode="outlined" onPress={() => navigation.navigate('NetworkClaimsList')}>
+              {t('network.claims.myClaims')}
+            </Button>
+            <Button mode="outlined" onPress={() => navigation.navigate('NetworkIncomingClaims')}>
+              {t('network.claims.incoming')}
+            </Button>
+          </>
+        ) : null}
+
         <Button mode="contained" onPress={openFleet}>
           {t('fleet.openFleet')}
         </Button>
         <Button mode="outlined" onPress={() => navigation.navigate('FleetRegisterImport')}>
           {t('fleetImport.openAction')}
         </Button>
+        {fleetFocused ? (
+          <Button mode="outlined" onPress={goRequestRepair}>
+            {t('org.home.requestRepair', null, 'Request repair')}
+          </Button>
+        ) : null}
       </ScrollView>
     </ScreenBackground>
   );

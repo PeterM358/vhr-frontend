@@ -7,7 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
-import AppNavigationBar from '../components/common/AppNavigationBar';
+import OrgAppHeader from '../components/org/OrgAppHeader';
 import { getOrgFleetVehicle } from '../api/fleet';
 import { useTranslation } from '../i18n';
 import {
@@ -48,14 +48,32 @@ export default function OrgFleetVehicleDetailScreen({ navigation, route }) {
 
   const readiness = mapFleetReadiness(vehicle?.readiness, t);
 
+  const goRequestRepair = () => {
+    if (!organizationId || !vehicleId) return;
+    navigation.navigate('CreateRepair', {
+      mode: 'request',
+      organizationId,
+      vehicleId,
+      returnTo: 'OrgFleetVehicleDetail',
+      origin: 'OrgFleetVehicleDetail',
+    });
+  };
+
   return (
     <ScreenBackground>
-      <AppNavigationBar title={fleetVehicleTitle(vehicle)} onBack={() => navigation.goBack()} />
+      <OrgAppHeader
+        mode="nested"
+        title={fleetVehicleTitle(vehicle)}
+        onBack={() => navigation.goBack()}
+      />
       <ScrollView contentContainerStyle={styles.content}>
         {loading ? <ActivityIndicator /> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {vehicle ? (
           <>
+            <Button mode="contained" onPress={goRequestRepair} style={styles.button}>
+              {t('org.home.requestRepair', null, 'Request repair')}
+            </Button>
             <AppCard>
               <View style={[styles.badge, { backgroundColor: readiness.bg }]}>
                 <MaterialCommunityIcons name={readiness.icon} size={18} color={readiness.color} />

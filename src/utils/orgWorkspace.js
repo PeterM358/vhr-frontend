@@ -73,6 +73,37 @@ export async function refreshOrganizationMemberships(token) {
   return rows;
 }
 
+const FLEET_FOCUSED_ROLE_TYPES = new Set(['TRANSPORT_COMPANY', 'FLEET_OPERATOR']);
+
+/** Shop / supplier B2B hub routes — not for transport/fleet-only companies. */
+const SHOP_B2B_ORG_ROUTES = new Set([
+  'OrgNetwork',
+  'OrgWarehouse',
+  'OrgLocations',
+  'OrgWorkOrders',
+  'OrgInvoicing',
+  'OrgLedger',
+]);
+
+/**
+ * Transport / fleet orgs without service-center locations should see fleet home,
+ * not shop B2B network (partners, claims, packaging, SKU mapping).
+ */
+export function isFleetFocusedOrg(org) {
+  if (!org) return false;
+  if (org.has_shop_locations) return false;
+  const roles = Array.isArray(org.roles) ? org.roles : [];
+  const activeRoleTypes = roles
+    .filter((row) => row?.is_active !== false)
+    .map((row) => String(row?.role_type || '').trim().toUpperCase())
+    .filter(Boolean);
+  if (activeRoleTypes.some((role) => FLEET_FOCUSED_ROLE_TYPES.has(role))) {
+    return true;
+  }
+  const modules = Array.isArray(org.enabled_modules) ? org.enabled_modules : [];
+  return modules.includes('fleet') && !modules.includes('service_center');
+}
+
 /** Build drawer sections from backend nav_sections + local route map. */
 export function buildOrgNavItems(org, t) {
   const sections = Array.isArray(org?.nav_sections) ? org.nav_sections : [];
@@ -91,12 +122,15 @@ export function buildOrgNavItems(org, t) {
     OrgPublicProfile: t('org.nav.publicProfile', null, 'Public profile'),
     OrgInvoicing: t('org.nav.invoicing', null, 'Invoicing'),
   };
-  return sections.map((section) => ({
-    key: section.key,
-    route: section.route,
-    module: section.module,
-    label: labels[section.route] || section.key,
-  }));
+  const fleetFocused = isFleetFocusedOrg(org);
+  return sections
+    .filter((section) => !(fleetFocused && SHOP_B2B_ORG_ROUTES.has(section.route)))
+    .map((section) => ({
+      key: section.key,
+      route: section.route,
+      module: section.module,
+      label: labels[section.route] || section.key,
+    }));
 }
 
 export function orgHasModule(org, moduleKey) {

@@ -6,9 +6,11 @@ import { useNavigation } from '@react-navigation/native';
 
 import { AuthContext } from '../context/AuthManager';
 import ScreenBackground from '../components/ScreenBackground';
+import OrgAppHeader from '../components/org/OrgAppHeader';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import {
   buildOrgNavItems,
+  isFleetFocusedOrg,
   organizationMembershipFor,
   readOrganizationMemberships,
   setCurrentOrganizationId,
@@ -39,6 +41,7 @@ export default function OrganizationHomeScreen() {
     load();
   }, [load, authToken]);
 
+  const fleetFocused = isFleetFocusedOrg(org);
   const navItems = buildOrgNavItems(org, t);
 
   const openSection = (route) => {
@@ -61,18 +64,34 @@ export default function OrganizationHomeScreen() {
     setOrg(nextOrg);
   };
 
+  const goRequestRepair = () => {
+    navigation.navigate('CreateRepair', {
+      mode: 'request',
+      organizationId: org?.id,
+      returnTo: 'OrgHome',
+      origin: 'OrgHome',
+    });
+  };
+
   return (
     <ScreenBackground>
+      <OrgAppHeader
+        mode="dashboard"
+        title={org?.display_name || t('org.home.title', null, 'Organization')}
+      />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
-        <Text variant="headlineSmall">
-          {org?.display_name || t('org.home.title', null, 'Organization')}
-        </Text>
         <Text variant="bodyMedium">
-          {t(
-            'org.home.subtitle',
-            null,
-            'Shared workforce, fleet, documents, and operations for your company.',
-          )}
+          {fleetFocused
+            ? t(
+                'org.home.fleetSubtitle',
+                null,
+                'Manage your company fleet and request repairs the same way customers do.',
+              )
+            : t(
+                'org.home.subtitle',
+                null,
+                'Shared workforce, fleet, documents, and operations for your company.',
+              )}
         </Text>
 
         {memberships.length > 1 ? (
@@ -90,26 +109,53 @@ export default function OrganizationHomeScreen() {
           </Card>
         ) : null}
 
-        <Card style={{ padding: 12 }}>
-          <Text variant="titleSmall">{t('org.home.modules', null, 'Workspace')}</Text>
-          {navItems.map((item) => (
-            <Button key={item.key} mode="text" onPress={() => openSection(item.route)}>
-              {item.label}
+        {fleetFocused ? (
+          <View style={{ gap: 8 }}>
+            <Button
+              mode="contained"
+              onPress={() => navigateToOrgFleet(navigation, { orgId: org?.id })}
+            >
+              {t('fleet.openFleet', null, 'View fleet')}
             </Button>
-          ))}
-        </Card>
+            {org?.manage_fleet ? (
+              <Button mode="contained-tonal" onPress={() => navigation.navigate('FleetRegisterImport')}>
+                {t('fleetImport.openAction', null, 'Import fleet')}
+              </Button>
+            ) : null}
+            <Button mode="outlined" onPress={goRequestRepair}>
+              {t('org.home.requestRepair', null, 'Request repair')}
+            </Button>
+          </View>
+        ) : (
+          <>
+            <Card style={{ padding: 12 }}>
+              <Text variant="titleSmall">{t('org.home.modules', null, 'Workspace')}</Text>
+              {navItems.map((item) => (
+                <Button key={item.key} mode="text" onPress={() => openSection(item.route)}>
+                  {item.label}
+                </Button>
+              ))}
+            </Card>
 
-        {org?.has_shop_locations ? (
-          <Button mode="outlined" onPress={() => navigateToPartnerDashboard(navigation)}>
-            {t('org.home.openServiceCenter', null, 'Open service center workspace')}
-          </Button>
-        ) : null}
+            {org?.has_shop_locations ? (
+              <Button mode="outlined" onPress={() => navigateToPartnerDashboard(navigation)}>
+                {t('org.home.openServiceCenter', null, 'Open service center workspace')}
+              </Button>
+            ) : null}
 
-        {org?.manage_fleet ? (
-          <Button mode="contained-tonal" onPress={() => navigation.navigate('FleetRegisterImport')}>
-            {t('org.home.importFleetLater', null, 'Import fleet later')}
-          </Button>
-        ) : null}
+            {org?.manage_fleet ? (
+              <Button mode="contained-tonal" onPress={() => navigation.navigate('FleetRegisterImport')}>
+                {t('org.home.importFleetLater', null, 'Import fleet later')}
+              </Button>
+            ) : null}
+
+            {org?.manage_fleet || org?.can_view_fleet ? (
+              <Button mode="outlined" onPress={goRequestRepair}>
+                {t('org.home.requestRepair', null, 'Request repair')}
+              </Button>
+            ) : null}
+          </>
+        )}
       </ScrollView>
     </ScreenBackground>
   );

@@ -31,7 +31,9 @@ import { API_BASE_URL } from '../api/config';
 import { createRepair, getRepairById, updateRepair, uploadRepairMedia } from '../api/repairs';
 import { getServiceCenters } from '../api/serviceCenters';
 import { getShopById } from '../api/shops';
+import { listOrgFleet } from '../api/fleet';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { resolveActiveOrganizationId } from '../utils/orgWorkspace';
 import FloatingCard from '../components/ui/FloatingCard';
 import RepairRequestHeader from '../components/repairRequest/RepairRequestHeader';
 import RepairProblemInput from '../components/repairRequest/RepairProblemInput';
@@ -64,6 +66,8 @@ export default function CreateRepairScreen({ navigation, route }) {
   const isEditMode = route.params?.mode === 'edit_request';
   const editRepairId = route.params?.repairId ? Number(route.params.repairId) : null;
   const preselectedVehicleId = route.params?.vehicleId?.toString() || '';
+  const organizationIdParam =
+    route.params?.organizationId || route.params?.orgId || null;
   const preselectedShopId = route.params?.shopId
     ? Number(route.params.shopId)
     : route.params?.serviceCenter
@@ -72,6 +76,9 @@ export default function CreateRepairScreen({ navigation, route }) {
   const fromVehicleDetail = route.params?.origin === 'VehicleDetail' || route.params?.returnTo === 'VehicleDetail';
   const [vehicles, setVehicles] = useState([]);
   const [repairTypes, setRepairTypes] = useState([]);
+  const [fleetOrganizationId, setFleetOrganizationId] = useState(
+    organizationIdParam != null ? String(organizationIdParam) : null,
+  );
 
   const [vehicleId, setVehicleId] = useState(preselectedVehicleId);
   const [repairTypeId, setRepairTypeId] = useState('');
@@ -229,19 +236,47 @@ export default function CreateRepairScreen({ navigation, route }) {
     const fetchFormData = async () => {
       try {
         const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+        const orgId = organizationIdParam
+          ? await resolveActiveOrganizationId(organizationIdParam)
+          : null;
+        if (orgId) setFleetOrganizationId(String(orgId));
+        else setFleetOrganizationId(null);
+
+        const loadPersonalVehicles = async () => {
+          const vehicleRes = await fetch(`${API_BASE_URL}/api/vehicles/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!vehicleRes.ok) throw new Error('Failed to fetch form data');
+          return vehicleRes.json();
+        };
+
+        const loadFleetVehicles = async (organizationId) => {
+          const data = await listOrgFleet(token, organizationId, {});
+          const rows = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+          return rows.map((row) => ({
+            id: row.id,
+            license_plate: row.license_plate || '',
+            make_name: '',
+            model_name: row.display_name || row.fleet_id || '',
+            display_name: row.display_name || '',
+            kilometers: row.kilometers,
+            vehicle_type_code: row.vehicle_type_code,
+            managing_organization_id: organizationId,
+          }));
+        };
+
         const requests = [
-          fetch(`${API_BASE_URL}/api/vehicles/`, { headers: { Authorization: `Bearer ${token}` } }),
+          orgId ? loadFleetVehicles(orgId) : loadPersonalVehicles(),
           fetch(`${API_BASE_URL}/api/repairs/types/`, { headers: { Authorization: `Bearer ${token}` } }),
         ];
         if (isEditMode && editRepairId) {
           requests.push(getRepairById(token, editRepairId));
         }
-        const [vehicleRes, typeRes, editRepair] = await Promise.all(requests);
+        const [vehicleData, typeRes, editRepair] = await Promise.all(requests);
 
-        if (!vehicleRes.ok || !typeRes.ok) throw new Error('Failed to fetch form data');
+        if (!typeRes.ok) throw new Error('Failed to fetch form data');
 
-        const vehicleData = await vehicleRes.json();
-        setVehicles(vehicleData);
+        setVehicles(Array.isArray(vehicleData) ? vehicleData : []);
         setRepairTypes(await typeRes.json());
         if (isEditMode && editRepair) {
           if (editRepair.status !== 'open') {
@@ -293,7 +328,7 @@ export default function CreateRepairScreen({ navigation, route }) {
           setShowVehiclePicker(false);
         }
 
-        if (!isEditMode && !vehicleId && vehicleData.length > 0) {
+        if (!isEditMode && !vehicleId && Array.isArray(vehicleData) && vehicleData.length > 0) {
           setVehicleId(vehicleData[0].id.toString());
         }
       } catch (err) {
@@ -695,7 +730,11 @@ export default function CreateRepairScreen({ navigation, route }) {
                   {vehicles.map((v) => (
                     <Picker.Item
                       key={v.id}
-                      label={`${v.license_plate} (${v.make_name} ${v.model_name})`}
+                      label={
+                        fleetOrganizationId
+                          ? `${v.license_plate || '—'} (${v.display_name || v.model_name || v.fleet_id || `#${v.id}`})`
+                          : `${v.license_plate} (${v.make_name} ${v.model_name})`
+                      }
                       value={v.id.toString()}
                     />
                   ))}
