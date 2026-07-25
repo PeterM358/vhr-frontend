@@ -101,12 +101,21 @@ export function fleetUploadErrorMessage({ status, bodyText, locale = 'en', fallb
 }
 
 export function messageFromApiError(error, fallback = 'Request failed.') {
+  const axiosData = error?.response?.data;
+  if (axiosData != null) {
+    const fromAxios = formatDrfErrorMessage(axiosData, '');
+    if (fromAxios) return fromAxios;
+  }
   const fromBody = messageFromApiResponseText(error?.responseText, '');
   if (fromBody) return fromBody;
   const msg = String(error?.message || '').trim();
   if (!msg) return fallback;
   if (msg.startsWith('<!DOCTYPE') || msg.startsWith('<html')) {
     return extractHtmlExceptionMessage(msg) || fallback;
+  }
+  // Axios default "Request failed with status code 400" — prefer fallback when no body parsed.
+  if (/^Request failed with status code \d+$/i.test(msg)) {
+    return fallback;
   }
   return msg;
 }

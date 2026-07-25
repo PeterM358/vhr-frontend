@@ -370,6 +370,17 @@ export default function FleetRegisterImportScreen({ navigation }) {
                   {t('fleetImport.rowStatus')}: {rowStatusLabel(t, row.duplicate_status)} ·{' '}
                   {t('fleetImport.resolution')}: {row.resolution}
                 </Text>
+                {row.normalized?.vehicle_category ? (
+                  <Text style={styles.rowMeta}>
+                    {t('fleetImport.byRegistration', null, 'By registration')}:{' '}
+                    {row.normalized.vehicle_category}
+                    {row.normalized.vehicle_type_unresolved
+                      ? ` · ${t('fleetImport.typeNeedsPick', null, 'type unclear — set later on the vehicle')}`
+                      : row.normalized.vehicle_type_code
+                        ? ` → ${row.normalized.vehicle_type_code}`
+                        : ''}
+                  </Text>
+                ) : null}
                 {row.result_error_message ? (
                   <Text style={styles.rowError}>{row.result_error_message}</Text>
                 ) : null}

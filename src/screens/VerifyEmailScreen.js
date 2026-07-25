@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Text, useTheme } from 'react-native-paper';
@@ -38,6 +38,7 @@ export default function VerifyEmailScreen({ route, navigation }) {
   const { uid, token } = useMemo(() => resolveEmailVerifyParams(route), [route]);
   const [status, setStatus] = useState('pending');
   const [error, setError] = useState('');
+  const ranKeyRef = useRef('');
 
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +48,11 @@ export default function VerifyEmailScreen({ route, navigation }) {
         setError(t('auth.invalidVerifyLink'));
         return;
       }
+      const key = `${uid}:${token}`;
+      if (ranKeyRef.current === key) {
+        return;
+      }
+      ranKeyRef.current = key;
       try {
         const data = await confirmEmailVerification(uid, token);
         if (cancelled) return;
@@ -66,7 +72,8 @@ export default function VerifyEmailScreen({ route, navigation }) {
           resetToClientDashboard(navigation);
           return;
         }
-        setStatus('success');
+        // Already verified (idempotent) — no new tokens; send user to login / onboarding.
+        setStatus(data?.already_verified ? 'already' : 'success');
       } catch (err) {
         safeError('Email verification failed', err);
         if (cancelled) return;
@@ -101,6 +108,20 @@ export default function VerifyEmailScreen({ route, navigation }) {
           {status === 'success' && (
             <Text style={styles.body}>{t('auth.verifyEmailSuccess')}</Text>
           )}
+          {status === 'already' && (
+            <>
+              <Text style={styles.body}>
+                {t(
+                  'auth.verifyEmailAlready',
+                  null,
+                  'Email already verified. Log in here, or on your other device tap Refresh status.',
+                )}
+              </Text>
+              <Button mode="contained" onPress={() => navigation.navigate('Login')} style={{ marginTop: 16 }}>
+                {t('auth.goToLogin')}
+              </Button>
+            </>
+          )}
           {status === 'error' && (
             <>
               <Text style={[styles.body, styles.error]}>{error}</Text>
@@ -132,14 +153,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.TEXT_DARK,
+    color: '#ffffff',
     marginBottom: 8,
   },
   body: {
-    color: COLORS.TEXT_MUTED,
+    color: 'rgba(255,255,255,0.78)',
     lineHeight: 20,
   },
   error: {
-    color: '#b91c1c',
+    color: '#fca5a5',
   },
 });

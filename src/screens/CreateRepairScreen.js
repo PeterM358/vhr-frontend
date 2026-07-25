@@ -725,21 +725,55 @@ export default function CreateRepairScreen({ navigation, route }) {
           {!isEditMode && (!selectedVehicle || showVehiclePicker) ? (
             <FloatingCard>
               <Text variant="labelLarge" style={styles.label}>{t('requestService.vehicleRequired')}</Text>
-              <View style={styles.pickerContainer}>
-                <Picker selectedValue={vehicleId} onValueChange={setVehicleId} style={styles.picker}>
-                  {vehicles.map((v) => (
-                    <Picker.Item
-                      key={v.id}
-                      label={
-                        fleetOrganizationId
-                          ? `${v.license_plate || '—'} (${v.display_name || v.model_name || v.fleet_id || `#${v.id}`})`
-                          : `${v.license_plate} (${v.make_name} ${v.model_name})`
+              {vehicles.length === 0 ? (
+                <View style={{ gap: 10, marginTop: 8 }}>
+                  <Text style={{ color: COLORS.TEXT_MUTED, lineHeight: 20 }}>
+                    {fleetOrganizationId
+                      ? t(
+                          'org.home.needVehicleBody',
+                          null,
+                          'Import your fleet register (or add vehicles), then request a repair the same way customers do.',
+                        )
+                      : t(
+                          'requestService.noVehicles',
+                          null,
+                          'Add a vehicle to your garage first, then request a repair.',
+                        )}
+                  </Text>
+                  {fleetOrganizationId ? (
+                    <Button
+                      mode="contained"
+                      onPress={() =>
+                        navigation.navigate('FleetRegisterImport', {
+                          organizationId: fleetOrganizationId,
+                        })
                       }
-                      value={v.id.toString()}
-                    />
-                  ))}
-                </Picker>
-              </View>
+                    >
+                      {t('fleetImport.openAction', null, 'Import fleet')}
+                    </Button>
+                  ) : (
+                    <Button mode="contained" onPress={() => navigation.navigate('CreateVehicle')}>
+                      {t('vehicles.addVehicle', null, 'Add vehicle')}
+                    </Button>
+                  )}
+                </View>
+              ) : (
+                <View style={styles.pickerContainer}>
+                  <Picker selectedValue={vehicleId} onValueChange={setVehicleId} style={styles.picker}>
+                    {vehicles.map((v) => (
+                      <Picker.Item
+                        key={v.id}
+                        label={
+                          fleetOrganizationId
+                            ? `${v.license_plate || '—'} (${v.display_name || v.model_name || v.fleet_id || `#${v.id}`})`
+                            : `${v.license_plate} (${v.make_name} ${v.model_name})`
+                        }
+                        value={v.id.toString()}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+              )}
             </FloatingCard>
           ) : null}
 
