@@ -322,8 +322,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   createButton: {
+    width: '100%',
+    alignSelf: 'center',
     marginTop: 4,
-    alignSelf: 'stretch',
   },
   backBtn: {
     marginTop: 12,
