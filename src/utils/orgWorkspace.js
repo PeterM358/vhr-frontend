@@ -179,13 +179,31 @@ export function resolvePartnerEntryRoute(data) {
 }
 
 /** Org member with no active shop profile — fleet lives under /api/organizations/{id}/fleet/. */
-export async function resolveIsOrgOnlySession() {
-  const data = await readStoredAuthRoutingData();
+export function isOrgOnlyAuthData(data) {
   const hasShop =
-    Boolean(data.is_shop) ||
-    (Array.isArray(data.shop_profiles) && data.shop_profiles.length > 0) ||
-    (Array.isArray(data.shop_memberships) && data.shop_memberships.length > 0);
+    Boolean(data?.is_shop) ||
+    (Array.isArray(data?.shop_profiles) && data.shop_profiles.length > 0) ||
+    (Array.isArray(data?.shop_memberships) && data.shop_memberships.length > 0);
   const hasOrg =
-    Array.isArray(data.organization_memberships) && data.organization_memberships.length > 0;
+    Array.isArray(data?.organization_memberships) && data.organization_memberships.length > 0;
   return hasOrg && !hasShop;
+}
+
+export async function resolveIsOrgOnlySession() {
+  return isOrgOnlyAuthData(await readStoredAuthRoutingData());
+}
+
+/**
+ * Active organization id for network/fleet calls.
+ * Prefer explicit id, then stored current org, then first membership.
+ */
+export async function resolveActiveOrganizationId(explicitId) {
+  if (explicitId != null && String(explicitId).trim() !== '') {
+    return String(explicitId).trim();
+  }
+  const current = await getCurrentOrganizationId();
+  if (current) return current;
+  const memberships = await readOrganizationMemberships();
+  const first = memberships[0];
+  return first?.id != null ? String(first.id) : null;
 }

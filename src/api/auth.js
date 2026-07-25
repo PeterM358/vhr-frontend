@@ -139,6 +139,12 @@ const storeLoginData = async (data, fallbackDisplay) => {
     if (shopId != null) {
       itemsToStore.push(['@current_shop_id', String(shopId)]);
     }
+  } else {
+    await AsyncStorage.multiRemove([
+      STORAGE_KEYS.SHOP_PROFILES,
+      STORAGE_KEYS.SHOP_MEMBERSHIPS,
+      STORAGE_KEYS.CURRENT_SHOP_ID,
+    ]);
   }
   if (shopMode && hasShopMemberships) {
     itemsToStore.push(['@shop_memberships', JSON.stringify(shop_memberships)]);

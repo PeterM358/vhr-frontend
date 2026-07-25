@@ -12,7 +12,11 @@ import ScreenBackground from '../components/ScreenBackground';
 import AppNavigationBar from '../components/common/AppNavigationBar';
 import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import { COLORS } from '../styles/colors';
-import { navigateToPartnerAddServiceCenter } from '../navigation/webNavigation';
+import {
+  navigateToOrgHome,
+  navigateToPartnerAddServiceCenter,
+} from '../navigation/webNavigation';
+import { resolveIsOrgOnlySession } from '../utils/orgWorkspace';
 import { Platform } from 'react-native';
 
 export default function ChooseShopScreen({ navigation }) {
@@ -26,6 +30,11 @@ export default function ChooseShopScreen({ navigation }) {
   const loadShops = useCallback(async () => {
     setLoading(true);
     try {
+      if (await resolveIsOrgOnlySession()) {
+        setShops([]);
+        navigateToOrgHome(navigation);
+        return;
+      }
       const storedId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
       const rows = await getMyShopProfiles();
       const list = Array.isArray(rows) ? rows : [];

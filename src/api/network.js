@@ -1,6 +1,7 @@
 import { API_BASE_URL } from './config';
 import { messageFromApiResponseText } from '../utils/apiErrorMessage';
-import { shopScopedHeaders } from '../utils/currentShop';
+import { getCurrentShopId } from '../utils/currentShop';
+import { orgScopedHeaders, resolveActiveOrganizationId } from '../utils/orgWorkspace';
 
 async function parseError(response, fallback) {
   const text = await response.text();
@@ -8,12 +9,27 @@ async function parseError(response, fallback) {
 }
 
 function orgQuery(organizationId) {
-  return organizationId ? `?organization_id=${organizationId}` : '';
+  return organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : '';
+}
+
+/** Org header first; attach shop header only when a shop session is active. */
+async function networkScopedHeaders(token, extra = {}) {
+  const headers = await orgScopedHeaders(token, extra);
+  const shopId = await getCurrentShopId();
+  if (shopId) {
+    headers['X-Shop-Profile-Id'] = shopId;
+  }
+  return headers;
+}
+
+async function withOrganizationId(organizationId) {
+  return resolveActiveOrganizationId(organizationId);
 }
 
 export async function getMyOrganization(token, organizationId) {
-  const response = await fetch(`${API_BASE_URL}/api/network/organization/${orgQuery(organizationId)}`, {
-    headers: await shopScopedHeaders(token),
+  const orgId = await withOrganizationId(organizationId);
+  const response = await fetch(`${API_BASE_URL}/api/network/organization/${orgQuery(orgId)}`, {
+    headers: await networkScopedHeaders(token),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load organization'));
   return response.json();
@@ -22,7 +38,7 @@ export async function getMyOrganization(token, organizationId) {
 export async function createMyOrganization(token, payload) {
   const response = await fetch(`${API_BASE_URL}/api/network/organization/`, {
     method: 'POST',
-    headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+    headers: { ...(await networkScopedHeaders(token)), 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to create organization'));
@@ -31,7 +47,7 @@ export async function createMyOrganization(token, payload) {
 
 export async function listOrganizationRoles(token, organizationId) {
   const response = await fetch(`${API_BASE_URL}/api/network/roles/${orgQuery(organizationId)}`, {
-    headers: await shopScopedHeaders(token),
+    headers: await networkScopedHeaders(token),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load roles'));
   return response.json();
@@ -40,7 +56,7 @@ export async function listOrganizationRoles(token, organizationId) {
 export async function activateOrganizationRole(token, organizationId, roleType) {
   const response = await fetch(`${API_BASE_URL}/api/network/roles/${orgQuery(organizationId)}`, {
     method: 'POST',
-    headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+    headers: { ...(await networkScopedHeaders(token)), 'Content-Type': 'application/json' },
     body: JSON.stringify({ organization_id: organizationId, role_type: roleType }),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to activate role'));
@@ -49,7 +65,7 @@ export async function activateOrganizationRole(token, organizationId, roleType) 
 
 export async function listBusinessPartners(token, organizationId) {
   const response = await fetch(`${API_BASE_URL}/api/network/partners/${orgQuery(organizationId)}`, {
-    headers: await shopScopedHeaders(token),
+    headers: await networkScopedHeaders(token),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load partners'));
   return response.json();
@@ -57,7 +73,7 @@ export async function listBusinessPartners(token, organizationId) {
 
 export async function listBusinessRelationships(token, organizationId) {
   const response = await fetch(`${API_BASE_URL}/api/network/relationships/${orgQuery(organizationId)}`, {
-    headers: await shopScopedHeaders(token),
+    headers: await networkScopedHeaders(token),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load relationships'));
   return response.json();
@@ -66,7 +82,7 @@ export async function listBusinessRelationships(token, organizationId) {
 export async function createBusinessInvitation(token, organizationId, payload) {
   const response = await fetch(`${API_BASE_URL}/api/network/invitations/${orgQuery(organizationId)}`, {
     method: 'POST',
-    headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+    headers: { ...(await networkScopedHeaders(token)), 'Content-Type': 'application/json' },
     body: JSON.stringify({ organization_id: organizationId, ...payload }),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to send invitation'));
@@ -76,7 +92,7 @@ export async function createBusinessInvitation(token, organizationId, payload) {
 export async function acceptBusinessInvitation(token, payload) {
   const response = await fetch(`${API_BASE_URL}/api/network/invitations/accept/`, {
     method: 'POST',
-    headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+    headers: { ...(await networkScopedHeaders(token)), 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to accept invitation'));
@@ -85,7 +101,7 @@ export async function acceptBusinessInvitation(token, payload) {
 
 export async function listIncomingOrders(token, organizationId) {
   const response = await fetch(`${API_BASE_URL}/api/network/incoming-orders/${orgQuery(organizationId)}`, {
-    headers: await shopScopedHeaders(token),
+    headers: await networkScopedHeaders(token),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load incoming orders'));
   return response.json();
@@ -96,7 +112,7 @@ export async function incomingOrderAction(token, organizationId, documentId, act
     `${API_BASE_URL}/api/network/incoming-orders/${documentId}/${action}/${orgQuery(organizationId)}`,
     {
       method: 'POST',
-      headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+      headers: { ...(await networkScopedHeaders(token)), 'Content-Type': 'application/json' },
       body: JSON.stringify({ organization_id: organizationId, ...payload }),
     },
   );
@@ -107,7 +123,7 @@ export async function incomingOrderAction(token, organizationId, documentId, act
 export async function sendPurchaseOrderNetwork(token, poId, payload) {
   const response = await fetch(`${API_BASE_URL}/api/network/purchase-orders/${poId}/send/`, {
     method: 'POST',
-    headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+    headers: { ...(await networkScopedHeaders(token)), 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to send PO over network'));
@@ -116,7 +132,7 @@ export async function sendPurchaseOrderNetwork(token, poId, payload) {
 
 export async function listProductMappings(token, organizationId) {
   const response = await fetch(`${API_BASE_URL}/api/network/product-mappings/${orgQuery(organizationId)}`, {
-    headers: await shopScopedHeaders(token),
+    headers: await networkScopedHeaders(token),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load product mappings'));
   return response.json();
@@ -125,7 +141,7 @@ export async function listProductMappings(token, organizationId) {
 export async function createProductMapping(token, organizationId, payload) {
   const response = await fetch(`${API_BASE_URL}/api/network/product-mappings/${orgQuery(organizationId)}`, {
     method: 'POST',
-    headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+    headers: { ...(await networkScopedHeaders(token)), 'Content-Type': 'application/json' },
     body: JSON.stringify({ organization_id: organizationId, ...payload }),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to create mapping'));
@@ -135,7 +151,7 @@ export async function createProductMapping(token, organizationId, payload) {
 export async function listPackaging(token, shopPartId) {
   const qs = shopPartId ? `?shop_part_id=${shopPartId}` : '';
   const response = await fetch(`${API_BASE_URL}/api/parts/packaging/${qs}`, {
-    headers: await shopScopedHeaders(token),
+    headers: await networkScopedHeaders(token),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load packaging'));
   return response.json();
@@ -144,7 +160,7 @@ export async function listPackaging(token, shopPartId) {
 export async function createPackaging(token, payload) {
   const response = await fetch(`${API_BASE_URL}/api/parts/packaging/`, {
     method: 'POST',
-    headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+    headers: { ...(await networkScopedHeaders(token)), 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to create packaging'));
@@ -154,7 +170,7 @@ export async function createPackaging(token, payload) {
 export async function supersedePackaging(token, packagingId, payload) {
   const response = await fetch(`${API_BASE_URL}/api/parts/packaging/${packagingId}/supersede/`, {
     method: 'POST',
-    headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+    headers: { ...(await networkScopedHeaders(token)), 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to supersede packaging'));
@@ -166,7 +182,7 @@ export async function listNetworkClaims(token, organizationId, scope = 'all') {
   const sep = base ? '&' : '?';
   const response = await fetch(
     `${API_BASE_URL}/api/network/claims/${base}${sep}scope=${encodeURIComponent(scope)}`,
-    { headers: await shopScopedHeaders(token) },
+    { headers: await networkScopedHeaders(token) },
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load claims'));
   return response.json();
@@ -175,7 +191,7 @@ export async function listNetworkClaims(token, organizationId, scope = 'all') {
 export async function getNetworkClaim(token, organizationId, claimId) {
   const response = await fetch(
     `${API_BASE_URL}/api/network/claims/${claimId}/${orgQuery(organizationId)}`,
-    { headers: await shopScopedHeaders(token) },
+    { headers: await networkScopedHeaders(token) },
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load claim'));
   return response.json();
@@ -184,7 +200,7 @@ export async function getNetworkClaim(token, organizationId, claimId) {
 export async function createNetworkClaim(token, organizationId, payload) {
   const response = await fetch(`${API_BASE_URL}/api/network/claims/${orgQuery(organizationId)}`, {
     method: 'POST',
-    headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+    headers: { ...(await networkScopedHeaders(token)), 'Content-Type': 'application/json' },
     body: JSON.stringify({ organization_id: organizationId, ...payload }),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to create claim'));
@@ -196,7 +212,7 @@ export async function networkClaimAction(token, organizationId, claimId, action,
     `${API_BASE_URL}/api/network/claims/${claimId}/${action}/${orgQuery(organizationId)}`,
     {
       method: 'POST',
-      headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+      headers: { ...(await networkScopedHeaders(token)), 'Content-Type': 'application/json' },
       body: JSON.stringify({ organization_id: organizationId, ...payload }),
     },
   );
@@ -208,7 +224,7 @@ export async function listProductMappingsAsBuyer(token, organizationId) {
   const q = orgQuery(organizationId);
   const response = await fetch(
     `${API_BASE_URL}/api/network/product-mappings/${q}${q ? '&' : '?'}as_buyer=1`,
-    { headers: await shopScopedHeaders(token) },
+    { headers: await networkScopedHeaders(token) },
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load product mappings'));
   return response.json();
@@ -241,7 +257,7 @@ export async function createOrganizationMembershipInvite(accessToken, organizati
     {
       method: 'POST',
       headers: {
-        ...(await shopScopedHeaders(accessToken)),
+        ...(await networkScopedHeaders(accessToken)),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),

@@ -7,9 +7,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
 import AppNavigationBar from '../components/common/AppNavigationBar';
-import useShopErpContext from '../hooks/useShopErpContext';
 import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import { createOrganizationMembershipInvite, getMyOrganization } from '../api/network';
+import { resolveActiveOrganizationId, resolveIsOrgOnlySession } from '../utils/orgWorkspace';
+import { navigateToOrgFleet, navigateToOrgHome } from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 
 async function copyInviteLink(text) {
@@ -20,10 +21,10 @@ async function copyInviteLink(text) {
   await Share.share({ message: text });
 }
 
-export default function NetworkOrganizationScreen({ navigation }) {
+export default function NetworkOrganizationScreen({ navigation, route }) {
   const onBack = usePartnerDashboardBack(navigation);
   const { t } = useTranslation();
-  const { shopId } = useShopErpContext();
+  const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
   const [org, setOrg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -34,12 +35,17 @@ export default function NetworkOrganizationScreen({ navigation }) {
   const [inviteMessage, setInviteMessage] = useState('');
 
   const load = useCallback(async () => {
-    if (!shopId) return;
     setLoading(true);
     setError('');
     try {
       const token = await AsyncStorage.getItem('@access_token');
-      const data = await getMyOrganization(token);
+      const orgId = await resolveActiveOrganizationId(routeOrgId);
+      if (!orgId && (await resolveIsOrgOnlySession())) {
+        setOrg(null);
+        setError(t('network.common.error'));
+        return;
+      }
+      const data = await getMyOrganization(token, orgId);
       setOrg(data);
     } catch (e) {
       setOrg(null);
@@ -47,7 +53,7 @@ export default function NetworkOrganizationScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [shopId, t]);
+  }, [routeOrgId, t]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -99,9 +105,27 @@ export default function NetworkOrganizationScreen({ navigation }) {
     }
   };
 
+  const openFleet = async () => {
+    const orgId = org?.id || (await resolveActiveOrganizationId(routeOrgId));
+    if (await resolveIsOrgOnlySession()) {
+      navigateToOrgFleet(navigation, { orgId });
+      return;
+    }
+    navigation.navigate('FleetDashboard', { organizationId: orgId });
+  };
+
   return (
     <ScreenBackground>
-      <AppNavigationBar title={t('network.organization.title')} onBack={onBack} />
+      <AppNavigationBar
+        title={t('network.organization.title')}
+        onBack={async () => {
+          if (await resolveIsOrgOnlySession()) {
+            navigateToOrgHome(navigation, { orgId: org?.id || routeOrgId });
+            return;
+          }
+          onBack();
+        }}
+      />
       <ScrollView contentContainerStyle={styles.content}>
         {loading ? <ActivityIndicator /> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -170,7 +194,7 @@ export default function NetworkOrganizationScreen({ navigation }) {
         <Button mode="outlined" onPress={() => navigation.navigate('NetworkIncomingClaims')}>
           {t('network.claims.incoming')}
         </Button>
-        <Button mode="contained" onPress={() => navigation.navigate('FleetDashboard', { organizationId: org?.id })}>
+        <Button mode="contained" onPress={openFleet}>
           {t('fleet.openFleet')}
         </Button>
         <Button mode="outlined" onPress={() => navigation.navigate('FleetRegisterImport')}>

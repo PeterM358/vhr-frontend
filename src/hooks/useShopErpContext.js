@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { getMyShopProfiles } from '../api/profiles';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { resolveIsOrgOnlySession } from '../utils/orgWorkspace';
 import { readShopMemberships, shopMembershipFor } from '../utils/shopErpAccess';
 
 export default function useShopErpContext() {
@@ -17,6 +18,13 @@ export default function useShopErpContext() {
     setLoading(true);
     setError('');
     try {
+      // Transport / org-only sessions have no ShopProfile — do not call shop-profiles/.
+      if (await resolveIsOrgOnlySession()) {
+        setShopId(null);
+        setShopProfile(null);
+        setMembership(null);
+        return;
+      }
       const [storedShopId, memberships, profiles] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID),
         readShopMemberships(),
@@ -32,6 +40,7 @@ export default function useShopErpContext() {
       setError(e?.message || 'Failed to load service center');
       setShopProfile(null);
       setMembership(null);
+      setShopId(null);
     } finally {
       setLoading(false);
     }
