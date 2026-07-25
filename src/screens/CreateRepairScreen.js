@@ -638,6 +638,18 @@ export default function CreateRepairScreen({ navigation, route }) {
           return;
         }
 
+        if (
+          (returnTo === 'OrgFleetVehicleDetail' || origin === 'OrgFleetVehicleDetail') &&
+          parsedVehicleId &&
+          route.params?.organizationId
+        ) {
+          navigation.navigate('OrgFleetVehicleDetail', {
+            organizationId: route.params.organizationId,
+            vehicleId: parsedVehicleId,
+          });
+          return;
+        }
+
         if ((returnTo === 'ClientRepairs' || origin === 'ClientRepairs') && parsedVehicleId) {
           navigation.navigate('ClientRepairs', {
             vehicleId: parsedVehicleId,

@@ -1005,6 +1005,15 @@ export default function LogServiceRecordScreen({ navigation, route }) {
       const returnToVehicleHistory = () => {
         AsyncStorage.removeItem(STORAGE_KEYS.logServiceRecordDraftKey(String(vid))).catch(() => {});
         clearServiceRecordDrafts(vid).catch(() => {});
+        const returnTo = route.params?.returnTo;
+        const organizationId = route.params?.organizationId;
+        if (returnTo === 'OrgFleetVehicleDetail' && organizationId) {
+          navigation.navigate('OrgFleetVehicleDetail', {
+            organizationId,
+            vehicleId: vid,
+          });
+          return;
+        }
         if (Platform.OS === 'web') {
           navigateToVehicleDetail(navigation, vid, { scrollToServiceHistory: true });
           return;

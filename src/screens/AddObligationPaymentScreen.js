@@ -252,7 +252,11 @@ export default function AddObligationPaymentScreen({ navigation, route }) {
       }
       navigation.navigate({
         name: returnTo,
-        params: { vehicleId: vid, expandReminders: true },
+        params: {
+          vehicleId: vid,
+          expandReminders: true,
+          organizationId: route.params?.organizationId,
+        },
         merge: true,
       });
     } catch (err) {

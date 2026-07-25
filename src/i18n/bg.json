@@ -65,6 +65,8 @@
       "serviceHistoryUntitled": "Сервизен запис",
       "nextDeadline": "Следващ срок",
       "internalNumber": "Вътр. №",
+      "makeModel": "Марка / модел",
+      "department": "Отдел",
       "noDate": "Без дата",
       "backToFleet": "Към автопарка",
       "outOfServiceWarning": "Активът е маркиран като извън експлоатация.",
