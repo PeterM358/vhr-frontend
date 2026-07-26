@@ -37,7 +37,8 @@
       "allStatuses": "All readiness statuses",
       "noDepartment": "No department",
       "empty": "No fleet vehicles match your filters.",
-      "error": "Could not load fleet."
+      "error": "Could not load fleet.",
+      "requestRepair": "Request repair"
     },
     "readiness": {
       "ready": "Ready",
