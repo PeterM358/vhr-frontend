@@ -18,6 +18,7 @@ export default function OrgAppHeader({
   mode = 'dashboard',
   onBack,
   showBack,
+  backLabel,
   iconOnlyBack = true,
   rightAction,
   scrolled = false,
@@ -81,6 +82,7 @@ export default function OrgAppHeader({
       subtitle={subtitle}
       showBack={showBack != null ? showBack : Boolean(onBack)}
       onBack={onBack}
+      backLabel={backLabel}
       iconOnlyBack={iconOnlyBack}
       scrolled={scrolled}
       compact={compact}

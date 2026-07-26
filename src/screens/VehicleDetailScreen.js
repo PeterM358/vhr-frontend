@@ -24,6 +24,7 @@ import { updateVehicle, patchVehicleReminder, getVehicleForecast } from '../api/
 import { listVehicleDocuments } from '../api/documents';
 import ScreenBackground from '../components/ScreenBackground';
 import AppNavigationBar from '../components/common/AppNavigationBar';
+import OrgAppHeader from '../components/org/OrgAppHeader';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import { useVehicleListBack } from '../navigation/appNavBarBack';
 import AppCard from '../components/ui/AppCard';
@@ -99,19 +100,45 @@ function isObligationReminderType(reminderType) {
 export default function VehicleDetailScreen({ route, navigation }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { vehicleId, mileageIntent: mileageIntentParam, backLabel: backLabelParam } = route.params || {};
+  const {
+    vehicleId,
+    mileageIntent: mileageIntentParam,
+    backLabel: backLabelParam,
+    organizationId,
+  } = route.params || {};
+  const isOrgFleet = organizationId != null && organizationId !== '';
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useVehicleListBack(navigation);
-  const backLabel = backLabelParam || t('vehicles.backToVehicles');
-  const onBack = backLabelParam
-    ? () => navigation.goBack()
-    : handleBack;
+  const backLabel =
+    backLabelParam ||
+    (isOrgFleet ? t('fleet.detail.backToFleet') : t('vehicles.backToVehicles'));
+  const onBack = isOrgFleet
+    ? () => navigation.navigate('FleetDashboard', { organizationId })
+    : backLabelParam
+      ? () => navigation.goBack()
+      : handleBack;
   const [vehicle, setVehicle] = useState(null);
   const [repairs, setRepairs] = useState([]);
   const [vehicleDocuments, setVehicleDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isShop, setIsShop] = useState(false);
+  // Partner sessions set @is_shop; org fleet still needs the full client detail UI.
+  const isShopView = isShop && !isOrgFleet;
+  const orgReturnParams = useMemo(
+    () =>
+      isOrgFleet
+        ? {
+            organizationId,
+            returnTo: 'OrgFleetVehicleDetail',
+            origin: 'OrgFleetVehicleDetail',
+          }
+        : {
+            returnTo: 'VehicleDetail',
+            origin: 'VehicleDetail',
+          },
+    [isOrgFleet, organizationId]
+  );
   const [sectionsExpanded, setSectionsExpanded] = useState({
     remindersObligations: false,
     serviceHistory: true,
@@ -163,6 +190,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
   const loadVehicleDetails = useCallback(async ({ silent = false } = {}) => {
     const token = await AsyncStorage.getItem('@access_token');
     const shopFlag = await AsyncStorage.getItem('@is_shop');
+    const treatAsShopView = shopFlag === 'true' && !isOrgFleet;
     if (!silent) {
       setLoading(true);
     }
@@ -176,7 +204,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
       const data = await res.json();
       setVehicle(data);
       setRepairs(data.repairs || []);
-      if (shopFlag !== 'true') {
+      if (!treatAsShopView) {
         try {
           const docs = await listVehicleDocuments(token, vehicleId);
           setVehicleDocuments(docs);
@@ -205,7 +233,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [vehicleId]);
+  }, [vehicleId, isOrgFleet]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -241,10 +269,19 @@ export default function VehicleDetailScreen({ route, navigation }) {
 
   const openTechnicalDetails = () => {
     if (!vehicle) return;
-    navigation.navigate('EditVehicleDetails', { vehicleId });
+    navigation.navigate('EditVehicleDetails', {
+      vehicleId,
+      ...(isOrgFleet
+        ? { organizationId, returnTo: 'OrgFleetVehicleDetail' }
+        : {}),
+    });
   };
 
   const openVehicleSpecs = () => {
+    if (isOrgFleet) {
+      navigation.navigate('VehicleSpecs', { vehicleId });
+      return;
+    }
     navigateToVehicleSpecs(navigation, vehicleId);
   };
 
@@ -283,7 +320,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
   };
 
   const openReminderEditor = (rowTemplate, reminderRow) => {
-    if (isShop) return;
+    if (isShopView) return;
     const r = reminderRow;
     if (!r?.id) {
       Alert.alert(
@@ -501,24 +538,40 @@ export default function VehicleDetailScreen({ route, navigation }) {
 
   const navigateLogServiceRecord = useCallback(
     (extraParams = {}) => {
+      if (isOrgFleet) {
+        navigation.navigate('LogServiceRecord', {
+          vehicleId,
+          ...orgReturnParams,
+          ...extraParams,
+        });
+        return;
+      }
       navigateToVehicleServiceRecordNew(navigation, vehicleId, {
         returnTo: 'VehicleDetail',
         origin: 'VehicleDetail',
         ...extraParams,
       });
     },
-    [navigation, vehicleId]
+    [navigation, vehicleId, isOrgFleet, orgReturnParams]
   );
 
   const navigateObligationPayment = useCallback(
     (extraParams = {}) => {
+      if (isOrgFleet) {
+        navigation.navigate('AddObligationPayment', {
+          vehicleId,
+          ...orgReturnParams,
+          ...extraParams,
+        });
+        return;
+      }
       navigateToVehicleReminderNew(navigation, vehicleId, {
         returnTo: 'VehicleDetail',
         origin: 'VehicleDetail',
         ...extraParams,
       });
     },
-    [navigation, vehicleId]
+    [navigation, vehicleId, isOrgFleet, orgReturnParams]
   );
 
   const vehicleHealth = useMemo(() => mapHealthFromApi(vehicle, t), [vehicle, t]);
@@ -544,16 +597,14 @@ export default function VehicleDetailScreen({ route, navigation }) {
           navigation.navigate('CreateRepair', {
             vehicleId,
             mode: 'request',
-            returnTo: 'VehicleDetail',
-            origin: 'VehicleDetail',
+            ...orgReturnParams,
           });
           break;
         case 'book_repair':
           navigation.navigate('CreateRepair', {
             vehicleId,
             mode: 'request',
-            returnTo: 'VehicleDetail',
-            origin: 'VehicleDetail',
+            ...orgReturnParams,
           });
           break;
         case 'reminders':
@@ -564,7 +615,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
           break;
       }
     },
-    [navigation, vehicleId, navigateLogServiceRecord, scrollToRemindersSection, openKmModal]
+    [navigation, vehicleId, navigateLogServiceRecord, scrollToRemindersSection, openKmModal, orgReturnParams]
   );
 
   const handleMileageFactorPress = useCallback(
@@ -589,10 +640,21 @@ export default function VehicleDetailScreen({ route, navigation }) {
           navigateObligationPayment({ initialReminderType: 'technical_inspection' });
           break;
         case 'manage_authorized_centers':
-          navigateToVehicleManageServiceCenters(navigation, vehicleId);
+          if (isOrgFleet) {
+            navigation.navigate('ManageVehicleServiceCenters', {
+              vehicleId,
+              ...orgReturnParams,
+            });
+          } else {
+            navigateToVehicleManageServiceCenters(navigation, vehicleId);
+          }
           break;
         case 'vehicle_specs':
-          navigateToVehicleSpecs(navigation, vehicleId);
+          if (isOrgFleet) {
+            navigation.navigate('VehicleSpecs', { vehicleId });
+          } else {
+            navigateToVehicleSpecs(navigation, vehicleId);
+          }
           break;
         default:
           scrollToServiceHistorySection();
@@ -601,13 +663,13 @@ export default function VehicleDetailScreen({ route, navigation }) {
     [
       navigation,
       vehicleId,
+      isOrgFleet,
+      orgReturnParams,
       scrollToServiceHistorySection,
       openRepairById,
       navigateLogServiceRecord,
       navigateObligationPayment,
       scrollToAuthorizedCenters,
-      navigateToVehicleManageServiceCenters,
-      navigateToVehicleSpecs,
     ]
   );
 
@@ -959,7 +1021,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
   }
 
   const handleAddActivity = () => {
-    if (isShop) {
+    if (isShopView) {
       Alert.alert(t('vehicles.detail.addActivityTitle'), t('vehicles.detail.addActivityBody'));
       return;
     }
@@ -973,8 +1035,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
     navigation.navigate('CreateRepair', {
       vehicleId,
       mode: 'request',
-      returnTo: 'VehicleDetail',
-      origin: 'VehicleDetail',
+      ...orgReturnParams,
     });
   };
 
@@ -997,7 +1058,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
     if (!vid) return;
     openServiceCenters(navigation, {
       vehicleId: vid,
-      returnTo: 'VehicleDetail',
+      ...orgReturnParams,
     });
   };
 
@@ -1042,12 +1103,20 @@ export default function VehicleDetailScreen({ route, navigation }) {
     navigation.navigate('ShopDetail', {
       shopId: center.id,
       vehicleId: vehicle?.id ?? route.params?.vehicleId,
-      returnTo: 'VehicleDetail',
+      ...orgReturnParams,
     });
   };
 
   const handleManageServiceCenters = () => {
-    navigateToVehicleManageServiceCenters(navigation, vehicle?.id ?? route.params?.vehicleId);
+    const vid = vehicle?.id ?? route.params?.vehicleId;
+    if (isOrgFleet) {
+      navigation.navigate('ManageVehicleServiceCenters', {
+        vehicleId: vid,
+        ...orgReturnParams,
+      });
+      return;
+    }
+    navigateToVehicleManageServiceCenters(navigation, vid);
   };
 
   const SectionHeader = ({ title, sectionKey }) => (
@@ -1118,12 +1187,23 @@ export default function VehicleDetailScreen({ route, navigation }) {
   return (
     <ScreenBackground safeArea={false}>
       <View style={styles.container}>
-        <AppNavigationBar
-          title={t('vehicles.nav.details')}
-          backLabel={backLabel}
-          onBack={onBack}
-          scrolled={scrolled}
-        />
+        {isOrgFleet ? (
+          <OrgAppHeader
+            mode="nested"
+            title={t('vehicles.nav.details')}
+            backLabel={backLabel}
+            onBack={onBack}
+            scrolled={scrolled}
+            iconOnlyBack={false}
+          />
+        ) : (
+          <AppNavigationBar
+            title={t('vehicles.nav.details')}
+            backLabel={backLabel}
+            onBack={onBack}
+            scrolled={scrolled}
+          />
+        )}
         <ScrollView
           ref={scrollRef}
           onScroll={onScroll}
@@ -1174,7 +1254,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
                     ? `${Number(vehicle.kilometers).toLocaleString()} km`
                     : t('vehicles.detail.kilometersNotSet')}
                 </Text>
-                {!isShop ? (
+                {!isShopView ? (
                   <Pressable
                     onPress={() => setMileageSheetVisible(true)}
                     accessibilityRole="button"
@@ -1220,7 +1300,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
               <Text style={styles.heroViewSpecsText}>{t('vehicles.detail.viewSpecs')}</Text>
               <MaterialCommunityIcons name="chevron-right" size={18} color="rgba(255,255,255,0.85)" />
             </Pressable>
-            {!isShop ? (
+            {!isShopView ? (
               <View style={styles.heroActionsRow}>
                 <Button
                   mode="outlined"
@@ -1244,14 +1324,14 @@ export default function VehicleDetailScreen({ route, navigation }) {
             ) : null}
           </AppCard>
 
-          {!isShop ? (
+          {!isShopView ? (
             <VehicleHealthCard health={vehicleHealth} onAction={handleHealthAction} />
           ) : null}
 
           <FloatingCard>
             <Text style={styles.sectionTitle}>{t('vehicles.detail.vehicleInfo')}</Text>
             <View style={styles.infoGrid}>
-              {!isShop
+              {!isShopView
                 ? heroTypeLabel
                   ? infoTile(t('vehicles.detail.vehicleType'), heroTypeLabel, {
                       onPress: openTechnicalDetails,
@@ -1301,7 +1381,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
             </View>
           </FloatingCard>
 
-          {!isShop ? (
+          {!isShopView ? (
             <FloatingCard>
               <VehicleForecastCard
                 forecast={forecast}
@@ -1340,7 +1420,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
                   const tone = reminderUiTone(uiStatus);
                   const ctaText =
                     translateReminderCtaLabel(r?.cta_label, t) ||
-                    (!dueLine && !isShop ? t('reminders.cta.add_date_set_reminder') : null);
+                    (!dueLine && !isShopView ? t('reminders.cta.add_date_set_reminder') : null);
                   return (
                     <Pressable
                       key={row.reminder_type}
@@ -1351,11 +1431,11 @@ export default function VehicleDetailScreen({ route, navigation }) {
                         }
                         openReminderEditor(row, r);
                       }}
-                      disabled={isShop}
+                      disabled={isShopView}
                       style={({ pressed }) => [
                         styles.reminderUnifiedRow,
-                        pressed && !isShop ? { opacity: 0.85 } : null,
-                        isShop ? styles.reminderUnifiedRowDisabled : null,
+                        pressed && !isShopView ? { opacity: 0.85 } : null,
+                        isShopView ? styles.reminderUnifiedRowDisabled : null,
                       ]}
                     >
                       <MaterialCommunityIcons name={row.icon} size={22} color={COLORS.PRIMARY} />
@@ -1367,7 +1447,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
                           {dueLine || t('vehicles.detail.noDateOrMileage')}
                         </Text>
                         {ctaText ? <Text style={styles.reminderUnifiedCta}>{ctaText}</Text> : null}
-                        {!isShop && isObligationReminderType(row.reminder_type) ? (
+                        {!isShopView && isObligationReminderType(row.reminder_type) ? (
                           <Button
                             mode="text"
                             compact
@@ -1451,7 +1531,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
             </FloatingCard>
           </View>
 
-          {!isShop ? (
+          {!isShopView ? (
           <View
             collapsable={false}
             onLayout={(e) => {
@@ -1515,7 +1595,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
                     onPress={() =>
                       navigation.navigate('VehicleHistoryAccess', {
                         vehicleId,
-                        returnTo: 'VehicleDetail',
+                        ...orgReturnParams,
                       })
                     }
                   >
@@ -1552,7 +1632,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
                   )}
                   {renderDocumentGroup(t('vehicles.detail.documentGroupPhotos'), documentGroups.photos)}
                   {renderDocumentGroup(t('vehicles.detail.documentGroupOther'), documentGroups.other)}
-                  {isShop ? (
+                  {isShopView ? (
                     <Text style={styles.sectionHint}>
                       {t('vehicles.detail.documentArchiveShopHint')}
                     </Text>
@@ -1573,7 +1653,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
         </ScrollView>
       </View>
 
-      {!isShop ? (
+      {!isShopView ? (
         <FAB
           icon="plus"
           label={t('vehicles.detail.addActivity')}
@@ -1583,7 +1663,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
         />
       ) : null}
 
-      {!isShop ? (
+      {!isShopView ? (
         <MileageConfidenceSheet
           visible={mileageSheetVisible}
           onDismiss={() => setMileageSheetVisible(false)}
