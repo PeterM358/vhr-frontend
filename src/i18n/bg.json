@@ -132,7 +132,8 @@
       "chassis_match": "Съвпадение по шаси",
       "serial_match": "Съвпадение по сериен №",
       "alias_match": "Съвпадение по псевдоним",
-      "invalid_vin": "Невалиден VIN"
+      "invalid_vin": "Невалиден VIN",
+      "in_batch_duplicate": "Дублиран рег. № в този файл (автоматично пропуснат)"
     },
     "errors": {
       "loadOrganizations": "Организациите не можаха да се заредят",

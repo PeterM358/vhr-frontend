@@ -133,7 +133,8 @@
       "chassis_match": "Chassis match",
       "serial_match": "Serial match",
       "alias_match": "Alias match",
-      "invalid_vin": "Invalid VIN"
+      "invalid_vin": "Invalid VIN",
+      "in_batch_duplicate": "Duplicate plate in this file (auto-skipped)"
     },
     "errors": {
       "loadOrganizations": "Could not load organizations",
