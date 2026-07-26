@@ -20,6 +20,7 @@ import {
   readOrganizationMemberships,
   resolveActiveOrganizationId,
 } from '../utils/orgWorkspace';
+import { isDriverMembership } from '../utils/orgRoleHome';
 
 function urgencyCount(fleetRows) {
   return (Array.isArray(fleetRows) ? fleetRows : []).filter((row) => {
@@ -32,19 +33,22 @@ export default function useOrgHeaderChrome({ loadCalendarBadge = true } = {}) {
   const navigation = useNavigation();
   const { unreadCount, refreshUnreadFromRest } = useContext(WebSocketContext);
   const [calendarBadgeCount, setCalendarBadgeCount] = useState(0);
+  const [isDriver, setIsDriver] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
 
       const load = async () => {
-        if (loadCalendarBadge) {
-          try {
+        try {
+          const rows = await readOrganizationMemberships();
+          const orgId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_ORGANIZATION_ID);
+          const active = organizationMembershipFor(rows, orgId) || rows[0] || null;
+          if (!cancelled) setIsDriver(isDriverMembership(active));
+
+          if (loadCalendarBadge) {
             const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-            const rows = await readOrganizationMemberships();
-            const orgId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_ORGANIZATION_ID);
-            const active = organizationMembershipFor(rows, orgId) || rows[0] || null;
-            if (active?.id && token) {
+            if (active?.id && token && !isDriverMembership(active)) {
               const resolved = await resolveActiveOrganizationId(active.id);
               const data = await listOrgFleet(token, resolved, {});
               const list = Array.isArray(data?.results)
@@ -56,9 +60,9 @@ export default function useOrgHeaderChrome({ loadCalendarBadge = true } = {}) {
             } else if (!cancelled) {
               setCalendarBadgeCount(0);
             }
-          } catch {
-            /* keep prior badge */
           }
+        } catch {
+          /* keep prior badge */
         }
         if (typeof refreshUnreadFromRest === 'function') {
           refreshUnreadFromRest();
@@ -101,8 +105,13 @@ export default function useOrgHeaderChrome({ loadCalendarBadge = true } = {}) {
     navigation.openDrawer?.();
   }, [navigation]);
 
+  const unread = unreadCount || 0;
+  // In Working mode, surface personal unread on the hamburger so drivers open the drawer.
+  const menuBadge = isDriver ? unread : 0;
+
   return {
-    unreadCount: unreadCount || 0,
+    unreadCount: unread,
+    menuBadge,
     calendarBadgeCount,
     openCalendar,
     openNotifications,

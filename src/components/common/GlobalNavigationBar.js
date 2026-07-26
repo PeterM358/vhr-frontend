@@ -12,6 +12,7 @@ import CompactLanguageSelector from './CompactLanguageSelector';
 export default function GlobalNavigationBar({
   title,
   unreadNotifications = 0,
+  menuBadge = 0,
   onMenuPress,
   onNotificationsPress,
   onLogoutPress,
@@ -25,11 +26,16 @@ export default function GlobalNavigationBar({
       showLanguageSelector={false}
       leftAction={
         <View style={styles.leftRow}>
-          <GlassNavIconButton
-            icon="menu"
-            onPress={onMenuPress}
-            accessibilityLabel="Open menu"
-          />
+          <View style={styles.bellWrap}>
+            <GlassNavIconButton
+              icon="menu"
+              onPress={onMenuPress}
+              accessibilityLabel="Open menu"
+            />
+            {menuBadge > 0 ? (
+              <Badge style={styles.notificationBadge}>{menuBadge}</Badge>
+            ) : null}
+          </View>
           <CompactLanguageSelector
             variant="dark"
             compact

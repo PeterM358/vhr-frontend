@@ -96,11 +96,14 @@ export default function OrgAppHeader({
         style={style}
         leftAction={
           <View style={styles.leftRow}>
-            <GlassNavIconButton
-              icon="menu"
-              onPress={chrome.openMenu}
-              accessibilityLabel={t('common.menu', null, 'Open menu')}
-            />
+            <View style={styles.iconWrap}>
+              <GlassNavIconButton
+                icon="menu"
+                onPress={chrome.openMenu}
+                accessibilityLabel={t('common.menu', null, 'Open menu')}
+              />
+              {chrome.menuBadge > 0 ? <Badge style={styles.badge}>{chrome.menuBadge}</Badge> : null}
+            </View>
             <CompactLanguageSelector
               variant="dark"
               compact
