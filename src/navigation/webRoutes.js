@@ -684,6 +684,10 @@ export function partnerOrganizationNetwork(params = {}) {
   return buildPathWithQuery(`${PARTNER}/organization/network`, params);
 }
 
+export function partnerOrganizationWorkforce(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/organization/workforce`, params);
+}
+
 export function publicBusinessProfile(slug, params = {}) {
   return buildPathWithQuery(`/business/${String(slug || '').trim().toLowerCase()}`, params);
 }

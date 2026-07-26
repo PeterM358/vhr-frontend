@@ -142,7 +142,11 @@ export default function FleetDashboardScreen({ navigation, route }) {
     const makeModel =
       item.display_name && item.display_name !== item.license_plate ? item.display_name : null;
     const deptLabel = item.department || t('fleet.dashboard.noDepartment');
-    const subtitle = [makeModel, deptLabel].filter(Boolean).join(' · ');
+    const driverLabel =
+      item.assigned_driver?.display_name
+      || item.driver_name
+      || null;
+    const subtitle = [makeModel, deptLabel, driverLabel].filter(Boolean).join(' · ');
     const showReason =
       readiness.shortReason &&
       readiness.shortReason !== readiness.label &&

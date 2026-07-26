@@ -60,6 +60,7 @@ import {
   partnerLegacyFleet,
   partnerOrganizationHome,
   partnerOrganizationNetwork,
+  partnerOrganizationWorkforce,
   partnerBusinessNetwork,
 } from './webRoutes';
 
@@ -1045,4 +1046,23 @@ export function navigateToOrgNetwork(navigation, params = {}) {
     return;
   }
   navigation.navigate('OrgHome', { screen: 'OrgNetwork', params: routeParams });
+}
+
+export function navigateToOrgWorkforce(navigation, params = {}) {
+  const routeParams = params.orgId != null ? { organizationId: params.orgId, ...params } : params;
+  const orgWorkforceRoute = {
+    name: 'OrgHome',
+    state: {
+      index: 1,
+      routes: [
+        { name: 'OrgOverview' },
+        { name: 'OrgWorkforce', params: Object.keys(routeParams).length ? routeParams : undefined },
+      ],
+    },
+  };
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [orgWorkforceRoute], partnerOrganizationWorkforce(params));
+    return;
+  }
+  navigation.navigate('OrgHome', { screen: 'OrgWorkforce', params: routeParams });
 }

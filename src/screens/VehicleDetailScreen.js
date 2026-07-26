@@ -22,6 +22,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { API_BASE_URL } from '../api/config';
 import { updateVehicle, patchVehicleReminder, getVehicleForecast } from '../api/vehicles';
 import { listVehicleDocuments } from '../api/documents';
+import { getOrgFleetVehicle } from '../api/fleet';
 import ScreenBackground from '../components/ScreenBackground';
 import AppNavigationBar from '../components/common/AppNavigationBar';
 import OrgAppHeader from '../components/org/OrgAppHeader';
@@ -149,6 +150,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
   const [forecastLoading, setForecastLoading] = useState(false);
   const [forecastExpanded, setForecastExpanded] = useState(true);
   const [pendingServiceHistoryScroll, setPendingServiceHistoryScroll] = useState(false);
+  const [orgFleetMeta, setOrgFleetMeta] = useState(null);
 
   const [mileageSheetVisible, setMileageSheetVisible] = useState(false);
   const [kmModalVisible, setKmModalVisible] = useState(false);
@@ -204,6 +206,17 @@ export default function VehicleDetailScreen({ route, navigation }) {
       const data = await res.json();
       setVehicle(data);
       setRepairs(data.repairs || []);
+      if (isOrgFleet && organizationId) {
+        try {
+          const fleetDetail = await getOrgFleetVehicle(token, organizationId, vehicleId);
+          setOrgFleetMeta(fleetDetail);
+        } catch (fleetErr) {
+          console.warn('Could not load org fleet vehicle detail', fleetErr);
+          setOrgFleetMeta(null);
+        }
+      } else {
+        setOrgFleetMeta(null);
+      }
       if (!treatAsShopView) {
         try {
           const docs = await listVehicleDocuments(token, vehicleId);
@@ -233,7 +246,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [vehicleId, isOrgFleet]);
+  }, [vehicleId, isOrgFleet, organizationId]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -1345,6 +1358,15 @@ export default function VehicleDetailScreen({ route, navigation }) {
               {String(vehicle.vin || '').trim()
                 ? infoTile('VIN', vehicle.vin, {})
                 : infoTile('VIN', t('vehicles.detail.vinHint'), {})}
+              {isOrgFleet
+                ? infoTile(
+                    t('org.workforce.assignedDriver', null, 'Assigned driver'),
+                    orgFleetMeta?.assigned_driver?.display_name
+                      || orgFleetMeta?.driver_name
+                      || vehicle.driver_name
+                      || t('org.workforce.noDriver', null, 'No driver assigned'),
+                  )
+                : null}
               {infoTile(t('vehicles.detail.completed'), String(lifetimeSummary.completedCount), {
                 onPress: scrollToServiceHistorySection,
                 showChevron: true,

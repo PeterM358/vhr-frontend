@@ -12,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import OrganizationHomeScreen from '../screens/OrganizationHomeScreen';
 import FleetDashboardScreen from '../screens/FleetDashboardScreen';
 import NetworkOrganizationScreen from '../screens/NetworkOrganizationScreen';
+import OrgWorkforceScreen from '../screens/OrgWorkforceScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
 
 import { AuthContext } from '../context/AuthManager';
@@ -26,6 +27,7 @@ import {
 import {
   navigateToOrgFleet,
   navigateToOrgNetwork,
+  navigateToOrgWorkforce,
   navigateToPartnerDashboard,
   navigateToPartnerSwitchCenter,
 } from '../navigation/webNavigation';
@@ -72,6 +74,10 @@ function CustomDrawerContent(props) {
     }
     if (route === 'OrgNetwork') {
       navigateToOrgNetwork(navigation, { orgId: org?.id });
+      return;
+    }
+    if (route === 'OrgWorkforce') {
+      navigateToOrgWorkforce(navigation, { orgId: org?.id });
       return;
     }
     if (Platform.OS === 'web') {
@@ -180,6 +186,7 @@ export default function OrganizationDrawer() {
     >
       <Drawer.Screen name="OrgOverview" component={OrganizationHomeScreen} />
       <Drawer.Screen name="OrgFleet" component={FleetDashboardScreen} />
+      <Drawer.Screen name="OrgWorkforce" component={OrgWorkforceScreen} />
       <Drawer.Screen name="OrgNetwork" component={NetworkOrganizationScreen} />
       <Drawer.Screen name="ChooseShop" component={ChooseShopScreen} />
     </Drawer.Navigator>

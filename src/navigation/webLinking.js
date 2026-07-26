@@ -883,6 +883,28 @@ export function getPartnerNavigationStateFromPath(path) {
       index: 0,
     };
   }
+  if (pathPart === 'partner/organization/workforce') {
+    const params = {};
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) {
+      params.organizationId = organizationId;
+    }
+    return {
+      routes: [
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [
+              { name: 'OrgOverview' },
+              { name: 'OrgWorkforce', params: Object.keys(params).length ? params : undefined },
+            ],
+          },
+        },
+      ],
+      index: 0,
+    };
+  }
   if (pathPart === 'partner/organization/fleet') {
     const params = {};
     const organizationId = parseOrganizationIdFromQuery(query);

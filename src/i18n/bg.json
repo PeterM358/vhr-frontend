@@ -244,6 +244,45 @@
       "publicProfile": "Публичен профил",
       "invoicing": "Фактуриране"
     },
+    "workforce": {
+      "title": "Персонал",
+      "membersTitle": "Екип",
+      "inviteTitle": "Покани член",
+      "inviteHelper": "Поканете с имейл или телефон. Споделете еднократния линк за присъединяване.",
+      "phone": "Телефон (по избор)",
+      "empty": "Все още няма членове.",
+      "roleLabel": "Роля",
+      "manageFleet": "Управление на автопарк",
+      "changeRole": "Смени роля",
+      "assignVehicle": "Назначи МПС",
+      "assignTitle": "Назначи МПС",
+      "pickVehicle": "Изберете МПС",
+      "confirmAssign": "Назначи",
+      "endAssignment": "Приключи",
+      "noVehicles": "Няма назначено МПС",
+      "noDriver": "Няма назначен водач",
+      "loadError": "Персоналът не можа да се зареди.",
+      "inviteError": "Поканата не бе създадена.",
+      "roleError": "Ролята не бе обновена.",
+      "assignError": "МПС не бе назначено.",
+      "endAssignError": "Назначението не бе приключено.",
+      "assignedDriver": "Назначен водач",
+      "roles": {
+        "owner": "Собственик",
+        "admin": "Мениджър",
+        "transport": "Шофьор",
+        "viewer": "Член",
+        "warehouse": "Склад",
+        "accounting": "Счетоводство",
+        "purchasing": "Снабдяване",
+        "sales": "Продажби"
+      },
+      "assignmentRoles": {
+        "driver": "Шофьор",
+        "operator": "Оператор",
+        "brigadier": "Бригадир"
+      }
+    },
     "onboarding": {
       "title": "Създайте организация",
       "subtitle": "Настройте работното пространство на фирмата. Можете да импортирате автопарк по-късно.",

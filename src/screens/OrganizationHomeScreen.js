@@ -27,6 +27,7 @@ import { useTranslation } from '../i18n';
 import {
   navigateToOrgFleet,
   navigateToOrgNetwork,
+  navigateToOrgWorkforce,
   navigateToPartnerDashboard,
 } from '../navigation/webNavigation';
 
@@ -87,6 +88,10 @@ export default function OrganizationHomeScreen() {
     }
     if (route === 'OrgNetwork') {
       navigateToOrgNetwork(navigation, { orgId: org?.id });
+      return;
+    }
+    if (route === 'OrgWorkforce') {
+      navigateToOrgWorkforce(navigation, { orgId: org?.id });
       return;
     }
     if (route === 'OrgOverview') {

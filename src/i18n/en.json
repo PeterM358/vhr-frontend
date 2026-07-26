@@ -245,6 +245,45 @@
       "publicProfile": "Public profile",
       "invoicing": "Invoicing"
     },
+    "workforce": {
+      "title": "Workforce",
+      "membersTitle": "Team members",
+      "inviteTitle": "Invite member",
+      "inviteHelper": "Invite by email or phone. Share the one-time link so they can join.",
+      "phone": "Phone (optional)",
+      "empty": "No members yet.",
+      "roleLabel": "Role",
+      "manageFleet": "Fleet manager",
+      "changeRole": "Change role",
+      "assignVehicle": "Assign vehicle",
+      "assignTitle": "Assign vehicle",
+      "pickVehicle": "Choose vehicle",
+      "confirmAssign": "Assign",
+      "endAssignment": "End",
+      "noVehicles": "No vehicle assigned",
+      "noDriver": "No driver assigned",
+      "loadError": "Could not load workforce.",
+      "inviteError": "Could not create invite.",
+      "roleError": "Could not update role.",
+      "assignError": "Could not assign vehicle.",
+      "endAssignError": "Could not end assignment.",
+      "assignedDriver": "Assigned driver",
+      "roles": {
+        "owner": "Owner",
+        "admin": "Manager",
+        "transport": "Driver",
+        "viewer": "Member",
+        "warehouse": "Warehouse",
+        "accounting": "Accounting",
+        "purchasing": "Purchasing",
+        "sales": "Sales"
+      },
+      "assignmentRoles": {
+        "driver": "Driver",
+        "operator": "Operator",
+        "brigadier": "Brigadier"
+      }
+    },
     "onboarding": {
       "title": "Create your organization",
       "subtitle": "Set up your company workspace. You can import a fleet later when you are ready.",
