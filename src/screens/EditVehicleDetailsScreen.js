@@ -48,7 +48,7 @@ import { translateVehicleTypeLabel } from '../utils/translateShopTypeLabels';
 export default function EditVehicleDetailsScreen({ navigation, route }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { vehicleId } = route.params || {};
+  const { vehicleId, organizationId, returnTo } = route.params || {};
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useGoBackOr(navigation);
 
@@ -98,16 +98,20 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
   const [dialogMessage, setDialogMessage] = useState('');
 
   const goBackToVehicleDetail = useCallback(() => {
-    if (!vehicleId) {
-      navigation.goBack();
-      return;
-    }
     if (navigation.canGoBack()) {
       navigation.goBack();
       return;
     }
+    if (returnTo === 'OrgFleetVehicleDetail' && organizationId && vehicleId) {
+      navigation.navigate('OrgFleetVehicleDetail', { organizationId, vehicleId });
+      return;
+    }
+    if (!vehicleId) {
+      navigation.goBack();
+      return;
+    }
     navigation.navigate('VehicleDetail', { vehicleId });
-  }, [navigation, vehicleId]);
+  }, [navigation, organizationId, returnTo, vehicleId]);
 
   const openFromMileageIntent = useCallback(
     (factor) => {

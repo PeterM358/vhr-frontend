@@ -1,5 +1,12 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
@@ -9,6 +16,7 @@ import {
   Modal,
   Portal,
   Text,
+  TextInput,
   useTheme,
 } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -17,15 +25,19 @@ import { useFocusEffect } from '@react-navigation/native';
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
 import OrgAppHeader from '../components/org/OrgAppHeader';
+import VehicleHealthCard from '../components/vehicle/VehicleHealthCard';
 import { getOrgFleetVehicle } from '../api/fleet';
+import { updateVehicle } from '../api/vehicles';
 import { COLORS } from '../constants/colors';
-import { translateRepairStatus, useTranslation } from '../i18n';
+import { showMessage } from '../utils/crossPlatformAlert';
+import { translateReminderType, translateRepairStatus, useTranslation } from '../i18n';
 import {
   fleetVehicleTitle,
   maintenanceStatusLabel,
   mapFleetReadiness,
   provenanceLabel,
 } from '../utils/fleetReadinessStatus';
+import { mapHealthFromApi } from '../utils/vehicleHealthStatus';
 
 function formatRepairDate(iso) {
   if (!iso) return null;
@@ -63,6 +75,11 @@ export default function OrgFleetVehicleDetailScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [addActivityModalVisible, setAddActivityModalVisible] = useState(false);
+  const [kmModalVisible, setKmModalVisible] = useState(false);
+  const [kmDraft, setKmDraft] = useState('');
+  const [kmSaving, setKmSaving] = useState(false);
+  const scrollRef = useRef(null);
+  const remindersYRef = useRef(0);
 
   const load = useCallback(async () => {
     if (!organizationId || !vehicleId) return;
@@ -87,6 +104,8 @@ export default function OrgFleetVehicleDetailScreen({ navigation, route }) {
   );
 
   const readiness = mapFleetReadiness(vehicle?.readiness, t);
+  const canManage = Boolean(vehicle?.can_manage);
+  const vehicleHealth = useMemo(() => mapHealthFromApi(vehicle, t), [vehicle, t]);
 
   const repairStats = useMemo(() => {
     const repairs = Array.isArray(vehicle?.repairs) ? vehicle.repairs : [];
@@ -100,12 +119,106 @@ export default function OrgFleetVehicleDetailScreen({ navigation, route }) {
 
   const closeAddActivityModal = () => setAddActivityModalVisible(false);
 
-  const orgReturnParams = {
-    organizationId,
-    vehicleId,
-    returnTo: 'OrgFleetVehicleDetail',
-    origin: 'OrgFleetVehicleDetail',
+  const orgReturnParams = useMemo(
+    () => ({
+      organizationId,
+      vehicleId,
+      returnTo: 'OrgFleetVehicleDetail',
+      origin: 'OrgFleetVehicleDetail',
+    }),
+    [organizationId, vehicleId],
+  );
+
+  const scrollToReminders = useCallback(() => {
+    const y = remindersYRef.current;
+    if (scrollRef.current && typeof scrollRef.current.scrollTo === 'function') {
+      scrollRef.current.scrollTo({ y: Math.max(0, y - 12), animated: true });
+    }
+  }, []);
+
+  const openKmModal = useCallback(() => {
+    if (!canManage) {
+      showMessage(t('common.notice'), t('fleet.detail.viewOnlyMutations'), { variant: 'info' });
+      return;
+    }
+    const cur =
+      vehicle?.kilometers != null && vehicle.kilometers !== ''
+        ? String(vehicle.kilometers)
+        : '';
+    setKmDraft(cur);
+    setKmModalVisible(true);
+  }, [canManage, t, vehicle?.kilometers]);
+
+  const saveKmOnly = async () => {
+    const kmRaw = String(kmDraft ?? '').trim();
+    let km = 0;
+    if (kmRaw) {
+      const kn = Number(kmRaw);
+      if (!Number.isFinite(kn) || kn < 0 || Math.round(kn) !== kn) {
+        showMessage(t('common.validation'), t('vehicles.detail.kilometersWholeNumber'), {
+          variant: 'error',
+        });
+        return;
+      }
+      km = kn;
+    }
+    setKmSaving(true);
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      await updateVehicle(vehicleId, { kilometers: km }, token);
+      await load();
+      setKmModalVisible(false);
+    } catch (e) {
+      Alert.alert(t('common.error'), e.message || t('vehicles.detail.kmUpdateError'));
+    } finally {
+      setKmSaving(false);
+    }
   };
+
+  const openTechnicalDetails = () => {
+    if (!canManage) {
+      showMessage(t('common.notice'), t('fleet.detail.viewOnlyMutations'), { variant: 'info' });
+      return;
+    }
+    navigation.navigate('EditVehicleDetails', {
+      vehicleId,
+      organizationId,
+      returnTo: 'OrgFleetVehicleDetail',
+    });
+  };
+
+  const handleHealthAction = useCallback(
+    (actionKey, row) => {
+      switch (actionKey) {
+        case 'update_km':
+          openKmModal();
+          break;
+        case 'log_service':
+        case 'add_service_history':
+          navigation.navigate('LogServiceRecord', {
+            ...orgReturnParams,
+            ...(row?.id === 'oil' ? { type: 'oil_service', prefillKm: true } : null),
+            ...(row?.id === 'brake' ? { type: 'brake', prefillKm: true } : null),
+          });
+          break;
+        case 'schedule':
+        case 'schedule_maintenance':
+        case 'book_repair':
+          navigation.navigate('CreateRepair', {
+            mode: 'request',
+            ...orgReturnParams,
+          });
+          break;
+        case 'reminders':
+        case 'configure_reminders':
+          scrollToReminders();
+          break;
+        default:
+          break;
+      }
+    },
+    [navigation, openKmModal, orgReturnParams, scrollToReminders],
+  );
 
   const handleAddActivityRequestService = () => {
     closeAddActivityModal();
@@ -141,6 +254,9 @@ export default function OrgFleetVehicleDetailScreen({ navigation, route }) {
     </View>
   );
 
+  const mandatoryItems = vehicle?.readiness?.mandatory_items || [];
+  const reminders = Array.isArray(vehicle?.reminders) ? vehicle.reminders : [];
+
   return (
     <ScreenBackground>
       <OrgAppHeader
@@ -149,7 +265,7 @@ export default function OrgFleetVehicleDetailScreen({ navigation, route }) {
         onBack={() => navigation.goBack()}
       />
       <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.content}>
           {loading ? <ActivityIndicator /> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {vehicle ? (
@@ -181,7 +297,29 @@ export default function OrgFleetVehicleDetailScreen({ navigation, route }) {
                   {infoCell(t('vehicles.detail.completed'), String(repairStats.completed))}
                   {infoCell(t('vehicles.detail.active'), String(repairStats.active))}
                 </View>
+                {canManage ? (
+                  <View style={styles.heroActionsRow}>
+                    <Button
+                      mode="outlined"
+                      compact
+                      onPress={openKmModal}
+                      style={styles.heroActionBtn}
+                    >
+                      {t('vehicles.detail.updateKilometers')}
+                    </Button>
+                    <Button
+                      mode="contained-tonal"
+                      compact
+                      onPress={openTechnicalDetails}
+                      style={styles.heroActionBtn}
+                    >
+                      {t('vehicles.detail.editTechnicalDetails')}
+                    </Button>
+                  </View>
+                ) : null}
               </AppCard>
+
+              <VehicleHealthCard health={vehicleHealth} onAction={handleHealthAction} />
 
               <AppCard>
                 <View style={[styles.badge, { backgroundColor: readiness.bg }]}>
@@ -189,29 +327,65 @@ export default function OrgFleetVehicleDetailScreen({ navigation, route }) {
                   <Text style={[styles.badgeText, { color: readiness.color }]}>{readiness.label}</Text>
                 </View>
                 <Text variant="titleMedium">{t('fleet.detail.readinessTitle')}</Text>
+                <Text style={styles.readinessHint}>{t('fleet.detail.readinessHint')}</Text>
                 <Text>{readiness.shortReason}</Text>
                 {vehicle.readiness?.nearest_deadline ? (
                   <Text style={styles.meta}>
                     {t('fleet.detail.nextDeadline')}: {vehicle.readiness.nearest_deadline}
                   </Text>
                 ) : null}
+                {mandatoryItems.length ? (
+                  <View style={styles.mandatoryCompact}>
+                    <Text style={styles.mandatoryTitle}>{t('fleet.detail.mandatoryItems')}</Text>
+                    {mandatoryItems.map((item) => (
+                      <Text key={item.key} style={styles.meta}>
+                        {item.label}: {t(`fleet.detail.state.${item.state}`)}
+                        {item.due_date ? ` · ${item.due_date}` : ''}
+                        {item.provenance ? ` · ${provenanceLabel(item.provenance, t)}` : ''}
+                      </Text>
+                    ))}
+                  </View>
+                ) : null}
               </AppCard>
 
-              <AppCard>
-                <Text variant="titleMedium">{t('fleet.detail.mandatoryItems')}</Text>
-                {(vehicle.readiness?.mandatory_items || []).map((item) => (
-                  <View key={item.key} style={styles.itemRow}>
-                    <Text style={styles.itemTitle}>{item.label}</Text>
-                    <Text style={styles.meta}>
-                      {t(`fleet.detail.state.${item.state}`)} · {item.due_date || t('fleet.detail.noDate')}
-                    </Text>
-                    {item.provenance ? (
-                      <Text style={styles.meta}>{provenanceLabel(item.provenance, t)}</Text>
-                    ) : null}
-                    <Divider style={styles.divider} />
-                  </View>
-                ))}
-              </AppCard>
+              <View
+                onLayout={(e) => {
+                  remindersYRef.current = e.nativeEvent.layout.y;
+                }}
+              >
+                <AppCard>
+                  <Text variant="titleMedium">{t('vehicles.detail.remindersObligations')}</Text>
+                  {reminders.length ? (
+                    reminders.map((reminder) => (
+                      <View key={reminder.id || reminder.reminder_type} style={styles.itemRow}>
+                        <Text style={styles.itemTitle}>
+                          {translateReminderType(reminder.reminder_type, t) ||
+                            reminder.title ||
+                            reminder.reminder_type}
+                        </Text>
+                        <Text style={styles.meta}>
+                          {[reminder.due_date || t('fleet.detail.noDate'), reminder.status]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </Text>
+                        <Divider style={styles.divider} />
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.meta}>{t('fleet.detail.remindersEmpty')}</Text>
+                  )}
+                  {canManage ? (
+                    <Button
+                      mode="outlined"
+                      compact
+                      onPress={handleAddActivityObligation}
+                      style={styles.remindersBtn}
+                    >
+                      {t('vehicles.detail.addObligationPayment')}
+                    </Button>
+                  ) : null}
+                </AppCard>
+              </View>
 
               <AppCard>
                 <Text variant="titleMedium">{t('fleet.detail.maintenanceTitle')}</Text>
@@ -309,6 +483,34 @@ export default function OrgFleetVehicleDetailScreen({ navigation, route }) {
             </Button>
           </View>
         </Modal>
+
+        <Modal
+          visible={kmModalVisible}
+          onDismiss={() => !kmSaving && setKmModalVisible(false)}
+          contentContainerStyle={styles.sheetModal}
+        >
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <Text style={styles.modalTitle}>{t('vehicles.detail.currentKilometers')}</Text>
+            <Text style={styles.modalMuted}>{t('vehicles.detail.currentKilometersHint')}</Text>
+            <TextInput
+              mode="outlined"
+              label={t('vehicles.detail.kilometersLabel')}
+              value={kmDraft}
+              onChangeText={setKmDraft}
+              keyboardType="number-pad"
+              style={styles.modalInput}
+              placeholder={t('vehicles.detail.kilometersPlaceholder')}
+            />
+            <View style={styles.modalActions}>
+              <Button mode="text" onPress={() => !kmSaving && setKmModalVisible(false)} disabled={kmSaving}>
+                {t('common.cancel')}
+              </Button>
+              <Button mode="contained" onPress={saveKmOnly} loading={kmSaving} disabled={kmSaving}>
+                {t('common.save')}
+              </Button>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
       </Portal>
     </ScreenBackground>
   );
@@ -330,6 +532,22 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   badgeText: { fontSize: 13, fontWeight: '600' },
+  readinessHint: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 13,
+    marginBottom: 6,
+  },
+  mandatoryCompact: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(15,23,42,0.12)',
+  },
+  mandatoryTitle: {
+    fontWeight: '700',
+    color: COLORS.TEXT_DARK,
+    marginBottom: 4,
+  },
   meta: { color: '#475569', marginTop: 4 },
   itemRow: { marginTop: 8 },
   itemTitle: { fontWeight: '600' },
@@ -358,6 +576,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  heroActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  heroActionBtn: {
+    flexGrow: 1,
+  },
+  remindersBtn: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
   fab: {
     position: 'absolute',
     right: 16,
@@ -378,6 +609,9 @@ const styles = StyleSheet.create({
   modalMuted: {
     color: COLORS.TEXT_MUTED,
     marginBottom: 14,
+  },
+  modalInput: {
+    marginBottom: 8,
   },
   addActivityBtn: { marginBottom: 8 },
   modalActions: {
