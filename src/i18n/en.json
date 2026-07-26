@@ -203,10 +203,29 @@
     },
     "home": {
       "title": "Organization",
+      "greeting": "Welcome, {{name}}",
       "subtitle": "Shared workforce, fleet, documents, and operations for your company.",
+      "fleetSubtitle": "Manage your company fleet and request repairs the same way customers do.",
       "modules": "Workspace",
       "openServiceCenter": "Open service center workspace",
-      "importFleetLater": "Import fleet later"
+      "importFleetLater": "Import fleet later",
+      "requestRepair": "Request repair",
+      "needVehicleTitle": "Add vehicles first",
+      "needVehicleBody": "Import your fleet register (or add vehicles), then request a repair the same way customers do.",
+      "needVehicleHint": "Request repair needs at least one fleet vehicle — import your register first.",
+      "summary": {
+        "fleet": "Fleet",
+        "repair": "Repair",
+        "ready": "Ready",
+        "needVehicles": "Add cars"
+      },
+      "actions": {
+        "fleetSubtitle": "Browse company vehicles, readiness, and details.",
+        "importSubtitle": "Upload your register spreadsheet to add vehicles.",
+        "repairSubtitle": "Request service for a fleet vehicle like a customer.",
+        "openSection": "Open this workspace section.",
+        "shopSubtitle": "Switch to bay operations, offers, and shop tools."
+      }
     },
     "switcher": {
       "label": "Organization"
