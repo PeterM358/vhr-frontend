@@ -199,7 +199,22 @@
     "drawer": {
       "title": "Organization",
       "serviceCenter": "Service center",
-      "switchCenter": "Switch service center"
+      "switchCenter": "Switch service center",
+      "calendar": "Calendar",
+      "notifications": "Notifications",
+      "profile": "Profile"
+    },
+    "chrome": {
+      "calendar": "Calendar",
+      "notifications": "Notifications",
+      "profile": "Profile"
+    },
+    "calendar": {
+      "title": "Org calendar",
+      "lead": "Fleet readiness deadlines and reminders for your organization.",
+      "empty": "No fleet deadlines yet. Add vehicles to see reminders here.",
+      "noDeadline": "No deadline set",
+      "loadError": "Could not load calendar."
     },
     "home": {
       "title": "Organization",
@@ -224,7 +239,13 @@
         "importSubtitle": "Upload your register spreadsheet to add vehicles.",
         "repairSubtitle": "Request service for a fleet vehicle like a customer.",
         "openSection": "Open this workspace section.",
-        "shopSubtitle": "Switch to bay operations, offers, and shop tools."
+        "shopSubtitle": "Switch to bay operations, offers, and shop tools.",
+        "calendar": "Calendar",
+        "calendarSubtitle": "Fleet readiness deadlines and reminders.",
+        "notifications": "Notifications",
+        "notificationsSubtitle": "Open your notification inbox.",
+        "profile": "Profile",
+        "profileSubtitle": "Open your account profile."
       }
     },
     "switcher": {

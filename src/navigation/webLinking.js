@@ -893,6 +893,20 @@ export function getPartnerNavigationStateFromPath(path) {
   if (pathPart === 'partner/organization' || pathPart === 'partner/organization/') {
     return { routes: [orgHome], index: 0 };
   }
+  if (pathPart === 'partner/organization/calendar') {
+    return {
+      routes: [
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [{ name: 'OrgOverview' }, { name: 'OrgCalendar' }],
+          },
+        },
+      ],
+      index: 0,
+    };
+  }
   if (pathPart === 'partner/organization/network') {
     return {
       routes: [

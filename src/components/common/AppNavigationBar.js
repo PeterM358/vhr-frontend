@@ -152,6 +152,7 @@ export default function AppNavigationBar({
               // Keep right slot wide enough for labeled actions (e.g. Select to invoice).
               !rightAction && iconOnlyBack && styles.sideSlotIconOnly,
               rightAction && styles.sideSlotRightWide,
+              rightAction && styles.sideSlotRightExtraWide,
             ]}
           >
             {rightAction ?? null}
@@ -246,6 +247,9 @@ const styles = StyleSheet.create({
     minWidth: 52,
     maxWidth: 200,
     flexShrink: 0,
+  },
+  sideSlotRightExtraWide: {
+    maxWidth: 260,
   },
   titleWrap: {
     flex: 1,

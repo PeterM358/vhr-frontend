@@ -25,10 +25,13 @@ import {
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 import { useTranslation } from '../i18n';
 import {
+  navigateToNotifications,
+  navigateToOrgCalendar,
   navigateToOrgFleet,
   navigateToOrgNetwork,
   navigateToOrgWorkforce,
   navigateToPartnerDashboard,
+  navigateToProfile,
 } from '../navigation/webNavigation';
 
 const PRIMARY_HOME_ROUTES = new Set(['OrgOverview', 'OrgFleet']);
@@ -171,6 +174,43 @@ export default function OrganizationHomeScreen() {
         ),
         onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }),
         count: typeof fleetCount === 'number' ? fleetCount : undefined,
+      },
+      {
+        key: 'calendar',
+        icon: 'calendar-month-outline',
+        title: t('org.home.actions.calendar', null, 'Calendar'),
+        subtitle: t(
+          'org.home.actions.calendarSubtitle',
+          null,
+          'Fleet readiness deadlines and reminders.',
+        ),
+        onPress: () => navigateToOrgCalendar(navigation, { orgId: org?.id }),
+      },
+      {
+        key: 'notifications',
+        icon: 'bell-outline',
+        title: t('org.home.actions.notifications', null, 'Notifications'),
+        subtitle: t(
+          'org.home.actions.notificationsSubtitle',
+          null,
+          'Open your notification inbox.',
+        ),
+        onPress: () =>
+          navigateToNotifications(navigation, {
+            returnTo: 'OrgHome',
+            backLabelKey: 'org.home.title',
+          }),
+      },
+      {
+        key: 'profile',
+        icon: 'account-circle-outline',
+        title: t('org.home.actions.profile', null, 'Profile'),
+        subtitle: t(
+          'org.home.actions.profileSubtitle',
+          null,
+          'Open your account profile.',
+        ),
+        onPress: () => navigateToProfile(navigation),
       },
     ];
 

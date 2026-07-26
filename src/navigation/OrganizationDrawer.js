@@ -13,9 +13,11 @@ import OrganizationHomeScreen from '../screens/OrganizationHomeScreen';
 import FleetDashboardScreen from '../screens/FleetDashboardScreen';
 import NetworkOrganizationScreen from '../screens/NetworkOrganizationScreen';
 import OrgWorkforceScreen from '../screens/OrgWorkforceScreen';
+import OrgCalendarScreen from '../screens/OrgCalendarScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
 
 import { AuthContext } from '../context/AuthManager';
+import { WebSocketContext } from '../context/WebSocketManager';
 import { logout } from '../api/auth';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import {
@@ -25,14 +27,18 @@ import {
   setCurrentOrganizationId,
 } from '../utils/orgWorkspace';
 import {
+  navigateToNotifications,
+  navigateToOrgCalendar,
   navigateToOrgFleet,
   navigateToOrgNetwork,
   navigateToOrgWorkforce,
   navigateToPartnerDashboard,
   navigateToPartnerSwitchCenter,
+  navigateToProfile,
 } from '../navigation/webNavigation';
 import {
   DrawerMenuIcon,
+  DrawerLabelWithBadge,
   DrawerVeversalLogoFooter,
   drawerGlassStyles,
   drawerMenuItemProps,
@@ -47,6 +53,7 @@ function CustomDrawerContent(props) {
   const navigation = useNavigation();
   const { t } = useTranslation();
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
+  const { unreadCount: unreadNotifications } = useContext(WebSocketContext);
   const [org, setOrg] = useState(null);
   const [memberships, setMemberships] = useState([]);
 
@@ -78,6 +85,10 @@ function CustomDrawerContent(props) {
     }
     if (route === 'OrgWorkforce') {
       navigateToOrgWorkforce(navigation, { orgId: org?.id });
+      return;
+    }
+    if (route === 'OrgCalendar') {
+      navigateToOrgCalendar(navigation, { orgId: org?.id });
       return;
     }
     if (Platform.OS === 'web') {
@@ -113,6 +124,47 @@ function CustomDrawerContent(props) {
             {...itemProps}
           />
         ))}
+
+        <DrawerItem
+          label={t('org.drawer.calendar', null, 'Calendar')}
+          onPress={() => openRoute('OrgCalendar')}
+          icon={({ color, size }) => (
+            <DrawerMenuIcon name="calendar-month-outline" color={color} size={size} />
+          )}
+          {...itemProps}
+        />
+
+        <DrawerItem
+          label={() => (
+            <DrawerLabelWithBadge
+              label={t('org.drawer.notifications', null, 'Notifications')}
+              badge={unreadNotifications}
+            />
+          )}
+          onPress={() => {
+            props.navigation.closeDrawer();
+            const root = navigation.getParent?.() || navigation;
+            navigateToNotifications(root, {
+              returnTo: 'OrgHome',
+              backLabelKey: 'org.home.title',
+            });
+          }}
+          icon={({ color, size }) => <DrawerMenuIcon name="bell-outline" color={color} size={size} />}
+          {...itemProps}
+        />
+
+        <DrawerItem
+          label={t('org.drawer.profile', null, 'Profile')}
+          onPress={() => {
+            props.navigation.closeDrawer();
+            const root = navigation.getParent?.() || navigation;
+            navigateToProfile(root);
+          }}
+          icon={({ color, size }) => (
+            <DrawerMenuIcon name="account-circle-outline" color={color} size={size} />
+          )}
+          {...itemProps}
+        />
 
         {org?.has_shop_locations ? (
           <DrawerItem
@@ -186,6 +238,7 @@ export default function OrganizationDrawer() {
     >
       <Drawer.Screen name="OrgOverview" component={OrganizationHomeScreen} />
       <Drawer.Screen name="OrgFleet" component={FleetDashboardScreen} />
+      <Drawer.Screen name="OrgCalendar" component={OrgCalendarScreen} />
       <Drawer.Screen name="OrgWorkforce" component={OrgWorkforceScreen} />
       <Drawer.Screen name="OrgNetwork" component={NetworkOrganizationScreen} />
       <Drawer.Screen name="ChooseShop" component={ChooseShopScreen} />

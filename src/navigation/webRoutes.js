@@ -676,6 +676,10 @@ export function partnerOrganizationHome(params = {}) {
   return buildPathWithQuery(`${PARTNER}/organization`, params);
 }
 
+export function partnerOrganizationCalendar(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/organization/calendar`, params);
+}
+
 export function partnerBusinessNetwork(params = {}) {
   return buildPathWithQuery(`${PARTNER}/business-network`, params);
 }

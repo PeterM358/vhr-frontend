@@ -59,6 +59,7 @@ import {
   partnerFleet,
   partnerLegacyFleet,
   partnerOrganizationHome,
+  partnerOrganizationCalendar,
   partnerOrganizationNetwork,
   partnerOrganizationWorkforce,
   partnerOrganizationWorkforceMember,
@@ -1009,6 +1010,25 @@ export function navigateToOrgHome(navigation, params = {}) {
     return;
   }
   navigation.navigate('OrgHome', params);
+}
+
+export function navigateToOrgCalendar(navigation, params = {}) {
+  const routeParams = params.orgId != null ? { organizationId: params.orgId, ...params } : params;
+  const orgCalendarRoute = {
+    name: 'OrgHome',
+    state: {
+      index: 1,
+      routes: [
+        { name: 'OrgOverview' },
+        { name: 'OrgCalendar', params: Object.keys(routeParams).length ? routeParams : undefined },
+      ],
+    },
+  };
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [orgCalendarRoute], partnerOrganizationCalendar(params));
+    return;
+  }
+  navigation.navigate('OrgHome', { screen: 'OrgCalendar', params: routeParams });
 }
 
 export function navigateToOrgFleet(navigation, params = {}) {
