@@ -27,6 +27,12 @@ import {
   setCurrentOrganizationId,
 } from '../utils/orgWorkspace';
 import {
+  WORKSPACE_MODE,
+  isDriverMembership,
+  setWorkspaceMode,
+} from '../utils/orgRoleHome';
+import { buildShopAuthReset } from '../utils/shopAuthNavigation';
+import {
   navigateToNotifications,
   navigateToOrgCalendar,
   navigateToOrgFleet,
@@ -71,7 +77,11 @@ function CustomDrawerContent(props) {
   );
 
   const itemProps = drawerMenuItemProps;
-  const navItems = buildOrgNavItems(org, t);
+  const isDriver = isDriverMembership(org);
+  const navItems = buildOrgNavItems(org, t).filter((item) => {
+    if (!isDriver) return true;
+    return item.route === 'OrgOverview' || item.route === 'OrgFleet';
+  });
 
   const openRoute = (route) => {
     props.navigation.closeDrawer();
@@ -100,6 +110,13 @@ function CustomDrawerContent(props) {
     props.navigation.navigate(route === 'OrgOverview' ? 'OrgOverview' : route);
   };
 
+  const switchToPersonal = async () => {
+    props.navigation.closeDrawer();
+    await setWorkspaceMode(WORKSPACE_MODE.PERSONAL);
+    const root = navigation.getParent?.() || navigation;
+    root.reset(buildShopAuthReset({ name: 'Home' }));
+  };
+
   const handleLogout = async () => {
     await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
   };
@@ -114,6 +131,15 @@ function CustomDrawerContent(props) {
         <Text style={drawerGlassStyles.drawerTitle}>
           {org?.display_name || t('org.drawer.title', null, 'Organization')}
         </Text>
+
+        {isDriver ? (
+          <DrawerItem
+            label={t('org.mode.switchToPersonal', null, 'Personal garage')}
+            onPress={switchToPersonal}
+            icon={({ color, size }) => <DrawerMenuIcon name="home-outline" color={color} size={size} />}
+            {...itemProps}
+          />
+        ) : null}
 
         {navItems.map((item) => (
           <DrawerItem
@@ -166,7 +192,7 @@ function CustomDrawerContent(props) {
           {...itemProps}
         />
 
-        {org?.has_shop_locations ? (
+        {!isDriver && org?.has_shop_locations ? (
           <DrawerItem
             label={t('org.drawer.serviceCenter', null, 'Service center')}
             onPress={() => {
@@ -194,7 +220,7 @@ function CustomDrawerContent(props) {
           ))
         ) : null}
 
-        {org?.has_shop_locations ? (
+        {!isDriver && org?.has_shop_locations ? (
           <DrawerItem
             label={t('org.drawer.switchCenter', null, 'Switch service center')}
             onPress={() => {

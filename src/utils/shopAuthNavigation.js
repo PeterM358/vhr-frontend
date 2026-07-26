@@ -9,6 +9,7 @@ import {
   resolveOrgOnboardingRoute,
   resolvePartnerEntryRoute,
 } from './orgWorkspace';
+import { resolveDriverAwareOrgRoute } from './orgRoleHome';
 
 /**
  * Resolve where a shop user should land after auth.
@@ -28,6 +29,17 @@ export async function resolveShopEntryRoute({ wizardWhenIncomplete = false, auth
     if (!data.signup_account_kind && stored.signup_account_kind) {
       data = { ...data, signup_account_kind: stored.signup_account_kind };
     }
+    if (
+      (!Array.isArray(data.organization_memberships) || data.organization_memberships.length === 0) &&
+      Array.isArray(stored.organization_memberships) &&
+      stored.organization_memberships.length > 0
+    ) {
+      data = { ...data, organization_memberships: stored.organization_memberships };
+    }
+  }
+  const driverAware = await resolveDriverAwareOrgRoute(data);
+  if (driverAware) {
+    return driverAware;
   }
   const orgRoute = resolvePartnerEntryRoute(data);
   if (orgRoute) {
@@ -56,6 +68,9 @@ export async function resolveShopEntryRoute({ wizardWhenIncomplete = false, auth
 }
 
 export function buildShopAuthReset(route) {
+  if (route.name === 'Home') {
+    return { index: 0, routes: [{ name: 'Home' }] };
+  }
   if (route.name === 'OrgHome') {
     return { index: 0, routes: [{ name: 'OrgHome', params: route.params }] };
   }

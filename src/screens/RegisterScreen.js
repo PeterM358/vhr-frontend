@@ -1,5 +1,5 @@
 import React, { useContext, useState, useMemo } from 'react';
-import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import { Text, TextInput, Button, Portal, Dialog, ActivityIndicator, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -10,7 +10,8 @@ import ScreenBackground from '../components/ScreenBackground';
 import { COLORS } from '../constants/colors';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
-import { resetToClientDashboard } from '../navigation/authNavigation';
+import { consumeAuthReturnUrl, resetToClientDashboard } from '../navigation/authNavigation';
+import { resetNavigationToCanonicalPath } from '../navigation/webLinking';
 import { safeError } from '../utils/logger';
 import DashboardCard from '../components/dashboard/DashboardCard';
 import AuthPublicEscape from '../components/auth/AuthPublicEscape';
@@ -74,6 +75,24 @@ export default function RegisterScreen({ navigation }) {
       await applyLocalAuthSession(result, identifier);
       await AsyncStorage.setItem(STORAGE_KEYS.SIGNUP_ACCOUNT_KIND, accountKind);
 
+      const returnPath = await consumeAuthReturnUrl();
+      if (returnPath && resetNavigationToCanonicalPath(navigation, returnPath)) {
+        return;
+      }
+      if (returnPath && Platform.OS !== 'web') {
+        // Native: return paths are invite deep links without web canonical mapper.
+        if (String(returnPath).includes('organization-invite')) {
+          const token = String(returnPath).split('organization-invite/')[1]?.split('?')[0] || '';
+          if (token) {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'OrganizationMembershipInvite', params: { token: decodeURIComponent(token) } }],
+            });
+            return;
+          }
+        }
+      }
+
       if (accountKind === 'company') {
         navigation.reset(buildShopAuthReset({ name: 'OrgOnboarding' }));
         return;
@@ -88,15 +107,14 @@ export default function RegisterScreen({ navigation }) {
         wizardWhenIncomplete: true,
         authData: result,
       });
-      if (route.name === 'OrgHome' || route.name === 'OrgOnboarding' || result.is_shop) {
+      if (route.name === 'OrgHome' || route.name === 'OrgOnboarding' || route.name === 'Home' || result.is_shop) {
         navigation.reset(buildShopAuthReset(route));
       } else {
         navigation.reset({
           index: 0,
           routes: [{ name: 'Login' }],
         });
-      }
-    } catch (err) {
+      }    } catch (err) {
       safeError('Registration failed', err);
       setDialogMessage(err.message || t('auth.registerFailed'));
       setDialogVisible(true);

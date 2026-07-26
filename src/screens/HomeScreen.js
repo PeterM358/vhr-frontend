@@ -121,8 +121,18 @@ export default function HomeScreen({ navigation }) {
           if (onClientDashboard) {
             const isPartner = await resolveIsPartnerSession();
             const isOrgOnly = !isPartner && (await resolveIsOrgOnlySession());
-            if (isPartner || isOrgOnly) {
+            if (isPartner) {
               const route = await resolveShopEntryRoute();
+              navigation.reset(buildShopAuthReset(route));
+              return;
+            }
+            if (isOrgOnly) {
+              const route = await resolveShopEntryRoute();
+              // Drivers in personal mode intentionally stay on client Home.
+              if (route?.name === 'Home') {
+                setSessionChecked(true);
+                return;
+              }
               navigation.reset(buildShopAuthReset(route));
               return;
             }

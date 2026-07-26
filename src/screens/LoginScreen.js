@@ -226,7 +226,12 @@ export default function LoginScreen({ navigation, route }) {
       }
 
       const shopRoute = await resolveShopEntryRoute({ authData: data });
-      if (shopRoute.name === 'OrgHome' || shopRoute.name === 'OrgOnboarding' || shopMode) {
+      if (
+        shopRoute.name === 'OrgHome' ||
+        shopRoute.name === 'OrgOnboarding' ||
+        shopRoute.name === 'Home' ||
+        shopMode
+      ) {
         const returnPath = await consumeAuthReturnUrl();
         if (returnPath && resetNavigationToCanonicalPath(navigation, returnPath)) {
           return;

@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Button, Text } from 'react-native-paper';
@@ -12,7 +12,6 @@ import { fetchAuthSession, resendEmailVerification } from '../api/auth';
 import { AuthContext } from '../context/AuthManager';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { BRAND_LOCKUP_ASPECT, IMAGES } from '../constants/images';
-import { COLORS } from '../constants/colors';
 import { useTranslation } from '../i18n';
 import { storeAuthReturnUrl } from '../navigation/authNavigation';
 import { resetNavigationToCanonicalPath } from '../navigation/webLinking';
@@ -23,6 +22,7 @@ import {
   resolveInviteTokenFromRoute,
 } from '../utils/orgInviteHelpers';
 import { refreshOrganizationMemberships } from '../utils/orgWorkspace';
+import { resolveOrgEntryAfterAccept } from '../utils/orgRoleHome';
 import { buildShopAuthReset } from '../utils/shopAuthNavigation';
 import BaseStyles from '../styles/base';
 
@@ -48,6 +48,9 @@ export default function OrganizationMembershipInviteScreen({ route, navigation }
   const [error, setError] = useState('');
   const [emailVerified, setEmailVerified] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
+  const neededVerifyRef = useRef(false);
+  const pendingAcceptRef = useRef(false);
+  const autoAcceptStartedRef = useRef(false);
 
   const loadPreview = useCallback(async () => {
     if (!token) {
@@ -118,11 +121,13 @@ export default function OrganizationMembershipInviteScreen({ route, navigation }
   }, [isAuthenticated, authLoading, emailVerified, token]);
 
   const goToLogin = async () => {
+    pendingAcceptRef.current = true;
     await storeAuthReturnUrl(inviteReturnPath(token));
     navigation.navigate('Login');
   };
 
   const goToRegister = async () => {
+    pendingAcceptRef.current = true;
     await storeAuthReturnUrl(inviteReturnPath(token));
     navigation.navigate('Register');
   };
@@ -149,7 +154,7 @@ export default function OrganizationMembershipInviteScreen({ route, navigation }
     }
   };
 
-  const handleAccept = async () => {
+  const handleAccept = useCallback(async () => {
     setAccepting(true);
     setError('');
     try {
@@ -159,23 +164,26 @@ export default function OrganizationMembershipInviteScreen({ route, navigation }
         return;
       }
       const result = await acceptOrganizationMembershipInvite(accessToken, token);
-      await refreshOrganizationMemberships(accessToken);
-      navigation.reset(
-        buildShopAuthReset({
-          name: 'OrgHome',
-          params: { organizationId: result.organization_id },
-        }),
-      );
-      if (Platform.OS === 'web') {
-        resetNavigationToCanonicalPath(
-          navigation,
-          `/partner/organization/fleet?organizationId=${result.organization_id}`,
-        );
+      const memberships = await refreshOrganizationMemberships(accessToken);
+      const entry = resolveOrgEntryAfterAccept({
+        organizationId: result.organization_id,
+        role: result.role,
+        memberships,
+      });
+      navigation.reset(buildShopAuthReset(entry));
+      if (Platform.OS === 'web' && entry.name === 'OrgHome') {
+        const orgId = entry.params?.organizationId || result.organization_id;
+        const path =
+          entry.params?.screen === 'OrgFleet'
+            ? `/partner/organization/fleet?organizationId=${orgId}`
+            : `/partner/organization?organizationId=${orgId}`;
+        resetNavigationToCanonicalPath(navigation, path);
       }
     } catch (err) {
       safeError('Organization invite accept failed', err);
       const message = String(err?.message || '');
       if (message.toLowerCase().includes('verify your email')) {
+        neededVerifyRef.current = true;
         setEmailVerified(false);
         await AsyncStorage.setItem(STORAGE_KEYS.EMAIL_VERIFIED, 'false');
         setError(t('orgInvite.verifyEmailFirst'));
@@ -188,15 +196,31 @@ export default function OrganizationMembershipInviteScreen({ route, navigation }
       } else {
         setError(message || t('orgInvite.acceptFailed'));
       }
+      autoAcceptStartedRef.current = false;
     } finally {
       setAccepting(false);
     }
-  };
+  }, [navigation, t, token]);
 
   const recipientLabel = preview?.masked_email || preview?.masked_phone || t('orgInvite.recipientHidden');
   const roleLabel = localizeOrgMembershipRole(t, preview?.role);
   const showAccept = isAuthenticated && sessionChecked && emailVerified;
   const showVerify = isAuthenticated && sessionChecked && !emailVerified;
+
+  useEffect(() => {
+    if (showVerify) {
+      neededVerifyRef.current = true;
+    }
+  }, [showVerify]);
+
+  // After login/register/verify returns here, accept once automatically.
+  useEffect(() => {
+    if (!showAccept || !preview || accepting || autoAcceptStartedRef.current) return;
+    if (!neededVerifyRef.current && !pendingAcceptRef.current) return;
+    autoAcceptStartedRef.current = true;
+    pendingAcceptRef.current = false;
+    handleAccept();
+  }, [showAccept, preview, accepting, handleAccept]);
 
   return (
     <ScreenBackground safeArea={false}>
@@ -211,7 +235,7 @@ export default function OrganizationMembershipInviteScreen({ route, navigation }
         <DashboardCard style={styles.card}>
           <Text style={styles.title}>{t('orgInvite.title')}</Text>
           {loading || authLoading || (isAuthenticated && !sessionChecked) ? (
-            <ActivityIndicator animating style={styles.spinner} />
+            <ActivityIndicator animating color="#fff" style={styles.spinner} />
           ) : null}
           {!loading && preview ? (
             <View style={styles.details}>
@@ -228,10 +252,10 @@ export default function OrganizationMembershipInviteScreen({ route, navigation }
           {!loading && preview && !isAuthenticated ? (
             <View style={styles.actions}>
               <Button mode="contained" onPress={goToLogin} style={styles.actionButton}>
-                {t('auth.login')}
+                {t('orgInvite.accept')}
               </Button>
-              <Button mode="outlined" onPress={goToRegister} style={styles.actionButton}>
-                {t('auth.register')}
+              <Button mode="outlined" onPress={goToRegister} style={styles.actionButton} textColor="#fff">
+                {t('orgInvite.acceptAndRegister')}
               </Button>
             </View>
           ) : null}
@@ -285,7 +309,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.TEXT_DARK,
+    color: '#ffffff',
     marginBottom: 12,
   },
   details: {
@@ -293,26 +317,26 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    color: COLORS.TEXT_MUTED,
+    color: 'rgba(255,255,255,0.65)',
     fontSize: 13,
     marginTop: 8,
   },
   value: {
-    color: COLORS.TEXT_DARK,
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
   },
   body: {
-    color: COLORS.TEXT_MUTED,
+    color: 'rgba(255,255,255,0.78)',
     lineHeight: 20,
     marginBottom: 12,
   },
   error: {
-    color: '#b91c1c',
+    color: '#fca5a5',
     marginBottom: 12,
   },
   success: {
-    color: COLORS.TEXT_MUTED,
+    color: 'rgba(167,243,208,0.95)',
     marginBottom: 12,
   },
   actions: {

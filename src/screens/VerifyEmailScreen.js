@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Text, useTheme } from 'react-native-paper';
@@ -10,7 +10,6 @@ import DashboardCard from '../components/dashboard/DashboardCard';
 import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
 import { AuthContext } from '../context/AuthManager';
 import { BRAND_LOCKUP_ASPECT, IMAGES } from '../constants/images';
-import { COLORS } from '../constants/colors';
 import { useTranslation } from '../i18n';
 import {
   applyAuthSession,
@@ -29,6 +28,24 @@ import BaseStyles from '../styles/base';
 const AUTH_BRAND_WIDTH = 220;
 const AUTH_BRAND_HEIGHT = Math.round(AUTH_BRAND_WIDTH * BRAND_LOCKUP_ASPECT);
 
+/** Deduplicate Strict Mode remounts — share one in-flight confirm per uid:token. */
+const verifyConfirmPromises = new Map();
+
+function confirmEmailVerificationOnce(uid, token) {
+  const key = `${uid}:${token}`;
+  let pending = verifyConfirmPromises.get(key);
+  if (!pending) {
+    pending = confirmEmailVerification(uid, token).finally(() => {
+      // Keep brief cache so remounts reuse the settled result; clear after navigation window.
+      setTimeout(() => {
+        verifyConfirmPromises.delete(key);
+      }, 30_000);
+    });
+    verifyConfirmPromises.set(key, pending);
+  }
+  return pending;
+}
+
 export default function VerifyEmailScreen({ route, navigation }) {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -38,7 +55,6 @@ export default function VerifyEmailScreen({ route, navigation }) {
   const { uid, token } = useMemo(() => resolveEmailVerifyParams(route), [route]);
   const [status, setStatus] = useState('pending');
   const [error, setError] = useState('');
-  const ranKeyRef = useRef('');
 
   useEffect(() => {
     let cancelled = false;
@@ -48,13 +64,8 @@ export default function VerifyEmailScreen({ route, navigation }) {
         setError(t('auth.invalidVerifyLink'));
         return;
       }
-      const key = `${uid}:${token}`;
-      if (ranKeyRef.current === key) {
-        return;
-      }
-      ranKeyRef.current = key;
       try {
-        const data = await confirmEmailVerification(uid, token);
+        const data = await confirmEmailVerificationOnce(uid, token);
         if (cancelled) return;
         if (data?.access) {
           const identifier = authDisplayIdentifier(data);
@@ -65,7 +76,7 @@ export default function VerifyEmailScreen({ route, navigation }) {
             return;
           }
           const shopRoute = await resolveShopEntryRoute({ authData: data });
-          if (shopRoute.name === 'OrgHome' || shopRoute.name === 'OrgOnboarding' || data.is_shop) {
+          if (shopRoute.name === 'OrgHome' || shopRoute.name === 'OrgOnboarding' || shopRoute.name === 'Home' || data.is_shop) {
             navigation.reset(buildShopAuthReset(shopRoute));
             return;
           }

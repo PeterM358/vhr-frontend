@@ -221,6 +221,7 @@
       "greeting": "Welcome, {name}",
       "subtitle": "Shared workforce, fleet, documents, and operations for your company.",
       "fleetSubtitle": "Manage your company fleet and request repairs the same way customers do.",
+      "driverSubtitle": "Working mode — assigned vehicles and repair requests for your job.",
       "modules": "Workspace",
       "openServiceCenter": "Open service center workspace",
       "importFleetLater": "Import fleet later",
@@ -228,14 +229,21 @@
       "needVehicleTitle": "Add vehicles first",
       "needVehicleBody": "Import your fleet register (or add vehicles), then request a repair the same way customers do.",
       "needVehicleHint": "Request repair needs at least one fleet vehicle — import your register first.",
+      "needAssignedTitle": "No assigned vehicles",
+      "needAssignedBody": "Ask your manager to assign a vehicle to you, then you can request a repair.",
+      "needAssignedHint": "Request repair needs an assigned vehicle from your manager.",
       "summary": {
         "fleet": "Fleet",
+        "assigned": "Assigned",
         "repair": "Repair",
         "ready": "Ready",
-        "needVehicles": "Add cars"
+        "needVehicles": "Add cars",
+        "needAssigned": "Awaiting"
       },
       "actions": {
         "fleetSubtitle": "Browse company vehicles, readiness, and details.",
+        "assignedFleet": "My assigned vehicles",
+        "assignedFleetSubtitle": "Only vehicles assigned to you for work.",
         "importSubtitle": "Upload your register spreadsheet to add vehicles.",
         "repairSubtitle": "Request service for a fleet vehicle like a customer.",
         "openSection": "Open this workspace section.",
@@ -250,6 +258,13 @@
     },
     "switcher": {
       "label": "Organization"
+    },
+    "mode": {
+      "label": "Mode",
+      "working": "Working",
+      "personal": "Personal",
+      "switchToWorking": "Working mode",
+      "switchToPersonal": "Personal garage"
     },
     "nav": {
       "overview": "Overview",
@@ -406,6 +421,7 @@
     "recipient": "Invited as",
     "recipientHidden": "Hidden recipient",
     "accept": "Accept invitation",
+    "acceptAndRegister": "Accept & register",
     "verifyEmailFirst": "Verify your email before accepting this invitation.",
     "openProfile": "Open profile",
     "invalid": "This invitation link is invalid, expired, or already used.",
@@ -423,7 +439,7 @@
       "purchasing": "Purchasing",
       "sales": "Sales",
       "warehouse": "Warehouse",
-      "transport": "Transport",
+      "transport": "Driver / Transport",
       "accounting": "Accounting",
       "viewer": "Viewer"
     }

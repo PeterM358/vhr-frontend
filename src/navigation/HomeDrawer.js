@@ -2,10 +2,10 @@
  * PATH: src/navigation/HomeDrawer.js
  */
 
-import React, { useContext } from 'react';
+import React, { useCallback, useContext, useState } from 'react';
 import { View } from 'react-native';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Text } from 'react-native-paper';
 import HomeScreen from '../screens/HomeScreen';
 import { WebSocketContext } from '../context/WebSocketManager';
@@ -28,6 +28,14 @@ import {
 } from './DrawerBranding';
 import CompactLanguageSelector from '../components/common/CompactLanguageSelector';
 import { useTranslation } from '../i18n';
+import { readOrganizationMemberships } from '../utils/orgWorkspace';
+import {
+  WORKSPACE_MODE,
+  isDriverMembership,
+  pickActiveOrganization,
+  setWorkspaceMode,
+} from '../utils/orgRoleHome';
+import { buildShopAuthReset } from '../utils/shopAuthNavigation';
 
 const Drawer = createDrawerNavigator();
 
@@ -36,9 +44,38 @@ function CustomDrawerContent(props) {
   const { t } = useTranslation();
   const { unreadCount: unreadNotifications } = useContext(WebSocketContext);
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
+  const [driverOrg, setDriverOrg] = useState(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const rows = await readOrganizationMemberships();
+        const active = pickActiveOrganization(rows);
+        if (!cancelled) {
+          setDriverOrg(isDriverMembership(active) ? active : null);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
 
   const handleLogout = async () => {
     await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
+  };
+
+  const switchToWorking = async () => {
+    props.navigation.closeDrawer();
+    await setWorkspaceMode(WORKSPACE_MODE.WORKING);
+    const root = navigation.getParent?.() || navigation;
+    root.reset(
+      buildShopAuthReset({
+        name: 'OrgHome',
+        params: driverOrg?.id != null ? { organizationId: driverOrg.id, screen: 'OrgFleet' } : { screen: 'OrgFleet' },
+      }),
+    );
   };
 
   const itemProps = drawerMenuItemProps;
@@ -51,6 +88,15 @@ function CustomDrawerContent(props) {
     >
       <View style={drawerGlassStyles.menuContainer}>
         <Text style={drawerGlassStyles.drawerTitle}>{t('common.menu')}</Text>
+
+        {driverOrg ? (
+          <DrawerItem
+            label={t('org.mode.switchToWorking', null, 'Working mode')}
+            onPress={switchToWorking}
+            icon={({ color, size }) => <DrawerMenuIcon name="briefcase-outline" color={color} size={size} />}
+            {...itemProps}
+          />
+        ) : null}
 
         <DrawerItem
           label={t('common.home')}

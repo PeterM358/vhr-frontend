@@ -22,6 +22,12 @@ import {
   resolveActiveOrganizationId,
   setCurrentOrganizationId,
 } from '../utils/orgWorkspace';
+import {
+  WORKSPACE_MODE,
+  isDriverMembership,
+  setWorkspaceMode,
+} from '../utils/orgRoleHome';
+import { buildShopAuthReset } from '../utils/shopAuthNavigation';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 import { useTranslation } from '../i18n';
 import {
@@ -46,6 +52,7 @@ export default function OrganizationHomeScreen() {
   const [fleetCount, setFleetCount] = useState(null);
   const [loading, setLoading] = useState(true);
   const scrollBottomPadding = useScrollContentBottomPadding(80);
+  const isDriver = isDriverMembership(org);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -113,18 +120,31 @@ export default function OrganizationHomeScreen() {
     navigation.navigate('FleetRegisterImport', { organizationId: org?.id });
   };
 
+  const switchToPersonal = async () => {
+    await setWorkspaceMode(WORKSPACE_MODE.PERSONAL);
+    navigation.reset(buildShopAuthReset({ name: 'Home' }));
+  };
+
   const goRequestRepair = () => {
     if (!hasFleet) {
       Alert.alert(
-        t('org.home.needVehicleTitle', null, 'Add vehicles first'),
-        t(
-          'org.home.needVehicleBody',
-          null,
-          'Import your fleet register (or add vehicles), then request a repair the same way customers do.',
-        ),
+        isDriver
+          ? t('org.home.needAssignedTitle', null, 'No assigned vehicles')
+          : t('org.home.needVehicleTitle', null, 'Add vehicles first'),
+        isDriver
+          ? t(
+              'org.home.needAssignedBody',
+              null,
+              'Ask your manager to assign a vehicle to you, then you can request a repair.',
+            )
+          : t(
+              'org.home.needVehicleBody',
+              null,
+              'Import your fleet register (or add vehicles), then request a repair the same way customers do.',
+            ),
         [
           { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
-          ...(org?.manage_fleet
+          ...(!isDriver && org?.manage_fleet
             ? [{ text: t('fleetImport.openAction', null, 'Import fleet'), onPress: goImportFleet }]
             : []),
           {
@@ -148,17 +168,23 @@ export default function OrganizationHomeScreen() {
       {
         key: 'fleet',
         value: fleetCount == null ? '—' : fleetCount,
-        label: t('org.home.summary.fleet', null, 'Fleet'),
+        label: isDriver
+          ? t('org.home.summary.assigned', null, 'Assigned')
+          : t('org.home.summary.fleet', null, 'Fleet'),
         onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }),
       },
       {
         key: 'repair',
-        value: hasFleet ? t('org.home.summary.ready', null, 'Ready') : t('org.home.summary.needVehicles', null, 'Add cars'),
+        value: hasFleet
+          ? t('org.home.summary.ready', null, 'Ready')
+          : isDriver
+            ? t('org.home.summary.needAssigned', null, 'Awaiting')
+            : t('org.home.summary.needVehicles', null, 'Add cars'),
         label: t('org.home.summary.repair', null, 'Repair'),
         onPress: goRequestRepair,
       },
     ],
-    [fleetCount, hasFleet, navigation, org?.id, t],
+    [fleetCount, hasFleet, isDriver, navigation, org?.id, t],
   );
 
   const actionTiles = useMemo(() => {
@@ -166,12 +192,20 @@ export default function OrganizationHomeScreen() {
       {
         key: 'fleet',
         icon: 'truck',
-        title: t('fleet.openFleet', null, 'View fleet'),
-        subtitle: t(
-          'org.home.actions.fleetSubtitle',
-          null,
-          'Browse company vehicles, readiness, and details.',
-        ),
+        title: isDriver
+          ? t('org.home.actions.assignedFleet', null, 'My assigned vehicles')
+          : t('fleet.openFleet', null, 'View fleet'),
+        subtitle: isDriver
+          ? t(
+              'org.home.actions.assignedFleetSubtitle',
+              null,
+              'Only vehicles assigned to you for work.',
+            )
+          : t(
+              'org.home.actions.fleetSubtitle',
+              null,
+              'Browse company vehicles, readiness, and details.',
+            ),
         onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }),
         count: typeof fleetCount === 'number' ? fleetCount : undefined,
       },
@@ -214,7 +248,7 @@ export default function OrganizationHomeScreen() {
       },
     ];
 
-    if (org?.manage_fleet) {
+    if (org?.manage_fleet && !isDriver) {
       tiles.push({
         key: 'import',
         icon: 'file-upload-outline',
@@ -228,7 +262,7 @@ export default function OrganizationHomeScreen() {
       });
     }
 
-    if (org?.manage_fleet || org?.can_view_fleet || fleetFocused) {
+    if (org?.manage_fleet || org?.can_view_fleet || fleetFocused || isDriver) {
       tiles.push({
         key: 'repair',
         icon: 'wrench',
@@ -239,52 +273,60 @@ export default function OrganizationHomeScreen() {
               null,
               'Request service for a fleet vehicle like a customer.',
             )
-          : t(
-              'org.home.needVehicleHint',
-              null,
-              'Request repair needs at least one fleet vehicle — import your register first.',
-            ),
+          : isDriver
+            ? t(
+                'org.home.needAssignedHint',
+                null,
+                'Request repair needs an assigned vehicle from your manager.',
+              )
+            : t(
+                'org.home.needVehicleHint',
+                null,
+                'Request repair needs at least one fleet vehicle — import your register first.',
+              ),
         onPress: goRequestRepair,
       });
     }
 
-    navItems
-      .filter((item) => item.route && !PRIMARY_HOME_ROUTES.has(item.route))
-      .forEach((item) => {
-        const iconByRoute = {
-          OrgWorkforce: 'account-hard-hat',
-          OrgWarehouse: 'warehouse',
-          OrgDocuments: 'file-document-outline',
-          OrgConstruction: 'hard-hat',
-          OrgTransport: 'bus',
-          OrgWorkOrders: 'clipboard-list-outline',
-          OrgNetwork: 'transit-connection-variant',
-          OrgInvoicing: 'receipt',
-          OrgLedger: 'book-open-outline',
-          OrgLocations: 'map-marker-radius',
-          OrgPublicProfile: 'earth',
-        };
-        tiles.push({
-          key: item.key || item.route,
-          icon: iconByRoute[item.route] || 'view-grid-outline',
-          title: item.label,
-          subtitle: t('org.home.actions.openSection', null, 'Open this workspace section.'),
-          onPress: () => openSection(item.route),
+    if (!isDriver) {
+      navItems
+        .filter((item) => item.route && !PRIMARY_HOME_ROUTES.has(item.route))
+        .forEach((item) => {
+          const iconByRoute = {
+            OrgWorkforce: 'account-hard-hat',
+            OrgWarehouse: 'warehouse',
+            OrgDocuments: 'file-document-outline',
+            OrgConstruction: 'hard-hat',
+            OrgTransport: 'bus',
+            OrgWorkOrders: 'clipboard-list-outline',
+            OrgNetwork: 'transit-connection-variant',
+            OrgInvoicing: 'receipt',
+            OrgLedger: 'book-open-outline',
+            OrgLocations: 'map-marker-radius',
+            OrgPublicProfile: 'earth',
+          };
+          tiles.push({
+            key: item.key || item.route,
+            icon: iconByRoute[item.route] || 'view-grid-outline',
+            title: item.label,
+            subtitle: t('org.home.actions.openSection', null, 'Open this workspace section.'),
+            onPress: () => openSection(item.route),
+          });
         });
-      });
 
-    if (org?.has_shop_locations) {
-      tiles.push({
-        key: 'shop',
-        icon: 'storefront-outline',
-        title: t('org.home.openServiceCenter', null, 'Open service center workspace'),
-        subtitle: t(
-          'org.home.actions.shopSubtitle',
-          null,
-          'Switch to bay operations, offers, and shop tools.',
-        ),
-        onPress: () => navigateToPartnerDashboard(navigation),
-      });
+      if (org?.has_shop_locations) {
+        tiles.push({
+          key: 'shop',
+          icon: 'storefront-outline',
+          title: t('org.home.openServiceCenter', null, 'Open service center workspace'),
+          subtitle: t(
+            'org.home.actions.shopSubtitle',
+            null,
+            'Switch to bay operations, offers, and shop tools.',
+          ),
+          onPress: () => navigateToPartnerDashboard(navigation),
+        });
+      }
     }
 
     return tiles;
@@ -292,6 +334,7 @@ export default function OrganizationHomeScreen() {
     fleetCount,
     fleetFocused,
     hasFleet,
+    isDriver,
     navItems,
     navigation,
     org?.can_view_fleet,
@@ -303,7 +346,7 @@ export default function OrganizationHomeScreen() {
 
   const fabConfig = hasFleet
     ? { label: t('org.home.requestRepair', null, 'Request repair'), onPress: goRequestRepair }
-    : org?.manage_fleet
+    : !isDriver && org?.manage_fleet
       ? { label: t('fleetImport.openAction', null, 'Import fleet'), onPress: goImportFleet }
       : { label: t('fleet.openFleet', null, 'View fleet'), onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }) };
 
@@ -320,19 +363,53 @@ export default function OrganizationHomeScreen() {
         <DashboardHeroCard
           title={t('org.home.greeting', { name: orgName }, `Welcome, ${orgName}`)}
           subtitle={
-            fleetFocused
+            isDriver
               ? t(
-                  'org.home.fleetSubtitle',
+                  'org.home.driverSubtitle',
                   null,
-                  'Manage your company fleet and request repairs the same way customers do.',
+                  'Working mode — assigned vehicles and repair requests for your job.',
                 )
-              : t(
-                  'org.home.subtitle',
-                  null,
-                  'Shared workforce, fleet, documents, and operations for your company.',
-                )
+              : fleetFocused
+                ? t(
+                    'org.home.fleetSubtitle',
+                    null,
+                    'Manage your company fleet and request repairs the same way customers do.',
+                  )
+                : t(
+                    'org.home.subtitle',
+                    null,
+                    'Shared workforce, fleet, documents, and operations for your company.',
+                  )
           }
         />
+
+        {isDriver ? (
+          <DashboardCard style={styles.switcherCard}>
+            <Text style={styles.switcherLabel}>{t('org.mode.label', null, 'Mode')}</Text>
+            <View style={styles.switcherList}>
+              <Pressable
+                style={[styles.switcherChip, styles.switcherChipActive]}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.switcherChipText, styles.switcherChipTextActive]}>
+                  {t('org.mode.working', null, 'Working')}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={switchToPersonal}
+                style={({ pressed }) => [
+                  styles.switcherChip,
+                  pressed && styles.switcherChipPressed,
+                ]}
+                accessibilityRole="button"
+              >
+                <Text style={styles.switcherChipText}>
+                  {t('org.mode.personal', null, 'Personal')}
+                </Text>
+              </Pressable>
+            </View>
+          </DashboardCard>
+        ) : null}
 
         {memberships.length > 1 ? (
           <DashboardCard style={styles.switcherCard}>
