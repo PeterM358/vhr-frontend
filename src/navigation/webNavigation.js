@@ -61,6 +61,7 @@ import {
   partnerOrganizationHome,
   partnerOrganizationNetwork,
   partnerOrganizationWorkforce,
+  partnerOrganizationWorkforceMember,
   partnerBusinessNetwork,
 } from './webRoutes';
 
@@ -1061,8 +1062,50 @@ export function navigateToOrgWorkforce(navigation, params = {}) {
     },
   };
   if (Platform.OS === 'web') {
-    resetPartnerStackWebRoutes(navigation, [orgWorkforceRoute], partnerOrganizationWorkforce(params));
+    const pathParams = {};
+    if (params.orgId != null) pathParams.organizationId = params.orgId;
+    else if (params.organizationId != null) pathParams.organizationId = params.organizationId;
+    if (params.mode) pathParams.mode = params.mode;
+    resetPartnerStackWebRoutes(
+      navigation,
+      [orgWorkforceRoute],
+      partnerOrganizationWorkforce(pathParams),
+    );
     return;
   }
   navigation.navigate('OrgHome', { screen: 'OrgWorkforce', params: routeParams });
+}
+
+export function navigateToOrgWorkforceMember(navigation, params = {}) {
+  const organizationId = params.orgId ?? params.organizationId;
+  const membershipId = params.membershipId;
+  if (membershipId == null) return;
+  const detailParams = {
+    membershipId,
+    ...(organizationId != null ? { organizationId } : {}),
+  };
+  const orgWorkforceRoute = {
+    name: 'OrgHome',
+    state: {
+      index: 1,
+      routes: [
+        { name: 'OrgOverview' },
+        {
+          name: 'OrgWorkforce',
+          params: organizationId != null ? { organizationId } : undefined,
+        },
+      ],
+    },
+  };
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(
+      navigation,
+      [orgWorkforceRoute, { name: 'OrgWorkforceMemberDetail', params: detailParams }],
+      partnerOrganizationWorkforceMember(membershipId, {
+        ...(organizationId != null ? { organizationId } : {}),
+      }),
+    );
+    return;
+  }
+  navigation.navigate('OrgWorkforceMemberDetail', detailParams);
 }

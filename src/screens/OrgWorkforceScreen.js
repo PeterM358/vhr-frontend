@@ -1,28 +1,28 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Platform, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, Button, Menu, Text, TextInput } from 'react-native-paper';
+import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useFocusEffect } from '@react-navigation/native';
 
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
 import OrgAppHeader from '../components/org/OrgAppHeader';
 import { createOrganizationMembershipInvite } from '../api/network';
-import { listOrgFleet } from '../api/fleet';
-import {
-  createVehicleAssignment,
-  endVehicleAssignment,
-  listOrgWorkforce,
-  updateOrgWorkforceMember,
-} from '../api/orgWorkforce';
+import { listOrgWorkforce } from '../api/orgWorkforce';
 import {
   readOrganizationMemberships,
   resolveActiveOrganizationId,
 } from '../utils/orgWorkspace';
-import { navigateToOrgHome } from '../navigation/webNavigation';
+import { navigateToOrgHome, navigateToOrgWorkforceMember } from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { COLORS } from '../constants/colors';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
+
+// Phase B HR (not built): manager→worker groups, multi-employer split shifts,
+// salaries / осигуровки, sick-leave uploads. Keep list + invite + role/vehicle
+// stubs until a dedicated HR model exists — skip empty Teams UI for now.
 
 const ROLE_OPTIONS = [
   { value: 'transport', labelKey: 'org.workforce.roles.transport' },
@@ -30,6 +30,16 @@ const ROLE_OPTIONS = [
   { value: 'viewer', labelKey: 'org.workforce.roles.viewer' },
   { value: 'warehouse', labelKey: 'org.workforce.roles.warehouse' },
   { value: 'accounting', labelKey: 'org.workforce.roles.accounting' },
+];
+
+const FILTER_ROLES = [
+  { value: 'all', labelKey: 'org.workforce.filterAll' },
+  ...ROLE_OPTIONS,
+];
+
+const MODES = [
+  { id: 'list', labelKey: 'org.workforce.allMembers' },
+  { id: 'add', labelKey: 'org.workforce.addMember' },
 ];
 
 async function copyInviteLink(text) {
@@ -43,6 +53,7 @@ async function copyInviteLink(text) {
 export default function OrgWorkforceScreen({ navigation, route }) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
+  const initialMode = route?.params?.mode === 'add' ? 'add' : 'list';
   const scrollBottomPadding = useScrollContentBottomPadding(40);
 
   const onBack = useCallback(async () => {
@@ -59,7 +70,8 @@ export default function OrgWorkforceScreen({ navigation, route }) {
   const [error, setError] = useState('');
   const [canManage, setCanManage] = useState(false);
   const [members, setMembers] = useState([]);
-  const [fleet, setFleet] = useState([]);
+  const [mode, setMode] = useState(initialMode);
+  const [roleFilter, setRoleFilter] = useState('all');
 
   const [inviteEmail, setInviteEmail] = useState('');
   const [invitePhone, setInvitePhone] = useState('');
@@ -67,11 +79,6 @@ export default function OrgWorkforceScreen({ navigation, route }) {
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
   const [inviteMessage, setInviteMessage] = useState('');
-
-  const [assignUserId, setAssignUserId] = useState(null);
-  const [assignVehicleId, setAssignVehicleId] = useState(null);
-  const [vehicleMenuOpen, setVehicleMenuOpen] = useState(false);
-  const [assignBusy, setAssignBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -86,13 +93,9 @@ export default function OrgWorkforceScreen({ navigation, route }) {
         setError(t('org.workforce.loadError', null, 'Could not load workforce.'));
         return;
       }
-      const [workforce, fleetData] = await Promise.all([
-        listOrgWorkforce(token, resolved),
-        listOrgFleet(token, resolved, {}).catch(() => ({ results: [] })),
-      ]);
+      const workforce = await listOrgWorkforce(token, resolved);
       setCanManage(Boolean(workforce?.can_manage || workforce?.can_assign_vehicles));
       setMembers(Array.isArray(workforce?.results) ? workforce.results : []);
-      setFleet(Array.isArray(fleetData?.results) ? fleetData.results : []);
     } catch (e) {
       setError(e.message || t('org.workforce.loadError', null, 'Could not load workforce.'));
       setMembers([]);
@@ -112,17 +115,10 @@ export default function OrgWorkforceScreen({ navigation, route }) {
     [t],
   );
 
-  const assignmentRoleLabel = useCallback(
-    (role) => t(`org.workforce.assignmentRoles.${role}`, null, role),
-    [t],
-  );
-
-  const selectedVehicleLabel = useMemo(() => {
-    if (!assignVehicleId) return t('org.workforce.pickVehicle', null, 'Choose vehicle');
-    const row = fleet.find((v) => String(v.id) === String(assignVehicleId));
-    if (!row) return t('org.workforce.pickVehicle', null, 'Choose vehicle');
-    return row.license_plate || row.fleet_id || row.display_name || `#${row.id}`;
-  }, [assignVehicleId, fleet, t]);
+  const filteredMembers = useMemo(() => {
+    if (roleFilter === 'all') return members;
+    return members.filter((m) => m.role === roleFilter);
+  }, [members, roleFilter]);
 
   const createInvite = async () => {
     if (!orgId || (!inviteEmail.trim() && !invitePhone.trim())) return;
@@ -148,51 +144,14 @@ export default function OrgWorkforceScreen({ navigation, route }) {
     }
   };
 
-  const changeRole = async (member, role) => {
-    if (!canManage || !orgId || member.role === 'owner' || member.role === role) return;
-    try {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      await updateOrgWorkforceMember(token, orgId, member.membership_id, { role });
-      await load();
-    } catch (e) {
-      Alert.alert(t('common.error'), e.message || t('org.workforce.roleError', null, 'Could not update role.'));
-    }
+  const openMember = (member) => {
+    navigateToOrgWorkforceMember(navigation, {
+      orgId,
+      membershipId: member.membership_id,
+    });
   };
 
-  const assignVehicle = async () => {
-    if (!orgId || !assignUserId || !assignVehicleId) return;
-    setAssignBusy(true);
-    setError('');
-    try {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      await createVehicleAssignment(token, orgId, {
-        vehicle_id: Number(assignVehicleId),
-        user_id: Number(assignUserId),
-        role: 'driver',
-      });
-      setAssignUserId(null);
-      setAssignVehicleId(null);
-      await load();
-    } catch (e) {
-      setError(e.message || t('org.workforce.assignError', null, 'Could not assign vehicle.'));
-    } finally {
-      setAssignBusy(false);
-    }
-  };
-
-  const endAssignment = async (assignmentId) => {
-    if (!orgId || !canManage) return;
-    try {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      await endVehicleAssignment(token, orgId, assignmentId);
-      await load();
-    } catch (e) {
-      Alert.alert(
-        t('common.error'),
-        e.message || t('org.workforce.endAssignError', null, 'Could not end assignment.'),
-      );
-    }
-  };
+  const visibleModes = canManage ? MODES : MODES.filter((m) => m.id === 'list');
 
   return (
     <ScreenBackground safeArea={false}>
@@ -205,12 +164,33 @@ export default function OrgWorkforceScreen({ navigation, route }) {
         contentContainerStyle={[styles.scroll, { paddingBottom: scrollBottomPadding }]}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={styles.segmentOuter}>
+          <View style={styles.segmentTrack}>
+            {visibleModes.map((tab) => {
+              const selected = mode === tab.id;
+              return (
+                <Pressable
+                  key={tab.id}
+                  onPress={() => setMode(tab.id)}
+                  style={[styles.segmentCell, selected && styles.segmentCellActive]}
+                >
+                  <Text style={[styles.segmentLabel, selected && styles.segmentLabelActive]}>
+                    {t(tab.labelKey, null, tab.id)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
         {loading ? <ActivityIndicator color="#fff" style={styles.loader} /> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        {canManage ? (
+        {mode === 'add' && canManage ? (
           <AppCard style={styles.card}>
-            <Text variant="titleMedium">{t('org.workforce.inviteTitle', null, 'Invite member')}</Text>
+            <Text style={styles.cardTitle}>
+              {t('org.workforce.inviteTitle', null, 'Invite member')}
+            </Text>
             <Text style={styles.helper}>
               {t(
                 'org.workforce.inviteHelper',
@@ -226,6 +206,7 @@ export default function OrgWorkforceScreen({ navigation, route }) {
               autoCapitalize="none"
               keyboardType="email-address"
               style={styles.input}
+              textColor={COLORS.TEXT_DARK}
             />
             <TextInput
               label={t('org.workforce.phone', null, 'Phone (optional)')}
@@ -234,6 +215,7 @@ export default function OrgWorkforceScreen({ navigation, route }) {
               mode="outlined"
               keyboardType="phone-pad"
               style={styles.input}
+              textColor={COLORS.TEXT_DARK}
             />
             <Text style={styles.fieldLabel}>
               {t('network.membershipInvite.role', null, 'Organization role')}
@@ -246,6 +228,7 @@ export default function OrgWorkforceScreen({ navigation, route }) {
                   compact
                   onPress={() => setInviteRole(opt.value)}
                   style={styles.roleChip}
+                  labelStyle={inviteRole === opt.value ? undefined : styles.outlinedChipLabel}
                 >
                   {t(opt.labelKey, null, opt.value)}
                 </Button>
@@ -260,7 +243,7 @@ export default function OrgWorkforceScreen({ navigation, route }) {
                 <Text selectable style={styles.link}>
                   {inviteLink}
                 </Text>
-                <Button mode="outlined" onPress={() => copyInviteLink(inviteLink)}>
+                <Button mode="outlined" onPress={() => copyInviteLink(inviteLink)} labelStyle={styles.outlinedChipLabel}>
                   {t('network.membershipInvite.copyLink')}
                 </Button>
               </View>
@@ -269,123 +252,75 @@ export default function OrgWorkforceScreen({ navigation, route }) {
           </AppCard>
         ) : null}
 
-        <AppCard style={styles.card}>
-          <Text variant="titleMedium">{t('org.workforce.membersTitle', null, 'Team members')}</Text>
-          {!loading && members.length === 0 ? (
-            <Text style={styles.helper}>{t('org.workforce.empty', null, 'No members yet.')}</Text>
-          ) : null}
-          {members.map((member) => {
-            const assignments = Array.isArray(member.vehicle_assignments)
-              ? member.vehicle_assignments
-              : [];
-            const contact = [member.email, member.phone].filter(Boolean).join(' · ');
-            return (
-              <View key={member.membership_id} style={styles.memberRow}>
-                <Text style={styles.memberName}>{member.display_name}</Text>
-                {contact ? <Text style={styles.memberMeta}>{contact}</Text> : null}
-                <Text style={styles.memberMeta}>
-                  {t('org.workforce.roleLabel', null, 'Role')}: {roleLabel(member.role)}
-                  {member.manage_fleet
-                    ? ` · ${t('org.workforce.manageFleet', null, 'Fleet manager')}`
-                    : ''}
-                </Text>
-                {assignments.length ? (
-                  <View style={styles.assignList}>
-                    {assignments.map((row) => (
-                      <View key={row.id} style={styles.assignRow}>
-                        <Text style={styles.assignText}>
-                          {row.vehicle_label || row.license_plate || `#${row.vehicle_id}`}
-                          {row.role ? ` · ${assignmentRoleLabel(row.role)}` : ''}
-                        </Text>
-                        {canManage ? (
-                          <Button compact onPress={() => endAssignment(row.id)}>
-                            {t('org.workforce.endAssignment', null, 'End')}
-                          </Button>
-                        ) : null}
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <Text style={styles.memberMeta}>
-                    {t('org.workforce.noVehicles', null, 'No vehicle assigned')}
-                  </Text>
-                )}
-                {canManage && member.role !== 'owner' ? (
-                  <View style={styles.memberActions}>
-                    <Text style={styles.fieldLabel}>
-                      {t('org.workforce.changeRole', null, 'Change role')}
-                    </Text>
-                    <View style={styles.roleChips}>
-                      {ROLE_OPTIONS.map((opt) => (
-                        <Button
-                          key={opt.value}
-                          compact
-                          mode={member.role === opt.value ? 'contained' : 'outlined'}
-                          onPress={() => changeRole(member, opt.value)}
-                        >
-                          {t(opt.labelKey, null, opt.value)}
-                        </Button>
-                      ))}
-                    </View>
-                    <Button
-                      mode="contained-tonal"
-                      compact
-                      onPress={() => {
-                        setAssignUserId(member.user_id);
-                        setAssignVehicleId(null);
-                      }}
-                    >
-                      {t('org.workforce.assignVehicle', null, 'Assign vehicle')}
-                    </Button>
-                  </View>
-                ) : null}
-              </View>
-            );
-          })}
-        </AppCard>
-
-        {canManage && assignUserId ? (
-          <AppCard style={styles.card}>
-            <Text variant="titleMedium">
-              {t('org.workforce.assignTitle', null, 'Assign vehicle')}
-            </Text>
-            <Text style={styles.helper}>
-              {members.find((m) => String(m.user_id) === String(assignUserId))?.display_name || ''}
-            </Text>
-            <Menu
-              visible={vehicleMenuOpen}
-              onDismiss={() => setVehicleMenuOpen(false)}
-              anchor={
-                <Button mode="outlined" onPress={() => setVehicleMenuOpen(true)}>
-                  {selectedVehicleLabel}
-                </Button>
-              }
+        {mode === 'list' ? (
+          <>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterRow}
             >
-              {fleet.map((v) => (
-                <Menu.Item
-                  key={v.id}
-                  title={v.license_plate || v.fleet_id || v.display_name || `#${v.id}`}
-                  onPress={() => {
-                    setAssignVehicleId(v.id);
-                    setVehicleMenuOpen(false);
-                  }}
-                />
-              ))}
-            </Menu>
-            <View style={styles.assignActions}>
-              <Button mode="outlined" onPress={() => setAssignUserId(null)}>
-                {t('common.cancel', null, 'Cancel')}
-              </Button>
-              <Button
-                mode="contained"
-                loading={assignBusy}
-                disabled={assignBusy || !assignVehicleId}
-                onPress={assignVehicle}
-              >
-                {t('org.workforce.confirmAssign', null, 'Assign')}
-              </Button>
-            </View>
-          </AppCard>
+              {FILTER_ROLES.map((opt) => {
+                const selected = roleFilter === opt.value;
+                return (
+                  <Pressable
+                    key={opt.value}
+                    onPress={() => setRoleFilter(opt.value)}
+                    style={[styles.filterChip, selected && styles.filterChipActive]}
+                  >
+                    <Text style={[styles.filterChipLabel, selected && styles.filterChipLabelActive]}>
+                      {t(opt.labelKey, null, opt.value)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {!loading && filteredMembers.length === 0 ? (
+              <AppCard style={styles.card}>
+                <Text style={styles.helper}>
+                  {members.length === 0
+                    ? t('org.workforce.empty', null, 'No members yet.')
+                    : t('org.workforce.emptyFiltered', null, 'No members match this role.')}
+                </Text>
+              </AppCard>
+            ) : null}
+
+            {filteredMembers.map((member) => {
+              const assignments = Array.isArray(member.vehicle_assignments)
+                ? member.vehicle_assignments
+                : [];
+              const contact = [member.email, member.phone].filter(Boolean).join(' · ');
+              const vehicleSummary = assignments.length
+                ? assignments
+                    .map((row) => row.vehicle_label || row.license_plate || `#${row.vehicle_id}`)
+                    .join(', ')
+                : t('org.workforce.noVehicles', null, 'No vehicle assigned');
+              return (
+                <Pressable
+                  key={member.membership_id}
+                  onPress={() => openMember(member)}
+                  style={({ pressed }) => [pressed && styles.pressed]}
+                >
+                  <AppCard style={styles.memberCard}>
+                    <View style={styles.memberRowInner}>
+                      <View style={styles.memberBody}>
+                        <Text style={styles.memberName}>{member.display_name}</Text>
+                        {contact ? <Text style={styles.memberMeta}>{contact}</Text> : null}
+                        <Text style={styles.memberMeta}>
+                          {t('org.workforce.roleLabel', null, 'Role')}: {roleLabel(member.role)}
+                          {member.manage_fleet
+                            ? ` · ${t('org.workforce.manageFleet', null, 'Fleet manager')}`
+                            : ''}
+                        </Text>
+                        <Text style={styles.memberMeta}>{vehicleSummary}</Text>
+                      </View>
+                      <MaterialCommunityIcons name="chevron-right" size={24} color="#94a3b8" />
+                    </View>
+                  </AppCard>
+                </Pressable>
+              );
+            })}
+          </>
         ) : null}
       </ScrollView>
     </ScreenBackground>
@@ -398,6 +333,60 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     gap: 12,
   },
+  segmentOuter: {
+    marginBottom: 4,
+  },
+  segmentTrack: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
+  },
+  segmentCell: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 11,
+    alignItems: 'center',
+  },
+  segmentCellActive: {
+    backgroundColor: '#fff',
+  },
+  segmentLabel: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  segmentLabelActive: {
+    color: COLORS.TEXT_DARK,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  filterChipActive: {
+    backgroundColor: '#fff',
+    borderColor: '#fff',
+  },
+  filterChipLabel: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  filterChipLabelActive: {
+    color: COLORS.TEXT_DARK,
+  },
   loader: {
     marginVertical: 16,
   },
@@ -405,28 +394,49 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 10,
   },
+  memberCard: {
+    padding: 14,
+  },
+  memberRowInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  memberBody: {
+    flex: 1,
+    gap: 4,
+  },
+  cardTitle: {
+    color: COLORS.TEXT_DARK,
+    fontSize: 17,
+    fontWeight: '700',
+  },
   helper: {
-    opacity: 0.75,
+    color: COLORS.TEXT_MUTED,
     marginBottom: 4,
+    lineHeight: 20,
   },
   fieldLabel: {
-    color: '#cbd5e1',
+    color: COLORS.TEXT_MUTED,
     fontSize: 13,
     marginBottom: 4,
+    fontWeight: '600',
   },
   input: {
     marginBottom: 4,
+    backgroundColor: '#fff',
   },
   error: {
     color: '#fecaca',
     marginBottom: 8,
   },
   success: {
-    color: '#bbf7d0',
+    color: '#166534',
     marginTop: 6,
+    fontWeight: '600',
   },
   link: {
-    color: '#e2e8f0',
+    color: COLORS.TEXT_DARK,
     marginVertical: 6,
   },
   inviteLinkBox: {
@@ -442,44 +452,20 @@ const styles = StyleSheet.create({
   roleChip: {
     marginRight: 0,
   },
-  memberRow: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.12)',
-    paddingTop: 12,
-    marginTop: 8,
-    gap: 4,
+  outlinedChipLabel: {
+    color: COLORS.TEXT_DARK,
   },
   memberName: {
-    color: '#fff',
+    color: COLORS.TEXT_DARK,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   memberMeta: {
-    color: '#cbd5e1',
+    color: COLORS.TEXT_MUTED,
     fontSize: 13,
+    lineHeight: 18,
   },
-  memberActions: {
-    gap: 6,
-    marginTop: 8,
-  },
-  assignList: {
-    marginTop: 6,
-    gap: 4,
-  },
-  assignRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  assignText: {
-    color: '#e2e8f0',
-    flex: 1,
-  },
-  assignActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 10,
+  pressed: {
+    opacity: 0.88,
   },
 });

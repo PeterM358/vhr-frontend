@@ -154,11 +154,14 @@ function resolvePath(catalog, key) {
 
 function interpolate(template, params) {
   if (!params || typeof template !== 'string') return template;
-  return Object.entries(params).reduce(
-    (acc, [paramKey, paramValue]) =>
-      acc.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(paramValue ?? '')),
-    template
-  );
+  return Object.entries(params).reduce((acc, [paramKey, paramValue]) => {
+    const value = String(paramValue ?? '');
+    // Prefer `{{name}}` (i18next-style) before `{name}` so double braces do not
+    // leave a leftover `{…}` wrapper (e.g. Welcome, {Bitulait}).
+    return acc
+      .replace(new RegExp(`\\{\\{${paramKey}\\}\\}`, 'g'), value)
+      .replace(new RegExp(`\\{${paramKey}\\}`, 'g'), value);
+  }, template);
 }
 
 /**

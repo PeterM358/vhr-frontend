@@ -49,6 +49,8 @@ import {
   partnerDocumentImports,
   partnerDocumentImportDetail,
   partnerComplaints,
+  partnerOrganizationWorkforce,
+  partnerOrganizationWorkforceMember,
   profile,
   repairRequests,
   repairRequestNew,
@@ -230,6 +232,17 @@ export function getCanonicalWebPath(state) {
       return partnerAnalytics();
     case 'ShopWorkforce':
       return partnerWorkforce();
+    case 'OrgWorkforceMemberDetail': {
+      const membershipId = params.membershipId;
+      if (membershipId == null) {
+        return partnerOrganizationWorkforce({
+          organizationId: params.organizationId || params.orgId,
+        });
+      }
+      return partnerOrganizationWorkforceMember(membershipId, {
+        organizationId: params.organizationId || params.orgId,
+      });
+    }
     case 'ShopDocumentImports':
       return partnerDocumentImports();
     case 'ShopDocumentImportDetail': {
@@ -506,6 +519,17 @@ export function getPolicyNavigationStateFromPath(path) {
 /** Resolve a canonical absolute web path into a navigation state (web deep links). */
 export function resolveNavigationStateFromCanonicalPath(input) {
   const normalized = normalizeWebLinkingPath(String(input || '').replace(/^\//, ''));
+  const inviteMatch = String(normalized || '').match(/^organization-invite\/([^/?#]+)/);
+  if (inviteMatch) {
+    return {
+      routes: [
+        {
+          name: 'OrganizationMembershipInvite',
+          params: { token: decodeURIComponent(inviteMatch[1]) },
+        },
+      ],
+    };
+  }
   const serviceCenterState = getServiceCenterNavigationStateFromPath(normalized);
   if (serviceCenterState?.redirectPath) {
     const redirected = normalizeWebLinkingPath(
@@ -903,6 +927,38 @@ export function getPartnerNavigationStateFromPath(path) {
         },
       ],
       index: 0,
+    };
+  }
+  const orgWorkforceMemberMatch = pathPart.match(
+    /^partner\/organization\/workforce\/member\/([^/]+)$/,
+  );
+  if (orgWorkforceMemberMatch) {
+    const membershipIdRaw = orgWorkforceMemberMatch[1];
+    const membershipIdNum = parseInt(membershipIdRaw, 10);
+    const membershipId = Number.isFinite(membershipIdNum) ? membershipIdNum : membershipIdRaw;
+    const params = { membershipId };
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) {
+      params.organizationId = organizationId;
+    }
+    return {
+      routes: [
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [
+              { name: 'OrgOverview' },
+              {
+                name: 'OrgWorkforce',
+                params: organizationId ? { organizationId } : undefined,
+              },
+            ],
+          },
+        },
+        { name: 'OrgWorkforceMemberDetail', params },
+      ],
+      index: 1,
     };
   }
   if (pathPart === 'partner/organization/fleet') {

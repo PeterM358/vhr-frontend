@@ -26,6 +26,7 @@ export { default as CreateVehicleScreen } from '../screens/CreateVehicleScreen';
 export { default as FleetRegisterImportScreen } from '../screens/FleetRegisterImportScreen';
 export { default as FleetDashboardScreen } from '../screens/FleetDashboardScreen';
 export { default as OrgFleetVehicleDetailScreen } from '../screens/OrgFleetVehicleDetailScreen';
+export { default as OrgWorkforceMemberDetailScreen } from '../screens/OrgWorkforceMemberDetailScreen';
 export { default as PartnerOnboardingScreen } from '../screens/PartnerOnboardingScreen';
 export { default as CreatePromotionScreen } from '../screens/CreatePromotionScreen';
 export { default as ShopRegisterClientScreen } from '../screens/ShopRegisterClientScreen';

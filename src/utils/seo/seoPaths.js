@@ -30,8 +30,20 @@ export const LEGACY_CITY_VEHICLE_SEGMENTS = {
 const RESERVED_ROOT_SEGMENTS = new Set([
   'sign-in',
   'sign-up',
+  'login',
   'forgot-password',
   'reset-password',
+  'verify-email',
+  // Must stay reserved: otherwise `organization-invite/:token` is misparsed as
+  // repair_first_city SEO and deep links land on ServiceCenterDiscovery map.
+  'organization-invite',
+  'privacy',
+  'terms',
+  'cookies',
+  'support',
+  'partner-terms',
+  'dpa',
+  'subprocessors',
   'dashboard',
   'partner',
   'service-centers',

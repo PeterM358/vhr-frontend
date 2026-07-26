@@ -28,6 +28,15 @@ export const linkingScreens = {
       ChooseShop: 'switch-center',
     },
   },
+  OrgWorkforceMemberDetail: {
+    path: 'partner/organization/workforce/member/:membershipId',
+    parse: {
+      membershipId: (value) => {
+        const id = parseInt(String(value), 10);
+        return Number.isFinite(id) ? id : String(value || '').trim();
+      },
+    },
+  },
   ShopHome: {
     path: 'partner',
     screens: {

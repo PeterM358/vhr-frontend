@@ -688,6 +688,13 @@ export function partnerOrganizationWorkforce(params = {}) {
   return buildPathWithQuery(`${PARTNER}/organization/workforce`, params);
 }
 
+export function partnerOrganizationWorkforceMember(membershipId, params = {}) {
+  return buildPathWithQuery(
+    `${PARTNER}/organization/workforce/member/${normalizeId(membershipId)}`,
+    params,
+  );
+}
+
 export function publicBusinessProfile(slug, params = {}) {
   return buildPathWithQuery(`/business/${String(slug || '').trim().toLowerCase()}`, params);
 }

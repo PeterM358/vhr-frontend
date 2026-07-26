@@ -41,6 +41,7 @@ import {
   FleetRegisterImportScreen,
   FleetDashboardScreen,
   OrgFleetVehicleDetailScreen,
+  OrgWorkforceMemberDetailScreen,
   PartnerOnboardingScreen,
   CreatePromotionScreen,
   ShopRegisterClientScreen,
@@ -466,6 +467,11 @@ export default function AppNavigator() {
           name="OrgFleetVehicleDetail"
           component={OrgFleetVehicleDetailScreen}
           options={{ ...appNavBarScreenOptions, title: 'Fleet vehicle' }}
+        />
+        <Stack.Screen
+          name="OrgWorkforceMemberDetail"
+          component={OrgWorkforceMemberDetailScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Team member' }}
         />
         <Stack.Screen
           name="PartnerOnboarding"
