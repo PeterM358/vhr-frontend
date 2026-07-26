@@ -53,7 +53,7 @@ export function resolveOrgEntryAfterAccept({ organizationId, role, memberships =
       name: 'OrgHome',
       params: {
         ...params,
-        screen: 'OrgFleet',
+        screen: 'OrgOverview',
       },
     };
   }
@@ -77,7 +77,7 @@ export async function resolveDriverAwareOrgRoute(data) {
     }
     return {
       name: 'OrgHome',
-      params: org?.id != null ? { organizationId: org.id, screen: 'OrgFleet' } : { screen: 'OrgFleet' },
+      params: org?.id != null ? { organizationId: org.id, screen: 'OrgOverview' } : { screen: 'OrgOverview' },
     };
   }
   return { name: 'OrgHome', params: org?.id != null ? { organizationId: org.id } : undefined };

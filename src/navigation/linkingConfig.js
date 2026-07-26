@@ -23,6 +23,7 @@ export const linkingScreens = {
     screens: {
       OrgOverview: '',
       OrgFleet: 'fleet',
+      OrgOperations: 'operations',
       OrgCalendar: 'calendar',
       OrgWorkforce: 'workforce',
       OrgNetwork: 'network',

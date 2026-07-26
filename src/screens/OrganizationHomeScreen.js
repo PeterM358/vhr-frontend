@@ -14,6 +14,7 @@ import DashboardCard from '../components/dashboard/DashboardCard';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
 import { listOrgFleet } from '../api/fleet';
+import { listWorkOrders } from '../api/orgOperations';
 import {
   buildOrgNavItems,
   isFleetFocusedOrg,
@@ -35,13 +36,26 @@ import {
   navigateToOrgCalendar,
   navigateToOrgFleet,
   navigateToOrgNetwork,
+  navigateToOrgOperations,
   navigateToOrgWorkforce,
   navigateToPartnerDashboard,
   navigateToProfile,
 } from '../navigation/webNavigation';
 
-const PRIMARY_HOME_ROUTES = new Set(['OrgOverview', 'OrgFleet']);
+const PRIMARY_HOME_ROUTES = new Set(['OrgOverview', 'OrgFleet', 'OrgOperations']);
 
+function localTodayIso() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function isOpenTaskStatus(status) {
+  const value = String(status || '').toLowerCase();
+  return value !== 'done' && value !== 'cancelled';
+}
 
 /** Same person-name heuristic as client Home ("Hi, Mihailov"). */
 function toDisplayName(rawValue) {
@@ -73,6 +87,8 @@ export default function OrganizationHomeScreen() {
   const [org, setOrg] = useState(null);
   const [memberships, setMemberships] = useState([]);
   const [fleetCount, setFleetCount] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [tasksExpanded, setTasksExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const scrollBottomPadding = useScrollContentBottomPadding(80);
   const isDriver = isDriverMembership(org);
@@ -87,16 +103,26 @@ export default function OrganizationHomeScreen() {
       setOrg(active);
       if (!active?.id) {
         setFleetCount(0);
+        setTasks([]);
         return;
       }
+      const token = authToken || (await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN));
+      const resolved = await resolveActiveOrganizationId(active.id);
+      const driverLike = isDriverMembership(active);
       try {
-        const token = authToken || (await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN));
-        const resolved = await resolveActiveOrganizationId(active.id);
-        const data = await listOrgFleet(token, resolved, {});
-        const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-        setFleetCount(list.length);
+        if (driverLike) {
+          const data = await listWorkOrders(token, resolved, { mine: 1 });
+          setTasks(Array.isArray(data?.results) ? data.results : []);
+          setFleetCount(null);
+        } else {
+          const data = await listOrgFleet(token, resolved, {});
+          const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+          setFleetCount(list.length);
+          setTasks([]);
+        }
       } catch {
-        setFleetCount(null);
+        if (driverLike) setTasks([]);
+        else setFleetCount(null);
       }
     } finally {
       setLoading(false);
@@ -113,8 +139,44 @@ export default function OrganizationHomeScreen() {
   const navItems = buildOrgNavItems(org, t);
   const hasFleet = fleetCount == null ? true : fleetCount > 0;
   const orgName = org?.display_name || t('org.home.title', null, 'Organization');
+  const personName = (() => {
+    const raw = String(userEmailOrPhone || '').trim();
+    if (!raw) return t('common.user', null, 'User');
+    if (raw.includes('@')) {
+      const local = raw.split('@')[0] || raw;
+      const token = local.replace(/[._-]+/g, ' ').trim().split(/\s+/)[0] || local;
+      const letters = token.replace(/[0-9]+/g, '');
+      if (!letters) return local;
+      return letters.charAt(0).toUpperCase() + letters.slice(1);
+    }
+    return raw;
+  })();
   const workerName =
     extractFirstName(userEmailOrPhone) || toDisplayName(userEmailOrPhone);
+  const today = localTodayIso();
+
+  const { todayTasks, upcomingTasks } = useMemo(() => {
+    const open = tasks.filter((row) => isOpenTaskStatus(row.status));
+    const todayRows = open.filter((row) => row.scheduled_date === today);
+    const upcoming = open
+      .filter((row) => row.scheduled_date && row.scheduled_date > today)
+      .sort((a, b) => String(a.scheduled_date || '').localeCompare(String(b.scheduled_date || '')));
+    // Include undated / past open tasks in today's board so drivers still see them.
+    const undatedOrPast = open.filter(
+      (row) => !row.scheduled_date || row.scheduled_date < today,
+    );
+    const mergedToday = [...todayRows];
+    undatedOrPast.forEach((row) => {
+      if (!mergedToday.some((item) => item.id === row.id)) mergedToday.push(row);
+    });
+    return { todayTasks: mergedToday, upcomingTasks: upcoming };
+  }, [tasks, today]);
+
+  const currentTask = todayTasks[0] || null;
+  const futureTasks = useMemo(() => {
+    const restToday = todayTasks.slice(1);
+    return [...restToday, ...upcomingTasks.filter((row) => row.id !== currentTask?.id)];
+  }, [todayTasks, upcomingTasks, currentTask]);
 
   const openSection = (route) => {
     if (route === 'OrgFleet') {
@@ -127,6 +189,10 @@ export default function OrganizationHomeScreen() {
     }
     if (route === 'OrgWorkforce') {
       navigateToOrgWorkforce(navigation, { orgId: org?.id });
+      return;
+    }
+    if (route === 'OrgOperations') {
+      navigateToOrgOperations(navigation, { orgId: org?.id });
       return;
     }
     if (route === 'OrgOverview') {
@@ -151,25 +217,17 @@ export default function OrganizationHomeScreen() {
   };
 
   const goRequestRepair = () => {
-    if (!hasFleet) {
+    if (!hasFleet && !isDriver) {
       Alert.alert(
-        isDriver
-          ? t('org.home.needAssignedTitle', null, 'No assigned vehicles')
-          : t('org.home.needVehicleTitle', null, 'Add vehicles first'),
-        isDriver
-          ? t(
-              'org.home.needAssignedBody',
-              null,
-              'Ask your manager to assign a vehicle to you, then you can request a repair.',
-            )
-          : t(
-              'org.home.needVehicleBody',
-              null,
-              'Import your fleet register (or add vehicles), then request a repair the same way customers do.',
-            ),
+        t('org.home.needVehicleTitle', null, 'Add vehicles first'),
+        t(
+          'org.home.needVehicleBody',
+          null,
+          'Import your fleet register (or add vehicles), then request a repair the same way customers do.',
+        ),
         [
           { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
-          ...(!isDriver && org?.manage_fleet
+          ...(org?.manage_fleet
             ? [{ text: t('fleetImport.openAction', null, 'Import fleet'), onPress: goImportFleet }]
             : []),
           {
@@ -177,6 +235,17 @@ export default function OrganizationHomeScreen() {
             onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }),
           },
         ],
+      );
+      return;
+    }
+    if (isDriver) {
+      Alert.alert(
+        t('org.home.tasks.repairLaterTitle', null, 'Repair from a task'),
+        t(
+          'org.home.tasks.repairLaterBody',
+          null,
+          'Vehicles travel with your work cards. When a task includes a vehicle, you can request repair from there.',
+        ),
       );
       return;
     }
@@ -188,49 +257,106 @@ export default function OrganizationHomeScreen() {
     });
   };
 
-  const summaryItems = useMemo(
-    () => [
+  const statusLabel = useCallback(
+    (status) => t(`org.home.tasks.status.${status}`, null, status),
+    [t],
+  );
+
+  const summaryItems = useMemo(() => {
+    if (isDriver) {
+      return [
+        {
+          key: 'today',
+          value: todayTasks.length,
+          label: t('org.home.summary.todayTasks', null, 'Today'),
+        },
+        {
+          key: 'upcoming',
+          value: futureTasks.length,
+          label: t('org.home.summary.upcomingTasks', null, 'Upcoming'),
+        },
+      ];
+    }
+    return [
       {
         key: 'fleet',
         value: fleetCount == null ? '—' : fleetCount,
-        label: isDriver
-          ? t('org.home.summary.assigned', null, 'Assigned')
-          : t('org.home.summary.fleet', null, 'Fleet'),
+        label: t('org.home.summary.fleet', null, 'Fleet'),
         onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }),
       },
       {
         key: 'repair',
         value: hasFleet
           ? t('org.home.summary.ready', null, 'Ready')
-          : isDriver
-            ? t('org.home.summary.needAssigned', null, 'Awaiting')
-            : t('org.home.summary.needVehicles', null, 'Add cars'),
+          : t('org.home.summary.needVehicles', null, 'Add cars'),
         label: t('org.home.summary.repair', null, 'Repair'),
         onPress: goRequestRepair,
       },
-    ],
-    [fleetCount, hasFleet, isDriver, navigation, org?.id, t],
-  );
+    ];
+  }, [
+    fleetCount,
+    futureTasks.length,
+    hasFleet,
+    isDriver,
+    navigation,
+    org?.id,
+    t,
+    todayTasks.length,
+  ]);
 
   const actionTiles = useMemo(() => {
+    if (isDriver) {
+      return [
+        {
+          key: 'notifications',
+          icon: 'bell-outline',
+          title: t('org.home.actions.notifications', null, 'Notifications'),
+          subtitle: t(
+            'org.home.actions.notificationsSubtitle',
+            null,
+            'Open your notification inbox.',
+          ),
+          onPress: () =>
+            navigateToNotifications(navigation, {
+              returnTo: 'OrgHome',
+              backLabelKey: 'org.home.title',
+            }),
+        },
+        {
+          key: 'profile',
+          icon: 'account-circle-outline',
+          title: t('org.home.actions.profile', null, 'Profile'),
+          subtitle: t(
+            'org.home.actions.profileSubtitle',
+            null,
+            'Open your account profile.',
+          ),
+          onPress: () => navigateToProfile(navigation),
+        },
+        {
+          key: 'fleet',
+          icon: 'truck',
+          title: t('org.home.actions.fleetSecondary', null, 'Fleet (optional)'),
+          subtitle: t(
+            'org.home.actions.fleetSecondarySubtitle',
+            null,
+            'Vehicles usually come with your tasks — open fleet only if you need it.',
+          ),
+          onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }),
+        },
+      ];
+    }
+
     const tiles = [
       {
         key: 'fleet',
         icon: 'truck',
-        title: isDriver
-          ? t('org.home.actions.assignedFleet', null, 'My assigned vehicles')
-          : t('fleet.openFleet', null, 'View fleet'),
-        subtitle: isDriver
-          ? t(
-              'org.home.actions.assignedFleetSubtitle',
-              null,
-              'Only vehicles assigned to you for work.',
-            )
-          : t(
-              'org.home.actions.fleetSubtitle',
-              null,
-              'Browse company vehicles, readiness, and details.',
-            ),
+        title: t('fleet.openFleet', null, 'View fleet'),
+        subtitle: t(
+          'org.home.actions.fleetSubtitle',
+          null,
+          'Browse company vehicles, readiness, and details.',
+        ),
         onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }),
         count: typeof fleetCount === 'number' ? fleetCount : undefined,
       },
@@ -273,7 +399,7 @@ export default function OrganizationHomeScreen() {
       },
     ];
 
-    if (org?.manage_fleet && !isDriver) {
+    if (org?.manage_fleet) {
       tiles.push({
         key: 'import',
         icon: 'file-upload-outline',
@@ -287,7 +413,7 @@ export default function OrganizationHomeScreen() {
       });
     }
 
-    if (org?.manage_fleet || org?.can_view_fleet || fleetFocused || isDriver) {
+    if (org?.manage_fleet || org?.can_view_fleet || fleetFocused) {
       tiles.push({
         key: 'repair',
         icon: 'wrench',
@@ -298,60 +424,66 @@ export default function OrganizationHomeScreen() {
               null,
               'Request service for a fleet vehicle like a customer.',
             )
-          : isDriver
-            ? t(
-                'org.home.needAssignedHint',
-                null,
-                'Request repair needs an assigned vehicle from your manager.',
-              )
-            : t(
-                'org.home.needVehicleHint',
-                null,
-                'Request repair needs at least one fleet vehicle — import your register first.',
-              ),
+          : t(
+              'org.home.needVehicleHint',
+              null,
+              'Request repair needs at least one fleet vehicle — import your register first.',
+            ),
         onPress: goRequestRepair,
       });
     }
 
-    if (!isDriver) {
-      navItems
-        .filter((item) => item.route && !PRIMARY_HOME_ROUTES.has(item.route))
-        .forEach((item) => {
-          const iconByRoute = {
-            OrgWorkforce: 'account-hard-hat',
-            OrgWarehouse: 'warehouse',
-            OrgDocuments: 'file-document-outline',
-            OrgConstruction: 'hard-hat',
-            OrgTransport: 'bus',
-            OrgWorkOrders: 'clipboard-list-outline',
-            OrgNetwork: 'transit-connection-variant',
-            OrgInvoicing: 'receipt',
-            OrgLedger: 'book-open-outline',
-            OrgLocations: 'map-marker-radius',
-            OrgPublicProfile: 'earth',
-          };
-          tiles.push({
-            key: item.key || item.route,
-            icon: iconByRoute[item.route] || 'view-grid-outline',
-            title: item.label,
-            subtitle: t('org.home.actions.openSection', null, 'Open this workspace section.'),
-            onPress: () => openSection(item.route),
-          });
-        });
-
-      if (org?.has_shop_locations) {
+    navItems
+      .filter((item) => item.route && !PRIMARY_HOME_ROUTES.has(item.route))
+      .forEach((item) => {
+        const iconByRoute = {
+          OrgWorkforce: 'account-hard-hat',
+          OrgWarehouse: 'warehouse',
+          OrgDocuments: 'file-document-outline',
+          OrgConstruction: 'hard-hat',
+          OrgTransport: 'bus',
+          OrgWorkOrders: 'clipboard-list-outline',
+          OrgNetwork: 'transit-connection-variant',
+          OrgInvoicing: 'receipt',
+          OrgLedger: 'book-open-outline',
+          OrgLocations: 'map-marker-radius',
+          OrgPublicProfile: 'earth',
+        };
         tiles.push({
-          key: 'shop',
-          icon: 'storefront-outline',
-          title: t('org.home.openServiceCenter', null, 'Open service center workspace'),
-          subtitle: t(
-            'org.home.actions.shopSubtitle',
-            null,
-            'Switch to bay operations, offers, and shop tools.',
-          ),
-          onPress: () => navigateToPartnerDashboard(navigation),
+          key: item.key || item.route,
+          icon: iconByRoute[item.route] || 'view-grid-outline',
+          title: item.label,
+          subtitle: t('org.home.actions.openSection', null, 'Open this workspace section.'),
+          onPress: () => openSection(item.route),
         });
-      }
+      });
+
+    if (org?.manage_org_operations || org?.manage_fleet) {
+      tiles.unshift({
+        key: 'operations',
+        icon: 'clipboard-list-outline',
+        title: t('org.operations.title', null, 'Operations'),
+        subtitle: t(
+          'org.home.actions.operationsSubtitle',
+          null,
+          'Define company operations used on work cards.',
+        ),
+        onPress: () => navigateToOrgOperations(navigation, { orgId: org?.id }),
+      });
+    }
+
+    if (org?.has_shop_locations) {
+      tiles.push({
+        key: 'shop',
+        icon: 'storefront-outline',
+        title: t('org.home.openServiceCenter', null, 'Open service center workspace'),
+        subtitle: t(
+          'org.home.actions.shopSubtitle',
+          null,
+          'Switch to bay operations, offers, and shop tools.',
+        ),
+        onPress: () => navigateToPartnerDashboard(navigation),
+      });
     }
 
     return tiles;
@@ -366,14 +498,22 @@ export default function OrganizationHomeScreen() {
     org?.has_shop_locations,
     org?.id,
     org?.manage_fleet,
+    org?.manage_org_operations,
     t,
   ]);
 
-  const fabConfig = hasFleet
-    ? { label: t('org.home.requestRepair', null, 'Request repair'), onPress: goRequestRepair }
-    : !isDriver && org?.manage_fleet
-      ? { label: t('fleetImport.openAction', null, 'Import fleet'), onPress: goImportFleet }
-      : { label: t('fleet.openFleet', null, 'View fleet'), onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }) };
+  const fabConfig = isDriver
+    ? null
+    : hasFleet
+      ? { label: t('org.home.requestRepair', null, 'Request repair'), onPress: goRequestRepair }
+      : org?.manage_fleet
+        ? { label: t('fleetImport.openAction', null, 'Import fleet'), onPress: goImportFleet }
+        : org?.manage_org_operations
+          ? {
+              label: t('org.operations.addOperation', null, 'Add operation'),
+              onPress: () => navigateToOrgOperations(navigation, { orgId: org?.id }),
+            }
+          : null;
 
   return (
     <ScreenBackground safeArea={false}>
@@ -472,17 +612,105 @@ export default function OrganizationHomeScreen() {
         ) : (
           <>
             <DashboardSummaryRow items={summaryItems} />
+
+            {isDriver ? (
+              <DashboardCard style={styles.tasksCard}>
+                <Text style={styles.tasksHeading}>
+                  {t('org.home.tasks.title', null, 'Tasks')}
+                </Text>
+                {!currentTask && futureTasks.length === 0 ? (
+                  <Text style={styles.tasksEmpty}>
+                    {t(
+                      'org.home.tasks.empty',
+                      null,
+                      'No tasks yet — your manager will assign work cards.',
+                    )}
+                  </Text>
+                ) : (
+                  <>
+                    {currentTask ? (
+                      <View style={styles.currentTask}>
+                        <Text style={styles.currentTaskEyebrow}>
+                          {t('org.home.tasks.current', null, 'Current task')}
+                        </Text>
+                        <Text style={styles.currentTaskTitle}>{currentTask.title}</Text>
+                        <Text style={styles.currentTaskMeta}>
+                          {[
+                            statusLabel(currentTask.status),
+                            currentTask.activity?.name,
+                            currentTask.vehicle?.license_plate || currentTask.vehicle?.display_name,
+                            currentTask.scheduled_date,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </Text>
+                        {currentTask.instructions ? (
+                          <Text style={styles.currentTaskInstructions} numberOfLines={4}>
+                            {currentTask.instructions}
+                          </Text>
+                        ) : null}
+                      </View>
+                    ) : (
+                      <Text style={styles.tasksEmpty}>
+                        {t('org.home.tasks.noneToday', null, 'No task scheduled for today.')}
+                      </Text>
+                    )}
+
+                    {futureTasks.length > 0 ? (
+                      <View style={styles.upcomingBlock}>
+                        <Pressable
+                          onPress={() => setTasksExpanded((value) => !value)}
+                          style={styles.upcomingToggle}
+                          accessibilityRole="button"
+                        >
+                          <Text style={styles.upcomingToggleText}>
+                            {tasksExpanded
+                              ? t('org.home.tasks.hideUpcoming', null, 'Hide upcoming')
+                              : t(
+                                  'org.home.tasks.showUpcoming',
+                                  { count: futureTasks.length },
+                                  `Upcoming (${futureTasks.length})`,
+                                )}
+                          </Text>
+                        </Pressable>
+                        {tasksExpanded
+                          ? futureTasks.map((row) => (
+                              <View key={row.id} style={styles.upcomingRow}>
+                                <Text style={styles.upcomingTitle} numberOfLines={1}>
+                                  {row.title}
+                                </Text>
+                                <Text style={styles.upcomingMeta} numberOfLines={1}>
+                                  {[
+                                    row.scheduled_date || t('org.home.tasks.unscheduled', null, 'No date'),
+                                    statusLabel(row.status),
+                                    row.activity?.name,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                                </Text>
+                              </View>
+                            ))
+                          : null}
+                      </View>
+                    ) : null}
+                  </>
+                )}
+              </DashboardCard>
+            ) : null}
+
             <DashboardActionGrid tiles={actionTiles} />
           </>
         )}
       </ScrollView>
 
-      <FAB
-        label={fabConfig.label}
-        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-        color="#fff"
-        onPress={fabConfig.onPress}
-      />
+      {fabConfig ? (
+        <FAB
+          label={fabConfig.label}
+          style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+          color="#fff"
+          onPress={fabConfig.onPress}
+        />
+      ) : null}
     </ScreenBackground>
   );
 }
@@ -536,6 +764,78 @@ const styles = StyleSheet.create({
   },
   switcherChipTextActive: {
     color: '#fff',
+  },
+  tasksCard: {
+    marginBottom: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+  },
+  tasksHeading: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 12,
+  },
+  tasksEmpty: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  currentTask: {
+    marginBottom: 8,
+  },
+  currentTaskEyebrow: {
+    color: COLORS.ACCENT,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 6,
+  },
+  currentTaskTitle: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '800',
+    lineHeight: 28,
+    marginBottom: 8,
+  },
+  currentTaskMeta: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  currentTaskInstructions: {
+    color: 'rgba(255,255,255,0.86)',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  upcomingBlock: {
+    marginTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.14)',
+    paddingTop: 10,
+  },
+  upcomingToggle: {
+    paddingVertical: 4,
+    marginBottom: 4,
+  },
+  upcomingToggleText: {
+    color: COLORS.ACCENT,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  upcomingRow: {
+    paddingVertical: 8,
+  },
+  upcomingTitle: {
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  upcomingMeta: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    marginTop: 2,
   },
   fab: {
     position: 'absolute',

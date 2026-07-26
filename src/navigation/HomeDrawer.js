@@ -27,6 +27,7 @@ import {
   drawerScreenOptions,
 } from './DrawerBranding';
 import CompactLanguageSelector from '../components/common/CompactLanguageSelector';
+import WorkspaceModeSwitch from '../components/org/WorkspaceModeSwitch';
 import { useTranslation } from '../i18n';
 import { readOrganizationMemberships } from '../utils/orgWorkspace';
 import {
@@ -73,7 +74,7 @@ function CustomDrawerContent(props) {
     root.reset(
       buildShopAuthReset({
         name: 'OrgHome',
-        params: driverOrg?.id != null ? { organizationId: driverOrg.id, screen: 'OrgFleet' } : { screen: 'OrgFleet' },
+        params: driverOrg?.id != null ? { organizationId: driverOrg.id, screen: 'OrgOverview' } : { screen: 'OrgOverview' },
       }),
     );
   };
@@ -90,11 +91,13 @@ function CustomDrawerContent(props) {
         <Text style={drawerGlassStyles.drawerTitle}>{t('common.menu')}</Text>
 
         {driverOrg ? (
-          <DrawerItem
-            label={t('org.mode.switchToWorking', null, 'Working mode')}
-            onPress={switchToWorking}
-            icon={({ color, size }) => <DrawerMenuIcon name="briefcase-outline" color={color} size={size} />}
-            {...itemProps}
+          <WorkspaceModeSwitch
+            activeMode={WORKSPACE_MODE.PERSONAL}
+            // Org-scoped unread not available yet — badge Working when tasks land.
+            workingBadge={0}
+            personalBadge={0}
+            onSelectWorking={switchToWorking}
+            onSelectPersonal={() => props.navigation.closeDrawer()}
           />
         ) : null}
 

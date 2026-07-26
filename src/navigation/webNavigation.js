@@ -61,6 +61,7 @@ import {
   partnerOrganizationHome,
   partnerOrganizationCalendar,
   partnerOrganizationNetwork,
+  partnerOrganizationOperations,
   partnerOrganizationWorkforce,
   partnerOrganizationWorkforceMember,
   partnerBusinessNetwork,
@@ -1094,6 +1095,32 @@ export function navigateToOrgWorkforce(navigation, params = {}) {
     return;
   }
   navigation.navigate('OrgHome', { screen: 'OrgWorkforce', params: routeParams });
+}
+
+export function navigateToOrgOperations(navigation, params = {}) {
+  const routeParams = params.orgId != null ? { organizationId: params.orgId, ...params } : params;
+  const orgOperationsRoute = {
+    name: 'OrgHome',
+    state: {
+      index: 1,
+      routes: [
+        { name: 'OrgOverview' },
+        { name: 'OrgOperations', params: Object.keys(routeParams).length ? routeParams : undefined },
+      ],
+    },
+  };
+  if (Platform.OS === 'web') {
+    const pathParams = {};
+    if (params.orgId != null) pathParams.organizationId = params.orgId;
+    else if (params.organizationId != null) pathParams.organizationId = params.organizationId;
+    resetPartnerStackWebRoutes(
+      navigation,
+      [orgOperationsRoute],
+      partnerOrganizationOperations(pathParams),
+    );
+    return;
+  }
+  navigation.navigate('OrgHome', { screen: 'OrgOperations', params: routeParams });
 }
 
 export function navigateToOrgWorkforceMember(navigation, params = {}) {

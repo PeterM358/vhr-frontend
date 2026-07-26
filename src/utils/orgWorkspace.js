@@ -111,6 +111,7 @@ export function buildOrgNavItems(org, t) {
     OrgOverview: t('org.nav.overview', null, 'Overview'),
     OrgLocations: t('org.nav.locations', null, 'Locations'),
     OrgFleet: t('org.nav.fleet', null, 'Fleet'),
+    OrgOperations: t('org.nav.operations', null, 'Operations'),
     OrgWorkOrders: t('org.nav.workOrders', null, 'Work orders'),
     OrgWarehouse: t('org.nav.warehouse', null, 'Warehouse'),
     OrgWorkforce: t('org.nav.workforce', null, 'Workforce'),

@@ -13,6 +13,7 @@ import OrganizationHomeScreen from '../screens/OrganizationHomeScreen';
 import FleetDashboardScreen from '../screens/FleetDashboardScreen';
 import NetworkOrganizationScreen from '../screens/NetworkOrganizationScreen';
 import OrgWorkforceScreen from '../screens/OrgWorkforceScreen';
+import OrgOperationsScreen from '../screens/OrgOperationsScreen';
 import OrgCalendarScreen from '../screens/OrgCalendarScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
 
@@ -37,6 +38,7 @@ import {
   navigateToOrgCalendar,
   navigateToOrgFleet,
   navigateToOrgNetwork,
+  navigateToOrgOperations,
   navigateToOrgWorkforce,
   navigateToPartnerDashboard,
   navigateToPartnerSwitchCenter,
@@ -51,6 +53,7 @@ import {
   drawerScreenOptions,
 } from './DrawerBranding';
 import CompactLanguageSelector from '../components/common/CompactLanguageSelector';
+import WorkspaceModeSwitch from '../components/org/WorkspaceModeSwitch';
 import { useTranslation } from '../i18n';
 
 const Drawer = createDrawerNavigator();
@@ -78,10 +81,21 @@ function CustomDrawerContent(props) {
 
   const itemProps = drawerMenuItemProps;
   const isDriver = isDriverMembership(org);
-  const navItems = buildOrgNavItems(org, t).filter((item) => {
-    if (!isDriver) return true;
-    return item.route === 'OrgOverview' || item.route === 'OrgFleet';
-  });
+  const personalUnread = isDriver ? unreadNotifications || 0 : 0;
+  const navItems = buildOrgNavItems(org, t)
+    .filter((item) => {
+      if (!isDriver) return true;
+      return item.route === 'OrgOverview';
+    })
+    .map((item) => {
+      if (isDriver && item.route === 'OrgOverview') {
+        return {
+          ...item,
+          label: t('org.home.tasks.title', null, 'Tasks'),
+        };
+      }
+      return item;
+    });
 
   const openRoute = (route) => {
     props.navigation.closeDrawer();
@@ -95,6 +109,10 @@ function CustomDrawerContent(props) {
     }
     if (route === 'OrgWorkforce') {
       navigateToOrgWorkforce(navigation, { orgId: org?.id });
+      return;
+    }
+    if (route === 'OrgOperations') {
+      navigateToOrgOperations(navigation, { orgId: org?.id });
       return;
     }
     if (route === 'OrgCalendar') {
@@ -133,11 +151,12 @@ function CustomDrawerContent(props) {
         </Text>
 
         {isDriver ? (
-          <DrawerItem
-            label={t('org.mode.switchToPersonal', null, 'Personal garage')}
-            onPress={switchToPersonal}
-            icon={({ color, size }) => <DrawerMenuIcon name="home-outline" color={color} size={size} />}
-            {...itemProps}
+          <WorkspaceModeSwitch
+            activeMode={WORKSPACE_MODE.WORKING}
+            workingBadge={0}
+            personalBadge={personalUnread}
+            onSelectWorking={() => props.navigation.closeDrawer()}
+            onSelectPersonal={switchToPersonal}
           />
         ) : null}
 
@@ -146,7 +165,13 @@ function CustomDrawerContent(props) {
             key={item.key}
             label={item.label}
             onPress={() => openRoute(item.route)}
-            icon={({ color, size }) => <DrawerMenuIcon name="domain" color={color} size={size} />}
+            icon={({ color, size }) => (
+              <DrawerMenuIcon
+                name={isDriver && item.route === 'OrgOverview' ? 'clipboard-check-outline' : 'domain'}
+                color={color}
+                size={size}
+              />
+            )}
             {...itemProps}
           />
         ))}
@@ -264,6 +289,7 @@ export default function OrganizationDrawer() {
     >
       <Drawer.Screen name="OrgOverview" component={OrganizationHomeScreen} />
       <Drawer.Screen name="OrgFleet" component={FleetDashboardScreen} />
+      <Drawer.Screen name="OrgOperations" component={OrgOperationsScreen} />
       <Drawer.Screen name="OrgCalendar" component={OrgCalendarScreen} />
       <Drawer.Screen name="OrgWorkforce" component={OrgWorkforceScreen} />
       <Drawer.Screen name="OrgNetwork" component={NetworkOrganizationScreen} />
