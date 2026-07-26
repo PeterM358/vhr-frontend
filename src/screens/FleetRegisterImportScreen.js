@@ -25,6 +25,7 @@ import {
   patchFleetImportRow,
   uploadFleetRegister,
 } from '../api/fleetImport';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 import { showMessage } from '../utils/crossPlatformAlert';
 
 const STEPS = ['organization', 'upload', 'preview', 'result'];
@@ -44,8 +45,10 @@ function rowStatusLabel(t, status) {
   return translated === key ? status : translated;
 }
 
-export default function FleetRegisterImportScreen({ navigation }) {
+export default function FleetRegisterImportScreen({ navigation, route }) {
   const { t, locale } = useTranslation();
+  const preferredOrgId =
+    route?.params?.organizationId || route?.params?.orgId || null;
   const [step, setStep] = useState('organization');
   const [loading, setLoading] = useState(true);
   const [organizations, setOrganizations] = useState([]);
@@ -73,13 +76,28 @@ export default function FleetRegisterImportScreen({ navigation }) {
     try {
       const token = await AsyncStorage.getItem('@access_token');
       const data = await listOrganizations(token);
-      setOrganizations(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setOrganizations(list);
+      const manageable = organizationsWithFleetImportAccess(list);
+      const storedOrgId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_ORGANIZATION_ID);
+      const preferred = String(preferredOrgId || storedOrgId || '');
+      let initial = null;
+      if (preferred) {
+        initial = manageable.find((o) => String(o.id) === preferred) || null;
+      }
+      if (!initial && manageable.length === 1) {
+        initial = manageable[0];
+      }
+      if (initial) {
+        setSelectedOrg(initial);
+        setStep('upload');
+      }
     } catch (error) {
       showMessage(t('fleetImport.errors.loadOrganizations'), error.message);
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [preferredOrgId, t]);
 
   useEffect(() => {
     loadOrganizations();
@@ -379,6 +397,15 @@ export default function FleetRegisterImportScreen({ navigation }) {
                       : row.normalized.vehicle_type_code
                         ? ` → ${row.normalized.vehicle_type_code}`
                         : ''}
+                  </Text>
+                ) : null}
+                {row.normalized?.make_hint || row.normalized?.model_hint ? (
+                  <Text style={styles.rowMeta}>
+                    {t('fleetImport.makeModel', null, 'Make / model')}:{' '}
+                    {[row.normalized.make_hint, row.normalized.model_hint].filter(Boolean).join(' · ')}
+                    {row.normalized.catalog_unresolved
+                      ? ` · ${t('fleetImport.catalogNeedsLink', null, 'catalog link later if needed')}`
+                      : ''}
                   </Text>
                 ) : null}
                 {row.result_error_message ? (
