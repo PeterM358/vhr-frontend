@@ -42,11 +42,34 @@ import {
 
 const PRIMARY_HOME_ROUTES = new Set(['OrgOverview', 'OrgFleet']);
 
+
+/** Same person-name heuristic as client Home ("Hi, Mihailov"). */
+function toDisplayName(rawValue) {
+  const raw = String(rawValue || '').trim();
+  if (!raw) return 'there';
+  if (raw.includes('@')) {
+    return raw.split('@')[0] || raw;
+  }
+  return raw;
+}
+
+function extractFirstName(rawValue) {
+  const raw = String(rawValue || '').trim();
+  if (!raw) return '';
+  const fromEmail = raw.includes('@') ? raw.split('@')[0] : raw;
+  const normalized = fromEmail.replace(/[._-]+/g, ' ').trim();
+  if (!normalized) return '';
+  const firstToken = normalized.split(/\s+/)[0] || '';
+  const lettersOnly = firstToken.replace(/[0-9]+/g, '');
+  if (!lettersOnly) return '';
+  return lettersOnly.charAt(0).toUpperCase() + lettersOnly.slice(1);
+}
+
 export default function OrganizationHomeScreen() {
   const navigation = useNavigation();
   const theme = useTheme();
   const { t } = useTranslation();
-  const { authToken } = useContext(AuthContext);
+  const { authToken, userEmailOrPhone } = useContext(AuthContext);
   const [org, setOrg] = useState(null);
   const [memberships, setMemberships] = useState([]);
   const [fleetCount, setFleetCount] = useState(null);
@@ -90,6 +113,8 @@ export default function OrganizationHomeScreen() {
   const navItems = buildOrgNavItems(org, t);
   const hasFleet = fleetCount == null ? true : fleetCount > 0;
   const orgName = org?.display_name || t('org.home.title', null, 'Organization');
+  const workerName =
+    extractFirstName(userEmailOrPhone) || toDisplayName(userEmailOrPhone);
 
   const openSection = (route) => {
     if (route === 'OrgFleet') {
@@ -361,13 +386,17 @@ export default function OrganizationHomeScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <DashboardHeroCard
-          title={t('org.home.greeting', { name: orgName }, `Welcome, ${orgName}`)}
+          title={
+            isDriver
+              ? t('org.home.workerGreeting', { name: workerName }, `Hi, ${workerName}`)
+              : t('org.home.greeting', { name: orgName }, `Welcome, ${orgName}`)
+          }
           subtitle={
             isDriver
               ? t(
                   'org.home.driverSubtitle',
-                  null,
-                  'Working mode — assigned vehicles and repair requests for your job.',
+                  { org: orgName },
+                  `Have a good day working with ${orgName}`,
                 )
               : fleetFocused
                 ? t(

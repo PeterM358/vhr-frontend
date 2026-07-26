@@ -219,9 +219,10 @@
     "home": {
       "title": "Organization",
       "greeting": "Welcome, {name}",
+      "workerGreeting": "Hi, {name}",
       "subtitle": "Shared workforce, fleet, documents, and operations for your company.",
       "fleetSubtitle": "Manage your company fleet and request repairs the same way customers do.",
-      "driverSubtitle": "Working mode — assigned vehicles and repair requests for your job.",
+      "driverSubtitle": "Have a good day working with {org}",
       "modules": "Workspace",
       "openServiceCenter": "Open service center workspace",
       "importFleetLater": "Import fleet later",
