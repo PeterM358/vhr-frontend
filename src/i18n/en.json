@@ -28,7 +28,8 @@
     "success": "Success",
     "validation": "Validation",
     "continue": "Continue",
-    "done": "Done"
+    "done": "Done",
+    "user": "User"
   },
   "fleet": {
     "dashboard": {
@@ -313,7 +314,8 @@
         "inspection": "Inspection",
         "workshop_service": "Workshop service",
         "other": "Other"
-      }
+      },
+      "defaultUnitPlaceholder": "m², km, L, hours…"
     },
     "switcher": {
       "label": "Organization"

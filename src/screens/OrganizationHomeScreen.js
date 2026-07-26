@@ -57,10 +57,10 @@ function isOpenTaskStatus(status) {
   return value !== 'done' && value !== 'cancelled';
 }
 
-/** Same person-name heuristic as client Home ("Hi, Mihailov"). */
+/** Same person-name heuristic as client Home ("Hi, Mihailov"). Empty → ''. */
 function toDisplayName(rawValue) {
   const raw = String(rawValue || '').trim();
-  if (!raw) return 'there';
+  if (!raw) return '';
   if (raw.includes('@')) {
     return raw.split('@')[0] || raw;
   }
@@ -138,21 +138,11 @@ export default function OrganizationHomeScreen() {
   const fleetFocused = isFleetFocusedOrg(org);
   const navItems = buildOrgNavItems(org, t);
   const hasFleet = fleetCount == null ? true : fleetCount > 0;
-  const orgName = org?.display_name || t('org.home.title', null, 'Organization');
-  const personName = (() => {
-    const raw = String(userEmailOrPhone || '').trim();
-    if (!raw) return t('common.user', null, 'User');
-    if (raw.includes('@')) {
-      const local = raw.split('@')[0] || raw;
-      const token = local.replace(/[._-]+/g, ' ').trim().split(/\s+/)[0] || local;
-      const letters = token.replace(/[0-9]+/g, '');
-      if (!letters) return local;
-      return letters.charAt(0).toUpperCase() + letters.slice(1);
-    }
-    return raw;
-  })();
+  const orgName = org?.display_name || t('org.home.title');
   const workerName =
-    extractFirstName(userEmailOrPhone) || toDisplayName(userEmailOrPhone);
+    extractFirstName(userEmailOrPhone) ||
+    toDisplayName(userEmailOrPhone) ||
+    t('common.user');
   const today = localTodayIso();
 
   const { todayTasks, upcomingTasks } = useMemo(() => {

@@ -27,7 +27,8 @@
     "service": "Услуга",
     "validation": "Валидация",
     "continue": "Напред",
-    "done": "Готово"
+    "done": "Готово",
+    "user": "Потребител"
   },
   "fleet": {
     "dashboard": {
@@ -406,7 +407,8 @@
         "inspection": "Преглед",
         "workshop_service": "Сервизна услуга",
         "other": "Друго"
-      }
+      },
+      "defaultUnitPlaceholder": "m², км, L, часове…"
     }
   },
   "auth": {

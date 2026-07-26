@@ -327,7 +327,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
               value={defaultUnit}
               onChangeText={setDefaultUnit}
               mode="outlined"
-              placeholder="m², km, L, hours…"
+              placeholder={t('org.operations.defaultUnitPlaceholder')}
               style={styles.input}
             />
             <View style={styles.switchRow}>
