@@ -402,24 +402,24 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    color: '#fff',
+    color: COLORS.TEXT_DARK,
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 6,
   },
   meta: {
-    color: 'rgba(255,255,255,0.65)',
+    color: COLORS.TEXT_MUTED,
     fontSize: 12,
     marginBottom: 12,
   },
   empty: {
-    color: 'rgba(255,255,255,0.72)',
+    color: COLORS.TEXT_MUTED,
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 12,
   },
   error: {
-    color: '#ffb4b4',
+    color: '#B91C1C',
     marginBottom: 10,
   },
   retry: {
@@ -427,19 +427,19 @@ const styles = StyleSheet.create({
   },
   row: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.12)',
+    borderTopColor: 'rgba(15,23,42,0.12)',
     paddingVertical: 12,
   },
   rowBody: {
     marginBottom: 8,
   },
   rowTitle: {
-    color: '#fff',
+    color: COLORS.TEXT_DARK,
     fontSize: 15,
     fontWeight: '700',
   },
   rowMeta: {
-    color: 'rgba(255,255,255,0.65)',
+    color: COLORS.TEXT_MUTED,
     fontSize: 12,
     marginTop: 4,
   },
@@ -452,15 +452,16 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   rowActionText: {
-    color: COLORS.ACCENT,
+    color: COLORS.PRIMARY,
     fontSize: 13,
     fontWeight: '600',
   },
   input: {
     marginBottom: 10,
+    backgroundColor: '#fff',
   },
   fieldLabel: {
-    color: 'rgba(255,255,255,0.7)',
+    color: COLORS.TEXT_DARK,
     fontSize: 12,
     fontWeight: '700',
     marginBottom: 8,
@@ -476,21 +477,21 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 7,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderColor: COLORS.BORDER_SOFT,
+    borderColor: '#CBD5E1',
   },
   kindChipActive: {
-    backgroundColor: COLORS.PRIMARY_GLASS,
-    borderColor: COLORS.ACCENT,
+    backgroundColor: COLORS.PRIMARY,
+    borderColor: COLORS.PRIMARY,
   },
   kindChipText: {
-    color: 'rgba(255,255,255,0.8)',
+    color: COLORS.TEXT_DARK,
     fontSize: 12,
     fontWeight: '600',
   },
   kindChipTextActive: {
-    color: '#fff',
+    color: COLORS.ON_PRIMARY,
   },
   switchRow: {
     flexDirection: 'row',
@@ -499,12 +500,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   switchLabel: {
-    color: 'rgba(255,255,255,0.85)',
+    color: COLORS.TEXT_DARK,
     fontSize: 14,
     fontWeight: '600',
   },
   formMessage: {
-    color: 'rgba(255,255,255,0.8)',
+    color: COLORS.TEXT_MUTED,
     marginBottom: 10,
   },
   primaryBtn: {
