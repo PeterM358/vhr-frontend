@@ -78,7 +78,6 @@ const FLEET_FOCUSED_ROLE_TYPES = new Set(['TRANSPORT_COMPANY', 'FLEET_OPERATOR']
 /** Shop / supplier B2B hub routes — not for transport/fleet-only companies. */
 const SHOP_B2B_ORG_ROUTES = new Set([
   'OrgNetwork',
-  'OrgWarehouse',
   'OrgLocations',
   'OrgInvoicing',
   'OrgLedger',

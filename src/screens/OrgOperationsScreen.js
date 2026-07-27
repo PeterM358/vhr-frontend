@@ -60,13 +60,10 @@ function emptyFormState() {
     plannedHours: '',
     consumesMaterials: false,
     materialUnitId: null,
-    // transport norms
     transportBaseRate: '',
     transportPerTonRate: '',
     transportRateUnitId: null,
-    // labor
     laborPresetHours: '',
-    // generic / material-consuming
     normRate: '',
     normBasisQty: '1',
     normInputUnitId: null,
@@ -243,6 +240,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
   const [rows, setRows] = useState([]);
   const [units, setUnits] = useState([]);
   const [mode, setMode] = useState('list');
+  const [wizardStep, setWizardStep] = useState(0);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyFormState);
   const [busy, setBusy] = useState(false);
@@ -251,6 +249,57 @@ export default function OrgOperationsScreen({ navigation, route }) {
   const setField = useCallback((key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   }, []);
+
+  const stepDefs = useMemo(
+    () => [
+      {
+        key: 'basics',
+        title: t('org.operations.wizard.stepBasics', null, 'Basics'),
+        hint: t(
+          'org.operations.wizard.stepBasicsHint',
+          null,
+          'Name the operation and choose its kind.',
+        ),
+      },
+      {
+        key: 'output',
+        title: t('org.operations.wizard.stepOutput', null, 'Output & time'),
+        hint: t(
+          'org.operations.wizard.stepOutputHint',
+          null,
+          'Primary unit and planned hours (norm time for training later).',
+        ),
+      },
+      {
+        key: 'norms',
+        title: t('org.operations.wizard.stepNorms', null, 'Norms'),
+        hint: t(
+          'org.operations.wizard.stepNormsHint',
+          null,
+          'Optional rates — fuel burn, paint per m², or labor hours.',
+        ),
+      },
+      {
+        key: 'materials',
+        title: t('org.operations.wizard.stepMaterials', null, 'Materials'),
+        hint: t(
+          'org.operations.wizard.stepMaterialsHint',
+          null,
+          'Does this operation consume warehouse materials? Lines are added on the task later.',
+        ),
+      },
+      {
+        key: 'review',
+        title: t('org.operations.wizard.stepReview', null, 'Review'),
+        hint: t(
+          'org.operations.wizard.stepReviewHint',
+          null,
+          'Check everything, then save.',
+        ),
+      },
+    ],
+    [t],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -292,10 +341,16 @@ export default function OrgOperationsScreen({ navigation, route }) {
     [t],
   );
 
+  const findUnit = useCallback(
+    (id) => (id == null ? null : units.find((u) => u.id === id) || null),
+    [units],
+  );
+
   const resetForm = () => {
     setEditingId(null);
     setForm(emptyFormState());
     setFormMessage('');
+    setWizardStep(0);
   };
 
   const startCreate = () => {
@@ -307,7 +362,29 @@ export default function OrgOperationsScreen({ navigation, route }) {
     setEditingId(row.id);
     setForm(hydrateFromRow(row));
     setFormMessage('');
+    setWizardStep(0);
     setMode('add');
+  };
+
+  const validateStep = (stepIndex) => {
+    if (stepIndex === 0) {
+      if (!form.name.trim()) {
+        setFormMessage(t('org.operations.nameRequired', null, 'Name is required.'));
+        return false;
+      }
+    }
+    setFormMessage('');
+    return true;
+  };
+
+  const goNext = () => {
+    if (!validateStep(wizardStep)) return;
+    if (wizardStep < stepDefs.length - 1) setWizardStep((s) => s + 1);
+  };
+
+  const goPrev = () => {
+    setFormMessage('');
+    if (wizardStep > 0) setWizardStep((s) => s - 1);
   };
 
   const save = async () => {
@@ -315,6 +392,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
     const trimmedName = form.name.trim();
     if (!trimmedName) {
       setFormMessage(t('org.operations.nameRequired', null, 'Name is required.'));
+      setWizardStep(0);
       return;
     }
     setBusy(true);
@@ -324,7 +402,6 @@ export default function OrgOperationsScreen({ navigation, route }) {
       const norms = buildNormsPayload(form);
       const payload = {
         name: trimmedName,
-        // Always send optional fields so Edit can clear them (null / empty).
         code: form.code.trim(),
         activity_kind: form.kind,
         unit_id: form.unitId || null,
@@ -412,7 +489,6 @@ export default function OrgOperationsScreen({ navigation, route }) {
     if (form.kind === 'transport') {
       return (
         <>
-          <Text style={styles.fieldLabel}>{t('org.operations.normsTitle', null, 'Norms (optional)')}</Text>
           <Text style={styles.helper}>
             {t(
               'org.operations.transportNormsHelper',
@@ -448,7 +524,6 @@ export default function OrgOperationsScreen({ navigation, route }) {
     if (form.kind === 'labor_only') {
       return (
         <>
-          <Text style={styles.fieldLabel}>{t('org.operations.normsTitle', null, 'Norms (optional)')}</Text>
           <Text style={styles.helper}>
             {t(
               'org.operations.laborNormsHelper',
@@ -473,7 +548,6 @@ export default function OrgOperationsScreen({ navigation, route }) {
     }
     return (
       <>
-        <Text style={styles.fieldLabel}>{t('org.operations.normsTitle', null, 'Norms (optional)')}</Text>
         <Text style={styles.helper}>
           {t(
             'org.operations.normsHelper',
@@ -506,6 +580,193 @@ export default function OrgOperationsScreen({ navigation, route }) {
       </>
     );
   };
+
+  const renderWizardBody = () => {
+    const stepKey = stepDefs[wizardStep]?.key;
+    if (stepKey === 'basics') {
+      return (
+        <>
+          <TextInput
+            label={t('org.operations.name', null, 'Name')}
+            value={form.name}
+            onChangeText={(value) => setField('name', value)}
+            mode="outlined"
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+          <TextInput
+            label={t('org.operations.code', null, 'Code (optional)')}
+            value={form.code}
+            onChangeText={(value) => setField('code', value)}
+            mode="outlined"
+            autoCapitalize="characters"
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+          <Text style={styles.fieldLabel}>{t('org.operations.kind', null, 'Kind')}</Text>
+          <View style={styles.kindWrap}>
+            {KIND_OPTIONS.map((option) => {
+              const active = form.kind === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  onPress={() => setField('kind', option.value)}
+                  style={[styles.kindChip, active && styles.kindChipActive]}
+                >
+                  <Text style={[styles.kindChipText, active && styles.kindChipTextActive]}>
+                    {t(option.labelKey, null, option.value)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <TextInput
+            label={t('org.operations.notes', null, 'Notes')}
+            value={form.notes}
+            onChangeText={(value) => setField('notes', value)}
+            mode="outlined"
+            multiline
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>{t('org.operations.active', null, 'Active')}</Text>
+            <Switch
+              value={form.isActive}
+              onValueChange={(value) => setField('isActive', value)}
+            />
+          </View>
+        </>
+      );
+    }
+    if (stepKey === 'output') {
+      return (
+        <>
+          <Text style={styles.fieldLabel}>{t('org.operations.unit', null, 'Unit of measure')}</Text>
+          <Text style={styles.helper}>
+            {t(
+              'org.operations.wizard.outputUnitHelper',
+              null,
+              'What the worker reports as output (km, m², hours, loads…).',
+            )}
+          </Text>
+          {renderUnitChips(form.unitId, (id) => setField('unitId', id))}
+          {form.kind !== 'labor_only' ? (
+            <>
+              <TextInput
+                label={t('org.operations.plannedHours', null, 'Planned / norm hours')}
+                value={form.plannedHours}
+                onChangeText={(value) => setField('plannedHours', value)}
+                mode="outlined"
+                keyboardType="decimal-pad"
+                style={styles.input}
+                textColor={ON_CARD}
+              />
+              <Text style={styles.helper}>
+                {t(
+                  'org.operations.wizard.plannedHoursHelper',
+                  null,
+                  'Used later to see who is on norm and who needs training.',
+                )}
+              </Text>
+            </>
+          ) : null}
+        </>
+      );
+    }
+    if (stepKey === 'norms') {
+      return (
+        <>
+          <Text style={styles.fieldLabel}>{t('org.operations.normsTitle', null, 'Norms (optional)')}</Text>
+          {renderNormsByKind()}
+        </>
+      );
+    }
+    if (stepKey === 'materials') {
+      if (form.kind === 'labor_only') {
+        return (
+          <Text style={styles.helper}>
+            {t(
+              'org.operations.wizard.laborNoMaterials',
+              null,
+              'Labor-only operations do not consume warehouse materials.',
+            )}
+          </Text>
+        );
+      }
+      return (
+        <>
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>
+              {t('org.operations.consumesMaterials', null, 'Consumes materials')}
+            </Text>
+            <Switch
+              value={form.consumesMaterials}
+              onValueChange={(value) => setField('consumesMaterials', value)}
+            />
+          </View>
+          <Text style={styles.helper}>
+            {t(
+              'org.operations.wizard.materialsLinesLater',
+              null,
+              'Material lines are issued on the task from a warehouse location — not on this form.',
+            )}
+          </Text>
+          {form.consumesMaterials ? (
+            <>
+              <Text style={styles.fieldLabel}>
+                {t('org.operations.materialUnit', null, 'Default material unit')}
+              </Text>
+              {renderUnitChips(form.materialUnitId, (id) => setField('materialUnitId', id))}
+            </>
+          ) : null}
+        </>
+      );
+    }
+    // review
+    const hours =
+      form.plannedHours.trim() ||
+      form.laborPresetHours.trim() ||
+      t('org.operations.wizard.none', null, 'None');
+    return (
+      <View style={styles.reviewBlock}>
+        <Text style={styles.reviewLine}>
+          <Text style={styles.reviewKey}>{t('org.operations.name', null, 'Name')}: </Text>
+          {form.name.trim() || '—'}
+        </Text>
+        <Text style={styles.reviewLine}>
+          <Text style={styles.reviewKey}>{t('org.operations.kind', null, 'Kind')}: </Text>
+          {kindLabel(form.kind)}
+        </Text>
+        <Text style={styles.reviewLine}>
+          <Text style={styles.reviewKey}>{t('org.operations.unit', null, 'Unit of measure')}: </Text>
+          {unitLabel(findUnit(form.unitId)) || t('org.operations.unitNone', null, 'None')}
+        </Text>
+        <Text style={styles.reviewLine}>
+          <Text style={styles.reviewKey}>
+            {t('org.operations.plannedHours', null, 'Planned / norm hours')}:{' '}
+          </Text>
+          {hours}
+        </Text>
+        <Text style={styles.reviewLine}>
+          <Text style={styles.reviewKey}>
+            {t('org.operations.consumesMaterials', null, 'Consumes materials')}:{' '}
+          </Text>
+          {form.kind === 'labor_only' || !form.consumesMaterials
+            ? t('org.operations.wizard.no', null, 'No')
+            : t('org.operations.wizard.yes', null, 'Yes')}
+        </Text>
+        {form.notes.trim() ? (
+          <Text style={styles.reviewLine}>
+            <Text style={styles.reviewKey}>{t('org.operations.notes', null, 'Notes')}: </Text>
+            {form.notes.trim()}
+          </Text>
+        ) : null}
+      </View>
+    );
+  };
+
+  const currentStep = stepDefs[wizardStep];
 
   return (
     <ScreenBackground safeArea={false}>
@@ -628,105 +889,74 @@ export default function OrgOperationsScreen({ navigation, route }) {
                 ? t('org.operations.editOperation', null, 'Edit operation')
                 : t('org.operations.addOperation', null, 'Add operation')}
             </Text>
-            <TextInput
-              label={t('org.operations.name', null, 'Name')}
-              value={form.name}
-              onChangeText={(value) => setField('name', value)}
-              mode="outlined"
-              style={styles.input}
-              textColor={ON_CARD}
-            />
-            <TextInput
-              label={t('org.operations.code', null, 'Code (optional)')}
-              value={form.code}
-              onChangeText={(value) => setField('code', value)}
-              mode="outlined"
-              autoCapitalize="characters"
-              style={styles.input}
-              textColor={ON_CARD}
-            />
-            <Text style={styles.fieldLabel}>{t('org.operations.kind', null, 'Kind')}</Text>
-            <View style={styles.kindWrap}>
-              {KIND_OPTIONS.map((option) => {
-                const active = form.kind === option.value;
-                return (
-                  <Pressable
-                    key={option.value}
-                    onPress={() => setField('kind', option.value)}
-                    style={[styles.kindChip, active && styles.kindChipActive]}
+            <View style={styles.stepRow}>
+              {stepDefs.map((s, idx) => (
+                <Pressable
+                  key={s.key}
+                  onPress={() => {
+                    if (idx <= wizardStep || (idx > 0 && validateStep(0))) {
+                      if (idx > wizardStep) {
+                        for (let i = wizardStep; i < idx; i += 1) {
+                          if (!validateStep(i)) return;
+                        }
+                      }
+                      setWizardStep(idx);
+                    }
+                  }}
+                  style={[
+                    styles.stepChip,
+                    idx === wizardStep && styles.stepChipActive,
+                    idx < wizardStep && styles.stepChipDone,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.stepChipText,
+                      idx === wizardStep && styles.stepChipTextActive,
+                    ]}
                   >
-                    <Text style={[styles.kindChipText, active && styles.kindChipTextActive]}>
-                      {t(option.labelKey, null, option.value)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={styles.fieldLabel}>{t('org.operations.unit', null, 'Unit of measure')}</Text>
-            {renderUnitChips(form.unitId, (id) => setField('unitId', id))}
-            <TextInput
-              label={t('org.operations.notes', null, 'Notes')}
-              value={form.notes}
-              onChangeText={(value) => setField('notes', value)}
-              mode="outlined"
-              multiline
-              style={styles.input}
-              textColor={ON_CARD}
-            />
-            {form.kind !== 'labor_only' ? (
-              <TextInput
-                label={t('org.operations.presetHours', null, 'Preset hours')}
-                value={form.plannedHours}
-                onChangeText={(value) => setField('plannedHours', value)}
-                mode="outlined"
-                keyboardType="decimal-pad"
-                style={styles.input}
-                textColor={ON_CARD}
-              />
-            ) : null}
-            {renderNormsByKind()}
-            {form.kind !== 'labor_only' ? (
-              <>
-                <View style={styles.switchRow}>
-                  <Text style={styles.switchLabel}>
-                    {t('org.operations.consumesMaterials', null, 'Consumes materials')}
+                    {idx + 1}. {s.title}
                   </Text>
-                  <Switch
-                    value={form.consumesMaterials}
-                    onValueChange={(value) => setField('consumesMaterials', value)}
-                  />
-                </View>
-                {form.consumesMaterials ? (
-                  <>
-                    <Text style={styles.fieldLabel}>
-                      {t('org.operations.materialUnit', null, 'Default material unit')}
-                    </Text>
-                    {renderUnitChips(form.materialUnitId, (id) => setField('materialUnitId', id))}
-                  </>
-                ) : null}
-              </>
-            ) : null}
-            <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>{t('org.operations.active', null, 'Active')}</Text>
-              <Switch
-                value={form.isActive}
-                onValueChange={(value) => setField('isActive', value)}
-              />
+                </Pressable>
+              ))}
             </View>
+            <Text style={styles.stepHint}>{currentStep?.hint}</Text>
+            {renderWizardBody()}
             {formMessage ? <Text style={styles.formMessage}>{formMessage}</Text> : null}
-            <Button mode="contained" loading={busy} disabled={busy} onPress={save} style={styles.primaryBtn}>
-              {t('common.save', null, 'Save')}
-            </Button>
-            <Button
-              mode="text"
-              onPress={() => {
-                resetForm();
-                setMode('list');
-              }}
-              textColor={ON_CARD}
-            >
-              {t('common.cancel', null, 'Cancel')}
-            </Button>
+            <View style={styles.wizardNav}>
+              {wizardStep > 0 ? (
+                <Button mode="outlined" onPress={goPrev} style={styles.navBtn} textColor={ON_CARD}>
+                  {t('common.back', null, 'Back')}
+                </Button>
+              ) : (
+                <Button
+                  mode="text"
+                  onPress={() => {
+                    resetForm();
+                    setMode('list');
+                  }}
+                  textColor={ON_CARD}
+                  style={styles.navBtn}
+                >
+                  {t('common.cancel', null, 'Cancel')}
+                </Button>
+              )}
+              {wizardStep < stepDefs.length - 1 ? (
+                <Button mode="contained" onPress={goNext} style={styles.navBtn}>
+                  {t('common.continue', null, 'Continue')}
+                </Button>
+              ) : (
+                <Button
+                  mode="contained"
+                  loading={busy}
+                  disabled={busy}
+                  onPress={save}
+                  style={styles.navBtn}
+                >
+                  {t('common.save', null, 'Save')}
+                </Button>
+              )}
+            </View>
           </AppCard>
         )}
       </ScrollView>
@@ -906,5 +1136,62 @@ const styles = StyleSheet.create({
   primaryBtn: {
     marginTop: 4,
     marginBottom: 4,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  stepChip: {
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  stepChipActive: {
+    backgroundColor: COLORS.PRIMARY,
+    borderColor: COLORS.PRIMARY,
+  },
+  stepChipDone: {
+    borderColor: COLORS.PRIMARY,
+  },
+  stepChipText: {
+    color: ON_CARD,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  stepChipTextActive: {
+    color: '#FFFFFF',
+  },
+  stepHint: {
+    color: ON_CARD_MUTED,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  wizardNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 8,
+  },
+  navBtn: {
+    flex: 1,
+  },
+  reviewBlock: {
+    marginBottom: 8,
+  },
+  reviewLine: {
+    color: ON_CARD,
+    fontSize: 14,
+    lineHeight: 22,
+    marginBottom: 6,
+  },
+  reviewKey: {
+    color: ON_CARD_MUTED,
+    fontWeight: '700',
   },
 });

@@ -40,12 +40,13 @@ import {
   navigateToOrgOperations,
   navigateToOrgProjects,
   navigateToOrgTasks,
+  navigateToOrgWarehouse,
   navigateToOrgWorkforce,
   navigateToPartnerDashboard,
   navigateToProfile,
 } from '../navigation/webNavigation';
 
-const PRIMARY_HOME_ROUTES = new Set(['OrgOverview', 'OrgFleet', 'OrgOperations', 'OrgTasks']);
+const PRIMARY_HOME_ROUTES = new Set(['OrgOverview', 'OrgFleet', 'OrgOperations', 'OrgTasks', 'OrgWarehouse']);
 
 function localTodayIso() {
   const now = new Date();
@@ -195,6 +196,10 @@ export default function OrganizationHomeScreen() {
     }
     if (route === 'OrgProjects') {
       navigateToOrgProjects(navigation, { orgId: org?.id });
+      return;
+    }
+    if (route === 'OrgWarehouse') {
+      navigateToOrgWarehouse(navigation, { orgId: org?.id });
       return;
     }
     if (route === 'OrgOverview') {

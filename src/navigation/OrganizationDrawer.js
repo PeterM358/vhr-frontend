@@ -17,6 +17,7 @@ import OrgOperationsScreen from '../screens/OrgOperationsScreen';
 import OrgTasksScreen from '../screens/OrgTasksScreen';
 import OrgCreateTaskScreen from '../screens/OrgCreateTaskScreen';
 import OrgProjectsScreen from '../screens/OrgProjectsScreen';
+import OrgWarehouseScreen from '../screens/OrgWarehouseScreen';
 import OrgCalendarScreen from '../screens/OrgCalendarScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
 
@@ -44,6 +45,7 @@ import {
   navigateToOrgOperations,
   navigateToOrgProjects,
   navigateToOrgTasks,
+  navigateToOrgWarehouse,
   navigateToOrgWorkforce,
   navigateToPartnerDashboard,
   navigateToPartnerSwitchCenter,
@@ -130,6 +132,10 @@ function CustomDrawerContent(props) {
     }
     if (route === 'OrgCalendar') {
       navigateToOrgCalendar(navigation, { orgId: org?.id });
+      return;
+    }
+    if (route === 'OrgWarehouse') {
+      navigateToOrgWarehouse(navigation, { orgId: org?.id });
       return;
     }
     if (Platform.OS === 'web') {
@@ -343,6 +349,7 @@ export default function OrganizationDrawer() {
         options={{ drawerItemStyle: { display: 'none' } }}
       />
       <Drawer.Screen name="OrgProjects" component={OrgProjectsScreen} />
+      <Drawer.Screen name="OrgWarehouse" component={OrgWarehouseScreen} />
       <Drawer.Screen name="OrgCalendar" component={OrgCalendarScreen} />
       <Drawer.Screen name="OrgWorkforce" component={OrgWorkforceScreen} />
       <Drawer.Screen name="OrgNetwork" component={NetworkOrganizationScreen} />

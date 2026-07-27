@@ -342,7 +342,53 @@
         "workshop_service": "Workshop service",
         "other": "Other"
       },
-      "defaultUnitPlaceholder": "m², km, L, hours…"
+      "defaultUnitPlaceholder": "m², km, L, hours…",
+      "plannedHours": "Planned / norm hours",
+      "wizard": {
+        "stepBasics": "Basics",
+        "stepBasicsHint": "Name the operation and choose its kind.",
+        "stepOutput": "Output & time",
+        "stepOutputHint": "Primary unit and planned hours (norm time for training later).",
+        "stepNorms": "Norms",
+        "stepNormsHint": "Optional rates — fuel burn, paint per m², or labor hours.",
+        "stepMaterials": "Materials",
+        "stepMaterialsHint": "Does this operation consume warehouse materials? Lines are added on the task later.",
+        "stepReview": "Review",
+        "stepReviewHint": "Check everything, then save.",
+        "outputUnitHelper": "What the worker reports as output (km, m², hours, loads…).",
+        "plannedHoursHelper": "Used later to see who is on norm and who needs training.",
+        "laborNoMaterials": "Labor-only operations do not consume warehouse materials.",
+        "materialsLinesLater": "Material lines are issued on the task from a warehouse location — not on this form.",
+        "none": "None",
+        "yes": "Yes",
+        "no": "No"
+      }
+    },
+    "warehouse": {
+      "title": "Warehouse",
+      "lead": "Define bins and yard addresses for materials. Issue and confirm on tasks comes next.",
+      "allLocations": "All locations",
+      "addLocation": "Add location",
+      "editLocation": "Edit location",
+      "locationsTitle": "Locations",
+      "count": "{active} active of {total}",
+      "empty": "No locations yet. Add paint rooms, fuel tanks, or yard bins.",
+      "nextSliceNote": "Next: warehouse users issue materials from a location; receivers confirm; workers fill only km / hours / m².",
+      "name": "Name",
+      "code": "Code (optional)",
+      "address": "Address / zone",
+      "description": "Description",
+      "qrCode": "QR / scan code (later)",
+      "qrHelper": "Optional stub for future labels. Scanning is not available yet.",
+      "active": "Active",
+      "inactive": "Inactive",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "created": "Location created.",
+      "updated": "Location updated.",
+      "nameRequired": "Name is required.",
+      "loadError": "Could not load warehouse.",
+      "saveError": "Could not save location."
     },
     "tasks": {
       "listTitle": "Tasks",
@@ -947,7 +993,7 @@
       },
       "inventory": {
         "title": "Inventory",
-        "subtitle": "Parts, warehouse stock and receiving workflows"
+        "subtitle": "Materials, warehouse stock and receiving workflows"
       },
       "reports": {
         "title": "Reports",
@@ -1198,18 +1244,18 @@
       "addDocument": "Add document",
       "documents": "Documents",
       "stock": "Stock",
-      "noPartsTitle": "No parts yet",
-      "noPartsSubtitle": "Upload a supplier invoice above or tap Add part.",
+      "noPartsTitle": "No materials yet",
+      "noPartsSubtitle": "Upload a supplier invoice above or tap Add material.",
       "noDocumentsTitle": "No documents yet",
       "noDocumentsSubtitle": "Complete a receiving draft to see it here.",
       "inventoryEmptyTitle": "Nothing in inventory",
-      "inventoryEmptySubtitle": "Parts appear here after you complete a receiving document. Turn on “Show 0-qty catalog” to see parts added but never stocked.",
+      "inventoryEmptySubtitle": "Materials appear here after you complete a receiving document. Turn on “Show 0-qty catalog” to see materials added but never stocked.",
       "noMovementsTitle": "No movements",
       "stockTab": "Inventory",
       "movementsTab": "Movements",
       "sortName": "Name",
       "sortQty": "Qty",
-      "sortPartNumber": "Part #",
+      "sortPartNumber": "Material #",
       "sortBrand": "Brand"
     },
     "marketComparison": {
