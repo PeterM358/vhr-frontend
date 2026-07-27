@@ -3,7 +3,7 @@
  * Confirm writes SKU + quantity_on_hand; drafts are deletable; confirmed invoices stay.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Button, TextInput } from 'react-native-paper';
@@ -30,8 +30,13 @@ import { confirmMessage } from '../../utils/crossPlatformAlert';
 import { STORAGE_KEYS } from '../../constants/storageKeys';
 import { useTranslation } from '../../i18n';
 
+/** Text on light AppCard / FloatingCard surfaces. */
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
+/** Text on dark org ScreenBackground chrome (outside cards). */
+const ON_CHROME = 'rgba(255,255,255,0.92)';
+const ON_CHROME_MUTED = 'rgba(255,255,255,0.72)';
+const ON_CHROME_SOFT = 'rgba(255,255,255,0.62)';
 
 /** Match warehouse / ops unit vocabulary (materials.UnitOfMeasure codes). */
 export const MATERIAL_UNIT_OPTIONS = [
@@ -287,6 +292,7 @@ export default function OrgMaterialsIntakePanel({
   const [showStandalone, setShowStandalone] = useState(false);
   const [supplierDraft, setSupplierDraft] = useState('');
   const [editingMaterial, setEditingMaterial] = useState(null);
+  const [materialQuery, setMaterialQuery] = useState('');
 
   const load = useCallback(async () => {
     if (!organizationId) return;
@@ -296,7 +302,7 @@ export default function OrgMaterialsIntakePanel({
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const [intakeData, matData] = await Promise.all([
         listMaterialsIntakes(token, organizationId),
-        listOrgMaterials(token, organizationId),
+        listOrgMaterials(token, organizationId, { limit: 500 }),
       ]);
       setIntakes(Array.isArray(intakeData?.results) ? intakeData.results : []);
       setMaterials(Array.isArray(matData?.results) ? matData.results : []);
@@ -316,6 +322,32 @@ export default function OrgMaterialsIntakePanel({
   useEffect(() => {
     setSupplierDraft(activeIntake?.supplier_name || '');
   }, [activeIntake?.id, activeIntake?.supplier_name]);
+
+  useEffect(() => {
+    if (section !== 'materials') {
+      setMaterialQuery('');
+      setShowStandalone(false);
+      setEditingMaterial(null);
+    }
+  }, [section]);
+
+  const filteredMaterials = useMemo(() => {
+    const q = materialQuery.trim().toLowerCase();
+    if (!q) return materials;
+    return materials.filter((row) => {
+      const haystack = [
+        row.name,
+        row.part_number,
+        row.org_sku,
+        row.description,
+        row.brand,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [materials, materialQuery]);
 
   const onUpload = async () => {
     if (!canManage || !organizationId) return;
@@ -637,7 +669,7 @@ export default function OrgMaterialsIntakePanel({
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color="#fff" />
       </View>
     );
   }
@@ -645,11 +677,12 @@ export default function OrgMaterialsIntakePanel({
   const vatBlocked = activeIntake?.buyer_vat_matches_organization === false;
   const isDocuments = section === 'documents';
   const isMaterials = section === 'materials';
+  const hasSearch = materialQuery.trim().length > 0;
 
   return (
     <View style={styles.wrap}>
       {isDocuments ? (
-        <Text style={styles.lead}>
+        <Text style={styles.chromeLead}>
           {t(
             'org.warehouse.intake.documentsLead',
             null,
@@ -657,7 +690,7 @@ export default function OrgMaterialsIntakePanel({
           )}
         </Text>
       ) : (
-        <Text style={styles.lead}>
+        <Text style={styles.chromeLead}>
           {t(
             'org.warehouse.intake.materialsLead',
             null,
@@ -709,7 +742,7 @@ export default function OrgMaterialsIntakePanel({
 
       {isMaterials && canManage ? (
         <Button
-          mode="outlined"
+          mode="contained"
           onPress={() => {
             setShowStandalone((v) => !v);
             setConfirmSummary(null);
@@ -938,7 +971,7 @@ export default function OrgMaterialsIntakePanel({
 
       {isDocuments && intakes.length > 0 ? (
         <>
-          <Text style={styles.sectionTitle}>
+          <Text style={styles.chromeSectionTitle}>
             {t('org.warehouse.intake.history', null, 'Recent imports')}
           </Text>
           {intakes.slice(0, 12).map((row) => (
@@ -978,11 +1011,45 @@ export default function OrgMaterialsIntakePanel({
         </>
       ) : null}
 
+      {isDocuments && intakes.length === 0 && !activeIntake ? (
+        <EmptyStateCard
+          title={t('org.warehouse.intake.docsEmptyTitle', null, 'No imports yet')}
+          subtitle={t(
+            'org.warehouse.intake.docsEmpty',
+            null,
+            'Import a supplier invoice PDF to review lines and add stock.',
+          )}
+          icon="file-document-outline"
+        />
+      ) : null}
+
       {isMaterials ? (
         <>
-          <Text style={styles.sectionTitle}>
+          <Text style={styles.chromeSectionTitle}>
             {t('org.warehouse.intake.stockTitle', null, 'Warehouse materials')}
           </Text>
+          {materials.length > 0 ? (
+            <TextInput
+              label={t(
+                'org.warehouse.intake.searchMaterials',
+                null,
+                'Search by name or material # / SKU',
+              )}
+              value={materialQuery}
+              onChangeText={setMaterialQuery}
+              mode="outlined"
+              style={styles.searchInput}
+              textColor={ON_CARD}
+              dense
+              right={
+                materialQuery ? (
+                  <TextInput.Icon icon="close" onPress={() => setMaterialQuery('')} />
+                ) : (
+                  <TextInput.Icon icon="magnify" />
+                )
+              }
+            />
+          ) : null}
           {editingMaterial ? (
             <AppCard style={styles.card}>
               <Text style={styles.cardTitle}>
@@ -1030,35 +1097,64 @@ export default function OrgMaterialsIntakePanel({
               )}
               icon="package-variant-closed"
             />
+          ) : filteredMaterials.length === 0 ? (
+            <EmptyStateCard
+              title={t('org.warehouse.intake.searchEmptyTitle', null, 'No matching materials')}
+              subtitle={t(
+                'org.warehouse.intake.searchEmpty',
+                { query: materialQuery.trim() },
+                `Nothing matched “${materialQuery.trim()}”. Try another name or SKU.`,
+              )}
+              icon="magnify"
+            />
           ) : (
-            materials.map((row) => (
-              <Pressable
-                key={row.stock_id || row.id}
-                onPress={() => {
-                  if (!canManage) return;
-                  setEditingMaterial({
-                    stock_id: row.stock_id,
-                    name: row.name || '',
-                    part_number: row.part_number || '',
-                    description: row.description || row.name || '',
-                    quantity_on_hand: row.quantity_on_hand,
-                    unit_code: row.unit_code,
-                  });
-                }}
-              >
-                <AppCard style={styles.card}>
-                  <Text style={styles.lineName}>{row.name}</Text>
-                  <Text style={styles.lineMeta}>
-                    {row.part_number ? `${row.part_number} · ` : ''}
-                    {t('org.warehouse.intake.onHand', null, 'On hand')}: {row.quantity_on_hand}
-                    {row.unit_code ? ` ${unitDisplay(row.unit_code, t)}` : ''}
-                    {canManage
-                      ? ` · ${t('org.warehouse.intake.tapToEdit', null, 'Tap to edit')}`
-                      : ''}
-                  </Text>
-                </AppCard>
-              </Pressable>
-            ))
+            <>
+              {hasSearch ? (
+                <Text style={styles.chromeMeta}>
+                  {t(
+                    'org.warehouse.intake.searchCount',
+                    { shown: filteredMaterials.length, total: materials.length },
+                    `${filteredMaterials.length} of ${materials.length}`,
+                  )}
+                </Text>
+              ) : (
+                <Text style={styles.chromeMeta}>
+                  {t(
+                    'org.warehouse.intake.stockCount',
+                    { count: materials.length },
+                    `${materials.length} material(s)`,
+                  )}
+                </Text>
+              )}
+              {filteredMaterials.map((row) => (
+                <Pressable
+                  key={row.stock_id || row.id}
+                  onPress={() => {
+                    if (!canManage) return;
+                    setEditingMaterial({
+                      stock_id: row.stock_id,
+                      name: row.name || '',
+                      part_number: row.part_number || '',
+                      description: row.description || row.name || '',
+                      quantity_on_hand: row.quantity_on_hand,
+                      unit_code: row.unit_code,
+                    });
+                  }}
+                >
+                  <AppCard style={styles.card}>
+                    <Text style={styles.lineName}>{row.name}</Text>
+                    <Text style={styles.lineMeta}>
+                      {row.part_number ? `${row.part_number} · ` : ''}
+                      {t('org.warehouse.intake.onHand', null, 'On hand')}: {row.quantity_on_hand}
+                      {row.unit_code ? ` ${unitDisplay(row.unit_code, t)}` : ''}
+                      {canManage
+                        ? ` · ${t('org.warehouse.intake.tapToEdit', null, 'Tap to edit')}`
+                        : ''}
+                    </Text>
+                  </AppCard>
+                </Pressable>
+              ))}
+            </>
           )}
         </>
       ) : null}
@@ -1069,7 +1165,9 @@ export default function OrgMaterialsIntakePanel({
 const styles = StyleSheet.create({
   wrap: { gap: 12 },
   center: { paddingVertical: 40, alignItems: 'center' },
-  lead: { color: ON_CARD_MUTED, fontSize: 14, lineHeight: 20 },
+  chromeLead: { color: ON_CHROME_MUTED, fontSize: 14, lineHeight: 20 },
+  chromeSectionTitle: { color: ON_CHROME, fontSize: 15, fontWeight: '700', marginTop: 4 },
+  chromeMeta: { color: ON_CHROME_SOFT, fontSize: 12, marginTop: -4 },
   primaryBtn: { marginTop: 4 },
   secondaryBtn: { marginBottom: 8, marginTop: 8 },
   deleteOutlined: {
@@ -1078,8 +1176,8 @@ const styles = StyleSheet.create({
     borderColor: '#B91C1C',
   },
   vatWarn: { color: '#B91C1C' },
-  error: { color: '#B91C1C', fontSize: 13 },
-  message: { color: '#15803d', fontSize: 13 },
+  error: { color: '#FCA5A5', fontSize: 13 },
+  message: { color: '#86EFAC', fontSize: 13 },
   card: { padding: 14, gap: 6 },
   summaryCard: { borderLeftWidth: 4, borderLeftColor: '#15803d' },
   cardTitle: { color: ON_CARD, fontSize: 16, fontWeight: '600' },
@@ -1090,8 +1188,8 @@ const styles = StyleSheet.create({
   lineMeta: { color: ON_CARD_MUTED, fontSize: 12, marginTop: 2 },
   manualBox: { marginTop: 12, gap: 4 },
   sectionLabel: { color: ON_CARD, fontWeight: '600', marginBottom: 4, marginTop: 4 },
-  sectionTitle: { color: ON_CARD, fontSize: 15, fontWeight: '600', marginTop: 8 },
   input: { backgroundColor: '#fff', marginBottom: 6 },
+  searchInput: { backgroundColor: '#fff', marginBottom: 4 },
   row2: { flexDirection: 'row', gap: 8 },
   flex1: { flex: 1 },
   unitRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },

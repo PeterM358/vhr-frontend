@@ -28,11 +28,14 @@ const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
 const CARD_SURFACE = { color: ON_CARD };
 
-const MODES = [
-  { id: 'documents', labelKey: 'org.warehouse.tabDocuments' },
-  { id: 'materials', labelKey: 'org.warehouse.tabMaterials' },
-  { id: 'list', labelKey: 'org.warehouse.tabLocations' },
-  { id: 'add', labelKey: 'org.warehouse.addLocation' },
+const PRIMARY_MODES = [
+  { id: 'documents', labelKey: 'org.warehouse.tabDocuments', fallback: 'Documents' },
+  { id: 'materials', labelKey: 'org.warehouse.tabMaterials', fallback: 'Materials' },
+];
+
+const SECONDARY_MODES = [
+  { id: 'list', labelKey: 'org.warehouse.tabLocations', fallback: 'Locations' },
+  { id: 'add', labelKey: 'org.warehouse.addLocation', fallback: 'Add location' },
 ];
 
 function emptyForm() {
@@ -210,7 +213,23 @@ export default function OrgWarehouseScreen({ navigation, route }) {
         </Text>
 
         <View style={styles.modeRow}>
-          {MODES.map((item) => {
+          {PRIMARY_MODES.map((item) => {
+            const active = mode === item.id;
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => setMode(item.id)}
+                style={[styles.modeChip, styles.modeChipPrimary, active && styles.modeChipActive]}
+              >
+                <Text style={[styles.modeChipText, styles.modeChipTextPrimary, active && styles.modeChipTextActive]}>
+                  {t(item.labelKey, null, item.fallback)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <View style={styles.modeRowSecondary}>
+          {SECONDARY_MODES.map((item) => {
             const active = mode === item.id;
             const disabled = item.id === 'add' && !canManage;
             return (
@@ -218,20 +237,21 @@ export default function OrgWarehouseScreen({ navigation, route }) {
                 key={item.id}
                 disabled={disabled}
                 onPress={() => (item.id === 'add' ? startCreate() : setMode(item.id))}
-                style={[styles.modeChip, active && styles.modeChipActive, disabled && styles.modeChipDisabled]}
+                style={[
+                  styles.modeChip,
+                  styles.modeChipSecondary,
+                  active && styles.modeChipActive,
+                  disabled && styles.modeChipDisabled,
+                ]}
               >
-                <Text style={[styles.modeChipText, active && styles.modeChipTextActive]}>
-                  {t(
-                    item.labelKey,
-                    null,
-                    item.id === 'documents'
-                      ? 'Documents'
-                      : item.id === 'materials'
-                        ? 'Materials'
-                        : item.id === 'list'
-                          ? 'Locations'
-                          : 'Add location',
-                  )}
+                <Text
+                  style={[
+                    styles.modeChipText,
+                    styles.modeChipTextSecondary,
+                    active && styles.modeChipTextActive,
+                  ]}
+                >
+                  {t(item.labelKey, null, item.fallback)}
                 </Text>
               </Pressable>
             );
@@ -431,15 +451,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 8,
+  },
+  modeRowSecondary: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
   },
   modeChip: {
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
     backgroundColor: 'rgba(255,255,255,0.16)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.22)',
+  },
+  modeChipPrimary: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    minWidth: 110,
+    alignItems: 'center',
+  },
+  modeChipSecondary: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   modeChipActive: {
     backgroundColor: '#fff',
@@ -449,9 +483,15 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   modeChipText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 13,
+    color: 'rgba(255,255,255,0.92)',
     fontWeight: '600',
+  },
+  modeChipTextPrimary: {
+    fontSize: 15,
+  },
+  modeChipTextSecondary: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.78)',
   },
   modeChipTextActive: {
     color: COLORS.TEXT_DARK,
