@@ -13,6 +13,7 @@ import {
   listWarehouseLocations,
   updateWarehouseLocation,
 } from '../api/orgWarehouse';
+import OrgMaterialsIntakePanel from '../components/org/OrgMaterialsIntakePanel';
 import {
   readOrganizationMemberships,
   resolveActiveOrganizationId,
@@ -28,7 +29,8 @@ const ON_CARD_MUTED = '#475569';
 const CARD_SURFACE = { color: ON_CARD };
 
 const MODES = [
-  { id: 'list', labelKey: 'org.warehouse.allLocations' },
+  { id: 'materials', labelKey: 'org.warehouse.tabMaterials' },
+  { id: 'list', labelKey: 'org.warehouse.tabLocations' },
   { id: 'add', labelKey: 'org.warehouse.addLocation' },
 ];
 
@@ -73,7 +75,7 @@ export default function OrgWarehouseScreen({ navigation, route }) {
   const [error, setError] = useState('');
   const [canManage, setCanManage] = useState(false);
   const [rows, setRows] = useState([]);
-  const [mode, setMode] = useState('list');
+  const [mode, setMode] = useState('materials');
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [busy, setBusy] = useState(false);
@@ -202,7 +204,7 @@ export default function OrgWarehouseScreen({ navigation, route }) {
           {t(
             'org.warehouse.lead',
             null,
-            'Define bins and yard addresses for materials. Issue and confirm on tasks comes next.',
+            'Import supplier invoices to stock materials, then define bins and yard addresses for issue.',
           )}
         </Text>
 
@@ -214,18 +216,38 @@ export default function OrgWarehouseScreen({ navigation, route }) {
               <Pressable
                 key={item.id}
                 disabled={disabled}
-                onPress={() => (item.id === 'add' ? startCreate() : setMode('list'))}
+                onPress={() => (item.id === 'add' ? startCreate() : setMode(item.id))}
                 style={[styles.modeChip, active && styles.modeChipActive, disabled && styles.modeChipDisabled]}
               >
                 <Text style={[styles.modeChipText, active && styles.modeChipTextActive]}>
-                  {t(item.labelKey, null, item.id)}
+                  {t(
+                    item.labelKey,
+                    null,
+                    item.id === 'materials'
+                      ? 'Materials'
+                      : item.id === 'list'
+                        ? 'Locations'
+                        : 'Add location',
+                  )}
                 </Text>
               </Pressable>
             );
           })}
         </View>
 
-        {loading ? (
+        {mode === 'materials' ? (
+          orgId ? (
+            <OrgMaterialsIntakePanel organizationId={orgId} canManage={canManage} />
+          ) : loading ? (
+            <ActivityIndicator color="#fff" style={styles.loader} />
+          ) : (
+            <AppCard style={styles.card} contentStyle={CARD_SURFACE}>
+              <Text style={styles.error}>
+                {error || t('org.warehouse.loadError', null, 'Could not load warehouse.')}
+              </Text>
+            </AppCard>
+          )
+        ) : loading ? (
           <ActivityIndicator color="#fff" style={styles.loader} />
         ) : error ? (
           <AppCard style={styles.card} contentStyle={CARD_SURFACE}>

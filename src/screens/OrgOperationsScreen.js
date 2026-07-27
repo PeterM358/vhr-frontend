@@ -22,12 +22,13 @@ import {
   listUnitsOfMeasure,
   updateActivityDefinition,
 } from '../api/orgOperations';
+import { listOrgMaterials } from '../api/orgWarehouse';
 import { getMaterialsCatalog } from '../api/materials';
 import {
   readOrganizationMemberships,
   resolveActiveOrganizationId,
 } from '../utils/orgWorkspace';
-import { navigateToOrgHome } from '../navigation/webNavigation';
+import { navigateToOrgHome, navigateToOrgWarehouse } from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
@@ -411,6 +412,15 @@ export default function OrgOperationsScreen({ navigation, route }) {
   const searchMaterials = useCallback(async (query) => {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const resolved = orgId || (await resolveActiveOrganizationId(routeOrgId));
+      if (resolved) {
+        const params = {};
+        if (query && String(query).trim()) params.search = String(query).trim();
+        const data = await listOrgMaterials(token, resolved, params);
+        const list = Array.isArray(data?.results) ? data.results : [];
+        setMaterialCatalog(list.slice(0, 40));
+        return;
+      }
       const params = {};
       if (query && String(query).trim()) params.search = String(query).trim();
       const data = await getMaterialsCatalog(token, params);
@@ -419,7 +429,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
     } catch {
       setMaterialCatalog([]);
     }
-  }, []);
+  }, [orgId, routeOrgId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -943,7 +953,21 @@ export default function OrgOperationsScreen({ navigation, route }) {
                   );
                 })}
               </View>
-              {selectedIds.length === 0 ? (
+              {catalogRows.length === 0 ? (
+                <Text style={styles.helper}>
+                  {t(
+                    'org.operations.materialsEmptyImport',
+                    null,
+                    'Import an invoice to add materials.',
+                  )}{' '}
+                  <Text
+                    style={styles.linkInline}
+                    onPress={() => navigateToOrgWarehouse(navigation, { orgId })}
+                  >
+                    {t('org.operations.openWarehouse', null, 'Open warehouse')}
+                  </Text>
+                </Text>
+              ) : selectedIds.length === 0 ? (
                 <Text style={styles.helper}>
                   {t(
                     'org.operations.noMaterialsSelected',
@@ -1515,5 +1539,10 @@ const styles = StyleSheet.create({
   reviewKey: {
     color: ON_CARD_MUTED,
     fontWeight: '700',
+  },
+  linkInline: {
+    color: COLORS.PRIMARY,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });
