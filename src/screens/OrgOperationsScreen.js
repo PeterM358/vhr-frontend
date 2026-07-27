@@ -49,6 +49,179 @@ function unitLabel(unit) {
   return unit.symbol || unit.name || unit.code || '';
 }
 
+function emptyFormState() {
+  return {
+    name: '',
+    code: '',
+    kind: 'transport',
+    unitId: null,
+    notes: '',
+    isActive: true,
+    plannedHours: '',
+    consumesMaterials: false,
+    materialUnitId: null,
+    // transport norms
+    transportBaseRate: '',
+    transportPerTonRate: '',
+    transportRateUnitId: null,
+    // labor
+    laborPresetHours: '',
+    // generic / material-consuming
+    normRate: '',
+    normBasisQty: '1',
+    normInputUnitId: null,
+  };
+}
+
+function hydrateFromRow(row) {
+  const norms = row?.norms && typeof row.norms === 'object' ? row.norms : {};
+  const transport = norms.transport || {};
+  const labor = norms.labor || {};
+  const materials = norms.materials || {};
+  const generic = norms.generic || {};
+  return {
+    name: row.name || '',
+    code: row.code || '',
+    kind: row.activity_kind || 'other',
+    unitId: row.unit_id || row.unit?.id || null,
+    notes: row.notes || '',
+    isActive: row.is_active !== false,
+    plannedHours: row.planned_hours != null ? String(row.planned_hours) : '',
+    consumesMaterials: Boolean(
+      row.consumes_materials ?? materials.consumes_materials,
+    ),
+    materialUnitId:
+      materials.default_material_unit_id ||
+      row.norm_input_unit_id ||
+      row.norm_input_unit?.id ||
+      null,
+    transportBaseRate:
+      transport.base_rate != null
+        ? String(transport.base_rate)
+        : row.norm_rate != null && row.activity_kind === 'transport'
+          ? String(row.norm_rate)
+          : '',
+    transportPerTonRate:
+      transport.per_ton_rate != null ? String(transport.per_ton_rate) : '',
+    transportRateUnitId:
+      transport.rate_unit_id ||
+      (row.activity_kind === 'transport'
+        ? row.norm_input_unit_id || row.norm_input_unit?.id || null
+        : null),
+    laborPresetHours:
+      labor.preset_hours != null
+        ? String(labor.preset_hours)
+        : row.planned_hours != null && row.activity_kind === 'labor_only'
+          ? String(row.planned_hours)
+          : '',
+    normRate:
+      generic.rate != null
+        ? String(generic.rate)
+        : row.norm_rate != null && row.activity_kind !== 'transport'
+          ? String(row.norm_rate)
+          : '',
+    normBasisQty:
+      generic.basis_qty != null
+        ? String(generic.basis_qty)
+        : row.norm_basis_qty != null
+          ? String(row.norm_basis_qty)
+          : '1',
+    normInputUnitId:
+      generic.input_unit_id ||
+      (row.activity_kind !== 'transport'
+        ? row.norm_input_unit_id || row.norm_input_unit?.id || null
+        : null),
+  };
+}
+
+function buildNormsPayload(form) {
+  const norms = {};
+  if (form.kind === 'transport') {
+    if (form.transportBaseRate.trim() || form.transportPerTonRate.trim()) {
+      norms.transport = {
+        base_rate: form.transportBaseRate.trim() || null,
+        per_ton_rate: form.transportPerTonRate.trim() || null,
+        per_load_rate: null,
+        rate_unit_id: form.transportRateUnitId || null,
+        input_keys: ['km', 'tons'],
+      };
+    }
+  } else if (form.kind === 'labor_only') {
+    const hours = form.laborPresetHours.trim() || form.plannedHours.trim();
+    if (hours) {
+      norms.labor = { preset_hours: hours };
+    }
+  } else if (form.normRate.trim() || form.normInputUnitId) {
+    norms.generic = {
+      rate: form.normRate.trim() || null,
+      basis_qty: form.normBasisQty.trim() || null,
+      input_unit_id: form.normInputUnitId || null,
+      input_key: '',
+    };
+  }
+
+  if (form.kind !== 'labor_only') {
+    norms.materials = {
+      consumes_materials: Boolean(form.consumesMaterials),
+      default_material_unit_id: form.consumesMaterials
+        ? form.materialUnitId || form.normInputUnitId || null
+        : null,
+    };
+  }
+
+  if (form.kind === 'labor_only' && (form.laborPresetHours.trim() || form.plannedHours.trim())) {
+    // already set
+  } else if (form.plannedHours.trim() && !norms.labor) {
+    norms.labor = { preset_hours: form.plannedHours.trim() };
+  }
+
+  return norms;
+}
+
+function normSummaryText(row, t, kindLabel) {
+  const norms = row?.norms || {};
+  if (norms.transport?.base_rate != null) {
+    const perTon = norms.transport.per_ton_rate;
+    return t(
+      'org.operations.transportNormSummary',
+      {
+        base: norms.transport.base_rate,
+        perTon: perTon || '0',
+      },
+      perTon
+        ? `${norms.transport.base_rate} + ${perTon} / t`
+        : `${norms.transport.base_rate} base`,
+    );
+  }
+  if (norms.labor?.preset_hours != null) {
+    return t(
+      'org.operations.laborNormSummary',
+      { hours: norms.labor.preset_hours },
+      `${norms.labor.preset_hours} h`,
+    );
+  }
+  if (row.norm_rate != null) {
+    return t(
+      'org.operations.normSummary',
+      {
+        rate: row.norm_rate,
+        basis: row.norm_basis_qty || '1',
+        unit: unitLabel(row.unit) || '—',
+        input: unitLabel(row.norm_input_unit) || '—',
+      },
+      `${row.norm_rate} ${unitLabel(row.norm_input_unit) || ''} / ${row.norm_basis_qty || '1'} ${unitLabel(row.unit) || ''}`.trim(),
+    );
+  }
+  if (row.planned_hours != null) {
+    return t(
+      'org.operations.laborNormSummary',
+      { hours: row.planned_hours },
+      `${row.planned_hours} h`,
+    );
+  }
+  return kindLabel(row.activity_kind);
+}
+
 export default function OrgOperationsScreen({ navigation, route }) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
@@ -71,18 +244,13 @@ export default function OrgOperationsScreen({ navigation, route }) {
   const [units, setUnits] = useState([]);
   const [mode, setMode] = useState('list');
   const [editingId, setEditingId] = useState(null);
-
-  const [name, setName] = useState('');
-  const [code, setCode] = useState('');
-  const [kind, setKind] = useState('transport');
-  const [unitId, setUnitId] = useState(null);
-  const [normInputUnitId, setNormInputUnitId] = useState(null);
-  const [notes, setNotes] = useState('');
-  const [normRate, setNormRate] = useState('');
-  const [normBasisQty, setNormBasisQty] = useState('1');
-  const [isActive, setIsActive] = useState(true);
+  const [form, setForm] = useState(emptyFormState);
   const [busy, setBusy] = useState(false);
   const [formMessage, setFormMessage] = useState('');
+
+  const setField = useCallback((key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,15 +294,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
 
   const resetForm = () => {
     setEditingId(null);
-    setName('');
-    setCode('');
-    setKind('transport');
-    setUnitId(null);
-    setNormInputUnitId(null);
-    setNotes('');
-    setNormRate('');
-    setNormBasisQty('1');
-    setIsActive(true);
+    setForm(emptyFormState());
     setFormMessage('');
   };
 
@@ -145,22 +305,14 @@ export default function OrgOperationsScreen({ navigation, route }) {
 
   const startEdit = (row) => {
     setEditingId(row.id);
-    setName(row.name || '');
-    setCode(row.code || '');
-    setKind(row.activity_kind || 'other');
-    setUnitId(row.unit_id || row.unit?.id || null);
-    setNormInputUnitId(row.norm_input_unit_id || row.norm_input_unit?.id || null);
-    setNotes(row.notes || '');
-    setNormRate(row.norm_rate != null ? String(row.norm_rate) : '');
-    setNormBasisQty(row.norm_basis_qty != null ? String(row.norm_basis_qty) : '1');
-    setIsActive(row.is_active !== false);
+    setForm(hydrateFromRow(row));
     setFormMessage('');
     setMode('add');
   };
 
   const save = async () => {
     if (!orgId || !canManage) return;
-    const trimmedName = name.trim();
+    const trimmedName = form.name.trim();
     if (!trimmedName) {
       setFormMessage(t('org.operations.nameRequired', null, 'Name is required.'));
       return;
@@ -169,17 +321,33 @@ export default function OrgOperationsScreen({ navigation, route }) {
     setFormMessage('');
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const norms = buildNormsPayload(form);
       const payload = {
         name: trimmedName,
-        activity_kind: kind,
-        unit_id: unitId || null,
-        notes: notes.trim(),
-        norm_rate: normRate.trim() || null,
-        norm_basis_qty: normBasisQty.trim() || null,
-        norm_input_unit_id: normInputUnitId || null,
-        is_active: isActive,
+        // Always send optional fields so Edit can clear them (null / empty).
+        code: form.code.trim(),
+        activity_kind: form.kind,
+        unit_id: form.unitId || null,
+        notes: form.notes.trim(),
+        planned_hours: form.plannedHours.trim() || form.laborPresetHours.trim() || null,
+        consumes_materials: form.kind === 'labor_only' ? false : Boolean(form.consumesMaterials),
+        norms,
+        is_active: form.isActive,
       };
-      if (code.trim()) payload.code = code.trim();
+      if (form.kind === 'transport') {
+        payload.norm_rate = form.transportBaseRate.trim() || null;
+        payload.norm_basis_qty = form.transportBaseRate.trim() ? '1' : null;
+        payload.norm_input_unit_id = form.transportRateUnitId || null;
+      } else if (form.kind !== 'labor_only') {
+        payload.norm_rate = form.normRate.trim() || null;
+        payload.norm_basis_qty = form.normBasisQty.trim() || null;
+        payload.norm_input_unit_id = form.normInputUnitId || null;
+      } else {
+        payload.norm_rate = null;
+        payload.norm_basis_qty = null;
+        payload.norm_input_unit_id = null;
+      }
+
       if (editingId) {
         await updateActivityDefinition(token, orgId, editingId, payload);
         setFormMessage(t('org.operations.updated', null, 'Operation updated.'));
@@ -239,6 +407,105 @@ export default function OrgOperationsScreen({ navigation, route }) {
       })}
     </View>
   );
+
+  const renderNormsByKind = () => {
+    if (form.kind === 'transport') {
+      return (
+        <>
+          <Text style={styles.fieldLabel}>{t('org.operations.normsTitle', null, 'Norms (optional)')}</Text>
+          <Text style={styles.helper}>
+            {t(
+              'org.operations.transportNormsHelper',
+              null,
+              'Fuel burn: base rate plus extra per ton in the trailer (e.g. DAF 25 L + 0.4 L/t). Driver later fills km and load.',
+            )}
+          </Text>
+          <TextInput
+            label={t('org.operations.transportBaseRate', null, 'Base fuel rate')}
+            value={form.transportBaseRate}
+            onChangeText={(value) => setField('transportBaseRate', value)}
+            mode="outlined"
+            keyboardType="decimal-pad"
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+          <TextInput
+            label={t('org.operations.transportPerTonRate', null, 'Per ton rate')}
+            value={form.transportPerTonRate}
+            onChangeText={(value) => setField('transportPerTonRate', value)}
+            mode="outlined"
+            keyboardType="decimal-pad"
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+          <Text style={styles.fieldLabel}>
+            {t('org.operations.transportRateUnit', null, 'Fuel unit')}
+          </Text>
+          {renderUnitChips(form.transportRateUnitId, (id) => setField('transportRateUnitId', id))}
+        </>
+      );
+    }
+    if (form.kind === 'labor_only') {
+      return (
+        <>
+          <Text style={styles.fieldLabel}>{t('org.operations.normsTitle', null, 'Norms (optional)')}</Text>
+          <Text style={styles.helper}>
+            {t(
+              'org.operations.laborNormsHelper',
+              null,
+              'Preset hours for this labor-only operation. Task lines can override later.',
+            )}
+          </Text>
+          <TextInput
+            label={t('org.operations.presetHours', null, 'Preset hours')}
+            value={form.laborPresetHours || form.plannedHours}
+            onChangeText={(value) => {
+              setField('laborPresetHours', value);
+              setField('plannedHours', value);
+            }}
+            mode="outlined"
+            keyboardType="decimal-pad"
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+        </>
+      );
+    }
+    return (
+      <>
+        <Text style={styles.fieldLabel}>{t('org.operations.normsTitle', null, 'Norms (optional)')}</Text>
+        <Text style={styles.helper}>
+          {t(
+            'org.operations.normsHelper',
+            null,
+            'How much input is consumed per basis quantity of the primary unit (e.g. 0.8 L paint per 1 m²).',
+          )}
+        </Text>
+        <TextInput
+          label={t('org.operations.normRate', null, 'Rate')}
+          value={form.normRate}
+          onChangeText={(value) => setField('normRate', value)}
+          mode="outlined"
+          keyboardType="decimal-pad"
+          style={styles.input}
+          textColor={ON_CARD}
+        />
+        <TextInput
+          label={t('org.operations.normBasisQty', null, 'Per (basis qty)')}
+          value={form.normBasisQty}
+          onChangeText={(value) => setField('normBasisQty', value)}
+          mode="outlined"
+          keyboardType="decimal-pad"
+          style={styles.input}
+          textColor={ON_CARD}
+        />
+        <Text style={styles.fieldLabel}>
+          {t('org.operations.normInputUnit', null, 'Consumed input unit')}
+        </Text>
+        {renderUnitChips(form.normInputUnitId, (id) => setField('normInputUnitId', id))}
+      </>
+    );
+  };
 
   return (
     <ScreenBackground safeArea={false}>
@@ -315,6 +582,11 @@ export default function OrgOperationsScreen({ navigation, route }) {
                     <Text style={styles.rowMeta}>
                       {row.code} · {kindLabel(row.activity_kind)}
                       {row.unit ? ` · ${unitLabel(row.unit)}` : ''}
+                      {row.consumes_materials
+                        ? ` · ${t('org.operations.consumesMaterialsShort', null, 'Materials')}`
+                        : row.activity_kind === 'labor_only'
+                          ? ` · ${t('org.operations.laborOnlyShort', null, 'Labor')}`
+                          : ''}
                       {row.is_active
                         ? ''
                         : ` · ${t('org.operations.inactive', null, 'Inactive')}`}
@@ -324,20 +596,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
                         {row.notes}
                       </Text>
                     ) : null}
-                    {row.norm_rate != null ? (
-                      <Text style={styles.rowMeta}>
-                        {t(
-                          'org.operations.normSummary',
-                          {
-                            rate: row.norm_rate,
-                            basis: row.norm_basis_qty || '1',
-                            unit: unitLabel(row.unit) || '—',
-                            input: unitLabel(row.norm_input_unit) || '—',
-                          },
-                          `${row.norm_rate} ${unitLabel(row.norm_input_unit) || ''} / ${row.norm_basis_qty || '1'} ${unitLabel(row.unit) || ''}`.trim(),
-                        )}
-                      </Text>
-                    ) : null}
+                    <Text style={styles.rowMeta}>{normSummaryText(row, t, kindLabel)}</Text>
                   </View>
                   {canManage ? (
                     <View style={styles.rowActions}>
@@ -371,16 +630,16 @@ export default function OrgOperationsScreen({ navigation, route }) {
             </Text>
             <TextInput
               label={t('org.operations.name', null, 'Name')}
-              value={name}
-              onChangeText={setName}
+              value={form.name}
+              onChangeText={(value) => setField('name', value)}
               mode="outlined"
               style={styles.input}
               textColor={ON_CARD}
             />
             <TextInput
               label={t('org.operations.code', null, 'Code (optional)')}
-              value={code}
-              onChangeText={setCode}
+              value={form.code}
+              onChangeText={(value) => setField('code', value)}
               mode="outlined"
               autoCapitalize="characters"
               style={styles.input}
@@ -389,11 +648,11 @@ export default function OrgOperationsScreen({ navigation, route }) {
             <Text style={styles.fieldLabel}>{t('org.operations.kind', null, 'Kind')}</Text>
             <View style={styles.kindWrap}>
               {KIND_OPTIONS.map((option) => {
-                const active = kind === option.value;
+                const active = form.kind === option.value;
                 return (
                   <Pressable
                     key={option.value}
-                    onPress={() => setKind(option.value)}
+                    onPress={() => setField('kind', option.value)}
                     style={[styles.kindChip, active && styles.kindChipActive]}
                   >
                     <Text style={[styles.kindChipText, active && styles.kindChipTextActive]}>
@@ -404,49 +663,55 @@ export default function OrgOperationsScreen({ navigation, route }) {
               })}
             </View>
             <Text style={styles.fieldLabel}>{t('org.operations.unit', null, 'Unit of measure')}</Text>
-            {renderUnitChips(unitId, setUnitId)}
+            {renderUnitChips(form.unitId, (id) => setField('unitId', id))}
             <TextInput
               label={t('org.operations.notes', null, 'Notes')}
-              value={notes}
-              onChangeText={setNotes}
+              value={form.notes}
+              onChangeText={(value) => setField('notes', value)}
               mode="outlined"
               multiline
               style={styles.input}
               textColor={ON_CARD}
             />
-            <Text style={styles.fieldLabel}>{t('org.operations.normsTitle', null, 'Norms (optional)')}</Text>
-            <Text style={styles.helper}>
-              {t(
-                'org.operations.normsHelper',
-                null,
-                'How much input is consumed per basis quantity of the primary unit (e.g. 0.8 L paint per 1 m²).',
-              )}
-            </Text>
-            <TextInput
-              label={t('org.operations.normRate', null, 'Rate')}
-              value={normRate}
-              onChangeText={setNormRate}
-              mode="outlined"
-              keyboardType="decimal-pad"
-              style={styles.input}
-              textColor={ON_CARD}
-            />
-            <TextInput
-              label={t('org.operations.normBasisQty', null, 'Per (basis qty)')}
-              value={normBasisQty}
-              onChangeText={setNormBasisQty}
-              mode="outlined"
-              keyboardType="decimal-pad"
-              style={styles.input}
-              textColor={ON_CARD}
-            />
-            <Text style={styles.fieldLabel}>
-              {t('org.operations.normInputUnit', null, 'Consumed input unit')}
-            </Text>
-            {renderUnitChips(normInputUnitId, setNormInputUnitId)}
+            {form.kind !== 'labor_only' ? (
+              <TextInput
+                label={t('org.operations.presetHours', null, 'Preset hours')}
+                value={form.plannedHours}
+                onChangeText={(value) => setField('plannedHours', value)}
+                mode="outlined"
+                keyboardType="decimal-pad"
+                style={styles.input}
+                textColor={ON_CARD}
+              />
+            ) : null}
+            {renderNormsByKind()}
+            {form.kind !== 'labor_only' ? (
+              <>
+                <View style={styles.switchRow}>
+                  <Text style={styles.switchLabel}>
+                    {t('org.operations.consumesMaterials', null, 'Consumes materials')}
+                  </Text>
+                  <Switch
+                    value={form.consumesMaterials}
+                    onValueChange={(value) => setField('consumesMaterials', value)}
+                  />
+                </View>
+                {form.consumesMaterials ? (
+                  <>
+                    <Text style={styles.fieldLabel}>
+                      {t('org.operations.materialUnit', null, 'Default material unit')}
+                    </Text>
+                    {renderUnitChips(form.materialUnitId, (id) => setField('materialUnitId', id))}
+                  </>
+                ) : null}
+              </>
+            ) : null}
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>{t('org.operations.active', null, 'Active')}</Text>
-              <Switch value={isActive} onValueChange={setIsActive} />
+              <Switch
+                value={form.isActive}
+                onValueChange={(value) => setField('isActive', value)}
+              />
             </View>
             {formMessage ? <Text style={styles.formMessage}>{formMessage}</Text> : null}
             <Button mode="contained" loading={busy} disabled={busy} onPress={save} style={styles.primaryBtn}>
@@ -605,7 +870,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 7,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#CBD5E1',
   },
@@ -631,6 +896,8 @@ const styles = StyleSheet.create({
     color: ON_CARD,
     fontSize: 14,
     fontWeight: '600',
+    flex: 1,
+    paddingRight: 12,
   },
   formMessage: {
     color: ON_CARD_MUTED,

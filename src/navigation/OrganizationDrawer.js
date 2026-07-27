@@ -14,6 +14,7 @@ import FleetDashboardScreen from '../screens/FleetDashboardScreen';
 import NetworkOrganizationScreen from '../screens/NetworkOrganizationScreen';
 import OrgWorkforceScreen from '../screens/OrgWorkforceScreen';
 import OrgOperationsScreen from '../screens/OrgOperationsScreen';
+import OrgTasksScreen from '../screens/OrgTasksScreen';
 import OrgCreateTaskScreen from '../screens/OrgCreateTaskScreen';
 import OrgCalendarScreen from '../screens/OrgCalendarScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
@@ -40,6 +41,7 @@ import {
   navigateToOrgFleet,
   navigateToOrgNetwork,
   navigateToOrgOperations,
+  navigateToOrgTasks,
   navigateToOrgWorkforce,
   navigateToPartnerDashboard,
   navigateToPartnerSwitchCenter,
@@ -116,6 +118,10 @@ function CustomDrawerContent(props) {
       navigateToOrgOperations(navigation, { orgId: org?.id });
       return;
     }
+    if (route === 'OrgTasks' || route === 'OrgWorkOrders') {
+      navigateToOrgTasks(navigation, { orgId: org?.id });
+      return;
+    }
     if (route === 'OrgCalendar') {
       navigateToOrgCalendar(navigation, { orgId: org?.id });
       return;
@@ -176,6 +182,17 @@ function CustomDrawerContent(props) {
             {...itemProps}
           />
         ))}
+
+        {!isDriver && (org?.manage_org_operations || org?.manage_fleet) ? (
+          <DrawerItem
+            label={t('org.nav.tasks', null, 'Tasks')}
+            onPress={() => openRoute('OrgTasks')}
+            icon={({ color, size }) => (
+              <DrawerMenuIcon name="clipboard-check-outline" color={color} size={size} />
+            )}
+            {...itemProps}
+          />
+        ) : null}
 
         <DrawerItem
           label={t('org.drawer.calendar', null, 'Calendar')}
@@ -291,6 +308,7 @@ export default function OrganizationDrawer() {
       <Drawer.Screen name="OrgOverview" component={OrganizationHomeScreen} />
       <Drawer.Screen name="OrgFleet" component={FleetDashboardScreen} />
       <Drawer.Screen name="OrgOperations" component={OrgOperationsScreen} />
+      <Drawer.Screen name="OrgTasks" component={OrgTasksScreen} />
       <Drawer.Screen
         name="OrgCreateTask"
         component={OrgCreateTaskScreen}

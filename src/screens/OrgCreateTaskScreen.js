@@ -14,7 +14,7 @@ import {
   readOrganizationMemberships,
   resolveActiveOrganizationId,
 } from '../utils/orgWorkspace';
-import { navigateToOrgHome } from '../navigation/webNavigation';
+import { navigateToOrgHome, navigateToOrgTasks } from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
@@ -54,13 +54,17 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [title, setTitle] = useState('');
   const [instructions, setInstructions] = useState('');
   const [scheduledDate, setScheduledDate] = useState(localTodayIso());
+  const [plannedStart, setPlannedStart] = useState('');
+  const [plannedEnd, setPlannedEnd] = useState('');
+  const [plannedHours, setPlannedHours] = useState('');
+  const [photoNote, setPhotoNote] = useState('');
   const [vehicleId, setVehicleId] = useState(null);
   const [overallAssignees, setOverallAssignees] = useState([]);
   const [selectedOps, setSelectedOps] = useState([]); // [{ activityId, notes, assigneeIds }]
   const [formMessage, setFormMessage] = useState('');
 
   const onBack = useCallback(() => {
-    navigateToOrgHome(navigation, { orgId: routeOrgId || orgId });
+    navigateToOrgTasks(navigation, { orgId: routeOrgId || orgId });
   }, [navigation, orgId, routeOrgId]);
 
   const load = useCallback(async () => {
@@ -156,6 +160,10 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         title: trimmed,
         instructions: instructions.trim(),
         scheduled_date: scheduledDate.trim() || null,
+        planned_start: plannedStart.trim() || null,
+        planned_end: plannedEnd.trim() || null,
+        planned_hours: plannedHours.trim() || null,
+        photo_refs: photoNote.trim() ? [photoNote.trim()] : [],
         vehicle_id: vehicleId || null,
         assignee_user_ids: overallAssignees,
         operations: selectedOps.map((row, idx) => ({
@@ -235,6 +243,42 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                 onChangeText={setScheduledDate}
                 mode="outlined"
                 autoCapitalize="none"
+                style={styles.input}
+                textColor={COLORS.TEXT_DARK}
+              />
+              <TextInput
+                label={t('org.tasks.plannedStart', null, 'Start time (HH:MM)')}
+                value={plannedStart}
+                onChangeText={setPlannedStart}
+                mode="outlined"
+                autoCapitalize="none"
+                placeholder="08:00"
+                style={styles.input}
+                textColor={COLORS.TEXT_DARK}
+              />
+              <TextInput
+                label={t('org.tasks.plannedEnd', null, 'End time (HH:MM, optional)')}
+                value={plannedEnd}
+                onChangeText={setPlannedEnd}
+                mode="outlined"
+                autoCapitalize="none"
+                style={styles.input}
+                textColor={COLORS.TEXT_DARK}
+              />
+              <TextInput
+                label={t('org.tasks.plannedHours', null, 'Preset hours (optional)')}
+                value={plannedHours}
+                onChangeText={setPlannedHours}
+                mode="outlined"
+                keyboardType="decimal-pad"
+                style={styles.input}
+                textColor={COLORS.TEXT_DARK}
+              />
+              <TextInput
+                label={t('org.tasks.photosStub', null, 'Photo note / link (optional)')}
+                value={photoNote}
+                onChangeText={setPhotoNote}
+                mode="outlined"
                 style={styles.input}
                 textColor={COLORS.TEXT_DARK}
               />

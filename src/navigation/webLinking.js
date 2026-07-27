@@ -51,6 +51,9 @@ import {
   partnerComplaints,
   partnerOrganizationWorkforce,
   partnerOrganizationWorkforceMember,
+  partnerOrganizationTasks,
+  partnerOrganizationCreateTask,
+  partnerOrganizationOperations,
   profile,
   repairRequests,
   repairRequestNew,
@@ -958,6 +961,30 @@ export function getPartnerNavigationStateFromPath(path) {
             routes: [
               { name: 'OrgOverview' },
               { name: 'OrgOperations', params: Object.keys(params).length ? params : undefined },
+            ],
+          },
+        },
+      ],
+      index: 0,
+    };
+  }
+  if (pathPart === 'partner/organization/tasks' || pathPart === 'partner/organization/tasks/') {
+    const params = {};
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) {
+      params.organizationId = organizationId;
+    }
+    const taskId = query.get('taskId');
+    if (taskId) params.taskId = taskId;
+    return {
+      routes: [
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [
+              { name: 'OrgOverview' },
+              { name: 'OrgTasks', params: Object.keys(params).length ? params : undefined },
             ],
           },
         },

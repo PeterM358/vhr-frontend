@@ -14,7 +14,7 @@ import DashboardCard from '../components/dashboard/DashboardCard';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
 import { listOrgFleet } from '../api/fleet';
-import { listWorkOrders } from '../api/orgOperations';
+import { listWorkOrders, startWorkOrder } from '../api/orgOperations';
 import {
   buildOrgNavItems,
   isFleetFocusedOrg,
@@ -38,12 +38,13 @@ import {
   navigateToOrgNetwork,
   navigateToOrgCreateTask,
   navigateToOrgOperations,
+  navigateToOrgTasks,
   navigateToOrgWorkforce,
   navigateToPartnerDashboard,
   navigateToProfile,
 } from '../navigation/webNavigation';
 
-const PRIMARY_HOME_ROUTES = new Set(['OrgOverview', 'OrgFleet', 'OrgOperations']);
+const PRIMARY_HOME_ROUTES = new Set(['OrgOverview', 'OrgFleet', 'OrgOperations', 'OrgTasks']);
 
 function localTodayIso() {
   const now = new Date();
@@ -90,6 +91,7 @@ export default function OrganizationHomeScreen() {
   const [fleetCount, setFleetCount] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [tasksExpanded, setTasksExpanded] = useState(false);
+  const [busyStart, setBusyStart] = useState(false);
   const [loading, setLoading] = useState(true);
   const scrollBottomPadding = useScrollContentBottomPadding(80);
   const isDriver = isDriverMembership(org);
@@ -186,6 +188,10 @@ export default function OrganizationHomeScreen() {
       navigateToOrgOperations(navigation, { orgId: org?.id });
       return;
     }
+    if (route === 'OrgTasks' || route === 'OrgWorkOrders') {
+      navigateToOrgTasks(navigation, { orgId: org?.id });
+      return;
+    }
     if (route === 'OrgOverview') {
       return;
     }
@@ -205,6 +211,23 @@ export default function OrganizationHomeScreen() {
   const switchToPersonal = async () => {
     await setWorkspaceMode(WORKSPACE_MODE.PERSONAL);
     navigation.reset(buildShopAuthReset({ name: 'Home' }));
+  };
+
+  const acknowledgeStart = async (task) => {
+    if (!org?.id || !task?.id) return;
+    setBusyStart(true);
+    try {
+      const token = authToken || (await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN));
+      const updated = await startWorkOrder(token, org.id, task.id);
+      setTasks((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+    } catch (e) {
+      Alert.alert(
+        t('org.tasks.startTitle', null, 'Start task'),
+        e.message || t('org.tasks.startError', null, 'Could not start the task.'),
+      );
+    } finally {
+      setBusyStart(false);
+    }
   };
 
   const goRequestRepair = () => {
@@ -462,6 +485,17 @@ export default function OrganizationHomeScreen() {
         onPress: () => navigateToOrgCreateTask(navigation, { orgId: org?.id }),
       });
       tiles.unshift({
+        key: 'tasks',
+        icon: 'clipboard-check-outline',
+        title: t('org.tasks.listTitle', null, 'Tasks'),
+        subtitle: t(
+          'org.home.actions.tasksSubtitle',
+          null,
+          'See work cards, people, vehicles, and status.',
+        ),
+        onPress: () => navigateToOrgTasks(navigation, { orgId: org?.id }),
+      });
+      tiles.unshift({
         key: 'operations',
         icon: 'clipboard-list-outline',
         title: t('org.operations.title', null, 'Operations'),
@@ -654,6 +688,24 @@ export default function OrganizationHomeScreen() {
                             {currentTask.instructions}
                           </Text>
                         ) : null}
+                        {currentTask.start_acknowledged_at || currentTask.started_at ? (
+                          <Text style={styles.startedBadge}>
+                            {t('org.tasks.startedDone', null, 'You started this task')}
+                          </Text>
+                        ) : currentTask.status === 'assigned' || currentTask.status === 'draft' ? (
+                          <Pressable
+                            onPress={() => acknowledgeStart(currentTask)}
+                            disabled={busyStart}
+                            style={[styles.startBtn, busyStart && styles.startBtnDisabled]}
+                            accessibilityRole="button"
+                          >
+                            <Text style={styles.startBtnText}>
+                              {busyStart
+                                ? t('common.loading', null, '…')
+                                : t('org.tasks.started', null, 'Started')}
+                            </Text>
+                          </Pressable>
+                        ) : null}
                       </View>
                     ) : (
                       <Text style={styles.tasksEmpty}>
@@ -822,6 +874,28 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.86)',
     fontSize: 14,
     lineHeight: 20,
+  },
+  startBtn: {
+    marginTop: 14,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  startBtnDisabled: {
+    opacity: 0.6,
+  },
+  startBtnText: {
+    color: COLORS.TEXT_DARK,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  startedBadge: {
+    marginTop: 12,
+    color: '#86EFAC',
+    fontSize: 14,
+    fontWeight: '700',
   },
   upcomingBlock: {
     marginTop: 10,

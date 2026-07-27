@@ -80,7 +80,6 @@ const SHOP_B2B_ORG_ROUTES = new Set([
   'OrgNetwork',
   'OrgWarehouse',
   'OrgLocations',
-  'OrgWorkOrders',
   'OrgInvoicing',
   'OrgLedger',
 ]);
@@ -112,7 +111,8 @@ export function buildOrgNavItems(org, t) {
     OrgLocations: t('org.nav.locations', null, 'Locations'),
     OrgFleet: t('org.nav.fleet', null, 'Fleet'),
     OrgOperations: t('org.nav.operations', null, 'Operations'),
-    OrgWorkOrders: t('org.nav.workOrders', null, 'Work orders'),
+    OrgTasks: t('org.nav.tasks', null, 'Tasks'),
+    OrgWorkOrders: t('org.nav.tasks', null, 'Tasks'),
     OrgWarehouse: t('org.nav.warehouse', null, 'Warehouse'),
     OrgWorkforce: t('org.nav.workforce', null, 'Workforce'),
     OrgDocuments: t('org.nav.documents', null, 'Documents'),

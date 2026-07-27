@@ -262,7 +262,8 @@
         "fleetSecondary": "Автопарк (по избор)",
         "fleetSecondarySubtitle": "МПС обикновено идва с задачите — отворете автопарка само ако ви трябва.",
         "operationsSubtitle": "Дефинирайте фирмените операции за работните карти.",
-        "createTaskSubtitle": "Назначете няколко операции и хора в една работна карта."
+        "createTaskSubtitle": "Назначете няколко операции и хора в една работна карта.",
+        "tasksSubtitle": "Вижте работни карти, хора, МПС и статус."
       },
       "tasks": {
         "title": "Задачи",
@@ -298,7 +299,7 @@
       "overview": "Преглед",
       "locations": "Локации",
       "fleet": "Автопарк",
-      "workOrders": "Работни поръчки",
+      "workOrders": "Задачи",
       "warehouse": "Склад",
       "workforce": "Персонал",
       "documents": "Документи",
@@ -308,7 +309,8 @@
       "construction": "Строителство",
       "publicProfile": "Публичен профил",
       "invoicing": "Фактуриране",
-      "operations": "Операции"
+      "operations": "Операции",
+      "tasks": "Задачи"
     },
     "workforce": {
       "title": "Персонал",
@@ -395,6 +397,18 @@
       "notes": "Бележки",
       "normsTitle": "Норми (по избор)",
       "normsHelper": "Колко вход се изразходва на базовата бройка от основната единица (напр. 0.8 L боя на 1 m²).",
+      "transportNormsHelper": "Разход на гориво: базова норма плюс добавка на тон в ремаркето (напр. DAF 25 L + 0.4 L/t). Шофьорът по-късно попълва км и товар.",
+      "transportBaseRate": "Базова норма гориво",
+      "transportPerTonRate": "Норма на тон",
+      "transportRateUnit": "Единица за гориво",
+      "transportNormSummary": "{base} + {perTon} / t",
+      "laborNormsHelper": "Предварителни часове за операция само с труд. Редовете в задачата могат да ги презапишат.",
+      "laborNormSummary": "{hours} ч",
+      "presetHours": "Предварителни часове",
+      "consumesMaterials": "Консумира материали",
+      "consumesMaterialsShort": "Материали",
+      "laborOnlyShort": "Труд",
+      "materialUnit": "Мерна единица за материал",
       "normRate": "Норма",
       "normBasisQty": "На (база)",
       "normInputUnit": "Единица на входа",
@@ -423,16 +437,25 @@
       "defaultUnitPlaceholder": "m², км, L, часове…"
     },
     "tasks": {
+      "listTitle": "Задачи",
+      "listLead": "Създавайте работни карти с няколко операции и следете статуса на екипа.",
+      "listEmpty": "Все още няма задачи. Създайте първата работна карта.",
+      "detailTitle": "Задача",
       "createTitle": "Създай задача",
       "createLead": "Обединете няколко операции в една задача и назначете хора общо или по операция.",
       "detailsTitle": "Данни за задачата",
       "title": "Заглавие",
       "instructions": "Инструкции",
       "scheduledDate": "Дата (ГГГГ-ММ-ДД)",
+      "plannedStart": "Начало (ЧЧ:ММ)",
+      "plannedEnd": "Край (ЧЧ:ММ, по избор)",
+      "plannedHours": "Часове (по избор)",
+      "photosStub": "Бележка / линк за снимка (по избор)",
       "vehicle": "МПС (по избор)",
       "noVehicle": "Няма",
       "overallPeople": "Хора по задачата",
       "overallPeopleHelper": "Изберете до {max} души за цялата задача.",
+      "noPeople": "Няма назначени хора",
       "operationsTitle": "Операции в задачата",
       "operationsHelper": "Изберете една или повече фирмени операции. По желание назначете хора за всяка стъпка.",
       "operationNotes": "Бележки за тази стъпка",
@@ -444,7 +467,13 @@
       "createdTitle": "Задачата е създадена",
       "createdBody": "Многооперационната задача е записана.",
       "saveError": "Задачата не можа да се създаде.",
-      "loadError": "Формата за задача не можа да се зареди."
+      "loadError": "Задачите не можаха да се заредят.",
+      "started": "Започнах",
+      "startedDone": "Започнахте тази задача",
+      "startedAt": "Започната в {time}",
+      "waitingStart": "Изчаква до {time}",
+      "startTitle": "Старт на задача",
+      "startError": "Задачата не можа да се стартира."
     }
   },
   "auth": {
