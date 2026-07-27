@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } fro
 import { Text } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AuthContext } from '../context/AuthManager';
 import ScreenBackground from '../components/ScreenBackground';
@@ -10,6 +11,7 @@ import OrgAppHeader from '../components/org/OrgAppHeader';
 import DashboardSummaryRow from '../components/dashboard/DashboardSummaryRow';
 import DashboardActionGrid from '../components/dashboard/DashboardActionGrid';
 import DashboardCard from '../components/dashboard/DashboardCard';
+import { appNavBarTotalHeight } from '../components/common/appNavBarMetrics';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
 import { listOrgFleet } from '../api/fleet';
@@ -131,6 +133,7 @@ function normalizeOrgRoute(route) {
 export default function OrganizationHomeScreen() {
   const navigation = useNavigation();
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const { authToken, userEmailOrPhone } = useContext(AuthContext);
   const [org, setOrg] = useState(null);
   const [memberships, setMemberships] = useState([]);
@@ -145,6 +148,7 @@ export default function OrganizationHomeScreen() {
   const [greetingToast, setGreetingToast] = useState('');
   const toastTimerRef = useRef(null);
   const scrollBottomPadding = useScrollContentBottomPadding(40);
+  const toastTop = appNavBarTotalHeight(insets) + 8;
   const isDriver = isDriverMembership(org);
 
   const showGreetingToast = useCallback((name, company) => {
@@ -768,7 +772,7 @@ export default function OrganizationHomeScreen() {
       </ScrollView>
 
       {greetingToast ? (
-        <View style={styles.toastWrap} pointerEvents="none">
+        <View style={[styles.toastWrap, { top: toastTop }]} pointerEvents="none">
           <Text style={styles.toastText}>{greetingToast}</Text>
         </View>
       ) : null}
@@ -788,14 +792,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-    top: 72,
     backgroundColor: 'rgba(15,23,42,0.94)',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.16)',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    zIndex: 20,
+    // Above OrgAppHeader / AppNavigationBar (zIndex 50); keep fully visible.
+    zIndex: 10000,
+    elevation: 24,
   },
   toastText: {
     color: '#fff',
