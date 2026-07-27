@@ -1,51 +1,65 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 
 import { useTranslation } from '../../i18n';
 import { COLORS } from '../../constants/colors';
+import { AuthContext } from '../../context/AuthManager';
 import {
   CONSENT_ACCEPTED,
   CONSENT_REJECTED,
   buildConsentState,
-  getCookieConsent,
   loadConsentState,
+  needsConsentPrompt,
   saveConsentState,
   setCookieConsent,
 } from '../../services/cookieConsent';
 import { initializeAnalytics } from '../../services/analytics';
 
 /**
- * Web-only consent banner. GA4 loads only after analytics consent.
+ * Web-only consent banner for anonymous visitors.
+ * Logged-in users never see it; GA4 still respects a prior stored choice.
  * Reject is as easy as Accept; Manage opens preference toggles.
  */
 export default function CookieConsentBanner() {
   const { t } = useTranslation();
+  const { isAuthenticated, isLoading: authLoading } = useContext(AuthContext);
   const [visible, setVisible] = useState(false);
   const [managing, setManaging] = useState(false);
   const [analyticsOn, setAnalyticsOn] = useState(false);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return undefined;
+    if (authLoading) return undefined;
+
     let cancelled = false;
     (async () => {
-      const consent = await getCookieConsent();
+      const state = await loadConsentState();
       if (cancelled) return;
-      if (consent === CONSENT_ACCEPTED) {
-        await initializeAnalytics(await loadConsentState());
+
+      if (state?.analytics) {
+        await initializeAnalytics(state);
+      }
+
+      // Authenticated users: never show the banner (anon-only).
+      if (isAuthenticated) {
         setVisible(false);
         return;
       }
-      if (consent === CONSENT_REJECTED) {
-        setVisible(false);
+
+      if (needsConsentPrompt(state)) {
+        setAnalyticsOn(Boolean(state?.analytics));
+        setVisible(true);
         return;
       }
-      setVisible(true);
+
+      setVisible(false);
     })();
+
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authLoading, isAuthenticated]);
 
   const accept = useCallback(async () => {
     await setCookieConsent(CONSENT_ACCEPTED);
@@ -69,7 +83,7 @@ export default function CookieConsentBanner() {
     setVisible(false);
   }, [analyticsOn]);
 
-  if (Platform.OS !== 'web' || !visible) {
+  if (Platform.OS !== 'web' || authLoading || isAuthenticated || !visible) {
     return null;
   }
 

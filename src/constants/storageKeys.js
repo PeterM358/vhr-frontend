@@ -16,7 +16,7 @@ export const STORAGE_KEYS = {
   /** 'person' | 'company' — set at sign-up to route company users to org onboarding */
   SIGNUP_ACCOUNT_KIND: '@signup_account_kind',
   LOCALE: '@veversal_locale',
-  /** 'accepted' | 'rejected' — web analytics/cookie consent choice */
+  /** JSON ConsentState (or legacy 'accepted'|'rejected') — web analytics/cookie consent */
   COOKIE_CONSENT: '@cookie_consent',
   logServiceRecordDraftKey: (vehicleId) => `@log_service_record_draft_${vehicleId}`,
   serviceRecordDraftKey: (vehicleId) => `serviceRecordDraft:${vehicleId}`,
