@@ -23,7 +23,9 @@ import { COLORS } from '../constants/colors';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 
 const MAX_PEOPLE = 10;
-const MAX_SEARCH_RESULTS = 15;
+const MAX_SEARCH_RESULTS = 18;
+const MAX_VEHICLES = 20;
+const MACHINE_TYPE_CODES = new Set(['construction', 'agricultural', 'other']);
 const TIME_OPTIONS = [
   '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
   '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00',
@@ -46,6 +48,19 @@ function memberLabel(member) {
 
 function vehicleLabel(vehicle) {
   return vehicle?.license_plate || vehicle?.fleet_id || vehicle?.display_name || `#${vehicle?.id}`;
+}
+
+function vehicleTypeCode(vehicle) {
+  return (
+    vehicle?.vehicle_type_code ||
+    vehicle?.vehicle_type?.code ||
+    vehicle?.type_code ||
+    ''
+  );
+}
+
+function vehicleReadinessStatus(vehicle) {
+  return mapFleetReadiness(vehicle?.readiness || vehicle?.fleet_readiness).status;
 }
 
 function filterByQuery(items, query, getLabel) {
@@ -88,8 +103,10 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [scheduledDate, setScheduledDate] = useState(localTodayIso());
   const [plannedStart, setPlannedStart] = useState('08:00');
   const [plannedEnd, setPlannedEnd] = useState('');
-  const [vehicleId, setVehicleId] = useState(null);
+  const [vehicleIds, setVehicleIds] = useState([]);
   const [vehicleQuery, setVehicleQuery] = useState('');
+  const [vehicleReadinessFilter, setVehicleReadinessFilter] = useState('all');
+  const [vehicleTypeFilter, setVehicleTypeFilter] = useState('all');
   const [overallAssignees, setOverallAssignees] = useState([]);
   const [peopleQuery, setPeopleQuery] = useState('');
   const [projectQuery, setProjectQuery] = useState('');
@@ -127,11 +144,11 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       },
       {
         id: 'vehicle',
-        title: t('org.tasks.wizard.stepVehicle', null, 'Vehicle'),
+        title: t('org.tasks.wizard.stepVehicle', null, 'Vehicles'),
         hint: t(
           'org.tasks.wizard.stepVehicleHint',
           null,
-          'Search the fleet. Readiness warnings appear when a vehicle is not ready.',
+          'Select one or more fleet vehicles. Filter by readiness and type. Warnings show when not ready.',
         ),
       },
       {
@@ -217,10 +234,25 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     [projects, projectQuery],
   );
 
-  const filteredVehicles = useMemo(
-    () => filterByQuery(vehicles, vehicleQuery, vehicleLabel),
-    [vehicles, vehicleQuery],
-  );
+  const filteredVehicles = useMemo(() => {
+    let rows = vehicles;
+    if (vehicleReadinessFilter === 'ready') {
+      rows = rows.filter((v) => vehicleReadinessStatus(v) === 'ready');
+    } else if (vehicleReadinessFilter === 'not_ready') {
+      rows = rows.filter((v) => {
+        const status = vehicleReadinessStatus(v);
+        return status === 'not_ready' || status === 'expiring_soon';
+      });
+    }
+    if (vehicleTypeFilter === 'truck') {
+      rows = rows.filter((v) => vehicleTypeCode(v) === 'truck');
+    } else if (vehicleTypeFilter === 'van') {
+      rows = rows.filter((v) => vehicleTypeCode(v) === 'van');
+    } else if (vehicleTypeFilter === 'machine') {
+      rows = rows.filter((v) => MACHINE_TYPE_CODES.has(vehicleTypeCode(v)));
+    }
+    return filterByQuery(rows, vehicleQuery, vehicleLabel);
+  }, [vehicles, vehicleQuery, vehicleReadinessFilter, vehicleTypeFilter]);
 
   const filteredMembers = useMemo(
     () => filterByQuery(members, peopleQuery, memberLabel),
@@ -239,6 +271,14 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     if (project?.name && !title.trim()) {
       setTitle(project.name);
     }
+  };
+
+  const toggleVehicle = (id) => {
+    setVehicleIds((prev) => {
+      if (prev.includes(id)) return prev.filter((vid) => vid !== id);
+      if (prev.length >= MAX_VEHICLES) return prev;
+      return [...prev, id];
+    });
   };
 
   const toggleOverallAssignee = (userId) => {
@@ -327,7 +367,8 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         planned_end: plannedEnd.trim() || null,
         photo_refs: photoRef.trim() ? [photoRef.trim()] : [],
         document_refs: documentRef.trim() ? [documentRef.trim()] : [],
-        vehicle_id: vehicleId || null,
+        vehicle_ids: vehicleIds,
+        vehicle_id: vehicleIds[0] || null,
         assignee_user_ids: overallAssignees,
         operations: selectedOps.map((row, idx) => ({
           activity_definition_id: row.activityId,
@@ -457,8 +498,67 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     }
 
     if (step === 2) {
+      const readinessOptions = [
+        { value: 'all', label: t('org.tasks.vehicleFilterReadinessAll', null, 'All') },
+        { value: 'ready', label: t('org.tasks.vehicleFilterReady', null, 'Ready') },
+        {
+          value: 'not_ready',
+          label: t('org.tasks.vehicleFilterNotReady', null, 'Not ready'),
+        },
+      ];
+      const typeOptions = [
+        { value: 'all', label: t('org.tasks.vehicleFilterTypeAll', null, 'All types') },
+        { value: 'truck', label: t('org.tasks.vehicleFilterTruck', null, 'Truck') },
+        { value: 'van', label: t('org.tasks.vehicleFilterVan', null, 'Van') },
+        { value: 'machine', label: t('org.tasks.vehicleFilterMachine', null, 'Machine') },
+      ];
       return (
         <>
+          <Text style={styles.helper}>
+            {t(
+              'org.tasks.vehiclesHelper',
+              { max: MAX_VEHICLES },
+              `Select up to ${MAX_VEHICLES} vehicles (e.g. trucks + machines).`,
+            )}
+          </Text>
+          <Text style={styles.fieldLabel}>
+            {t('org.tasks.vehicleFilterReadiness', null, 'Readiness')}
+          </Text>
+          <View style={styles.chipWrap}>
+            {readinessOptions.map((opt) => {
+              const active = vehicleReadinessFilter === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => setVehicleReadinessFilter(opt.value)}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={styles.fieldLabel}>
+            {t('org.tasks.vehicleFilterType', null, 'Vehicle type')}
+          </Text>
+          <View style={styles.chipWrap}>
+            {typeOptions.map((opt) => {
+              const active = vehicleTypeFilter === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => setVehicleTypeFilter(opt.value)}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <TextInput
             label={t('org.tasks.searchVehicles', null, 'Search vehicles')}
             value={vehicleQuery}
@@ -467,23 +567,37 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             style={styles.input}
             textColor={ON_CARD}
           />
+          {vehicleIds.length > 0 ? (
+            <Text style={styles.helper}>
+              {t(
+                'org.tasks.vehiclesSelected',
+                { count: vehicleIds.length },
+                `${vehicleIds.length} selected`,
+              )}
+            </Text>
+          ) : null}
           <View style={styles.chipWrap}>
             <Pressable
-              onPress={() => setVehicleId(null)}
-              style={[styles.chip, vehicleId == null && styles.chipActive]}
+              onPress={() => setVehicleIds([])}
+              style={[styles.chip, vehicleIds.length === 0 && styles.chipActive]}
             >
-              <Text style={[styles.chipText, vehicleId == null && styles.chipTextActive]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  vehicleIds.length === 0 && styles.chipTextActive,
+                ]}
+              >
                 {t('org.tasks.noVehicle', null, 'None')}
               </Text>
             </Pressable>
             {filteredVehicles.map((vehicle) => {
-              const active = vehicleId === vehicle.id;
+              const active = vehicleIds.includes(vehicle.id);
               const readiness = mapFleetReadiness(vehicle.readiness || vehicle.fleet_readiness);
               const warn = readiness.status === 'not_ready' || readiness.status === 'expiring_soon';
               return (
                 <Pressable
                   key={vehicle.id}
-                  onPress={() => setVehicleId(vehicle.id)}
+                  onPress={() => toggleVehicle(vehicle.id)}
                   style={[
                     styles.chip,
                     active && styles.chipActive,
@@ -492,6 +606,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                   ]}
                 >
                   <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {active ? '✓ ' : ''}
                     {vehicleLabel(vehicle)}
                     {warn ? ` · ${readiness.label}` : ''}
                   </Text>
@@ -618,7 +733,9 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     }
 
     // Review
-    const vehicle = vehicles.find((v) => v.id === vehicleId);
+    const selectedVehicles = vehicleIds
+      .map((id) => vehicles.find((v) => v.id === id))
+      .filter(Boolean);
     return (
       <>
         <Text style={styles.reviewLine}>
@@ -634,8 +751,10 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
           {[scheduledDate, plannedStart, plannedEnd && `→ ${plannedEnd}`].filter(Boolean).join(' ')}
         </Text>
         <Text style={styles.reviewLine}>
-          <Text style={styles.reviewKey}>{t('org.tasks.vehicle', null, 'Vehicle')}: </Text>
-          {vehicle ? vehicleLabel(vehicle) : t('org.tasks.noVehicle', null, 'None')}
+          <Text style={styles.reviewKey}>{t('org.tasks.vehicles', null, 'Vehicles')}: </Text>
+          {selectedVehicles.length
+            ? selectedVehicles.map(vehicleLabel).join(', ')
+            : t('org.tasks.noVehicle', null, 'None')}
         </Text>
         <Text style={styles.reviewLine}>
           <Text style={styles.reviewKey}>{t('org.tasks.overallPeople', null, 'People')}: </Text>

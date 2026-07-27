@@ -40,6 +40,16 @@ function vehicleLabel(vehicle) {
   return vehicle?.license_plate || vehicle?.fleet_id || vehicle?.display_name || '';
 }
 
+function taskVehicles(task) {
+  if (Array.isArray(task?.vehicles) && task.vehicles.length) return task.vehicles;
+  if (task?.vehicle) return [task.vehicle];
+  return [];
+}
+
+function vehiclesLabel(task) {
+  return taskVehicles(task).map(vehicleLabel).filter(Boolean).join(', ');
+}
+
 function scheduledStartLabel(task) {
   if (!task?.scheduled_date) return '';
   if (task.planned_start) {
@@ -355,7 +365,7 @@ export default function OrgTasksScreen({ navigation, route }) {
                   statusLabel(selected.status, t),
                   selected.project?.name,
                   scheduledStartLabel(selected),
-                  vehicleLabel(selected.vehicle),
+                  vehiclesLabel(selected),
                 ]
                   .filter(Boolean)
                   .join(' · ')}
@@ -475,10 +485,12 @@ export default function OrgTasksScreen({ navigation, route }) {
                 {(selected.assignees || []).map(personLabel).join(', ') ||
                   t('org.tasks.noPeople', null, 'No people assigned')}
               </Text>
-              {selected.vehicle ? (
+              {taskVehicles(selected).length > 0 ? (
                 <>
-                  <Text style={styles.section}>{t('org.tasks.vehicle', null, 'Vehicle')}</Text>
-                  <Text style={styles.opMeta}>{vehicleLabel(selected.vehicle)}</Text>
+                  <Text style={styles.section}>
+                    {t('org.tasks.vehicles', null, 'Vehicles')}
+                  </Text>
+                  <Text style={styles.opMeta}>{vehiclesLabel(selected)}</Text>
                 </>
               ) : null}
             </AppCard>
@@ -524,7 +536,7 @@ export default function OrgTasksScreen({ navigation, route }) {
                       {[
                         statusLabel(row.status, t),
                         scheduledStartLabel(row),
-                        vehicleLabel(row.vehicle),
+                        vehiclesLabel(row),
                         Array.isArray(row.operations) && row.operations.length
                           ? t(
                               'org.home.tasks.operationCount',

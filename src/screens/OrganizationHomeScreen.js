@@ -689,7 +689,12 @@ export default function OrganizationHomeScreen() {
                                   `${currentTask.operations.length} operations`,
                                 )
                               : currentTask.activity?.name || currentTask.operations?.[0]?.activity?.name,
-                            currentTask.vehicle?.license_plate || currentTask.vehicle?.display_name,
+                            Array.isArray(currentTask.vehicles) && currentTask.vehicles.length
+                              ? currentTask.vehicles
+                                  .map((v) => v?.license_plate || v?.fleet_id || v?.display_name)
+                                  .filter(Boolean)
+                                  .join(', ')
+                              : currentTask.vehicle?.license_plate || currentTask.vehicle?.display_name,
                             currentTask.scheduled_date,
                           ]
                             .filter(Boolean)

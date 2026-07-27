@@ -13,9 +13,11 @@ import { navigateToOrgHome } from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
+import { buildE164Phone, parseStoredPhone } from '../utils/phoneE164';
 
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
+const DEFAULT_PHONE_PREFIX = '+359';
 
 const KIND_OPTIONS = [
   { value: 'transport', labelKey: 'org.projects.kinds.transport', fallback: 'Transport' },
@@ -42,7 +44,8 @@ function emptyForm() {
     expectedRevenue: '',
     companies: '',
     contactName: '',
-    contactPhone: '',
+    contactPhonePrefix: DEFAULT_PHONE_PREFIX,
+    contactPhoneNational: '',
     contactEmail: '',
     photoRef: '',
   };
@@ -50,6 +53,13 @@ function emptyForm() {
 
 function formFromProject(row) {
   const contact = Array.isArray(row?.contacts) && row.contacts[0] ? row.contacts[0] : {};
+  const fromParts =
+    contact.phone_country_code || contact.phone_national
+      ? {
+          prefix: contact.phone_country_code || DEFAULT_PHONE_PREFIX,
+          national: contact.phone_national || '',
+        }
+      : parseStoredPhone(contact.phone);
   return {
     name: row?.name || '',
     kind: row?.kind || 'other',
@@ -60,7 +70,8 @@ function formFromProject(row) {
     expectedRevenue: row?.expected_revenue != null ? String(row.expected_revenue) : '',
     companies: Array.isArray(row?.companies) ? row.companies.join(', ') : '',
     contactName: contact.name || '',
-    contactPhone: contact.phone || '',
+    contactPhonePrefix: fromParts.prefix || DEFAULT_PHONE_PREFIX,
+    contactPhoneNational: fromParts.national || '',
     contactEmail: contact.email || '',
     photoRef: Array.isArray(row?.photo_refs) && row.photo_refs[0] ? String(row.photo_refs[0]) : '',
   };
@@ -171,10 +182,15 @@ export default function OrgProjectsScreen({ navigation, route }) {
 
   const buildPayload = () => {
     const contacts = [];
-    if (form.contactName.trim() || form.contactPhone.trim() || form.contactEmail.trim()) {
+    const phonePrefix = String(form.contactPhonePrefix || '').trim();
+    const phoneNational = String(form.contactPhoneNational || '').trim();
+    const phoneE164 = buildE164Phone(phonePrefix, phoneNational);
+    if (form.contactName.trim() || phoneNational || form.contactEmail.trim()) {
       contacts.push({
         name: form.contactName.trim(),
-        phone: form.contactPhone.trim(),
+        phone: phoneE164 || '',
+        phone_country_code: phonePrefix,
+        phone_national: phoneNational.replace(/\D/g, '').replace(/^0+/, ''),
         email: form.contactEmail.trim(),
       });
     }
@@ -326,14 +342,28 @@ export default function OrgProjectsScreen({ navigation, route }) {
         style={styles.input}
         textColor={ON_CARD}
       />
-      <TextInput
-        label={t('org.projects.contactPhone', null, 'Phone')}
-        value={form.contactPhone}
-        onChangeText={(v) => setField('contactPhone', v)}
-        mode="outlined"
-        style={styles.input}
-        textColor={ON_CARD}
-      />
+      <View style={styles.phoneRow}>
+        <TextInput
+          label={t('org.projects.contactPhonePrefix', null, 'Prefix')}
+          value={form.contactPhonePrefix}
+          onChangeText={(v) => setField('contactPhonePrefix', v)}
+          mode="outlined"
+          keyboardType="phone-pad"
+          placeholder="+359"
+          style={[styles.input, styles.phonePrefixInput]}
+          textColor={ON_CARD}
+        />
+        <TextInput
+          label={t('org.projects.contactPhoneNational', null, 'Number')}
+          value={form.contactPhoneNational}
+          onChangeText={(v) => setField('contactPhoneNational', v)}
+          mode="outlined"
+          keyboardType="phone-pad"
+          placeholder="885828412"
+          style={[styles.input, styles.phoneNationalInput]}
+          textColor={ON_CARD}
+        />
+      </View>
       <TextInput
         label={t('org.projects.contactEmail', null, 'Email')}
         value={form.contactEmail}
@@ -481,6 +511,9 @@ const styles = StyleSheet.create({
   card: { padding: 14, marginBottom: 12 },
   createBtn: { marginBottom: 12 },
   input: { marginBottom: 10, backgroundColor: '#fff' },
+  phoneRow: { flexDirection: 'row', gap: 8 },
+  phonePrefixInput: { flex: 0.38, marginBottom: 10 },
+  phoneNationalInput: { flex: 0.62, marginBottom: 10 },
   fieldLabel: {
     color: ON_CARD_MUTED,
     fontSize: 12,
