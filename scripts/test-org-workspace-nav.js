@@ -40,9 +40,7 @@ function resolvePartnerEntryRoute(data) {
 const FLEET_FOCUSED_ROLE_TYPES = new Set(['TRANSPORT_COMPANY', 'FLEET_OPERATOR']);
 const SHOP_B2B_ORG_ROUTES = new Set([
   'OrgNetwork',
-  'OrgWarehouse',
   'OrgLocations',
-  'OrgWorkOrders',
   'OrgInvoicing',
   'OrgLedger',
 ]);
@@ -152,7 +150,7 @@ assert.deepStrictEqual(
       { key: 'warehouse', route: 'OrgWarehouse' },
     ],
   }),
-  ['OrgOverview', 'OrgFleet'],
+  ['OrgOverview', 'OrgFleet', 'OrgWarehouse'],
 );
 
 console.log('org workspace nav helpers ok');

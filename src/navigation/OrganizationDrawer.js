@@ -168,6 +168,29 @@ function CustomDrawerContent(props) {
         label: t('org.nav.projects', null, 'Projects'),
         icon: 'briefcase-outline',
       });
+      seen.add('OrgProjects');
+    }
+
+    const canWarehouse = Boolean(canManageOps || org?.manage_org_warehouse);
+    if (canWarehouse && !seen.has('OrgWarehouse')) {
+      const workforceIdx = items.findIndex((row) => row.route === 'OrgWorkforce');
+      const projectsIdx = items.findIndex((row) => row.route === 'OrgProjects');
+      const opsIdx = items.findIndex((row) => row.route === 'OrgOperations');
+      const insertAt =
+        workforceIdx >= 0
+          ? workforceIdx
+          : projectsIdx >= 0
+            ? projectsIdx + 1
+            : opsIdx >= 0
+              ? opsIdx + 1
+              : items.length;
+      items.splice(insertAt, 0, {
+        key: 'warehouse',
+        route: 'OrgWarehouse',
+        label: t('org.nav.warehouse', null, 'Warehouse'),
+        icon: 'warehouse',
+      });
+      seen.add('OrgWarehouse');
     }
 
     return items;

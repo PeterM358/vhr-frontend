@@ -639,17 +639,27 @@ export default function OrgOperationsScreen({ navigation, route }) {
   );
 
   const renderNormsByKind = () => {
+    const outputUnit = unitLabel(findUnit(form.unitId)) || 'm²';
+    const inputUnit = unitLabel(findUnit(form.normInputUnitId)) || 'L';
+
     if (form.kind === 'transport') {
       return (
         <>
           <Text style={styles.fieldLabel}>
-            {t('org.operations.wizard.consumedInputLabel', null, 'Consumed input (for norms)')}
+            {t('org.operations.wizard.consumedInputLabel', null, 'Consumed input (numbers only)')}
           </Text>
           <Text style={styles.helper}>
             {t(
               'org.operations.transportNormsHelper',
               null,
-              'Two-part fuel norm: L per 100 km empty + extra L per ton loaded (e.g. 25 + 0.4). Driver fills meter start/end on End — not a separate km field.',
+              'Numbers only — two fuel rates. Worker reports km on End (meter start/end), not liters here.',
+            )}
+          </Text>
+          <Text style={styles.helper}>
+            {t(
+              'org.operations.wizard.normsMaterialsHint',
+              null,
+              'Pick fuel SKU on the next step; here only the rate.',
             )}
           </Text>
           <TextInput
@@ -664,6 +674,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
             keyboardType="decimal-pad"
             style={styles.input}
             textColor={ON_CARD}
+            placeholder="25"
           />
           <TextInput
             label={t(
@@ -677,6 +688,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
             keyboardType="decimal-pad"
             style={styles.input}
             textColor={ON_CARD}
+            placeholder="0.4"
           />
           <Text style={styles.fieldLabel}>
             {t('org.operations.transportRateUnit', null, 'Fuel unit')}
@@ -718,41 +730,79 @@ export default function OrgOperationsScreen({ navigation, route }) {
     return (
       <>
         <Text style={styles.fieldLabel}>
-          {t('org.operations.wizard.consumedInputLabel', null, 'Consumed input (for norms)')}
+          {t('org.operations.wizard.consumedInputLabel', null, 'Consumed input (numbers only)')}
         </Text>
         <Text style={styles.helper}>
-            {t(
+          {t(
             'org.operations.normsHelper',
+            {
+              rate: form.normRate || '0.5',
+              inputUnit,
+              basis: form.normBasisQty || '1',
+              outputUnit,
+            },
+            `Numbers only — e.g. ${form.normRate || '0.5'} ${inputUnit} per ${form.normBasisQty || '1'} ${outputUnit}. Not free text.`,
+          )}
+        </Text>
+        <Text style={styles.helper}>
+          {t(
+            'org.operations.wizard.normsMaterialsHint',
             null,
-            'Consumed input = rate × (output ÷ basis). Example: 0.5 L paint per 1 m².',
+            'Pick paint/fuel SKU on the next step; here only the rate.',
           )}
         </Text>
         <TextInput
-          label={t('org.operations.normRate', null, 'Input rate (e.g. 0.5 L)')}
+          label={t(
+            'org.operations.normRateLabeled',
+            { unit: inputUnit },
+            `Rate (${inputUnit})`,
+          )}
           value={form.normRate}
           onChangeText={(value) => setField('normRate', value)}
           mode="outlined"
           keyboardType="decimal-pad"
           style={styles.input}
           textColor={ON_CARD}
+          placeholder="0.5"
         />
         <TextInput
-          label={t('org.operations.normBasisQty', null, 'Per output qty (e.g. 1 m²)')}
+          label={t(
+            'org.operations.normBasisLabeled',
+            { unit: outputUnit },
+            `Per (${outputUnit})`,
+          )}
           value={form.normBasisQty}
           onChangeText={(value) => setField('normBasisQty', value)}
           mode="outlined"
           keyboardType="decimal-pad"
           style={styles.input}
           textColor={ON_CARD}
+          placeholder="1"
         />
         <Text style={styles.fieldLabel}>
-          {t('org.operations.normInputUnit', null, 'Input unit (paint L, etc.)')}
+          {t(
+            'org.operations.normInputUnitLabeled',
+            { outputUnit },
+            `Input unit (e.g. L paint) — rate applies per ${outputUnit}`,
+          )}
         </Text>
         {renderUnitChips(
           form.normInputUnitId,
           (id) => setField('normInputUnitId', id),
           inputUnits,
         )}
+        <Text style={styles.helper}>
+          {t(
+            'org.operations.wizard.normsFormulaPreview',
+            {
+              rate: form.normRate || '0.5',
+              inputUnit,
+              basis: form.normBasisQty || '1',
+              outputUnit,
+            },
+            `${inputUnit}: [${form.normRate || '0.5'}] per [${form.normBasisQty || '1'}] ${outputUnit}`,
+          )}
+        </Text>
       </>
     );
   };
@@ -836,7 +886,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
             {t(
               'org.operations.wizard.outputUnitHelper',
               null,
-              'ONE primary output unit. For km the worker enters meter start/end; for m² / qty a single actual quantity.',
+              'ONE primary output only (m² or km). Paint/fuel liters are NOT selected here — they are norms + leftovers later.',
             )}
           </Text>
           {renderUnitChips(form.unitId, (id) => setField('unitId', id), outputUnits)}

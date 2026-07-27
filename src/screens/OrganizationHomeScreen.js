@@ -463,12 +463,16 @@ export default function OrganizationHomeScreen() {
       });
     }
 
-    if (navRoutes.has('OrgWarehouse')) {
+    if (canManageOps || org?.manage_org_warehouse || navRoutes.has('OrgWarehouse')) {
       tiles.push({
         key: 'warehouse',
         icon: 'warehouse',
         title: t('org.nav.warehouse', null, 'Warehouse'),
-        subtitle: t('org.home.actions.openSection', null, 'Open this workspace section.'),
+        subtitle: t(
+          'org.home.actions.warehouseSubtitle',
+          null,
+          'Import supplier invoices and stock materials for operations.',
+        ),
         onPress: () => navigateToOrgWarehouse(navigation, { orgId: org?.id }),
       });
     }
@@ -495,6 +499,7 @@ export default function OrganizationHomeScreen() {
     navigation,
     org?.has_shop_locations,
     org?.id,
+    org?.manage_org_warehouse,
     t,
   ]);
 
