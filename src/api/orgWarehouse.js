@@ -99,6 +99,22 @@ export async function createOrgMaterial(token, organizationId, payload) {
   return response.json();
 }
 
+export async function updateOrgMaterial(token, organizationId, stockId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/materials/${stockId}/`,
+    {
+      method: 'PATCH',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to update material'));
+  return response.json();
+}
+
 export async function listMaterialsIntakes(token, organizationId, params = {}) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/materials-intake/${buildQuery(params)}`,
@@ -114,6 +130,22 @@ export async function getMaterialsIntake(token, organizationId, intakeId) {
     { headers: authHeaders(token) },
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load intake'));
+  return response.json();
+}
+
+export async function updateMaterialsIntake(token, organizationId, intakeId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/materials-intake/${intakeId}/`,
+    {
+      method: 'PATCH',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to update intake'));
   return response.json();
 }
 
@@ -207,12 +239,16 @@ export async function deleteMaterialsIntakeLine(token, organizationId, intakeId,
   return true;
 }
 
-export async function confirmMaterialsIntake(token, organizationId, intakeId) {
+export async function confirmMaterialsIntake(token, organizationId, intakeId, payload = {}) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/materials-intake/${intakeId}/confirm/`,
     {
       method: 'POST',
-      headers: authHeaders(token),
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
     },
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to confirm intake'));

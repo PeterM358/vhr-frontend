@@ -29,6 +29,7 @@ const ON_CARD_MUTED = '#475569';
 const CARD_SURFACE = { color: ON_CARD };
 
 const MODES = [
+  { id: 'documents', labelKey: 'org.warehouse.tabDocuments' },
   { id: 'materials', labelKey: 'org.warehouse.tabMaterials' },
   { id: 'list', labelKey: 'org.warehouse.tabLocations' },
   { id: 'add', labelKey: 'org.warehouse.addLocation' },
@@ -75,7 +76,7 @@ export default function OrgWarehouseScreen({ navigation, route }) {
   const [error, setError] = useState('');
   const [canManage, setCanManage] = useState(false);
   const [rows, setRows] = useState([]);
-  const [mode, setMode] = useState('materials');
+  const [mode, setMode] = useState('documents');
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [busy, setBusy] = useState(false);
@@ -204,7 +205,7 @@ export default function OrgWarehouseScreen({ navigation, route }) {
           {t(
             'org.warehouse.lead',
             null,
-            'Import supplier invoices to stock materials, then define bins and yard addresses for issue.',
+            'Documents: import invoices. Materials: on-hand stock. Locations: bins for issue.',
           )}
         </Text>
 
@@ -223,11 +224,13 @@ export default function OrgWarehouseScreen({ navigation, route }) {
                   {t(
                     item.labelKey,
                     null,
-                    item.id === 'materials'
-                      ? 'Materials'
-                      : item.id === 'list'
-                        ? 'Locations'
-                        : 'Add location',
+                    item.id === 'documents'
+                      ? 'Documents'
+                      : item.id === 'materials'
+                        ? 'Materials'
+                        : item.id === 'list'
+                          ? 'Locations'
+                          : 'Add location',
                   )}
                 </Text>
               </Pressable>
@@ -235,9 +238,13 @@ export default function OrgWarehouseScreen({ navigation, route }) {
           })}
         </View>
 
-        {mode === 'materials' ? (
+        {mode === 'documents' || mode === 'materials' ? (
           orgId ? (
-            <OrgMaterialsIntakePanel organizationId={orgId} canManage={canManage} />
+            <OrgMaterialsIntakePanel
+              organizationId={orgId}
+              canManage={canManage}
+              section={mode}
+            />
           ) : loading ? (
             <ActivityIndicator color="#fff" style={styles.loader} />
           ) : (

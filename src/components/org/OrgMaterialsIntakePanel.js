@@ -1,10 +1,10 @@
 /**
- * Org materials intake: import invoice/proforma → preview lines → confirm to warehouse SKUs.
- * Also supports standalone manual add (no invoice) and draft delete.
+ * Org materials intake: Documents (import/review) + Materials (stock list).
+ * Confirm writes SKU + quantity_on_hand; drafts are deletable; confirmed invoices stay.
  */
 
-import React, { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Button, TextInput } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
@@ -16,9 +16,13 @@ import {
   confirmMaterialsIntake,
   createOrgMaterial,
   deleteMaterialsIntake,
+  deleteMaterialsIntakeLine,
   getMaterialsIntake,
   listMaterialsIntakes,
   listOrgMaterials,
+  updateMaterialsIntake,
+  updateMaterialsIntakeLine,
+  updateOrgMaterial,
   uploadMaterialsIntake,
 } from '../../api/orgWarehouse';
 import { pickReceiptOrInvoiceAttachment } from '../../utils/pickDocumentFile';
@@ -31,7 +35,7 @@ const ON_CARD_MUTED = '#475569';
 
 /** Match warehouse / ops unit vocabulary (materials.UnitOfMeasure codes). */
 export const MATERIAL_UNIT_OPTIONS = [
-  { code: 'piece', labelKey: 'org.warehouse.intake.units.piece', fallback: 'piece' },
+  { code: 'piece', labelKey: 'org.warehouse.intake.units.piece', fallback: 'бр' },
   { code: 'kg', labelKey: 'org.warehouse.intake.units.kg', fallback: 'kg' },
   { code: 'L', labelKey: 'org.warehouse.intake.units.L', fallback: 'L' },
   { code: 'm3', labelKey: 'org.warehouse.intake.units.m3', fallback: 'm³' },
@@ -53,10 +57,23 @@ function emptyManual() {
   };
 }
 
-function priceLabel(line) {
-  if (line?.unit_price != null && line.unit_price !== '') return String(line.unit_price);
-  const minor = Number(line?.unit_price_ex_vat_minor || 0);
-  return (minor / 100).toFixed(2);
+function moneyFromMinor(minor) {
+  const n = Number(minor || 0);
+  return (n / 100).toFixed(2);
+}
+
+function lineTotalLabel(line) {
+  if (line?.line_total_inc_vat != null && line.line_total_inc_vat !== '') {
+    return String(line.line_total_inc_vat);
+  }
+  if (line?.line_total_inc_vat_minor != null) {
+    return moneyFromMinor(line.line_total_inc_vat_minor);
+  }
+  const qty = Number(line?.quantity || 0);
+  const ex = Number(line?.unit_price_ex_vat_minor || 0);
+  const vat = Number(line?.unit_vat_minor || 0);
+  const inc = Number(line?.unit_price_inc_vat_minor || ex + vat);
+  return ((qty * inc) / 100).toFixed(2);
 }
 
 function unitDisplay(code, t) {
@@ -65,7 +82,7 @@ function unitDisplay(code, t) {
   return t(opt.labelKey, null, opt.fallback);
 }
 
-function UnitPicker({ value, onChange, t }) {
+function UnitPicker({ value, onChange, t, disabled }) {
   return (
     <View style={styles.unitRow}>
       {MATERIAL_UNIT_OPTIONS.map((opt) => {
@@ -73,8 +90,13 @@ function UnitPicker({ value, onChange, t }) {
         return (
           <Pressable
             key={opt.code}
+            disabled={disabled}
             onPress={() => onChange(opt.code)}
-            style={[styles.unitChip, selected && styles.unitChipSelected]}
+            style={[
+              styles.unitChip,
+              selected && styles.unitChipSelected,
+              disabled && styles.unitChipDisabled,
+            ]}
           >
             <Text style={[styles.unitChipText, selected && styles.unitChipTextSelected]}>
               {t(opt.labelKey, null, opt.fallback)}
@@ -86,7 +108,171 @@ function UnitPicker({ value, onChange, t }) {
   );
 }
 
-export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
+function EditableLineCard({
+  line,
+  canEdit,
+  busy,
+  t,
+  onSave,
+  onConfirmRow,
+  onDeleteLine,
+  vatBlocked,
+}) {
+  const [draft, setDraft] = useState({
+    description: line.description || '',
+    part_number: line.part_number || '',
+    part_number_alias: line.part_number_alias || '',
+    quantity: String(line.quantity ?? ''),
+    unit_code: line.unit_code || 'piece',
+    unit_price: line.unit_price || moneyFromMinor(line.unit_price_ex_vat_minor),
+  });
+
+  useEffect(() => {
+    setDraft({
+      description: line.description || '',
+      part_number: line.part_number || '',
+      part_number_alias: line.part_number_alias || '',
+      quantity: String(line.quantity ?? ''),
+      unit_code: line.unit_code || 'piece',
+      unit_price: line.unit_price || moneyFromMinor(line.unit_price_ex_vat_minor),
+    });
+  }, [line]);
+
+  const confirmed = Boolean(line.is_confirmed);
+  const editable = canEdit && !confirmed;
+
+  return (
+    <View style={[styles.tableRow, confirmed && styles.tableRowConfirmed]}>
+      <View style={styles.tableGrid}>
+        <TextInput
+          label={t('org.warehouse.intake.colSku', null, 'Material #')}
+          value={draft.part_number}
+          onChangeText={(v) => setDraft((p) => ({ ...p, part_number: v }))}
+          mode="outlined"
+          dense
+          style={[styles.input, styles.colSku]}
+          textColor={ON_CARD}
+          editable={editable}
+        />
+        <TextInput
+          label={t('org.warehouse.intake.colName', null, 'Name')}
+          value={draft.description}
+          onChangeText={(v) => setDraft((p) => ({ ...p, description: v }))}
+          mode="outlined"
+          dense
+          style={[styles.input, styles.colName]}
+          textColor={ON_CARD}
+          editable={editable}
+        />
+        <TextInput
+          label={t('org.warehouse.intake.qty', null, 'Qty')}
+          value={draft.quantity}
+          onChangeText={(v) => setDraft((p) => ({ ...p, quantity: v }))}
+          mode="outlined"
+          dense
+          style={[styles.input, styles.colQty]}
+          keyboardType="decimal-pad"
+          textColor={ON_CARD}
+          editable={editable}
+        />
+        <TextInput
+          label={t('org.warehouse.intake.colPriceEx', null, 'Unit ex-VAT')}
+          value={draft.unit_price}
+          onChangeText={(v) => setDraft((p) => ({ ...p, unit_price: v }))}
+          mode="outlined"
+          dense
+          style={[styles.input, styles.colPrice]}
+          keyboardType="decimal-pad"
+          textColor={ON_CARD}
+          editable={editable}
+        />
+        <TextInput
+          label={t('org.warehouse.intake.colVat', null, 'VAT')}
+          value={line.unit_vat != null ? String(line.unit_vat) : moneyFromMinor(line.unit_vat_minor)}
+          mode="outlined"
+          dense
+          style={[styles.input, styles.colPrice]}
+          textColor={ON_CARD}
+          editable={false}
+        />
+        <TextInput
+          label={t('org.warehouse.intake.colPriceInc', null, 'With VAT')}
+          value={
+            line.unit_price_inc_vat != null
+              ? String(line.unit_price_inc_vat)
+              : moneyFromMinor(line.unit_price_inc_vat_minor)
+          }
+          mode="outlined"
+          dense
+          style={[styles.input, styles.colPrice]}
+          textColor={ON_CARD}
+          editable={false}
+        />
+        <TextInput
+          label={t('org.warehouse.intake.colTotal', null, 'Line total')}
+          value={lineTotalLabel(line)}
+          mode="outlined"
+          dense
+          style={[styles.input, styles.colPrice]}
+          textColor={ON_CARD}
+          editable={false}
+        />
+      </View>
+      {line.part_number_alias ? (
+        <Text style={styles.lineMeta}>
+          {t('org.warehouse.intake.oldSku', null, 'old')} {line.part_number_alias}
+        </Text>
+      ) : null}
+      <Text style={styles.sectionLabel}>{t('org.warehouse.intake.unit', null, 'Unit')}</Text>
+      <UnitPicker
+        value={draft.unit_code}
+        onChange={(code) => setDraft((p) => ({ ...p, unit_code: code }))}
+        t={t}
+        disabled={!editable}
+      />
+      {confirmed ? (
+        <Text style={styles.confirmedBadge}>
+          {t('org.warehouse.intake.lineConfirmed', null, 'Confirmed → stock')}
+        </Text>
+      ) : null}
+      {editable ? (
+        <View style={styles.lineActions}>
+          <Button
+            mode="outlined"
+            compact
+            disabled={busy}
+            onPress={() => onSave(line.id, draft)}
+          >
+            {t('org.warehouse.intake.saveLine', null, 'Save row')}
+          </Button>
+          <Button
+            mode="contained"
+            compact
+            disabled={busy || vatBlocked}
+            onPress={() => onConfirmRow(line.id)}
+          >
+            {t('org.warehouse.intake.confirmRow', null, 'Confirm row')}
+          </Button>
+          <Button
+            mode="text"
+            compact
+            textColor="#B91C1C"
+            disabled={busy}
+            onPress={() => onDeleteLine(line.id)}
+          >
+            {t('org.warehouse.intake.deleteLine', null, 'Remove')}
+          </Button>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+export default function OrgMaterialsIntakePanel({
+  organizationId,
+  canManage,
+  section = 'documents',
+}) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -99,6 +285,8 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
   const [manual, setManual] = useState(emptyManual);
   const [standalone, setStandalone] = useState(emptyManual);
   const [showStandalone, setShowStandalone] = useState(false);
+  const [supplierDraft, setSupplierDraft] = useState('');
+  const [editingMaterial, setEditingMaterial] = useState(null);
 
   const load = useCallback(async () => {
     if (!organizationId) return;
@@ -124,6 +312,10 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
       load();
     }, [load]),
   );
+
+  useEffect(() => {
+    setSupplierDraft(activeIntake?.supplier_name || '');
+  }, [activeIntake?.id, activeIntake?.supplier_name]);
 
   const onUpload = async () => {
     if (!canManage || !organizationId) return;
@@ -167,6 +359,74 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
     }
   };
 
+  const refreshActive = async (token, intakeId) => {
+    const refreshed = await getMaterialsIntake(token, organizationId, intakeId);
+    setActiveIntake(refreshed);
+    return refreshed;
+  };
+
+  const onSaveSupplier = async () => {
+    if (!activeIntake?.id || activeIntake.status !== 'draft') return;
+    setBusy(true);
+    setError('');
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const data = await updateMaterialsIntake(token, organizationId, activeIntake.id, {
+        supplier_name: supplierDraft.trim(),
+      });
+      setActiveIntake(data);
+      setMessage(t('org.warehouse.intake.supplierSaved', null, 'Supplier saved.'));
+    } catch (e) {
+      setError(e.message || t('org.warehouse.intake.saveError', null, 'Could not save.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onSaveLine = async (lineId, draft) => {
+    if (!activeIntake?.id) return;
+    setBusy(true);
+    setError('');
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      await updateMaterialsIntakeLine(token, organizationId, activeIntake.id, lineId, {
+        description: draft.description.trim(),
+        part_number: draft.part_number.trim(),
+        part_number_alias: draft.part_number_alias.trim(),
+        quantity: draft.quantity || '1',
+        unit_code: draft.unit_code || 'piece',
+        unit_price: draft.unit_price || '0',
+      });
+      await refreshActive(token, activeIntake.id);
+      setMessage(t('org.warehouse.intake.lineSaved', null, 'Row saved.'));
+    } catch (e) {
+      setError(e.message || t('org.warehouse.intake.lineError', null, 'Could not update line.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onDeleteLine = async (lineId) => {
+    if (!activeIntake?.id) return;
+    const ok = await confirmMessage(
+      t('org.warehouse.intake.deleteLineTitle', null, 'Remove line?'),
+      t('org.warehouse.intake.deleteLineBody', null, 'This removes the draft line only.'),
+      { confirmLabel: t('org.warehouse.intake.delete', null, 'Delete') },
+    );
+    if (!ok) return;
+    setBusy(true);
+    setError('');
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      await deleteMaterialsIntakeLine(token, organizationId, activeIntake.id, lineId);
+      await refreshActive(token, activeIntake.id);
+    } catch (e) {
+      setError(e.message || t('org.warehouse.intake.lineError', null, 'Could not delete line.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const onAddManual = async () => {
     if (!activeIntake?.id || activeIntake.status !== 'draft') return;
     if (!manual.description.trim() && !manual.part_number.trim()) {
@@ -185,8 +445,7 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
         unit_code: manual.unit_code || 'piece',
         unit_price: manual.unit_price || '0',
       });
-      const refreshed = await getMaterialsIntake(token, organizationId, activeIntake.id);
-      setActiveIntake(refreshed);
+      await refreshActive(token, activeIntake.id);
       setManual(emptyManual());
     } catch (e) {
       setError(e.message || t('org.warehouse.intake.lineError', null, 'Could not add line.'));
@@ -232,13 +491,7 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
           },
         ],
       });
-      setMessage(
-        t(
-          'org.warehouse.intake.manualCreated',
-          null,
-          'Material added to warehouse stock.',
-        ),
-      );
+      setMessage(t('org.warehouse.intake.manualCreated', null, 'Material added to warehouse stock.'));
       setStandalone(emptyManual());
       setShowStandalone(false);
       await load();
@@ -249,23 +502,65 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
     }
   };
 
-  const onConfirm = async () => {
+  const applyConfirmResult = async (data) => {
+    setActiveIntake(data);
+    setConfirmSummary(data.confirm_summary || null);
+    setMessage(
+      t(
+        'org.warehouse.intake.confirmed',
+        null,
+        'Confirmed — materials are in warehouse stock (SKU + on-hand qty).',
+      ),
+    );
+    await load();
+  };
+
+  const onConfirmAll = async () => {
     if (!activeIntake?.id || activeIntake.status !== 'draft') return;
+    const pending = (activeIntake.lines || []).filter((l) => !l.is_confirmed).length;
+    const ok = await confirmMessage(
+      t('org.warehouse.intake.confirmAllTitle', null, 'Confirm all lines?'),
+      t(
+        'org.warehouse.intake.confirmAllBody',
+        { count: pending },
+        `Writes ${pending} SKU(s) to warehouse and adds quantities on hand. Original invoice stays permanently.`,
+      ),
+      { confirmLabel: t('org.warehouse.intake.confirm', null, 'Confirm → warehouse') },
+    );
+    if (!ok) return;
     setBusy(true);
     setError('');
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const data = await confirmMaterialsIntake(token, organizationId, activeIntake.id);
-      setActiveIntake(data);
-      setConfirmSummary(data.confirm_summary || null);
-      setMessage(
-        t(
-          'org.warehouse.intake.confirmed',
-          null,
-          'Confirmed — materials are in warehouse stock and selectable on operations.',
-        ),
-      );
-      await load();
+      const data = await confirmMaterialsIntake(token, organizationId, activeIntake.id, {});
+      await applyConfirmResult(data);
+    } catch (e) {
+      setError(e.message || t('org.warehouse.intake.confirmError', null, 'Confirm failed.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onConfirmRow = async (lineId) => {
+    if (!activeIntake?.id) return;
+    const ok = await confirmMessage(
+      t('org.warehouse.intake.confirmRowTitle', null, 'Confirm this row?'),
+      t(
+        'org.warehouse.intake.confirmRowBody',
+        null,
+        'Creates/updates the SKU and adds this quantity to on-hand stock.',
+      ),
+      { confirmLabel: t('org.warehouse.intake.confirmRow', null, 'Confirm row') },
+    );
+    if (!ok) return;
+    setBusy(true);
+    setError('');
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const data = await confirmMaterialsIntake(token, organizationId, activeIntake.id, {
+        line_id: lineId,
+      });
+      await applyConfirmResult(data);
     } catch (e) {
       setError(e.message || t('org.warehouse.intake.confirmError', null, 'Confirm failed.'));
     } finally {
@@ -280,7 +575,7 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
       t(
         'org.warehouse.intake.deleteDraftBody',
         null,
-        'This removes the unfinished import and its lines. Stock is unchanged.',
+        'This removes the unfinished import and its lines. Stock is unchanged. Confirmed invoices are never deleted.',
       ),
       { confirmLabel: t('org.warehouse.intake.delete', null, 'Delete') },
     );
@@ -318,6 +613,27 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
     }
   };
 
+  const onSaveMaterial = async () => {
+    if (!editingMaterial?.stock_id) return;
+    setBusy(true);
+    setError('');
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      await updateOrgMaterial(token, organizationId, editingMaterial.stock_id, {
+        name: editingMaterial.name,
+        part_number: editingMaterial.part_number,
+        description: editingMaterial.description,
+      });
+      setEditingMaterial(null);
+      setMessage(t('org.warehouse.intake.materialUpdated', null, 'Material updated.'));
+      await load();
+    } catch (e) {
+      setError(e.message || t('org.warehouse.intake.saveError', null, 'Could not save.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -326,34 +642,29 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
     );
   }
 
+  const vatBlocked = activeIntake?.buyer_vat_matches_organization === false;
+  const isDocuments = section === 'documents';
+  const isMaterials = section === 'materials';
+
   return (
     <View style={styles.wrap}>
-      <Text style={styles.lead}>
-        {t(
-          'org.warehouse.intake.lead',
-          null,
-          'Import a supplier invoice or proforma PDF. Review proposed lines, then Confirm to add SKUs to warehouse stock. Or add a material manually without an invoice.',
-        )}
-      </Text>
-
-      {canManage ? (
-        <View style={styles.actionsRow}>
-          <Button mode="contained" onPress={onUpload} loading={busy} disabled={busy} style={styles.flexBtn}>
-            {t('org.warehouse.intake.upload', null, 'Import invoice PDF')}
-          </Button>
-          <Button
-            mode="outlined"
-            onPress={() => {
-              setShowStandalone((v) => !v);
-              setConfirmSummary(null);
-            }}
-            disabled={busy}
-            style={styles.flexBtn}
-          >
-            {t('org.warehouse.intake.addMaterial', null, 'Add material')}
-          </Button>
-        </View>
-      ) : null}
+      {isDocuments ? (
+        <Text style={styles.lead}>
+          {t(
+            'org.warehouse.intake.documentsLead',
+            null,
+            'Import supplier invoices, review lines in the table, then Confirm row or Confirm all. Confirmed invoices stay forever; drafts can be deleted.',
+          )}
+        </Text>
+      ) : (
+        <Text style={styles.lead}>
+          {t(
+            'org.warehouse.intake.materialsLead',
+            null,
+            'On-hand stock from confirmed imports. Issuing materials to a task will decrease quantity here (next slice).',
+          )}
+        </Text>
+      )}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {message ? <Text style={styles.message}>{message}</Text> : null}
@@ -363,23 +674,13 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
           <Text style={styles.cardTitle}>
             {t('org.warehouse.intake.summaryTitle', null, 'Stock update summary')}
           </Text>
-          {(confirmSummary.invoice_number || confirmSummary.supplier_name || confirmSummary.source_file_name) ? (
-            <Text style={styles.meta}>
-              {[
-                confirmSummary.supplier_name,
-                confirmSummary.invoice_number
-                  ? `#${confirmSummary.invoice_number}`
-                  : null,
-                confirmSummary.source_file_name,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </Text>
-          ) : (
-            <Text style={styles.meta}>
-              {t('org.warehouse.intake.summaryManual', null, 'Manual material entry')}
-            </Text>
-          )}
+          <Text style={styles.meta}>
+            {t(
+              'org.warehouse.intake.confirmWrites',
+              null,
+              'Wrote SKU + on-hand quantity for each confirmed line.',
+            )}
+          </Text>
           {(confirmSummary.materials || []).map((m, idx) => (
             <View key={`${m.part_number || m.name}-${idx}`} style={styles.lineRow}>
               <Text style={styles.lineName} numberOfLines={2}>
@@ -387,7 +688,9 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
               </Text>
               <Text style={styles.lineMeta}>
                 {m.part_number ? `${m.part_number}` : ''}
-                {m.part_number_alias ? ` · ${t('org.warehouse.intake.oldSku', null, 'old')} ${m.part_number_alias}` : ''}
+                {m.part_number_alias
+                  ? ` · ${t('org.warehouse.intake.oldSku', null, 'old')} ${m.part_number_alias}`
+                  : ''}
                 {m.part_number || m.part_number_alias ? ' · ' : ''}
                 +{m.quantity_added} {unitDisplay(m.unit_code, t)}
                 {' → '}
@@ -398,7 +701,26 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
         </AppCard>
       ) : null}
 
-      {showStandalone && canManage ? (
+      {isDocuments && canManage ? (
+        <Button mode="contained" onPress={onUpload} loading={busy} disabled={busy}>
+          {t('org.warehouse.intake.upload', null, 'Import invoice PDF')}
+        </Button>
+      ) : null}
+
+      {isMaterials && canManage ? (
+        <Button
+          mode="outlined"
+          onPress={() => {
+            setShowStandalone((v) => !v);
+            setConfirmSummary(null);
+          }}
+          disabled={busy}
+        >
+          {t('org.warehouse.intake.addMaterial', null, 'Add material')}
+        </Button>
+      ) : null}
+
+      {isMaterials && showStandalone && canManage ? (
         <AppCard style={styles.card}>
           <Text style={styles.cardTitle}>
             {t('org.warehouse.intake.addMaterialTitle', null, 'Add material (no invoice)')}
@@ -415,14 +737,6 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
             label={t('org.warehouse.intake.partNumber', null, 'Part number / SKU')}
             value={standalone.part_number}
             onChangeText={(v) => setStandalone((p) => ({ ...p, part_number: v }))}
-            mode="outlined"
-            style={styles.input}
-            textColor={ON_CARD}
-          />
-          <TextInput
-            label={t('org.warehouse.intake.oldPartNumber', null, 'Old material number (optional)')}
-            value={standalone.part_number_alias}
-            onChangeText={(v) => setStandalone((p) => ({ ...p, part_number_alias: v }))}
             mode="outlined"
             style={styles.input}
             textColor={ON_CARD}
@@ -453,13 +767,13 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
             onChange={(code) => setStandalone((p) => ({ ...p, unit_code: code }))}
             t={t}
           />
-          <Button mode="contained" onPress={onAddStandalone} loading={busy} disabled={busy} style={styles.primaryBtn}>
+          <Button mode="contained" onPress={onAddStandalone} loading={busy} disabled={busy}>
             {t('org.warehouse.intake.saveMaterial', null, 'Save to warehouse')}
           </Button>
         </AppCard>
       ) : null}
 
-      {activeIntake ? (
+      {isDocuments && activeIntake ? (
         <AppCard style={styles.card}>
           <Text style={styles.cardTitle}>
             {activeIntake.document_kind === 'proforma'
@@ -468,34 +782,42 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
             {activeIntake.invoice_number ? ` #${activeIntake.invoice_number}` : ''}
           </Text>
           <Text style={styles.meta}>
-            {activeIntake.supplier_name || t('org.warehouse.intake.unknownSupplier', null, 'Supplier unknown')}
-            {' · '}
             {activeIntake.status}
-            {activeIntake.linked_proforma_id
-              ? ` · ${t('org.warehouse.intake.linkedProforma', null, 'Linked proforma')} #${activeIntake.linked_proforma_id}`
-              : ''}
+            {activeIntake.source_file_name ? ` · ${activeIntake.source_file_name}` : ''}
+            {activeIntake.layout_id ? ` · ${activeIntake.layout_id}` : ''}
           </Text>
+
+          {activeIntake.status === 'draft' && canManage ? (
+            <View style={styles.supplierRow}>
+              <TextInput
+                label={t('org.warehouse.intake.supplier', null, 'Supplier')}
+                value={supplierDraft}
+                onChangeText={setSupplierDraft}
+                mode="outlined"
+                style={[styles.input, styles.flex1]}
+                textColor={ON_CARD}
+              />
+              <Button mode="outlined" onPress={onSaveSupplier} disabled={busy} style={styles.supplierSave}>
+                {t('org.warehouse.intake.saveSupplier', null, 'Save supplier')}
+              </Button>
+            </View>
+          ) : (
+            <Text style={styles.meta}>
+              {activeIntake.supplier_name
+                || t('org.warehouse.intake.unknownSupplier', null, 'Supplier unknown')}
+            </Text>
+          )}
+
           {activeIntake.buyer_vat_number || activeIntake.organization_vat_number ? (
-            <Text
-              style={[
-                styles.meta,
-                activeIntake.buyer_vat_matches_organization === false ? styles.vatWarn : null,
-              ]}
-            >
+            <Text style={[styles.meta, vatBlocked ? styles.vatWarn : null]}>
               {t('org.warehouse.intake.buyerVat', null, 'Buyer VAT')}:{' '}
               {activeIntake.buyer_vat_number || '—'}
               {activeIntake.organization_vat_number
                 ? ` · ${t('org.warehouse.intake.orgVat', null, 'Org VAT')}: ${activeIntake.organization_vat_number}`
                 : ''}
-              {activeIntake.buyer_vat_matches_organization === false
+              {vatBlocked
                 ? ` — ${t('org.warehouse.intake.vatMismatchShort', null, 'mismatch')}`
                 : ''}
-            </Text>
-          ) : null}
-          {activeIntake.source_file_name ? (
-            <Text style={styles.docRef}>
-              {t('org.warehouse.intake.documentFile', null, 'Document')}: {activeIntake.source_file_name}
-              {activeIntake.layout_id ? ` · ${activeIntake.layout_id}` : ''}
             </Text>
           ) : null}
 
@@ -508,20 +830,30 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
               )}
             </Text>
           ) : (
-            (activeIntake.lines || []).map((line) => (
-              <View key={line.id} style={styles.lineRow}>
-                <Text style={styles.lineName} numberOfLines={2}>
-                  {line.description || line.part_number || '—'}
+            <ScrollView horizontal showsHorizontalScrollIndicator>
+              <View style={styles.tableWrap}>
+                <Text style={styles.tableHint}>
+                  {t(
+                    'org.warehouse.intake.tableHint',
+                    null,
+                    'Edit fields, pick unit, Save row, then Confirm row or Confirm all.',
+                  )}
                 </Text>
-                <Text style={styles.lineMeta}>
-                  {line.part_number ? `${line.part_number} · ` : ''}
-                  {line.part_number_alias
-                    ? `${t('org.warehouse.intake.oldSku', null, 'old')} ${line.part_number_alias} · `
-                    : ''}
-                  {line.quantity} {unitDisplay(line.unit_code, t)} · {priceLabel(line)}
-                </Text>
+                {(activeIntake.lines || []).map((line) => (
+                  <EditableLineCard
+                    key={line.id}
+                    line={line}
+                    canEdit={activeIntake.status === 'draft' && canManage}
+                    busy={busy}
+                    t={t}
+                    onSave={onSaveLine}
+                    onConfirmRow={onConfirmRow}
+                    onDeleteLine={onDeleteLine}
+                    vatBlocked={vatBlocked}
+                  />
+                ))}
               </View>
-            ))
+            </ScrollView>
           )}
 
           {activeIntake.status === 'draft' && canManage ? (
@@ -545,14 +877,6 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
                 style={styles.input}
                 textColor={ON_CARD}
               />
-              <TextInput
-                label={t('org.warehouse.intake.oldPartNumber', null, 'Old material number (optional)')}
-                value={manual.part_number_alias}
-                onChangeText={(v) => setManual((p) => ({ ...p, part_number_alias: v }))}
-                mode="outlined"
-                style={styles.input}
-                textColor={ON_CARD}
-              />
               <View style={styles.row2}>
                 <TextInput
                   label={t('org.warehouse.intake.qty', null, 'Qty')}
@@ -564,7 +888,7 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
                   textColor={ON_CARD}
                 />
                 <TextInput
-                  label={t('org.warehouse.intake.price', null, 'Price')}
+                  label={t('org.warehouse.intake.colPriceEx', null, 'Unit ex-VAT')}
                   value={manual.unit_price}
                   onChangeText={(v) => setManual((p) => ({ ...p, unit_price: v }))}
                   mode="outlined"
@@ -582,14 +906,21 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
               <Button mode="outlined" onPress={onAddManual} disabled={busy} style={styles.secondaryBtn}>
                 {t('org.warehouse.intake.addLine', null, 'Add line')}
               </Button>
+              <Text style={styles.helper}>
+                {t(
+                  'org.warehouse.intake.confirmHint',
+                  null,
+                  'Confirm writes each line as a warehouse SKU and adds quantity on hand. Original invoice is kept permanently.',
+                )}
+              </Text>
               <Button
                 mode="contained"
-                onPress={onConfirm}
+                onPress={onConfirmAll}
                 loading={busy}
-                disabled={busy || activeIntake.buyer_vat_matches_organization === false}
+                disabled={busy || vatBlocked}
                 style={styles.primaryBtn}
               >
-                {t('org.warehouse.intake.confirm', null, 'Confirm → warehouse')}
+                {t('org.warehouse.intake.confirm', null, 'Confirm all → warehouse')}
               </Button>
               <Button
                 mode="outlined"
@@ -598,19 +929,19 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
                 disabled={busy}
                 style={styles.deleteOutlined}
               >
-                {t('org.warehouse.intake.delete', null, 'Delete')}
+                {t('org.warehouse.intake.delete', null, 'Delete draft')}
               </Button>
             </View>
           ) : null}
         </AppCard>
       ) : null}
 
-      {intakes.length > 0 ? (
+      {isDocuments && intakes.length > 0 ? (
         <>
           <Text style={styles.sectionTitle}>
             {t('org.warehouse.intake.history', null, 'Recent imports')}
           </Text>
-          {intakes.slice(0, 8).map((row) => (
+          {intakes.slice(0, 12).map((row) => (
             <AppCard key={row.id} style={styles.card}>
               <Pressable onPress={() => openIntake(row)}>
                 <Text style={styles.lineName}>
@@ -631,39 +962,106 @@ export default function OrgMaterialsIntakePanel({ organizationId, canManage }) {
                   disabled={busy}
                   style={styles.deleteOutlined}
                 >
-                  {t('org.warehouse.intake.delete', null, 'Delete')}
+                  {t('org.warehouse.intake.delete', null, 'Delete draft')}
                 </Button>
+              ) : row.status === 'confirmed' ? (
+                <Text style={styles.keptNote}>
+                  {t(
+                    'org.warehouse.intake.keptForever',
+                    null,
+                    'Confirmed — original kept permanently',
+                  )}
+                </Text>
               ) : null}
             </AppCard>
           ))}
         </>
       ) : null}
 
-      <Text style={styles.sectionTitle}>
-        {t('org.warehouse.intake.stockTitle', null, 'Warehouse materials')}
-      </Text>
-      {materials.length === 0 ? (
-        <EmptyStateCard
-          title={t('org.warehouse.intake.emptyTitle', null, 'No materials yet')}
-          subtitle={t(
-            'org.warehouse.intake.empty',
-            null,
-            'Import an invoice or add a material manually.',
+      {isMaterials ? (
+        <>
+          <Text style={styles.sectionTitle}>
+            {t('org.warehouse.intake.stockTitle', null, 'Warehouse materials')}
+          </Text>
+          {editingMaterial ? (
+            <AppCard style={styles.card}>
+              <Text style={styles.cardTitle}>
+                {t('org.warehouse.intake.editMaterial', null, 'Edit material')}
+              </Text>
+              <TextInput
+                label={t('org.warehouse.intake.lineName', null, 'Name / description')}
+                value={editingMaterial.name}
+                onChangeText={(v) => setEditingMaterial((p) => ({ ...p, name: v }))}
+                mode="outlined"
+                style={styles.input}
+                textColor={ON_CARD}
+              />
+              <TextInput
+                label={t('org.warehouse.intake.partNumber', null, 'Part number / SKU')}
+                value={editingMaterial.part_number}
+                onChangeText={(v) => setEditingMaterial((p) => ({ ...p, part_number: v }))}
+                mode="outlined"
+                style={styles.input}
+                textColor={ON_CARD}
+              />
+              <Text style={styles.meta}>
+                {t('org.warehouse.intake.onHand', null, 'On hand')}: {editingMaterial.quantity_on_hand}
+                {editingMaterial.unit_code
+                  ? ` ${unitDisplay(editingMaterial.unit_code, t)}`
+                  : ''}
+              </Text>
+              <View style={styles.lineActions}>
+                <Button mode="contained" onPress={onSaveMaterial} loading={busy} disabled={busy}>
+                  {t('common.save', null, 'Save')}
+                </Button>
+                <Button mode="text" onPress={() => setEditingMaterial(null)} textColor={ON_CARD}>
+                  {t('common.cancel', null, 'Cancel')}
+                </Button>
+              </View>
+            </AppCard>
+          ) : null}
+          {materials.length === 0 ? (
+            <EmptyStateCard
+              title={t('org.warehouse.intake.emptyTitle', null, 'No materials yet')}
+              subtitle={t(
+                'org.warehouse.intake.empty',
+                null,
+                'Import an invoice or add a material manually.',
+              )}
+              icon="package-variant-closed"
+            />
+          ) : (
+            materials.map((row) => (
+              <Pressable
+                key={row.stock_id || row.id}
+                onPress={() => {
+                  if (!canManage) return;
+                  setEditingMaterial({
+                    stock_id: row.stock_id,
+                    name: row.name || '',
+                    part_number: row.part_number || '',
+                    description: row.description || row.name || '',
+                    quantity_on_hand: row.quantity_on_hand,
+                    unit_code: row.unit_code,
+                  });
+                }}
+              >
+                <AppCard style={styles.card}>
+                  <Text style={styles.lineName}>{row.name}</Text>
+                  <Text style={styles.lineMeta}>
+                    {row.part_number ? `${row.part_number} · ` : ''}
+                    {t('org.warehouse.intake.onHand', null, 'On hand')}: {row.quantity_on_hand}
+                    {row.unit_code ? ` ${unitDisplay(row.unit_code, t)}` : ''}
+                    {canManage
+                      ? ` · ${t('org.warehouse.intake.tapToEdit', null, 'Tap to edit')}`
+                      : ''}
+                  </Text>
+                </AppCard>
+              </Pressable>
+            ))
           )}
-          icon="package-variant-closed"
-        />
-      ) : (
-        materials.map((row) => (
-          <AppCard key={row.stock_id || row.id} style={styles.card}>
-            <Text style={styles.lineName}>{row.name}</Text>
-            <Text style={styles.lineMeta}>
-              {row.part_number ? `${row.part_number} · ` : ''}
-              {t('org.warehouse.intake.onHand', null, 'On hand')}: {row.quantity_on_hand}
-              {row.unit_code ? ` ${unitDisplay(row.unit_code, t)}` : ''}
-            </Text>
-          </AppCard>
-        ))
-      )}
+        </>
+      ) : null}
     </View>
   );
 }
@@ -672,11 +1070,8 @@ const styles = StyleSheet.create({
   wrap: { gap: 12 },
   center: { paddingVertical: 40, alignItems: 'center' },
   lead: { color: ON_CARD_MUTED, fontSize: 14, lineHeight: 20 },
-  actionsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  flexBtn: { flexGrow: 1 },
   primaryBtn: { marginTop: 4 },
   secondaryBtn: { marginBottom: 8, marginTop: 8 },
-  deleteBtn: { alignSelf: 'flex-start', marginTop: 4 },
   deleteOutlined: {
     alignSelf: 'flex-start',
     marginTop: 8,
@@ -689,8 +1084,7 @@ const styles = StyleSheet.create({
   summaryCard: { borderLeftWidth: 4, borderLeftColor: '#15803d' },
   cardTitle: { color: ON_CARD, fontSize: 16, fontWeight: '600' },
   meta: { color: ON_CARD_MUTED, fontSize: 12 },
-  docRef: { color: ON_CARD_MUTED, fontSize: 12, fontStyle: 'italic' },
-  helper: { color: ON_CARD_MUTED, fontSize: 13, marginTop: 6 },
+  helper: { color: ON_CARD_MUTED, fontSize: 13, marginTop: 6, marginBottom: 6 },
   lineRow: { paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E2E8F0' },
   lineName: { color: ON_CARD, fontSize: 14, fontWeight: '500' },
   lineMeta: { color: ON_CARD_MUTED, fontSize: 12, marginTop: 2 },
@@ -713,6 +1107,35 @@ const styles = StyleSheet.create({
     borderColor: '#0F766E',
     backgroundColor: '#CCFBF1',
   },
+  unitChipDisabled: { opacity: 0.55 },
   unitChipText: { color: ON_CARD_MUTED, fontSize: 12, fontWeight: '500' },
   unitChipTextSelected: { color: '#115E59' },
+  tableWrap: { minWidth: 720, gap: 10, paddingBottom: 4 },
+  tableHint: { color: ON_CARD_MUTED, fontSize: 12, marginBottom: 4 },
+  tableRow: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: '#F8FAFC',
+    gap: 4,
+  },
+  tableRowConfirmed: {
+    borderColor: '#86EFAC',
+    backgroundColor: '#F0FDF4',
+  },
+  tableGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  colSku: { width: 130 },
+  colName: { width: 220 },
+  colQty: { width: 90 },
+  colPrice: { width: 110 },
+  lineActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 },
+  confirmedBadge: { color: '#15803d', fontSize: 12, fontWeight: '600' },
+  supplierRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' },
+  supplierSave: { marginTop: 6 },
+  keptNote: { color: ON_CARD_MUTED, fontSize: 11, fontStyle: 'italic', marginTop: 4 },
 });
