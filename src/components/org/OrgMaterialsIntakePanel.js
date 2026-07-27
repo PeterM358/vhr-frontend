@@ -21,7 +21,6 @@ import {
 import { pickReceiptOrInvoiceAttachment } from '../utils/pickDocumentFile';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useTranslation } from '../i18n';
-import { COLORS } from '../constants/colors';
 
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
