@@ -57,8 +57,7 @@ function isOpenTaskStatus(status) {
 }
 
 function isFleetIssueStatus(status) {
-  const value = String(status || '').toLowerCase();
-  return value === 'not_ready' || value === 'expiring_soon';
+  return String(status || '').toLowerCase() === 'not_ready';
 }
 
 /** Same person-name heuristic as client Home ("Hi, Mihailov"). Empty → ''. */
