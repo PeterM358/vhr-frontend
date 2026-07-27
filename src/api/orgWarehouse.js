@@ -83,6 +83,22 @@ export async function listOrgMaterials(token, organizationId, params = {}) {
   return response.json();
 }
 
+export async function createOrgMaterial(token, organizationId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/materials/`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to add material'));
+  return response.json();
+}
+
 export async function listMaterialsIntakes(token, organizationId, params = {}) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/materials-intake/${buildQuery(params)}`,
@@ -99,6 +115,18 @@ export async function getMaterialsIntake(token, organizationId, intakeId) {
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load intake'));
   return response.json();
+}
+
+export async function deleteMaterialsIntake(token, organizationId, intakeId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/materials-intake/${intakeId}/`,
+    {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to delete draft'));
+  return true;
 }
 
 export async function uploadMaterialsIntake(
