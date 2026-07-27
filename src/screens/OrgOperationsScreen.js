@@ -259,10 +259,11 @@ function normSummaryText(row, t, kindLabel) {
       {
         base: norms.transport.base_rate,
         perTon: perTon || '0',
+        unit: 'L',
       },
       perTon
-        ? `${norms.transport.base_rate} + ${perTon} / t`
-        : `${norms.transport.base_rate} base`,
+        ? `${norms.transport.base_rate} L/100 km empty + ${perTon} L/t`
+        : `${norms.transport.base_rate} L/100 km empty`,
     );
   }
   if (norms.labor?.preset_hours != null) {
@@ -638,11 +639,15 @@ export default function OrgOperationsScreen({ navigation, route }) {
             {t(
               'org.operations.transportNormsHelper',
               null,
-              'Fuel burn: base rate plus extra per ton in the trailer (e.g. DAF 25 L + 0.4 L/t). Driver later fills meter start/end — not a separate km field.',
+              'Two-part fuel norm: L per 100 km empty + extra L per ton loaded (e.g. 25 + 0.4). Driver fills meter start/end on End — not a separate km field.',
             )}
           </Text>
           <TextInput
-            label={t('org.operations.transportBaseRate', null, 'Base fuel rate')}
+            label={t(
+              'org.operations.transportBaseRate',
+              null,
+              'Fuel L / 100 km (empty)',
+            )}
             value={form.transportBaseRate}
             onChangeText={(value) => setField('transportBaseRate', value)}
             mode="outlined"
@@ -651,7 +656,11 @@ export default function OrgOperationsScreen({ navigation, route }) {
             textColor={ON_CARD}
           />
           <TextInput
-            label={t('org.operations.transportPerTonRate', null, 'Per ton rate')}
+            label={t(
+              'org.operations.transportPerTonRate',
+              null,
+              'Extra L / ton (loaded)',
+            )}
             value={form.transportPerTonRate}
             onChangeText={(value) => setField('transportPerTonRate', value)}
             mode="outlined"
@@ -702,14 +711,14 @@ export default function OrgOperationsScreen({ navigation, route }) {
           {t('org.operations.wizard.consumedInputLabel', null, 'Consumed input (for norms)')}
         </Text>
         <Text style={styles.helper}>
-          {t(
+            {t(
             'org.operations.normsHelper',
             null,
-            'How much input is consumed per basis quantity of the primary unit (e.g. 0.8 L paint per 1 m²).',
+            'Consumed input = rate × (output ÷ basis). Example: 0.5 L paint per 1 m².',
           )}
         </Text>
         <TextInput
-          label={t('org.operations.normRate', null, 'Rate')}
+          label={t('org.operations.normRate', null, 'Input rate (e.g. 0.5 L)')}
           value={form.normRate}
           onChangeText={(value) => setField('normRate', value)}
           mode="outlined"
@@ -718,7 +727,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
           textColor={ON_CARD}
         />
         <TextInput
-          label={t('org.operations.normBasisQty', null, 'Per (basis qty)')}
+          label={t('org.operations.normBasisQty', null, 'Per output qty (e.g. 1 m²)')}
           value={form.normBasisQty}
           onChangeText={(value) => setField('normBasisQty', value)}
           mode="outlined"
@@ -727,7 +736,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
           textColor={ON_CARD}
         />
         <Text style={styles.fieldLabel}>
-          {t('org.operations.normInputUnit', null, 'Consumed input unit')}
+          {t('org.operations.normInputUnit', null, 'Input unit (paint L, etc.)')}
         </Text>
         {renderUnitChips(
           form.normInputUnitId,
@@ -975,9 +984,19 @@ export default function OrgOperationsScreen({ navigation, route }) {
       .join(', ');
     let rateLine = t('org.operations.wizard.none', null, 'None');
     if (form.kind === 'transport' && (form.transportBaseRate || form.transportPerTonRate)) {
-      rateLine = `${form.transportBaseRate || '0'}${
-        form.transportPerTonRate ? ` + ${form.transportPerTonRate}/t` : ''
-      } ${unitLabel(findUnit(form.transportRateUnitId)) || ''}`.trim();
+      const fuelUnit = unitLabel(findUnit(form.transportRateUnitId)) || 'L';
+      rateLine = t(
+        'org.operations.transportNormSummary',
+        {
+          base: form.transportBaseRate || '0',
+          perTon: form.transportPerTonRate || '0',
+          unit: fuelUnit,
+        },
+        `${form.transportBaseRate || '0'} ${fuelUnit}/100 km empty` +
+          (form.transportPerTonRate
+            ? ` + ${form.transportPerTonRate} ${fuelUnit}/t`
+            : ''),
+      );
     } else if (form.normRate.trim()) {
       rateLine = `${form.normRate} ${unitLabel(findUnit(form.normInputUnitId)) || ''} / ${
         form.normBasisQty || '1'

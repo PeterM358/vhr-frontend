@@ -629,11 +629,24 @@ export default function OrgTasksScreen({ navigation, route }) {
                         {op.actual_qty != null
                           ? ` · ${t('org.tasks.actualQty', null, 'Actual')}: ${op.actual_qty}`
                           : ''}
+                        {op.expected_input_qty != null
+                          ? ` · ${t('org.tasks.expectedInputQtyShort', null, 'Expected')}: ${op.expected_input_qty}`
+                          : ''}
                       </Text>
                     ) : op.actual_qty != null ? (
                       <Text style={styles.opMeta}>
                         {t('org.tasks.actualQty', null, 'Actual')}: {op.actual_qty}
                         {unitLabelText ? ` ${unitLabelText}` : ''}
+                      </Text>
+                    ) : null}
+
+                    {op.expected_input_qty != null ? (
+                      <Text style={styles.opMeta}>
+                        {t(
+                          'org.tasks.expectedInputQty',
+                          { qty: op.expected_input_qty },
+                          `Expected input (norm): ${op.expected_input_qty}`,
+                        )}
                       </Text>
                     ) : null}
 
