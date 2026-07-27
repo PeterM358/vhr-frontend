@@ -8,8 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Button, TextInput } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 
-import AppCard from './ui/AppCard';
-import EmptyStateCard from './ui/EmptyStateCard';
+import AppCard from '../ui/AppCard';
+import EmptyStateCard from '../ui/EmptyStateCard';
 import {
   addMaterialsIntakeLine,
   confirmMaterialsIntake,
@@ -17,10 +17,10 @@ import {
   listMaterialsIntakes,
   listOrgMaterials,
   uploadMaterialsIntake,
-} from '../api/orgWarehouse';
-import { pickReceiptOrInvoiceAttachment } from '../utils/pickDocumentFile';
-import { STORAGE_KEYS } from '../constants/storageKeys';
-import { useTranslation } from '../i18n';
+} from '../../api/orgWarehouse';
+import { pickReceiptOrInvoiceAttachment } from '../../utils/pickDocumentFile';
+import { STORAGE_KEYS } from '../../constants/storageKeys';
+import { useTranslation } from '../../i18n';
 
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
