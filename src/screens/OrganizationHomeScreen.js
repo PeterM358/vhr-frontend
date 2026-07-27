@@ -1,6 +1,6 @@
 import React, { useCallback, useContext, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { FAB, Text, useTheme } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
@@ -33,10 +33,7 @@ import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 import { useTranslation } from '../i18n';
 import {
   navigateToNotifications,
-  navigateToOrgCalendar,
   navigateToOrgFleet,
-  navigateToOrgNetwork,
-  navigateToOrgCreateTask,
   navigateToOrgOperations,
   navigateToOrgProjects,
   navigateToOrgTasks,
@@ -45,8 +42,6 @@ import {
   navigateToPartnerDashboard,
   navigateToProfile,
 } from '../navigation/webNavigation';
-
-const PRIMARY_HOME_ROUTES = new Set(['OrgOverview', 'OrgFleet', 'OrgOperations', 'OrgTasks', 'OrgWarehouse']);
 
 function localTodayIso() {
   const now = new Date();
@@ -59,6 +54,11 @@ function localTodayIso() {
 function isOpenTaskStatus(status) {
   const value = String(status || '').toLowerCase();
   return value !== 'done' && value !== 'cancelled';
+}
+
+function isFleetIssueStatus(status) {
+  const value = String(status || '').toLowerCase();
+  return value === 'not_ready' || value === 'expiring_soon';
 }
 
 /** Same person-name heuristic as client Home ("Hi, Mihailov"). Empty → ''. */
@@ -83,19 +83,24 @@ function extractFirstName(rawValue) {
   return lettersOnly.charAt(0).toUpperCase() + lettersOnly.slice(1);
 }
 
+function normalizeOrgRoute(route) {
+  if (route === 'OrgWorkOrders') return 'OrgTasks';
+  return route;
+}
+
 export default function OrganizationHomeScreen() {
   const navigation = useNavigation();
-  const theme = useTheme();
   const { t } = useTranslation();
   const { authToken, userEmailOrPhone } = useContext(AuthContext);
   const [org, setOrg] = useState(null);
   const [memberships, setMemberships] = useState([]);
   const [fleetCount, setFleetCount] = useState(null);
+  const [notReadyCount, setNotReadyCount] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [tasksExpanded, setTasksExpanded] = useState(false);
   const [busyStart, setBusyStart] = useState(false);
   const [loading, setLoading] = useState(true);
-  const scrollBottomPadding = useScrollContentBottomPadding(80);
+  const scrollBottomPadding = useScrollContentBottomPadding(40);
   const isDriver = isDriverMembership(org);
 
   const load = useCallback(async () => {
@@ -108,6 +113,7 @@ export default function OrganizationHomeScreen() {
       setOrg(active);
       if (!active?.id) {
         setFleetCount(0);
+        setNotReadyCount(0);
         setTasks([]);
         return;
       }
@@ -119,15 +125,22 @@ export default function OrganizationHomeScreen() {
           const data = await listWorkOrders(token, resolved, { mine: 1 });
           setTasks(Array.isArray(data?.results) ? data.results : []);
           setFleetCount(null);
+          setNotReadyCount(null);
         } else {
           const data = await listOrgFleet(token, resolved, {});
           const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
           setFleetCount(list.length);
+          setNotReadyCount(
+            list.filter((row) => isFleetIssueStatus(row?.readiness?.status)).length,
+          );
           setTasks([]);
         }
       } catch {
         if (driverLike) setTasks([]);
-        else setFleetCount(null);
+        else {
+          setFleetCount(null);
+          setNotReadyCount(null);
+        }
       }
     } finally {
       setLoading(false);
@@ -142,13 +155,18 @@ export default function OrganizationHomeScreen() {
 
   const fleetFocused = isFleetFocusedOrg(org);
   const navItems = buildOrgNavItems(org, t);
-  const hasFleet = fleetCount == null ? true : fleetCount > 0;
+  const navRoutes = useMemo(
+    () => new Set(navItems.map((item) => normalizeOrgRoute(item.route))),
+    [navItems],
+  );
   const orgName = org?.display_name || t('org.home.title');
   const workerName =
     extractFirstName(userEmailOrPhone) ||
     toDisplayName(userEmailOrPhone) ||
     t('common.user');
   const today = localTodayIso();
+  const canManageOps = Boolean(org?.manage_org_operations || org?.manage_fleet);
+  const canViewFleet = Boolean(org?.manage_fleet || org?.can_view_fleet || fleetFocused);
 
   const { todayTasks, upcomingTasks } = useMemo(() => {
     const open = tasks.filter((row) => isOpenTaskStatus(row.status));
@@ -173,49 +191,10 @@ export default function OrganizationHomeScreen() {
     return [...restToday, ...upcomingTasks.filter((row) => row.id !== currentTask?.id)];
   }, [todayTasks, upcomingTasks, currentTask]);
 
-  const openSection = (route) => {
-    if (route === 'OrgFleet') {
-      navigateToOrgFleet(navigation, { orgId: org?.id });
-      return;
-    }
-    if (route === 'OrgNetwork') {
-      navigateToOrgNetwork(navigation, { orgId: org?.id });
-      return;
-    }
-    if (route === 'OrgWorkforce') {
-      navigateToOrgWorkforce(navigation, { orgId: org?.id });
-      return;
-    }
-    if (route === 'OrgOperations') {
-      navigateToOrgOperations(navigation, { orgId: org?.id });
-      return;
-    }
-    if (route === 'OrgTasks' || route === 'OrgWorkOrders') {
-      navigateToOrgTasks(navigation, { orgId: org?.id });
-      return;
-    }
-    if (route === 'OrgProjects') {
-      navigateToOrgProjects(navigation, { orgId: org?.id });
-      return;
-    }
-    if (route === 'OrgWarehouse') {
-      navigateToOrgWarehouse(navigation, { orgId: org?.id });
-      return;
-    }
-    if (route === 'OrgOverview') {
-      return;
-    }
-    navigation.navigate(route, { organizationId: org?.id });
-  };
-
   const switchOrganization = async (nextOrg) => {
     await setCurrentOrganizationId(nextOrg.id);
     setOrg(nextOrg);
     load();
-  };
-
-  const goImportFleet = () => {
-    navigation.navigate('FleetRegisterImport', { organizationId: org?.id });
   };
 
   const switchToPersonal = async () => {
@@ -238,47 +217,6 @@ export default function OrganizationHomeScreen() {
     } finally {
       setBusyStart(false);
     }
-  };
-
-  const goRequestRepair = () => {
-    if (!hasFleet && !isDriver) {
-      Alert.alert(
-        t('org.home.needVehicleTitle', null, 'Add vehicles first'),
-        t(
-          'org.home.needVehicleBody',
-          null,
-          'Import your fleet register (or add vehicles), then request a repair the same way customers do.',
-        ),
-        [
-          { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
-          ...(org?.manage_fleet
-            ? [{ text: t('fleetImport.openAction', null, 'Import fleet'), onPress: goImportFleet }]
-            : []),
-          {
-            text: t('fleet.openFleet', null, 'View fleet'),
-            onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }),
-          },
-        ],
-      );
-      return;
-    }
-    if (isDriver) {
-      Alert.alert(
-        t('org.home.tasks.repairLaterTitle', null, 'Repair from a task'),
-        t(
-          'org.home.tasks.repairLaterBody',
-          null,
-          'Vehicles travel with your work cards. When a task includes a vehicle, you can request repair from there.',
-        ),
-      );
-      return;
-    }
-    navigation.navigate('CreateRepair', {
-      mode: 'request',
-      organizationId: org?.id,
-      returnTo: 'OrgHome',
-      origin: 'OrgHome',
-    });
   };
 
   const statusLabel = useCallback(
@@ -309,20 +247,19 @@ export default function OrganizationHomeScreen() {
         onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }),
       },
       {
-        key: 'repair',
-        value: hasFleet
-          ? t('org.home.summary.ready', null, 'Ready')
-          : t('org.home.summary.needVehicles', null, 'Add cars'),
-        label: t('org.home.summary.repair', null, 'Repair'),
-        onPress: goRequestRepair,
+        key: 'notReady',
+        value: notReadyCount == null ? '—' : notReadyCount,
+        label: t('org.home.summary.notReady', null, 'Not ready'),
+        onPress: () =>
+          navigateToOrgFleet(navigation, { orgId: org?.id, tab: 'issues' }),
       },
     ];
   }, [
     fleetCount,
     futureTasks.length,
-    hasFleet,
     isDriver,
     navigation,
+    notReadyCount,
     org?.id,
     t,
     todayTasks.length,
@@ -371,144 +308,42 @@ export default function OrganizationHomeScreen() {
       ];
     }
 
-    const tiles = [
-      {
-        key: 'fleet',
-        icon: 'truck',
-        title: t('fleet.openFleet', null, 'View fleet'),
-        subtitle: t(
-          'org.home.actions.fleetSubtitle',
-          null,
-          'Browse company vehicles, readiness, and details.',
-        ),
-        onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }),
-        count: typeof fleetCount === 'number' ? fleetCount : undefined,
-      },
-      {
-        key: 'calendar',
-        icon: 'calendar-month-outline',
-        title: t('org.home.actions.calendar', null, 'Calendar'),
-        subtitle: t(
-          'org.home.actions.calendarSubtitle',
-          null,
-          'Fleet readiness deadlines and reminders.',
-        ),
-        onPress: () => navigateToOrgCalendar(navigation, { orgId: org?.id }),
-      },
-      {
-        key: 'notifications',
-        icon: 'bell-outline',
-        title: t('org.home.actions.notifications', null, 'Notifications'),
-        subtitle: t(
-          'org.home.actions.notificationsSubtitle',
-          null,
-          'Open your notification inbox.',
-        ),
-        onPress: () =>
-          navigateToNotifications(navigation, {
-            returnTo: 'OrgHome',
-            backLabelKey: 'org.home.title',
-          }),
-      },
-      {
-        key: 'profile',
-        icon: 'account-circle-outline',
-        title: t('org.home.actions.profile', null, 'Profile'),
-        subtitle: t(
-          'org.home.actions.profileSubtitle',
-          null,
-          'Open your account profile.',
-        ),
-        onPress: () => navigateToProfile(navigation),
-      },
-    ];
+    const tiles = [];
 
-    if (org?.manage_fleet) {
+    if (canManageOps || navRoutes.has('OrgTasks')) {
       tiles.push({
-        key: 'import',
-        icon: 'file-upload-outline',
-        title: t('fleetImport.openAction', null, 'Import fleet'),
-        subtitle: t(
-          'org.home.actions.importSubtitle',
-          null,
-          'Upload your register spreadsheet to add vehicles.',
-        ),
-        onPress: goImportFleet,
-      });
-    }
-
-    if (org?.manage_fleet || org?.can_view_fleet || fleetFocused) {
-      tiles.push({
-        key: 'repair',
-        icon: 'wrench',
-        title: t('org.home.requestRepair', null, 'Request repair'),
-        subtitle: hasFleet
-          ? t(
-              'org.home.actions.repairSubtitle',
-              null,
-              'Request service for a fleet vehicle like a customer.',
-            )
-          : t(
-              'org.home.needVehicleHint',
-              null,
-              'Request repair needs at least one fleet vehicle — import your register first.',
-            ),
-        onPress: goRequestRepair,
-      });
-    }
-
-    navItems
-      .filter((item) => item.route && !PRIMARY_HOME_ROUTES.has(item.route))
-      .forEach((item) => {
-        const iconByRoute = {
-          OrgWorkforce: 'account-hard-hat',
-          OrgWarehouse: 'warehouse',
-          OrgDocuments: 'file-document-outline',
-          OrgConstruction: 'hard-hat',
-          OrgTransport: 'bus',
-          OrgWorkOrders: 'clipboard-list-outline',
-          OrgNetwork: 'transit-connection-variant',
-          OrgInvoicing: 'receipt',
-          OrgLedger: 'book-open-outline',
-          OrgLocations: 'map-marker-radius',
-          OrgPublicProfile: 'earth',
-        };
-        tiles.push({
-          key: item.key || item.route,
-          icon: iconByRoute[item.route] || 'view-grid-outline',
-          title: item.label,
-          subtitle: t('org.home.actions.openSection', null, 'Open this workspace section.'),
-          onPress: () => openSection(item.route),
-        });
-      });
-
-    if (org?.manage_org_operations || org?.manage_fleet) {
-      tiles.unshift({
-        key: 'create-task',
-        icon: 'clipboard-plus-outline',
-        title: t('org.tasks.createTitle', null, 'Create task'),
-        subtitle: t(
-          'org.home.actions.createTaskSubtitle',
-          null,
-          'Assign multiple operations and people on one work card.',
-        ),
-        onPress: () => navigateToOrgCreateTask(navigation, { orgId: org?.id }),
-      });
-      tiles.unshift({
         key: 'tasks',
         icon: 'clipboard-check-outline',
-        title: t('org.tasks.listTitle', null, 'Tasks'),
+        title: t('org.nav.tasks', null, 'Tasks'),
         subtitle: t(
           'org.home.actions.tasksSubtitle',
           null,
-          'See work cards, people, vehicles, and status.',
+          'Open, all, and add work cards.',
         ),
         onPress: () => navigateToOrgTasks(navigation, { orgId: org?.id }),
       });
-      tiles.unshift({
+    }
+
+    if (canViewFleet || navRoutes.has('OrgFleet')) {
+      tiles.push({
+        key: 'fleet',
+        icon: 'truck',
+        title: t('org.nav.fleet', null, 'Fleet'),
+        subtitle: t(
+          'org.home.actions.fleetSubtitle',
+          null,
+          'Vehicles, readiness, import, and service requests.',
+        ),
+        onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }),
+        count: typeof fleetCount === 'number' ? fleetCount : undefined,
+      });
+    }
+
+    if (canManageOps) {
+      tiles.push({
         key: 'projects',
         icon: 'briefcase-outline',
-        title: t('org.projects.title', null, 'Projects'),
+        title: t('org.nav.projects', null, 'Projects'),
         subtitle: t(
           'org.home.actions.projectsSubtitle',
           null,
@@ -516,16 +351,36 @@ export default function OrganizationHomeScreen() {
         ),
         onPress: () => navigateToOrgProjects(navigation, { orgId: org?.id }),
       });
-      tiles.unshift({
+      tiles.push({
         key: 'operations',
         icon: 'clipboard-list-outline',
-        title: t('org.operations.title', null, 'Operations'),
+        title: t('org.nav.operations', null, 'Operations'),
         subtitle: t(
           'org.home.actions.operationsSubtitle',
           null,
           'Define company operations used on work cards.',
         ),
         onPress: () => navigateToOrgOperations(navigation, { orgId: org?.id }),
+      });
+    }
+
+    if (navRoutes.has('OrgWorkforce')) {
+      tiles.push({
+        key: 'workforce',
+        icon: 'account-hard-hat',
+        title: t('org.nav.workforce', null, 'Workforce'),
+        subtitle: t('org.home.actions.openSection', null, 'Open this workspace section.'),
+        onPress: () => navigateToOrgWorkforce(navigation, { orgId: org?.id }),
+      });
+    }
+
+    if (navRoutes.has('OrgWarehouse')) {
+      tiles.push({
+        key: 'warehouse',
+        icon: 'warehouse',
+        title: t('org.nav.warehouse', null, 'Warehouse'),
+        subtitle: t('org.home.actions.openSection', null, 'Open this workspace section.'),
+        onPress: () => navigateToOrgWarehouse(navigation, { orgId: org?.id }),
       });
     }
 
@@ -545,34 +400,16 @@ export default function OrganizationHomeScreen() {
 
     return tiles;
   }, [
+    canManageOps,
+    canViewFleet,
     fleetCount,
-    fleetFocused,
-    hasFleet,
     isDriver,
-    navItems,
+    navRoutes,
     navigation,
-    org?.can_view_fleet,
     org?.has_shop_locations,
     org?.id,
-    org?.manage_fleet,
-    org?.manage_org_operations,
     t,
   ]);
-
-  const canCreateTasks = Boolean(org?.manage_org_operations || org?.manage_fleet);
-
-  const fabConfig = isDriver
-    ? null
-    : canCreateTasks
-      ? {
-          label: t('org.tasks.createTitle', null, 'Create task'),
-          onPress: () => navigateToOrgCreateTask(navigation, { orgId: org?.id }),
-        }
-      : hasFleet
-        ? { label: t('org.home.requestRepair', null, 'Request repair'), onPress: goRequestRepair }
-        : org?.manage_fleet
-          ? { label: t('fleetImport.openAction', null, 'Import fleet'), onPress: goImportFleet }
-          : null;
 
   return (
     <ScreenBackground safeArea={false}>
@@ -810,15 +647,6 @@ export default function OrganizationHomeScreen() {
           </>
         )}
       </ScrollView>
-
-      {fabConfig ? (
-        <FAB
-          label={fabConfig.label}
-          style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-          color="#fff"
-          onPress={fabConfig.onPress}
-        />
-      ) : null}
     </ScreenBackground>
   );
 }
@@ -981,10 +809,5 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
     marginTop: 2,
-  },
-  fab: {
-    position: 'absolute',
-    right: 16,
-    bottom: 20,
   },
 });

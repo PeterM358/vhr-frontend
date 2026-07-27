@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Button, FAB, Menu, Searchbar, Text, TouchableRipple, useTheme } from 'react-native-paper';
@@ -17,6 +17,12 @@ import { fleetVehicleTitle, mapFleetReadiness } from '../utils/fleetReadinessSta
 import { COLORS } from '../styles/colors';
 
 const READINESS_FILTERS = ['', 'not_ready', 'expiring_soon', 'unknown', 'ready'];
+
+const FLEET_TABS = [
+  { id: 'all', labelKey: 'fleet.dashboard.tabs.all', fallback: 'All' },
+  { id: 'issues', labelKey: 'fleet.dashboard.tabs.issues', fallback: 'Not ready' },
+  { id: 'import', labelKey: 'fleet.dashboard.tabs.import', fallback: 'Import' },
+];
 
 function FilterChipAnchor({ label, active, icon, onPress, style }) {
   return (
@@ -70,6 +76,7 @@ export default function FleetDashboardScreen({ navigation, route }) {
   const { width } = useWindowDimensions();
   const isWide = width >= 900;
   const initialOrgId = route.params?.organizationId;
+  const routeTab = String(route.params?.tab || '').toLowerCase();
 
   const [organizations, setOrganizations] = useState([]);
   const [selectedOrg, setSelectedOrg] = useState(null);
@@ -79,7 +86,12 @@ export default function FleetDashboardScreen({ navigation, route }) {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState('');
-  const [readinessStatus, setReadinessStatus] = useState('');
+  const [readinessStatus, setReadinessStatus] = useState(
+    routeTab === 'issues' ? 'not_ready' : '',
+  );
+  const [activeTab, setActiveTab] = useState(
+    routeTab === 'issues' || routeTab === 'import' ? routeTab : 'all',
+  );
   const [orgMenuVisible, setOrgMenuVisible] = useState(false);
   const [deptMenuVisible, setDeptMenuVisible] = useState(false);
   const [statusMenuVisible, setStatusMenuVisible] = useState(false);
@@ -90,6 +102,25 @@ export default function FleetDashboardScreen({ navigation, route }) {
   );
   const showOrgChip = visibleOrgs.length > 1;
 
+  useEffect(() => {
+    if (routeTab === 'issues' || routeTab === 'import' || routeTab === 'all') {
+      setActiveTab(routeTab);
+      if (routeTab === 'issues') setReadinessStatus('not_ready');
+      if (routeTab === 'all') setReadinessStatus('');
+    }
+  }, [routeTab]);
+
+  const selectTab = useCallback((tabId) => {
+    setActiveTab(tabId);
+    if (tabId === 'all') {
+      setReadinessStatus('');
+      return;
+    }
+    if (tabId === 'issues') {
+      setReadinessStatus('not_ready');
+    }
+  }, []);
+
   const loadOrganizations = useCallback(async () => {
     const token = await AsyncStorage.getItem('@access_token');
     const rows = await listOrganizations(token);
@@ -99,10 +130,16 @@ export default function FleetDashboardScreen({ navigation, route }) {
   }, [initialOrgId]);
 
   const loadFleet = useCallback(async () => {
-    if (!selectedOrg?.id) {
-      setFleet([]);
-      setDepartments([]);
-      setLoading(false);
+    if (!selectedOrg?.id || activeTab === 'import') {
+      if (activeTab === 'import') {
+        setFleet([]);
+        setLoading(false);
+      }
+      if (!selectedOrg?.id) {
+        setFleet([]);
+        setDepartments([]);
+        setLoading(false);
+      }
       return;
     }
     setLoading(true);
@@ -122,7 +159,7 @@ export default function FleetDashboardScreen({ navigation, route }) {
     } finally {
       setLoading(false);
     }
-  }, [department, readinessStatus, search, selectedOrg, t]);
+  }, [activeTab, department, readinessStatus, search, selectedOrg, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -202,7 +239,7 @@ export default function FleetDashboardScreen({ navigation, route }) {
     ? mapFleetReadiness({ status: readinessStatus }, t).label
     : t('fleet.dashboard.allStatuses');
 
-  const goRequestRepair = async () => {
+  const goServiceRequest = async () => {
     const orgId = selectedOrg?.id || initialOrgId;
     const isOrgOnly = await resolveIsOrgOnlySession();
     navigation.navigate('CreateRepair', {
@@ -213,144 +250,192 @@ export default function FleetDashboardScreen({ navigation, route }) {
     });
   };
 
+  const goImportFleet = () => {
+    navigation.navigate('FleetRegisterImport', {
+      organizationId: selectedOrg?.id || initialOrgId,
+    });
+  };
+
   return (
     <ScreenBackground>
       <OrgAppHeader mode="nested" title={t('fleet.dashboard.title')} onBack={onBack} />
       <View style={styles.container}>
         <View style={styles.toolbar}>
-          <Searchbar
-            placeholder={t('fleet.dashboard.searchPlaceholder')}
-            value={search}
-            onChangeText={setSearch}
-            onSubmitEditing={loadFleet}
-            onIconPress={loadFleet}
-            style={styles.search}
-            inputStyle={styles.searchInput}
-            iconColor="#64748b"
-            placeholderTextColor="#94a3b8"
-          />
-
-          <View style={styles.filterRow}>
-            {showOrgChip ? (
-              <Menu
-                visible={orgMenuVisible}
-                onDismiss={() => setOrgMenuVisible(false)}
-                anchor={
-                  <FilterChipAnchor
-                    label={selectedOrg?.display_name || t('fleetImport.chooseOrganization')}
-                    active={Boolean(selectedOrg)}
-                    icon="office-building-outline"
-                    onPress={() => setOrgMenuVisible(true)}
-                    style={styles.filterChipGrow}
-                  />
-                }
-              >
-                {visibleOrgs.map((org) => (
-                  <Menu.Item
-                    key={org.id}
-                    title={org.display_name}
-                    onPress={() => {
-                      setSelectedOrg(org);
-                      setOrgMenuVisible(false);
-                    }}
-                  />
-                ))}
-              </Menu>
-            ) : null}
-
-            <Menu
-              visible={deptMenuVisible}
-              onDismiss={() => setDeptMenuVisible(false)}
-              anchor={
-                <FilterChipAnchor
-                  label={department || t('fleet.dashboard.allDepartments')}
-                  active={Boolean(department)}
-                  icon="sitemap"
-                  onPress={() => setDeptMenuVisible(true)}
-                />
-              }
-            >
-              <Menu.Item
-                title={t('fleet.dashboard.allDepartments')}
-                onPress={() => {
-                  setDepartment('');
-                  setDeptMenuVisible(false);
-                }}
-              />
-              {departments.map((value) => (
-                <Menu.Item
-                  key={value}
-                  title={value}
-                  onPress={() => {
-                    setDepartment(value);
-                    setDeptMenuVisible(false);
-                  }}
-                />
-              ))}
-            </Menu>
-
-            <Menu
-              visible={statusMenuVisible}
-              onDismiss={() => setStatusMenuVisible(false)}
-              anchor={
-                <FilterChipAnchor
-                  label={statusLabel}
-                  active={Boolean(readinessStatus)}
-                  icon="shield-check-outline"
-                  onPress={() => setStatusMenuVisible(true)}
-                />
-              }
-            >
-              {READINESS_FILTERS.map((value) => (
-                <Menu.Item
-                  key={value || 'all'}
-                  title={
-                    value
-                      ? mapFleetReadiness({ status: value }, t).label
-                      : t('fleet.dashboard.allStatuses')
-                  }
-                  onPress={() => {
-                    setReadinessStatus(value);
-                    setStatusMenuVisible(false);
-                  }}
-                />
-              ))}
-            </Menu>
+          <View style={styles.modeRow}>
+            {FLEET_TABS.map((item) => {
+              const active = activeTab === item.id;
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => selectTab(item.id)}
+                  style={[styles.modeChip, active && styles.modeChipActive]}
+                >
+                  <Text style={[styles.modeChipText, active && styles.modeChipTextActive]}>
+                    {t(item.labelKey, null, item.fallback)}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
-          <Button
-            mode="outlined"
-            icon="file-upload-outline"
-            onPress={() => navigation.navigate('FleetRegisterImport')}
-            style={styles.importButton}
-            contentStyle={styles.importButtonContent}
-            labelStyle={styles.importButtonLabel}
-            textColor="#0f172a"
-          >
-            {t('fleetImport.openAction')}
-          </Button>
+          {activeTab === 'import' ? (
+            <View style={styles.importPanel}>
+              <Text style={styles.importLead}>
+                {t(
+                  'fleet.dashboard.importLead',
+                  null,
+                  'Upload your fleet register spreadsheet, or request service for a vehicle.',
+                )}
+              </Text>
+              <Button
+                mode="contained"
+                icon="file-upload-outline"
+                onPress={goImportFleet}
+                style={styles.importPrimary}
+              >
+                {t('fleetImport.openAction', null, 'Import fleet register')}
+              </Button>
+              <Button
+                mode="outlined"
+                icon="wrench"
+                onPress={goServiceRequest}
+                style={styles.importSecondary}
+                textColor="#fff"
+              >
+                {t('fleet.dashboard.serviceRequest', null, 'Service request')}
+              </Button>
+            </View>
+          ) : (
+            <>
+              <Searchbar
+                placeholder={t('fleet.dashboard.searchPlaceholder')}
+                value={search}
+                onChangeText={setSearch}
+                onSubmitEditing={loadFleet}
+                onIconPress={loadFleet}
+                style={styles.search}
+                inputStyle={styles.searchInput}
+                iconColor="#64748b"
+                placeholderTextColor="#94a3b8"
+              />
+
+              <View style={styles.filterRow}>
+                {showOrgChip ? (
+                  <Menu
+                    visible={orgMenuVisible}
+                    onDismiss={() => setOrgMenuVisible(false)}
+                    anchor={
+                      <FilterChipAnchor
+                        label={selectedOrg?.display_name || t('fleetImport.chooseOrganization')}
+                        active={Boolean(selectedOrg)}
+                        icon="office-building-outline"
+                        onPress={() => setOrgMenuVisible(true)}
+                        style={styles.filterChipGrow}
+                      />
+                    }
+                  >
+                    {visibleOrgs.map((org) => (
+                      <Menu.Item
+                        key={org.id}
+                        title={org.display_name}
+                        onPress={() => {
+                          setSelectedOrg(org);
+                          setOrgMenuVisible(false);
+                        }}
+                      />
+                    ))}
+                  </Menu>
+                ) : null}
+
+                <Menu
+                  visible={deptMenuVisible}
+                  onDismiss={() => setDeptMenuVisible(false)}
+                  anchor={
+                    <FilterChipAnchor
+                      label={department || t('fleet.dashboard.allDepartments')}
+                      active={Boolean(department)}
+                      icon="sitemap"
+                      onPress={() => setDeptMenuVisible(true)}
+                    />
+                  }
+                >
+                  <Menu.Item
+                    title={t('fleet.dashboard.allDepartments')}
+                    onPress={() => {
+                      setDepartment('');
+                      setDeptMenuVisible(false);
+                    }}
+                  />
+                  {departments.map((value) => (
+                    <Menu.Item
+                      key={value}
+                      title={value}
+                      onPress={() => {
+                        setDepartment(value);
+                        setDeptMenuVisible(false);
+                      }}
+                    />
+                  ))}
+                </Menu>
+
+                {activeTab === 'all' ? (
+                  <Menu
+                    visible={statusMenuVisible}
+                    onDismiss={() => setStatusMenuVisible(false)}
+                    anchor={
+                      <FilterChipAnchor
+                        label={statusLabel}
+                        active={Boolean(readinessStatus)}
+                        icon="shield-check-outline"
+                        onPress={() => setStatusMenuVisible(true)}
+                      />
+                    }
+                  >
+                    {READINESS_FILTERS.map((value) => (
+                      <Menu.Item
+                        key={value || 'all'}
+                        title={
+                          value
+                            ? mapFleetReadiness({ status: value }, t).label
+                            : t('fleet.dashboard.allStatuses')
+                        }
+                        onPress={() => {
+                          setReadinessStatus(value);
+                          setStatusMenuVisible(false);
+                        }}
+                      />
+                    ))}
+                  </Menu>
+                ) : null}
+              </View>
+            </>
+          )}
         </View>
 
-        {loading ? <ActivityIndicator style={styles.loader} color="#fff" /> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {activeTab !== 'import' ? (
+          <>
+            {loading ? <ActivityIndicator style={styles.loader} color="#fff" /> : null}
+            {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        {!loading && !error ? (
-          <FlatList
-            data={fleet}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={renderRow}
-            contentContainerStyle={styles.list}
-            ListEmptyComponent={<Text style={styles.empty}>{t('fleet.dashboard.empty')}</Text>}
-          />
+            {!loading && !error ? (
+              <FlatList
+                data={fleet}
+                keyExtractor={(item) => String(item.id)}
+                renderItem={renderRow}
+                contentContainerStyle={styles.list}
+                ListEmptyComponent={<Text style={styles.empty}>{t('fleet.dashboard.empty')}</Text>}
+              />
+            ) : null}
+
+            <FAB
+              icon="plus"
+              style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+              onPress={goServiceRequest}
+              label={t('fleet.dashboard.serviceRequest', null, 'Service request')}
+              color={theme.colors.onPrimary}
+            />
+          </>
         ) : null}
-
-        <FAB
-          icon="plus"
-          style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-          onPress={goRequestRepair}
-          label={t('fleet.dashboard.requestRepair', null, 'Request repair')}
-          color={theme.colors.onPrimary}
-        />
       </View>
     </ScreenBackground>
   );
@@ -364,6 +449,51 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     gap: 10,
+  },
+  modeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  modeChip: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  modeChipActive: {
+    backgroundColor: '#fff',
+    borderColor: '#fff',
+  },
+  modeChipText: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modeChipTextActive: {
+    color: '#0F172A',
+  },
+  importPanel: {
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    padding: 14,
+    gap: 10,
+  },
+  importLead: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  importPrimary: {
+    borderRadius: 12,
+  },
+  importSecondary: {
+    borderRadius: 12,
+    borderColor: 'rgba(255,255,255,0.45)',
   },
   search: {
     borderRadius: 12,
@@ -416,19 +546,6 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: '#fff',
     fontWeight: '700',
-  },
-  importButton: {
-    alignSelf: 'flex-start',
-    borderRadius: 12,
-    borderColor: 'rgba(255,255,255,0.55)',
-    backgroundColor: 'rgba(255,255,255,0.92)',
-  },
-  importButtonContent: {
-    minHeight: 40,
-  },
-  importButtonLabel: {
-    fontWeight: '600',
-    fontSize: 13,
   },
   loader: { marginTop: 24 },
   error: {

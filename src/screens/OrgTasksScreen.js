@@ -28,6 +28,17 @@ import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
 
+const TASK_TABS = [
+  { id: 'open', labelKey: 'org.tasks.tabs.open', fallback: 'Open' },
+  { id: 'all', labelKey: 'org.tasks.tabs.all', fallback: 'All' },
+  { id: 'add', labelKey: 'org.tasks.tabs.add', fallback: 'Add' },
+];
+
+function isOpenTaskStatus(status) {
+  const value = String(status || '').toLowerCase();
+  return value !== 'done' && value !== 'cancelled';
+}
+
 function statusLabel(status, t) {
   return t(`org.home.tasks.status.${status}`, null, status || '');
 }
@@ -86,6 +97,7 @@ export default function OrgTasksScreen({ navigation, route }) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
   const routeTaskId = route?.params?.taskId || route?.params?.workOrderId || null;
+  const routeTab = String(route?.params?.tab || '').toLowerCase();
   const scrollBottomPadding = useScrollContentBottomPadding(40);
 
   const [orgId, setOrgId] = useState(null);
@@ -93,6 +105,9 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [error, setError] = useState('');
   const [canManage, setCanManage] = useState(false);
   const [rows, setRows] = useState([]);
+  const [activeTab, setActiveTab] = useState(
+    routeTab === 'all' || routeTab === 'add' ? routeTab : 'open',
+  );
   const [selectedId, setSelectedId] = useState(routeTaskId);
   const [selectedDetail, setSelectedDetail] = useState(null);
   const [busyAction, setBusyAction] = useState(false);
@@ -108,6 +123,30 @@ export default function OrgTasksScreen({ navigation, route }) {
     }
     navigateToOrgHome(navigation, { orgId: routeOrgId || orgId });
   }, [navigation, orgId, routeOrgId, selectedId]);
+
+  const openCreateTab = useCallback(() => {
+    setActiveTab('add');
+    navigateToOrgCreateTask(navigation, { orgId: routeOrgId || orgId });
+  }, [navigation, orgId, routeOrgId]);
+
+  const selectTab = useCallback(
+    (tabId) => {
+      if (tabId === 'add') {
+        if (!canManage) return;
+        openCreateTab();
+        return;
+      }
+      setActiveTab(tabId);
+      setSelectedId(null);
+      setSelectedDetail(null);
+    },
+    [canManage, openCreateTab],
+  );
+
+  const visibleRows = useMemo(() => {
+    if (activeTab === 'all') return rows;
+    return rows.filter((row) => isOpenTaskStatus(row.status));
+  }, [activeTab, rows]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -135,12 +174,18 @@ export default function OrgTasksScreen({ navigation, route }) {
   useFocusEffect(
     useCallback(() => {
       load();
+      setActiveTab((prev) => (prev === 'add' ? 'open' : prev));
     }, [load]),
   );
 
   useEffect(() => {
     if (routeTaskId) setSelectedId(routeTaskId);
   }, [routeTaskId]);
+
+  useEffect(() => {
+    if (routeTab === 'all' || routeTab === 'open') setActiveTab(routeTab);
+    if (routeTab === 'add' && canManage) openCreateTab();
+  }, [canManage, openCreateTab, routeTab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -356,7 +401,34 @@ export default function OrgTasksScreen({ navigation, route }) {
               {t('common.retry', null, 'Retry')}
             </Button>
           </AppCard>
-        ) : selected ? (
+        ) : (
+          <>
+            {!selected ? (
+              <View style={styles.modeRow}>
+                {TASK_TABS.map((item) => {
+                  const active = activeTab === item.id;
+                  const disabled = item.id === 'add' && !canManage;
+                  return (
+                    <Pressable
+                      key={item.id}
+                      disabled={disabled}
+                      onPress={() => selectTab(item.id)}
+                      style={[
+                        styles.modeChip,
+                        active && styles.modeChipActive,
+                        disabled && styles.modeChipDisabled,
+                      ]}
+                    >
+                      <Text style={[styles.modeChipText, active && styles.modeChipTextActive]}>
+                        {t(item.labelKey, null, item.fallback)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+
+            {selected ? (
           <>
             <AppCard style={styles.card}>
               <Text style={styles.title}>{selected.title}</Text>
@@ -495,7 +567,7 @@ export default function OrgTasksScreen({ navigation, route }) {
               ) : null}
             </AppCard>
           </>
-        ) : (
+            ) : (
           <>
             <Text style={styles.lead}>
               {canManage
@@ -510,22 +582,15 @@ export default function OrgTasksScreen({ navigation, route }) {
                     'Open a task to start, fill operations, upload docs, and end work.',
                   )}
             </Text>
-            {canManage ? (
-              <Button
-                mode="contained"
-                onPress={() => navigateToOrgCreateTask(navigation, { orgId })}
-                style={styles.createBtn}
-              >
-                {t('org.tasks.createTitle', null, 'Create task')}
-              </Button>
-            ) : null}
             <AppCard style={styles.card}>
-              {rows.length === 0 ? (
+              {visibleRows.length === 0 ? (
                 <Text style={styles.empty}>
-                  {t('org.tasks.listEmpty', null, 'No tasks yet. Create the first work card.')}
+                  {activeTab === 'open'
+                    ? t('org.tasks.openEmpty', null, 'No open tasks.')
+                    : t('org.tasks.listEmpty', null, 'No tasks yet. Create the first work card.')}
                 </Text>
               ) : (
-                rows.map((row) => (
+                visibleRows.map((row) => (
                   <Pressable
                     key={row.id}
                     onPress={() => setSelectedId(row.id)}
@@ -553,6 +618,8 @@ export default function OrgTasksScreen({ navigation, route }) {
               )}
             </AppCard>
           </>
+            )}
+          </>
         )}
       </ScrollView>
     </ScreenBackground>
@@ -567,9 +634,37 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 12,
   },
+  modeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  modeChip: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  modeChipActive: {
+    backgroundColor: '#fff',
+    borderColor: '#fff',
+  },
+  modeChipDisabled: {
+    opacity: 0.45,
+  },
+  modeChipText: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modeChipTextActive: {
+    color: '#0F172A',
+  },
   loader: { marginVertical: 24 },
   card: { padding: 14, marginBottom: 12 },
-  createBtn: { marginBottom: 12 },
   title: { color: ON_CARD, fontSize: 18, fontWeight: '700', marginBottom: 6 },
   meta: { color: ON_CARD_MUTED, fontSize: 13, marginBottom: 10 },
   instructions: { color: ON_CARD, fontSize: 14, lineHeight: 20, marginBottom: 12 },

@@ -2,7 +2,7 @@
  * Organization workspace drawer — fleet and org ERP live here, not behind ShopDrawer.
  */
 
-import React, { useCallback, useContext, useState } from 'react';
+import React, { useCallback, useContext, useMemo, useState } from 'react';
 import { View, Platform } from 'react-native';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -65,6 +65,31 @@ import { useTranslation } from '../i18n';
 
 const Drawer = createDrawerNavigator();
 
+const ROUTE_ICONS = {
+  OrgOverview: 'view-dashboard-outline',
+  OrgFleet: 'truck',
+  OrgOperations: 'clipboard-list-outline',
+  OrgTasks: 'clipboard-check-outline',
+  OrgWorkOrders: 'clipboard-check-outline',
+  OrgProjects: 'briefcase-outline',
+  OrgWarehouse: 'warehouse',
+  OrgWorkforce: 'account-hard-hat',
+  OrgNetwork: 'transit-connection-variant',
+  OrgDocuments: 'file-document-outline',
+  OrgLocations: 'map-marker-radius',
+  OrgTransport: 'bus',
+  OrgConstruction: 'hard-hat',
+  OrgInvoicing: 'receipt',
+  OrgLedger: 'book-open-outline',
+  OrgPublicProfile: 'earth',
+  OrgCalendar: 'calendar-month-outline',
+};
+
+function normalizeOrgRoute(route) {
+  if (route === 'OrgWorkOrders') return 'OrgTasks';
+  return route;
+}
+
 function CustomDrawerContent(props) {
   const navigation = useNavigation();
   const { t } = useTranslation();
@@ -89,62 +114,107 @@ function CustomDrawerContent(props) {
   const itemProps = drawerMenuItemProps;
   const isDriver = isDriverMembership(org);
   const personalUnread = isDriver ? unreadNotifications || 0 : 0;
-  const navItems = buildOrgNavItems(org, t)
-    .filter((item) => {
-      if (!isDriver) return true;
-      return item.route === 'OrgOverview';
-    })
-    .map((item) => {
-      if (isDriver && item.route === 'OrgOverview') {
-        return {
-          ...item,
+  const canManageOps = Boolean(org?.manage_org_operations || org?.manage_fleet);
+
+  const departmentItems = useMemo(() => {
+    if (isDriver) {
+      return [
+        {
+          key: 'tasks-home',
+          route: 'OrgOverview',
           label: t('org.home.tasks.title', null, 'Tasks'),
-        };
-      }
-      return item;
+          icon: 'clipboard-check-outline',
+        },
+      ];
+    }
+
+    const fromNav = buildOrgNavItems(org, t);
+    const seen = new Set();
+    const items = [];
+
+    fromNav.forEach((item) => {
+      const route = normalizeOrgRoute(item.route);
+      if (seen.has(route)) return;
+      seen.add(route);
+      items.push({
+        key: item.key || route,
+        route,
+        label:
+          route === 'OrgTasks'
+            ? t('org.nav.tasks', null, 'Tasks')
+            : item.label,
+        icon: ROUTE_ICONS[route] || 'view-grid-outline',
+      });
     });
+
+    if (canManageOps && !seen.has('OrgTasks')) {
+      const overviewIdx = items.findIndex((row) => row.route === 'OrgOverview');
+      const insertAt = overviewIdx >= 0 ? overviewIdx + 1 : 0;
+      items.splice(insertAt, 0, {
+        key: 'tasks',
+        route: 'OrgTasks',
+        label: t('org.nav.tasks', null, 'Tasks'),
+        icon: 'clipboard-check-outline',
+      });
+      seen.add('OrgTasks');
+    }
+
+    if (canManageOps && !seen.has('OrgProjects')) {
+      const opsIdx = items.findIndex((row) => row.route === 'OrgOperations');
+      const insertAt = opsIdx >= 0 ? opsIdx + 1 : items.length;
+      items.splice(insertAt, 0, {
+        key: 'projects',
+        route: 'OrgProjects',
+        label: t('org.nav.projects', null, 'Projects'),
+        icon: 'briefcase-outline',
+      });
+    }
+
+    return items;
+  }, [canManageOps, isDriver, org, t]);
 
   const openRoute = (route) => {
     props.navigation.closeDrawer();
-    if (route === 'OrgFleet') {
+    const normalized = normalizeOrgRoute(route);
+    if (normalized === 'OrgFleet') {
       navigateToOrgFleet(navigation, { orgId: org?.id });
       return;
     }
-    if (route === 'OrgNetwork') {
+    if (normalized === 'OrgNetwork') {
       navigateToOrgNetwork(navigation, { orgId: org?.id });
       return;
     }
-    if (route === 'OrgWorkforce') {
+    if (normalized === 'OrgWorkforce') {
       navigateToOrgWorkforce(navigation, { orgId: org?.id });
       return;
     }
-    if (route === 'OrgOperations') {
+    if (normalized === 'OrgOperations') {
       navigateToOrgOperations(navigation, { orgId: org?.id });
       return;
     }
-    if (route === 'OrgTasks' || route === 'OrgWorkOrders') {
+    if (normalized === 'OrgTasks') {
       navigateToOrgTasks(navigation, { orgId: org?.id });
       return;
     }
-    if (route === 'OrgProjects') {
+    if (normalized === 'OrgProjects') {
       navigateToOrgProjects(navigation, { orgId: org?.id });
       return;
     }
-    if (route === 'OrgCalendar') {
+    if (normalized === 'OrgCalendar') {
       navigateToOrgCalendar(navigation, { orgId: org?.id });
       return;
     }
-    if (route === 'OrgWarehouse') {
+    if (normalized === 'OrgWarehouse') {
       navigateToOrgWarehouse(navigation, { orgId: org?.id });
       return;
     }
     if (Platform.OS === 'web') {
-      if (route === 'OrgOverview') {
+      if (normalized === 'OrgOverview') {
         navigation.navigate('OrgOverview');
       }
       return;
     }
-    props.navigation.navigate(route === 'OrgOverview' ? 'OrgOverview' : route);
+    props.navigation.navigate(normalized === 'OrgOverview' ? 'OrgOverview' : normalized);
   };
 
   const switchToPersonal = async () => {
@@ -179,54 +249,17 @@ function CustomDrawerContent(props) {
           />
         ) : null}
 
-        {navItems.map((item) => (
+        {departmentItems.map((item) => (
           <DrawerItem
             key={item.key}
             label={item.label}
             onPress={() => openRoute(item.route)}
             icon={({ color, size }) => (
-              <DrawerMenuIcon
-                name={isDriver && item.route === 'OrgOverview' ? 'clipboard-check-outline' : 'domain'}
-                color={color}
-                size={size}
-              />
+              <DrawerMenuIcon name={item.icon} color={color} size={size} />
             )}
             {...itemProps}
           />
         ))}
-
-        {!isDriver && (org?.manage_org_operations || org?.manage_fleet) ? (
-          <DrawerItem
-            label={t('org.nav.tasks', null, 'Tasks')}
-            onPress={() => openRoute('OrgTasks')}
-            icon={({ color, size }) => (
-              <DrawerMenuIcon name="clipboard-check-outline" color={color} size={size} />
-            )}
-            {...itemProps}
-          />
-        ) : null}
-
-        {isDriver ? (
-          <DrawerItem
-            label={t('org.nav.tasks', null, 'Tasks')}
-            onPress={() => openRoute('OrgTasks')}
-            icon={({ color, size }) => (
-              <DrawerMenuIcon name="clipboard-check-outline" color={color} size={size} />
-            )}
-            {...itemProps}
-          />
-        ) : null}
-
-        {!isDriver && (org?.manage_org_operations || org?.manage_fleet) ? (
-          <DrawerItem
-            label={t('org.nav.projects', null, 'Projects')}
-            onPress={() => openRoute('OrgProjects')}
-            icon={({ color, size }) => (
-              <DrawerMenuIcon name="briefcase-outline" color={color} size={size} />
-            )}
-            {...itemProps}
-          />
-        ) : null}
 
         <DrawerItem
           label={t('org.drawer.calendar', null, 'Calendar')}

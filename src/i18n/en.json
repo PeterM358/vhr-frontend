@@ -40,7 +40,14 @@
       "noDepartment": "No department",
       "empty": "No fleet vehicles match your filters.",
       "error": "Could not load fleet.",
-      "requestRepair": "Request repair"
+      "requestRepair": "Service request",
+      "serviceRequest": "Service request",
+      "importLead": "Upload your fleet register spreadsheet, or request service for a vehicle.",
+      "tabs": {
+        "all": "All",
+        "issues": "Not ready",
+        "import": "Import"
+      }
     },
     "readiness": {
       "ready": "Ready",
@@ -229,7 +236,7 @@
       "modules": "Workspace",
       "openServiceCenter": "Open service center workspace",
       "importFleetLater": "Import fleet later",
-      "requestRepair": "Request repair",
+      "requestRepair": "Service request",
       "needVehicleTitle": "Add vehicles first",
       "needVehicleBody": "Import your fleet register (or add vehicles), then request a repair the same way customers do.",
       "needVehicleHint": "Request repair needs at least one fleet vehicle — import your register first.",
@@ -241,6 +248,7 @@
         "assigned": "Assigned",
         "repair": "Repair",
         "ready": "Ready",
+        "notReady": "Not ready",
         "needVehicles": "Add cars",
         "needAssigned": "Awaiting",
         "todayTasks": "Today",
@@ -267,7 +275,7 @@
         }
       },
       "actions": {
-        "fleetSubtitle": "Browse company vehicles, readiness, and details.",
+        "fleetSubtitle": "Vehicles, readiness, import, and service requests.",
         "assignedFleet": "My assigned vehicles",
         "assignedFleetSubtitle": "Only vehicles assigned to you for work.",
         "fleetSecondary": "Fleet (optional)",
@@ -284,7 +292,7 @@
         "profile": "Profile",
         "profileSubtitle": "Open your account profile.",
         "createTaskSubtitle": "Assign multiple operations and people on one work card.",
-        "tasksSubtitle": "See work cards, people, vehicles, and status.",
+        "tasksSubtitle": "Open, all, and add work cards.",
         "projectsSubtitle": "Volume, value, contacts, and counterparties."
       }
     },
@@ -395,8 +403,14 @@
       "listLead": "Create multi-operation work cards and track status for your team.",
       "workerListLead": "Open a task to start, fill operations, upload docs, and end work.",
       "listEmpty": "No tasks yet. Create the first work card.",
+      "openEmpty": "No open tasks.",
       "detailTitle": "Task",
       "createTitle": "Create task",
+      "tabs": {
+        "open": "Open",
+        "all": "All",
+        "add": "Add"
+      },
       "createLead": "Create a multi-step work card. Workers tap Start and End themselves.",
       "detailsTitle": "Task details",
       "title": "Title",
