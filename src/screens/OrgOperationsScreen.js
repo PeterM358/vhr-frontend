@@ -1,5 +1,14 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Button, Switch, TextInput } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
@@ -13,6 +22,7 @@ import {
   listUnitsOfMeasure,
   updateActivityDefinition,
 } from '../api/orgOperations';
+import { getMaterialsCatalog } from '../api/materials';
 import {
   readOrganizationMemberships,
   resolveActiveOrganizationId,
@@ -39,6 +49,32 @@ const KIND_OPTIONS = [
   { value: 'other', labelKey: 'org.operations.kinds.other' },
 ];
 
+/** Kind → preferred output measure_kinds (worker reports). */
+const KIND_OUTPUT_MEASURES = {
+  transport: ['distance', 'duration', 'count'],
+  construction: ['area', 'volume', 'mass', 'count'],
+  road_marking: ['area', 'distance', 'count'],
+  field_service: ['count', 'duration', 'area', 'distance'],
+  warehouse_task: ['count', 'mass', 'volume'],
+  labor_only: ['duration'],
+  inspection: ['count', 'duration'],
+  workshop_service: ['duration', 'count'],
+  other: null,
+};
+
+/** Kind → preferred consumed-input measure_kinds (for norms). */
+const KIND_INPUT_MEASURES = {
+  transport: ['volume'],
+  construction: ['volume', 'mass'],
+  road_marking: ['volume', 'mass'],
+  field_service: ['volume', 'count', 'mass'],
+  warehouse_task: ['count', 'mass', 'volume'],
+  labor_only: [],
+  inspection: [],
+  workshop_service: ['count', 'volume'],
+  other: null,
+};
+
 const MODES = [
   { id: 'list', labelKey: 'org.operations.allOperations' },
   { id: 'add', labelKey: 'org.operations.addOperation' },
@@ -47,6 +83,28 @@ const MODES = [
 function unitLabel(unit) {
   if (!unit) return '';
   return unit.symbol || unit.name || unit.code || '';
+}
+
+function materialLabel(row) {
+  if (!row) return '';
+  const name = row.name || `Material #${row.id}`;
+  const sku = row.part_number || row.shop_sku || '';
+  return sku ? `${name} (${sku})` : name;
+}
+
+/** Hours field: digits + optional decimal only (no "per hour" text). */
+function sanitizeHoursInput(value) {
+  const raw = String(value || '').replace(/,/g, '.');
+  let out = '';
+  let seenDot = false;
+  for (const ch of raw) {
+    if (ch >= '0' && ch <= '9') out += ch;
+    else if (ch === '.' && !seenDot) {
+      out += '.';
+      seenDot = true;
+    }
+  }
+  return out;
 }
 
 function emptyFormState() {
@@ -60,6 +118,8 @@ function emptyFormState() {
     plannedHours: '',
     consumesMaterials: false,
     materialUnitId: null,
+    defaultMaterialIds: [],
+    materialSearch: '',
     transportBaseRate: '',
     transportPerTonRate: '',
     transportRateUnitId: null,
@@ -76,6 +136,11 @@ function hydrateFromRow(row) {
   const labor = norms.labor || {};
   const materials = norms.materials || {};
   const generic = norms.generic || {};
+  const materialIds = Array.isArray(materials.default_material_ids)
+    ? materials.default_material_ids
+    : Array.isArray(row.default_material_ids)
+      ? row.default_material_ids
+      : [];
   return {
     name: row.name || '',
     code: row.code || '',
@@ -92,6 +157,8 @@ function hydrateFromRow(row) {
       row.norm_input_unit_id ||
       row.norm_input_unit?.id ||
       null,
+    defaultMaterialIds: materialIds.map((id) => Number(id)).filter(Boolean),
+    materialSearch: '',
     transportBaseRate:
       transport.base_rate != null
         ? String(transport.base_rate)
@@ -144,7 +211,7 @@ function buildNormsPayload(form) {
       };
     }
   } else if (form.kind === 'labor_only') {
-    const hours = form.laborPresetHours.trim() || form.plannedHours.trim();
+    const hours = sanitizeHoursInput(form.laborPresetHours || form.plannedHours);
     if (hours) {
       norms.labor = { preset_hours: hours };
     }
@@ -163,16 +230,24 @@ function buildNormsPayload(form) {
       default_material_unit_id: form.consumesMaterials
         ? form.materialUnitId || form.normInputUnitId || null
         : null,
+      default_material_ids: form.consumesMaterials
+        ? (form.defaultMaterialIds || []).slice(0, 40)
+        : [],
     };
   }
 
-  if (form.kind === 'labor_only' && (form.laborPresetHours.trim() || form.plannedHours.trim())) {
-    // already set
-  } else if (form.plannedHours.trim() && !norms.labor) {
-    norms.labor = { preset_hours: form.plannedHours.trim() };
+  const planned = sanitizeHoursInput(form.plannedHours || form.laborPresetHours);
+  if (form.kind === 'labor_only' && planned) {
+    // already set above
+  } else if (planned && !norms.labor) {
+    norms.labor = { preset_hours: planned };
   }
 
   return norms;
+}
+
+function kindExampleKey(kind) {
+  return `org.operations.wizard.examples.${kind}`;
 }
 
 function normSummaryText(row, t, kindLabel) {
@@ -239,6 +314,8 @@ export default function OrgOperationsScreen({ navigation, route }) {
   const [canManage, setCanManage] = useState(false);
   const [rows, setRows] = useState([]);
   const [units, setUnits] = useState([]);
+  const [materialCatalog, setMaterialCatalog] = useState([]);
+  const [selectedMaterials, setSelectedMaterials] = useState([]);
   const [mode, setMode] = useState('list');
   const [wizardStep, setWizardStep] = useState(0);
   const [editingId, setEditingId] = useState(null);
@@ -258,25 +335,25 @@ export default function OrgOperationsScreen({ navigation, route }) {
         hint: t(
           'org.operations.wizard.stepBasicsHint',
           null,
-          'Name the operation and choose its kind.',
+          'Name the operation and choose its kind (filters units & norms).',
         ),
       },
       {
         key: 'output',
-        title: t('org.operations.wizard.stepOutput', null, 'Output & time'),
+        title: t('org.operations.wizard.stepOutput', null, 'Worker reports'),
         hint: t(
           'org.operations.wizard.stepOutputHint',
           null,
-          'Primary unit and planned hours (norm time for training later).',
+          'ONE primary output the worker reports (m², km, h…) plus optional time norm in hours.',
         ),
       },
       {
         key: 'norms',
-        title: t('org.operations.wizard.stepNorms', null, 'Norms'),
+        title: t('org.operations.wizard.stepNorms', null, 'Consumed input'),
         hint: t(
           'org.operations.wizard.stepNormsHint',
           null,
-          'Optional rates — fuel burn, paint per m², or labor hours.',
+          'Optional rates for consumed input (paint L / m², fuel L / 100 km) — not what the worker re-types on End.',
         ),
       },
       {
@@ -285,7 +362,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
         hint: t(
           'org.operations.wizard.stepMaterialsHint',
           null,
-          'Does this operation consume warehouse materials? Lines are added on the task later.',
+          'Toggle if materials are issued from warehouse. Pick default SKUs here — workers only enter leftovers on End.',
         ),
       },
       {
@@ -294,7 +371,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
         hint: t(
           'org.operations.wizard.stepReviewHint',
           null,
-          'Check everything, then save.',
+          'Check output unit, time norm, rates, and materials, then save.',
         ),
       },
     ],
@@ -330,6 +407,19 @@ export default function OrgOperationsScreen({ navigation, route }) {
     }
   }, [routeOrgId, t]);
 
+  const searchMaterials = useCallback(async (query) => {
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const params = {};
+      if (query && String(query).trim()) params.search = String(query).trim();
+      const data = await getMaterialsCatalog(token, params);
+      const list = Array.isArray(data) ? data : data?.results || [];
+      setMaterialCatalog(list.slice(0, 40));
+    } catch {
+      setMaterialCatalog([]);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       load();
@@ -346,9 +436,31 @@ export default function OrgOperationsScreen({ navigation, route }) {
     [units],
   );
 
+  const filterUnitsByKind = useCallback(
+    (measureKinds) => {
+      if (!measureKinds) return units;
+      if (!measureKinds.length) return [];
+      const preferred = units.filter((u) => measureKinds.includes(u.measure_kind));
+      return preferred.length ? preferred : units;
+    },
+    [units],
+  );
+
+  const outputUnits = useMemo(
+    () => filterUnitsByKind(KIND_OUTPUT_MEASURES[form.kind]),
+    [filterUnitsByKind, form.kind],
+  );
+
+  const inputUnits = useMemo(
+    () => filterUnitsByKind(KIND_INPUT_MEASURES[form.kind]),
+    [filterUnitsByKind, form.kind],
+  );
+
   const resetForm = () => {
     setEditingId(null);
     setForm(emptyFormState());
+    setSelectedMaterials([]);
+    setMaterialCatalog([]);
     setFormMessage('');
     setWizardStep(0);
   };
@@ -356,14 +468,25 @@ export default function OrgOperationsScreen({ navigation, route }) {
   const startCreate = () => {
     resetForm();
     setMode('add');
+    searchMaterials('');
   };
 
   const startEdit = (row) => {
+    const hydrated = hydrateFromRow(row);
     setEditingId(row.id);
-    setForm(hydrateFromRow(row));
+    setForm(hydrated);
+    setSelectedMaterials(
+      Array.isArray(row.default_materials) ? row.default_materials : [],
+    );
     setFormMessage('');
     setWizardStep(0);
     setMode('add');
+    searchMaterials('');
+  };
+
+  const closeWizard = () => {
+    resetForm();
+    setMode('list');
   };
 
   const validateStep = (stepIndex) => {
@@ -387,6 +510,22 @@ export default function OrgOperationsScreen({ navigation, route }) {
     if (wizardStep > 0) setWizardStep((s) => s - 1);
   };
 
+  const toggleMaterial = (mat) => {
+    const id = Number(mat.id);
+    setForm((prev) => {
+      const exists = (prev.defaultMaterialIds || []).includes(id);
+      const nextIds = exists
+        ? prev.defaultMaterialIds.filter((x) => x !== id)
+        : [...(prev.defaultMaterialIds || []), id].slice(0, 40);
+      return { ...prev, defaultMaterialIds: nextIds, consumesMaterials: true };
+    });
+    setSelectedMaterials((prev) => {
+      const exists = prev.some((m) => Number(m.id) === id);
+      if (exists) return prev.filter((m) => Number(m.id) !== id);
+      return [...prev, mat].slice(0, 40);
+    });
+  };
+
   const save = async () => {
     if (!orgId || !canManage) return;
     const trimmedName = form.name.trim();
@@ -400,13 +539,17 @@ export default function OrgOperationsScreen({ navigation, route }) {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const norms = buildNormsPayload(form);
+      const plannedHours =
+        sanitizeHoursInput(form.plannedHours) ||
+        sanitizeHoursInput(form.laborPresetHours) ||
+        null;
       const payload = {
         name: trimmedName,
         code: form.code.trim(),
         activity_kind: form.kind,
         unit_id: form.unitId || null,
         notes: form.notes.trim(),
-        planned_hours: form.plannedHours.trim() || form.laborPresetHours.trim() || null,
+        planned_hours: plannedHours,
         consumes_materials: form.kind === 'labor_only' ? false : Boolean(form.consumesMaterials),
         norms,
         is_active: form.isActive,
@@ -433,8 +576,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
         setFormMessage(t('org.operations.created', null, 'Operation created.'));
       }
       await load();
-      resetForm();
-      setMode('list');
+      closeWizard();
     } catch (e) {
       setFormMessage(e.message || t('org.operations.saveError', null, 'Could not save operation.'));
     } finally {
@@ -458,7 +600,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
 
   const activeCount = useMemo(() => rows.filter((row) => row.is_active).length, [rows]);
 
-  const renderUnitChips = (selectedId, onSelect) => (
+  const renderUnitChips = (selectedId, onSelect, unitList = units) => (
     <View style={styles.kindWrap}>
       <Pressable
         onPress={() => onSelect(null)}
@@ -468,7 +610,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
           {t('org.operations.unitNone', null, 'None')}
         </Text>
       </Pressable>
-      {units.map((unit) => {
+      {unitList.map((unit) => {
         const active = selectedId === unit.id;
         return (
           <Pressable
@@ -489,11 +631,14 @@ export default function OrgOperationsScreen({ navigation, route }) {
     if (form.kind === 'transport') {
       return (
         <>
+          <Text style={styles.fieldLabel}>
+            {t('org.operations.wizard.consumedInputLabel', null, 'Consumed input (for norms)')}
+          </Text>
           <Text style={styles.helper}>
             {t(
               'org.operations.transportNormsHelper',
               null,
-              'Fuel burn: base rate plus extra per ton in the trailer (e.g. DAF 25 L + 0.4 L/t). Driver later fills km and load.',
+              'Fuel burn: base rate plus extra per ton in the trailer (e.g. DAF 25 L + 0.4 L/t). Driver later fills meter start/end — not a separate km field.',
             )}
           </Text>
           <TextInput
@@ -517,7 +662,11 @@ export default function OrgOperationsScreen({ navigation, route }) {
           <Text style={styles.fieldLabel}>
             {t('org.operations.transportRateUnit', null, 'Fuel unit')}
           </Text>
-          {renderUnitChips(form.transportRateUnitId, (id) => setField('transportRateUnitId', id))}
+          {renderUnitChips(
+            form.transportRateUnitId,
+            (id) => setField('transportRateUnitId', id),
+            inputUnits,
+          )}
         </>
       );
     }
@@ -535,8 +684,9 @@ export default function OrgOperationsScreen({ navigation, route }) {
             label={t('org.operations.presetHours', null, 'Preset hours')}
             value={form.laborPresetHours || form.plannedHours}
             onChangeText={(value) => {
-              setField('laborPresetHours', value);
-              setField('plannedHours', value);
+              const hours = sanitizeHoursInput(value);
+              setField('laborPresetHours', hours);
+              setField('plannedHours', hours);
             }}
             mode="outlined"
             keyboardType="decimal-pad"
@@ -548,6 +698,9 @@ export default function OrgOperationsScreen({ navigation, route }) {
     }
     return (
       <>
+        <Text style={styles.fieldLabel}>
+          {t('org.operations.wizard.consumedInputLabel', null, 'Consumed input (for norms)')}
+        </Text>
         <Text style={styles.helper}>
           {t(
             'org.operations.normsHelper',
@@ -576,7 +729,11 @@ export default function OrgOperationsScreen({ navigation, route }) {
         <Text style={styles.fieldLabel}>
           {t('org.operations.normInputUnit', null, 'Consumed input unit')}
         </Text>
-        {renderUnitChips(form.normInputUnitId, (id) => setField('normInputUnitId', id))}
+        {renderUnitChips(
+          form.normInputUnitId,
+          (id) => setField('normInputUnitId', id),
+          inputUnits,
+        )}
       </>
     );
   };
@@ -620,6 +777,17 @@ export default function OrgOperationsScreen({ navigation, route }) {
               );
             })}
           </View>
+          <Text style={styles.helper}>
+            {t(
+              kindExampleKey(form.kind),
+              null,
+              form.kind === 'transport'
+                ? 'Example: Sofia–Varna haul → worker reports km (meter start/end) + ~9 h time norm.'
+                : form.kind === 'construction' || form.kind === 'road_marking'
+                  ? 'Example: hidroizolaciq / marking → worker reports m² done.'
+                  : 'Pick a kind to suggest the right output units and norms.',
+            )}
+          </Text>
           <TextInput
             label={t('org.operations.notes', null, 'Notes')}
             value={form.notes}
@@ -642,31 +810,43 @@ export default function OrgOperationsScreen({ navigation, route }) {
     if (stepKey === 'output') {
       return (
         <>
-          <Text style={styles.fieldLabel}>{t('org.operations.unit', null, 'Unit of measure')}</Text>
+          <Text style={styles.fieldLabel}>
+            {t('org.operations.wizard.workerReportsLabel', null, 'Worker reports (output)')}
+          </Text>
           <Text style={styles.helper}>
             {t(
               'org.operations.wizard.outputUnitHelper',
               null,
-              'What the worker reports as output (km, m², hours, loads…).',
+              'ONE primary output unit. For km the worker enters meter start/end; for m² / qty a single actual quantity.',
             )}
           </Text>
-          {renderUnitChips(form.unitId, (id) => setField('unitId', id))}
+          {renderUnitChips(form.unitId, (id) => setField('unitId', id), outputUnits)}
+          <Text style={styles.helper}>
+            {t(
+              kindExampleKey(form.kind),
+              null,
+              form.kind === 'transport'
+                ? 'Example: Sofia–Varna haul → km + ~9 h.'
+                : 'Example: hidroizolaciq → m².',
+            )}
+          </Text>
           {form.kind !== 'labor_only' ? (
             <>
               <TextInput
-                label={t('org.operations.plannedHours', null, 'Planned / norm hours')}
+                label={t('org.operations.plannedHours', null, 'Time norm (hours)')}
                 value={form.plannedHours}
-                onChangeText={(value) => setField('plannedHours', value)}
+                onChangeText={(value) => setField('plannedHours', sanitizeHoursInput(value))}
                 mode="outlined"
                 keyboardType="decimal-pad"
                 style={styles.input}
                 textColor={ON_CARD}
+                placeholder="9"
               />
               <Text style={styles.helper}>
                 {t(
                   'org.operations.wizard.plannedHoursHelper',
                   null,
-                  'Used later to see who is on norm and who needs training.',
+                  'Numeric hours only (e.g. 9). Not a rate — rates belong on the next step.',
                 )}
               </Text>
             </>
@@ -694,6 +874,13 @@ export default function OrgOperationsScreen({ navigation, route }) {
           </Text>
         );
       }
+      const selectedIds = form.defaultMaterialIds || [];
+      const catalogRows = [
+        ...selectedMaterials,
+        ...materialCatalog.filter(
+          (m) => !selectedMaterials.some((s) => Number(s.id) === Number(m.id)),
+        ),
+      ];
       return (
         <>
           <View style={styles.switchRow}>
@@ -709,15 +896,69 @@ export default function OrgOperationsScreen({ navigation, route }) {
             {t(
               'org.operations.wizard.materialsLinesLater',
               null,
-              'Material lines are issued on the task from a warehouse location — not on this form.',
+              'Warehouse issues material lines on the task later. Workers only enter leftover (остатък) on End — they do not rebuild the catalog.',
             )}
           </Text>
           {form.consumesMaterials ? (
             <>
               <Text style={styles.fieldLabel}>
-                {t('org.operations.materialUnit', null, 'Default material unit')}
+                {t('org.operations.defaultMaterials', null, 'Default materials (SKUs)')}
               </Text>
-              {renderUnitChips(form.materialUnitId, (id) => setField('materialUnitId', id))}
+              <TextInput
+                label={t('org.operations.searchMaterials', null, 'Search materials')}
+                value={form.materialSearch}
+                onChangeText={(value) => {
+                  setField('materialSearch', value);
+                  searchMaterials(value);
+                }}
+                mode="outlined"
+                style={styles.input}
+                textColor={ON_CARD}
+              />
+              <View style={styles.kindWrap}>
+                {catalogRows.map((mat) => {
+                  const active = selectedIds.includes(Number(mat.id));
+                  return (
+                    <Pressable
+                      key={mat.id}
+                      onPress={() => toggleMaterial(mat)}
+                      style={[styles.kindChip, active && styles.kindChipActive]}
+                    >
+                      <Text
+                        style={[styles.kindChipText, active && styles.kindChipTextActive]}
+                        numberOfLines={1}
+                      >
+                        {materialLabel(mat)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {selectedIds.length === 0 ? (
+                <Text style={styles.helper}>
+                  {t(
+                    'org.operations.noMaterialsSelected',
+                    null,
+                    'No SKUs selected yet. Search and tap to multi-select fuel, paint, bitumen…',
+                  )}
+                </Text>
+              ) : (
+                <Text style={styles.helper}>
+                  {t(
+                    'org.operations.materialsSelectedCount',
+                    { count: selectedIds.length },
+                    `${selectedIds.length} material(s) selected`,
+                  )}
+                </Text>
+              )}
+              <Text style={styles.fieldLabel}>
+                {t('org.operations.materialUnit', null, 'Default material unit (optional)')}
+              </Text>
+              {renderUnitChips(
+                form.materialUnitId,
+                (id) => setField('materialUnitId', id),
+                inputUnits.length ? inputUnits : units,
+              )}
             </>
           ) : null}
         </>
@@ -725,9 +966,23 @@ export default function OrgOperationsScreen({ navigation, route }) {
     }
     // review
     const hours =
-      form.plannedHours.trim() ||
-      form.laborPresetHours.trim() ||
+      sanitizeHoursInput(form.plannedHours) ||
+      sanitizeHoursInput(form.laborPresetHours) ||
       t('org.operations.wizard.none', null, 'None');
+    const materialNames = selectedMaterials
+      .filter((m) => (form.defaultMaterialIds || []).includes(Number(m.id)))
+      .map(materialLabel)
+      .join(', ');
+    let rateLine = t('org.operations.wizard.none', null, 'None');
+    if (form.kind === 'transport' && (form.transportBaseRate || form.transportPerTonRate)) {
+      rateLine = `${form.transportBaseRate || '0'}${
+        form.transportPerTonRate ? ` + ${form.transportPerTonRate}/t` : ''
+      } ${unitLabel(findUnit(form.transportRateUnitId)) || ''}`.trim();
+    } else if (form.normRate.trim()) {
+      rateLine = `${form.normRate} ${unitLabel(findUnit(form.normInputUnitId)) || ''} / ${
+        form.normBasisQty || '1'
+      } ${unitLabel(findUnit(form.unitId)) || ''}`.trim();
+    }
     return (
       <View style={styles.reviewBlock}>
         <Text style={styles.reviewLine}>
@@ -739,14 +994,22 @@ export default function OrgOperationsScreen({ navigation, route }) {
           {kindLabel(form.kind)}
         </Text>
         <Text style={styles.reviewLine}>
-          <Text style={styles.reviewKey}>{t('org.operations.unit', null, 'Unit of measure')}: </Text>
+          <Text style={styles.reviewKey}>
+            {t('org.operations.wizard.workerReportsLabel', null, 'Worker reports (output)')}:{' '}
+          </Text>
           {unitLabel(findUnit(form.unitId)) || t('org.operations.unitNone', null, 'None')}
         </Text>
         <Text style={styles.reviewLine}>
           <Text style={styles.reviewKey}>
-            {t('org.operations.plannedHours', null, 'Planned / norm hours')}:{' '}
+            {t('org.operations.plannedHours', null, 'Time norm (hours)')}:{' '}
           </Text>
           {hours}
+        </Text>
+        <Text style={styles.reviewLine}>
+          <Text style={styles.reviewKey}>
+            {t('org.operations.wizard.ratesReview', null, 'Norm rates')}:{' '}
+          </Text>
+          {rateLine}
         </Text>
         <Text style={styles.reviewLine}>
           <Text style={styles.reviewKey}>
@@ -756,6 +1019,14 @@ export default function OrgOperationsScreen({ navigation, route }) {
             ? t('org.operations.wizard.no', null, 'No')
             : t('org.operations.wizard.yes', null, 'Yes')}
         </Text>
+        {form.consumesMaterials && materialNames ? (
+          <Text style={styles.reviewLine}>
+            <Text style={styles.reviewKey}>
+              {t('org.operations.defaultMaterials', null, 'Default materials')}:{' '}
+            </Text>
+            {materialNames}
+          </Text>
+        ) : null}
         {form.notes.trim() ? (
           <Text style={styles.reviewLine}>
             <Text style={styles.reviewKey}>{t('org.operations.notes', null, 'Notes')}: </Text>
@@ -767,6 +1038,91 @@ export default function OrgOperationsScreen({ navigation, route }) {
   };
 
   const currentStep = stepDefs[wizardStep];
+
+  const renderWizardModal = () => (
+    <Modal
+      visible={mode === 'add'}
+      animationType="slide"
+      transparent
+      onRequestClose={closeWizard}
+      statusBarTranslucent
+    >
+      <View style={styles.modalBackdrop} pointerEvents="box-none">
+        <View style={styles.modalSheet}>
+          <ScrollView
+            contentContainerStyle={styles.modalScroll}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={styles.sectionTitle}>
+              {editingId
+                ? t('org.operations.editOperation', null, 'Edit operation')
+                : t('org.operations.addOperation', null, 'Add operation')}
+            </Text>
+            <View style={styles.stepRow}>
+              {stepDefs.map((s, idx) => (
+                <Pressable
+                  key={s.key}
+                  onPress={() => {
+                    if (idx <= wizardStep || (idx > 0 && validateStep(0))) {
+                      if (idx > wizardStep) {
+                        for (let i = wizardStep; i < idx; i += 1) {
+                          if (!validateStep(i)) return;
+                        }
+                      }
+                      setWizardStep(idx);
+                    }
+                  }}
+                  style={[
+                    styles.stepChip,
+                    idx === wizardStep && styles.stepChipActive,
+                    idx < wizardStep && styles.stepChipDone,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.stepChipText,
+                      idx === wizardStep && styles.stepChipTextActive,
+                    ]}
+                  >
+                    {idx + 1}. {s.title}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.stepHint}>{currentStep?.hint}</Text>
+            {renderWizardBody()}
+            {formMessage ? <Text style={styles.formMessage}>{formMessage}</Text> : null}
+            <View style={styles.wizardNav}>
+              {wizardStep > 0 ? (
+                <Button mode="outlined" onPress={goPrev} style={styles.navBtn} textColor={ON_CARD}>
+                  {t('common.back', null, 'Back')}
+                </Button>
+              ) : (
+                <Button mode="text" onPress={closeWizard} textColor={ON_CARD} style={styles.navBtn}>
+                  {t('common.cancel', null, 'Cancel')}
+                </Button>
+              )}
+              {wizardStep < stepDefs.length - 1 ? (
+                <Button mode="contained" onPress={goNext} style={styles.navBtn}>
+                  {t('common.continue', null, 'Continue')}
+                </Button>
+              ) : (
+                <Button
+                  mode="contained"
+                  loading={busy}
+                  disabled={busy}
+                  onPress={save}
+                  style={styles.navBtn}
+                >
+                  {t('common.save', null, 'Save')}
+                </Button>
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
 
   return (
     <ScreenBackground safeArea={false}>
@@ -815,7 +1171,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
               {t('common.retry', null, 'Retry')}
             </Button>
           </AppCard>
-        ) : mode === 'list' ? (
+        ) : (
           <AppCard style={styles.card} contentStyle={CARD_SURFACE}>
             <Text style={styles.sectionTitle}>
               {t('org.operations.catalogTitle', null, 'Company operations')}
@@ -882,84 +1238,9 @@ export default function OrgOperationsScreen({ navigation, route }) {
               </Button>
             ) : null}
           </AppCard>
-        ) : (
-          <AppCard style={styles.card} contentStyle={CARD_SURFACE}>
-            <Text style={styles.sectionTitle}>
-              {editingId
-                ? t('org.operations.editOperation', null, 'Edit operation')
-                : t('org.operations.addOperation', null, 'Add operation')}
-            </Text>
-            <View style={styles.stepRow}>
-              {stepDefs.map((s, idx) => (
-                <Pressable
-                  key={s.key}
-                  onPress={() => {
-                    if (idx <= wizardStep || (idx > 0 && validateStep(0))) {
-                      if (idx > wizardStep) {
-                        for (let i = wizardStep; i < idx; i += 1) {
-                          if (!validateStep(i)) return;
-                        }
-                      }
-                      setWizardStep(idx);
-                    }
-                  }}
-                  style={[
-                    styles.stepChip,
-                    idx === wizardStep && styles.stepChipActive,
-                    idx < wizardStep && styles.stepChipDone,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.stepChipText,
-                      idx === wizardStep && styles.stepChipTextActive,
-                    ]}
-                  >
-                    {idx + 1}. {s.title}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={styles.stepHint}>{currentStep?.hint}</Text>
-            {renderWizardBody()}
-            {formMessage ? <Text style={styles.formMessage}>{formMessage}</Text> : null}
-            <View style={styles.wizardNav}>
-              {wizardStep > 0 ? (
-                <Button mode="outlined" onPress={goPrev} style={styles.navBtn} textColor={ON_CARD}>
-                  {t('common.back', null, 'Back')}
-                </Button>
-              ) : (
-                <Button
-                  mode="text"
-                  onPress={() => {
-                    resetForm();
-                    setMode('list');
-                  }}
-                  textColor={ON_CARD}
-                  style={styles.navBtn}
-                >
-                  {t('common.cancel', null, 'Cancel')}
-                </Button>
-              )}
-              {wizardStep < stepDefs.length - 1 ? (
-                <Button mode="contained" onPress={goNext} style={styles.navBtn}>
-                  {t('common.continue', null, 'Continue')}
-                </Button>
-              ) : (
-                <Button
-                  mode="contained"
-                  loading={busy}
-                  disabled={busy}
-                  onPress={save}
-                  style={styles.navBtn}
-                >
-                  {t('common.save', null, 'Save')}
-                </Button>
-              )}
-            </View>
-          </AppCard>
         )}
       </ScrollView>
+      {renderWizardModal()}
     </ScreenBackground>
   );
 }
@@ -968,6 +1249,28 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: 14,
     paddingTop: 12,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.62)',
+    justifyContent: 'flex-end',
+    zIndex: 100000,
+    elevation: 100000,
+    ...(Platform.OS === 'web' ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 } : {}),
+  },
+  modalSheet: {
+    maxHeight: '92%',
+    backgroundColor: '#F8FAFC',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    paddingTop: 14,
+    paddingHorizontal: 14,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 16,
+    zIndex: 100001,
+    elevation: 100001,
+  },
+  modalScroll: {
+    paddingBottom: 24,
   },
   lead: {
     color: 'rgba(255,255,255,0.78)',

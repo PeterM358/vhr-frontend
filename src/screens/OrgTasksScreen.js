@@ -93,6 +93,38 @@ function isWaitingForStartTime(task) {
   return Date.now() < startMs;
 }
 
+function isDistanceOutput(op) {
+  const measure = String(op?.activity?.measure_kind || op?.activity?.unit?.measure_kind || '').toLowerCase();
+  if (measure === 'distance') return true;
+  const symbol = String(
+    op?.activity?.default_unit || op?.activity?.unit?.symbol || op?.activity?.unit?.code || '',
+  ).toLowerCase();
+  return symbol === 'km' || symbol.includes('km');
+}
+
+function leftoverKey(opId, materialId) {
+  return `${opId}:${materialId}`;
+}
+
+function buildLeftoverDrafts(operations) {
+  const drafts = {};
+  (operations || []).forEach((op) => {
+    const existing = Array.isArray(op.material_leftovers) ? op.material_leftovers : [];
+    existing.forEach((line) => {
+      if (line?.material_id != null) {
+        drafts[leftoverKey(op.id, line.material_id)] =
+          line.leftover_qty != null ? String(line.leftover_qty) : '';
+      }
+    });
+    const materials = op.activity?.default_materials || [];
+    materials.forEach((mat) => {
+      const key = leftoverKey(op.id, mat.id);
+      if (drafts[key] == null) drafts[key] = '';
+    });
+  });
+  return drafts;
+}
+
 export default function OrgTasksScreen({ navigation, route }) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
@@ -114,6 +146,9 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [photoDraft, setPhotoDraft] = useState('');
   const [documentDraft, setDocumentDraft] = useState('');
   const [actualDrafts, setActualDrafts] = useState({});
+  const [meterStartDrafts, setMeterStartDrafts] = useState({});
+  const [meterEndDrafts, setMeterEndDrafts] = useState({});
+  const [leftoverDrafts, setLeftoverDrafts] = useState({});
 
   const onBack = useCallback(() => {
     if (selectedId) {
@@ -205,10 +240,17 @@ export default function OrgTasksScreen({ navigation, route }) {
             return prev.map((row) => (String(row.id) === String(detail.id) ? detail : row));
           });
           const drafts = {};
+          const meterStarts = {};
+          const meterEnds = {};
           (detail.operations || []).forEach((op) => {
             drafts[op.id] = op.actual_qty != null ? String(op.actual_qty) : '';
+            meterStarts[op.id] = op.meter_start != null ? String(op.meter_start) : '';
+            meterEnds[op.id] = op.meter_end != null ? String(op.meter_end) : '';
           });
           setActualDrafts(drafts);
+          setMeterStartDrafts(meterStarts);
+          setMeterEndDrafts(meterEnds);
+          setLeftoverDrafts(buildLeftoverDrafts(detail.operations));
         }
       } catch (e) {
         if (!cancelled) {
@@ -232,6 +274,18 @@ export default function OrgTasksScreen({ navigation, route }) {
   const replaceTask = (updated) => {
     setSelectedDetail(updated);
     setRows((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+    const drafts = {};
+    const meterStarts = {};
+    const meterEnds = {};
+    (updated.operations || []).forEach((op) => {
+      drafts[op.id] = op.actual_qty != null ? String(op.actual_qty) : '';
+      meterStarts[op.id] = op.meter_start != null ? String(op.meter_start) : '';
+      meterEnds[op.id] = op.meter_end != null ? String(op.meter_end) : '';
+    });
+    setActualDrafts(drafts);
+    setMeterStartDrafts(meterStarts);
+    setMeterEndDrafts(meterEnds);
+    setLeftoverDrafts(buildLeftoverDrafts(updated.operations));
   };
 
   const acknowledgeStart = async (task) => {
@@ -251,12 +305,47 @@ export default function OrgTasksScreen({ navigation, route }) {
     }
   };
 
+  const buildOperationsActualsPayload = (task = selected) =>
+    (task?.operations || [])
+      .filter((op) => op.id != null)
+      .map((op) => {
+        const payload = { id: op.id };
+        if (isDistanceOutput(op)) {
+          payload.meter_start =
+            meterStartDrafts[op.id] === '' || meterStartDrafts[op.id] == null
+              ? null
+              : meterStartDrafts[op.id];
+          payload.meter_end =
+            meterEndDrafts[op.id] === '' || meterEndDrafts[op.id] == null
+              ? null
+              : meterEndDrafts[op.id];
+        } else {
+          payload.actual_qty =
+            actualDrafts[op.id] === '' || actualDrafts[op.id] == null
+              ? null
+              : actualDrafts[op.id];
+        }
+        if (op.activity?.consumes_materials) {
+          const materials = op.activity?.default_materials || [];
+          payload.material_leftovers = materials.map((mat) => ({
+            material_id: mat.id,
+            leftover_qty:
+              leftoverDrafts[leftoverKey(op.id, mat.id)] === ''
+                ? null
+                : leftoverDrafts[leftoverKey(op.id, mat.id)] || null,
+            label: mat.name || '',
+          }));
+        }
+        return payload;
+      });
+
   const acknowledgeEnd = async (task) => {
     if (!orgId || !task?.id) return;
     setBusyAction(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const updated = await endWorkOrder(token, orgId, task.id);
+      const operations = buildOperationsActualsPayload(task);
+      const updated = await endWorkOrder(token, orgId, task.id, { operations });
       replaceTask(updated);
     } catch (e) {
       Alert.alert(
@@ -298,12 +387,7 @@ export default function OrgTasksScreen({ navigation, route }) {
     setBusyAction(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const operations = (selected.operations || [])
-        .filter((op) => op.id != null)
-        .map((op) => ({
-          id: op.id,
-          actual_qty: actualDrafts[op.id] === '' ? null : actualDrafts[op.id],
-        }));
+      const operations = buildOperationsActualsPayload();
       const updated = await updateWorkOrder(token, orgId, selected.id, { operations });
       replaceTask(updated);
     } catch (e) {
@@ -452,36 +536,153 @@ export default function OrgTasksScreen({ navigation, route }) {
               <Text style={styles.section}>
                 {t('org.tasks.operationsTitle', null, 'Operations in this task')}
               </Text>
-              {(selected.operations || []).map((op, idx) => (
-                <View key={op.id || idx} style={styles.opRow}>
-                  <Text style={styles.opTitle}>
-                    {`${idx + 1}. ${op.activity?.name || '—'}`}
-                  </Text>
-                  {op.notes ? <Text style={styles.opMeta}>{op.notes}</Text> : null}
-                  {(op.assignees || []).length > 0 ? (
-                    <Text style={styles.opMeta}>
-                      {(op.assignees || []).map(personLabel).join(', ')}
+              <Text style={styles.opMeta}>
+                {t(
+                  'org.tasks.actualsHint',
+                  null,
+                  'Fill output actuals before End. Start/End buttons only track time — do not re-enter clock times here.',
+                )}
+              </Text>
+              {(selected.operations || []).map((op, idx) => {
+                const editable =
+                  canShowEndButton(selected) || selected.status === 'in_progress';
+                const unitLabelText =
+                  op.activity?.default_unit ||
+                  op.activity?.unit?.symbol ||
+                  '';
+                const distance = isDistanceOutput(op);
+                const materials =
+                  op.activity?.consumes_materials
+                    ? op.activity?.default_materials || []
+                    : [];
+                return (
+                  <View key={op.id || idx} style={styles.opRow}>
+                    <Text style={styles.opTitle}>
+                      {`${idx + 1}. ${op.activity?.name || '—'}`}
+                      {unitLabelText ? ` · ${unitLabelText}` : ''}
                     </Text>
-                  ) : null}
-                  {canShowEndButton(selected) || selected.status === 'in_progress' ? (
-                    <TextInput
-                      label={t('org.tasks.actualQty', null, 'Actual quantity')}
-                      value={actualDrafts[op.id] || ''}
-                      onChangeText={(value) =>
-                        setActualDrafts((prev) => ({ ...prev, [op.id]: value }))
-                      }
-                      mode="outlined"
-                      keyboardType="decimal-pad"
-                      style={styles.input}
-                      textColor={ON_CARD}
-                    />
-                  ) : op.actual_qty != null ? (
-                    <Text style={styles.opMeta}>
-                      {t('org.tasks.actualQty', null, 'Actual')}: {op.actual_qty}
-                    </Text>
-                  ) : null}
-                </View>
-              ))}
+                    {op.notes ? <Text style={styles.opMeta}>{op.notes}</Text> : null}
+                    {(op.assignees || []).length > 0 ? (
+                      <Text style={styles.opMeta}>
+                        {(op.assignees || []).map(personLabel).join(', ')}
+                      </Text>
+                    ) : null}
+                    {editable ? (
+                      distance ? (
+                        <>
+                          <TextInput
+                            label={t('org.tasks.meterStart', null, 'Meter start')}
+                            value={meterStartDrafts[op.id] || ''}
+                            onChangeText={(value) =>
+                              setMeterStartDrafts((prev) => ({ ...prev, [op.id]: value }))
+                            }
+                            mode="outlined"
+                            keyboardType="decimal-pad"
+                            style={styles.input}
+                            textColor={ON_CARD}
+                          />
+                          <TextInput
+                            label={t('org.tasks.meterEnd', null, 'Meter end')}
+                            value={meterEndDrafts[op.id] || ''}
+                            onChangeText={(value) =>
+                              setMeterEndDrafts((prev) => ({ ...prev, [op.id]: value }))
+                            }
+                            mode="outlined"
+                            keyboardType="decimal-pad"
+                            style={styles.input}
+                            textColor={ON_CARD}
+                          />
+                          <Text style={styles.opMeta}>
+                            {t(
+                              'org.tasks.meterKmHint',
+                              null,
+                              'km is computed from meter end − start (no separate km field).',
+                            )}
+                          </Text>
+                        </>
+                      ) : (
+                        <TextInput
+                          label={
+                            unitLabelText
+                              ? t(
+                                  'org.tasks.actualQtyWithUnit',
+                                  { unit: unitLabelText },
+                                  `Actual (${unitLabelText})`,
+                                )
+                              : t('org.tasks.actualQty', null, 'Actual quantity')
+                          }
+                          value={actualDrafts[op.id] || ''}
+                          onChangeText={(value) =>
+                            setActualDrafts((prev) => ({ ...prev, [op.id]: value }))
+                          }
+                          mode="outlined"
+                          keyboardType="decimal-pad"
+                          style={styles.input}
+                          textColor={ON_CARD}
+                        />
+                      )
+                    ) : distance && (op.meter_start != null || op.meter_end != null) ? (
+                      <Text style={styles.opMeta}>
+                        {t('org.tasks.meterStart', null, 'Meter start')}: {op.meter_start ?? '—'}
+                        {' · '}
+                        {t('org.tasks.meterEnd', null, 'Meter end')}: {op.meter_end ?? '—'}
+                        {op.actual_qty != null
+                          ? ` · ${t('org.tasks.actualQty', null, 'Actual')}: ${op.actual_qty}`
+                          : ''}
+                      </Text>
+                    ) : op.actual_qty != null ? (
+                      <Text style={styles.opMeta}>
+                        {t('org.tasks.actualQty', null, 'Actual')}: {op.actual_qty}
+                        {unitLabelText ? ` ${unitLabelText}` : ''}
+                      </Text>
+                    ) : null}
+
+                    {op.activity?.consumes_materials ? (
+                      <>
+                        <Text style={styles.opMeta}>
+                          {t(
+                            'org.tasks.leftoverHint',
+                            null,
+                            'Leftover (остатък) per issued material. Consumed = issued − leftover (issue comes later).',
+                          )}
+                        </Text>
+                        {materials.length === 0 ? (
+                          <Text style={styles.opMeta}>
+                            {t(
+                              'org.tasks.leftoverNoSkus',
+                              null,
+                              'No default SKUs on this operation yet — leftovers will appear once materials are issued.',
+                            )}
+                          </Text>
+                        ) : (
+                          materials.map((mat) => (
+                            <TextInput
+                              key={mat.id}
+                              label={t(
+                                'org.tasks.leftoverFor',
+                                { name: mat.name || `#${mat.id}` },
+                                `Leftover — ${mat.name || mat.id}`,
+                              )}
+                              value={leftoverDrafts[leftoverKey(op.id, mat.id)] || ''}
+                              onChangeText={(value) =>
+                                setLeftoverDrafts((prev) => ({
+                                  ...prev,
+                                  [leftoverKey(op.id, mat.id)]: value,
+                                }))
+                              }
+                              mode="outlined"
+                              keyboardType="decimal-pad"
+                              style={styles.input}
+                              textColor={ON_CARD}
+                              disabled={!editable}
+                            />
+                          ))
+                        )}
+                      </>
+                    ) : null}
+                  </View>
+                );
+              })}
               {(canShowEndButton(selected) || selected.status === 'in_progress') &&
               (selected.operations || []).length > 0 ? (
                 <Button
