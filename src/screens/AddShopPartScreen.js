@@ -61,7 +61,7 @@ export default function AddShopPartScreen({ navigation, route }) {
     setCatalogResults(data);
   } catch (err) {
     console.error(err);
-    Alert.alert('Error', 'Failed to search parts catalog');
+    Alert.alert('Error', 'Failed to search materials catalog');
   } finally {
     setSearching(false);
   }
@@ -254,7 +254,7 @@ export default function AddShopPartScreen({ navigation, route }) {
     >
       <ScrollView contentContainerStyle={styles.container}>
         <Text variant="headlineSmall" style={styles.title}>
-          Search & Add Parts
+          Search & Add Materials
         </Text>
 
         <TextInput

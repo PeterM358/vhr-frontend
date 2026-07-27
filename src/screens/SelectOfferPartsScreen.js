@@ -119,7 +119,7 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
       setResults(data);
     } catch (err) {
       console.error(err);
-      Alert.alert('Error', 'Failed to fetch parts catalog');
+      Alert.alert('Error', 'Failed to fetch materials catalog');
     } finally {
       setLoading(false);
     }
@@ -250,7 +250,7 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
 
         <TextInput
           mode="outlined"
-          label="Search parts catalog"
+          label="Search materials catalog"
           value={query}
           onChangeText={setQuery}
           style={styles.input}

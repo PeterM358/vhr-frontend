@@ -36,23 +36,23 @@ async function authPost(token, path, body) {
 
 export function fetchPartTypes(token, search = '') {
   const q = search ? `?search=${encodeURIComponent(search)}` : '';
-  return authGet(token, `/api/parts/part-types/${q}`);
+  return authGet(token, `/api/materials/material-types/${q}`);
 }
 
 export function fetchPartBrands(token, search = '') {
   const q = search ? `?search=${encodeURIComponent(search)}` : '';
-  return authGet(token, `/api/parts/part-brands/${q}`);
+  return authGet(token, `/api/materials/material-brands/${q}`);
 }
 
 export function fetchUnits(token, dimension = '') {
   const q = dimension ? `?dimension=${encodeURIComponent(dimension)}` : '';
-  return authGet(token, `/api/parts/units/${q}`);
+  return authGet(token, `/api/materials/units/${q}`);
 }
 
 export function createPartType(token, name) {
-  return authPost(token, '/api/parts/part-types/', { name });
+  return authPost(token, '/api/materials/material-types/', { name });
 }
 
 export function createPartBrand(token, name) {
-  return authPost(token, '/api/parts/part-brands/', { name });
+  return authPost(token, '/api/materials/material-brands/', { name });
 }

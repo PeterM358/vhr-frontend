@@ -150,7 +150,7 @@ export async function createProductMapping(token, organizationId, payload) {
 
 export async function listPackaging(token, shopPartId) {
   const qs = shopPartId ? `?shop_part_id=${shopPartId}` : '';
-  const response = await fetch(`${API_BASE_URL}/api/parts/packaging/${qs}`, {
+  const response = await fetch(`${API_BASE_URL}/api/materials/packaging/${qs}`, {
     headers: await networkScopedHeaders(token),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load packaging'));
@@ -158,7 +158,7 @@ export async function listPackaging(token, shopPartId) {
 }
 
 export async function createPackaging(token, payload) {
-  const response = await fetch(`${API_BASE_URL}/api/parts/packaging/`, {
+  const response = await fetch(`${API_BASE_URL}/api/materials/packaging/`, {
     method: 'POST',
     headers: { ...(await networkScopedHeaders(token)), 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -168,7 +168,7 @@ export async function createPackaging(token, payload) {
 }
 
 export async function supersedePackaging(token, packagingId, payload) {
-  const response = await fetch(`${API_BASE_URL}/api/parts/packaging/${packagingId}/supersede/`, {
+  const response = await fetch(`${API_BASE_URL}/api/materials/packaging/${packagingId}/supersede/`, {
     method: 'POST',
     headers: { ...(await networkScopedHeaders(token)), 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

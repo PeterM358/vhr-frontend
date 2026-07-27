@@ -73,7 +73,7 @@ export default function CreateMasterPartScreen({ navigation, route }) {
     >
       <ScrollView contentContainerStyle={BASE_STYLES.formScreenScroll}>
         <Text variant="headlineSmall" style={styles.title}>
-          Add New Part to Catalog
+          Add New Material to Catalog
         </Text>
 
         <TextInput

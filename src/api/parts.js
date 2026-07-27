@@ -1,7 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from './config';
 
-// ✅ Get global PartsMaster catalog with query params object
+// Materials catalog — paths use /api/materials/ ( /api/parts/ remains a BE alias for one release ).
+// Prefer importing from `./materials` for new code.
+
+// Get global MaterialMaster catalog with query params object
 export async function getSuggestedPartsForRepairType(token, repairTypeId, shopProfileId) {
   const qs = new URLSearchParams();
   if (shopProfileId) qs.set('shop_profile_id', String(shopProfileId));
@@ -13,7 +16,7 @@ export async function getSuggestedPartsForRepairType(token, repairTypeId, shopPr
 
 export async function getPartsCatalog(token, queryParams = {}) {
   const params = new URLSearchParams(queryParams).toString();
-  const url = `${API_BASE_URL}/api/parts/parts/${params ? '?' + params : ''}`;
+  const url = `${API_BASE_URL}/api/materials/materials/${params ? '?' + params : ''}`;
 
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
@@ -26,7 +29,7 @@ export async function getPartsCatalog(token, queryParams = {}) {
 
 // ✅ Create new PartsMaster entry (global)
 export async function createPartsMaster(token, data) {
-  const response = await fetch(`${API_BASE_URL}/api/parts/parts/`, {
+  const response = await fetch(`${API_BASE_URL}/api/materials/materials/`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -43,7 +46,7 @@ export async function createPartsMaster(token, data) {
 
 // ✅ Get shop's own ShopParts listings
 export async function getShopParts(token) {
-  const response = await fetch(`${API_BASE_URL}/api/parts/shop-parts/`, {
+  const response = await fetch(`${API_BASE_URL}/api/materials/org-materials/`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -55,7 +58,7 @@ export async function getShopParts(token) {
 
 // ✅ Create new ShopPart listing
 export async function createShopPart(token, data) {
-  const response = await fetch(`${API_BASE_URL}/api/parts/shop-parts/`, {
+  const response = await fetch(`${API_BASE_URL}/api/materials/org-materials/`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -72,7 +75,7 @@ export async function createShopPart(token, data) {
 
 // ✅ Update existing ShopPart listing
 export async function updateShopPart(token, shopPartId, data) {
-  const response = await fetch(`${API_BASE_URL}/api/parts/shop-parts/${shopPartId}/`, {
+  const response = await fetch(`${API_BASE_URL}/api/materials/org-materials/${shopPartId}/`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -89,7 +92,7 @@ export async function updateShopPart(token, shopPartId, data) {
 
 // ✅ Delete ShopPart listing
 export async function deleteShopPart(token, shopPartId) {
-  const response = await fetch(`${API_BASE_URL}/api/parts/shop-parts/${shopPartId}/`, {
+  const response = await fetch(`${API_BASE_URL}/api/materials/org-materials/${shopPartId}/`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -127,7 +130,7 @@ export async function prepareRepairPartsData(token, shopProfileId, selectedParts
         default_labor_cost: part.labor,
       });
     } else {
-      const url = `${API_BASE_URL}/api/parts/shop-parts/?part=${part.partsMasterId}&shop_profile=${shopProfileId}`;
+      const url = `${API_BASE_URL}/api/materials/org-materials/?part=${part.partsMasterId}&shop_profile=${shopProfileId}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const data = await res.json();
