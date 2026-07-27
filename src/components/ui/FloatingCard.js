@@ -55,6 +55,8 @@ export default function FloatingCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#f8fafc',
+    // Force dark text on light surfaces (esp. RN Web CSS inheritance from dark shells).
+    color: COLORS.TEXT_DARK,
     borderRadius: 20,
     padding: 16,
     marginBottom: 14,

@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, Button, Switch, Text, TextInput } from 'react-native-paper';
+import { ActivityIndicator, Button, Switch, TextInput } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 
 import ScreenBackground from '../components/ScreenBackground';
@@ -22,6 +22,11 @@ import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
+
+/** Hardcoded on-card colors — avoid Paper theme / CSS inheritance washing text white. */
+const ON_CARD = '#0F172A';
+const ON_CARD_MUTED = '#475569';
+const CARD_SURFACE = { color: ON_CARD };
 
 const KIND_OPTIONS = [
   { value: 'transport', labelKey: 'org.operations.kinds.transport' },
@@ -276,14 +281,14 @@ export default function OrgOperationsScreen({ navigation, route }) {
         {loading ? (
           <ActivityIndicator color="#fff" style={styles.loader} />
         ) : error ? (
-          <AppCard style={styles.card}>
+          <AppCard style={styles.card} contentStyle={CARD_SURFACE}>
             <Text style={styles.error}>{error}</Text>
             <Button mode="contained" onPress={load} style={styles.retry}>
               {t('common.retry', null, 'Retry')}
             </Button>
           </AppCard>
         ) : mode === 'list' ? (
-          <AppCard style={styles.card}>
+          <AppCard style={styles.card} contentStyle={CARD_SURFACE}>
             <Text style={styles.sectionTitle}>
               {t('org.operations.catalogTitle', null, 'Company operations')}
             </Text>
@@ -358,7 +363,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
             ) : null}
           </AppCard>
         ) : (
-          <AppCard style={styles.card}>
+          <AppCard style={styles.card} contentStyle={CARD_SURFACE}>
             <Text style={styles.sectionTitle}>
               {editingId
                 ? t('org.operations.editOperation', null, 'Edit operation')
@@ -370,7 +375,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
               onChangeText={setName}
               mode="outlined"
               style={styles.input}
-              textColor={COLORS.TEXT_DARK}
+              textColor={ON_CARD}
             />
             <TextInput
               label={t('org.operations.code', null, 'Code (optional)')}
@@ -379,7 +384,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
               mode="outlined"
               autoCapitalize="characters"
               style={styles.input}
-              textColor={COLORS.TEXT_DARK}
+              textColor={ON_CARD}
             />
             <Text style={styles.fieldLabel}>{t('org.operations.kind', null, 'Kind')}</Text>
             <View style={styles.kindWrap}>
@@ -407,7 +412,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
               mode="outlined"
               multiline
               style={styles.input}
-              textColor={COLORS.TEXT_DARK}
+              textColor={ON_CARD}
             />
             <Text style={styles.fieldLabel}>{t('org.operations.normsTitle', null, 'Norms (optional)')}</Text>
             <Text style={styles.helper}>
@@ -424,7 +429,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
               mode="outlined"
               keyboardType="decimal-pad"
               style={styles.input}
-              textColor={COLORS.TEXT_DARK}
+              textColor={ON_CARD}
             />
             <TextInput
               label={t('org.operations.normBasisQty', null, 'Per (basis qty)')}
@@ -433,7 +438,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
               mode="outlined"
               keyboardType="decimal-pad"
               style={styles.input}
-              textColor={COLORS.TEXT_DARK}
+              textColor={ON_CARD}
             />
             <Text style={styles.fieldLabel}>
               {t('org.operations.normInputUnit', null, 'Consumed input unit')}
@@ -453,7 +458,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
                 resetForm();
                 setMode('list');
               }}
-              textColor={COLORS.TEXT_DARK}
+              textColor={ON_CARD}
             >
               {t('common.cancel', null, 'Cancel')}
             </Button>
@@ -510,26 +515,27 @@ const styles = StyleSheet.create({
   card: {
     padding: 14,
     marginBottom: 12,
+    color: ON_CARD,
   },
   sectionTitle: {
-    color: COLORS.TEXT_DARK,
+    color: ON_CARD,
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 6,
   },
   meta: {
-    color: COLORS.TEXT_MUTED,
+    color: ON_CARD_MUTED,
     fontSize: 12,
     marginBottom: 12,
   },
   helper: {
-    color: COLORS.TEXT_MUTED,
+    color: ON_CARD_MUTED,
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 10,
   },
   empty: {
-    color: COLORS.TEXT_MUTED,
+    color: ON_CARD_MUTED,
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 12,
@@ -550,17 +556,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   rowTitle: {
-    color: COLORS.TEXT_DARK,
+    color: ON_CARD,
     fontSize: 15,
     fontWeight: '700',
   },
   rowMeta: {
-    color: COLORS.TEXT_MUTED,
+    color: ON_CARD_MUTED,
     fontSize: 12,
     marginTop: 4,
   },
   rowNotes: {
-    color: COLORS.TEXT_MUTED,
+    color: ON_CARD_MUTED,
     fontSize: 12,
     marginTop: 4,
     fontStyle: 'italic',
@@ -583,7 +589,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   fieldLabel: {
-    color: COLORS.TEXT_MUTED,
+    color: ON_CARD,
     fontSize: 12,
     fontWeight: '700',
     marginBottom: 8,
@@ -599,21 +605,21 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 7,
-    backgroundColor: '#eef2f7',
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.12)',
+    borderColor: '#CBD5E1',
   },
   kindChipActive: {
-    backgroundColor: COLORS.PRIMARY_SOFT || '#dbeafe',
+    backgroundColor: COLORS.PRIMARY,
     borderColor: COLORS.PRIMARY,
   },
   kindChipText: {
-    color: COLORS.TEXT_DARK,
+    color: ON_CARD,
     fontSize: 12,
     fontWeight: '600',
   },
   kindChipTextActive: {
-    color: COLORS.TEXT_DARK,
+    color: '#FFFFFF',
   },
   switchRow: {
     flexDirection: 'row',
@@ -622,12 +628,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   switchLabel: {
-    color: COLORS.TEXT_DARK,
+    color: ON_CARD,
     fontSize: 14,
     fontWeight: '600',
   },
   formMessage: {
-    color: COLORS.TEXT_DARK,
+    color: ON_CARD_MUTED,
     marginBottom: 10,
   },
   primaryBtn: {
