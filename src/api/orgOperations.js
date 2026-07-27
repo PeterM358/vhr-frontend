@@ -21,6 +21,15 @@ function buildQuery(params = {}) {
   return serialized ? `?${serialized}` : '';
 }
 
+export async function listUnitsOfMeasure(token, organizationId, params = {}) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/units-of-measure/${buildQuery(params)}`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load units'));
+  return response.json();
+}
+
 export async function listActivityDefinitions(token, organizationId, params = {}) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/activity-definitions/${buildQuery(params)}`,

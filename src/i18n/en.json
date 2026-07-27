@@ -225,6 +225,7 @@
       "subtitle": "Shared workforce, fleet, documents, and operations for your company.",
       "fleetSubtitle": "Manage your company fleet and request repairs the same way customers do.",
       "driverSubtitle": "Pleasant work with {org}",
+      "pleasantWork": "Pleasant work with {org}",
       "modules": "Workspace",
       "openServiceCenter": "Open service center workspace",
       "importFleetLater": "Import fleet later",
@@ -255,6 +256,7 @@
         "unscheduled": "No date",
         "repairLaterTitle": "Repair from a task",
         "repairLaterBody": "Vehicles travel with your work cards. When a task includes a vehicle, you can request repair from there.",
+        "operationCount": "{count} operations",
         "status": {
           "draft": "Draft",
           "assigned": "Assigned",
@@ -279,7 +281,8 @@
         "notifications": "Notifications",
         "notificationsSubtitle": "Open your notification inbox.",
         "profile": "Profile",
-        "profileSubtitle": "Open your account profile."
+        "profileSubtitle": "Open your account profile.",
+        "createTaskSubtitle": "Assign multiple operations and people on one work card."
       }
     },
     "operations": {
@@ -294,6 +297,15 @@
       "name": "Name",
       "code": "Code (optional)",
       "kind": "Kind",
+      "unit": "Unit of measure",
+      "unitNone": "None",
+      "notes": "Notes",
+      "normsTitle": "Norms (optional)",
+      "normsHelper": "How much input is consumed per basis quantity of the primary unit (e.g. 0.8 L paint per 1 m²).",
+      "normRate": "Rate",
+      "normBasisQty": "Per (basis qty)",
+      "normInputUnit": "Consumed input unit",
+      "normSummary": "{rate} {input} / {basis} {unit}",
       "defaultUnit": "Default unit (optional)",
       "active": "Active",
       "inactive": "Inactive",
@@ -316,6 +328,30 @@
         "other": "Other"
       },
       "defaultUnitPlaceholder": "m², km, L, hours…"
+    },
+    "tasks": {
+      "createTitle": "Create task",
+      "createLead": "Combine several operations into one task and assign people overall or per operation.",
+      "detailsTitle": "Task details",
+      "title": "Title",
+      "instructions": "Instructions",
+      "scheduledDate": "Date (YYYY-MM-DD)",
+      "vehicle": "Vehicle (optional)",
+      "noVehicle": "None",
+      "overallPeople": "People on this task",
+      "overallPeopleHelper": "Select up to {max} people for the whole task.",
+      "operationsTitle": "Operations in this task",
+      "operationsHelper": "Pick one or more company operations. Optionally assign people to each step.",
+      "operationNotes": "Notes for this step",
+      "operationPeople": "People for this step",
+      "noOperations": "No active operations yet. Create them under Operations first.",
+      "titleRequired": "Title is required.",
+      "operationsRequired": "Pick at least one operation.",
+      "save": "Create task",
+      "createdTitle": "Task created",
+      "createdBody": "The multi-operation task was saved.",
+      "saveError": "Could not create task.",
+      "loadError": "Could not load task form."
     },
     "switcher": {
       "label": "Organization"

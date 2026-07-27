@@ -10,6 +10,7 @@ import OrgAppHeader from '../components/org/OrgAppHeader';
 import {
   createActivityDefinition,
   listActivityDefinitions,
+  listUnitsOfMeasure,
   updateActivityDefinition,
 } from '../api/orgOperations';
 import {
@@ -38,6 +39,11 @@ const MODES = [
   { id: 'add', labelKey: 'org.operations.addOperation' },
 ];
 
+function unitLabel(unit) {
+  if (!unit) return '';
+  return unit.symbol || unit.name || unit.code || '';
+}
+
 export default function OrgOperationsScreen({ navigation, route }) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
@@ -57,13 +63,18 @@ export default function OrgOperationsScreen({ navigation, route }) {
   const [error, setError] = useState('');
   const [canManage, setCanManage] = useState(false);
   const [rows, setRows] = useState([]);
+  const [units, setUnits] = useState([]);
   const [mode, setMode] = useState('list');
   const [editingId, setEditingId] = useState(null);
 
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [kind, setKind] = useState('transport');
-  const [defaultUnit, setDefaultUnit] = useState('');
+  const [unitId, setUnitId] = useState(null);
+  const [normInputUnitId, setNormInputUnitId] = useState(null);
+  const [notes, setNotes] = useState('');
+  const [normRate, setNormRate] = useState('');
+  const [normBasisQty, setNormBasisQty] = useState('1');
   const [isActive, setIsActive] = useState(true);
   const [busy, setBusy] = useState(false);
   const [formMessage, setFormMessage] = useState('');
@@ -77,13 +88,18 @@ export default function OrgOperationsScreen({ navigation, route }) {
       setOrgId(resolved);
       if (!resolved) {
         setRows([]);
+        setUnits([]);
         setCanManage(false);
         setError(t('org.operations.loadError', null, 'Could not load operations.'));
         return;
       }
-      const data = await listActivityDefinitions(token, resolved);
+      const [data, unitsData] = await Promise.all([
+        listActivityDefinitions(token, resolved),
+        listUnitsOfMeasure(token, resolved).catch(() => ({ results: [] })),
+      ]);
       setCanManage(Boolean(data?.can_manage));
       setRows(Array.isArray(data?.results) ? data.results : []);
+      setUnits(Array.isArray(unitsData?.results) ? unitsData.results : []);
     } catch (e) {
       setError(e.message || t('org.operations.loadError', null, 'Could not load operations.'));
       setRows([]);
@@ -108,7 +124,11 @@ export default function OrgOperationsScreen({ navigation, route }) {
     setName('');
     setCode('');
     setKind('transport');
-    setDefaultUnit('');
+    setUnitId(null);
+    setNormInputUnitId(null);
+    setNotes('');
+    setNormRate('');
+    setNormBasisQty('1');
     setIsActive(true);
     setFormMessage('');
   };
@@ -123,7 +143,11 @@ export default function OrgOperationsScreen({ navigation, route }) {
     setName(row.name || '');
     setCode(row.code || '');
     setKind(row.activity_kind || 'other');
-    setDefaultUnit(row.default_unit || '');
+    setUnitId(row.unit_id || row.unit?.id || null);
+    setNormInputUnitId(row.norm_input_unit_id || row.norm_input_unit?.id || null);
+    setNotes(row.notes || '');
+    setNormRate(row.norm_rate != null ? String(row.norm_rate) : '');
+    setNormBasisQty(row.norm_basis_qty != null ? String(row.norm_basis_qty) : '1');
     setIsActive(row.is_active !== false);
     setFormMessage('');
     setMode('add');
@@ -143,7 +167,11 @@ export default function OrgOperationsScreen({ navigation, route }) {
       const payload = {
         name: trimmedName,
         activity_kind: kind,
-        default_unit: defaultUnit.trim(),
+        unit_id: unitId || null,
+        notes: notes.trim(),
+        norm_rate: normRate.trim() || null,
+        norm_basis_qty: normBasisQty.trim() || null,
+        norm_input_unit_id: normInputUnitId || null,
         is_active: isActive,
       };
       if (code.trim()) payload.code = code.trim();
@@ -179,6 +207,33 @@ export default function OrgOperationsScreen({ navigation, route }) {
   };
 
   const activeCount = useMemo(() => rows.filter((row) => row.is_active).length, [rows]);
+
+  const renderUnitChips = (selectedId, onSelect) => (
+    <View style={styles.kindWrap}>
+      <Pressable
+        onPress={() => onSelect(null)}
+        style={[styles.kindChip, selectedId == null && styles.kindChipActive]}
+      >
+        <Text style={[styles.kindChipText, selectedId == null && styles.kindChipTextActive]}>
+          {t('org.operations.unitNone', null, 'None')}
+        </Text>
+      </Pressable>
+      {units.map((unit) => {
+        const active = selectedId === unit.id;
+        return (
+          <Pressable
+            key={unit.id}
+            onPress={() => onSelect(unit.id)}
+            style={[styles.kindChip, active && styles.kindChipActive]}
+          >
+            <Text style={[styles.kindChipText, active && styles.kindChipTextActive]}>
+              {unitLabel(unit)}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 
   return (
     <ScreenBackground safeArea={false}>
@@ -254,11 +309,30 @@ export default function OrgOperationsScreen({ navigation, route }) {
                     <Text style={styles.rowTitle}>{row.name}</Text>
                     <Text style={styles.rowMeta}>
                       {row.code} · {kindLabel(row.activity_kind)}
-                      {row.default_unit ? ` · ${row.default_unit}` : ''}
+                      {row.unit ? ` · ${unitLabel(row.unit)}` : ''}
                       {row.is_active
                         ? ''
                         : ` · ${t('org.operations.inactive', null, 'Inactive')}`}
                     </Text>
+                    {row.notes ? (
+                      <Text style={styles.rowNotes} numberOfLines={2}>
+                        {row.notes}
+                      </Text>
+                    ) : null}
+                    {row.norm_rate != null ? (
+                      <Text style={styles.rowMeta}>
+                        {t(
+                          'org.operations.normSummary',
+                          {
+                            rate: row.norm_rate,
+                            basis: row.norm_basis_qty || '1',
+                            unit: unitLabel(row.unit) || '—',
+                            input: unitLabel(row.norm_input_unit) || '—',
+                          },
+                          `${row.norm_rate} ${unitLabel(row.norm_input_unit) || ''} / ${row.norm_basis_qty || '1'} ${unitLabel(row.unit) || ''}`.trim(),
+                        )}
+                      </Text>
+                    ) : null}
                   </View>
                   {canManage ? (
                     <View style={styles.rowActions}>
@@ -296,6 +370,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
               onChangeText={setName}
               mode="outlined"
               style={styles.input}
+              textColor={COLORS.TEXT_DARK}
             />
             <TextInput
               label={t('org.operations.code', null, 'Code (optional)')}
@@ -304,6 +379,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
               mode="outlined"
               autoCapitalize="characters"
               style={styles.input}
+              textColor={COLORS.TEXT_DARK}
             />
             <Text style={styles.fieldLabel}>{t('org.operations.kind', null, 'Kind')}</Text>
             <View style={styles.kindWrap}>
@@ -322,14 +398,47 @@ export default function OrgOperationsScreen({ navigation, route }) {
                 );
               })}
             </View>
+            <Text style={styles.fieldLabel}>{t('org.operations.unit', null, 'Unit of measure')}</Text>
+            {renderUnitChips(unitId, setUnitId)}
             <TextInput
-              label={t('org.operations.defaultUnit', null, 'Default unit (optional)')}
-              value={defaultUnit}
-              onChangeText={setDefaultUnit}
+              label={t('org.operations.notes', null, 'Notes')}
+              value={notes}
+              onChangeText={setNotes}
               mode="outlined"
-              placeholder={t('org.operations.defaultUnitPlaceholder')}
+              multiline
               style={styles.input}
+              textColor={COLORS.TEXT_DARK}
             />
+            <Text style={styles.fieldLabel}>{t('org.operations.normsTitle', null, 'Norms (optional)')}</Text>
+            <Text style={styles.helper}>
+              {t(
+                'org.operations.normsHelper',
+                null,
+                'How much input is consumed per basis quantity of the primary unit (e.g. 0.8 L paint per 1 m²).',
+              )}
+            </Text>
+            <TextInput
+              label={t('org.operations.normRate', null, 'Rate')}
+              value={normRate}
+              onChangeText={setNormRate}
+              mode="outlined"
+              keyboardType="decimal-pad"
+              style={styles.input}
+              textColor={COLORS.TEXT_DARK}
+            />
+            <TextInput
+              label={t('org.operations.normBasisQty', null, 'Per (basis qty)')}
+              value={normBasisQty}
+              onChangeText={setNormBasisQty}
+              mode="outlined"
+              keyboardType="decimal-pad"
+              style={styles.input}
+              textColor={COLORS.TEXT_DARK}
+            />
+            <Text style={styles.fieldLabel}>
+              {t('org.operations.normInputUnit', null, 'Consumed input unit')}
+            </Text>
+            {renderUnitChips(normInputUnitId, setNormInputUnitId)}
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>{t('org.operations.active', null, 'Active')}</Text>
               <Switch value={isActive} onValueChange={setIsActive} />
@@ -344,6 +453,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
                 resetForm();
                 setMode('list');
               }}
+              textColor={COLORS.TEXT_DARK}
             >
               {t('common.cancel', null, 'Cancel')}
             </Button>
@@ -375,24 +485,24 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.16)',
     borderWidth: 1,
-    borderColor: COLORS.BORDER_SOFT,
+    borderColor: 'rgba(255,255,255,0.22)',
   },
   modeChipActive: {
-    backgroundColor: COLORS.PRIMARY_GLASS,
-    borderColor: COLORS.ACCENT,
+    backgroundColor: '#fff',
+    borderColor: '#fff',
   },
   modeChipDisabled: {
     opacity: 0.45,
   },
   modeChipText: {
-    color: 'rgba(255,255,255,0.82)',
+    color: 'rgba(255,255,255,0.9)',
     fontSize: 13,
     fontWeight: '600',
   },
   modeChipTextActive: {
-    color: '#fff',
+    color: COLORS.TEXT_DARK,
   },
   loader: {
     marginVertical: 24,
@@ -412,6 +522,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 12,
   },
+  helper: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
   empty: {
     color: COLORS.TEXT_MUTED,
     fontSize: 14,
@@ -419,7 +535,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   error: {
-    color: '#B91C1C',
+    color: '#b91c1c',
     marginBottom: 10,
   },
   retry: {
@@ -443,6 +559,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
   },
+  rowNotes: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
   rowActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -461,7 +583,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   fieldLabel: {
-    color: COLORS.TEXT_DARK,
+    color: COLORS.TEXT_MUTED,
     fontSize: 12,
     fontWeight: '700',
     marginBottom: 8,
@@ -477,12 +599,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 7,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#eef2f7',
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: 'rgba(15,23,42,0.12)',
   },
   kindChipActive: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: COLORS.PRIMARY_SOFT || '#dbeafe',
     borderColor: COLORS.PRIMARY,
   },
   kindChipText: {
@@ -491,7 +613,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   kindChipTextActive: {
-    color: COLORS.ON_PRIMARY,
+    color: COLORS.TEXT_DARK,
   },
   switchRow: {
     flexDirection: 'row',
@@ -505,7 +627,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   formMessage: {
-    color: COLORS.TEXT_MUTED,
+    color: COLORS.TEXT_DARK,
     marginBottom: 10,
   },
   primaryBtn: {

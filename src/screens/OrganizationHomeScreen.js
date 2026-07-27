@@ -36,6 +36,7 @@ import {
   navigateToOrgCalendar,
   navigateToOrgFleet,
   navigateToOrgNetwork,
+  navigateToOrgCreateTask,
   navigateToOrgOperations,
   navigateToOrgWorkforce,
   navigateToPartnerDashboard,
@@ -450,6 +451,17 @@ export default function OrganizationHomeScreen() {
 
     if (org?.manage_org_operations || org?.manage_fleet) {
       tiles.unshift({
+        key: 'create-task',
+        icon: 'clipboard-plus-outline',
+        title: t('org.tasks.createTitle', null, 'Create task'),
+        subtitle: t(
+          'org.home.actions.createTaskSubtitle',
+          null,
+          'Assign multiple operations and people on one work card.',
+        ),
+        onPress: () => navigateToOrgCreateTask(navigation, { orgId: org?.id }),
+      });
+      tiles.unshift({
         key: 'operations',
         icon: 'clipboard-list-outline',
         title: t('org.operations.title', null, 'Operations'),
@@ -492,17 +504,19 @@ export default function OrganizationHomeScreen() {
     t,
   ]);
 
+  const canCreateTasks = Boolean(org?.manage_org_operations || org?.manage_fleet);
+
   const fabConfig = isDriver
     ? null
-    : hasFleet
-      ? { label: t('org.home.requestRepair', null, 'Request repair'), onPress: goRequestRepair }
-      : org?.manage_fleet
-        ? { label: t('fleetImport.openAction', null, 'Import fleet'), onPress: goImportFleet }
-        : org?.manage_org_operations
-          ? {
-              label: t('org.operations.addOperation', null, 'Add operation'),
-              onPress: () => navigateToOrgOperations(navigation, { orgId: org?.id }),
-            }
+    : canCreateTasks
+      ? {
+          label: t('org.tasks.createTitle', null, 'Create task'),
+          onPress: () => navigateToOrgCreateTask(navigation, { orgId: org?.id }),
+        }
+      : hasFleet
+        ? { label: t('org.home.requestRepair', null, 'Request repair'), onPress: goRequestRepair }
+        : org?.manage_fleet
+          ? { label: t('fleetImport.openAction', null, 'Import fleet'), onPress: goImportFleet }
           : null;
 
   return (
@@ -516,30 +530,12 @@ export default function OrganizationHomeScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <DashboardHeroCard
-          title={
-            isDriver
-              ? t('org.home.workerGreeting', { name: workerName }, `Hi, ${workerName}`)
-              : t('org.home.greeting', { name: orgName }, `Welcome, ${orgName}`)
-          }
-          subtitle={
-            isDriver
-              ? t(
-                  'org.home.driverSubtitle',
-                  { org: orgName },
-                  `Have a good day working with ${orgName}`,
-                )
-              : fleetFocused
-                ? t(
-                    'org.home.fleetSubtitle',
-                    null,
-                    'Manage your company fleet and request repairs the same way customers do.',
-                  )
-                : t(
-                    'org.home.subtitle',
-                    null,
-                    'Shared workforce, fleet, documents, and operations for your company.',
-                  )
-          }
+          title={t('org.home.greeting', { name: workerName }, `Welcome, ${workerName}`)}
+          subtitle={t(
+            'org.home.pleasantWork',
+            { org: orgName },
+            `Pleasant work with ${orgName}`,
+          )}
         />
 
         {isDriver ? (
@@ -627,13 +623,32 @@ export default function OrganizationHomeScreen() {
                         <Text style={styles.currentTaskMeta}>
                           {[
                             statusLabel(currentTask.status),
-                            currentTask.activity?.name,
+                            Array.isArray(currentTask.operations) && currentTask.operations.length > 1
+                              ? t(
+                                  'org.home.tasks.operationCount',
+                                  { count: currentTask.operations.length },
+                                  `${currentTask.operations.length} operations`,
+                                )
+                              : currentTask.activity?.name || currentTask.operations?.[0]?.activity?.name,
                             currentTask.vehicle?.license_plate || currentTask.vehicle?.display_name,
                             currentTask.scheduled_date,
                           ]
                             .filter(Boolean)
                             .join(' · ')}
                         </Text>
+                        {Array.isArray(currentTask.operations) && currentTask.operations.length > 0 ? (
+                          <View style={styles.opList}>
+                            {currentTask.operations.map((op, idx) => (
+                              <Text key={op.id || idx} style={styles.opLine} numberOfLines={2}>
+                                {`${idx + 1}. ${op.activity?.name || '—'}${
+                                  op.assignees?.length
+                                    ? ` · ${op.assignees.map((a) => a.display_name).filter(Boolean).join(', ')}`
+                                    : ''
+                                }`}
+                              </Text>
+                            ))}
+                          </View>
+                        ) : null}
                         {currentTask.instructions ? (
                           <Text style={styles.currentTaskInstructions} numberOfLines={4}>
                             {currentTask.instructions}
@@ -773,6 +788,15 @@ const styles = StyleSheet.create({
   },
   currentTask: {
     marginBottom: 8,
+  },
+  opList: {
+    marginTop: 8,
+    gap: 4,
+  },
+  opLine: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 13,
+    lineHeight: 18,
   },
   currentTaskEyebrow: {
     color: COLORS.ACCENT,

@@ -14,6 +14,7 @@ import FleetDashboardScreen from '../screens/FleetDashboardScreen';
 import NetworkOrganizationScreen from '../screens/NetworkOrganizationScreen';
 import OrgWorkforceScreen from '../screens/OrgWorkforceScreen';
 import OrgOperationsScreen from '../screens/OrgOperationsScreen';
+import OrgCreateTaskScreen from '../screens/OrgCreateTaskScreen';
 import OrgCalendarScreen from '../screens/OrgCalendarScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
 
@@ -290,6 +291,11 @@ export default function OrganizationDrawer() {
       <Drawer.Screen name="OrgOverview" component={OrganizationHomeScreen} />
       <Drawer.Screen name="OrgFleet" component={FleetDashboardScreen} />
       <Drawer.Screen name="OrgOperations" component={OrgOperationsScreen} />
+      <Drawer.Screen
+        name="OrgCreateTask"
+        component={OrgCreateTaskScreen}
+        options={{ drawerItemStyle: { display: 'none' } }}
+      />
       <Drawer.Screen name="OrgCalendar" component={OrgCalendarScreen} />
       <Drawer.Screen name="OrgWorkforce" component={OrgWorkforceScreen} />
       <Drawer.Screen name="OrgNetwork" component={NetworkOrganizationScreen} />
