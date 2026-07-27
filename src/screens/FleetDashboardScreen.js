@@ -16,10 +16,11 @@ import { useTranslation } from '../i18n';
 import { fleetVehicleTitle, mapFleetReadiness } from '../utils/fleetReadinessStatus';
 import { COLORS } from '../styles/colors';
 
-const READINESS_FILTERS = ['', 'not_ready', 'expiring_soon', 'unknown', 'ready'];
+const READINESS_FILTERS = ['', 'ready', 'not_ready', 'expiring_soon', 'unknown'];
 
 const FLEET_TABS = [
   { id: 'all', labelKey: 'fleet.dashboard.tabs.all', fallback: 'All' },
+  { id: 'ready', labelKey: 'fleet.dashboard.tabs.ready', fallback: 'Ready' },
   { id: 'issues', labelKey: 'fleet.dashboard.tabs.issues', fallback: 'Not ready' },
   { id: 'import', labelKey: 'fleet.dashboard.tabs.import', fallback: 'Import' },
 ];
@@ -87,10 +88,12 @@ export default function FleetDashboardScreen({ navigation, route }) {
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState('');
   const [readinessStatus, setReadinessStatus] = useState(
-    routeTab === 'issues' ? 'not_ready' : '',
+    routeTab === 'issues' ? 'not_ready' : routeTab === 'ready' ? 'ready' : '',
   );
   const [activeTab, setActiveTab] = useState(
-    routeTab === 'issues' || routeTab === 'import' ? routeTab : 'all',
+    routeTab === 'issues' || routeTab === 'import' || routeTab === 'ready'
+      ? routeTab
+      : 'all',
   );
   const [orgMenuVisible, setOrgMenuVisible] = useState(false);
   const [deptMenuVisible, setDeptMenuVisible] = useState(false);
@@ -103,10 +106,16 @@ export default function FleetDashboardScreen({ navigation, route }) {
   const showOrgChip = visibleOrgs.length > 1;
 
   useEffect(() => {
-    if (routeTab === 'issues' || routeTab === 'import' || routeTab === 'all') {
+    if (
+      routeTab === 'issues' ||
+      routeTab === 'import' ||
+      routeTab === 'all' ||
+      routeTab === 'ready'
+    ) {
       setActiveTab(routeTab);
       if (routeTab === 'issues') setReadinessStatus('not_ready');
-      if (routeTab === 'all') setReadinessStatus('');
+      else if (routeTab === 'ready') setReadinessStatus('ready');
+      else if (routeTab === 'all') setReadinessStatus('');
     }
   }, [routeTab]);
 
@@ -114,6 +123,10 @@ export default function FleetDashboardScreen({ navigation, route }) {
     setActiveTab(tabId);
     if (tabId === 'all') {
       setReadinessStatus('');
+      return;
+    }
+    if (tabId === 'ready') {
+      setReadinessStatus('ready');
       return;
     }
     if (tabId === 'issues') {

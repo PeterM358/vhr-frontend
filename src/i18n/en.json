@@ -45,6 +45,7 @@
       "importLead": "Upload your fleet register spreadsheet, or request service for a vehicle.",
       "tabs": {
         "all": "All",
+        "ready": "Ready",
         "issues": "Not ready",
         "import": "Import"
       }
@@ -228,6 +229,7 @@
     "home": {
       "title": "Organization",
       "greeting": "Welcome, {name}",
+      "greetingToast": "Hi, {name} — {org} dashboard",
       "workerGreeting": "Hi, {name}",
       "subtitle": "Shared workforce, fleet, documents, and operations for your company.",
       "fleetSubtitle": "Manage your company fleet and request repairs the same way customers do.",
@@ -245,6 +247,8 @@
       "needAssignedHint": "Request repair needs an assigned vehicle from your manager.",
       "summary": {
         "fleet": "Fleet",
+        "fleetTotal": "Fleet total",
+        "needAttention": "Need attention",
         "assigned": "Assigned",
         "repair": "Repair",
         "ready": "Ready",
@@ -253,6 +257,13 @@
         "needAssigned": "Awaiting",
         "todayTasks": "Today",
         "upcomingTasks": "Upcoming"
+      },
+      "stats": {
+        "title": "This week",
+        "hint": "Simple pulse — are we finishing work day by day.",
+        "jobsDone": "Jobs done",
+        "expectedValue": "Project expected value",
+        "moneyFootnote": "Prepaid / expenses coming later."
       },
       "tasks": {
         "title": "Tasks",
@@ -440,6 +451,9 @@
       "vehicleFilterReadinessAll": "All",
       "vehicleFilterReady": "Ready",
       "vehicleFilterNotReady": "Not ready",
+      "vehicleNotReadyTitle": "Vehicle not ready",
+      "vehicleNotReadyConfirm": "Vehicle not ready — assign anyway?",
+      "vehicleNotReadyAssign": "Assign anyway",
       "vehicleFilterType": "Vehicle type",
       "vehicleFilterTypeAll": "All types",
       "vehicleFilterTruck": "Truck",

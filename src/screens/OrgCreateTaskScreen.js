@@ -105,7 +105,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [plannedEnd, setPlannedEnd] = useState('');
   const [vehicleIds, setVehicleIds] = useState([]);
   const [vehicleQuery, setVehicleQuery] = useState('');
-  const [vehicleReadinessFilter, setVehicleReadinessFilter] = useState('all');
+  const [vehicleReadinessFilter, setVehicleReadinessFilter] = useState('ready');
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState('all');
   const [overallAssignees, setOverallAssignees] = useState([]);
   const [peopleQuery, setPeopleQuery] = useState('');
@@ -279,6 +279,37 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       if (prev.length >= MAX_VEHICLES) return prev;
       return [...prev, id];
     });
+  };
+
+  const requestToggleVehicle = (vehicle) => {
+    const id = vehicle?.id;
+    if (id == null) return;
+    if (vehicleIds.includes(id)) {
+      toggleVehicle(id);
+      return;
+    }
+    if (vehicleIds.length >= MAX_VEHICLES) return;
+    const status = vehicleReadinessStatus(vehicle);
+    const notReady = status === 'not_ready' || status === 'expiring_soon';
+    if (!notReady) {
+      toggleVehicle(id);
+      return;
+    }
+    Alert.alert(
+      t('org.tasks.vehicleNotReadyTitle', null, 'Vehicle not ready'),
+      t(
+        'org.tasks.vehicleNotReadyConfirm',
+        { vehicle: vehicleLabel(vehicle) },
+        'Vehicle not ready — assign anyway?',
+      ),
+      [
+        { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
+        {
+          text: t('org.tasks.vehicleNotReadyAssign', null, 'Assign anyway'),
+          onPress: () => toggleVehicle(id),
+        },
+      ],
+    );
   };
 
   const toggleOverallAssignee = (userId) => {
@@ -597,7 +628,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
               return (
                 <Pressable
                   key={vehicle.id}
-                  onPress={() => toggleVehicle(vehicle.id)}
+                  onPress={() => requestToggleVehicle(vehicle)}
                   style={[
                     styles.chip,
                     active && styles.chipActive,

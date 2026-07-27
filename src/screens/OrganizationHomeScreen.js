@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -7,17 +7,15 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthManager';
 import ScreenBackground from '../components/ScreenBackground';
 import OrgAppHeader from '../components/org/OrgAppHeader';
-import DashboardHeroCard from '../components/dashboard/DashboardHeroCard';
 import DashboardSummaryRow from '../components/dashboard/DashboardSummaryRow';
 import DashboardActionGrid from '../components/dashboard/DashboardActionGrid';
 import DashboardCard from '../components/dashboard/DashboardCard';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
 import { listOrgFleet } from '../api/fleet';
-import { listWorkOrders, startWorkOrder } from '../api/orgOperations';
+import { listProjects, listWorkOrders, startWorkOrder } from '../api/orgOperations';
 import {
   buildOrgNavItems,
-  isFleetFocusedOrg,
   organizationMembershipFor,
   readOrganizationMemberships,
   resolveActiveOrganizationId,
@@ -51,6 +49,15 @@ function localTodayIso() {
   return `${y}-${m}-${d}`;
 }
 
+function startOfWeekDate() {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? 6 : day - 1;
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
+
 function isOpenTaskStatus(status) {
   const value = String(status || '').toLowerCase();
   return value !== 'done' && value !== 'cancelled';
@@ -58,6 +65,40 @@ function isOpenTaskStatus(status) {
 
 function isFleetIssueStatus(status) {
   return String(status || '').toLowerCase() === 'not_ready';
+}
+
+function isDoneThisWeek(row, weekStart) {
+  if (String(row?.status || '').toLowerCase() !== 'done') return false;
+  const raw = row?.ended_at || row?.completed_at || row?.updated_at;
+  if (!raw) return false;
+  const ended = new Date(raw);
+  if (Number.isNaN(ended.getTime())) return false;
+  return ended >= weekStart;
+}
+
+function sumExpectedRevenue(projects) {
+  let total = 0;
+  let found = false;
+  (projects || []).forEach((row) => {
+    const raw = row?.expected_revenue;
+    if (raw == null || raw === '') return;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return;
+    found = true;
+    total += n;
+  });
+  return found ? total : null;
+}
+
+function formatMoneySignal(value) {
+  if (value == null) return '—';
+  try {
+    return new Intl.NumberFormat(undefined, {
+      maximumFractionDigits: 0,
+    }).format(value);
+  } catch {
+    return String(Math.round(value));
+  }
 }
 
 /** Same person-name heuristic as client Home ("Hi, Mihailov"). Empty → ''. */
@@ -95,12 +136,43 @@ export default function OrganizationHomeScreen() {
   const [memberships, setMemberships] = useState([]);
   const [fleetCount, setFleetCount] = useState(null);
   const [notReadyCount, setNotReadyCount] = useState(null);
+  const [jobsDoneWeek, setJobsDoneWeek] = useState(null);
+  const [expectedValueSum, setExpectedValueSum] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [tasksExpanded, setTasksExpanded] = useState(false);
   const [busyStart, setBusyStart] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [greetingToast, setGreetingToast] = useState('');
+  const toastTimerRef = useRef(null);
   const scrollBottomPadding = useScrollContentBottomPadding(40);
   const isDriver = isDriverMembership(org);
+
+  const showGreetingToast = useCallback((name, company) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    const person = name || t('common.user');
+    const orgLabel = company || t('org.home.title');
+    setGreetingToast(
+      t(
+        'org.home.greetingToast',
+        { name: person, org: orgLabel },
+        `Hi, ${person} — ${orgLabel} dashboard`,
+      ),
+    );
+    toastTimerRef.current = setTimeout(() => {
+      setGreetingToast('');
+      toastTimerRef.current = null;
+    }, 3400);
+  }, [t]);
+
+  useEffect(
+    () => () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    },
+    [],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -113,25 +185,56 @@ export default function OrganizationHomeScreen() {
       if (!active?.id) {
         setFleetCount(0);
         setNotReadyCount(0);
+        setJobsDoneWeek(null);
+        setExpectedValueSum(null);
         setTasks([]);
         return;
       }
       const token = authToken || (await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN));
       const resolved = await resolveActiveOrganizationId(active.id);
       const driverLike = isDriverMembership(active);
+      const displayOrg = active.display_name || t('org.home.title');
+      const person =
+        extractFirstName(userEmailOrPhone) ||
+        toDisplayName(userEmailOrPhone) ||
+        t('common.user');
+      showGreetingToast(person, displayOrg);
       try {
         if (driverLike) {
           const data = await listWorkOrders(token, resolved, { mine: 1 });
           setTasks(Array.isArray(data?.results) ? data.results : []);
           setFleetCount(null);
           setNotReadyCount(null);
+          setJobsDoneWeek(null);
+          setExpectedValueSum(null);
         } else {
-          const data = await listOrgFleet(token, resolved, {});
-          const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+          const weekStart = startOfWeekDate();
+          const [fleetData, workOrdersData, projectsData] = await Promise.all([
+            listOrgFleet(token, resolved, {}),
+            listWorkOrders(token, resolved, {}).catch(() => ({ results: [] })),
+            listProjects(token, resolved, { active: 1 }).catch(() => ({ results: [] })),
+          ]);
+          const list = Array.isArray(fleetData?.results)
+            ? fleetData.results
+            : Array.isArray(fleetData)
+              ? fleetData
+              : [];
           setFleetCount(list.length);
           setNotReadyCount(
             list.filter((row) => isFleetIssueStatus(row?.readiness?.status)).length,
           );
+          const orders = Array.isArray(workOrdersData?.results)
+            ? workOrdersData.results
+            : Array.isArray(workOrdersData)
+              ? workOrdersData
+              : [];
+          setJobsDoneWeek(orders.filter((row) => isDoneThisWeek(row, weekStart)).length);
+          const projects = Array.isArray(projectsData?.results)
+            ? projectsData.results
+            : Array.isArray(projectsData)
+              ? projectsData
+              : [];
+          setExpectedValueSum(sumExpectedRevenue(projects));
           setTasks([]);
         }
       } catch {
@@ -139,12 +242,14 @@ export default function OrganizationHomeScreen() {
         else {
           setFleetCount(null);
           setNotReadyCount(null);
+          setJobsDoneWeek(null);
+          setExpectedValueSum(null);
         }
       }
     } finally {
       setLoading(false);
     }
-  }, [authToken]);
+  }, [authToken, showGreetingToast, t, userEmailOrPhone]);
 
   useFocusEffect(
     useCallback(() => {
@@ -152,20 +257,14 @@ export default function OrganizationHomeScreen() {
     }, [load]),
   );
 
-  const fleetFocused = isFleetFocusedOrg(org);
   const navItems = buildOrgNavItems(org, t);
   const navRoutes = useMemo(
     () => new Set(navItems.map((item) => normalizeOrgRoute(item.route))),
     [navItems],
   );
   const orgName = org?.display_name || t('org.home.title');
-  const workerName =
-    extractFirstName(userEmailOrPhone) ||
-    toDisplayName(userEmailOrPhone) ||
-    t('common.user');
   const today = localTodayIso();
   const canManageOps = Boolean(org?.manage_org_operations || org?.manage_fleet);
-  const canViewFleet = Boolean(org?.manage_fleet || org?.can_view_fleet || fleetFocused);
 
   const { todayTasks, upcomingTasks } = useMemo(() => {
     const open = tasks.filter((row) => isOpenTaskStatus(row.status));
@@ -242,13 +341,13 @@ export default function OrganizationHomeScreen() {
       {
         key: 'fleet',
         value: fleetCount == null ? '—' : fleetCount,
-        label: t('org.home.summary.fleet', null, 'Fleet'),
+        label: t('org.home.summary.fleetTotal', null, 'Fleet total'),
         onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }),
       },
       {
         key: 'notReady',
         value: notReadyCount == null ? '—' : notReadyCount,
-        label: t('org.home.summary.notReady', null, 'Not ready'),
+        label: t('org.home.summary.needAttention', null, 'Need attention'),
         onPress: () =>
           navigateToOrgFleet(navigation, { orgId: org?.id, tab: 'issues' }),
       },
@@ -323,20 +422,7 @@ export default function OrganizationHomeScreen() {
       });
     }
 
-    if (canViewFleet || navRoutes.has('OrgFleet')) {
-      tiles.push({
-        key: 'fleet',
-        icon: 'truck',
-        title: t('org.nav.fleet', null, 'Fleet'),
-        subtitle: t(
-          'org.home.actions.fleetSubtitle',
-          null,
-          'Vehicles, readiness, import, and service requests.',
-        ),
-        onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }),
-        count: typeof fleetCount === 'number' ? fleetCount : undefined,
-      });
-    }
+    // Fleet lives on the summary strip — avoid duplicating the department tile.
 
     if (canManageOps) {
       tiles.push({
@@ -400,8 +486,6 @@ export default function OrganizationHomeScreen() {
     return tiles;
   }, [
     canManageOps,
-    canViewFleet,
-    fleetCount,
     isDriver,
     navRoutes,
     navigation,
@@ -420,15 +504,6 @@ export default function OrganizationHomeScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: scrollBottomPadding }]}
         keyboardShouldPersistTaps="handled"
       >
-        <DashboardHeroCard
-          title={t('org.home.greeting', { name: workerName }, `Welcome, ${workerName}`)}
-          subtitle={t(
-            'org.home.pleasantWork',
-            { org: orgName },
-            `Pleasant work with ${orgName}`,
-          )}
-        />
-
         {isDriver ? (
           <DashboardCard style={styles.switcherCard}>
             <Text style={styles.switcherLabel}>{t('org.mode.label', null, 'Mode')}</Text>
@@ -488,7 +563,7 @@ export default function OrganizationHomeScreen() {
           <ActivityIndicator color="#fff" style={styles.loader} />
         ) : (
           <>
-            <DashboardSummaryRow items={summaryItems} />
+            <DashboardSummaryRow items={summaryItems} compact={!isDriver} />
 
             {isDriver ? (
               <DashboardCard style={styles.tasksCard}>
@@ -643,9 +718,60 @@ export default function OrganizationHomeScreen() {
             ) : null}
 
             <DashboardActionGrid tiles={actionTiles} />
+
+            {!isDriver ? (
+              <DashboardCard style={styles.statsCard}>
+                <Text style={styles.statsHeading}>
+                  {t('org.home.stats.title', null, 'This week')}
+                </Text>
+                <Text style={styles.statsHint}>
+                  {t(
+                    'org.home.stats.hint',
+                    null,
+                    'Simple pulse — are we finishing work day by day.',
+                  )}
+                </Text>
+                <View style={styles.statsRow}>
+                  <View style={styles.statsCell}>
+                    <Text style={styles.statsValue}>
+                      {jobsDoneWeek == null ? '—' : jobsDoneWeek}
+                    </Text>
+                    <Text style={styles.statsLabel}>
+                      {t('org.home.stats.jobsDone', null, 'Jobs done')}
+                    </Text>
+                  </View>
+                  <View style={styles.statsDivider} />
+                  <View style={styles.statsCell}>
+                    <Text style={styles.statsValue}>
+                      {formatMoneySignal(expectedValueSum)}
+                    </Text>
+                    <Text style={styles.statsLabel}>
+                      {t(
+                        'org.home.stats.expectedValue',
+                        null,
+                        'Project expected value',
+                      )}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.statsFootnote}>
+                  {t(
+                    'org.home.stats.moneyFootnote',
+                    null,
+                    'Prepaid / expenses coming later.',
+                  )}
+                </Text>
+              </DashboardCard>
+            ) : null}
           </>
         )}
       </ScrollView>
+
+      {greetingToast ? (
+        <View style={styles.toastWrap} pointerEvents="none">
+          <Text style={styles.toastText}>{greetingToast}</Text>
+        </View>
+      ) : null}
     </ScreenBackground>
   );
 }
@@ -657,6 +783,25 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginVertical: 24,
+  },
+  toastWrap: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    top: 72,
+    backgroundColor: 'rgba(15,23,42,0.94)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    zIndex: 20,
+  },
+  toastText: {
+    color: '#fff',
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '600',
   },
   switcherCard: {
     marginBottom: 12,
@@ -808,5 +953,52 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
     marginTop: 2,
+  },
+  statsCard: {
+    marginTop: 4,
+    marginBottom: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+  },
+  statsHeading: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  statsHint: {
+    color: 'rgba(255,255,255,0.62)',
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 12,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  statsCell: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  statsDivider: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    marginHorizontal: 12,
+  },
+  statsValue: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  statsLabel: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statsFootnote: {
+    marginTop: 10,
+    color: 'rgba(255,255,255,0.48)',
+    fontSize: 11,
   },
 });
