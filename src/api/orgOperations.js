@@ -148,3 +148,77 @@ export async function startWorkOrder(token, organizationId, workOrderId) {
   if (!response.ok) throw new Error(await parseError(response, 'Failed to start task'));
   return response.json();
 }
+
+export async function endWorkOrder(token, organizationId, workOrderId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/end/`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to end task'));
+  return response.json();
+}
+
+export async function attachWorkOrderMedia(token, organizationId, workOrderId, payload) {
+  const isFormData = typeof FormData !== 'undefined' && payload instanceof FormData;
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/attachments/`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token),
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      },
+      body: isFormData ? payload : JSON.stringify(payload || {}),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to attach file'));
+  return response.json();
+}
+
+export async function listProjects(token, organizationId, params = {}) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/projects/${buildQuery(params)}`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load projects'));
+  return response.json();
+}
+
+export async function createProject(token, organizationId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/projects/`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to create project'));
+  return response.json();
+}
+
+export async function updateProject(token, organizationId, projectId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/projects/${projectId}/`,
+    {
+      method: 'PATCH',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to update project'));
+  return response.json();
+}

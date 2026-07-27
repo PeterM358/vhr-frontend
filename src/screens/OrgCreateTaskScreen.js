@@ -7,20 +7,30 @@ import { useFocusEffect } from '@react-navigation/native';
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
 import OrgAppHeader from '../components/org/OrgAppHeader';
-import { createWorkOrder, listActivityDefinitions } from '../api/orgOperations';
+import {
+  createWorkOrder,
+  listActivityDefinitions,
+  listProjects,
+} from '../api/orgOperations';
 import { listOrgFleet } from '../api/fleet';
 import { listOrgWorkforce } from '../api/orgWorkforce';
-import {
-  readOrganizationMemberships,
-  resolveActiveOrganizationId,
-} from '../utils/orgWorkspace';
-import { navigateToOrgHome, navigateToOrgTasks } from '../navigation/webNavigation';
+import { resolveActiveOrganizationId } from '../utils/orgWorkspace';
+import { navigateToOrgTasks } from '../navigation/webNavigation';
+import { mapFleetReadiness } from '../utils/fleetReadinessStatus';
 import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 
 const MAX_PEOPLE = 10;
+const MAX_SEARCH_RESULTS = 15;
+const TIME_OPTIONS = [
+  '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
+  '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00',
+];
+
+const ON_CARD = '#0F172A';
+const ON_CARD_MUTED = '#475569';
 
 function localTodayIso() {
   const now = new Date();
@@ -38,6 +48,23 @@ function vehicleLabel(vehicle) {
   return vehicle?.license_plate || vehicle?.fleet_id || vehicle?.display_name || `#${vehicle?.id}`;
 }
 
+function filterByQuery(items, query, getLabel) {
+  const q = String(query || '').trim().toLowerCase();
+  const filtered = !q
+    ? items
+    : items.filter((item) => getLabel(item).toLowerCase().includes(q));
+  return filtered.slice(0, MAX_SEARCH_RESULTS);
+}
+
+function detectTaskFlavor(activities) {
+  const kinds = new Set((activities || []).map((a) => a.activity_kind).filter(Boolean));
+  const transport = kinds.has('transport');
+  const construction = kinds.has('construction') || kinds.has('road_marking');
+  if (transport && !construction) return 'transport';
+  if (construction && !transport) return 'construction';
+  return 'generic';
+}
+
 export default function OrgCreateTaskScreen({ navigation, route }) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
@@ -47,25 +74,104 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [step, setStep] = useState(0);
+  const [formMessage, setFormMessage] = useState('');
+
   const [activities, setActivities] = useState([]);
   const [members, setMembers] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [projects, setProjects] = useState([]);
 
+  const [projectId, setProjectId] = useState(null);
   const [title, setTitle] = useState('');
   const [instructions, setInstructions] = useState('');
   const [scheduledDate, setScheduledDate] = useState(localTodayIso());
-  const [plannedStart, setPlannedStart] = useState('');
+  const [plannedStart, setPlannedStart] = useState('08:00');
   const [plannedEnd, setPlannedEnd] = useState('');
-  const [plannedHours, setPlannedHours] = useState('');
-  const [photoNote, setPhotoNote] = useState('');
   const [vehicleId, setVehicleId] = useState(null);
+  const [vehicleQuery, setVehicleQuery] = useState('');
   const [overallAssignees, setOverallAssignees] = useState([]);
-  const [selectedOps, setSelectedOps] = useState([]); // [{ activityId, notes, assigneeIds }]
-  const [formMessage, setFormMessage] = useState('');
+  const [peopleQuery, setPeopleQuery] = useState('');
+  const [projectQuery, setProjectQuery] = useState('');
+  const [selectedOps, setSelectedOps] = useState([]);
+  const [photoRef, setPhotoRef] = useState('');
+  const [documentRef, setDocumentRef] = useState('');
+
+  const flavor = useMemo(() => detectTaskFlavor(activities), [activities]);
+
+  const stepDefs = useMemo(() => {
+    const taskNoun =
+      flavor === 'transport'
+        ? t('org.tasks.wizard.nounTransport', null, 'waybill / work card')
+        : flavor === 'construction'
+          ? t('org.tasks.wizard.nounConstruction', null, 'site / work card')
+          : t('org.tasks.wizard.nounGeneric', null, 'work card');
+    return [
+      {
+        id: 'project',
+        title: t('org.tasks.wizard.stepProject', null, 'Project'),
+        hint: t(
+          'org.tasks.wizard.stepProjectHint',
+          { noun: taskNoun },
+          `Link a project or create this ${taskNoun} without one.`,
+        ),
+      },
+      {
+        id: 'when',
+        title: t('org.tasks.wizard.stepWhen', null, 'When'),
+        hint: t(
+          'org.tasks.wizard.stepWhenHint',
+          null,
+          'Schedule date and planned start for reminders. Workers tap Start/End themselves.',
+        ),
+      },
+      {
+        id: 'vehicle',
+        title: t('org.tasks.wizard.stepVehicle', null, 'Vehicle'),
+        hint: t(
+          'org.tasks.wizard.stepVehicleHint',
+          null,
+          'Search the fleet. Readiness warnings appear when a vehicle is not ready.',
+        ),
+      },
+      {
+        id: 'people',
+        title: t('org.tasks.wizard.stepPeople', null, 'People'),
+        hint: t(
+          'org.tasks.wizard.stepPeopleHint',
+          null,
+          'Search and assign people for the whole task.',
+        ),
+      },
+      {
+        id: 'operations',
+        title: t('org.tasks.wizard.stepOperations', null, 'Operations'),
+        hint: t(
+          'org.tasks.wizard.stepOperationsHint',
+          null,
+          'Pick distinct operations. Add people and notes per step.',
+        ),
+      },
+      {
+        id: 'review',
+        title: t('org.tasks.wizard.stepReview', null, 'Review'),
+        hint: t(
+          'org.tasks.wizard.stepReviewHint',
+          null,
+          'Confirm and create. You will go to the tasks list.',
+        ),
+      },
+    ];
+  }, [flavor, t]);
 
   const onBack = useCallback(() => {
+    if (step > 0) {
+      setStep((s) => s - 1);
+      setFormMessage('');
+      return;
+    }
     navigateToOrgTasks(navigation, { orgId: routeOrgId || orgId });
-  }, [navigation, orgId, routeOrgId]);
+  }, [navigation, orgId, routeOrgId, step]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,15 +184,21 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         setError(t('org.tasks.loadError', null, 'Could not load task form.'));
         return;
       }
-      const [opsData, workforce, fleet] = await Promise.all([
+      const [opsData, workforce, fleet, projectData] = await Promise.all([
         listActivityDefinitions(token, resolved, { active: 1 }),
         listOrgWorkforce(token, resolved),
         listOrgFleet(token, resolved, {}).catch(() => ({ results: [] })),
+        listProjects(token, resolved, { active: 1 }).catch(() => ({ results: [] })),
       ]);
       setActivities((opsData?.results || []).filter((row) => row.is_active !== false));
       setMembers(Array.isArray(workforce?.results) ? workforce.results : []);
-      const fleetRows = Array.isArray(fleet?.results) ? fleet.results : Array.isArray(fleet) ? fleet : [];
+      const fleetRows = Array.isArray(fleet?.results)
+        ? fleet.results
+        : Array.isArray(fleet)
+          ? fleet
+          : [];
       setVehicles(fleetRows);
+      setProjects((projectData?.results || []).filter((row) => row.is_active !== false));
     } catch (e) {
       setError(e.message || t('org.tasks.loadError', null, 'Could not load task form.'));
     } finally {
@@ -99,6 +211,35 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       load();
     }, [load]),
   );
+
+  const filteredProjects = useMemo(
+    () => filterByQuery(projects, projectQuery, (p) => p.name || ''),
+    [projects, projectQuery],
+  );
+
+  const filteredVehicles = useMemo(
+    () => filterByQuery(vehicles, vehicleQuery, vehicleLabel),
+    [vehicles, vehicleQuery],
+  );
+
+  const filteredMembers = useMemo(
+    () => filterByQuery(members, peopleQuery, memberLabel),
+    [members, peopleQuery],
+  );
+
+  const selectedProject = useMemo(
+    () => projects.find((p) => p.id === projectId) || null,
+    [projects, projectId],
+  );
+
+  const selectProject = (id) => {
+    setProjectId(id);
+    if (id == null) return;
+    const project = projects.find((p) => p.id === id);
+    if (project?.name && !title.trim()) {
+      setTitle(project.name);
+    }
+  };
 
   const toggleOverallAssignee = (userId) => {
     setOverallAssignees((prev) => {
@@ -141,8 +282,29 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     [selectedOps],
   );
 
+  const validateStep = () => {
+    if (step === 0) {
+      if (!title.trim()) {
+        setFormMessage(t('org.tasks.titleRequired', null, 'Title is required.'));
+        return false;
+      }
+    }
+    if (step === 4 && selectedOps.length === 0) {
+      setFormMessage(t('org.tasks.operationsRequired', null, 'Pick at least one operation.'));
+      return false;
+    }
+    setFormMessage('');
+    return true;
+  };
+
+  const goNext = () => {
+    if (!validateStep()) return;
+    if (step < stepDefs.length - 1) setStep((s) => s + 1);
+  };
+
   const save = async () => {
     if (!orgId) return;
+    if (!validateStep()) return;
     const trimmed = title.trim();
     if (!trimmed) {
       setFormMessage(t('org.tasks.titleRequired', null, 'Title is required.'));
@@ -159,11 +321,12 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       const payload = {
         title: trimmed,
         instructions: instructions.trim(),
+        project_id: projectId,
         scheduled_date: scheduledDate.trim() || null,
         planned_start: plannedStart.trim() || null,
         planned_end: plannedEnd.trim() || null,
-        planned_hours: plannedHours.trim() || null,
-        photo_refs: photoNote.trim() ? [photoNote.trim()] : [],
+        photo_refs: photoRef.trim() ? [photoRef.trim()] : [],
+        document_refs: documentRef.trim() ? [documentRef.trim()] : [],
         vehicle_id: vehicleId || null,
         assignee_user_ids: overallAssignees,
         operations: selectedOps.map((row, idx) => ({
@@ -174,17 +337,348 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         })),
       };
       await createWorkOrder(token, orgId, payload);
-      Alert.alert(
-        t('org.tasks.createdTitle', null, 'Task created'),
-        t('org.tasks.createdBody', null, 'The multi-operation task was saved.'),
-        [{ text: t('common.ok', null, 'OK'), onPress: onBack }],
-      );
+      navigateToOrgTasks(navigation, { orgId });
     } catch (e) {
       setFormMessage(e.message || t('org.tasks.saveError', null, 'Could not create task.'));
     } finally {
       setBusy(false);
     }
   };
+
+  const renderTimeChips = (value, onSelect, includeNone = false) => (
+    <View style={styles.chipWrap}>
+      {includeNone ? (
+        <Pressable
+          onPress={() => onSelect('')}
+          style={[styles.chip, !value && styles.chipActive]}
+        >
+          <Text style={[styles.chipText, !value && styles.chipTextActive]}>
+            {t('org.tasks.noEndTime', null, 'None')}
+          </Text>
+        </Pressable>
+      ) : null}
+      {TIME_OPTIONS.map((opt) => {
+        const active = value === opt;
+        return (
+          <Pressable
+            key={opt}
+            onPress={() => onSelect(opt)}
+            style={[styles.chip, active && styles.chipActive]}
+          >
+            <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
+  const renderStepBody = () => {
+    if (step === 0) {
+      return (
+        <>
+          <Text style={styles.fieldLabel}>
+            {t('org.tasks.project', null, 'Project')}
+          </Text>
+          <TextInput
+            label={t('org.tasks.searchProjects', null, 'Search projects')}
+            value={projectQuery}
+            onChangeText={setProjectQuery}
+            mode="outlined"
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+          <View style={styles.chipWrap}>
+            <Pressable
+              onPress={() => selectProject(null)}
+              style={[styles.chip, projectId == null && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, projectId == null && styles.chipTextActive]}>
+                {t('org.tasks.noProject', null, 'No project')}
+              </Text>
+            </Pressable>
+            {filteredProjects.map((project) => {
+              const active = projectId === project.id;
+              return (
+                <Pressable
+                  key={project.id}
+                  onPress={() => selectProject(project.id)}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {project.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <TextInput
+            label={t('org.tasks.title', null, 'Title')}
+            value={title}
+            onChangeText={setTitle}
+            mode="outlined"
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+          <TextInput
+            label={t('org.tasks.instructions', null, 'Instructions')}
+            value={instructions}
+            onChangeText={setInstructions}
+            mode="outlined"
+            multiline
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+        </>
+      );
+    }
+
+    if (step === 1) {
+      return (
+        <>
+          <TextInput
+            label={t('org.tasks.scheduledDate', null, 'Date (YYYY-MM-DD)')}
+            value={scheduledDate}
+            onChangeText={setScheduledDate}
+            mode="outlined"
+            autoCapitalize="none"
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+          <Text style={styles.fieldLabel}>
+            {t('org.tasks.plannedStart', null, 'Start time')}
+          </Text>
+          {renderTimeChips(plannedStart, setPlannedStart)}
+          <Text style={styles.fieldLabel}>
+            {t('org.tasks.plannedEnd', null, 'End time (optional)')}
+          </Text>
+          {renderTimeChips(plannedEnd, setPlannedEnd, true)}
+        </>
+      );
+    }
+
+    if (step === 2) {
+      return (
+        <>
+          <TextInput
+            label={t('org.tasks.searchVehicles', null, 'Search vehicles')}
+            value={vehicleQuery}
+            onChangeText={setVehicleQuery}
+            mode="outlined"
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+          <View style={styles.chipWrap}>
+            <Pressable
+              onPress={() => setVehicleId(null)}
+              style={[styles.chip, vehicleId == null && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, vehicleId == null && styles.chipTextActive]}>
+                {t('org.tasks.noVehicle', null, 'None')}
+              </Text>
+            </Pressable>
+            {filteredVehicles.map((vehicle) => {
+              const active = vehicleId === vehicle.id;
+              const readiness = mapFleetReadiness(vehicle.readiness || vehicle.fleet_readiness);
+              const warn = readiness.status === 'not_ready' || readiness.status === 'expiring_soon';
+              return (
+                <Pressable
+                  key={vehicle.id}
+                  onPress={() => setVehicleId(vehicle.id)}
+                  style={[
+                    styles.chip,
+                    active && styles.chipActive,
+                    warn && styles.chipWarn,
+                    warn && active && styles.chipWarnActive,
+                  ]}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {vehicleLabel(vehicle)}
+                    {warn ? ` · ${readiness.label}` : ''}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {vehicles.length > MAX_SEARCH_RESULTS && !vehicleQuery.trim() ? (
+            <Text style={styles.helper}>
+              {t(
+                'org.tasks.searchToNarrow',
+                { max: MAX_SEARCH_RESULTS },
+                `Showing ${MAX_SEARCH_RESULTS}. Type to narrow the list.`,
+              )}
+            </Text>
+          ) : null}
+        </>
+      );
+    }
+
+    if (step === 3) {
+      return (
+        <>
+          <Text style={styles.helper}>
+            {t(
+              'org.tasks.overallPeopleHelper',
+              { max: MAX_PEOPLE },
+              `Select up to ${MAX_PEOPLE} people for the whole task.`,
+            )}
+          </Text>
+          <TextInput
+            label={t('org.tasks.searchPeople', null, 'Search people')}
+            value={peopleQuery}
+            onChangeText={setPeopleQuery}
+            mode="outlined"
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+          <View style={styles.chipWrap}>
+            {filteredMembers.map((member) => {
+              const uid = member.user_id;
+              const active = overallAssignees.includes(uid);
+              return (
+                <Pressable
+                  key={member.id || uid}
+                  onPress={() => toggleOverallAssignee(uid)}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {memberLabel(member)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      );
+    }
+
+    if (step === 4) {
+      if (activities.length === 0) {
+        return (
+          <Text style={styles.empty}>
+            {t(
+              'org.tasks.noOperations',
+              null,
+              'No active operations yet. Create them under Operations first.',
+            )}
+          </Text>
+        );
+      }
+      return activities.map((activity) => {
+        const selected = selectedActivityIds.has(activity.id);
+        const line = selectedOps.find((row) => row.activityId === activity.id);
+        return (
+          <View key={activity.id} style={styles.opBlock}>
+            <Pressable
+              onPress={() => toggleOperation(activity.id)}
+              style={[styles.opToggle, selected && styles.opToggleActive]}
+            >
+              <Text style={styles.opToggleText}>
+                {selected ? '✓ ' : ''}
+                {activity.name}
+              </Text>
+              {activity.activity_kind ? (
+                <Text style={styles.opKind}>{activity.activity_kind}</Text>
+              ) : null}
+            </Pressable>
+            {selected && line ? (
+              <View style={styles.opDetails}>
+                <TextInput
+                  label={t('org.tasks.operationNotes', null, 'Notes for this step')}
+                  value={line.notes}
+                  onChangeText={(value) => updateOpNotes(activity.id, value)}
+                  mode="outlined"
+                  style={styles.input}
+                  textColor={ON_CARD}
+                />
+                <Text style={styles.fieldLabel}>
+                  {t('org.tasks.operationPeople', null, 'People for this step')}
+                </Text>
+                <View style={styles.chipWrap}>
+                  {members.slice(0, MAX_SEARCH_RESULTS).map((member) => {
+                    const uid = member.user_id;
+                    const active = line.assigneeIds.includes(uid);
+                    return (
+                      <Pressable
+                        key={`${activity.id}-${uid}`}
+                        onPress={() => toggleOpAssignee(activity.id, uid)}
+                        style={[styles.chip, active && styles.chipActive]}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                          {memberLabel(member)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+          </View>
+        );
+      });
+    }
+
+    // Review
+    const vehicle = vehicles.find((v) => v.id === vehicleId);
+    return (
+      <>
+        <Text style={styles.reviewLine}>
+          <Text style={styles.reviewKey}>{t('org.tasks.project', null, 'Project')}: </Text>
+          {selectedProject?.name || t('org.tasks.noProject', null, 'No project')}
+        </Text>
+        <Text style={styles.reviewLine}>
+          <Text style={styles.reviewKey}>{t('org.tasks.title', null, 'Title')}: </Text>
+          {title || '—'}
+        </Text>
+        <Text style={styles.reviewLine}>
+          <Text style={styles.reviewKey}>{t('org.tasks.wizard.whenLabel', null, 'When')}: </Text>
+          {[scheduledDate, plannedStart, plannedEnd && `→ ${plannedEnd}`].filter(Boolean).join(' ')}
+        </Text>
+        <Text style={styles.reviewLine}>
+          <Text style={styles.reviewKey}>{t('org.tasks.vehicle', null, 'Vehicle')}: </Text>
+          {vehicle ? vehicleLabel(vehicle) : t('org.tasks.noVehicle', null, 'None')}
+        </Text>
+        <Text style={styles.reviewLine}>
+          <Text style={styles.reviewKey}>{t('org.tasks.overallPeople', null, 'People')}: </Text>
+          {overallAssignees.length
+            ? overallAssignees
+                .map((id) => memberLabel(members.find((m) => m.user_id === id)))
+                .join(', ')
+            : t('org.tasks.noPeople', null, 'No people assigned')}
+        </Text>
+        <Text style={styles.reviewLine}>
+          <Text style={styles.reviewKey}>{t('org.tasks.operationsTitle', null, 'Operations')}: </Text>
+          {selectedOps
+            .map((row) => activities.find((a) => a.id === row.activityId)?.name)
+            .filter(Boolean)
+            .join(', ') || '—'}
+        </Text>
+        <TextInput
+          label={t('org.tasks.photoUpload', null, 'Photo URL or label (optional)')}
+          value={photoRef}
+          onChangeText={setPhotoRef}
+          mode="outlined"
+          style={styles.input}
+          textColor={ON_CARD}
+        />
+        <TextInput
+          label={t('org.tasks.documentUpload', null, 'Document URL or label (optional)')}
+          value={documentRef}
+          onChangeText={setDocumentRef}
+          mode="outlined"
+          style={styles.input}
+          textColor={ON_CARD}
+        />
+        {instructions.trim() ? (
+          <Text style={styles.reviewLine}>
+            <Text style={styles.reviewKey}>{t('org.tasks.instructions', null, 'Instructions')}: </Text>
+            {instructions.trim()}
+          </Text>
+        ) : null}
+      </>
+    );
+  };
+
+  const current = stepDefs[step];
 
   return (
     <ScreenBackground safeArea={false}>
@@ -197,13 +691,29 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         contentContainerStyle={[styles.scroll, { paddingBottom: scrollBottomPadding }]}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.lead}>
-          {t(
-            'org.tasks.createLead',
-            null,
-            'Combine several operations into one task and assign people overall or per operation.',
-          )}
-        </Text>
+        {flavor !== 'generic' ? (
+          <Text style={styles.lead}>
+            {flavor === 'transport'
+              ? t(
+                  'org.tasks.wizard.leadTransport',
+                  null,
+                  'Transport-style task (наряд / пътен лист). Workers start and end themselves.',
+                )
+              : t(
+                  'org.tasks.wizard.leadConstruction',
+                  null,
+                  'Site-style task (обект). Workers start and end themselves.',
+                )}
+          </Text>
+        ) : (
+          <Text style={styles.lead}>
+            {t(
+              'org.tasks.createLead',
+              null,
+              'Create a multi-step work card. Workers tap Start and End themselves.',
+            )}
+          </Text>
+        )}
 
         {loading ? (
           <ActivityIndicator color="#fff" style={styles.loader} />
@@ -216,199 +726,35 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
           </AppCard>
         ) : (
           <>
-            <AppCard style={styles.card}>
-              <Text style={styles.sectionTitle}>
-                {t('org.tasks.detailsTitle', null, 'Task details')}
-              </Text>
-              <TextInput
-                label={t('org.tasks.title', null, 'Title')}
-                value={title}
-                onChangeText={setTitle}
-                mode="outlined"
-                style={styles.input}
-                textColor={COLORS.TEXT_DARK}
-              />
-              <TextInput
-                label={t('org.tasks.instructions', null, 'Instructions')}
-                value={instructions}
-                onChangeText={setInstructions}
-                mode="outlined"
-                multiline
-                style={styles.input}
-                textColor={COLORS.TEXT_DARK}
-              />
-              <TextInput
-                label={t('org.tasks.scheduledDate', null, 'Date (YYYY-MM-DD)')}
-                value={scheduledDate}
-                onChangeText={setScheduledDate}
-                mode="outlined"
-                autoCapitalize="none"
-                style={styles.input}
-                textColor={COLORS.TEXT_DARK}
-              />
-              <TextInput
-                label={t('org.tasks.plannedStart', null, 'Start time (HH:MM)')}
-                value={plannedStart}
-                onChangeText={setPlannedStart}
-                mode="outlined"
-                autoCapitalize="none"
-                placeholder="08:00"
-                style={styles.input}
-                textColor={COLORS.TEXT_DARK}
-              />
-              <TextInput
-                label={t('org.tasks.plannedEnd', null, 'End time (HH:MM, optional)')}
-                value={plannedEnd}
-                onChangeText={setPlannedEnd}
-                mode="outlined"
-                autoCapitalize="none"
-                style={styles.input}
-                textColor={COLORS.TEXT_DARK}
-              />
-              <TextInput
-                label={t('org.tasks.plannedHours', null, 'Preset hours (optional)')}
-                value={plannedHours}
-                onChangeText={setPlannedHours}
-                mode="outlined"
-                keyboardType="decimal-pad"
-                style={styles.input}
-                textColor={COLORS.TEXT_DARK}
-              />
-              <TextInput
-                label={t('org.tasks.photosStub', null, 'Photo note / link (optional)')}
-                value={photoNote}
-                onChangeText={setPhotoNote}
-                mode="outlined"
-                style={styles.input}
-                textColor={COLORS.TEXT_DARK}
-              />
-              <Text style={styles.fieldLabel}>{t('org.tasks.vehicle', null, 'Vehicle (optional)')}</Text>
-              <View style={styles.chipWrap}>
+            <View style={styles.stepBar}>
+              {stepDefs.map((s, idx) => (
                 <Pressable
-                  onPress={() => setVehicleId(null)}
-                  style={[styles.chip, vehicleId == null && styles.chipActive]}
+                  key={s.id}
+                  onPress={() => {
+                    if (idx <= step) setStep(idx);
+                  }}
+                  style={[
+                    styles.stepDot,
+                    idx === step && styles.stepDotCurrent,
+                    idx < step && styles.stepDotDone,
+                  ]}
                 >
-                  <Text style={[styles.chipText, vehicleId == null && styles.chipTextActive]}>
-                    {t('org.tasks.noVehicle', null, 'None')}
+                  <Text
+                    style={[
+                      styles.stepDotText,
+                      (idx === step || idx < step) && styles.stepDotTextActive,
+                    ]}
+                  >
+                    {idx + 1}
                   </Text>
                 </Pressable>
-                {vehicles.map((vehicle) => {
-                  const active = vehicleId === vehicle.id;
-                  return (
-                    <Pressable
-                      key={vehicle.id}
-                      onPress={() => setVehicleId(vehicle.id)}
-                      style={[styles.chip, active && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                        {vehicleLabel(vehicle)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </AppCard>
+              ))}
+            </View>
 
             <AppCard style={styles.card}>
-              <Text style={styles.sectionTitle}>
-                {t('org.tasks.overallPeople', null, 'People on this task')}
-              </Text>
-              <Text style={styles.helper}>
-                {t(
-                  'org.tasks.overallPeopleHelper',
-                  { max: MAX_PEOPLE },
-                  `Select up to ${MAX_PEOPLE} people for the whole task.`,
-                )}
-              </Text>
-              <View style={styles.chipWrap}>
-                {members.map((member) => {
-                  const uid = member.user_id;
-                  const active = overallAssignees.includes(uid);
-                  return (
-                    <Pressable
-                      key={member.id || uid}
-                      onPress={() => toggleOverallAssignee(uid)}
-                      style={[styles.chip, active && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                        {memberLabel(member)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </AppCard>
-
-            <AppCard style={styles.card}>
-              <Text style={styles.sectionTitle}>
-                {t('org.tasks.operationsTitle', null, 'Operations in this task')}
-              </Text>
-              <Text style={styles.helper}>
-                {t(
-                  'org.tasks.operationsHelper',
-                  null,
-                  'Pick one or more company operations. Optionally assign people to each step.',
-                )}
-              </Text>
-              {activities.length === 0 ? (
-                <Text style={styles.empty}>
-                  {t(
-                    'org.tasks.noOperations',
-                    null,
-                    'No active operations yet. Create them under Operations first.',
-                  )}
-                </Text>
-              ) : (
-                activities.map((activity) => {
-                  const selected = selectedActivityIds.has(activity.id);
-                  const line = selectedOps.find((row) => row.activityId === activity.id);
-                  return (
-                    <View key={activity.id} style={styles.opBlock}>
-                      <Pressable
-                        onPress={() => toggleOperation(activity.id)}
-                        style={[styles.opToggle, selected && styles.opToggleActive]}
-                      >
-                        <Text style={styles.opToggleText}>
-                          {selected ? '✓ ' : ''}
-                          {activity.name}
-                        </Text>
-                      </Pressable>
-                      {selected && line ? (
-                        <View style={styles.opDetails}>
-                          <TextInput
-                            label={t('org.tasks.operationNotes', null, 'Notes for this step')}
-                            value={line.notes}
-                            onChangeText={(value) => updateOpNotes(activity.id, value)}
-                            mode="outlined"
-                            style={styles.input}
-                            textColor={COLORS.TEXT_DARK}
-                          />
-                          <Text style={styles.fieldLabel}>
-                            {t('org.tasks.operationPeople', null, 'People for this step')}
-                          </Text>
-                          <View style={styles.chipWrap}>
-                            {members.map((member) => {
-                              const uid = member.user_id;
-                              const active = line.assigneeIds.includes(uid);
-                              return (
-                                <Pressable
-                                  key={`${activity.id}-${uid}`}
-                                  onPress={() => toggleOpAssignee(activity.id, uid)}
-                                  style={[styles.chip, active && styles.chipActive]}
-                                >
-                                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                                    {memberLabel(member)}
-                                  </Text>
-                                </Pressable>
-                              );
-                            })}
-                          </View>
-                        </View>
-                      ) : null}
-                    </View>
-                  );
-                })
-              )}
+              <Text style={styles.sectionTitle}>{current.title}</Text>
+              <Text style={styles.helper}>{current.hint}</Text>
+              {renderStepBody()}
             </AppCard>
 
             {formMessage ? (
@@ -417,9 +763,30 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
               </AppCard>
             ) : null}
 
-            <Button mode="contained" loading={busy} disabled={busy} onPress={save} style={styles.saveBtn}>
-              {t('org.tasks.save', null, 'Create task')}
-            </Button>
+            <View style={styles.navRow}>
+              {step > 0 ? (
+                <Button mode="outlined" onPress={() => setStep((s) => s - 1)} style={styles.navBtn}>
+                  {t('common.back', null, 'Back')}
+                </Button>
+              ) : (
+                <View style={styles.navBtn} />
+              )}
+              {step < stepDefs.length - 1 ? (
+                <Button mode="contained" onPress={goNext} style={styles.navBtn}>
+                  {t('common.continue', null, 'Continue')}
+                </Button>
+              ) : (
+                <Button
+                  mode="contained"
+                  loading={busy}
+                  disabled={busy}
+                  onPress={save}
+                  style={styles.navBtn}
+                >
+                  {t('org.tasks.save', null, 'Create task')}
+                </Button>
+              )}
+            </View>
           </>
         )}
       </ScrollView>
@@ -441,24 +808,52 @@ const styles = StyleSheet.create({
   loader: {
     marginVertical: 24,
   },
+  stepBar: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  stepDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  stepDotCurrent: {
+    backgroundColor: '#fff',
+  },
+  stepDotDone: {
+    backgroundColor: COLORS.ACCENT || '#22c55e',
+  },
+  stepDotText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  stepDotTextActive: {
+    color: ON_CARD,
+  },
   card: {
     padding: 14,
     marginBottom: 12,
   },
   sectionTitle: {
-    color: COLORS.TEXT_DARK,
+    color: ON_CARD,
     fontSize: 16,
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   helper: {
-    color: COLORS.TEXT_MUTED,
+    color: ON_CARD_MUTED,
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 10,
   },
   empty: {
-    color: COLORS.TEXT_MUTED,
+    color: ON_CARD_MUTED,
     fontSize: 14,
   },
   error: {
@@ -473,7 +868,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   fieldLabel: {
-    color: COLORS.TEXT_MUTED,
+    color: ON_CARD_MUTED,
     fontSize: 12,
     fontWeight: '700',
     marginBottom: 8,
@@ -483,7 +878,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   chip: {
     borderRadius: 10,
@@ -497,24 +892,34 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.PRIMARY_SOFT,
     borderColor: COLORS.PRIMARY,
   },
+  chipWarn: {
+    borderColor: '#dc2626',
+    shadowColor: '#dc2626',
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  chipWarnActive: {
+    backgroundColor: 'rgba(220,38,38,0.12)',
+  },
   chipText: {
-    color: COLORS.TEXT_DARK,
+    color: ON_CARD,
     fontSize: 12,
     fontWeight: '600',
   },
   chipTextActive: {
-    color: COLORS.TEXT_DARK,
+    color: ON_CARD,
   },
   opBlock: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(15,23,42,0.12)',
-    paddingTop: 10,
-    marginBottom: 8,
+    paddingTop: 12,
+    marginBottom: 12,
   },
   opToggle: {
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     backgroundColor: '#eef2f7',
     borderWidth: 1,
     borderColor: 'rgba(15,23,42,0.12)',
@@ -524,14 +929,38 @@ const styles = StyleSheet.create({
     borderColor: COLORS.PRIMARY,
   },
   opToggleText: {
-    color: COLORS.TEXT_DARK,
-    fontSize: 14,
+    color: ON_CARD,
+    fontSize: 15,
     fontWeight: '700',
+  },
+  opKind: {
+    color: ON_CARD_MUTED,
+    fontSize: 11,
+    marginTop: 4,
+    textTransform: 'uppercase',
+    fontWeight: '600',
   },
   opDetails: {
     marginTop: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.PRIMARY,
+    paddingLeft: 10,
   },
-  saveBtn: {
-    marginBottom: 24,
+  reviewLine: {
+    color: ON_CARD,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  reviewKey: {
+    fontWeight: '700',
+  },
+  navRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 28,
+  },
+  navBtn: {
+    flex: 1,
   },
 });

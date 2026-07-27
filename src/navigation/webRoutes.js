@@ -704,6 +704,10 @@ export function partnerOrganizationTasks(params = {}) {
   return buildPathWithQuery(`${PARTNER}/organization/tasks`, params);
 }
 
+export function partnerOrganizationProjects(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/organization/projects`, params);
+}
+
 export function partnerOrganizationWorkforceMember(membershipId, params = {}) {
   return buildPathWithQuery(
     `${PARTNER}/organization/workforce/member/${normalizeId(membershipId)}`,

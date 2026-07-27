@@ -16,6 +16,7 @@ import OrgWorkforceScreen from '../screens/OrgWorkforceScreen';
 import OrgOperationsScreen from '../screens/OrgOperationsScreen';
 import OrgTasksScreen from '../screens/OrgTasksScreen';
 import OrgCreateTaskScreen from '../screens/OrgCreateTaskScreen';
+import OrgProjectsScreen from '../screens/OrgProjectsScreen';
 import OrgCalendarScreen from '../screens/OrgCalendarScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
 
@@ -41,6 +42,7 @@ import {
   navigateToOrgFleet,
   navigateToOrgNetwork,
   navigateToOrgOperations,
+  navigateToOrgProjects,
   navigateToOrgTasks,
   navigateToOrgWorkforce,
   navigateToPartnerDashboard,
@@ -122,6 +124,10 @@ function CustomDrawerContent(props) {
       navigateToOrgTasks(navigation, { orgId: org?.id });
       return;
     }
+    if (route === 'OrgProjects') {
+      navigateToOrgProjects(navigation, { orgId: org?.id });
+      return;
+    }
     if (route === 'OrgCalendar') {
       navigateToOrgCalendar(navigation, { orgId: org?.id });
       return;
@@ -189,6 +195,28 @@ function CustomDrawerContent(props) {
             onPress={() => openRoute('OrgTasks')}
             icon={({ color, size }) => (
               <DrawerMenuIcon name="clipboard-check-outline" color={color} size={size} />
+            )}
+            {...itemProps}
+          />
+        ) : null}
+
+        {isDriver ? (
+          <DrawerItem
+            label={t('org.nav.tasks', null, 'Tasks')}
+            onPress={() => openRoute('OrgTasks')}
+            icon={({ color, size }) => (
+              <DrawerMenuIcon name="clipboard-check-outline" color={color} size={size} />
+            )}
+            {...itemProps}
+          />
+        ) : null}
+
+        {!isDriver && (org?.manage_org_operations || org?.manage_fleet) ? (
+          <DrawerItem
+            label={t('org.nav.projects', null, 'Projects')}
+            onPress={() => openRoute('OrgProjects')}
+            icon={({ color, size }) => (
+              <DrawerMenuIcon name="briefcase-outline" color={color} size={size} />
             )}
             {...itemProps}
           />
@@ -314,6 +342,7 @@ export default function OrganizationDrawer() {
         component={OrgCreateTaskScreen}
         options={{ drawerItemStyle: { display: 'none' } }}
       />
+      <Drawer.Screen name="OrgProjects" component={OrgProjectsScreen} />
       <Drawer.Screen name="OrgCalendar" component={OrgCalendarScreen} />
       <Drawer.Screen name="OrgWorkforce" component={OrgWorkforceScreen} />
       <Drawer.Screen name="OrgNetwork" component={NetworkOrganizationScreen} />

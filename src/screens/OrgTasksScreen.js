@@ -1,17 +1,21 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, Button, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
 import OrgAppHeader from '../components/org/OrgAppHeader';
-import { listWorkOrders, startWorkOrder } from '../api/orgOperations';
 import {
-  readOrganizationMemberships,
-  resolveActiveOrganizationId,
-} from '../utils/orgWorkspace';
+  attachWorkOrderMedia,
+  endWorkOrder,
+  getWorkOrder,
+  listWorkOrders,
+  startWorkOrder,
+  updateWorkOrder,
+} from '../api/orgOperations';
+import { resolveActiveOrganizationId } from '../utils/orgWorkspace';
 import {
   navigateToOrgCreateTask,
   navigateToOrgHome,
@@ -51,6 +55,13 @@ function canShowStartButton(task) {
   return task.status === 'assigned' || task.status === 'draft';
 }
 
+function canShowEndButton(task) {
+  if (!task) return false;
+  if (task.status === 'done' || task.status === 'cancelled') return false;
+  if (task.ended_at) return false;
+  return Boolean(task.start_acknowledged_at || task.started_at || task.status === 'in_progress');
+}
+
 function isWaitingForStartTime(task) {
   if (!task?.scheduled_date || !task?.planned_start) return false;
   if (task.start_acknowledged_at || task.started_at) return false;
@@ -64,7 +75,7 @@ function isWaitingForStartTime(task) {
 export default function OrgTasksScreen({ navigation, route }) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
-  const initialTaskId = route?.params?.taskId || route?.params?.workOrderId || null;
+  const routeTaskId = route?.params?.taskId || route?.params?.workOrderId || null;
   const scrollBottomPadding = useScrollContentBottomPadding(40);
 
   const [orgId, setOrgId] = useState(null);
@@ -72,12 +83,17 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [error, setError] = useState('');
   const [canManage, setCanManage] = useState(false);
   const [rows, setRows] = useState([]);
-  const [selectedId, setSelectedId] = useState(initialTaskId);
-  const [busyStart, setBusyStart] = useState(false);
+  const [selectedId, setSelectedId] = useState(routeTaskId);
+  const [selectedDetail, setSelectedDetail] = useState(null);
+  const [busyAction, setBusyAction] = useState(false);
+  const [photoDraft, setPhotoDraft] = useState('');
+  const [documentDraft, setDocumentDraft] = useState('');
+  const [actualDrafts, setActualDrafts] = useState({});
 
   const onBack = useCallback(() => {
     if (selectedId) {
       setSelectedId(null);
+      setSelectedDetail(null);
       return;
     }
     navigateToOrgHome(navigation, { orgId: routeOrgId || orgId });
@@ -112,61 +128,197 @@ export default function OrgTasksScreen({ navigation, route }) {
     }, [load]),
   );
 
-  const selected = useMemo(
-    () => rows.find((row) => String(row.id) === String(selectedId)) || null,
-    [rows, selectedId],
-  );
+  useEffect(() => {
+    if (routeTaskId) setSelectedId(routeTaskId);
+  }, [routeTaskId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadDetail = async () => {
+      if (!orgId || !selectedId) {
+        setSelectedDetail(null);
+        return;
+      }
+      try {
+        const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+        const detail = await getWorkOrder(token, orgId, selectedId);
+        if (!cancelled) {
+          setSelectedDetail(detail);
+          setRows((prev) => {
+            const exists = prev.some((row) => String(row.id) === String(detail.id));
+            if (!exists) return [detail, ...prev];
+            return prev.map((row) => (String(row.id) === String(detail.id) ? detail : row));
+          });
+          const drafts = {};
+          (detail.operations || []).forEach((op) => {
+            drafts[op.id] = op.actual_qty != null ? String(op.actual_qty) : '';
+          });
+          setActualDrafts(drafts);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          Alert.alert(
+            t('org.tasks.detailTitle', null, 'Task'),
+            e.message || t('org.tasks.loadError', null, 'Could not load tasks.'),
+          );
+          setSelectedId(null);
+          setSelectedDetail(null);
+        }
+      }
+    };
+    loadDetail();
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId, selectedId, t]);
+
+  const selected = selectedDetail;
+
+  const replaceTask = (updated) => {
+    setSelectedDetail(updated);
+    setRows((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+  };
 
   const acknowledgeStart = async (task) => {
     if (!orgId || !task?.id) return;
-    setBusyStart(true);
+    setBusyAction(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const updated = await startWorkOrder(token, orgId, task.id);
-      setRows((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+      replaceTask(updated);
     } catch (e) {
       Alert.alert(
         t('org.tasks.startTitle', null, 'Start task'),
         e.message || t('org.tasks.startError', null, 'Could not start the task.'),
       );
     } finally {
-      setBusyStart(false);
+      setBusyAction(false);
     }
   };
 
-  const renderStartControls = (task) => {
+  const acknowledgeEnd = async (task) => {
+    if (!orgId || !task?.id) return;
+    setBusyAction(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const updated = await endWorkOrder(token, orgId, task.id);
+      replaceTask(updated);
+    } catch (e) {
+      Alert.alert(
+        t('org.tasks.endTitle', null, 'End work'),
+        e.message || t('org.tasks.endError', null, 'Could not end the task.'),
+      );
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const attachRef = async (kind) => {
+    if (!orgId || !selected?.id) return;
+    const draft = kind === 'photo' ? photoDraft.trim() : documentDraft.trim();
+    if (!draft) return;
+    setBusyAction(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const updated = await attachWorkOrderMedia(token, orgId, selected.id, {
+        kind,
+        ref: draft,
+        label: draft,
+      });
+      replaceTask(updated);
+      if (kind === 'photo') setPhotoDraft('');
+      else setDocumentDraft('');
+    } catch (e) {
+      Alert.alert(
+        t('org.tasks.attachTitle', null, 'Attach'),
+        e.message || t('org.tasks.attachError', null, 'Could not attach file.'),
+      );
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const saveActuals = async () => {
+    if (!orgId || !selected?.id) return;
+    setBusyAction(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const operations = (selected.operations || [])
+        .filter((op) => op.id != null)
+        .map((op) => ({
+          id: op.id,
+          actual_qty: actualDrafts[op.id] === '' ? null : actualDrafts[op.id],
+        }));
+      const updated = await updateWorkOrder(token, orgId, selected.id, { operations });
+      replaceTask(updated);
+    } catch (e) {
+      Alert.alert(
+        t('org.tasks.actualsTitle', null, 'Actuals'),
+        e.message || t('org.tasks.actualsError', null, 'Could not save actuals.'),
+      );
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const renderStartEndControls = (task) => {
     if (!task) return null;
-    if (task.start_acknowledged_at || task.started_at) {
-      return (
-        <Text style={styles.startedBadge}>
-          {t('org.tasks.startedAt', { time: String(task.start_acknowledged_at || task.started_at).slice(11, 16) }, 'Started')}
-        </Text>
-      );
-    }
-    if (isWaitingForStartTime(task)) {
-      return (
-        <Text style={styles.waitingText}>
-          {t(
-            'org.tasks.waitingStart',
-            { time: scheduledStartLabel(task) },
-            `Waiting until ${scheduledStartLabel(task)}`,
-          )}
-        </Text>
-      );
-    }
-    if (!canShowStartButton(task)) return null;
     return (
-      <Button
-        mode="contained"
-        loading={busyStart}
-        disabled={busyStart}
-        onPress={() => acknowledgeStart(task)}
-        style={styles.startBtn}
-        contentStyle={styles.startBtnContent}
-        labelStyle={styles.startBtnLabel}
-      >
-        {t('org.tasks.started', null, 'Started')}
-      </Button>
+      <View style={styles.actionBlock}>
+        {task.start_acknowledged_at || task.started_at ? (
+          <Text style={styles.startedBadge}>
+            {t(
+              'org.tasks.startedAt',
+              { time: String(task.start_acknowledged_at || task.started_at).slice(11, 16) },
+              'Started',
+            )}
+          </Text>
+        ) : isWaitingForStartTime(task) ? (
+          <Text style={styles.waitingText}>
+            {t(
+              'org.tasks.waitingStart',
+              { time: scheduledStartLabel(task) },
+              `Waiting until ${scheduledStartLabel(task)}`,
+            )}
+          </Text>
+        ) : canShowStartButton(task) ? (
+          <Button
+            mode="contained"
+            loading={busyAction}
+            disabled={busyAction}
+            onPress={() => acknowledgeStart(task)}
+            style={styles.startBtn}
+            contentStyle={styles.startBtnContent}
+            labelStyle={styles.startBtnLabel}
+          >
+            {t('org.tasks.startCta', null, 'Start')}
+          </Button>
+        ) : null}
+
+        {canShowEndButton(task) ? (
+          <Button
+            mode="contained"
+            loading={busyAction}
+            disabled={busyAction}
+            onPress={() => acknowledgeEnd(task)}
+            style={styles.endBtn}
+            contentStyle={styles.startBtnContent}
+            labelStyle={styles.startBtnLabel}
+          >
+            {t('org.tasks.endCta', null, 'End work')}
+          </Button>
+        ) : null}
+
+        {task.ended_at ? (
+          <Text style={styles.endedBadge}>
+            {t(
+              'org.tasks.endedAt',
+              { time: String(task.ended_at).slice(11, 16) },
+              'Ended',
+            )}
+          </Text>
+        ) : null}
+      </View>
     );
   };
 
@@ -195,59 +347,156 @@ export default function OrgTasksScreen({ navigation, route }) {
             </Button>
           </AppCard>
         ) : selected ? (
-          <AppCard style={styles.card}>
-            <Text style={styles.title}>{selected.title}</Text>
-            <Text style={styles.meta}>
-              {[
-                statusLabel(selected.status, t),
-                scheduledStartLabel(selected),
-                vehicleLabel(selected.vehicle),
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </Text>
-            {selected.instructions ? (
-              <Text style={styles.instructions}>{selected.instructions}</Text>
-            ) : null}
-            {renderStartControls(selected)}
-            <Text style={styles.section}>
-              {t('org.tasks.operationsTitle', null, 'Operations in this task')}
-            </Text>
-            {(selected.operations || []).map((op, idx) => (
-              <View key={op.id || idx} style={styles.opRow}>
-                <Text style={styles.opTitle}>
-                  {`${idx + 1}. ${op.activity?.name || '—'}`}
-                </Text>
-                {op.notes ? <Text style={styles.opMeta}>{op.notes}</Text> : null}
-                {(op.assignees || []).length > 0 ? (
-                  <Text style={styles.opMeta}>
-                    {(op.assignees || []).map(personLabel).join(', ')}
+          <>
+            <AppCard style={styles.card}>
+              <Text style={styles.title}>{selected.title}</Text>
+              <Text style={styles.meta}>
+                {[
+                  statusLabel(selected.status, t),
+                  selected.project?.name,
+                  scheduledStartLabel(selected),
+                  vehicleLabel(selected.vehicle),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Text>
+              {selected.instructions ? (
+                <Text style={styles.instructions}>{selected.instructions}</Text>
+              ) : null}
+              {renderStartEndControls(selected)}
+            </AppCard>
+
+            <AppCard style={styles.card}>
+              <Text style={styles.section}>
+                {t('org.tasks.operationsTitle', null, 'Operations in this task')}
+              </Text>
+              {(selected.operations || []).map((op, idx) => (
+                <View key={op.id || idx} style={styles.opRow}>
+                  <Text style={styles.opTitle}>
+                    {`${idx + 1}. ${op.activity?.name || '—'}`}
                   </Text>
-                ) : null}
-              </View>
-            ))}
-            <Text style={styles.section}>
-              {t('org.tasks.overallPeople', null, 'People on this task')}
-            </Text>
-            <Text style={styles.opMeta}>
-              {(selected.assignees || []).map(personLabel).join(', ') ||
-                t('org.tasks.noPeople', null, 'No people assigned')}
-            </Text>
-            {selected.vehicle ? (
-              <>
-                <Text style={styles.section}>{t('org.tasks.vehicle', null, 'Vehicle')}</Text>
-                <Text style={styles.opMeta}>{vehicleLabel(selected.vehicle)}</Text>
-              </>
-            ) : null}
-          </AppCard>
+                  {op.notes ? <Text style={styles.opMeta}>{op.notes}</Text> : null}
+                  {(op.assignees || []).length > 0 ? (
+                    <Text style={styles.opMeta}>
+                      {(op.assignees || []).map(personLabel).join(', ')}
+                    </Text>
+                  ) : null}
+                  {canShowEndButton(selected) || selected.status === 'in_progress' ? (
+                    <TextInput
+                      label={t('org.tasks.actualQty', null, 'Actual quantity')}
+                      value={actualDrafts[op.id] || ''}
+                      onChangeText={(value) =>
+                        setActualDrafts((prev) => ({ ...prev, [op.id]: value }))
+                      }
+                      mode="outlined"
+                      keyboardType="decimal-pad"
+                      style={styles.input}
+                      textColor={ON_CARD}
+                    />
+                  ) : op.actual_qty != null ? (
+                    <Text style={styles.opMeta}>
+                      {t('org.tasks.actualQty', null, 'Actual')}: {op.actual_qty}
+                    </Text>
+                  ) : null}
+                </View>
+              ))}
+              {(canShowEndButton(selected) || selected.status === 'in_progress') &&
+              (selected.operations || []).length > 0 ? (
+                <Button
+                  mode="outlined"
+                  loading={busyAction}
+                  disabled={busyAction}
+                  onPress={saveActuals}
+                  style={styles.secondaryBtn}
+                >
+                  {t('org.tasks.saveActuals', null, 'Save actuals')}
+                </Button>
+              ) : null}
+            </AppCard>
+
+            <AppCard style={styles.card}>
+              <Text style={styles.section}>
+                {t('org.tasks.attachmentsTitle', null, 'Photos & documents')}
+              </Text>
+              {(selected.photo_refs || []).length > 0 ? (
+                <Text style={styles.opMeta}>
+                  {t('org.tasks.photosLabel', null, 'Photos')}: {(selected.photo_refs || []).join(', ')}
+                </Text>
+              ) : null}
+              {(selected.document_refs || []).length > 0 ? (
+                <Text style={styles.opMeta}>
+                  {t('org.tasks.documentsLabel', null, 'Documents')}:{' '}
+                  {(selected.document_refs || []).join(', ')}
+                </Text>
+              ) : null}
+              {selected.status !== 'done' && selected.status !== 'cancelled' ? (
+                <>
+                  <TextInput
+                    label={t('org.tasks.photoUpload', null, 'Photo URL or label')}
+                    value={photoDraft}
+                    onChangeText={setPhotoDraft}
+                    mode="outlined"
+                    style={styles.input}
+                    textColor={ON_CARD}
+                  />
+                  <Button
+                    mode="outlined"
+                    disabled={busyAction || !photoDraft.trim()}
+                    onPress={() => attachRef('photo')}
+                    style={styles.secondaryBtn}
+                  >
+                    {t('org.tasks.addPhoto', null, 'Add photo')}
+                  </Button>
+                  <TextInput
+                    label={t('org.tasks.documentUpload', null, 'Document URL or label')}
+                    value={documentDraft}
+                    onChangeText={setDocumentDraft}
+                    mode="outlined"
+                    style={styles.input}
+                    textColor={ON_CARD}
+                  />
+                  <Button
+                    mode="outlined"
+                    disabled={busyAction || !documentDraft.trim()}
+                    onPress={() => attachRef('document')}
+                    style={styles.secondaryBtn}
+                  >
+                    {t('org.tasks.addDocument', null, 'Add document')}
+                  </Button>
+                </>
+              ) : null}
+            </AppCard>
+
+            <AppCard style={styles.card}>
+              <Text style={styles.section}>
+                {t('org.tasks.overallPeople', null, 'People on this task')}
+              </Text>
+              <Text style={styles.opMeta}>
+                {(selected.assignees || []).map(personLabel).join(', ') ||
+                  t('org.tasks.noPeople', null, 'No people assigned')}
+              </Text>
+              {selected.vehicle ? (
+                <>
+                  <Text style={styles.section}>{t('org.tasks.vehicle', null, 'Vehicle')}</Text>
+                  <Text style={styles.opMeta}>{vehicleLabel(selected.vehicle)}</Text>
+                </>
+              ) : null}
+            </AppCard>
+          </>
         ) : (
           <>
             <Text style={styles.lead}>
-              {t(
-                'org.tasks.listLead',
-                null,
-                'Create multi-operation work cards and track status for your team.',
-              )}
+              {canManage
+                ? t(
+                    'org.tasks.listLead',
+                    null,
+                    'Create multi-operation work cards and track status for your team.',
+                  )
+                : t(
+                    'org.tasks.workerListLead',
+                    null,
+                    'Open a task to start, fill operations, upload docs, and end work.',
+                  )}
             </Text>
             {canManage ? (
               <Button
@@ -317,7 +566,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
-    marginTop: 14,
+    marginTop: 4,
     marginBottom: 6,
   },
   opRow: {
@@ -327,6 +576,7 @@ const styles = StyleSheet.create({
   },
   opTitle: { color: ON_CARD, fontSize: 14, fontWeight: '700' },
   opMeta: { color: ON_CARD_MUTED, fontSize: 12, marginTop: 4 },
+  input: { marginTop: 8, marginBottom: 4, backgroundColor: '#fff' },
   row: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(15,23,42,0.12)',
@@ -336,19 +586,25 @@ const styles = StyleSheet.create({
   rowMeta: { color: ON_CARD_MUTED, fontSize: 12, marginTop: 4 },
   empty: { color: ON_CARD_MUTED, fontSize: 14, lineHeight: 20 },
   error: { color: '#b91c1c', marginBottom: 10 },
-  startBtn: { marginBottom: 8, backgroundColor: COLORS.PRIMARY },
+  actionBlock: { marginBottom: 4, gap: 8 },
+  startBtn: { backgroundColor: COLORS.PRIMARY },
+  endBtn: { backgroundColor: '#0f766e' },
   startBtnContent: { paddingVertical: 8 },
-  startBtnLabel: { fontSize: 18, fontWeight: '800', letterSpacing: 0.3 },
+  startBtnLabel: { fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
+  secondaryBtn: { marginTop: 8 },
   startedBadge: {
     color: '#166534',
     fontSize: 14,
     fontWeight: '700',
-    marginBottom: 8,
+  },
+  endedBadge: {
+    color: '#0f766e',
+    fontSize: 14,
+    fontWeight: '700',
   },
   waitingText: {
     color: ON_CARD_MUTED,
     fontSize: 13,
     fontStyle: 'italic',
-    marginBottom: 8,
   },
 });
