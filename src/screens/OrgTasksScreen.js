@@ -32,6 +32,7 @@ import { COLORS } from '../constants/colors';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 import { pickReceiptOrInvoiceAttachment } from '../utils/pickDocumentFile';
 import { confirmMessage } from '../utils/crossPlatformAlert';
+import { formatMaterialListLabel, stripOldMaterialSuffix } from '../utils/materialDisplayLabel';
 
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
@@ -157,6 +158,36 @@ function isDurationUnit(unit) {
 }
 
 function hasKmMeterInput(op) {
+  return reportUnitsForOp(op).some(isKmUnit);
+}
+
+/** Duration/km are entered once on the task — not on every operation card. */
+function isTaskLevelReportUnit(unit) {
+  return isDurationUnit(unit) || isKmUnit(unit);
+}
+
+function opLocalReportUnits(op) {
+  return reportUnitsForOp(op).filter((unit) => !isTaskLevelReportUnit(unit));
+}
+
+function taskNeedsMachineHours(task) {
+  return (task?.operations || []).some((op) => {
+    if (reportUnitsForOp(op).some(isDurationUnit)) return true;
+    return materialLinesForOp(op).some(
+      (line) => String(line.basis || '').toLowerCase() === 'work_hours',
+    );
+  });
+}
+
+function taskNeedsKm(task) {
+  return (task?.operations || []).some((op) => {
+    if (reportUnitsForOp(op).some(isKmUnit)) return true;
+    return isDistanceOutput(op);
+  });
+}
+
+function opUsesDistanceForNorms(op) {
+  if (isDistanceOutput(op)) return true;
   return reportUnitsForOp(op).some(isKmUnit);
 }
 
@@ -358,7 +389,8 @@ function collectTaskDefaultMaterials(task) {
       const brief = briefById.get(mid) || {};
       byId.set(mid, {
         material_id: mid,
-        name: brief.name || `Material #${mid}`,
+        name: stripOldMaterialSuffix(brief.name || brief.label || '') || `Material #${mid}`,
+        label: brief.label || stripOldMaterialSuffix(brief.name || '') || `Material #${mid}`,
         part_number: brief.part_number || '',
         from_operations: true,
         norm_rate: line.rate ?? brief.norm_rate,
@@ -436,7 +468,10 @@ function formatIssueAudit(issue, t) {
     issue?.location?.code ||
     (issue?.location_id != null ? `#${issue.location_id}` : '');
   const qtyParts = (issue?.lines || []).map((line) => {
-    const name = line.material?.name || `#${line.material_id}`;
+    const name = formatMaterialListLabel(
+      { name: line.material?.name, part_number: line.material?.part_number || line.part_number },
+      { fallbackId: line.material_id, includeSku: false },
+    );
     const unit = line.unit_code ? ` ${line.unit_code}` : '';
     return `${name}: ${line.quantity ?? '—'}${unit}`;
   });
@@ -497,6 +532,8 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [issueLocationId, setIssueLocationId] = useState(null);
   const [plannedIssueOutput, setPlannedIssueOutput] = useState('');
   const [plannedIssueHours, setPlannedIssueHours] = useState('');
+  const [taskActualHours, setTaskActualHours] = useState('');
+  const [taskActualKm, setTaskActualKm] = useState('');
   const [showExtraMaterials, setShowExtraMaterials] = useState(false);
   const [extraMaterialSearch, setExtraMaterialSearch] = useState('');
   const [expenseType, setExpenseType] = useState('fuel');
@@ -606,6 +643,8 @@ export default function OrgTasksScreen({ navigation, route }) {
           setActualByUnitDrafts(hydrateActualByUnitDrafts(detail.operations));
           setMeterStartDrafts(meterStarts);
           setMeterEndDrafts(meterEnds);
+          setTaskActualHours(detail.actual_hours != null ? String(detail.actual_hours) : '');
+          setTaskActualKm(detail.actual_km != null ? String(detail.actual_km) : '');
           setLeftoverDrafts(buildLeftoverDrafts(detail.operations, detail.materials));
         }
       } catch (e) {
@@ -677,6 +716,8 @@ export default function OrgTasksScreen({ navigation, route }) {
     setActualByUnitDrafts(hydrateActualByUnitDrafts(updated.operations));
     setMeterStartDrafts(meterStarts);
     setMeterEndDrafts(meterEnds);
+    setTaskActualHours(updated.actual_hours != null ? String(updated.actual_hours) : '');
+    setTaskActualKm(updated.actual_km != null ? String(updated.actual_km) : '');
     setLeftoverDrafts(buildLeftoverDrafts(updated.operations, updated.materials));
   };
 
@@ -822,7 +863,18 @@ export default function OrgTasksScreen({ navigation, route }) {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const operations = buildOperationsPayload();
-      const updated = await updateWorkOrder(token, orgId, selected.id, { operations });
+      const payload = { operations };
+      if (String(taskActualHours || '').trim() !== '') {
+        payload.actual_hours = String(taskActualHours).trim();
+      } else if (selected.actual_hours != null) {
+        payload.actual_hours = null;
+      }
+      if (String(taskActualKm || '').trim() !== '') {
+        payload.actual_km = String(taskActualKm).trim();
+      } else if (selected.actual_km != null) {
+        payload.actual_km = null;
+      }
+      const updated = await updateWorkOrder(token, orgId, selected.id, payload);
       replaceTask(updated);
     } catch (e) {
       Alert.alert(
@@ -962,10 +1014,13 @@ export default function OrgTasksScreen({ navigation, route }) {
     (materialId) => {
       const mid = Number(materialId);
       const plannedOut = String(plannedIssueOutput || '').trim();
-      const plannedHours = String(plannedIssueHours || '').trim();
+      const taskHours = String(
+        taskActualHours || plannedIssueHours || selected?.actual_hours || '',
+      ).trim();
+      const taskKm = String(taskActualKm || selected?.actual_km || '').trim();
 
-      // Boss planned wave: sum per-SKU norms across operations.
-      if (plannedOut || plannedHours) {
+      // Task-level hours/km + optional planned output → sum per-SKU norms across ops.
+      if (plannedOut || taskHours || taskKm) {
         let total = 0;
         let unit = '';
         let any = false;
@@ -975,14 +1030,17 @@ export default function OrgTasksScreen({ navigation, route }) {
           );
           if (!line) continue;
           const hoursFallback =
-            plannedHours ||
+            taskHours ||
             (op.planned_hours != null
               ? String(op.planned_hours)
               : op.activity?.planned_hours != null
                 ? String(op.activity.planned_hours)
                 : '');
+          const outputFallback = opUsesDistanceForNorms(op)
+            ? taskKm || plannedOut
+            : plannedOut;
           const qty = computeLineSuggestedQty(line, {
-            outputQty: plannedOut,
+            outputQty: outputFallback,
             workHours: hoursFallback,
           });
           if (qty == null) continue;
@@ -1005,14 +1063,23 @@ export default function OrgTasksScreen({ navigation, route }) {
         };
       }
       for (const op of selected?.operations || []) {
-        const liveQty = primaryOutputDraft(
-          op,
-          actualByUnitDrafts,
-          actualDrafts,
-          meterStartDrafts,
-          meterEndDrafts,
-        );
-        const hoursFallback = workHoursDraft(op, actualByUnitDrafts);
+        const liveQty = opUsesDistanceForNorms(op)
+          ? taskKm ||
+            primaryOutputDraft(
+              op,
+              actualByUnitDrafts,
+              actualDrafts,
+              meterStartDrafts,
+              meterEndDrafts,
+            )
+          : primaryOutputDraft(
+              op,
+              actualByUnitDrafts,
+              actualDrafts,
+              meterStartDrafts,
+              meterEndDrafts,
+            );
+        const hoursFallback = taskHours || workHoursDraft(op, actualByUnitDrafts);
         const line = materialLinesForOp(op).find((l) => Number(l.material_id) === mid);
         if (line?.rate != null) {
           const qty = computeLineSuggestedQty(line, {
@@ -1052,6 +1119,8 @@ export default function OrgTasksScreen({ navigation, route }) {
       meterEndDrafts,
       plannedIssueOutput,
       plannedIssueHours,
+      taskActualHours,
+      taskActualKm,
     ],
   );
 
@@ -1384,19 +1453,18 @@ export default function OrgTasksScreen({ navigation, route }) {
               <Text style={styles.section}>
                 {t('org.tasks.operationsTitle', null, 'Operations in this task')}
               </Text>
-                            <Text style={styles.opMeta}>
+              <Text style={styles.opMeta}>
                 {t(
                   'org.tasks.actualsHint',
                   null,
-                  'Fill each report unit for the operation (e.g. painted m² and working hours). Warehouse leftovers stay under Materials.',
+                  'Per operation: paint/output only (e.g. m²). Machine hours, total km, and road fuel receipt are entered once for the whole task below.',
                 )}
               </Text>
               {(selected.operations || []).map((op, idx) => {
                 const editable =
                   canShowEndButton(selected) || selected.status === 'in_progress';
                 const unitLabelText = opUnitLabel(op);
-                const reportUnits = reportUnitsForOp(op);
-                const showKmMeters = hasKmMeterInput(op);
+                const localUnits = opLocalReportUnits(op);
                 const draftQty = primaryOutputDraft(
                   op,
                   actualByUnitDrafts,
@@ -1404,13 +1472,6 @@ export default function OrgTasksScreen({ navigation, route }) {
                   meterStartDrafts,
                   meterEndDrafts,
                 );
-                const liveExpected = draftQty
-                  ? computeExpectedFromNorms(op, draftQty)
-                  : null;
-                const expectedQty =
-                  liveExpected ||
-                  (op.expected_input_qty != null ? String(op.expected_input_qty) : null);
-                const expectedUnit = expectedInputUnit(op);
                 const setUnitDraft = (unitId, value) => {
                   setActualByUnitDrafts((prev) => ({
                     ...prev,
@@ -1423,6 +1484,22 @@ export default function OrgTasksScreen({ navigation, route }) {
                     setActualDrafts((prev) => ({ ...prev, [op.id]: value }));
                   }
                 };
+                const storedLocal = localUnits
+                  .map((unit) => {
+                    const stored =
+                      (op.actual_by_unit || {})[String(unit.id)] ??
+                      (op.actual_by_unit || {})[unit.id];
+                    const qty =
+                      stored != null
+                        ? String(stored)
+                        : Number(unit.id) === Number(op.activity?.unit_id) &&
+                            op.actual_qty != null
+                          ? String(op.actual_qty)
+                          : null;
+                    if (qty == null) return null;
+                    return `${reportUnitFieldLabel(unit, t)}: ${qty}`;
+                  })
+                  .filter(Boolean);
                 return (
                   <View key={op.id || idx} style={styles.opRow}>
                     <Text style={styles.opTitle}>
@@ -1436,55 +1513,21 @@ export default function OrgTasksScreen({ navigation, route }) {
                     ) : null}
                     {editable ? (
                       <>
-                        {showKmMeters ? (
-                          <>
-                            <TextInput
-                              label={t('org.tasks.meterStart', null, 'Meter start')}
-                              value={meterStartDrafts[op.id] || ''}
-                              onChangeText={(value) =>
-                                setMeterStartDrafts((prev) => ({ ...prev, [op.id]: value }))
-                              }
-                              mode="outlined"
-                              keyboardType="decimal-pad"
-                              style={styles.input}
-                              textColor={ON_CARD}
-                            />
-                            <TextInput
-                              label={t('org.tasks.meterEnd', null, 'Meter end')}
-                              value={meterEndDrafts[op.id] || ''}
-                              onChangeText={(value) =>
-                                setMeterEndDrafts((prev) => ({ ...prev, [op.id]: value }))
-                              }
-                              mode="outlined"
-                              keyboardType="decimal-pad"
-                              style={styles.input}
-                              textColor={ON_CARD}
-                            />
-                            <Text style={styles.opMeta}>
-                              {t(
-                                'org.tasks.meterKmHint',
-                                null,
-                                'Distance (km) = meter end − start.',
-                              )}
-                            </Text>
-                          </>
-                        ) : null}
-                        {reportUnits.length
-                          ? reportUnits
-                              .filter((unit) => !isKmUnit(unit))
-                              .map((unit) => (
-                                <TextInput
-                                  key={`${op.id}-${unit.id}`}
-                                  label={reportUnitFieldLabel(unit, t)}
-                                  value={(actualByUnitDrafts[op.id] || {})[unit.id] || ''}
-                                  onChangeText={(value) => setUnitDraft(unit.id, value)}
-                                  mode="outlined"
-                                  keyboardType="decimal-pad"
-                                  style={styles.input}
-                                  textColor={ON_CARD}
-                                />
-                              ))
-                          : !showKmMeters ? (
+                        {localUnits.length
+                          ? localUnits.map((unit) => (
+                              <TextInput
+                                key={`${op.id}-${unit.id}`}
+                                label={reportUnitFieldLabel(unit, t)}
+                                value={(actualByUnitDrafts[op.id] || {})[unit.id] || ''}
+                                onChangeText={(value) => setUnitDraft(unit.id, value)}
+                                mode="outlined"
+                                keyboardType="decimal-pad"
+                                style={styles.input}
+                                textColor={ON_CARD}
+                              />
+                            ))
+                          : !opUsesDistanceForNorms(op) &&
+                            !reportUnitsForOp(op).some(isDurationUnit) ? (
                             <TextInput
                               label={outputFieldLabel(op, t)}
                               value={actualDrafts[op.id] || ''}
@@ -1496,63 +1539,73 @@ export default function OrgTasksScreen({ navigation, route }) {
                               style={styles.input}
                               textColor={ON_CARD}
                             />
-                          ) : null}
+                          ) : (
+                            <Text style={styles.opMeta}>
+                              {t(
+                                'org.tasks.opUsesTaskTotals',
+                                null,
+                                'Hours / km for this operation use the task totals below.',
+                              )}
+                            </Text>
+                          )}
                       </>
-                    ) : showKmMeters && (op.meter_start != null || op.meter_end != null) ? (
-                      <Text style={styles.opMeta}>
-                        {t('org.tasks.meterStart', null, 'Meter start')}: {op.meter_start ?? '—'}
-                        {' · '}
-                        {t('org.tasks.meterEnd', null, 'Meter end')}: {op.meter_end ?? '—'}
-                        {op.actual_qty != null
-                          ? ` · ${t('org.tasks.outputDistance', { unit: unitLabelText || 'km' }, `Distance (${unitLabelText || 'km'})`)}: ${op.actual_qty}`
-                          : ''}
-                      </Text>
                     ) : (
                       <Text style={styles.opMeta}>
-                        {reportUnits.length
-                          ? reportUnits
-                              .map((unit) => {
-                                const stored =
-                                  (op.actual_by_unit || {})[String(unit.id)] ??
-                                  (op.actual_by_unit || {})[unit.id];
-                                const qty =
-                                  stored != null
-                                    ? String(stored)
-                                    : Number(unit.id) === Number(op.activity?.unit_id) &&
-                                        op.actual_qty != null
-                                      ? String(op.actual_qty)
-                                      : null;
-                                if (qty == null) return null;
-                                return `${reportUnitFieldLabel(unit, t)}: ${qty}`;
-                              })
-                              .filter(Boolean)
-                              .join(' · ') ||
-                            (op.actual_qty != null
-                              ? `${outputFieldLabel(op, t)}: ${op.actual_qty}`
-                              : t('org.tasks.noActualsYet', null, 'No actuals yet'))
-                          : op.actual_qty != null
-                            ? `${outputFieldLabel(op, t)}: ${op.actual_qty}${
+                        {storedLocal.length
+                          ? storedLocal.join(' · ')
+                          : draftQty
+                            ? `${outputFieldLabel(op, t)}: ${draftQty}${
                                 unitLabelText ? ` ${unitLabelText}` : ''
                               }`
                             : t('org.tasks.noActualsYet', null, 'No actuals yet')}
                       </Text>
                     )}
-
-                    {expectedQty != null ? (
-                      <Text style={styles.opMeta}>
-                        {t(
-                          'org.tasks.suggestedMaterialsQty',
-                          {
-                            qty: expectedQty,
-                            unit: expectedUnit,
-                          },
-                          `Suggested materials from norm: ~${expectedQty}${expectedUnit ? ` ${expectedUnit}` : ''}`,
-                        )}
-                      </Text>
-                    ) : null}
                   </View>
                 );
               })}
+
+              {(canShowEndButton(selected) || selected.status === 'in_progress') &&
+              (taskNeedsMachineHours(selected) || taskNeedsKm(selected)) ? (
+                <>
+                  <Text style={[styles.fieldLabel, { marginTop: 8 }]}>
+                    {t('org.tasks.taskTotalsTitle', null, 'Task totals (once)')}
+                  </Text>
+                  <Text style={styles.opMeta}>
+                    {t(
+                      'org.tasks.taskTotalsHint',
+                      null,
+                      'Enter machine hours and/or total km once for the whole work card. Fuel suggestions use these totals — not per-operation hour fields.',
+                    )}
+                  </Text>
+                  {taskNeedsMachineHours(selected) ? (
+                    <TextInput
+                      label={t(
+                        'org.tasks.taskMachineHours',
+                        null,
+                        'Machine / working hours (task total)',
+                      )}
+                      value={taskActualHours}
+                      onChangeText={setTaskActualHours}
+                      mode="outlined"
+                      keyboardType="decimal-pad"
+                      style={styles.input}
+                      textColor={ON_CARD}
+                    />
+                  ) : null}
+                  {taskNeedsKm(selected) ? (
+                    <TextInput
+                      label={t('org.tasks.taskTotalKm', null, 'Total km driven (task)')}
+                      value={taskActualKm}
+                      onChangeText={setTaskActualKm}
+                      mode="outlined"
+                      keyboardType="decimal-pad"
+                      style={styles.input}
+                      textColor={ON_CARD}
+                    />
+                  ) : null}
+                </>
+              ) : null}
+
               {(canShowEndButton(selected) || selected.status === 'in_progress') &&
               (selected.operations || []).length > 0 ? (
                 <Button
@@ -1564,6 +1617,29 @@ export default function OrgTasksScreen({ navigation, route }) {
                 >
                   {t('org.tasks.saveActuals', null, 'Save actuals')}
                 </Button>
+              ) : null}
+
+              {!canShowEndButton(selected) && selected.status !== 'in_progress' ? (
+                <Text style={styles.opMeta}>
+                  {[
+                    selected.actual_hours != null
+                      ? t(
+                          'org.tasks.taskMachineHoursRead',
+                          { hours: selected.actual_hours },
+                          `Machine hours: ${selected.actual_hours}`,
+                        )
+                      : null,
+                    selected.actual_km != null
+                      ? t(
+                          'org.tasks.taskTotalKmRead',
+                          { km: selected.actual_km },
+                          `Total km: ${selected.actual_km}`,
+                        )
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Text>
               ) : null}
             </AppCard>
 
@@ -1708,7 +1784,7 @@ export default function OrgTasksScreen({ navigation, route }) {
                     {t(
                       'org.tasks.issueFromWarehouseHint',
                       null,
-                      'Default list = materials from this task’s operations. Set planned output to get suggested qty, then edit qty before issuing.',
+                      'Default list = materials from this task’s operations. Fuel ~qty uses task machine hours / total km (and paint uses op m²). Edit qty before issuing.',
                     )}
                   </Text>
                   <TextInput
@@ -1724,12 +1800,12 @@ export default function OrgTasksScreen({ navigation, route }) {
                     style={styles.input}
                     textColor={ON_CARD}
                   />
-                  {hasHourBasedNorms ? (
+                  {hasHourBasedNorms && !String(taskActualHours || '').trim() ? (
                     <TextInput
                       label={t(
                         'org.tasks.plannedIssueHours',
                         null,
-                        'Planned working hours (for fuel norms)',
+                        'Planned working hours (for fuel norms) — or fill Task totals above',
                       )}
                       value={plannedIssueHours}
                       onChangeText={setPlannedIssueHours}
@@ -1770,7 +1846,9 @@ export default function OrgTasksScreen({ navigation, route }) {
                             style={[styles.chip, active && styles.chipActive]}
                           >
                             <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                              {mat.name || `#${mid}`}
+                              {formatMaterialListLabel(mat, {
+                                fallbackId: mid,
+                              })}
                               {onHand}
                               {sug?.qty ? ` · ~${sug.qty}` : ''}
                             </Text>
@@ -1806,11 +1884,14 @@ export default function OrgTasksScreen({ navigation, route }) {
                         {filteredExtraStock.map((row) => {
                           const mid = Number(row.material_id || row.material?.id || row.id);
                           const active = Number(issueMaterialId) === mid;
-                          const label =
-                            row.material?.name ||
-                            row.name ||
-                            row.part_number ||
-                            `#${mid}`;
+                          const label = formatMaterialListLabel(
+                            {
+                              name: row.material?.name || row.name,
+                              label: row.material?.label || row.label,
+                              part_number: row.part_number || row.material?.part_number,
+                            },
+                            { fallbackId: mid },
+                          );
                           const onHand =
                             row.quantity_on_hand != null
                               ? ` (${row.quantity_on_hand})`
@@ -1930,7 +2011,7 @@ export default function OrgTasksScreen({ navigation, route }) {
                 {t(
                   'org.tasks.expensesHint',
                   null,
-                  'On-road fuel or any receipt: add expense + attach касова бележка / фактура. Depot fuel already in stock → issue from warehouse, not here.',
+                  'Road fuel once for the task: add expense + attach receipt. Depot fuel already in stock → issue from Materials above (suggestions use task hours/km).',
                 )}
               </Text>
               {(selected.expenses || []).length === 0 ? (

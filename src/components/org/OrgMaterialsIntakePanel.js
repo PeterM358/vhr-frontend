@@ -28,6 +28,11 @@ import {
 } from '../../api/orgWarehouse';
 import { pickReceiptOrInvoiceAttachment } from '../../utils/pickDocumentFile';
 import { confirmMessage } from '../../utils/crossPlatformAlert';
+import {
+  extractOldMaterialNumber,
+  formatMaterialListLabel,
+  stripOldMaterialSuffix,
+} from '../../utils/materialDisplayLabel';
 import { STORAGE_KEYS } from '../../constants/storageKeys';
 import { useTranslation } from '../../i18n';
 import { navigateToOrgLegalEntity } from '../../navigation/webNavigation';
@@ -896,14 +901,10 @@ export default function OrgMaterialsIntakePanel({
           {(confirmSummary.materials || []).map((m, idx) => (
             <View key={`${m.part_number || m.name}-${idx}`} style={styles.lineRow}>
               <Text style={styles.lineName} numberOfLines={2}>
-                {m.name || m.part_number || '—'}
+                {formatMaterialListLabel(m, { includeSku: false }) || m.part_number || '—'}
               </Text>
               <Text style={styles.lineMeta}>
-                {m.part_number ? `${m.part_number}` : ''}
-                {m.part_number_alias
-                  ? ` · ${t('org.warehouse.intake.oldSku', null, 'old')} ${m.part_number_alias}`
-                  : ''}
-                {m.part_number || m.part_number_alias ? ' · ' : ''}
+                {m.part_number ? `${m.part_number} · ` : ''}
                 +{m.quantity_added} {unitDisplay(m.unit_code, t)}
                 {' → '}
                 {t('org.warehouse.intake.onStock', null, 'On stock')}: {m.quantity_on_hand}
@@ -1386,6 +1387,13 @@ export default function OrgMaterialsIntakePanel({
                 style={styles.input}
                 textColor={ON_CARD}
               />
+              {editingMaterial.part_number_alias ? (
+                <Text style={styles.meta}>
+                  {t('org.warehouse.intake.oldPartNumber', null, 'Old material number (optional)')}
+                  {': '}
+                  {editingMaterial.part_number_alias}
+                </Text>
+              ) : null}
               <Text style={styles.meta}>
                 {t('org.warehouse.intake.onStock', null, 'On stock')}: {editingMaterial.quantity_on_hand}
                 {editingMaterial.unit_code
@@ -1446,18 +1454,27 @@ export default function OrgMaterialsIntakePanel({
                   key={row.stock_id || row.id}
                   onPress={() => {
                     if (!canManage) return;
+                    const rawName = row.name || '';
+                    const rawDesc = row.description || row.name || '';
                     setEditingMaterial({
                       stock_id: row.stock_id,
-                      name: row.name || '',
+                      name: stripOldMaterialSuffix(rawName) || rawName,
                       part_number: row.part_number || '',
-                      description: row.description || row.name || '',
+                      description: stripOldMaterialSuffix(rawDesc) || rawDesc,
+                      part_number_alias:
+                        row.part_number_alias ||
+                        extractOldMaterialNumber(rawName) ||
+                        extractOldMaterialNumber(rawDesc) ||
+                        '',
                       quantity_on_hand: row.quantity_on_hand,
                       unit_code: row.unit_code,
                     });
                   }}
                 >
                   <AppCard style={styles.card}>
-                    <Text style={styles.lineName}>{row.name}</Text>
+                    <Text style={styles.lineName}>
+                      {formatMaterialListLabel(row, { includeSku: false })}
+                    </Text>
                     <Text style={styles.lineMeta}>
                       {row.part_number ? `${row.part_number} · ` : ''}
                       {t('org.warehouse.intake.onStock', null, 'On stock')}: {row.quantity_on_hand}
