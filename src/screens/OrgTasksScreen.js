@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
 import OrgAppHeader from '../components/org/OrgAppHeader';
+import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePicker';
 import {
   attachWorkOrderMedia,
   createWorkOrderExpense,
@@ -34,8 +35,8 @@ const ON_CARD_MUTED = '#475569';
 
 const TASK_TABS = [
   { id: 'open', labelKey: 'org.tasks.tabs.open', fallback: 'Open' },
+  { id: 'completed', labelKey: 'org.tasks.tabs.completed', fallback: 'Completed' },
   { id: 'all', labelKey: 'org.tasks.tabs.all', fallback: 'All' },
-  { id: 'add', labelKey: 'org.tasks.tabs.add', fallback: 'Add' },
 ];
 
 const EXPENSE_TYPES = [
@@ -48,6 +49,11 @@ const EXPENSE_TYPES = [
 function isOpenTaskStatus(status) {
   const value = String(status || '').toLowerCase();
   return value !== 'done' && value !== 'cancelled';
+}
+
+function isCompletedTaskStatus(status) {
+  const value = String(status || '').toLowerCase();
+  return value === 'done' || value === 'cancelled';
 }
 
 function statusLabel(status, t) {
@@ -167,6 +173,37 @@ function formatMoneyMinor(amountMinor, currency = 'BGN') {
   return `${(n / 100).toFixed(2)} ${currency || 'BGN'}`;
 }
 
+function formatIssueAudit(issue, t) {
+  const who =
+    issue?.issued_by?.display_name ||
+    issue?.issued_by?.email ||
+    (issue?.issued_by_id != null ? `#${issue.issued_by_id}` : '');
+  const when = issue?.issued_at ? String(issue.issued_at).slice(0, 16).replace('T', ' ') : '';
+  const loc =
+    issue?.location?.name ||
+    issue?.location?.code ||
+    (issue?.location_id != null ? `#${issue.location_id}` : '');
+  const qtyParts = (issue?.lines || []).map((line) => {
+    const name = line.material?.name || `#${line.material_id}`;
+    const unit = line.unit_code ? ` ${line.unit_code}` : '';
+    return `${name}: ${line.quantity ?? '—'}${unit}`;
+  });
+  return [
+    who
+      ? t('org.tasks.issueAuditWho', { name: who }, `Issued by ${who}`)
+      : null,
+    when
+      ? t('org.tasks.issueAuditWhen', { time: when }, `at ${when}`)
+      : null,
+    loc
+      ? t('org.tasks.issueAuditLocation', { location: loc }, `from ${loc}`)
+      : null,
+    qtyParts.length ? qtyParts.join(', ') : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 export default function OrgTasksScreen({ navigation, route }) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
@@ -180,8 +217,10 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [canManage, setCanManage] = useState(false);
   const [rows, setRows] = useState([]);
   const [activeTab, setActiveTab] = useState(
-    routeTab === 'all' || routeTab === 'add' ? routeTab : 'open',
+    routeTab === 'all' || routeTab === 'completed' ? routeTab : 'open',
   );
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
   const [selectedId, setSelectedId] = useState(routeTaskId);
   const [selectedDetail, setSelectedDetail] = useState(null);
   const [busyAction, setBusyAction] = useState(false);
@@ -213,27 +252,23 @@ export default function OrgTasksScreen({ navigation, route }) {
   }, [navigation, orgId, routeOrgId, selectedId]);
 
   const openCreateTab = useCallback(() => {
-    setActiveTab('add');
     navigateToOrgCreateTask(navigation, { orgId: routeOrgId || orgId });
   }, [navigation, orgId, routeOrgId]);
 
-  const selectTab = useCallback(
-    (tabId) => {
-      if (tabId === 'add') {
-        if (!canManage) return;
-        openCreateTab();
-        return;
-      }
-      setActiveTab(tabId);
-      setSelectedId(null);
-      setSelectedDetail(null);
-    },
-    [canManage, openCreateTab],
-  );
+  const selectTab = useCallback((tabId) => {
+    setActiveTab(tabId);
+    setSelectedId(null);
+    setSelectedDetail(null);
+  }, []);
 
   const visibleRows = useMemo(() => {
-    if (activeTab === 'all') return rows;
-    return rows.filter((row) => isOpenTaskStatus(row.status));
+    let list = rows;
+    if (activeTab === 'open') {
+      list = list.filter((row) => isOpenTaskStatus(row.status));
+    } else if (activeTab === 'completed') {
+      list = list.filter((row) => isCompletedTaskStatus(row.status));
+    }
+    return list;
   }, [activeTab, rows]);
 
   const load = useCallback(async () => {
@@ -248,7 +283,10 @@ export default function OrgTasksScreen({ navigation, route }) {
         setRows([]);
         return;
       }
-      const data = await listWorkOrders(token, resolved);
+      const params = {};
+      if (filterFrom) params.from = filterFrom;
+      if (filterTo) params.to = filterTo;
+      const data = await listWorkOrders(token, resolved, params);
       setCanManage(Boolean(data?.can_manage));
       setRows(Array.isArray(data?.results) ? data.results : []);
     } catch (e) {
@@ -257,12 +295,11 @@ export default function OrgTasksScreen({ navigation, route }) {
     } finally {
       setLoading(false);
     }
-  }, [routeOrgId, t]);
+  }, [filterFrom, filterTo, routeOrgId, t]);
 
   useFocusEffect(
     useCallback(() => {
       load();
-      setActiveTab((prev) => (prev === 'add' ? 'open' : prev));
     }, [load]),
   );
 
@@ -271,9 +308,10 @@ export default function OrgTasksScreen({ navigation, route }) {
   }, [routeTaskId]);
 
   useEffect(() => {
-    if (routeTab === 'all' || routeTab === 'open') setActiveTab(routeTab);
-    if (routeTab === 'add' && canManage) openCreateTab();
-  }, [canManage, openCreateTab, routeTab]);
+    if (routeTab === 'all' || routeTab === 'open' || routeTab === 'completed') {
+      setActiveTab(routeTab);
+    }
+  }, [routeTab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -703,19 +741,17 @@ export default function OrgTasksScreen({ navigation, route }) {
         ) : (
           <>
             {!selected ? (
+              <>
               <View style={styles.modeRow}>
                 {TASK_TABS.map((item) => {
                   const active = activeTab === item.id;
-                  const disabled = item.id === 'add' && !canManage;
                   return (
                     <Pressable
                       key={item.id}
-                      disabled={disabled}
                       onPress={() => selectTab(item.id)}
                       style={[
                         styles.modeChip,
                         active && styles.modeChipActive,
-                        disabled && styles.modeChipDisabled,
                       ]}
                     >
                       <Text style={[styles.modeChipText, active && styles.modeChipTextActive]}>
@@ -725,6 +761,45 @@ export default function OrgTasksScreen({ navigation, route }) {
                   );
                 })}
               </View>
+              <AppCard style={styles.card}>
+                <Text style={styles.section}>
+                  {t('org.tasks.dateFilterTitle', null, 'Schedule dates')}
+                </Text>
+                <Text style={styles.opMeta}>
+                  {t(
+                    'org.tasks.dateFilterHint',
+                    null,
+                    'Filter by scheduled start/end range.',
+                  )}
+                </Text>
+                <ServiceRecordDatePicker
+                  label={t('org.tasks.filterFrom', null, 'From')}
+                  valueIso={filterFrom || null}
+                  onChangeIso={setFilterFrom}
+                  optional
+                  maxIso={filterTo || undefined}
+                />
+                <ServiceRecordDatePicker
+                  label={t('org.tasks.filterTo', null, 'To')}
+                  valueIso={filterTo || null}
+                  onChangeIso={setFilterTo}
+                  optional
+                  minIso={filterFrom || undefined}
+                />
+                {(filterFrom || filterTo) ? (
+                  <Button
+                    mode="text"
+                    onPress={() => {
+                      setFilterFrom('');
+                      setFilterTo('');
+                    }}
+                    style={styles.secondaryBtn}
+                  >
+                    {t('org.tasks.clearDateFilter', null, 'Clear dates')}
+                  </Button>
+                ) : null}
+              </AppCard>
+              </>
             ) : null}
 
             {selected ? (
@@ -964,6 +1039,39 @@ export default function OrgTasksScreen({ navigation, route }) {
                   );
                 })
               )}
+              {(selected.material_issues || []).length > 0 ? (
+                <>
+                  <Text style={styles.fieldLabel}>
+                    {t('org.tasks.issueLogTitle', null, 'Issue log')}
+                  </Text>
+                  {(selected.material_issues || []).map((issue) => (
+                    <Text key={issue.id} style={styles.opMeta}>
+                      {formatIssueAudit(issue, t)}
+                      {(issue.lines || [])
+                        .filter((line) => line.leftover_entered_by || line.leftover_entered_at)
+                        .map((line) => {
+                          const who =
+                            line.leftover_entered_by?.display_name ||
+                            line.leftover_entered_by?.email ||
+                            (line.leftover_entered_by_id != null
+                              ? `#${line.leftover_entered_by_id}`
+                              : '');
+                          const when = line.leftover_entered_at
+                            ? String(line.leftover_entered_at).slice(0, 16).replace('T', ' ')
+                            : '';
+                          return (
+                            `\n${t(
+                              'org.tasks.leftoverAudit',
+                              { name: who, time: when, qty: line.leftover_qty },
+                              `Leftover ${line.leftover_qty ?? '—'} by ${who || '—'} ${when}`,
+                            )}`
+                          );
+                        })
+                        .join('')}
+                    </Text>
+                  ))}
+                </>
+              ) : null}
               {canManage && selected.status !== 'done' && selected.status !== 'cancelled' ? (
                 <>
                   <Text style={styles.fieldLabel}>
@@ -1266,7 +1374,9 @@ export default function OrgTasksScreen({ navigation, route }) {
                 <Text style={styles.empty}>
                   {activeTab === 'open'
                     ? t('org.tasks.openEmpty', null, 'No open tasks.')
-                    : t('org.tasks.listEmpty', null, 'No tasks yet. Create the first work card.')}
+                    : activeTab === 'completed'
+                      ? t('org.tasks.completedEmpty', null, 'No completed tasks.')
+                      : t('org.tasks.listEmpty', null, 'No tasks yet. Create the first work card.')}
                 </Text>
               ) : (
                 visibleRows.map((row) => (

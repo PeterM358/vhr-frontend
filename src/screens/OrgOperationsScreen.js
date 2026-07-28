@@ -364,7 +364,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
         hint: t(
           'org.operations.wizard.stepMaterialsHint',
           null,
-          'Toggle if materials are issued from warehouse. Pick default SKUs here — workers only enter leftovers on End.',
+          'Toggle if this operation is labor-only or labor + materials (same Operation — no separate MaterialOperation). Pick default SKUs when materials are on; workers enter leftovers on End.',
         ),
       },
       {
@@ -965,7 +965,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
             {t(
               'org.operations.wizard.materialsLinesLater',
               null,
-              'Warehouse issues material lines on the task later. Workers only enter leftover (остатък) on End — they do not rebuild the catalog.',
+              'Same Operation entity: off = labor-only; on = labor + materials. Warehouse issues those SKUs onto the task later. Workers/managers enter leftover (остатък) on End — they do not rebuild the catalog.',
             )}
           </Text>
           {form.consumesMaterials ? (

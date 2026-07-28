@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
 import OrgAppHeader from '../components/org/OrgAppHeader';
+import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePicker';
 import {
   createWorkOrder,
   listActivityDefinitions,
@@ -521,24 +522,22 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     if (step === 1) {
       return (
         <>
-          <TextInput
-            label={t('org.tasks.scheduledDate', null, 'Start date (YYYY-MM-DD)')}
-            value={scheduledDate}
-            onChangeText={setScheduledDate}
-            mode="outlined"
-            autoCapitalize="none"
-            style={styles.input}
-            textColor={ON_CARD}
+          <ServiceRecordDatePicker
+            label={t('org.tasks.scheduledDate', null, 'Start date')}
+            valueIso={scheduledDate || null}
+            onChangeIso={(iso) => {
+              setScheduledDate(iso || '');
+              if (scheduledEndDate && iso && scheduledEndDate < iso) {
+                setScheduledEndDate(iso);
+              }
+            }}
           />
-          <TextInput
+          <ServiceRecordDatePicker
             label={t('org.tasks.scheduledEndDate', null, 'End date (optional)')}
-            value={scheduledEndDate}
-            onChangeText={setScheduledEndDate}
-            mode="outlined"
-            autoCapitalize="none"
-            style={styles.input}
-            textColor={ON_CARD}
-            placeholder={t('org.tasks.scheduledEndDateHint', null, 'Leave blank for a single day')}
+            valueIso={scheduledEndDate || null}
+            onChangeIso={setScheduledEndDate}
+            optional
+            minIso={scheduledDate || undefined}
           />
           <Text style={styles.helper}>
             {t(
@@ -759,6 +758,22 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             </Pressable>
             {selected && line ? (
               <View style={styles.opDetails}>
+                {(activity.default_materials || []).length > 0 ? (
+                  <Text style={styles.helper}>
+                    {t('org.tasks.materialsFromOp', null, 'Materials from this operation')}:{' '}
+                    {(activity.default_materials || [])
+                      .map((mat) => mat.name || `#${mat.id}`)
+                      .join(', ')}
+                  </Text>
+                ) : activity.consumes_materials ? (
+                  <Text style={styles.helper}>
+                    {t(
+                      'org.tasks.materialsOpNone',
+                      null,
+                      'This operation consumes materials but has no default SKUs yet.',
+                    )}
+                  </Text>
+                ) : null}
                 <TextInput
                   label={t('org.tasks.operationNotes', null, 'Notes for this step')}
                   value={line.notes}
