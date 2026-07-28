@@ -18,6 +18,7 @@ import AppCard from '../components/ui/AppCard';
 import OrgAppHeader from '../components/org/OrgAppHeader';
 import {
   createActivityDefinition,
+  deleteActivityDefinition,
   listActivityDefinitions,
   listUnitsOfMeasure,
   updateActivityDefinition,
@@ -33,6 +34,7 @@ import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
+import { confirmMessage, showMessage } from '../utils/crossPlatformAlert';
 
 /** Hardcoded on-card colors — avoid Paper theme / CSS inheritance washing text white. */
 const ON_CARD = '#0F172A';
@@ -693,6 +695,42 @@ export default function OrgOperationsScreen({ navigation, route }) {
         t('org.operations.title', null, 'Operations'),
         e.message || t('org.operations.saveError', null, 'Could not save operation.'),
       );
+    }
+  };
+
+  const deleteOperation = async (row) => {
+    if (!orgId || !canManage || !row?.id) return;
+    const ok = await confirmMessage(
+      t('org.operations.deleteTitle', null, 'Delete operation?'),
+      t(
+        'org.operations.deleteConfirm',
+        null,
+        'This permanently removes the operation. Blocked if it is used on any task — deactivate instead.',
+      ),
+      {
+        confirmLabel: t('common.delete', null, 'Delete'),
+        cancelLabel: t('common.cancel', null, 'Cancel'),
+        destructive: true,
+      },
+    );
+    if (!ok) return;
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      await deleteActivityDefinition(token, orgId, row.id);
+      if (editingId === row.id) closeWizard();
+      await load();
+    } catch (e) {
+      const message =
+        e?.code === 'operation_in_use'
+          ? t(
+              'org.operations.deleteBlockedInUse',
+              null,
+              'Cannot delete this operation because it is used on one or more tasks. Deactivate it instead.',
+            )
+          : e.message || t('org.operations.deleteError', null, 'Could not delete the operation.');
+      showMessage(t('org.operations.deleteTitle', null, 'Delete operation'), message, {
+        variant: 'error',
+      });
     }
   };
 
@@ -1415,6 +1453,19 @@ export default function OrgOperationsScreen({ navigation, route }) {
                 </Button>
               )}
             </View>
+            {editingId ? (
+              <Button
+                mode="text"
+                textColor="#B91C1C"
+                onPress={() => {
+                  const row = rows.find((r) => r.id === editingId);
+                  if (row) deleteOperation(row);
+                }}
+                style={styles.deleteInWizard}
+              >
+                {t('common.delete', null, 'Delete')}
+              </Button>
+            ) : null}
           </ScrollView>
         </View>
       </View>
@@ -1522,6 +1573,11 @@ export default function OrgOperationsScreen({ navigation, route }) {
                           {row.is_active
                             ? t('org.operations.deactivate', null, 'Deactivate')
                             : t('org.operations.activate', null, 'Activate')}
+                        </Text>
+                      </Pressable>
+                      <Pressable onPress={() => deleteOperation(row)} style={styles.rowAction}>
+                        <Text style={[styles.rowActionText, styles.rowActionDanger]}>
+                          {t('common.delete', null, 'Delete')}
                         </Text>
                       </Pressable>
                     </View>
@@ -1673,6 +1729,13 @@ const styles = StyleSheet.create({
   },
   rowAction: {
     paddingVertical: 4,
+  },
+  rowActionDanger: {
+    color: '#B91C1C',
+  },
+  deleteInWizard: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
   },
   rowActionText: {
     color: COLORS.PRIMARY,

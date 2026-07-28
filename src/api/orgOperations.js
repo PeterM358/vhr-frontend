@@ -72,6 +72,10 @@ export async function updateActivityDefinition(token, organizationId, activityId
 }
 
 export async function deactivateActivityDefinition(token, organizationId, activityId) {
+  return updateActivityDefinition(token, organizationId, activityId, { is_active: false });
+}
+
+export async function deleteActivityDefinition(token, organizationId, activityId) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/activity-definitions/${activityId}/`,
     {
@@ -79,8 +83,20 @@ export async function deactivateActivityDefinition(token, organizationId, activi
       headers: authHeaders(token),
     },
   );
-  if (!response.ok) throw new Error(await parseError(response, 'Failed to deactivate operation'));
-  return true;
+  if (response.status === 204) return true;
+  const text = await response.text();
+  let parsed = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    parsed = null;
+  }
+  const err = new Error(
+    (parsed && (parsed.detail || parsed.message)) ||
+      messageFromApiResponseText(text, 'Failed to delete operation'),
+  );
+  if (parsed?.code) err.code = parsed.code;
+  throw err;
 }
 
 export async function listWorkOrders(token, organizationId, params = {}) {
