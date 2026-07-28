@@ -48,6 +48,7 @@ const ON_CHROME_SOFT = 'rgba(255,255,255,0.62)';
 /** Match warehouse / ops unit vocabulary (materials.UnitOfMeasure codes). */
 export const MATERIAL_UNIT_OPTIONS = [
   { code: 'piece', labelKey: 'org.warehouse.intake.units.piece', fallback: 'бр' },
+  { code: 'roll', labelKey: 'org.warehouse.intake.units.roll', fallback: 'ролка' },
   { code: 'kg', labelKey: 'org.warehouse.intake.units.kg', fallback: 'kg' },
   { code: 'L', labelKey: 'org.warehouse.intake.units.L', fallback: 'L' },
   { code: 'm3', labelKey: 'org.warehouse.intake.units.m3', fallback: 'm³' },

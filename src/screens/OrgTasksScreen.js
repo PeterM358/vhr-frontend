@@ -170,6 +170,12 @@ function opLocalReportUnits(op) {
   return reportUnitsForOp(op).filter((unit) => !isTaskLevelReportUnit(unit));
 }
 
+function taskNeedsFuelTank(task) {
+  return (task?.operations || []).some(
+    (op) => String(op?.activity?.activity_kind || '').toLowerCase() === 'transport',
+  );
+}
+
 function taskNeedsMachineHours(task) {
   return (task?.operations || []).some((op) => {
     if (reportUnitsForOp(op).some(isDurationUnit)) return true;
@@ -534,6 +540,9 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [plannedIssueHours, setPlannedIssueHours] = useState('');
   const [taskActualHours, setTaskActualHours] = useState('');
   const [taskActualKm, setTaskActualKm] = useState('');
+  const [taskFuelStart, setTaskFuelStart] = useState('');
+  const [taskFuelEnd, setTaskFuelEnd] = useState('');
+  const [taskLoadTons, setTaskLoadTons] = useState('');
   const [showExtraMaterials, setShowExtraMaterials] = useState(false);
   const [extraMaterialSearch, setExtraMaterialSearch] = useState('');
   const [expenseType, setExpenseType] = useState('fuel');
@@ -645,6 +654,9 @@ export default function OrgTasksScreen({ navigation, route }) {
           setMeterEndDrafts(meterEnds);
           setTaskActualHours(detail.actual_hours != null ? String(detail.actual_hours) : '');
           setTaskActualKm(detail.actual_km != null ? String(detail.actual_km) : '');
+          setTaskFuelStart(detail.fuel_start != null ? String(detail.fuel_start) : '');
+          setTaskFuelEnd(detail.fuel_end != null ? String(detail.fuel_end) : '');
+          setTaskLoadTons(detail.load_tons != null ? String(detail.load_tons) : '');
           setLeftoverDrafts(buildLeftoverDrafts(detail.operations, detail.materials));
         }
       } catch (e) {
@@ -718,7 +730,29 @@ export default function OrgTasksScreen({ navigation, route }) {
     setMeterEndDrafts(meterEnds);
     setTaskActualHours(updated.actual_hours != null ? String(updated.actual_hours) : '');
     setTaskActualKm(updated.actual_km != null ? String(updated.actual_km) : '');
+    setTaskFuelStart(updated.fuel_start != null ? String(updated.fuel_start) : '');
+    setTaskFuelEnd(updated.fuel_end != null ? String(updated.fuel_end) : '');
+    setTaskLoadTons(updated.load_tons != null ? String(updated.load_tons) : '');
     setLeftoverDrafts(buildLeftoverDrafts(updated.operations, updated.materials));
+  };
+
+  const appendFuelPayload = (payload) => {
+    if (String(taskFuelStart || '').trim() !== '') {
+      payload.fuel_start = String(taskFuelStart).trim();
+    } else if (selected?.fuel_start != null) {
+      payload.fuel_start = null;
+    }
+    if (String(taskFuelEnd || '').trim() !== '') {
+      payload.fuel_end = String(taskFuelEnd).trim();
+    } else if (selected?.fuel_end != null) {
+      payload.fuel_end = null;
+    }
+    if (String(taskLoadTons || '').trim() !== '') {
+      payload.load_tons = String(taskLoadTons).trim();
+    } else if (selected?.load_tons != null) {
+      payload.load_tons = null;
+    }
+    return payload;
   };
 
   const firstConsumingOpId = useMemo(() => {
@@ -820,7 +854,15 @@ export default function OrgTasksScreen({ navigation, route }) {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const operations = buildOperationsPayload();
-      const updated = await endWorkOrder(token, orgId, task.id, { operations });
+      const payload = { operations };
+      if (String(taskActualHours || '').trim() !== '') {
+        payload.actual_hours = String(taskActualHours).trim();
+      }
+      if (String(taskActualKm || '').trim() !== '') {
+        payload.actual_km = String(taskActualKm).trim();
+      }
+      appendFuelPayload(payload);
+      const updated = await endWorkOrder(token, orgId, task.id, payload);
       replaceTask(updated);
     } catch (e) {
       Alert.alert(
@@ -874,6 +916,7 @@ export default function OrgTasksScreen({ navigation, route }) {
       } else if (selected.actual_km != null) {
         payload.actual_km = null;
       }
+      appendFuelPayload(payload);
       const updated = await updateWorkOrder(token, orgId, selected.id, payload);
       replaceTask(updated);
     } catch (e) {
@@ -1565,17 +1608,25 @@ export default function OrgTasksScreen({ navigation, route }) {
               })}
 
               {(canShowEndButton(selected) || selected.status === 'in_progress') &&
-              (taskNeedsMachineHours(selected) || taskNeedsKm(selected)) ? (
+              (taskNeedsMachineHours(selected) ||
+                taskNeedsKm(selected) ||
+                taskNeedsFuelTank(selected)) ? (
                 <>
                   <Text style={[styles.fieldLabel, { marginTop: 8 }]}>
                     {t('org.tasks.taskTotalsTitle', null, 'Task totals (once)')}
                   </Text>
                   <Text style={styles.opMeta}>
-                    {t(
-                      'org.tasks.taskTotalsHint',
-                      null,
-                      'Enter machine hours and/or total km once for the whole work card. Fuel suggestions use these totals — not per-operation hour fields.',
-                    )}
+                    {taskNeedsFuelTank(selected)
+                      ? t(
+                          'org.tasks.taskTotalsHintTransport',
+                          null,
+                          'Report km (and optional hours) once on the work card. Fuel = tank start/end + receipts — not a free liters guess.',
+                        )
+                      : t(
+                          'org.tasks.taskTotalsHint',
+                          null,
+                          'Enter machine hours and/or total km once for the whole work card. Fuel suggestions use these totals — not per-operation hour fields.',
+                        )}
                   </Text>
                   {taskNeedsMachineHours(selected) ? (
                     <TextInput
@@ -1592,7 +1643,7 @@ export default function OrgTasksScreen({ navigation, route }) {
                       textColor={ON_CARD}
                     />
                   ) : null}
-                  {taskNeedsKm(selected) ? (
+                  {taskNeedsKm(selected) || taskNeedsFuelTank(selected) ? (
                     <TextInput
                       label={t('org.tasks.taskTotalKm', null, 'Total km driven (task)')}
                       value={taskActualKm}
@@ -1602,6 +1653,97 @@ export default function OrgTasksScreen({ navigation, route }) {
                       style={styles.input}
                       textColor={ON_CARD}
                     />
+                  ) : null}
+                  {taskNeedsFuelTank(selected) ? (
+                    <>
+                      <Text style={[styles.fieldLabel, { marginTop: 8 }]}>
+                        {t('org.tasks.fuelTankTitle', null, 'Fuel tank (litres)')}
+                      </Text>
+                      <Text style={styles.opMeta}>
+                        {t(
+                          'org.tasks.fuelTankHint',
+                          null,
+                          'Start qty in tank + end qty + fuel receipts (касови бележки). System computes burn vs norm.',
+                        )}
+                      </Text>
+                      <TextInput
+                        label={t('org.tasks.fuelStart', null, 'Fuel start (L in tank)')}
+                        value={taskFuelStart}
+                        onChangeText={setTaskFuelStart}
+                        mode="outlined"
+                        keyboardType="decimal-pad"
+                        style={styles.input}
+                        textColor={ON_CARD}
+                      />
+                      <TextInput
+                        label={t('org.tasks.fuelEnd', null, 'Fuel end (L in tank)')}
+                        value={taskFuelEnd}
+                        onChangeText={setTaskFuelEnd}
+                        mode="outlined"
+                        keyboardType="decimal-pad"
+                        style={styles.input}
+                        textColor={ON_CARD}
+                      />
+                      <TextInput
+                        label={t('org.tasks.loadTons', null, 'Load tons (optional)')}
+                        value={taskLoadTons}
+                        onChangeText={setTaskLoadTons}
+                        mode="outlined"
+                        keyboardType="decimal-pad"
+                        style={styles.input}
+                        textColor={ON_CARD}
+                      />
+                      {selected.fuel_summary ? (
+                        <View style={{ marginTop: 6 }}>
+                          <Text style={styles.opMeta}>
+                            {t(
+                              'org.tasks.fuelReceiptsSum',
+                              {
+                                liters: selected.fuel_summary.receipts_liters || '0',
+                              },
+                              `Fuel receipts: ${selected.fuel_summary.receipts_liters || '0'} L`,
+                            )}
+                          </Text>
+                          {selected.fuel_summary.consumed_liters != null ? (
+                            <Text style={styles.opMeta}>
+                              {t(
+                                'org.tasks.fuelConsumed',
+                                { liters: selected.fuel_summary.consumed_liters },
+                                `Consumed: ${selected.fuel_summary.consumed_liters} L (start + receipts − end)`,
+                              )}
+                            </Text>
+                          ) : null}
+                          {selected.fuel_summary.effective_l_per_100 != null ? (
+                            <Text style={styles.opTitle}>
+                              {t(
+                                'org.tasks.fuelEffectiveVsNorm',
+                                {
+                                  effective: selected.fuel_summary.effective_l_per_100,
+                                  expected:
+                                    selected.fuel_summary.expected_l_per_100 ||
+                                    selected.fuel_summary.norm_base_rate ||
+                                    '—',
+                                  expectedL: selected.fuel_summary.expected_liters || '—',
+                                },
+                                `Effective ${selected.fuel_summary.effective_l_per_100} L/100 km vs norm ${
+                                  selected.fuel_summary.expected_l_per_100 ||
+                                  selected.fuel_summary.norm_base_rate ||
+                                  '—'
+                                } L/100 (expected ${selected.fuel_summary.expected_liters || '—'} L)`,
+                              )}
+                            </Text>
+                          ) : (
+                            <Text style={styles.opMeta}>
+                              {t(
+                                'org.tasks.fuelSummaryIncomplete',
+                                null,
+                                'Enter start, end, and km to see L/100 vs norm.',
+                              )}
+                            </Text>
+                          )}
+                        </View>
+                      ) : null}
+                    </>
                   ) : null}
                 </>
               ) : null}
@@ -1636,9 +1778,24 @@ export default function OrgTasksScreen({ navigation, route }) {
                           `Total km: ${selected.actual_km}`,
                         )
                       : null,
+                    selected.fuel_summary?.effective_l_per_100 != null
+                      ? t(
+                          'org.tasks.fuelEffectiveVsNorm',
+                          {
+                            effective: selected.fuel_summary.effective_l_per_100,
+                            expected:
+                              selected.fuel_summary.expected_l_per_100 ||
+                              selected.fuel_summary.norm_base_rate ||
+                              '—',
+                            expectedL: selected.fuel_summary.expected_liters || '—',
+                          },
+                          `Effective ${selected.fuel_summary.effective_l_per_100} L/100 km vs norm`,
+                        )
+                      : null,
                   ]
                     .filter(Boolean)
-                    .join(' · ')}
+                    .join(' · ') ||
+                    t('org.tasks.noTaskTotalsYet', null, 'No task totals yet')}
                 </Text>
               ) : null}
             </AppCard>
@@ -2008,11 +2165,17 @@ export default function OrgTasksScreen({ navigation, route }) {
                 {t('org.tasks.expensesTitle', null, 'Road / extra expenses')}
               </Text>
               <Text style={styles.opMeta}>
-                {t(
-                  'org.tasks.expensesHint',
-                  null,
-                  'Road fuel once for the task: add expense + attach receipt. Depot fuel already in stock → issue from Materials above (suggestions use task hours/km).',
-                )}
+                {taskNeedsFuelTank(selected)
+                  ? t(
+                      'org.tasks.expensesHintTransport',
+                      null,
+                      'Attach fuel receipts (касови бележки) with litres and/or money. Tank start/end above + receipts → effective L/100. Do not invent “liters used” as a free guess.',
+                    )
+                  : t(
+                      'org.tasks.expensesHint',
+                      null,
+                      'Road fuel once for the task: add expense + attach receipt. Depot fuel already in stock → issue from Materials above (suggestions use task hours/km).',
+                    )}
               </Text>
               {(selected.expenses || []).length === 0 ? (
                 <Text style={styles.opMeta}>
@@ -2076,7 +2239,11 @@ export default function OrgTasksScreen({ navigation, route }) {
                     })}
                   </View>
                   <TextInput
-                    label={t('org.tasks.expenseQty', null, 'Quantity (e.g. liters)')}
+                    label={
+                      expenseType === 'fuel'
+                        ? t('org.tasks.expenseQtyFuel', null, 'Litres on receipt')
+                        : t('org.tasks.expenseQty', null, 'Quantity (e.g. liters)')
+                    }
                     value={expenseQty}
                     onChangeText={setExpenseQty}
                     mode="outlined"
@@ -2217,6 +2384,11 @@ export default function OrgTasksScreen({ navigation, route }) {
                     {t('org.tasks.vehicles', null, 'Vehicles')}
                   </Text>
                   <Text style={styles.opMeta}>{vehiclesLabel(selected)}</Text>
+                  {selected.route_from || selected.route_to ? (
+                    <Text style={styles.opMeta}>
+                      {[selected.route_from, selected.route_to].filter(Boolean).join(' → ')}
+                    </Text>
+                  ) : null}
                 </>
               ) : null}
             </AppCard>

@@ -43,16 +43,18 @@ export function formatDrfErrorMessage(parsed, fallback = 'Request failed') {
   if (typeof parsed === 'object' && parsed !== null) {
     const parts = Object.entries(parsed).flatMap(([key, val]) => {
       if (key === 'mileage_requires_odometer_photo') return [];
+      if (key === 'vehicle_overlap_conflicts') return [];
       const label = labelForField(key);
       if (Array.isArray(val)) {
         return val.map((v) => {
+          if (v && typeof v === 'object' && !Array.isArray(v)) return '';
           const text = String(v);
           if (key === 'non_field_errors') return text;
           if (text.toLowerCase().includes('this field is required')) {
             return `${label} is required.`;
           }
           return `${label}: ${text}`;
-        });
+        }).filter(Boolean);
       }
       if (typeof val === 'string') {
         if (val.toLowerCase().includes('this field is required')) {
@@ -65,6 +67,22 @@ export function formatDrfErrorMessage(parsed, fallback = 'Request failed') {
     if (parts.length) return parts.join('\n');
   }
   return fallback;
+}
+
+/** Map of field → first error string from a DRF validation body. */
+export function extractDrfFieldErrors(parsed) {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+  const out = {};
+  Object.entries(parsed).forEach(([key, val]) => {
+    if (key === 'vehicle_overlap_conflicts' || key === 'detail' || key === 'code') return;
+    if (Array.isArray(val) && val.length) {
+      const first = val.find((v) => typeof v === 'string' || typeof v === 'number');
+      if (first != null) out[key] = String(first);
+      return;
+    }
+    if (typeof val === 'string') out[key] = val;
+  });
+  return out;
 }
 
 export function messageFromApiResponseText(rawText, fallback = 'Request failed') {
@@ -83,6 +101,21 @@ export function messageFromApiResponseText(rawText, fallback = 'Request failed')
     if (raw.length > 280) return fallback;
     return raw;
   }
+}
+
+export function enrichApiError(error, parsed, fallback) {
+  if (!error) return error;
+  if (parsed && typeof parsed === 'object') {
+    error.fieldErrors = extractDrfFieldErrors(parsed);
+    if (parsed.vehicle_overlap_conflicts) {
+      error.vehicleOverlapConflicts = parsed.vehicle_overlap_conflicts;
+    }
+    if (parsed.code) error.code = parsed.code;
+  }
+  if (!error.message) {
+    error.message = formatDrfErrorMessage(parsed, fallback);
+  }
+  return error;
 }
 
 /** Map fleet upload HTTP status + parsed body to a friendly localized message. */

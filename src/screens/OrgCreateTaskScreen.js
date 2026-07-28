@@ -109,6 +109,9 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [vehicleQuery, setVehicleQuery] = useState('');
   const [vehicleReadinessFilter, setVehicleReadinessFilter] = useState('ready');
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState('all');
+  const [routeFrom, setRouteFrom] = useState('');
+  const [routeTo, setRouteTo] = useState('');
+  const [allowVehicleOverlap, setAllowVehicleOverlap] = useState(false);
   const [overallAssignees, setOverallAssignees] = useState([]);
   const [peopleQuery, setPeopleQuery] = useState('');
   const [projectQuery, setProjectQuery] = useState('');
@@ -416,6 +419,9 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         vehicle_ids: vehicleIds,
         vehicle_id: vehicleIds[0] || null,
         assignee_user_ids: overallAssignees,
+        route_from: routeFrom.trim() || '',
+        route_to: routeTo.trim() || '',
+        allow_vehicle_overlap: allowVehicleOverlap || undefined,
         operations: selectedOps.map((row, idx) => ({
           activity_definition_id: row.activityId,
           sort_order: idx,
@@ -426,7 +432,39 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       await createWorkOrder(token, orgId, payload);
       navigateToOrgTasks(navigation, { orgId });
     } catch (e) {
-      setFormMessage(e.message || t('org.tasks.saveError', null, 'Could not create task.'));
+      const overlap =
+        e?.vehicleOverlapConflicts ||
+        (String(e?.message || '').toLowerCase().includes('overlapping') &&
+          e?.fieldErrors?.vehicle_ids);
+      if (overlap && !allowVehicleOverlap) {
+        Alert.alert(
+          t('org.tasks.vehicleOverlapTitle', null, 'Vehicle already booked'),
+          e.message ||
+            t(
+              'org.tasks.vehicleOverlapBody',
+              null,
+              'This vehicle is on another open task with overlapping dates.',
+            ),
+          [
+            { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
+            {
+              text: t('org.tasks.vehicleOverlapAssign', null, 'Assign anyway'),
+              onPress: () => {
+                setAllowVehicleOverlap(true);
+                setFormMessage(
+                  t(
+                    'org.tasks.vehicleOverlapRetry',
+                    null,
+                    'Override enabled — tap Create again to confirm.',
+                  ),
+                );
+              },
+            },
+          ],
+        );
+      } else {
+        setFormMessage(e.message || t('org.tasks.saveError', null, 'Could not create task.'));
+      }
     } finally {
       setBusy(false);
     }
@@ -544,6 +582,29 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
               'org.tasks.scheduledEndDateHelper',
               null,
               'Optional. Use when one work card spans multiple days (e.g. 1–20 Aug) instead of creating many tasks.',
+            )}
+          </Text>
+          <TextInput
+            label={t('org.tasks.routeFrom', null, 'From address (optional)')}
+            value={routeFrom}
+            onChangeText={setRouteFrom}
+            mode="outlined"
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+          <TextInput
+            label={t('org.tasks.routeTo', null, 'To address (optional)')}
+            value={routeTo}
+            onChangeText={setRouteTo}
+            mode="outlined"
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+          <Text style={styles.helper}>
+            {t(
+              'org.tasks.routeHelper',
+              null,
+              'Simple from/to for transport. Full multi-stop map comes later.',
             )}
           </Text>
           <Text style={styles.fieldLabel}>

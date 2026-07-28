@@ -3,7 +3,7 @@
  * Old material numbers stay on detail views via part_number_alias (or extracted suffix).
  */
 
-const OLD_MATERIAL_SUFFIX_RE = /\s*[·•]\s*(?:old|стар)\s+(\S+)\s*$/i;
+const OLD_MATERIAL_SUFFIX_RE = /\s*[·•]\s*(?:old|стар)(?:\s+\S+)?\s*$/i;
 
 export function stripOldMaterialSuffix(text) {
   const raw = String(text || '').trim();
@@ -19,7 +19,7 @@ export function stripOldMaterialSuffix(text) {
 export function extractOldMaterialNumber(text) {
   const raw = String(text || '').trim();
   if (!raw) return '';
-  const match = raw.match(OLD_MATERIAL_SUFFIX_RE);
+  const match = raw.match(/\s*[·•]\s*(?:old|стар)\s+(\S+)\s*$/i);
   return match ? match[1] : '';
 }
 

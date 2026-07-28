@@ -55,7 +55,7 @@ const KIND_OPTIONS = [
 
 /** Kind → preferred output measure_kinds (worker reports). Multi-select allowed. */
 const KIND_OUTPUT_MEASURES = {
-  transport: ['distance', 'duration', 'count', 'volume', 'mass'],
+  transport: ['distance', 'duration', 'count', 'mass'],
   construction: ['area', 'volume', 'mass', 'count', 'duration', 'distance'],
   road_marking: ['area', 'distance', 'count', 'duration', 'volume', 'mass'],
   field_service: ['count', 'duration', 'area', 'distance', 'volume', 'mass'],
@@ -422,8 +422,15 @@ export default function OrgOperationsScreen({ navigation, route }) {
   const [form, setForm] = useState(emptyFormState);
   const [busy, setBusy] = useState(false);
   const [formMessage, setFormMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const setField = useCallback((key, value) => {
+    setFieldErrors((prev) => {
+      if (!prev || !prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
     setForm((prev) => ({ ...prev, [key]: value }));
   }, []);
 
@@ -675,6 +682,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
     }
     setBusy(true);
     setFormMessage('');
+    setFieldErrors({});
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const norms = buildNormsPayload(form);
@@ -725,6 +733,11 @@ export default function OrgOperationsScreen({ navigation, route }) {
       await load();
       closeWizard();
     } catch (e) {
+      const errors = e?.fieldErrors || {};
+      setFieldErrors(errors);
+      if (errors.code || errors.name) {
+        setWizardStep(0);
+      }
       setFormMessage(e.message || t('org.operations.saveError', null, 'Could not save operation.'));
     } finally {
       setBusy(false);
@@ -877,7 +890,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
             {t(
               'org.operations.transportNormsHelper',
               null,
-              'Numbers only — two fuel rates. Worker reports km on End (meter start/end), not liters here.',
+              'Numbers only — L/100 km empty + L/t. On the task: km + fuel start/end + receipts. Do not ask workers to invent liters used.',
             )}
           </Text>
           <Text style={styles.helper}>
@@ -1044,7 +1057,9 @@ export default function OrgOperationsScreen({ navigation, route }) {
             mode="outlined"
             style={styles.input}
             textColor={ON_CARD}
+            error={Boolean(fieldErrors.name)}
           />
+          {fieldErrors.name ? <Text style={styles.fieldError}>{fieldErrors.name}</Text> : null}
           <TextInput
             label={t('org.operations.code', null, 'Code (optional)')}
             value={form.code}
@@ -1053,7 +1068,16 @@ export default function OrgOperationsScreen({ navigation, route }) {
             autoCapitalize="characters"
             style={styles.input}
             textColor={ON_CARD}
+            error={Boolean(fieldErrors.code)}
           />
+          <Text style={styles.helper}>
+            {t(
+              'org.operations.codeHelper',
+              null,
+              'Leave blank to auto-generate from the name (works with Bulgarian names too).',
+            )}
+          </Text>
+          {fieldErrors.code ? <Text style={styles.fieldError}>{fieldErrors.code}</Text> : null}
           <Text style={styles.fieldLabel}>{t('org.operations.kind', null, 'Kind')}</Text>
           <View style={styles.kindWrap}>
             {KIND_OPTIONS.map((option) => {
@@ -1116,9 +1140,13 @@ export default function OrgOperationsScreen({ navigation, route }) {
           </Text>
           <Text style={styles.helper}>
             {t(
-              'org.operations.wizard.outputUnitHelper',
+              form.kind === 'transport'
+                ? 'org.operations.wizard.outputUnitHelperTransport'
+                : 'org.operations.wizard.outputUnitHelper',
               null,
-              'Select every unit the worker will fill on the task (e.g. m² + hours for a marking machine, or km + hours for transport).',
+              form.kind === 'transport'
+                ? 'Prefer km (+ optional hours). Fuel litres come from tank start/end + receipts on the task — not as the main report chip.'
+                : 'Select every unit the worker will fill on the task (e.g. m² + hours for a marking machine, or km + hours for transport).',
             )}
           </Text>
           {renderMultiReportUnitChips(outputUnits)}
@@ -1876,6 +1904,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 10,
+  },
+  fieldError: {
+    color: '#B00020',
+    fontSize: 13,
+    marginTop: -4,
+    marginBottom: 8,
   },
   empty: {
     color: ON_CARD_MUTED,

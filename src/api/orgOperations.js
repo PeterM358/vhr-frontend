@@ -1,5 +1,29 @@
 import { API_BASE_URL } from './config';
-import { messageFromApiResponseText } from '../utils/apiErrorMessage';
+import {
+  enrichApiError,
+  extractDrfFieldErrors,
+  formatDrfErrorMessage,
+  messageFromApiResponseText,
+} from '../utils/apiErrorMessage';
+
+async function throwApiError(response, fallback) {
+  const text = await response.text();
+  let parsed = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    parsed = null;
+  }
+  const message = parsed
+    ? formatDrfErrorMessage(parsed, fallback)
+    : messageFromApiResponseText(text, fallback);
+  const err = new Error(message);
+  enrichApiError(err, parsed, fallback);
+  if (!err.fieldErrors && parsed) {
+    err.fieldErrors = extractDrfFieldErrors(parsed);
+  }
+  throw err;
+}
 
 async function parseError(response, fallback) {
   const text = await response.text();
@@ -51,7 +75,7 @@ export async function createActivityDefinition(token, organizationId, payload) {
       body: JSON.stringify(payload),
     },
   );
-  if (!response.ok) throw new Error(await parseError(response, 'Failed to create operation'));
+  if (!response.ok) await throwApiError(response, 'Failed to create operation');
   return response.json();
 }
 
@@ -67,7 +91,7 @@ export async function updateActivityDefinition(token, organizationId, activityId
       body: JSON.stringify(payload),
     },
   );
-  if (!response.ok) throw new Error(await parseError(response, 'Failed to update operation'));
+  if (!response.ok) await throwApiError(response, 'Failed to update operation');
   return response.json();
 }
 
@@ -120,7 +144,7 @@ export async function createWorkOrder(token, organizationId, payload) {
       body: JSON.stringify(payload),
     },
   );
-  if (!response.ok) throw new Error(await parseError(response, 'Failed to create task'));
+  if (!response.ok) await throwApiError(response, 'Failed to create task');
   return response.json();
 }
 
@@ -145,7 +169,7 @@ export async function updateWorkOrder(token, organizationId, workOrderId, payloa
       body: JSON.stringify(payload),
     },
   );
-  if (!response.ok) throw new Error(await parseError(response, 'Failed to update task'));
+  if (!response.ok) await throwApiError(response, 'Failed to update task');
   return response.json();
 }
 
