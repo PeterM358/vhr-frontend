@@ -29,6 +29,7 @@ import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
+import { pickReceiptOrInvoiceAttachment } from '../utils/pickDocumentFile';
 
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
@@ -120,13 +121,86 @@ function isWaitingForStartTime(task) {
   return Date.now() < startMs;
 }
 
+function opUnitLabel(op) {
+  return (
+    op?.activity?.default_unit ||
+    op?.activity?.unit?.symbol ||
+    op?.activity?.unit?.code ||
+    ''
+  );
+}
+
 function isDistanceOutput(op) {
   const measure = String(op?.activity?.measure_kind || op?.activity?.unit?.measure_kind || '').toLowerCase();
   if (measure === 'distance') return true;
-  const symbol = String(
-    op?.activity?.default_unit || op?.activity?.unit?.symbol || op?.activity?.unit?.code || '',
-  ).toLowerCase();
+  const symbol = String(opUnitLabel(op)).toLowerCase();
   return symbol === 'km' || symbol.includes('km');
+}
+
+/** Worker-facing label for the one output field — never bare "Actual quantity". */
+function outputFieldLabel(op, t) {
+  const unit = opUnitLabel(op);
+  const measure = String(op?.activity?.measure_kind || op?.activity?.unit?.measure_kind || '').toLowerCase();
+  if (measure === 'area' || unit === 'm²' || String(unit).toLowerCase() === 'm2') {
+    return t('org.tasks.outputArea', { unit: unit || 'm²' }, `Painted area (${unit || 'm²'})`);
+  }
+  if (measure === 'distance' || isDistanceOutput(op)) {
+    return t('org.tasks.outputDistance', { unit: unit || 'km' }, `Distance (${unit || 'km'})`);
+  }
+  if (measure === 'volume') {
+    return t('org.tasks.outputVolume', { unit: unit || 'm³' }, `Volume (${unit || 'm³'})`);
+  }
+  if (measure === 'mass' || measure === 'weight') {
+    return t('org.tasks.outputWeight', { unit: unit || 'kg' }, `Weight (${unit || 'kg'})`);
+  }
+  if (measure === 'count') {
+    return t('org.tasks.outputCount', { unit: unit || 'pcs' }, `Count (${unit || 'pcs'})`);
+  }
+  if (measure === 'time' || measure === 'duration') {
+    return t('org.tasks.outputHours', { unit: unit || 'h' }, `Hours (${unit || 'h'})`);
+  }
+  if (unit) {
+    return t('org.tasks.outputWithUnit', { unit }, `Output (${unit})`);
+  }
+  return t('org.tasks.outputGeneric', null, 'Output completed');
+}
+
+/** Mirror backend compute_expected_input_qty for live draft suggestions. */
+function computeExpectedFromNorms(op, outputQty) {
+  const qty = Number(String(outputQty ?? '').replace(',', '.'));
+  if (!Number.isFinite(qty)) return null;
+  const norms = op?.activity?.norms || {};
+  const kind = String(op?.activity?.activity_kind || '').toLowerCase();
+  const transport = norms.transport && typeof norms.transport === 'object' ? norms.transport : {};
+  const generic = norms.generic && typeof norms.generic === 'object' ? norms.generic : {};
+  const useTransport =
+    kind === 'transport' ||
+    transport.base_rate != null ||
+    transport.per_ton_rate != null;
+  if (useTransport && (transport.base_rate != null || transport.per_ton_rate != null)) {
+    const base = Number(transport.base_rate || 0);
+    const perTon = Number(transport.per_ton_rate || 0);
+    const expected = (qty / 100) * base;
+    if (!Number.isFinite(expected)) return null;
+    return String(Number(expected.toPrecision(12)));
+  }
+  if (generic.rate != null) {
+    const rate = Number(generic.rate);
+    const basis = Number(generic.basis_qty != null ? generic.basis_qty : 1);
+    if (!Number.isFinite(rate) || !Number.isFinite(basis) || basis === 0) return null;
+    const expected = (qty / basis) * rate;
+    return String(Number(expected.toPrecision(12)));
+  }
+  return null;
+}
+
+function expectedInputUnit(op) {
+  return (
+    op?.expected_input_unit ||
+    op?.activity?.norm_input_unit?.symbol ||
+    op?.activity?.norm_input_unit?.code ||
+    ''
+  );
 }
 
 function leftoverKey(opId, materialId) {
@@ -204,6 +278,12 @@ function formatIssueAudit(issue, t) {
     .join(' · ');
 }
 
+function receiptFileLabel(ref) {
+  if (!ref) return '';
+  const parts = String(ref).split('/');
+  return parts[parts.length - 1] || ref;
+}
+
 export default function OrgTasksScreen({ navigation, route }) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
@@ -241,6 +321,7 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [expenseUnit, setExpenseUnit] = useState('L');
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseNote, setExpenseNote] = useState('');
+  const [expenseReceipt, setExpenseReceipt] = useState(null);
 
   const onBack = useCallback(() => {
     if (selectedId) {
@@ -602,28 +683,55 @@ export default function OrgTasksScreen({ navigation, route }) {
       }
       amountMinor = Math.round(major * 100);
     }
-    if (!qty && amountMinor == null && !expenseNote.trim()) {
+    if (!qty && amountMinor == null && !expenseNote.trim() && !expenseReceipt) {
       Alert.alert(
         t('org.tasks.expensesTitle', null, 'Road expenses'),
-        t('org.tasks.expenseRequired', null, 'Enter quantity, amount, or a note.'),
+        t(
+          'org.tasks.expenseRequired',
+          null,
+          'Enter quantity, amount, note, or attach a receipt.',
+        ),
       );
       return;
     }
     setBusyAction(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      await createWorkOrderExpense(token, orgId, selected.id, {
-        expense_type: expenseType,
-        quantity: qty || null,
-        unit_code: expenseUnit.trim(),
-        amount_minor: amountMinor,
-        note: expenseNote.trim(),
-      });
+      let payload;
+      if (expenseReceipt) {
+        const form = new FormData();
+        form.append('expense_type', expenseType);
+        if (qty) form.append('quantity', qty);
+        if (expenseUnit.trim()) form.append('unit_code', expenseUnit.trim());
+        if (amountMinor != null) form.append('amount_minor', String(amountMinor));
+        if (expenseNote.trim()) form.append('note', expenseNote.trim());
+        const file = expenseReceipt.file;
+        if (file) {
+          form.append('file', file, expenseReceipt.fileName || 'receipt.jpg');
+        } else if (expenseReceipt.uri) {
+          form.append('file', {
+            uri: expenseReceipt.uri,
+            name: expenseReceipt.fileName || 'receipt.jpg',
+            type: expenseReceipt.mimeType || 'image/jpeg',
+          });
+        }
+        payload = form;
+      } else {
+        payload = {
+          expense_type: expenseType,
+          quantity: qty || null,
+          unit_code: expenseUnit.trim(),
+          amount_minor: amountMinor,
+          note: expenseNote.trim(),
+        };
+      }
+      await createWorkOrderExpense(token, orgId, selected.id, payload);
       const detail = await getWorkOrder(token, orgId, selected.id);
       replaceTask(detail);
       setExpenseQty('');
       setExpenseAmount('');
       setExpenseNote('');
+      setExpenseReceipt(null);
     } catch (e) {
       Alert.alert(
         t('org.tasks.expensesTitle', null, 'Road expenses'),
@@ -633,6 +741,70 @@ export default function OrgTasksScreen({ navigation, route }) {
       setBusyAction(false);
     }
   };
+
+  const pickExpenseReceipt = async () => {
+    try {
+      const picked = await pickReceiptOrInvoiceAttachment();
+      if (picked) setExpenseReceipt(picked);
+    } catch (e) {
+      Alert.alert(
+        t('org.tasks.expensesTitle', null, 'Road expenses'),
+        e.message || t('org.tasks.expenseReceiptError', null, 'Could not pick receipt.'),
+      );
+    }
+  };
+
+  const suggestionForMaterial = useCallback(
+    (materialId) => {
+      const mid = Number(materialId);
+      const fromMats = (selected?.materials || []).find(
+        (m) => Number(m.material_id || m.id) === mid,
+      );
+      if (fromMats?.suggested_qty != null) {
+        return {
+          qty: String(fromMats.suggested_qty),
+          unit: fromMats.unit_code || '',
+        };
+      }
+      for (const op of selected?.operations || []) {
+        const liveQty =
+          actualDrafts[op.id] ||
+          (isDistanceOutput(op)
+            ? null
+            : op.actual_qty != null
+              ? String(op.actual_qty)
+              : op.planned_qty != null
+                ? String(op.planned_qty)
+                : '');
+        let expected = null;
+        if (isDistanceOutput(op)) {
+          const start = Number(String(meterStartDrafts[op.id] || op.meter_start || '').replace(',', '.'));
+          const end = Number(String(meterEndDrafts[op.id] || op.meter_end || '').replace(',', '.'));
+          if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
+            expected = computeExpectedFromNorms(op, end - start);
+          } else if (op.expected_input_qty != null) {
+            expected = String(op.expected_input_qty);
+          }
+        } else if (liveQty) {
+          expected = computeExpectedFromNorms(op, liveQty) || (op.expected_input_qty != null ? String(op.expected_input_qty) : null);
+        } else if (op.expected_input_qty != null) {
+          expected = String(op.expected_input_qty);
+        }
+        const defaults = op.activity?.default_material_ids || [];
+        const suggested = (op.suggested_materials || []).find(
+          (s) => Number(s.material_id) === mid,
+        );
+        if (suggested?.suggested_qty != null || (expected && defaults.map(Number).includes(mid))) {
+          return {
+            qty: String(suggested?.suggested_qty || expected),
+            unit: suggested?.unit_code || expectedInputUnit(op) || '',
+          };
+        }
+      }
+      return null;
+    },
+    [selected, actualDrafts, meterStartDrafts, meterEndDrafts],
+  );
 
   const removeExpense = async (expenseId) => {
     if (!orgId || !selected?.id || !expenseId) return;
@@ -830,22 +1002,44 @@ export default function OrgTasksScreen({ navigation, route }) {
                 {t(
                   'org.tasks.actualsHint',
                   null,
-                  'Fill output actuals before End. Start/End buttons only track time — do not re-enter clock times here.',
+                  'Fill the labeled output for each operation (e.g. painted m² or distance). Materials leftovers are in Materials. Start/End only track time.',
                 )}
               </Text>
               {(selected.operations || []).map((op, idx) => {
                 const editable =
                   canShowEndButton(selected) || selected.status === 'in_progress';
-                const unitLabelText =
-                  op.activity?.default_unit ||
-                  op.activity?.unit?.symbol ||
-                  '';
+                const unitLabelText = opUnitLabel(op);
                 const distance = isDistanceOutput(op);
+                const draftQty = actualDrafts[op.id] || '';
+                const liveExpected =
+                  !distance && draftQty
+                    ? computeExpectedFromNorms(op, draftQty)
+                    : distance
+                      ? (() => {
+                          const start = Number(
+                            String(meterStartDrafts[op.id] || '').replace(',', '.'),
+                          );
+                          const end = Number(
+                            String(meterEndDrafts[op.id] || '').replace(',', '.'),
+                          );
+                          if (
+                            Number.isFinite(start) &&
+                            Number.isFinite(end) &&
+                            end >= start
+                          ) {
+                            return computeExpectedFromNorms(op, end - start);
+                          }
+                          return null;
+                        })()
+                      : null;
+                const expectedQty =
+                  liveExpected ||
+                  (op.expected_input_qty != null ? String(op.expected_input_qty) : null);
+                const expectedUnit = expectedInputUnit(op);
                 return (
                   <View key={op.id || idx} style={styles.opRow}>
                     <Text style={styles.opTitle}>
                       {`${idx + 1}. ${op.activity?.name || '—'}`}
-                      {unitLabelText ? ` · ${unitLabelText}` : ''}
                     </Text>
                     {op.notes ? <Text style={styles.opMeta}>{op.notes}</Text> : null}
                     {(op.assignees || []).length > 0 ? (
@@ -882,21 +1076,13 @@ export default function OrgTasksScreen({ navigation, route }) {
                             {t(
                               'org.tasks.meterKmHint',
                               null,
-                              'km is computed from meter end − start (no separate km field).',
+                              'Distance (km) = meter end − start.',
                             )}
                           </Text>
                         </>
                       ) : (
                         <TextInput
-                          label={
-                            unitLabelText
-                              ? t(
-                                  'org.tasks.actualQtyWithUnit',
-                                  { unit: unitLabelText },
-                                  `Actual (${unitLabelText})`,
-                                )
-                              : t('org.tasks.actualQty', null, 'Actual quantity')
-                          }
+                          label={outputFieldLabel(op, t)}
                           value={actualDrafts[op.id] || ''}
                           onChangeText={(value) =>
                             setActualDrafts((prev) => ({ ...prev, [op.id]: value }))
@@ -913,25 +1099,25 @@ export default function OrgTasksScreen({ navigation, route }) {
                         {' · '}
                         {t('org.tasks.meterEnd', null, 'Meter end')}: {op.meter_end ?? '—'}
                         {op.actual_qty != null
-                          ? ` · ${t('org.tasks.actualQty', null, 'Actual')}: ${op.actual_qty}`
-                          : ''}
-                        {op.expected_input_qty != null
-                          ? ` · ${t('org.tasks.expectedInputQtyShort', null, 'Expected')}: ${op.expected_input_qty}`
+                          ? ` · ${t('org.tasks.outputDistance', { unit: unitLabelText || 'km' }, `Distance (${unitLabelText || 'km'})`)}: ${op.actual_qty}`
                           : ''}
                       </Text>
                     ) : op.actual_qty != null ? (
                       <Text style={styles.opMeta}>
-                        {t('org.tasks.actualQty', null, 'Actual')}: {op.actual_qty}
+                        {outputFieldLabel(op, t)}: {op.actual_qty}
                         {unitLabelText ? ` ${unitLabelText}` : ''}
                       </Text>
                     ) : null}
 
-                    {op.expected_input_qty != null ? (
+                    {expectedQty != null ? (
                       <Text style={styles.opMeta}>
                         {t(
-                          'org.tasks.expectedInputQty',
-                          { qty: op.expected_input_qty },
-                          `Expected input (norm): ${op.expected_input_qty}`,
+                          'org.tasks.suggestedMaterialsQty',
+                          {
+                            qty: expectedQty,
+                            unit: expectedUnit,
+                          },
+                          `Suggested materials from norm: ~${expectedQty}${expectedUnit ? ` ${expectedUnit}` : ''}`,
                         )}
                       </Text>
                     ) : null}
@@ -960,15 +1146,15 @@ export default function OrgTasksScreen({ navigation, route }) {
                 {t(
                   'org.tasks.materialsHint',
                   null,
-                  'From selected operations and warehouse issues. Enter leftover after work — consumed = issued − leftover.',
+                  'Warehouse issues materials onto this task. Enter leftover after work — consumed = issued − leftover.',
                 )}
               </Text>
               {(selected.materials || []).length === 0 ? (
                 <Text style={styles.opMeta}>
                   {t(
-                    'org.tasks.materialsEmpty',
+                    'org.tasks.materialsAskWarehouse',
                     null,
-                    'No materials yet. Pick operations with default SKUs, or issue from warehouse below.',
+                    'Ask warehouse to issue materials for this task.',
                   )}
                 </Text>
               ) : (
@@ -977,6 +1163,7 @@ export default function OrgTasksScreen({ navigation, route }) {
                   const unitChip = mat.unit_code ? ` · ${mat.unit_code}` : '';
                   const editable =
                     canShowEndButton(selected) || selected.status === 'in_progress';
+                  const issued = mat.issued_qty != null;
                   return (
                     <View key={mid} style={styles.opRow}>
                       <Text style={styles.opTitle}>
@@ -987,13 +1174,27 @@ export default function OrgTasksScreen({ navigation, route }) {
                       </Text>
                       <Text style={styles.opMeta}>
                         {[
-                          mat.issued_qty != null
+                          issued
                             ? t(
                                 'org.tasks.issuedQty',
                                 { qty: mat.issued_qty, unit: mat.unit_code || '' },
                                 `Issued: ${mat.issued_qty} ${mat.unit_code || ''}`.trim(),
                               )
-                            : t('org.tasks.notIssuedYet', null, 'Not issued yet'),
+                            : t(
+                                'org.tasks.notIssuedAskWarehouse',
+                                null,
+                                'Not issued — ask warehouse',
+                              ),
+                          mat.suggested_qty != null && !issued
+                            ? t(
+                                'org.tasks.suggestedIssueQty',
+                                {
+                                  qty: mat.suggested_qty,
+                                  unit: mat.unit_code || '',
+                                },
+                                `Need ~${mat.suggested_qty} ${mat.unit_code || ''}`.trim(),
+                              )
+                            : null,
                           mat.leftover_qty != null
                             ? t(
                                 'org.tasks.leftoverQtyShort',
@@ -1008,14 +1209,11 @@ export default function OrgTasksScreen({ navigation, route }) {
                                 `Consumed: ${mat.consumed_qty}`,
                               )
                             : null,
-                          (mat.sources || []).includes('operation_default')
-                            ? t('org.tasks.fromOperation', null, 'From operation')
-                            : null,
                         ]
                           .filter(Boolean)
                           .join(' · ')}
                       </Text>
-                      {editable && mat.issued_qty != null ? (
+                      {editable && issued ? (
                         <TextInput
                           label={t(
                             'org.tasks.leftoverFor',
@@ -1077,6 +1275,13 @@ export default function OrgTasksScreen({ navigation, route }) {
                   <Text style={styles.fieldLabel}>
                     {t('org.tasks.issueFromWarehouse', null, 'Issue from warehouse')}
                   </Text>
+                  <Text style={styles.opMeta}>
+                    {t(
+                      'org.tasks.issueFromWarehouseHint',
+                      null,
+                      'Storekeeper: worker shows this task — issue stock here (including depot fuel). Suggested qty from norms when output is known.',
+                    )}
+                  </Text>
                   <View style={styles.chipWrap}>
                     {stockRows.slice(0, 24).map((row) => {
                       const mid = row.material_id || row.material?.id || row.id;
@@ -1094,6 +1299,11 @@ export default function OrgTasksScreen({ navigation, route }) {
                           onPress={() => {
                             setIssueMaterialId(mid);
                             if (row.unit_code) setIssueUnit(String(row.unit_code));
+                            const sug = suggestionForMaterial(mid);
+                            if (sug?.qty) {
+                              setIssueQty(sug.qty);
+                              if (sug.unit) setIssueUnit(sug.unit);
+                            }
                           }}
                           style={[styles.chip, active && styles.chipActive]}
                         >
@@ -1105,6 +1315,18 @@ export default function OrgTasksScreen({ navigation, route }) {
                       );
                     })}
                   </View>
+                  {issueMaterialId && suggestionForMaterial(issueMaterialId) ? (
+                    <Text style={styles.opMeta}>
+                      {t(
+                        'org.tasks.suggestedIssueQty',
+                        {
+                          qty: suggestionForMaterial(issueMaterialId).qty,
+                          unit: suggestionForMaterial(issueMaterialId).unit || '',
+                        },
+                        `Need ~${suggestionForMaterial(issueMaterialId).qty} ${suggestionForMaterial(issueMaterialId).unit || ''}`.trim(),
+                      )}
+                    </Text>
+                  ) : null}
                   {locations.length > 0 ? (
                     <>
                       <Text style={styles.fieldLabel}>
@@ -1175,13 +1397,13 @@ export default function OrgTasksScreen({ navigation, route }) {
 
             <AppCard style={styles.card}>
               <Text style={styles.section}>
-                {t('org.tasks.expensesTitle', null, 'Road expenses')}
+                {t('org.tasks.expensesTitle', null, 'Road / extra expenses')}
               </Text>
               <Text style={styles.opMeta}>
                 {t(
                   'org.tasks.expensesHint',
                   null,
-                  'Fuel already in the truck or bought on the way — capture qty and/or money + note.',
+                  'On-road fuel or any receipt: add expense + attach касова бележка / фактура. Depot fuel already in stock → issue from warehouse, not here.',
                 )}
               </Text>
               {(selected.expenses || []).length === 0 ? (
@@ -1205,6 +1427,15 @@ export default function OrgTasksScreen({ navigation, route }) {
                         : ''}
                     </Text>
                     {exp.note ? <Text style={styles.opMeta}>{exp.note}</Text> : null}
+                    {exp.receipt_ref ? (
+                      <Text style={styles.opMeta}>
+                        {t(
+                          'org.tasks.expenseReceiptAttached',
+                          { name: receiptFileLabel(exp.receipt_ref) },
+                          `Receipt: ${receiptFileLabel(exp.receipt_ref)}`,
+                        )}
+                      </Text>
+                    ) : null}
                     {selected.status !== 'done' && selected.status !== 'cancelled' ? (
                       <Button
                         mode="text"
@@ -1270,6 +1501,34 @@ export default function OrgTasksScreen({ navigation, route }) {
                     style={styles.input}
                     textColor={ON_CARD}
                   />
+                  <Button
+                    mode="outlined"
+                    disabled={busyAction}
+                    onPress={pickExpenseReceipt}
+                    style={styles.secondaryBtn}
+                  >
+                    {expenseReceipt
+                      ? t(
+                          'org.tasks.expenseReceiptPicked',
+                          { name: expenseReceipt.fileName || 'receipt' },
+                          `Receipt: ${expenseReceipt.fileName || 'receipt'}`,
+                        )
+                      : t(
+                          'org.tasks.expenseAttachReceipt',
+                          null,
+                          'Attach receipt (photo/PDF)',
+                        )}
+                  </Button>
+                  {expenseReceipt ? (
+                    <Button
+                      mode="text"
+                      compact
+                      onPress={() => setExpenseReceipt(null)}
+                      disabled={busyAction}
+                    >
+                      {t('org.tasks.expenseClearReceipt', null, 'Clear receipt')}
+                    </Button>
+                  ) : null}
                   <Button
                     mode="outlined"
                     loading={busyAction}

@@ -208,15 +208,16 @@ export async function listWorkOrderExpenses(token, organizationId, workOrderId) 
 }
 
 export async function createWorkOrderExpense(token, organizationId, workOrderId, payload) {
+  const isFormData = typeof FormData !== 'undefined' && payload instanceof FormData;
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/expenses/`,
     {
       method: 'POST',
       headers: {
         ...authHeaders(token),
-        'Content-Type': 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       },
-      body: JSON.stringify(payload || {}),
+      body: isFormData ? payload : JSON.stringify(payload || {}),
     },
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to add expense'));
