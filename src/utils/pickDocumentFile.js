@@ -69,7 +69,27 @@ export async function pickReceiptOrInvoiceAttachment() {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
     allowsEditing: false,
-    quality: 0.85,
+    quality: 0.7,
+  });
+  if (result.canceled || !result.assets?.length) return null;
+  const asset = result.assets[0];
+  return assetToAttachment(asset, inferReceiptDocumentType(asset.mimeType, asset.fileName));
+}
+
+/** Camera capture for road expense receipts (native). Web falls back to file picker. */
+export async function pickReceiptFromCamera() {
+  if (Platform.OS === 'web') {
+    return pickWebFile('image/*');
+  }
+  const { status } = await ImagePicker.requestCameraPermissionsAsync();
+  if (status !== 'granted') {
+    Alert.alert('Permission required', 'Allow camera access to photograph receipts.');
+    return null;
+  }
+  const result = await ImagePicker.launchCameraAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: false,
+    quality: 0.7,
   });
   if (result.canceled || !result.assets?.length) return null;
   const asset = result.assets[0];

@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
 import OrgAppHeader from '../components/org/OrgAppHeader';
+import WorkOrderStopsEditor from '../components/org/WorkOrderStopsEditor';
 import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePicker';
 import {
   createWorkOrder,
@@ -111,6 +112,8 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState('all');
   const [routeFrom, setRouteFrom] = useState('');
   const [routeTo, setRouteTo] = useState('');
+  const [outboundStops, setOutboundStops] = useState([]);
+  const [returnStops, setReturnStops] = useState([]);
   const [allowVehicleOverlap, setAllowVehicleOverlap] = useState(false);
   const [overallAssignees, setOverallAssignees] = useState([]);
   const [peopleQuery, setPeopleQuery] = useState('');
@@ -419,8 +422,25 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         vehicle_ids: vehicleIds,
         vehicle_id: vehicleIds[0] || null,
         assignee_user_ids: overallAssignees,
-        route_from: routeFrom.trim() || '',
-        route_to: routeTo.trim() || '',
+        route_from: (outboundStops[0]?.address || routeFrom).trim() || '',
+        route_to:
+          (outboundStops[outboundStops.length - 1]?.address || routeTo).trim() || '',
+        stops: [
+          ...outboundStops.map((s, i) => ({
+            direction: 'outbound',
+            sort_order: i,
+            address: String(s.address || '').trim(),
+            company_name: String(s.company_name || '').trim(),
+            notes: String(s.notes || '').trim(),
+          })),
+          ...returnStops.map((s, i) => ({
+            direction: 'return',
+            sort_order: i,
+            address: String(s.address || '').trim(),
+            company_name: String(s.company_name || '').trim(),
+            notes: String(s.notes || '').trim(),
+          })),
+        ].filter((s) => s.address),
         allow_vehicle_overlap: allowVehicleOverlap || undefined,
         operations: selectedOps.map((row, idx) => ({
           activity_definition_id: row.activityId,
@@ -584,27 +604,38 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
               'Optional. Use when one work card spans multiple days (e.g. 1–20 Aug) instead of creating many tasks.',
             )}
           </Text>
-          <TextInput
-            label={t('org.tasks.routeFrom', null, 'From address (optional)')}
-            value={routeFrom}
-            onChangeText={setRouteFrom}
-            mode="outlined"
-            style={styles.input}
-            textColor={ON_CARD}
-          />
-          <TextInput
-            label={t('org.tasks.routeTo', null, 'To address (optional)')}
-            value={routeTo}
-            onChangeText={setRouteTo}
-            mode="outlined"
-            style={styles.input}
-            textColor={ON_CARD}
+          <WorkOrderStopsEditor
+            t={t}
+            outboundStops={outboundStops}
+            returnStops={returnStops}
+            editable
+            onAdd={(payload) => {
+              const row = { ...payload, id: `local-${Date.now()}-${Math.random()}` };
+              if (payload.direction === 'return') {
+                setReturnStops((prev) => [...prev, row]);
+              } else {
+                setOutboundStops((prev) => [...prev, row]);
+              }
+            }}
+            onUpdate={(stop, draft) => {
+              const apply = (prev) =>
+                prev.map((s) => (s.id === stop.id ? { ...s, ...draft } : s));
+              if (stop.direction === 'return') setReturnStops(apply);
+              else setOutboundStops(apply);
+            }}
+            onRemove={(stop) => {
+              if (stop.direction === 'return') {
+                setReturnStops((prev) => prev.filter((s) => s.id !== stop.id));
+              } else {
+                setOutboundStops((prev) => prev.filter((s) => s.id !== stop.id));
+              }
+            }}
           />
           <Text style={styles.helper}>
             {t(
               'org.tasks.routeHelper',
               null,
-              'Simple from/to for transport. Full multi-stop map comes later.',
+              'Prefer load stops above. Legacy from/to still works.',
             )}
           </Text>
           <Text style={styles.fieldLabel}>

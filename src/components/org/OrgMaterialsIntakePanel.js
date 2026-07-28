@@ -35,6 +35,8 @@ import {
 } from '../../utils/materialDisplayLabel';
 import { STORAGE_KEYS } from '../../constants/storageKeys';
 import { useTranslation } from '../../i18n';
+import { fetchUnits } from '../../api/partCatalog';
+import UnitOfMeasurePicker from './UnitOfMeasurePicker';
 import { navigateToOrgLegalEntity } from '../../navigation/webNavigation';
 
 /** Text on light AppCard / FloatingCard surfaces. */
@@ -95,29 +97,24 @@ function unitDisplay(code, t) {
   return t(opt.labelKey, null, opt.fallback);
 }
 
-function UnitPicker({ value, onChange, t, disabled }) {
+function UnitPicker({ value, onChange, t, disabled, units }) {
+  const list = Array.isArray(units) && units.length
+    ? units
+    : MATERIAL_UNIT_OPTIONS.map((opt) => ({
+        id: opt.code,
+        code: opt.code,
+        symbol: t(opt.labelKey, null, opt.fallback),
+        name: t(opt.labelKey, null, opt.fallback),
+        is_active: true,
+      }));
   return (
-    <View style={styles.unitRow}>
-      {MATERIAL_UNIT_OPTIONS.map((opt) => {
-        const selected = value === opt.code;
-        return (
-          <Pressable
-            key={opt.code}
-            disabled={disabled}
-            onPress={() => onChange(opt.code)}
-            style={[
-              styles.unitChip,
-              selected && styles.unitChipSelected,
-              disabled && styles.unitChipDisabled,
-            ]}
-          >
-            <Text style={[styles.unitChipText, selected && styles.unitChipTextSelected]}>
-              {t(opt.labelKey, null, opt.fallback)}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
+    <UnitOfMeasurePicker
+      units={list}
+      valueCode={value}
+      disabled={disabled}
+      emptyLabel={t('org.warehouse.intake.unit', null, 'Unit')}
+      onChange={({ code }) => onChange(code)}
+    />
   );
 }
 
@@ -130,6 +127,7 @@ function EditableLineCard({
   onConfirmRow,
   onDeleteLine,
   vatBlocked,
+  units,
 }) {
   const [draft, setDraft] = useState({
     description: line.description || '',
@@ -242,6 +240,7 @@ function EditableLineCard({
         onChange={(code) => setDraft((p) => ({ ...p, unit_code: code }))}
         t={t}
         disabled={!editable}
+        units={units}
       />
       {confirmed ? (
         <Text style={styles.confirmedBadge}>
@@ -307,6 +306,7 @@ export default function OrgMaterialsIntakePanel({
   const [docQuery, setDocQuery] = useState('');
   const [confirmLocationId, setConfirmLocationId] = useState(null);
   const [legalComplete, setLegalComplete] = useState(true);
+  const [catalogUnits, setCatalogUnits] = useState([]);
 
   const activeLocations = useMemo(
     () => (Array.isArray(locations) ? locations.filter((r) => r && r.is_active !== false) : []),
@@ -319,12 +319,27 @@ export default function OrgMaterialsIntakePanel({
     setError('');
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const [intakeData, matData] = await Promise.all([
+      const [intakeData, matData, unitsData] = await Promise.all([
         listMaterialsIntakes(token, organizationId),
         listOrgMaterials(token, organizationId, { limit: 500 }),
+        fetchUnits(token).catch(() => []),
       ]);
       setIntakes(Array.isArray(intakeData?.results) ? intakeData.results : []);
       setMaterials(Array.isArray(matData?.results) ? matData.results : []);
+      const unitRows = Array.isArray(unitsData)
+        ? unitsData
+        : Array.isArray(unitsData?.results)
+          ? unitsData.results
+          : [];
+      setCatalogUnits(
+        unitRows.map((u) => ({
+          id: u.id,
+          code: u.code,
+          name: u.name || u.symbol || u.code,
+          symbol: u.symbol || u.name || u.code,
+          is_active: u.is_active !== false,
+        })),
+      );
       if (typeof intakeData?.legal_entity_complete === 'boolean') {
         setLegalComplete(intakeData.legal_entity_complete);
       }
@@ -980,6 +995,7 @@ export default function OrgMaterialsIntakePanel({
             value={standalone.unit_code}
             onChange={(code) => setStandalone((p) => ({ ...p, unit_code: code }))}
             t={t}
+            units={catalogUnits}
           />
           <Text style={styles.sectionLabel}>
             {t('org.warehouse.intake.storeLocation', null, 'Store into location')}
@@ -1131,6 +1147,7 @@ export default function OrgMaterialsIntakePanel({
                 {(activeIntake.lines || []).map((line) => (
                   <EditableLineCard
                     key={line.id}
+                    units={catalogUnits}
                     line={line}
                     canEdit={activeIntake.status === 'draft' && canManage}
                     busy={busy}
@@ -1191,6 +1208,7 @@ export default function OrgMaterialsIntakePanel({
                 value={manual.unit_code}
                 onChange={(code) => setManual((p) => ({ ...p, unit_code: code }))}
                 t={t}
+            units={catalogUnits}
               />
               <Button mode="outlined" onPress={onAddManual} disabled={busy} style={styles.secondaryBtn}>
                 {t('org.warehouse.intake.addLine', null, 'Add line')}

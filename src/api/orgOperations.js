@@ -300,6 +300,59 @@ export async function deleteWorkOrderExpense(token, organizationId, workOrderId,
   return true;
 }
 
+export async function listWorkOrderStops(token, organizationId, workOrderId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/stops/`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load stops'));
+  return response.json();
+}
+
+export async function createWorkOrderStop(token, organizationId, workOrderId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/stops/`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to add stop'));
+  return response.json();
+}
+
+export async function updateWorkOrderStop(token, organizationId, workOrderId, stopId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/stops/${stopId}/`,
+    {
+      method: 'PATCH',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to update stop'));
+  return response.json();
+}
+
+export async function deleteWorkOrderStop(token, organizationId, workOrderId, stopId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/stops/${stopId}/`,
+    {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to delete stop'));
+  return true;
+}
+
 export async function listProjects(token, organizationId, params = {}) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/projects/${buildQuery(params)}`,

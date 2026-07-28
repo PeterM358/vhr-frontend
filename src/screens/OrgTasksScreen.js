@@ -11,15 +11,23 @@ import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePick
 import {
   attachWorkOrderMedia,
   createWorkOrderExpense,
+  createWorkOrderStop,
   deleteWorkOrder,
   deleteWorkOrderExpense,
+  deleteWorkOrderStop,
   endWorkOrder,
   getWorkOrder,
   issueWorkOrderMaterials,
+  listUnitsOfMeasure,
   listWorkOrders,
   startWorkOrder,
   updateWorkOrder,
+  updateWorkOrderStop,
 } from '../api/orgOperations';
+import ExpenseReceiptGallery from '../components/org/ExpenseReceiptGallery';
+import UnitOfMeasurePicker from '../components/org/UnitOfMeasurePicker';
+import WorkOrderStopsEditor from '../components/org/WorkOrderStopsEditor';
+import { compressImageForUpload } from '../utils/compressImage';
 import { listOrgMaterials, listWarehouseLocations } from '../api/orgWarehouse';
 import { resolveActiveOrganizationId } from '../utils/orgWorkspace';
 import {
@@ -30,7 +38,7 @@ import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
-import { pickReceiptOrInvoiceAttachment } from '../utils/pickDocumentFile';
+import { pickReceiptFromCamera, pickReceiptOrInvoiceAttachment } from '../utils/pickDocumentFile';
 import { confirmMessage } from '../utils/crossPlatformAlert';
 import { formatMaterialListLabel, stripOldMaterialSuffix } from '../utils/materialDisplayLabel';
 
@@ -176,6 +184,33 @@ function taskNeedsFuelTank(task) {
   );
 }
 
+
+function isFuelMaterial(mat) {
+  const unit = String(mat?.unit_code || '').trim().toLowerCase();
+  if (['l', 'л', 'lt', 'ltr', 'liter', 'litre', 'liters', 'litres'].includes(unit)) {
+    return true;
+  }
+  const name = String(mat?.name || '').toLowerCase();
+  return /fuel|diesel|petrol|gasoline|gasoil|гориво|дизел|бензин|нафта/.test(name);
+}
+
+function taskIsTransportFocused(task) {
+  const ops = task?.operations || [];
+  if (!ops.length) return false;
+  return ops.every(
+    (op) => String(op?.activity?.activity_kind || '').toLowerCase() === 'transport',
+  );
+}
+
+function taskUsesFullMaterialsUi(task) {
+  if (taskIsTransportFocused(task)) return false;
+  const ops = task?.operations || [];
+  return ops.some((op) => {
+    if (op?.activity?.consumes_materials) return true;
+    const defaults = op?.activity?.default_materials || [];
+    return defaults.length > 0;
+  }) || (task?.materials || []).some((m) => m.issued_qty != null && Number(m.issued_qty) > 0 && !isFuelMaterial(m));
+}
 function taskNeedsMachineHours(task) {
   return (task?.operations || []).some((op) => {
     if (reportUnitsForOp(op).some(isDurationUnit)) return true;
@@ -546,11 +581,8 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [showExtraMaterials, setShowExtraMaterials] = useState(false);
   const [extraMaterialSearch, setExtraMaterialSearch] = useState('');
   const [expenseType, setExpenseType] = useState('fuel');
-  const [expenseQty, setExpenseQty] = useState('');
-  const [expenseUnit, setExpenseUnit] = useState('L');
-  const [expenseAmount, setExpenseAmount] = useState('');
-  const [expenseNote, setExpenseNote] = useState('');
-  const [expenseReceipt, setExpenseReceipt] = useState(null);
+  const [uomUnits, setUomUnits] = useState([]);
+  const [accessToken, setAccessToken] = useState('');
 
   const onBack = useCallback(() => {
     if (selectedId) {
@@ -596,9 +628,14 @@ export default function OrgTasksScreen({ navigation, route }) {
       const params = {};
       if (filterFrom) params.from = filterFrom;
       if (filterTo) params.to = filterTo;
-      const data = await listWorkOrders(token, resolved, params);
+      setAccessToken(token || '');
+      const [data, unitsData] = await Promise.all([
+        listWorkOrders(token, resolved, params),
+        listUnitsOfMeasure(token, resolved).catch(() => ({ results: [] })),
+      ]);
       setCanManage(Boolean(data?.can_manage));
       setRows(Array.isArray(data?.results) ? data.results : []);
+      setUomUnits(Array.isArray(unitsData?.results) ? unitsData.results : []);
     } catch (e) {
       setError(e.message || t('org.tasks.loadError', null, 'Could not load tasks.'));
       setRows([]);
@@ -966,71 +1003,30 @@ export default function OrgTasksScreen({ navigation, route }) {
     }
   };
 
-  const submitExpense = async () => {
-    if (!orgId || !selected?.id) return;
-    const qty = String(expenseQty || '').trim();
-    const amountRaw = String(expenseAmount || '').trim().replace(',', '.');
-    let amountMinor = null;
-    if (amountRaw) {
-      const major = Number(amountRaw);
-      if (!Number.isFinite(major) || major < 0) {
-        Alert.alert(
-          t('org.tasks.expensesTitle', null, 'Road expenses'),
-          t('org.tasks.expenseAmountInvalid', null, 'Enter a valid amount.'),
-        );
-        return;
-      }
-      amountMinor = Math.round(major * 100);
-    }
-    if (!qty && amountMinor == null && !expenseNote.trim() && !expenseReceipt) {
-      Alert.alert(
-        t('org.tasks.expensesTitle', null, 'Road expenses'),
-        t(
-          'org.tasks.expenseRequired',
-          null,
-          'Enter quantity, amount, note, or attach a receipt.',
-        ),
-      );
-      return;
-    }
+  const uploadExpensePhoto = async (picked) => {
+    if (!orgId || !selected?.id || !picked) return;
     setBusyAction(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      let payload;
-      if (expenseReceipt) {
-        const form = new FormData();
-        form.append('expense_type', expenseType);
-        if (qty) form.append('quantity', qty);
-        if (expenseUnit.trim()) form.append('unit_code', expenseUnit.trim());
-        if (amountMinor != null) form.append('amount_minor', String(amountMinor));
-        if (expenseNote.trim()) form.append('note', expenseNote.trim());
-        const file = expenseReceipt.file;
-        if (file) {
-          form.append('file', file, expenseReceipt.fileName || 'receipt.jpg');
-        } else if (expenseReceipt.uri) {
-          form.append('file', {
-            uri: expenseReceipt.uri,
-            name: expenseReceipt.fileName || 'receipt.jpg',
-            type: expenseReceipt.mimeType || 'image/jpeg',
-          });
-        }
-        payload = form;
+      setAccessToken(token || '');
+      const compressed = await compressImageForUpload(picked);
+      const form = new FormData();
+      form.append('expense_type', expenseType || 'fuel');
+      const file = compressed?.file;
+      if (file) {
+        form.append('file', file, compressed.fileName || 'receipt.jpg');
+      } else if (compressed?.uri) {
+        form.append('file', {
+          uri: compressed.uri,
+          name: compressed.fileName || 'receipt.jpg',
+          type: compressed.mimeType || 'image/jpeg',
+        });
       } else {
-        payload = {
-          expense_type: expenseType,
-          quantity: qty || null,
-          unit_code: expenseUnit.trim(),
-          amount_minor: amountMinor,
-          note: expenseNote.trim(),
-        };
+        throw new Error(t('org.tasks.expensePhotoRequired', null, 'Add at least one receipt photo.'));
       }
-      await createWorkOrderExpense(token, orgId, selected.id, payload);
+      await createWorkOrderExpense(token, orgId, selected.id, form);
       const detail = await getWorkOrder(token, orgId, selected.id);
       replaceTask(detail);
-      setExpenseQty('');
-      setExpenseAmount('');
-      setExpenseNote('');
-      setExpenseReceipt(null);
     } catch (e) {
       Alert.alert(
         t('org.tasks.expensesTitle', null, 'Road expenses'),
@@ -1041,15 +1037,87 @@ export default function OrgTasksScreen({ navigation, route }) {
     }
   };
 
-  const pickExpenseReceipt = async () => {
+  const pickExpenseFromGallery = async () => {
     try {
       const picked = await pickReceiptOrInvoiceAttachment();
-      if (picked) setExpenseReceipt(picked);
+      if (picked) await uploadExpensePhoto(picked);
     } catch (e) {
       Alert.alert(
         t('org.tasks.expensesTitle', null, 'Road expenses'),
         e.message || t('org.tasks.expenseReceiptError', null, 'Could not pick receipt.'),
       );
+    }
+  };
+
+  const pickExpenseFromCamera = async () => {
+    try {
+      const picked = await pickReceiptFromCamera();
+      if (picked) await uploadExpensePhoto(picked);
+    } catch (e) {
+      Alert.alert(
+        t('org.tasks.expensesTitle', null, 'Road expenses'),
+        e.message || t('org.tasks.expenseReceiptError', null, 'Could not pick receipt.'),
+      );
+    }
+  };
+
+  const refreshSelectedDetail = async () => {
+    if (!orgId || !selected?.id) return null;
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    setAccessToken(token || '');
+    const detail = await getWorkOrder(token, orgId, selected.id);
+    replaceTask(detail);
+    return detail;
+  };
+
+  const addStop = async (payload) => {
+    if (!orgId || !selected?.id) return;
+    setBusyAction(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      await createWorkOrderStop(token, orgId, selected.id, payload);
+      await refreshSelectedDetail();
+    } catch (e) {
+      Alert.alert(
+        t('org.tasks.outboundLoadsTitle', null, 'Outbound loads'),
+        e.message || t('org.tasks.stopError', null, 'Could not save stop.'),
+      );
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const saveStop = async (stop, draft) => {
+    if (!orgId || !selected?.id || !stop?.id) return;
+    setBusyAction(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      await updateWorkOrderStop(token, orgId, selected.id, stop.id, draft);
+      await refreshSelectedDetail();
+    } catch (e) {
+      Alert.alert(
+        t('org.tasks.outboundLoadsTitle', null, 'Outbound loads'),
+        e.message || t('org.tasks.stopError', null, 'Could not save stop.'),
+      );
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const removeStop = async (stop) => {
+    if (!orgId || !selected?.id || !stop?.id) return;
+    setBusyAction(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      await deleteWorkOrderStop(token, orgId, selected.id, stop.id);
+      await refreshSelectedDetail();
+    } catch (e) {
+      Alert.alert(
+        t('org.tasks.outboundLoadsTitle', null, 'Outbound loads'),
+        e.message || t('org.tasks.stopError', null, 'Could not save stop.'),
+      );
+    } finally {
+      setBusyAction(false);
     }
   };
 
@@ -1167,10 +1235,13 @@ export default function OrgTasksScreen({ navigation, route }) {
     ],
   );
 
-  const defaultIssueMaterials = useMemo(
-    () => collectTaskDefaultMaterials(selected),
-    [selected],
-  );
+  const transportFocused = taskIsTransportFocused(selected);
+
+  const defaultIssueMaterials = useMemo(() => {
+    const rows = collectTaskDefaultMaterials(selected);
+    if (!taskIsTransportFocused(selected)) return rows;
+    return rows.filter(isFuelMaterial);
+  }, [selected]);
 
   const primaryOutputUnit = useMemo(() => {
     const ops = selected?.operations || [];
@@ -1192,10 +1263,16 @@ export default function OrgTasksScreen({ navigation, route }) {
   const filteredExtraStock = useMemo(() => {
     const q = String(extraMaterialSearch || '').trim().toLowerCase();
     const defaultIds = new Set(defaultIssueMaterials.map((m) => Number(m.material_id)));
+    const transportOnly = taskIsTransportFocused(selected);
     return (stockRows || [])
       .filter((row) => {
         const mid = Number(row.material_id || row.material?.id || row.id);
         if (defaultIds.has(mid)) return false;
+        const matLike = {
+          name: row.material?.name || row.name,
+          unit_code: row.unit_code || row.material?.unit_code,
+        };
+        if (transportOnly && !isFuelMaterial(matLike)) return false;
         if (!q) return true;
         const label = `${row.material?.name || row.name || ''} ${
           row.part_number || row.material?.part_number || ''
@@ -1203,7 +1280,7 @@ export default function OrgTasksScreen({ navigation, route }) {
         return label.includes(q);
       })
       .slice(0, 24);
-  }, [stockRows, defaultIssueMaterials, extraMaterialSearch]);
+  }, [stockRows, defaultIssueMaterials, extraMaterialSearch, selected]);
 
   const stockByMaterialId = useMemo(() => {
     const map = new Map();
@@ -1663,7 +1740,7 @@ export default function OrgTasksScreen({ navigation, route }) {
                         {t(
                           'org.tasks.fuelTankHint',
                           null,
-                          'Start qty in tank + end qty + fuel receipts (касови бележки). System computes burn vs norm.',
+                          'Start + depot issue + road receipt photos − end leftover. System computes burn vs norm.',
                         )}
                       </Text>
                       <TextInput
@@ -1697,6 +1774,22 @@ export default function OrgTasksScreen({ navigation, route }) {
                         <View style={{ marginTop: 6 }}>
                           <Text style={styles.opMeta}>
                             {t(
+                              'org.tasks.fuelEquationHint',
+                              null,
+                              'Burn = start + depot + road receipts − end. Compare to norm.',
+                            )}
+                          </Text>
+                          <Text style={styles.opMeta}>
+                            {t(
+                              'org.tasks.depotIssuedSum',
+                              {
+                                liters: selected.fuel_summary.depot_liters || '0',
+                              },
+                              `Depot issued: ${selected.fuel_summary.depot_liters || '0'} L`,
+                            )}
+                          </Text>
+                          <Text style={styles.opMeta}>
+                            {t(
                               'org.tasks.fuelReceiptsSum',
                               {
                                 liters: selected.fuel_summary.receipts_liters || '0',
@@ -1709,7 +1802,7 @@ export default function OrgTasksScreen({ navigation, route }) {
                               {t(
                                 'org.tasks.fuelConsumed',
                                 { liters: selected.fuel_summary.consumed_liters },
-                                `Consumed: ${selected.fuel_summary.consumed_liters} L (start + receipts − end)`,
+                                `Consumed: ${selected.fuel_summary.consumed_liters} L (start + depot + receipts − end)`,
                               )}
                             </Text>
                           ) : null}
@@ -1802,25 +1895,39 @@ export default function OrgTasksScreen({ navigation, route }) {
 
             <AppCard style={styles.card}>
               <Text style={styles.section}>
-                {t('org.tasks.materialsTitle', null, 'Materials')}
+                {transportFocused
+                  ? t('org.tasks.depotRefuelTitle', null, 'Refuel from base / depot')
+                  : t('org.tasks.materialsTitle', null, 'Materials')}
               </Text>
               <Text style={styles.opMeta}>
-                {t(
-                  'org.tasks.materialsHint',
-                  null,
-                  'Warehouse issues materials onto this task. Enter leftover after work — consumed = issued − leftover.',
-                )}
+                {transportFocused
+                  ? t(
+                      'org.tasks.depotRefuelHint',
+                      null,
+                      'Optional: issue fuel SKU from warehouse (e.g. Baza) onto this task. Paint/other materials are hidden on transport.',
+                    )
+                  : t(
+                      'org.tasks.materialsHint',
+                      null,
+                      'Warehouse issues materials onto this task. Enter leftover after work — consumed = issued − leftover.',
+                    )}
               </Text>
-              {(selected.materials || []).length === 0 ? (
+              {((selected.materials || []).filter((m) => !transportFocused || isFuelMaterial(m))).length === 0 ? (
                 <Text style={styles.opMeta}>
-                  {t(
-                    'org.tasks.materialsAskWarehouse',
-                    null,
-                    'Ask warehouse to issue materials for this task.',
-                  )}
+                  {transportFocused
+                    ? t(
+                        'org.tasks.depotRefuelEmpty',
+                        null,
+                        'No fuel SKUs issued yet. Issue diesel/fuel from warehouse below.',
+                      )
+                    : t(
+                        'org.tasks.materialsAskWarehouse',
+                        null,
+                        'Ask warehouse to issue materials for this task.',
+                      )}
                 </Text>
               ) : (
-                (selected.materials || []).map((mat) => {
+                (selected.materials || []).filter((m) => !transportFocused || isFuelMaterial(m)).map((mat) => {
                   const mid = mat.material_id || mat.id;
                   const unitChip = mat.unit_code ? ` · ${mat.unit_code}` : '';
                   const editable =
@@ -1935,7 +2042,9 @@ export default function OrgTasksScreen({ navigation, route }) {
               {canManage && selected.status !== 'done' && selected.status !== 'cancelled' ? (
                 <>
                   <Text style={styles.fieldLabel}>
-                    {t('org.tasks.issueFromWarehouse', null, 'Issue from warehouse')}
+                    {transportFocused
+                      ? t('org.tasks.depotRefuelTitle', null, 'Refuel from base / depot')
+                      : t('org.tasks.issueFromWarehouse', null, 'Issue from warehouse')}
                   </Text>
                   <Text style={styles.opMeta}>
                     {t(
@@ -1944,6 +2053,7 @@ export default function OrgTasksScreen({ navigation, route }) {
                       'Default list = materials from this task’s operations. Fuel ~qty uses task machine hours / total km (and paint uses op m²). Edit qty before issuing.',
                     )}
                   </Text>
+                  {!transportFocused ? (
                   <TextInput
                     label={t(
                       'org.tasks.plannedIssueOutput',
@@ -1957,7 +2067,8 @@ export default function OrgTasksScreen({ navigation, route }) {
                     style={styles.input}
                     textColor={ON_CARD}
                   />
-                  {hasHourBasedNorms && !String(taskActualHours || '').trim() ? (
+                  ) : null}
+                  {!transportFocused && hasHourBasedNorms && !String(taskActualHours || '').trim() ? (
                     <TextInput
                       label={t(
                         'org.tasks.plannedIssueHours',
@@ -1977,11 +2088,17 @@ export default function OrgTasksScreen({ navigation, route }) {
                   </Text>
                   {defaultIssueMaterials.length === 0 ? (
                     <Text style={styles.opMeta}>
-                      {t(
-                        'org.tasks.issueOpMaterialsEmpty',
-                        null,
-                        'No default materials on the operations of this task. Pick operations with materials, or use Add extra material.',
-                      )}
+                      {transportFocused
+                        ? t(
+                            'org.tasks.depotRefuelEmpty',
+                            null,
+                            'No fuel SKUs in warehouse yet. Add diesel/fuel stock, then issue here.',
+                          )
+                        : t(
+                            'org.tasks.issueOpMaterialsEmpty',
+                            null,
+                            'No default materials on the operations of this task. Pick operations with materials, or use Add extra material.',
+                          )}
                     </Text>
                   ) : (
                     <View style={styles.chipWrap}>
@@ -2021,7 +2138,9 @@ export default function OrgTasksScreen({ navigation, route }) {
                   >
                     {showExtraMaterials
                       ? t('org.tasks.hideExtraMaterial', null, 'Hide extra material')
-                      : t('org.tasks.addExtraMaterial', null, 'Add extra material')}
+                      : transportFocused
+                        ? t('org.tasks.depotRefuelTitle', null, 'Refuel from base / depot')
+                        : t('org.tasks.addExtraMaterial', null, 'Add extra material')}
                   </Button>
                   {showExtraMaterials ? (
                     <>
@@ -2139,13 +2258,13 @@ export default function OrgTasksScreen({ navigation, route }) {
                     style={styles.input}
                     textColor={ON_CARD}
                   />
-                  <TextInput
-                    label={t('org.tasks.issueUnit', null, 'Unit (kg, L, …)')}
-                    value={issueUnit}
-                    onChangeText={setIssueUnit}
-                    mode="outlined"
-                    style={styles.input}
-                    textColor={ON_CARD}
+                  <Text style={styles.fieldLabel}>
+                    {t('org.tasks.issueUnitSelect', null, 'Select unit')}
+                  </Text>
+                  <UnitOfMeasurePicker
+                    units={uomUnits}
+                    valueCode={issueUnit}
+                    onChange={({ code }) => setIssueUnit(code || '')}
                   />
                   <Button
                     mode="contained"
@@ -2160,6 +2279,35 @@ export default function OrgTasksScreen({ navigation, route }) {
               ) : null}
             </AppCard>
 
+
+            {(taskNeedsFuelTank(selected) ||
+              (selected.stops || []).length > 0 ||
+              (selected.outbound_stops || []).length > 0 ||
+              (selected.return_stops || []).length > 0) ? (
+              <AppCard style={styles.card}>
+                <WorkOrderStopsEditor
+                  t={t}
+                  outboundStops={
+                    selected.outbound_stops ||
+                    (selected.stops || []).filter((s) => s.direction === 'outbound')
+                  }
+                  returnStops={
+                    selected.return_stops ||
+                    (selected.stops || []).filter((s) => s.direction === 'return')
+                  }
+                  editable={
+                    selected.status !== 'done' &&
+                    selected.status !== 'cancelled' &&
+                    (canManage || true)
+                  }
+                  busy={busyAction}
+                  onAdd={addStop}
+                  onUpdate={saveStop}
+                  onRemove={removeStop}
+                />
+              </AppCard>
+            ) : null}
+
             <AppCard style={styles.card}>
               <Text style={styles.section}>
                 {t('org.tasks.expensesTitle', null, 'Road / extra expenses')}
@@ -2169,12 +2317,12 @@ export default function OrgTasksScreen({ navigation, route }) {
                   ? t(
                       'org.tasks.expensesHintTransport',
                       null,
-                      'Attach fuel receipts (касови бележки) with litres and/or money. Tank start/end above + receipts → effective L/100. Do not invent “liters used” as a free guess.',
+                      'Photograph касови бележки only. Tank start/end + depot + photos → burn.',
                     )
                   : t(
                       'org.tasks.expensesHint',
                       null,
-                      'Road fuel once for the task: add expense + attach receipt. Depot fuel already in stock → issue from Materials above (suggestions use task hours/km).',
+                      'Attach receipt photos. No need to type litres or amount.',
                     )}
               </Text>
               {(selected.expenses || []).length === 0 ? (
@@ -2182,46 +2330,23 @@ export default function OrgTasksScreen({ navigation, route }) {
                   {t('org.tasks.expensesEmpty', null, 'No road expenses yet.')}
                 </Text>
               ) : (
-                (selected.expenses || []).map((exp) => (
-                  <View key={exp.id} style={styles.opRow}>
-                    <Text style={styles.opTitle}>
-                      {t(
-                        `org.tasks.expenseTypes.${exp.expense_type}`,
-                        null,
-                        exp.expense_type,
-                      )}
-                      {exp.quantity != null
-                        ? ` · ${exp.quantity}${exp.unit_code ? ` ${exp.unit_code}` : ''}`
-                        : ''}
-                      {exp.amount_minor != null
-                        ? ` · ${formatMoneyMinor(exp.amount_minor, exp.currency)}`
-                        : ''}
-                    </Text>
-                    {exp.note ? <Text style={styles.opMeta}>{exp.note}</Text> : null}
-                    {exp.receipt_ref ? (
-                      <Text style={styles.opMeta}>
-                        {t(
-                          'org.tasks.expenseReceiptAttached',
-                          { name: receiptFileLabel(exp.receipt_ref) },
-                          `Receipt: ${receiptFileLabel(exp.receipt_ref)}`,
-                        )}
-                      </Text>
-                    ) : null}
-                    {selected.status !== 'done' && selected.status !== 'cancelled' ? (
-                      <Button
-                        mode="text"
-                        compact
-                        onPress={() => removeExpense(exp.id)}
-                        disabled={busyAction}
-                      >
-                        {t('common.delete', null, 'Delete')}
-                      </Button>
-                    ) : null}
-                  </View>
-                ))
+                <ExpenseReceiptGallery
+                  expenses={selected.expenses || []}
+                  token={accessToken}
+                  t={t}
+                  canDelete={selected.status !== 'done' && selected.status !== 'cancelled'}
+                  onDelete={removeExpense}
+                />
               )}
               {selected.status !== 'done' && selected.status !== 'cancelled' ? (
                 <>
+                  <Text style={styles.opMeta}>
+                    {t(
+                      'org.tasks.expensePhotosOnly',
+                      null,
+                      'Add receipt photos (camera / gallery / PDF). Type is optional.',
+                    )}
+                  </Text>
                   <View style={styles.chipWrap}>
                     {EXPENSE_TYPES.map((item) => {
                       const active = expenseType === item.id;
@@ -2238,81 +2363,26 @@ export default function OrgTasksScreen({ navigation, route }) {
                       );
                     })}
                   </View>
-                  <TextInput
-                    label={
-                      expenseType === 'fuel'
-                        ? t('org.tasks.expenseQtyFuel', null, 'Litres on receipt')
-                        : t('org.tasks.expenseQty', null, 'Quantity (e.g. liters)')
-                    }
-                    value={expenseQty}
-                    onChangeText={setExpenseQty}
-                    mode="outlined"
-                    keyboardType="decimal-pad"
-                    style={styles.input}
-                    textColor={ON_CARD}
-                  />
-                  <TextInput
-                    label={t('org.tasks.expenseUnit', null, 'Unit')}
-                    value={expenseUnit}
-                    onChangeText={setExpenseUnit}
-                    mode="outlined"
-                    style={styles.input}
-                    textColor={ON_CARD}
-                  />
-                  <TextInput
-                    label={t('org.tasks.expenseAmount', null, 'Amount (e.g. 180.00)')}
-                    value={expenseAmount}
-                    onChangeText={setExpenseAmount}
-                    mode="outlined"
-                    keyboardType="decimal-pad"
-                    style={styles.input}
-                    textColor={ON_CARD}
-                  />
-                  <TextInput
-                    label={t('org.tasks.expenseNote', null, 'Note')}
-                    value={expenseNote}
-                    onChangeText={setExpenseNote}
-                    mode="outlined"
-                    style={styles.input}
-                    textColor={ON_CARD}
-                  />
-                  <Button
-                    mode="outlined"
-                    disabled={busyAction}
-                    onPress={pickExpenseReceipt}
-                    style={styles.secondaryBtn}
-                  >
-                    {expenseReceipt
-                      ? t(
-                          'org.tasks.expenseReceiptPicked',
-                          { name: expenseReceipt.fileName || 'receipt' },
-                          `Receipt: ${expenseReceipt.fileName || 'receipt'}`,
-                        )
-                      : t(
-                          'org.tasks.expenseAttachReceipt',
-                          null,
-                          'Attach receipt (photo/PDF)',
-                        )}
-                  </Button>
-                  {expenseReceipt ? (
+                  <View style={styles.chipWrap}>
                     <Button
-                      mode="text"
-                      compact
-                      onPress={() => setExpenseReceipt(null)}
+                      mode="contained"
+                      loading={busyAction}
                       disabled={busyAction}
+                      onPress={pickExpenseFromCamera}
+                      style={styles.secondaryBtn}
                     >
-                      {t('org.tasks.expenseClearReceipt', null, 'Clear receipt')}
+                      {t('org.tasks.expenseAddFromCamera', null, 'Camera')}
                     </Button>
-                  ) : null}
-                  <Button
-                    mode="outlined"
-                    loading={busyAction}
-                    disabled={busyAction}
-                    onPress={submitExpense}
-                    style={styles.secondaryBtn}
-                  >
-                    {t('org.tasks.addExpense', null, 'Add expense')}
-                  </Button>
+                    <Button
+                      mode="outlined"
+                      loading={busyAction}
+                      disabled={busyAction}
+                      onPress={pickExpenseFromGallery}
+                      style={styles.secondaryBtn}
+                    >
+                      {t('org.tasks.expenseAddFromGallery', null, 'Gallery / PDF')}
+                    </Button>
+                  </View>
                 </>
               ) : null}
             </AppCard>
