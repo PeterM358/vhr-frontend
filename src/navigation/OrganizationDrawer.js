@@ -18,6 +18,7 @@ import OrgTasksScreen from '../screens/OrgTasksScreen';
 import OrgCreateTaskScreen from '../screens/OrgCreateTaskScreen';
 import OrgProjectsScreen from '../screens/OrgProjectsScreen';
 import OrgWarehouseScreen from '../screens/OrgWarehouseScreen';
+import OrgLegalEntityScreen from '../screens/OrgLegalEntityScreen';
 import OrgCalendarScreen from '../screens/OrgCalendarScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
 
@@ -41,6 +42,7 @@ import {
   navigateToNotifications,
   navigateToOrgCalendar,
   navigateToOrgFleet,
+  navigateToOrgLegalEntity,
   navigateToOrgNetwork,
   navigateToOrgOperations,
   navigateToOrgProjects,
@@ -73,6 +75,7 @@ const ROUTE_ICONS = {
   OrgWorkOrders: 'clipboard-check-outline',
   OrgProjects: 'briefcase-outline',
   OrgWarehouse: 'warehouse',
+  OrgLegalEntity: 'domain',
   OrgWorkforce: 'account-hard-hat',
   OrgNetwork: 'transit-connection-variant',
   OrgDocuments: 'file-document-outline',
@@ -231,6 +234,10 @@ function CustomDrawerContent(props) {
       navigateToOrgWarehouse(navigation, { orgId: org?.id });
       return;
     }
+    if (normalized === 'OrgLegalEntity') {
+      navigateToOrgLegalEntity(navigation, { orgId: org?.id });
+      return;
+    }
     if (Platform.OS === 'web') {
       if (normalized === 'OrgOverview') {
         navigation.navigate('OrgOverview');
@@ -309,6 +316,15 @@ function CustomDrawerContent(props) {
             });
           }}
           icon={({ color, size }) => <DrawerMenuIcon name="bell-outline" color={color} size={size} />}
+          {...itemProps}
+        />
+
+        <DrawerItem
+          label={t('org.drawer.company', null, 'Company details')}
+          onPress={() => openRoute('OrgLegalEntity')}
+          icon={({ color, size }) => (
+            <DrawerMenuIcon name="domain" color={color} size={size} />
+          )}
           {...itemProps}
         />
 
@@ -406,6 +422,7 @@ export default function OrganizationDrawer() {
       />
       <Drawer.Screen name="OrgProjects" component={OrgProjectsScreen} />
       <Drawer.Screen name="OrgWarehouse" component={OrgWarehouseScreen} />
+      <Drawer.Screen name="OrgLegalEntity" component={OrgLegalEntityScreen} />
       <Drawer.Screen name="OrgCalendar" component={OrgCalendarScreen} />
       <Drawer.Screen name="OrgWorkforce" component={OrgWorkforceScreen} />
       <Drawer.Screen name="OrgNetwork" component={NetworkOrganizationScreen} />

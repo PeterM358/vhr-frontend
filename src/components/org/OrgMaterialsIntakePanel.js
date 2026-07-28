@@ -20,6 +20,7 @@ import {
   getMaterialsIntake,
   listMaterialsIntakes,
   listOrgMaterials,
+  openMaterialsIntakeFile,
   updateMaterialsIntake,
   updateMaterialsIntakeLine,
   updateOrgMaterial,
@@ -29,6 +30,7 @@ import { pickReceiptOrInvoiceAttachment } from '../../utils/pickDocumentFile';
 import { confirmMessage } from '../../utils/crossPlatformAlert';
 import { STORAGE_KEYS } from '../../constants/storageKeys';
 import { useTranslation } from '../../i18n';
+import { navigateToOrgLegalEntity } from '../../navigation/webNavigation';
 
 /** Text on light AppCard / FloatingCard surfaces. */
 const ON_CARD = '#0F172A';
@@ -277,6 +279,8 @@ export default function OrgMaterialsIntakePanel({
   organizationId,
   canManage,
   section = 'documents',
+  locations = [],
+  navigation = null,
 }) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
@@ -293,6 +297,14 @@ export default function OrgMaterialsIntakePanel({
   const [supplierDraft, setSupplierDraft] = useState('');
   const [editingMaterial, setEditingMaterial] = useState(null);
   const [materialQuery, setMaterialQuery] = useState('');
+  const [docQuery, setDocQuery] = useState('');
+  const [confirmLocationId, setConfirmLocationId] = useState(null);
+  const [legalComplete, setLegalComplete] = useState(true);
+
+  const activeLocations = useMemo(
+    () => (Array.isArray(locations) ? locations.filter((r) => r && r.is_active !== false) : []),
+    [locations],
+  );
 
   const load = useCallback(async () => {
     if (!organizationId) return;
@@ -306,6 +318,9 @@ export default function OrgMaterialsIntakePanel({
       ]);
       setIntakes(Array.isArray(intakeData?.results) ? intakeData.results : []);
       setMaterials(Array.isArray(matData?.results) ? matData.results : []);
+      if (typeof intakeData?.legal_entity_complete === 'boolean') {
+        setLegalComplete(intakeData.legal_entity_complete);
+      }
     } catch (e) {
       setError(e.message || t('org.warehouse.intake.loadError', null, 'Could not load materials intake.'));
     } finally {
@@ -329,7 +344,16 @@ export default function OrgMaterialsIntakePanel({
       setShowStandalone(false);
       setEditingMaterial(null);
     }
+    if (section !== 'documents') {
+      setDocQuery('');
+    }
   }, [section]);
+
+  useEffect(() => {
+    if (!confirmLocationId && activeLocations.length === 1) {
+      setConfirmLocationId(activeLocations[0].id);
+    }
+  }, [activeLocations, confirmLocationId]);
 
   const filteredMaterials = useMemo(() => {
     const q = materialQuery.trim().toLowerCase();
@@ -341,6 +365,8 @@ export default function OrgMaterialsIntakePanel({
         row.org_sku,
         row.description,
         row.brand,
+        row.location_name,
+        row.location_code,
       ]
         .filter(Boolean)
         .join(' ')
@@ -348,6 +374,28 @@ export default function OrgMaterialsIntakePanel({
       return haystack.includes(q);
     });
   }, [materials, materialQuery]);
+
+  const filteredIntakes = useMemo(() => {
+    const q = docQuery.trim().toLowerCase();
+    if (!q) return intakes;
+    return intakes.filter((row) => {
+      const haystack = [
+        row.invoice_number,
+        row.supplier_name,
+        row.source_file_name,
+        row.status,
+        row.buyer_vat_number,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [docQuery, intakes]);
+
+  const locationBlocked = !confirmLocationId;
+  const legalBlocked = legalComplete === false
+    || activeIntake?.legal_entity_complete === false;
 
   const onUpload = async () => {
     if (!canManage || !organizationId) return;
@@ -492,19 +540,32 @@ export default function OrgMaterialsIntakePanel({
       setError(t('org.warehouse.intake.lineRequired', null, 'Enter a material name or part number.'));
       return;
     }
+    const qty = Number(standalone.quantity || 0);
+    if (qty > 0 && !confirmLocationId) {
+      setError(
+        t(
+          'org.warehouse.intake.locationRequired',
+          null,
+          'Select a warehouse location before storing quantity.',
+        ),
+      );
+      return;
+    }
     setBusy(true);
     setError('');
     setMessage('');
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const created = await createOrgMaterial(token, organizationId, {
+      const payload = {
         description: standalone.description.trim(),
         part_number: standalone.part_number.trim(),
         part_number_alias: standalone.part_number_alias.trim(),
         quantity: standalone.quantity || '0',
         unit_code: standalone.unit_code || 'piece',
         unit_price: standalone.unit_price || '0',
-      });
+      };
+      if (confirmLocationId) payload.location_id = confirmLocationId;
+      const created = await createOrgMaterial(token, organizationId, payload);
       setConfirmSummary({
         invoice_number: '',
         supplier_name: '',
@@ -520,6 +581,7 @@ export default function OrgMaterialsIntakePanel({
             quantity_on_hand: created.quantity_on_hand,
             unit_code: created.unit_code || standalone.unit_code,
             created: true,
+            location_name: created.location_name,
           },
         ],
       });
@@ -547,8 +609,33 @@ export default function OrgMaterialsIntakePanel({
     await load();
   };
 
+  const ensureConfirmReady = () => {
+    if (legalBlocked) {
+      setError(
+        t(
+          'org.warehouse.intake.legalRequired',
+          null,
+          'Complete organization legal entity (name, VAT/EIK, address) before confirming.',
+        ),
+      );
+      return false;
+    }
+    if (!confirmLocationId) {
+      setError(
+        t(
+          'org.warehouse.intake.locationRequired',
+          null,
+          'Select a warehouse location before confirming into stock.',
+        ),
+      );
+      return false;
+    }
+    return true;
+  };
+
   const onConfirmAll = async () => {
     if (!activeIntake?.id || activeIntake.status !== 'draft') return;
+    if (!ensureConfirmReady()) return;
     const pending = (activeIntake.lines || []).filter((l) => !l.is_confirmed).length;
     const ok = await confirmMessage(
       t('org.warehouse.intake.confirmAllTitle', null, 'Confirm all lines?'),
@@ -564,7 +651,9 @@ export default function OrgMaterialsIntakePanel({
     setError('');
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const data = await confirmMaterialsIntake(token, organizationId, activeIntake.id, {});
+      const data = await confirmMaterialsIntake(token, organizationId, activeIntake.id, {
+        location_id: confirmLocationId,
+      });
       await applyConfirmResult(data);
     } catch (e) {
       setError(e.message || t('org.warehouse.intake.confirmError', null, 'Confirm failed.'));
@@ -575,6 +664,7 @@ export default function OrgMaterialsIntakePanel({
 
   const onConfirmRow = async (lineId) => {
     if (!activeIntake?.id) return;
+    if (!ensureConfirmReady()) return;
     const ok = await confirmMessage(
       t('org.warehouse.intake.confirmRowTitle', null, 'Confirm this row?'),
       t(
@@ -591,6 +681,7 @@ export default function OrgMaterialsIntakePanel({
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const data = await confirmMaterialsIntake(token, organizationId, activeIntake.id, {
         line_id: lineId,
+        location_id: confirmLocationId,
       });
       await applyConfirmResult(data);
     } catch (e) {
@@ -638,8 +729,31 @@ export default function OrgMaterialsIntakePanel({
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const data = await getMaterialsIntake(token, organizationId, row.id);
       setActiveIntake(data);
+      if (typeof data?.legal_entity_complete === 'boolean') {
+        setLegalComplete(data.legal_entity_complete);
+      }
     } catch (e) {
       setError(e.message || t('org.warehouse.intake.loadError', null, 'Could not load intake.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const closeDetail = () => {
+    setActiveIntake(null);
+    setConfirmSummary(null);
+    setMessage('');
+  };
+
+  const onOpenPdf = async () => {
+    if (!activeIntake?.id || !activeIntake.has_source_file) return;
+    setBusy(true);
+    setError('');
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      await openMaterialsIntakeFile(token, organizationId, activeIntake.id);
+    } catch (e) {
+      setError(e.message || t('org.warehouse.intake.pdfError', null, 'Could not open PDF.'));
     } finally {
       setBusy(false);
     }
@@ -675,9 +789,11 @@ export default function OrgMaterialsIntakePanel({
   }
 
   const vatBlocked = activeIntake?.buyer_vat_matches_organization === false;
+  const confirmBlocked = Boolean(vatBlocked || locationBlocked || legalBlocked);
   const isDocuments = section === 'documents';
   const isMaterials = section === 'materials';
   const hasSearch = materialQuery.trim().length > 0;
+  const detailOpen = isDocuments && Boolean(activeIntake);
 
   return (
     <View style={styles.wrap}>
@@ -686,7 +802,7 @@ export default function OrgMaterialsIntakePanel({
           {t(
             'org.warehouse.intake.documentsLead',
             null,
-            'Import supplier invoices, review lines in the table, then Confirm row or Confirm all. Confirmed invoices stay forever; drafts can be deleted.',
+            'Import supplier invoices. Open a document for full detail + PDF. Confirm stores stock at a chosen location.',
           )}
         </Text>
       ) : (
@@ -702,6 +818,30 @@ export default function OrgMaterialsIntakePanel({
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {message ? <Text style={styles.message}>{message}</Text> : null}
 
+      {legalBlocked ? (
+        <AppCard style={[styles.card, styles.warnCard]}>
+          <Text style={styles.cardTitle}>
+            {t('org.warehouse.intake.legalTitle', null, 'Organization legal entity required')}
+          </Text>
+          <Text style={styles.meta}>
+            {t(
+              'org.warehouse.intake.legalBody',
+              null,
+              'Fill legal name, VAT/EIK and registered address in Organization → Company details before confirming stock.',
+            )}
+          </Text>
+          {navigation ? (
+            <Button
+              mode="contained"
+              onPress={() => navigateToOrgLegalEntity(navigation, { orgId: organizationId })}
+              style={styles.primaryBtn}
+            >
+              {t('org.warehouse.intake.openLegal', null, 'Open company details')}
+            </Button>
+          ) : null}
+        </AppCard>
+      ) : null}
+
       {confirmSummary ? (
         <AppCard style={[styles.card, styles.summaryCard]}>
           <Text style={styles.cardTitle}>
@@ -714,6 +854,12 @@ export default function OrgMaterialsIntakePanel({
               'Wrote SKU + on-hand quantity for each confirmed line.',
             )}
           </Text>
+          {confirmSummary.location_name ? (
+            <Text style={styles.meta}>
+              {t('org.warehouse.intake.storedAt', null, 'Stored at')}: {confirmSummary.location_name}
+              {confirmSummary.location_code ? ` (${confirmSummary.location_code})` : ''}
+            </Text>
+          ) : null}
           {(confirmSummary.materials || []).map((m, idx) => (
             <View key={`${m.part_number || m.name}-${idx}`} style={styles.lineRow}>
               <Text style={styles.lineName} numberOfLines={2}>
@@ -734,7 +880,7 @@ export default function OrgMaterialsIntakePanel({
         </AppCard>
       ) : null}
 
-      {isDocuments && canManage ? (
+      {isDocuments && canManage && !detailOpen ? (
         <Button mode="contained" onPress={onUpload} loading={busy} disabled={busy}>
           {t('org.warehouse.intake.upload', null, 'Import invoice PDF')}
         </Button>
@@ -800,14 +946,53 @@ export default function OrgMaterialsIntakePanel({
             onChange={(code) => setStandalone((p) => ({ ...p, unit_code: code }))}
             t={t}
           />
+          <Text style={styles.sectionLabel}>
+            {t('org.warehouse.intake.storeLocation', null, 'Store into location')}
+          </Text>
+          {activeLocations.length === 0 ? (
+            <Text style={styles.helper}>
+              {t(
+                'org.warehouse.intake.noLocations',
+                null,
+                'Add a location under Locations (e.g. Baza / Port 1) before confirming.',
+              )}
+            </Text>
+          ) : (
+            <View style={styles.unitRow}>
+              {activeLocations.map((loc) => {
+                const selected = Number(confirmLocationId) === Number(loc.id);
+                return (
+                  <Pressable
+                    key={loc.id}
+                    onPress={() => setConfirmLocationId(loc.id)}
+                    style={[styles.unitChip, selected && styles.unitChipSelected]}
+                  >
+                    <Text style={[styles.unitChipText, selected && styles.unitChipTextSelected]}>
+                      {loc.name || loc.code}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
           <Button mode="contained" onPress={onAddStandalone} loading={busy} disabled={busy}>
             {t('org.warehouse.intake.saveMaterial', null, 'Save to warehouse')}
           </Button>
         </AppCard>
       ) : null}
 
-      {isDocuments && activeIntake ? (
-        <AppCard style={styles.card}>
+      {detailOpen ? (
+        <AppCard style={[styles.card, styles.detailCard]}>
+          <View style={styles.detailHeader}>
+            <Button mode="text" onPress={closeDetail} textColor={ON_CARD} compact>
+              {t('org.warehouse.intake.backToList', null, '← Documents')}
+            </Button>
+            {activeIntake.has_source_file ? (
+              <Button mode="outlined" onPress={onOpenPdf} disabled={busy} compact>
+                {t('org.warehouse.intake.viewPdf', null, 'View PDF')}
+              </Button>
+            ) : null}
+          </View>
           <Text style={styles.cardTitle}>
             {activeIntake.document_kind === 'proforma'
               ? t('org.warehouse.intake.proforma', null, 'Proforma')
@@ -815,7 +1000,7 @@ export default function OrgMaterialsIntakePanel({
             {activeIntake.invoice_number ? ` #${activeIntake.invoice_number}` : ''}
           </Text>
           <Text style={styles.meta}>
-            {activeIntake.status}
+            {t('org.warehouse.intake.status', null, 'Status')}: {activeIntake.status}
             {activeIntake.source_file_name ? ` · ${activeIntake.source_file_name}` : ''}
             {activeIntake.layout_id ? ` · ${activeIntake.layout_id}` : ''}
           </Text>
@@ -836,6 +1021,7 @@ export default function OrgMaterialsIntakePanel({
             </View>
           ) : (
             <Text style={styles.meta}>
+              {t('org.warehouse.intake.supplier', null, 'Supplier')}:{' '}
               {activeIntake.supplier_name
                 || t('org.warehouse.intake.unknownSupplier', null, 'Supplier unknown')}
             </Text>
@@ -852,6 +1038,41 @@ export default function OrgMaterialsIntakePanel({
                 ? ` — ${t('org.warehouse.intake.vatMismatchShort', null, 'mismatch')}`
                 : ''}
             </Text>
+          ) : null}
+
+          {activeIntake.status === 'draft' && canManage ? (
+            <View style={styles.locationBox}>
+              <Text style={styles.sectionLabel}>
+                {t('org.warehouse.intake.storeLocation', null, 'Store into location')}
+              </Text>
+              {activeLocations.length === 0 ? (
+                <Text style={styles.helper}>
+                  {t(
+                    'org.warehouse.intake.noLocations',
+                    null,
+                    'Add a location under Locations (e.g. Baza / Port 1) before confirming.',
+                  )}
+                </Text>
+              ) : (
+                <View style={styles.unitRow}>
+                  {activeLocations.map((loc) => {
+                    const selected = Number(confirmLocationId) === Number(loc.id);
+                    return (
+                      <Pressable
+                        key={loc.id}
+                        onPress={() => setConfirmLocationId(loc.id)}
+                        style={[styles.unitChip, selected && styles.unitChipSelected]}
+                      >
+                        <Text style={[styles.unitChipText, selected && styles.unitChipTextSelected]}>
+                          {loc.name || loc.code}
+                          {loc.code && loc.name !== loc.code ? ` (${loc.code})` : ''}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
           ) : null}
 
           {(activeIntake.lines || []).length === 0 ? (
@@ -882,7 +1103,7 @@ export default function OrgMaterialsIntakePanel({
                     onSave={onSaveLine}
                     onConfirmRow={onConfirmRow}
                     onDeleteLine={onDeleteLine}
-                    vatBlocked={vatBlocked}
+                    vatBlocked={confirmBlocked}
                   />
                 ))}
               </View>
@@ -943,14 +1164,14 @@ export default function OrgMaterialsIntakePanel({
                 {t(
                   'org.warehouse.intake.confirmHint',
                   null,
-                  'Confirm writes each line as a warehouse SKU and adds quantity on hand. Original invoice is kept permanently.',
+                  'Pick a location, then Confirm. Writes each line as a warehouse SKU and adds quantity on hand. Original invoice is kept permanently.',
                 )}
               </Text>
               <Button
                 mode="contained"
                 onPress={onConfirmAll}
                 loading={busy}
-                disabled={busy || vatBlocked}
+                disabled={busy || confirmBlocked}
                 style={styles.primaryBtn}
               >
                 {t('org.warehouse.intake.confirm', null, 'Confirm all → warehouse')}
@@ -969,45 +1190,80 @@ export default function OrgMaterialsIntakePanel({
         </AppCard>
       ) : null}
 
-      {isDocuments && intakes.length > 0 ? (
+      {isDocuments && !detailOpen && intakes.length > 0 ? (
         <>
           <Text style={styles.chromeSectionTitle}>
             {t('org.warehouse.intake.history', null, 'Recent imports')}
           </Text>
-          {intakes.slice(0, 12).map((row) => (
-            <AppCard key={row.id} style={styles.card}>
-              <Pressable onPress={() => openIntake(row)}>
-                <Text style={styles.lineName}>
-                  {row.invoice_number || `#${row.id}`} · {row.status}
-                </Text>
-                <Text style={styles.lineMeta}>
-                  {row.supplier_name || '—'} · {row.lines_count || 0}{' '}
-                  {t('org.warehouse.intake.lines', null, 'lines')}
-                  {row.source_file_name ? ` · ${row.source_file_name}` : ''}
-                </Text>
-              </Pressable>
-              {row.status === 'draft' && canManage ? (
-                <Button
-                  mode="outlined"
-                  compact
-                  textColor="#B91C1C"
-                  onPress={() => onDeleteDraft(row)}
-                  disabled={busy}
-                  style={styles.deleteOutlined}
-                >
-                  {t('org.warehouse.intake.delete', null, 'Delete draft')}
-                </Button>
-              ) : row.status === 'confirmed' ? (
-                <Text style={styles.keptNote}>
-                  {t(
-                    'org.warehouse.intake.keptForever',
-                    null,
-                    'Confirmed — original kept permanently',
-                  )}
-                </Text>
-              ) : null}
-            </AppCard>
-          ))}
+          <TextInput
+            label={t(
+              'org.warehouse.intake.searchDocs',
+              null,
+              'Search by number or supplier',
+            )}
+            value={docQuery}
+            onChangeText={setDocQuery}
+            mode="outlined"
+            style={styles.searchInput}
+            textColor={ON_CARD}
+            dense
+            right={
+              docQuery ? (
+                <TextInput.Icon icon="close" onPress={() => setDocQuery('')} />
+              ) : (
+                <TextInput.Icon icon="magnify" />
+              )
+            }
+          />
+          {filteredIntakes.length === 0 ? (
+            <EmptyStateCard
+              title={t('org.warehouse.intake.searchDocsEmptyTitle', null, 'No matching documents')}
+              subtitle={t(
+                'org.warehouse.intake.searchDocsEmpty',
+                { query: docQuery.trim() },
+                `Nothing matched “${docQuery.trim()}”.`,
+              )}
+              icon="magnify"
+            />
+          ) : (
+            filteredIntakes.map((row) => (
+              <AppCard key={row.id} style={styles.card}>
+                <Pressable onPress={() => openIntake(row)}>
+                  <Text style={styles.lineName}>
+                    {row.invoice_number || `#${row.id}`} · {row.status}
+                  </Text>
+                  <Text style={styles.lineMeta}>
+                    {row.supplier_name || '—'} · {row.lines_count || 0}{' '}
+                    {t('org.warehouse.intake.lines', null, 'lines')}
+                    {row.source_file_name ? ` · ${row.source_file_name}` : ''}
+                  </Text>
+                  <Text style={styles.openHint}>
+                    {t('org.warehouse.intake.openDetail', null, 'Open document detail')}
+                  </Text>
+                </Pressable>
+                {row.status === 'draft' && canManage ? (
+                  <Button
+                    mode="outlined"
+                    compact
+                    textColor="#B91C1C"
+                    onPress={() => onDeleteDraft(row)}
+                    disabled={busy}
+                    style={styles.deleteOutlined}
+                  >
+                    {t('org.warehouse.intake.delete', null, 'Delete draft')}
+                  </Button>
+                ) : row.status === 'confirmed' ? (
+                  <Text style={styles.keptNote}>
+                    {t(
+                      'org.warehouse.intake.keptForever',
+                      null,
+                      'Confirmed — original kept permanently',
+                    )}
+                  </Text>
+                ) : null}
+              </AppCard>
+            ))
+          )}
         </>
       ) : null}
 
@@ -1147,6 +1403,9 @@ export default function OrgMaterialsIntakePanel({
                       {row.part_number ? `${row.part_number} · ` : ''}
                       {t('org.warehouse.intake.onHand', null, 'On hand')}: {row.quantity_on_hand}
                       {row.unit_code ? ` ${unitDisplay(row.unit_code, t)}` : ''}
+                      {row.location_name
+                        ? ` · ${t('org.warehouse.intake.atLocation', null, 'at')} ${row.location_name}`
+                        : ''}
                       {canManage
                         ? ` · ${t('org.warehouse.intake.tapToEdit', null, 'Tap to edit')}`
                         : ''}
@@ -1180,6 +1439,18 @@ const styles = StyleSheet.create({
   message: { color: '#86EFAC', fontSize: 13 },
   card: { padding: 14, gap: 6 },
   summaryCard: { borderLeftWidth: 4, borderLeftColor: '#15803d' },
+  warnCard: { borderLeftWidth: 4, borderLeftColor: '#B45309' },
+  detailCard: { borderLeftWidth: 4, borderLeftColor: '#0F766E' },
+  detailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
+  },
+  locationBox: { marginTop: 8, marginBottom: 4 },
+  openHint: { color: '#0F766E', fontSize: 12, fontWeight: '600', marginTop: 4 },
   cardTitle: { color: ON_CARD, fontSize: 16, fontWeight: '600' },
   meta: { color: ON_CARD_MUTED, fontSize: 12 },
   helper: { color: ON_CARD_MUTED, fontSize: 13, marginTop: 6, marginBottom: 6 },

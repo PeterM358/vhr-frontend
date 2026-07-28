@@ -28,6 +28,7 @@ export const linkingScreens = {
       OrgCreateTask: 'tasks/new',
       OrgProjects: 'projects',
       OrgWarehouse: 'warehouse',
+      OrgLegalEntity: 'company',
       OrgCalendar: 'calendar',
       OrgWorkforce: 'workforce',
       OrgNetwork: 'network',

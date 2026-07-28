@@ -254,3 +254,56 @@ export async function confirmMaterialsIntake(token, organizationId, intakeId, pa
   if (!response.ok) throw new Error(await parseError(response, 'Failed to confirm intake'));
   return response.json();
 }
+
+export function materialsIntakeFileUrl(organizationId, intakeId) {
+  return `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/materials-intake/${intakeId}/file/`;
+}
+
+/** Open original invoice PDF (auth + blob / signed URL). */
+export async function openMaterialsIntakeFile(token, organizationId, intakeId) {
+  const response = await fetch(materialsIntakeFileUrl(organizationId, intakeId), {
+    headers: authHeaders(token),
+  });
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to open document'));
+  const contentType = (response.headers.get('content-type') || '').toLowerCase();
+  if (contentType.includes('application/json')) {
+    const data = await response.json();
+    const url = data?.url;
+    if (!url) throw new Error('No document URL returned');
+    if (typeof window !== 'undefined' && window.open) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+    return url;
+  }
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  if (typeof window !== 'undefined' && window.open) {
+    window.open(objectUrl, '_blank', 'noopener,noreferrer');
+  }
+  return objectUrl;
+}
+
+export async function getOrganizationLegalEntity(token, organizationId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/legal-entity/`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load legal entity'));
+  return response.json();
+}
+
+export async function updateOrganizationLegalEntity(token, organizationId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/legal-entity/`,
+    {
+      method: 'PATCH',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to save legal entity'));
+  return response.json();
+}

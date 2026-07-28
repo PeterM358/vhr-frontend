@@ -264,6 +264,8 @@ export default function OrgWarehouseScreen({ navigation, route }) {
               organizationId={orgId}
               canManage={canManage}
               section={mode}
+              locations={rows.filter((r) => r.is_active !== false)}
+              navigation={navigation}
             />
           ) : loading ? (
             <ActivityIndicator color="#fff" style={styles.loader} />
