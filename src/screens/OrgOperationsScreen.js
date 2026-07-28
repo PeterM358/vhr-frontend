@@ -52,18 +52,28 @@ const KIND_OPTIONS = [
   { value: 'other', labelKey: 'org.operations.kinds.other' },
 ];
 
-/** Kind → preferred output measure_kinds (worker reports). */
+/** Kind → preferred output measure_kinds (worker reports). Multi-select allowed. */
 const KIND_OUTPUT_MEASURES = {
-  transport: ['distance', 'duration', 'count'],
-  construction: ['area', 'volume', 'mass', 'count'],
-  road_marking: ['area', 'distance', 'count'],
-  field_service: ['count', 'duration', 'area', 'distance'],
-  warehouse_task: ['count', 'mass', 'volume'],
-  labor_only: ['duration'],
+  transport: ['distance', 'duration', 'count', 'volume', 'mass'],
+  construction: ['area', 'volume', 'mass', 'count', 'duration', 'distance'],
+  road_marking: ['area', 'distance', 'count', 'duration', 'volume', 'mass'],
+  field_service: ['count', 'duration', 'area', 'distance', 'volume', 'mass'],
+  warehouse_task: ['count', 'mass', 'volume', 'duration'],
+  labor_only: ['duration', 'count'],
   inspection: ['count', 'duration'],
-  workshop_service: ['duration', 'count'],
-  other: null,
+  workshop_service: ['duration', 'count', 'volume'],
+  other: ['area', 'distance', 'duration', 'volume', 'mass', 'count'],
 };
+
+/** Always offer these measure kinds on Worker reports (in addition to kind prefs). */
+const REPORT_MEASURE_KINDS = [
+  'area',
+  'distance',
+  'duration',
+  'volume',
+  'mass',
+  'count',
+];
 
 /** Kind → preferred consumed-input measure_kinds (for norms). */
 const KIND_INPUT_MEASURES = {
@@ -118,6 +128,7 @@ function emptyFormState() {
     code: '',
     kind: 'transport',
     unitId: null,
+    reportUnitIds: [],
     notes: '',
     isActive: true,
     plannedHours: '',
@@ -196,6 +207,14 @@ function hydrateFromRow(row) {
     code: row.code || '',
     kind: row.activity_kind || 'other',
     unitId: row.unit_id || row.unit?.id || null,
+    reportUnitIds: (() => {
+      const fromList = Array.isArray(row.report_unit_ids)
+        ? row.report_unit_ids.map((id) => Number(id)).filter(Boolean)
+        : [];
+      if (fromList.length) return fromList;
+      const primary = row.unit_id || row.unit?.id;
+      return primary ? [Number(primary)] : [];
+    })(),
     notes: row.notes || '',
     isActive: row.is_active !== false,
     plannedHours: row.planned_hours != null ? String(row.planned_hours) : '',
@@ -404,7 +423,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
         hint: t(
           'org.operations.wizard.stepOutputHint',
           null,
-          'ONE primary output the worker reports (m², km, h…) plus optional time norm in hours.',
+          'Multi-select what the worker reports on this operation (m², hours, km, liters…).',
         ),
       },
       {
@@ -413,7 +432,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
         hint: t(
           'org.operations.wizard.stepMaterialsNormsHint',
           null,
-          'Toggle labor-only vs labor + materials. For each SKU set the norm rate and basis (per output unit or per working hour).',
+          'Toggle labor-only vs labor + materials. Each SKU has its own basis — paint per m² and fuel per working hour can both be set on the same operation.',
         ),
       },
       {
@@ -506,10 +525,11 @@ export default function OrgOperationsScreen({ navigation, route }) {
     [units],
   );
 
-  const outputUnits = useMemo(
-    () => filterUnitsByKind(KIND_OUTPUT_MEASURES[form.kind]),
-    [filterUnitsByKind, form.kind],
-  );
+  const outputUnits = useMemo(() => {
+    const preferred = KIND_OUTPUT_MEASURES[form.kind] || REPORT_MEASURE_KINDS;
+    const kinds = [...new Set([...preferred, ...REPORT_MEASURE_KINDS])];
+    return filterUnitsByKind(kinds);
+  }, [filterUnitsByKind, form.kind]);
 
   const inputUnits = useMemo(
     () => filterUnitsByKind(KIND_INPUT_MEASURES[form.kind]),
@@ -641,7 +661,8 @@ export default function OrgOperationsScreen({ navigation, route }) {
         name: trimmedName,
         code: form.code.trim(),
         activity_kind: form.kind,
-        unit_id: form.unitId || null,
+        report_unit_ids: (form.reportUnitIds || []).slice(0, 12),
+        unit_id: (form.reportUnitIds && form.reportUnitIds[0]) || form.unitId || null,
         notes: form.notes.trim(),
         planned_hours: plannedHours,
         consumes_materials: form.kind === 'labor_only' ? false : Boolean(form.consumesMaterials),
@@ -653,9 +674,10 @@ export default function OrgOperationsScreen({ navigation, route }) {
         payload.norm_basis_qty = form.transportBaseRate.trim() ? '1' : null;
         payload.norm_input_unit_id = form.transportRateUnitId || null;
       } else if (form.kind !== 'labor_only') {
-        const firstId = (form.defaultMaterialIds || [])[0];
-        const firstMeta =
-          firstId != null ? (form.materialNorms && form.materialNorms[firstId]) || {} : {};
+        const firstOutputLine = (form.defaultMaterialIds || [])
+          .map((mid) => (form.materialNorms && form.materialNorms[mid]) || {})
+          .find((meta) => meta.basis !== 'work_hours' && String(meta.rate || '').trim());
+        const firstMeta = firstOutputLine || {};
         payload.norm_rate =
           String(firstMeta.rate || '').trim() || form.normRate.trim() || null;
         payload.norm_basis_qty =
@@ -763,8 +785,61 @@ export default function OrgOperationsScreen({ navigation, route }) {
     </View>
   );
 
+  const toggleReportUnit = (unitId) => {
+    setForm((prev) => {
+      const current = Array.isArray(prev.reportUnitIds) ? prev.reportUnitIds : [];
+      const exists = current.includes(unitId);
+      const next = exists
+        ? current.filter((id) => id !== unitId)
+        : [...current, unitId].slice(0, 12);
+      return {
+        ...prev,
+        reportUnitIds: next,
+        unitId: next[0] || null,
+      };
+    });
+  };
+
+  const renderMultiReportUnitChips = (unitList = outputUnits) => (
+    <View style={styles.kindWrap}>
+      <Pressable
+        onPress={() =>
+          setForm((prev) => ({ ...prev, reportUnitIds: [], unitId: null }))
+        }
+        style={[
+          styles.kindChip,
+          !(form.reportUnitIds || []).length && styles.kindChipActive,
+        ]}
+      >
+        <Text
+          style={[
+            styles.kindChipText,
+            !(form.reportUnitIds || []).length && styles.kindChipTextActive,
+          ]}
+        >
+          {t('org.operations.unitNone', null, 'None')}
+        </Text>
+      </Pressable>
+      {unitList.map((unit) => {
+        const active = (form.reportUnitIds || []).includes(unit.id);
+        return (
+          <Pressable
+            key={unit.id}
+            onPress={() => toggleReportUnit(unit.id)}
+            style={[styles.kindChip, active && styles.kindChipActive]}
+          >
+            <Text style={[styles.kindChipText, active && styles.kindChipTextActive]}>
+              {unitLabel(unit)}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
   const renderNormsByKind = () => {
-    const outputUnit = unitLabel(findUnit(form.unitId)) || 'm²';
+    const outputUnit =
+      unitLabel(findUnit((form.reportUnitIds || [])[0] || form.unitId)) || 'm²';
     const inputUnit = unitLabel(findUnit(form.normInputUnitId)) || 'L';
 
     if (form.kind === 'transport') {
@@ -1002,26 +1077,42 @@ export default function OrgOperationsScreen({ navigation, route }) {
       );
     }
     if (stepKey === 'output') {
+      const selectedReportLabels = (form.reportUnitIds || [])
+        .map((id) => unitLabel(findUnit(id)))
+        .filter(Boolean);
       return (
         <>
           <Text style={styles.fieldLabel}>
-            {t('org.operations.wizard.workerReportsLabel', null, 'Worker reports (output)')}
+            {t(
+              'org.operations.wizard.workerReportsLabel',
+              null,
+              'Worker reports — multi-select',
+            )}
           </Text>
           <Text style={styles.helper}>
             {t(
               'org.operations.wizard.outputUnitHelper',
               null,
-              'ONE primary output only (m² or km). Paint/fuel liters are NOT selected here — they are norms + leftovers later.',
+              'Select every unit the worker will fill on the task (e.g. m² + hours for a marking machine, or km + hours for transport).',
             )}
           </Text>
-          {renderUnitChips(form.unitId, (id) => setField('unitId', id), outputUnits)}
+          {renderMultiReportUnitChips(outputUnits)}
+          {selectedReportLabels.length ? (
+            <Text style={styles.helper}>
+              {t(
+                'org.operations.wizard.reportUnitsSelected',
+                { units: selectedReportLabels.join(' · ') },
+                `Selected: ${selectedReportLabels.join(' · ')}`,
+              )}
+            </Text>
+          ) : null}
           <Text style={styles.helper}>
             {t(
               kindExampleKey(form.kind),
               null,
               form.kind === 'transport'
-                ? 'Example: Sofia–Varna haul → km + ~9 h.'
-                : 'Example: hidroizolaciq → m².',
+                ? 'Example: Sofia–Varna haul → km + hours.'
+                : 'Example: marking machine → m² + working hours.',
             )}
           </Text>
           {form.kind !== 'labor_only' ? (
@@ -1040,7 +1131,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
                 {t(
                   'org.operations.wizard.plannedHoursHelper',
                   null,
-                  'Numeric hours only (e.g. 9). Not a rate — rates belong on the next step.',
+                  'Optional planned hours when hours are not selected as a report unit. Material fuel norms can use reported working hours.',
                 )}
               </Text>
             </>
@@ -1067,7 +1158,45 @@ export default function OrgOperationsScreen({ navigation, route }) {
           (m) => !selectedMaterials.some((s) => Number(s.id) === Number(m.id)),
         ),
       ];
-      const outputUnitLbl = unitLabel(findUnit(form.unitId)) || 'm²';
+      const primaryReportId = (form.reportUnitIds || [])[0] || form.unitId;
+      const areaReport =
+        (form.reportUnitIds || [])
+          .map((id) => findUnit(id))
+          .find((u) => u && String(u.measure_kind || '').toLowerCase() === 'area') ||
+        findUnit(primaryReportId);
+      const outputUnitLbl = unitLabel(areaReport) || unitLabel(findUnit(primaryReportId)) || 'm²';
+      const dualNormSummary = (() => {
+        const parts = selectedIds
+          .map((mid) => {
+            const meta = (form.materialNorms && form.materialNorms[mid]) || {};
+            if (!String(meta.rate || '').trim()) return null;
+            const mat =
+              selectedMaterials.find((m) => Number(m.id) === Number(mid)) ||
+              catalogRows.find((m) => Number(m.id) === Number(mid));
+            const inputUnit =
+              unitLabel(findUnit(meta.unitId)) ||
+              unitLabel(findUnit(form.materialUnitId)) ||
+              '';
+            const basisLabel =
+              meta.basis === 'work_hours'
+                ? t('org.operations.basisWorkHoursShort', null, 'h')
+                : outputUnitLbl;
+            const name = materialLabel(mat) || `#${mid}`;
+            return t(
+              'org.operations.materialNormLineSummary',
+              {
+                rate: meta.rate,
+                input: inputUnit,
+                per: meta.perQty || '1',
+                basis: basisLabel,
+                name,
+              },
+              `${meta.rate}${inputUnit ? ` ${inputUnit}` : ''} / ${meta.perQty || '1'} ${basisLabel} (${name})`,
+            );
+          })
+          .filter(Boolean);
+        return parts.length ? parts.join(' + ') : '';
+      })();
       return (
         <>
           {form.kind === 'transport' ? (
@@ -1091,13 +1220,20 @@ export default function OrgOperationsScreen({ navigation, route }) {
             {t(
               'org.operations.wizard.materialsNormsCoupledHint',
               null,
-              'Off = labor-only. On = pick SKUs and set each norm (e.g. paint 0.5 kg per 1 m²; machine fuel 3 L per working hour). Worker still reports ONE output unit.',
+              'Off = labor-only. On = add separate SKU lines (e.g. paint per m² AND machine fuel per working hour). Both bases can be set on the same operation.',
             )}
           </Text>
           {form.consumesMaterials ? (
             <>
               <Text style={styles.fieldLabel}>
                 {t('org.operations.defaultMaterials', null, 'Default materials (SKUs)')}
+              </Text>
+              <Text style={styles.helper}>
+                {t(
+                  'org.operations.wizard.dualMaterialSlotsHint',
+                  null,
+                  'Add at least two lines when needed: (1) paint/thinner → rate per m², (2) fuel → rate per working hour + L.',
+                )}
               </Text>
               <TextInput
                 label={t('org.operations.searchMaterials', null, 'Search materials')}
@@ -1152,7 +1288,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
                   )}
                 </Text>
               ) : (
-                selectedIds.map((mid) => {
+                selectedIds.map((mid, lineIdx) => {
                   const mat =
                     selectedMaterials.find((m) => Number(m.id) === Number(mid)) ||
                     catalogRows.find((m) => Number(m.id) === Number(mid));
@@ -1165,7 +1301,16 @@ export default function OrgOperationsScreen({ navigation, route }) {
                   const basisIsHours = meta.basis === 'work_hours';
                   return (
                     <View key={mid} style={styles.materialNormBlock}>
-                      <Text style={styles.opTitleInline}>{materialLabel(mat) || `#${mid}`}</Text>
+                      <Text style={styles.opTitleInline}>
+                        {t(
+                          'org.operations.materialNormLineTitle',
+                          {
+                            n: lineIdx + 1,
+                            name: materialLabel(mat) || `#${mid}`,
+                          },
+                          `Line ${lineIdx + 1}: ${materialLabel(mat) || `#${mid}`}`,
+                        )}
+                      </Text>
                       <TextInput
                         label={t(
                           'org.operations.materialNormRate',
@@ -1205,7 +1350,18 @@ export default function OrgOperationsScreen({ navigation, route }) {
                         textColor={ON_CARD}
                       />
                       <Text style={styles.fieldLabel}>
-                        {t('org.operations.materialNormBasis', null, 'Norm basis')}
+                        {t(
+                          'org.operations.materialNormBasis',
+                          null,
+                          'Basis for this SKU',
+                        )}
+                      </Text>
+                      <Text style={styles.helper}>
+                        {t(
+                          'org.operations.materialNormBasisHelper',
+                          null,
+                          'Per-SKU only — not for the whole operation. Paint → per m²; fuel → per working hour. Both can be set together.',
+                        )}
                       </Text>
                       <View style={styles.kindWrap}>
                         <Pressable
@@ -1261,6 +1417,15 @@ export default function OrgOperationsScreen({ navigation, route }) {
                   );
                 })
               )}
+              {dualNormSummary ? (
+                <Text style={[styles.helper, styles.opTitleInline]}>
+                  {t(
+                    'org.operations.wizard.dualNormsSummary',
+                    { summary: dualNormSummary },
+                    `Norms: ${dualNormSummary}`,
+                  )}
+                </Text>
+              ) : null}
             </>
           ) : null}
         </>
@@ -1323,9 +1488,14 @@ export default function OrgOperationsScreen({ navigation, route }) {
         </Text>
         <Text style={styles.reviewLine}>
           <Text style={styles.reviewKey}>
-            {t('org.operations.wizard.workerReportsLabel', null, 'Worker reports (output)')}:{' '}
+            {t('org.operations.wizard.workerReportsLabel', null, 'Worker reports')}:{' '}
           </Text>
-          {unitLabel(findUnit(form.unitId)) || t('org.operations.unitNone', null, 'None')}
+          {(form.reportUnitIds || [])
+            .map((id) => unitLabel(findUnit(id)))
+            .filter(Boolean)
+            .join(' · ') ||
+            unitLabel(findUnit(form.unitId)) ||
+            t('org.operations.unitNone', null, 'None')}
         </Text>
         <Text style={styles.reviewLine}>
           <Text style={styles.reviewKey}>

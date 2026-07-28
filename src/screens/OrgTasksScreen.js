@@ -139,8 +139,59 @@ function isDistanceOutput(op) {
   return symbol === 'km' || symbol.includes('km');
 }
 
+function reportUnitsForOp(op) {
+  const units = Array.isArray(op?.activity?.report_units) ? op.activity.report_units : [];
+  if (units.length) return units;
+  if (op?.activity?.unit) return [op.activity.unit];
+  return [];
+}
+
+function isKmUnit(unit) {
+  const code = String(unit?.code || '').toUpperCase();
+  const symbol = String(unit?.symbol || unit?.name || '').toLowerCase();
+  return code === 'KM' || symbol === 'km';
+}
+
+function isDurationUnit(unit) {
+  return String(unit?.measure_kind || '').toLowerCase() === 'duration';
+}
+
+function hasKmMeterInput(op) {
+  return reportUnitsForOp(op).some(isKmUnit);
+}
+
+/** Worker-facing label for a specific report unit. */
+function reportUnitFieldLabel(unit, t) {
+  const label = unit?.symbol || unit?.name || unit?.code || '';
+  const measure = String(unit?.measure_kind || '').toLowerCase();
+  if (measure === 'area' || label === 'm²' || String(label).toLowerCase() === 'm2') {
+    return t('org.tasks.outputArea', { unit: label || 'm²' }, `Painted area (${label || 'm²'})`);
+  }
+  if (measure === 'distance' || isKmUnit(unit)) {
+    return t('org.tasks.outputDistance', { unit: label || 'km' }, `Distance (${label || 'km'})`);
+  }
+  if (measure === 'volume' || String(label).toUpperCase() === 'L') {
+    return t('org.tasks.outputVolume', { unit: label || 'L' }, `Volume (${label || 'L'})`);
+  }
+  if (measure === 'mass' || measure === 'weight') {
+    return t('org.tasks.outputWeight', { unit: label || 'kg' }, `Weight (${label || 'kg'})`);
+  }
+  if (measure === 'count') {
+    return t('org.tasks.outputCount', { unit: label || 'pcs' }, `Count (${label || 'pcs'})`);
+  }
+  if (measure === 'duration' || measure === 'time') {
+    return t('org.tasks.outputHours', { unit: label || 'h' }, `Working hours (${label || 'h'})`);
+  }
+  if (label) {
+    return t('org.tasks.outputWithUnit', { unit: label }, `Output (${label})`);
+  }
+  return t('org.tasks.outputGeneric', null, 'Output completed');
+}
+
 /** Worker-facing label for the one output field — never bare "Actual quantity". */
 function outputFieldLabel(op, t) {
+  const units = reportUnitsForOp(op);
+  if (units.length === 1) return reportUnitFieldLabel(units[0], t);
   const unit = opUnitLabel(op);
   const measure = String(op?.activity?.measure_kind || op?.activity?.unit?.measure_kind || '').toLowerCase();
   if (measure === 'area' || unit === 'm²' || String(unit).toLowerCase() === 'm2') {
@@ -165,6 +216,70 @@ function outputFieldLabel(op, t) {
     return t('org.tasks.outputWithUnit', { unit }, `Output (${unit})`);
   }
   return t('org.tasks.outputGeneric', null, 'Output completed');
+}
+
+function hydrateActualByUnitDrafts(operations) {
+  const drafts = {};
+  (operations || []).forEach((op) => {
+    const map = {};
+    const stored = op.actual_by_unit && typeof op.actual_by_unit === 'object' ? op.actual_by_unit : {};
+    reportUnitsForOp(op).forEach((unit) => {
+      const uid = unit.id;
+      const fromStored = stored[String(uid)] ?? stored[uid];
+      if (fromStored != null && String(fromStored).trim() !== '') {
+        map[uid] = String(fromStored);
+      } else if (
+        Number(uid) === Number(op.activity?.unit_id) &&
+        op.actual_qty != null
+      ) {
+        map[uid] = String(op.actual_qty);
+      } else {
+        map[uid] = '';
+      }
+    });
+    drafts[op.id] = map;
+  });
+  return drafts;
+}
+
+function primaryOutputDraft(op, actualByUnitDrafts, actualDrafts, meterStartDrafts, meterEndDrafts) {
+  const units = reportUnitsForOp(op);
+  const byUnit = (actualByUnitDrafts && actualByUnitDrafts[op.id]) || {};
+  if (hasKmMeterInput(op)) {
+    const start = Number(String((meterStartDrafts && meterStartDrafts[op.id]) || '').replace(',', '.'));
+    const end = Number(String((meterEndDrafts && meterEndDrafts[op.id]) || '').replace(',', '.'));
+    if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
+      return String(end - start);
+    }
+  }
+  const primaryId = op.activity?.unit_id || (units[0] && units[0].id);
+  if (primaryId != null && byUnit[primaryId] != null && String(byUnit[primaryId]).trim() !== '') {
+    return String(byUnit[primaryId]);
+  }
+  const nonDuration = units.find((u) => !isDurationUnit(u) && !isKmUnit(u));
+  if (nonDuration && byUnit[nonDuration.id] != null && String(byUnit[nonDuration.id]).trim() !== '') {
+    return String(byUnit[nonDuration.id]);
+  }
+  if (actualDrafts && actualDrafts[op.id] != null && String(actualDrafts[op.id]).trim() !== '') {
+    return String(actualDrafts[op.id]);
+  }
+  return op.actual_qty != null
+    ? String(op.actual_qty)
+    : op.planned_qty != null
+      ? String(op.planned_qty)
+      : '';
+}
+
+function workHoursDraft(op, actualByUnitDrafts) {
+  const units = reportUnitsForOp(op);
+  const byUnit = (actualByUnitDrafts && actualByUnitDrafts[op.id]) || {};
+  const duration = units.find(isDurationUnit);
+  if (duration && byUnit[duration.id] != null && String(byUnit[duration.id]).trim() !== '') {
+    return String(byUnit[duration.id]);
+  }
+  if (op.planned_hours != null) return String(op.planned_hours);
+  if (op.activity?.planned_hours != null) return String(op.activity.planned_hours);
+  return '';
 }
 
 /** Mirror backend compute_expected_input_qty for live draft suggestions. */
@@ -370,6 +485,7 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [photoDraft, setPhotoDraft] = useState('');
   const [documentDraft, setDocumentDraft] = useState('');
   const [actualDrafts, setActualDrafts] = useState({});
+  const [actualByUnitDrafts, setActualByUnitDrafts] = useState({});
   const [meterStartDrafts, setMeterStartDrafts] = useState({});
   const [meterEndDrafts, setMeterEndDrafts] = useState({});
   const [leftoverDrafts, setLeftoverDrafts] = useState({});
@@ -487,6 +603,7 @@ export default function OrgTasksScreen({ navigation, route }) {
             meterEnds[op.id] = op.meter_end != null ? String(op.meter_end) : '';
           });
           setActualDrafts(drafts);
+          setActualByUnitDrafts(hydrateActualByUnitDrafts(detail.operations));
           setMeterStartDrafts(meterStarts);
           setMeterEndDrafts(meterEnds);
           setLeftoverDrafts(buildLeftoverDrafts(detail.operations, detail.materials));
@@ -557,6 +674,7 @@ export default function OrgTasksScreen({ navigation, route }) {
       meterEnds[op.id] = op.meter_end != null ? String(op.meter_end) : '';
     });
     setActualDrafts(drafts);
+    setActualByUnitDrafts(hydrateActualByUnitDrafts(updated.operations));
     setMeterStartDrafts(meterStarts);
     setMeterEndDrafts(meterEnds);
     setLeftoverDrafts(buildLeftoverDrafts(updated.operations, updated.materials));
@@ -572,17 +690,35 @@ export default function OrgTasksScreen({ navigation, route }) {
     const ops = selected?.operations || [];
     const materials = selected?.materials || [];
     return ops.map((op) => {
-      const distance = isDistanceOutput(op);
+      const units = reportUnitsForOp(op);
+      const byUnit = actualByUnitDrafts[op.id] || {};
       const payload = { id: op.id };
-      if (distance) {
+      const actualByUnit = {};
+      units.forEach((unit) => {
+        if (isKmUnit(unit)) return;
+        const raw = byUnit[unit.id];
+        if (raw != null && String(raw).trim() !== '') {
+          actualByUnit[String(unit.id)] = String(raw).trim();
+        }
+      });
+      if (Object.keys(actualByUnit).length) {
+        payload.actual_by_unit = actualByUnit;
+      }
+      if (hasKmMeterInput(op)) {
         if (meterStartDrafts[op.id] != null && String(meterStartDrafts[op.id]).trim() !== '') {
           payload.meter_start = String(meterStartDrafts[op.id]).trim();
         }
         if (meterEndDrafts[op.id] != null && String(meterEndDrafts[op.id]).trim() !== '') {
           payload.meter_end = String(meterEndDrafts[op.id]).trim();
         }
-      } else if (actualDrafts[op.id] != null && String(actualDrafts[op.id]).trim() !== '') {
+      } else if (
+        !units.length &&
+        actualDrafts[op.id] != null &&
+        String(actualDrafts[op.id]).trim() !== ''
+      ) {
         payload.actual_qty = String(actualDrafts[op.id]).trim();
+      } else if (units.length === 1 && actualByUnit[String(units[0].id)]) {
+        payload.actual_qty = actualByUnit[String(units[0].id)];
       }
       const leftovers = [];
       const seen = new Set();
@@ -615,6 +751,7 @@ export default function OrgTasksScreen({ navigation, route }) {
     meterStartDrafts,
     meterEndDrafts,
     actualDrafts,
+    actualByUnitDrafts,
     leftoverDrafts,
     firstConsumingOpId,
   ]);
@@ -868,37 +1005,18 @@ export default function OrgTasksScreen({ navigation, route }) {
         };
       }
       for (const op of selected?.operations || []) {
-        const liveQty =
-          actualDrafts[op.id] ||
-          (isDistanceOutput(op)
-            ? null
-            : op.actual_qty != null
-              ? String(op.actual_qty)
-              : op.planned_qty != null
-                ? String(op.planned_qty)
-                : '');
-        const hoursFallback =
-          op.planned_hours != null
-            ? String(op.planned_hours)
-            : op.activity?.planned_hours != null
-              ? String(op.activity.planned_hours)
-              : '';
+        const liveQty = primaryOutputDraft(
+          op,
+          actualByUnitDrafts,
+          actualDrafts,
+          meterStartDrafts,
+          meterEndDrafts,
+        );
+        const hoursFallback = workHoursDraft(op, actualByUnitDrafts);
         const line = materialLinesForOp(op).find((l) => Number(l.material_id) === mid);
         if (line?.rate != null) {
-          let outputForLine = liveQty;
-          if (isDistanceOutput(op)) {
-            const start = Number(
-              String(meterStartDrafts[op.id] || op.meter_start || '').replace(',', '.'),
-            );
-            const end = Number(
-              String(meterEndDrafts[op.id] || op.meter_end || '').replace(',', '.'),
-            );
-            if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
-              outputForLine = String(end - start);
-            }
-          }
           const qty = computeLineSuggestedQty(line, {
-            outputQty: outputForLine,
+            outputQty: liveQty,
             workHours: hoursFallback,
           });
           if (qty != null) {
@@ -906,16 +1024,10 @@ export default function OrgTasksScreen({ navigation, route }) {
           }
         }
         let expected = null;
-        if (isDistanceOutput(op)) {
-          const start = Number(String(meterStartDrafts[op.id] || op.meter_start || '').replace(',', '.'));
-          const end = Number(String(meterEndDrafts[op.id] || op.meter_end || '').replace(',', '.'));
-          if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
-            expected = computeExpectedFromNorms(op, end - start);
-          } else if (op.expected_input_qty != null) {
-            expected = String(op.expected_input_qty);
-          }
-        } else if (liveQty) {
-          expected = computeExpectedFromNorms(op, liveQty) || (op.expected_input_qty != null ? String(op.expected_input_qty) : null);
+        if (liveQty) {
+          expected =
+            computeExpectedFromNorms(op, liveQty) ||
+            (op.expected_input_qty != null ? String(op.expected_input_qty) : null);
         } else if (op.expected_input_qty != null) {
           expected = String(op.expected_input_qty);
         }
@@ -935,6 +1047,7 @@ export default function OrgTasksScreen({ navigation, route }) {
     [
       selected,
       actualDrafts,
+      actualByUnitDrafts,
       meterStartDrafts,
       meterEndDrafts,
       plannedIssueOutput,
@@ -1271,44 +1384,45 @@ export default function OrgTasksScreen({ navigation, route }) {
               <Text style={styles.section}>
                 {t('org.tasks.operationsTitle', null, 'Operations in this task')}
               </Text>
-              <Text style={styles.opMeta}>
+                            <Text style={styles.opMeta}>
                 {t(
                   'org.tasks.actualsHint',
                   null,
-                  'Fill the labeled output for each operation (e.g. painted m² or distance). Materials leftovers are in Materials. Start/End only track time.',
+                  'Fill each report unit for the operation (e.g. painted m² and working hours). Warehouse leftovers stay under Materials.',
                 )}
               </Text>
               {(selected.operations || []).map((op, idx) => {
                 const editable =
                   canShowEndButton(selected) || selected.status === 'in_progress';
                 const unitLabelText = opUnitLabel(op);
-                const distance = isDistanceOutput(op);
-                const draftQty = actualDrafts[op.id] || '';
-                const liveExpected =
-                  !distance && draftQty
-                    ? computeExpectedFromNorms(op, draftQty)
-                    : distance
-                      ? (() => {
-                          const start = Number(
-                            String(meterStartDrafts[op.id] || '').replace(',', '.'),
-                          );
-                          const end = Number(
-                            String(meterEndDrafts[op.id] || '').replace(',', '.'),
-                          );
-                          if (
-                            Number.isFinite(start) &&
-                            Number.isFinite(end) &&
-                            end >= start
-                          ) {
-                            return computeExpectedFromNorms(op, end - start);
-                          }
-                          return null;
-                        })()
-                      : null;
+                const reportUnits = reportUnitsForOp(op);
+                const showKmMeters = hasKmMeterInput(op);
+                const draftQty = primaryOutputDraft(
+                  op,
+                  actualByUnitDrafts,
+                  actualDrafts,
+                  meterStartDrafts,
+                  meterEndDrafts,
+                );
+                const liveExpected = draftQty
+                  ? computeExpectedFromNorms(op, draftQty)
+                  : null;
                 const expectedQty =
                   liveExpected ||
                   (op.expected_input_qty != null ? String(op.expected_input_qty) : null);
                 const expectedUnit = expectedInputUnit(op);
+                const setUnitDraft = (unitId, value) => {
+                  setActualByUnitDrafts((prev) => ({
+                    ...prev,
+                    [op.id]: {
+                      ...(prev[op.id] || {}),
+                      [unitId]: value,
+                    },
+                  }));
+                  if (Number(unitId) === Number(op.activity?.unit_id)) {
+                    setActualDrafts((prev) => ({ ...prev, [op.id]: value }));
+                  }
+                };
                 return (
                   <View key={op.id || idx} style={styles.opRow}>
                     <Text style={styles.opTitle}>
@@ -1321,52 +1435,70 @@ export default function OrgTasksScreen({ navigation, route }) {
                       </Text>
                     ) : null}
                     {editable ? (
-                      distance ? (
-                        <>
-                          <TextInput
-                            label={t('org.tasks.meterStart', null, 'Meter start')}
-                            value={meterStartDrafts[op.id] || ''}
-                            onChangeText={(value) =>
-                              setMeterStartDrafts((prev) => ({ ...prev, [op.id]: value }))
-                            }
-                            mode="outlined"
-                            keyboardType="decimal-pad"
-                            style={styles.input}
-                            textColor={ON_CARD}
-                          />
-                          <TextInput
-                            label={t('org.tasks.meterEnd', null, 'Meter end')}
-                            value={meterEndDrafts[op.id] || ''}
-                            onChangeText={(value) =>
-                              setMeterEndDrafts((prev) => ({ ...prev, [op.id]: value }))
-                            }
-                            mode="outlined"
-                            keyboardType="decimal-pad"
-                            style={styles.input}
-                            textColor={ON_CARD}
-                          />
-                          <Text style={styles.opMeta}>
-                            {t(
-                              'org.tasks.meterKmHint',
-                              null,
-                              'Distance (km) = meter end − start.',
-                            )}
-                          </Text>
-                        </>
-                      ) : (
-                        <TextInput
-                          label={outputFieldLabel(op, t)}
-                          value={actualDrafts[op.id] || ''}
-                          onChangeText={(value) =>
-                            setActualDrafts((prev) => ({ ...prev, [op.id]: value }))
-                          }
-                          mode="outlined"
-                          keyboardType="decimal-pad"
-                          style={styles.input}
-                          textColor={ON_CARD}
-                        />
-                      )
-                    ) : distance && (op.meter_start != null || op.meter_end != null) ? (
+                      <>
+                        {showKmMeters ? (
+                          <>
+                            <TextInput
+                              label={t('org.tasks.meterStart', null, 'Meter start')}
+                              value={meterStartDrafts[op.id] || ''}
+                              onChangeText={(value) =>
+                                setMeterStartDrafts((prev) => ({ ...prev, [op.id]: value }))
+                              }
+                              mode="outlined"
+                              keyboardType="decimal-pad"
+                              style={styles.input}
+                              textColor={ON_CARD}
+                            />
+                            <TextInput
+                              label={t('org.tasks.meterEnd', null, 'Meter end')}
+                              value={meterEndDrafts[op.id] || ''}
+                              onChangeText={(value) =>
+                                setMeterEndDrafts((prev) => ({ ...prev, [op.id]: value }))
+                              }
+                              mode="outlined"
+                              keyboardType="decimal-pad"
+                              style={styles.input}
+                              textColor={ON_CARD}
+                            />
+                            <Text style={styles.opMeta}>
+                              {t(
+                                'org.tasks.meterKmHint',
+                                null,
+                                'Distance (km) = meter end − start.',
+                              )}
+                            </Text>
+                          </>
+                        ) : null}
+                        {reportUnits.length
+                          ? reportUnits
+                              .filter((unit) => !isKmUnit(unit))
+                              .map((unit) => (
+                                <TextInput
+                                  key={`${op.id}-${unit.id}`}
+                                  label={reportUnitFieldLabel(unit, t)}
+                                  value={(actualByUnitDrafts[op.id] || {})[unit.id] || ''}
+                                  onChangeText={(value) => setUnitDraft(unit.id, value)}
+                                  mode="outlined"
+                                  keyboardType="decimal-pad"
+                                  style={styles.input}
+                                  textColor={ON_CARD}
+                                />
+                              ))
+                          : !showKmMeters ? (
+                            <TextInput
+                              label={outputFieldLabel(op, t)}
+                              value={actualDrafts[op.id] || ''}
+                              onChangeText={(value) =>
+                                setActualDrafts((prev) => ({ ...prev, [op.id]: value }))
+                              }
+                              mode="outlined"
+                              keyboardType="decimal-pad"
+                              style={styles.input}
+                              textColor={ON_CARD}
+                            />
+                          ) : null}
+                      </>
+                    ) : showKmMeters && (op.meter_start != null || op.meter_end != null) ? (
                       <Text style={styles.opMeta}>
                         {t('org.tasks.meterStart', null, 'Meter start')}: {op.meter_start ?? '—'}
                         {' · '}
@@ -1375,12 +1507,36 @@ export default function OrgTasksScreen({ navigation, route }) {
                           ? ` · ${t('org.tasks.outputDistance', { unit: unitLabelText || 'km' }, `Distance (${unitLabelText || 'km'})`)}: ${op.actual_qty}`
                           : ''}
                       </Text>
-                    ) : op.actual_qty != null ? (
+                    ) : (
                       <Text style={styles.opMeta}>
-                        {outputFieldLabel(op, t)}: {op.actual_qty}
-                        {unitLabelText ? ` ${unitLabelText}` : ''}
+                        {reportUnits.length
+                          ? reportUnits
+                              .map((unit) => {
+                                const stored =
+                                  (op.actual_by_unit || {})[String(unit.id)] ??
+                                  (op.actual_by_unit || {})[unit.id];
+                                const qty =
+                                  stored != null
+                                    ? String(stored)
+                                    : Number(unit.id) === Number(op.activity?.unit_id) &&
+                                        op.actual_qty != null
+                                      ? String(op.actual_qty)
+                                      : null;
+                                if (qty == null) return null;
+                                return `${reportUnitFieldLabel(unit, t)}: ${qty}`;
+                              })
+                              .filter(Boolean)
+                              .join(' · ') ||
+                            (op.actual_qty != null
+                              ? `${outputFieldLabel(op, t)}: ${op.actual_qty}`
+                              : t('org.tasks.noActualsYet', null, 'No actuals yet'))
+                          : op.actual_qty != null
+                            ? `${outputFieldLabel(op, t)}: ${op.actual_qty}${
+                                unitLabelText ? ` ${unitLabelText}` : ''
+                              }`
+                            : t('org.tasks.noActualsYet', null, 'No actuals yet')}
                       </Text>
-                    ) : null}
+                    )}
 
                     {expectedQty != null ? (
                       <Text style={styles.opMeta}>
