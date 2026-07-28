@@ -101,6 +101,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [title, setTitle] = useState('');
   const [instructions, setInstructions] = useState('');
   const [scheduledDate, setScheduledDate] = useState(localTodayIso());
+  const [scheduledEndDate, setScheduledEndDate] = useState('');
   const [plannedStart, setPlannedStart] = useState('08:00');
   const [plannedEnd, setPlannedEnd] = useState('');
   const [vehicleIds, setVehicleIds] = useState([]);
@@ -360,6 +361,18 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         return false;
       }
     }
+    if (step === 1) {
+      if (scheduledDate.trim() && scheduledEndDate.trim() && scheduledEndDate.trim() < scheduledDate.trim()) {
+        setFormMessage(
+          t(
+            'org.tasks.endDateBeforeStart',
+            null,
+            'End date must be on or after the start date.',
+          ),
+        );
+        return false;
+      }
+    }
     if (step === 4 && selectedOps.length === 0) {
       setFormMessage(t('org.tasks.operationsRequired', null, 'Pick at least one operation.'));
       return false;
@@ -394,6 +407,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         instructions: instructions.trim(),
         project_id: projectId,
         scheduled_date: scheduledDate.trim() || null,
+        scheduled_end_date: scheduledEndDate.trim() || null,
         planned_start: plannedStart.trim() || null,
         planned_end: plannedEnd.trim() || null,
         photo_refs: photoRef.trim() ? [photoRef.trim()] : [],
@@ -508,7 +522,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       return (
         <>
           <TextInput
-            label={t('org.tasks.scheduledDate', null, 'Date (YYYY-MM-DD)')}
+            label={t('org.tasks.scheduledDate', null, 'Start date (YYYY-MM-DD)')}
             value={scheduledDate}
             onChangeText={setScheduledDate}
             mode="outlined"
@@ -516,6 +530,23 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             style={styles.input}
             textColor={ON_CARD}
           />
+          <TextInput
+            label={t('org.tasks.scheduledEndDate', null, 'End date (optional)')}
+            value={scheduledEndDate}
+            onChangeText={setScheduledEndDate}
+            mode="outlined"
+            autoCapitalize="none"
+            style={styles.input}
+            textColor={ON_CARD}
+            placeholder={t('org.tasks.scheduledEndDateHint', null, 'Leave blank for a single day')}
+          />
+          <Text style={styles.helper}>
+            {t(
+              'org.tasks.scheduledEndDateHelper',
+              null,
+              'Optional. Use when one work card spans multiple days (e.g. 1–20 Aug) instead of creating many tasks.',
+            )}
+          </Text>
           <Text style={styles.fieldLabel}>
             {t('org.tasks.plannedStart', null, 'Start time')}
           </Text>
@@ -779,7 +810,14 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         </Text>
         <Text style={styles.reviewLine}>
           <Text style={styles.reviewKey}>{t('org.tasks.wizard.whenLabel', null, 'When')}: </Text>
-          {[scheduledDate, plannedStart, plannedEnd && `→ ${plannedEnd}`].filter(Boolean).join(' ')}
+          {[
+            scheduledDate,
+            scheduledEndDate && scheduledEndDate !== scheduledDate ? `→ ${scheduledEndDate}` : null,
+            plannedStart,
+            plannedEnd && `→ ${plannedEnd}`,
+          ]
+            .filter(Boolean)
+            .join(' ')}
         </Text>
         <Text style={styles.reviewLine}>
           <Text style={styles.reviewKey}>{t('org.tasks.vehicles', null, 'Vehicles')}: </Text>
@@ -801,6 +839,31 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             .map((row) => activities.find((a) => a.id === row.activityId)?.name)
             .filter(Boolean)
             .join(', ') || '—'}
+        </Text>
+        <Text style={styles.reviewLine}>
+          <Text style={styles.reviewKey}>{t('org.tasks.materialsTitle', null, 'Materials')}: </Text>
+          {(() => {
+            const seen = new Map();
+            selectedOps.forEach((row) => {
+              const act = activities.find((a) => a.id === row.activityId);
+              (act?.default_materials || []).forEach((mat) => {
+                if (mat?.id != null && !seen.has(mat.id)) {
+                  const unit =
+                    act?.norms?.materials?.default_material_unit_symbol ||
+                    act?.norms?.materials?.default_material_unit_code ||
+                    '';
+                  seen.set(
+                    mat.id,
+                    `${mat.name || `#${mat.id}`}${unit ? ` (${unit})` : ''}`,
+                  );
+                }
+              });
+            });
+            const names = [...seen.values()];
+            return names.length
+              ? names.join(', ')
+              : t('org.tasks.materialsNoneYet', null, 'None from selected operations');
+          })()}
         </Text>
         <TextInput
           label={t('org.tasks.photoUpload', null, 'Photo URL or label (optional)')}
