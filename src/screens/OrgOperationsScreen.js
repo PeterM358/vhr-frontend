@@ -108,6 +108,8 @@ function sanitizeHoursInput(value) {
   return out;
 }
 
+const sanitizeDecimalInput = sanitizeHoursInput;
+
 function emptyFormState() {
   return {
     name: '',
@@ -120,6 +122,7 @@ function emptyFormState() {
     consumesMaterials: false,
     materialUnitId: null,
     defaultMaterialIds: [],
+    materialNorms: {},
     materialSearch: '',
     transportBaseRate: '',
     transportPerTonRate: '',
@@ -142,6 +145,50 @@ function hydrateFromRow(row) {
     : Array.isArray(row.default_material_ids)
       ? row.default_material_ids
       : [];
+  const materialNorms = {};
+  const lines = Array.isArray(materials.material_lines)
+    ? materials.material_lines
+    : Array.isArray(row.material_lines)
+      ? row.material_lines
+      : [];
+  lines.forEach((line) => {
+    const mid = Number(line.material_id);
+    if (!mid) return;
+    materialNorms[mid] = {
+      rate: line.rate != null ? String(line.rate) : '',
+      perQty: line.per_qty != null ? String(line.per_qty) : '1',
+      basis: line.basis === 'work_hours' ? 'work_hours' : 'output_unit',
+      unitId: line.unit_id || null,
+    };
+  });
+  // Legacy: apply global generic rate to every default SKU without a line rate.
+  const legacyRate =
+    generic.rate != null
+      ? String(generic.rate)
+      : row.norm_rate != null && row.activity_kind !== 'transport'
+        ? String(row.norm_rate)
+        : '';
+  const legacyPer =
+    generic.basis_qty != null
+      ? String(generic.basis_qty)
+      : row.norm_basis_qty != null
+        ? String(row.norm_basis_qty)
+        : '1';
+  const legacyUnit =
+    generic.input_unit_id ||
+    (row.activity_kind !== 'transport'
+      ? row.norm_input_unit_id || row.norm_input_unit?.id || null
+      : null);
+  materialIds.forEach((rawId) => {
+    const mid = Number(rawId);
+    if (!mid || materialNorms[mid]) return;
+    materialNorms[mid] = {
+      rate: legacyRate,
+      perQty: legacyPer,
+      basis: 'output_unit',
+      unitId: legacyUnit,
+    };
+  });
   return {
     name: row.name || '',
     code: row.code || '',
@@ -159,6 +206,7 @@ function hydrateFromRow(row) {
       row.norm_input_unit?.id ||
       null,
     defaultMaterialIds: materialIds.map((id) => Number(id)).filter(Boolean),
+    materialNorms,
     materialSearch: '',
     transportBaseRate:
       transport.base_rate != null
@@ -179,23 +227,9 @@ function hydrateFromRow(row) {
         : row.planned_hours != null && row.activity_kind === 'labor_only'
           ? String(row.planned_hours)
           : '',
-    normRate:
-      generic.rate != null
-        ? String(generic.rate)
-        : row.norm_rate != null && row.activity_kind !== 'transport'
-          ? String(row.norm_rate)
-          : '',
-    normBasisQty:
-      generic.basis_qty != null
-        ? String(generic.basis_qty)
-        : row.norm_basis_qty != null
-          ? String(row.norm_basis_qty)
-          : '1',
-    normInputUnitId:
-      generic.input_unit_id ||
-      (row.activity_kind !== 'transport'
-        ? row.norm_input_unit_id || row.norm_input_unit?.id || null
-        : null),
+    normRate: legacyRate,
+    normBasisQty: legacyPer,
+    normInputUnitId: legacyUnit,
   };
 }
 
@@ -216,24 +250,46 @@ function buildNormsPayload(form) {
     if (hours) {
       norms.labor = { preset_hours: hours };
     }
-  } else if (form.normRate.trim() || form.normInputUnitId) {
-    norms.generic = {
-      rate: form.normRate.trim() || null,
-      basis_qty: form.normBasisQty.trim() || null,
-      input_unit_id: form.normInputUnitId || null,
-      input_key: '',
-    };
   }
 
   if (form.kind !== 'labor_only') {
+    const ids = form.consumesMaterials ? (form.defaultMaterialIds || []).slice(0, 40) : [];
+    const materialLines = ids.map((mid) => {
+      const meta = (form.materialNorms && form.materialNorms[mid]) || {};
+      return {
+        material_id: mid,
+        rate: String(meta.rate || '').trim() || null,
+        per_qty: String(meta.perQty || form.normBasisQty || '1').trim() || '1',
+        basis: meta.basis === 'work_hours' ? 'work_hours' : 'output_unit',
+        unit_id: meta.unitId || form.materialUnitId || form.normInputUnitId || null,
+      };
+    });
+    // Keep a legacy generic rate from the first output_unit line for older clients.
+    const firstOutput = materialLines.find(
+      (line) => line.basis === 'output_unit' && line.rate,
+    );
+    if (firstOutput) {
+      norms.generic = {
+        rate: firstOutput.rate,
+        basis_qty: firstOutput.per_qty || '1',
+        input_unit_id: firstOutput.unit_id || null,
+        input_key: '',
+      };
+    } else if (form.normRate.trim() || form.normInputUnitId) {
+      norms.generic = {
+        rate: form.normRate.trim() || null,
+        basis_qty: form.normBasisQty.trim() || null,
+        input_unit_id: form.normInputUnitId || null,
+        input_key: '',
+      };
+    }
     norms.materials = {
       consumes_materials: Boolean(form.consumesMaterials),
       default_material_unit_id: form.consumesMaterials
         ? form.materialUnitId || form.normInputUnitId || null
         : null,
-      default_material_ids: form.consumesMaterials
-        ? (form.defaultMaterialIds || []).slice(0, 40)
-        : [],
+      default_material_ids: ids,
+      material_lines: materialLines,
     };
   }
 
@@ -350,21 +406,12 @@ export default function OrgOperationsScreen({ navigation, route }) {
         ),
       },
       {
-        key: 'norms',
-        title: t('org.operations.wizard.stepNorms', null, 'Consumed input'),
-        hint: t(
-          'org.operations.wizard.stepNormsHint',
-          null,
-          'Optional rates for consumed input (paint L / m², fuel L / 100 km) — not what the worker re-types on End.',
-        ),
-      },
-      {
         key: 'materials',
-        title: t('org.operations.wizard.stepMaterials', null, 'Materials'),
+        title: t('org.operations.wizard.stepMaterialsNorms', null, 'Materials + norms'),
         hint: t(
-          'org.operations.wizard.stepMaterialsHint',
+          'org.operations.wizard.stepMaterialsNormsHint',
           null,
-          'Toggle if this operation is labor-only or labor + materials (same Operation — no separate MaterialOperation). Pick default SKUs when materials are on; workers enter leftovers on End.',
+          'Toggle labor-only vs labor + materials. For each SKU set the norm rate and basis (per output unit or per working hour).',
         ),
       },
       {
@@ -528,13 +575,47 @@ export default function OrgOperationsScreen({ navigation, route }) {
       const nextIds = exists
         ? prev.defaultMaterialIds.filter((x) => x !== id)
         : [...(prev.defaultMaterialIds || []), id].slice(0, 40);
-      return { ...prev, defaultMaterialIds: nextIds, consumesMaterials: true };
+      const nextNorms = { ...(prev.materialNorms || {}) };
+      if (exists) {
+        delete nextNorms[id];
+      } else if (!nextNorms[id]) {
+        nextNorms[id] = {
+          rate: prev.normRate || '',
+          perQty: prev.normBasisQty || '1',
+          basis: 'output_unit',
+          unitId: prev.materialUnitId || prev.normInputUnitId || null,
+        };
+      }
+      return {
+        ...prev,
+        defaultMaterialIds: nextIds,
+        materialNorms: nextNorms,
+        consumesMaterials: true,
+      };
     });
     setSelectedMaterials((prev) => {
       const exists = prev.some((m) => Number(m.id) === id);
       if (exists) return prev.filter((m) => Number(m.id) !== id);
       return [...prev, mat].slice(0, 40);
     });
+  };
+
+  const setMaterialNormField = (materialId, key, value) => {
+    const mid = Number(materialId);
+    setForm((prev) => ({
+      ...prev,
+      materialNorms: {
+        ...(prev.materialNorms || {}),
+        [mid]: {
+          rate: '',
+          perQty: '1',
+          basis: 'output_unit',
+          unitId: prev.materialUnitId || prev.normInputUnitId || null,
+          ...((prev.materialNorms && prev.materialNorms[mid]) || {}),
+          [key]: value,
+        },
+      },
+    }));
   };
 
   const save = async () => {
@@ -570,9 +651,15 @@ export default function OrgOperationsScreen({ navigation, route }) {
         payload.norm_basis_qty = form.transportBaseRate.trim() ? '1' : null;
         payload.norm_input_unit_id = form.transportRateUnitId || null;
       } else if (form.kind !== 'labor_only') {
-        payload.norm_rate = form.normRate.trim() || null;
-        payload.norm_basis_qty = form.normBasisQty.trim() || null;
-        payload.norm_input_unit_id = form.normInputUnitId || null;
+        const firstId = (form.defaultMaterialIds || [])[0];
+        const firstMeta =
+          firstId != null ? (form.materialNorms && form.materialNorms[firstId]) || {} : {};
+        payload.norm_rate =
+          String(firstMeta.rate || '').trim() || form.normRate.trim() || null;
+        payload.norm_basis_qty =
+          String(firstMeta.perQty || '').trim() || form.normBasisQty.trim() || null;
+        payload.norm_input_unit_id =
+          firstMeta.unitId || form.normInputUnitId || form.materialUnitId || null;
       } else {
         payload.norm_rate = null;
         payload.norm_basis_qty = null;
@@ -923,14 +1010,6 @@ export default function OrgOperationsScreen({ navigation, route }) {
         </>
       );
     }
-    if (stepKey === 'norms') {
-      return (
-        <>
-          <Text style={styles.fieldLabel}>{t('org.operations.normsTitle', null, 'Norms (optional)')}</Text>
-          {renderNormsByKind()}
-        </>
-      );
-    }
     if (stepKey === 'materials') {
       if (form.kind === 'labor_only') {
         return (
@@ -950,8 +1029,17 @@ export default function OrgOperationsScreen({ navigation, route }) {
           (m) => !selectedMaterials.some((s) => Number(s.id) === Number(m.id)),
         ),
       ];
+      const outputUnitLbl = unitLabel(findUnit(form.unitId)) || 'm²';
       return (
         <>
+          {form.kind === 'transport' ? (
+            <>
+              <Text style={styles.fieldLabel}>
+                {t('org.operations.wizard.consumedInputLabel', null, 'Consumed input (numbers only)')}
+              </Text>
+              {renderNormsByKind()}
+            </>
+          ) : null}
           <View style={styles.switchRow}>
             <Text style={styles.switchLabel}>
               {t('org.operations.consumesMaterials', null, 'Consumes materials')}
@@ -963,9 +1051,9 @@ export default function OrgOperationsScreen({ navigation, route }) {
           </View>
           <Text style={styles.helper}>
             {t(
-              'org.operations.wizard.materialsLinesLater',
+              'org.operations.wizard.materialsNormsCoupledHint',
               null,
-              'Same Operation entity: off = labor-only; on = labor + materials. Warehouse issues those SKUs onto the task later. Workers/managers enter leftover (остатък) on End — they do not rebuild the catalog.',
+              'Off = labor-only. On = pick SKUs and set each norm (e.g. paint 0.5 kg per 1 m²; machine fuel 3 L per working hour). Worker still reports ONE output unit.',
             )}
           </Text>
           {form.consumesMaterials ? (
@@ -1026,21 +1114,114 @@ export default function OrgOperationsScreen({ navigation, route }) {
                   )}
                 </Text>
               ) : (
-                <Text style={styles.helper}>
-                  {t(
-                    'org.operations.materialsSelectedCount',
-                    { count: selectedIds.length },
-                    `${selectedIds.length} material(s) selected`,
-                  )}
-                </Text>
-              )}
-              <Text style={styles.fieldLabel}>
-                {t('org.operations.materialUnit', null, 'Default material unit (optional)')}
-              </Text>
-              {renderUnitChips(
-                form.materialUnitId,
-                (id) => setField('materialUnitId', id),
-                inputUnits.length ? inputUnits : units,
+                selectedIds.map((mid) => {
+                  const mat =
+                    selectedMaterials.find((m) => Number(m.id) === Number(mid)) ||
+                    catalogRows.find((m) => Number(m.id) === Number(mid));
+                  const meta = (form.materialNorms && form.materialNorms[mid]) || {
+                    rate: '',
+                    perQty: '1',
+                    basis: 'output_unit',
+                    unitId: null,
+                  };
+                  const basisIsHours = meta.basis === 'work_hours';
+                  return (
+                    <View key={mid} style={styles.materialNormBlock}>
+                      <Text style={styles.opTitleInline}>{materialLabel(mat) || `#${mid}`}</Text>
+                      <TextInput
+                        label={t(
+                          'org.operations.materialNormRate',
+                          null,
+                          'Norm rate (e.g. 0.5)',
+                        )}
+                        value={meta.rate || ''}
+                        onChangeText={(value) =>
+                          setMaterialNormField(mid, 'rate', sanitizeDecimalInput(value))
+                        }
+                        mode="outlined"
+                        keyboardType="decimal-pad"
+                        style={styles.input}
+                        textColor={ON_CARD}
+                      />
+                      <TextInput
+                        label={
+                          basisIsHours
+                            ? t(
+                                'org.operations.materialNormPerHours',
+                                null,
+                                'Per working hours (e.g. 1)',
+                              )
+                            : t(
+                                'org.operations.materialNormPerOutput',
+                                { unit: outputUnitLbl },
+                                `Per output qty (e.g. 1 ${outputUnitLbl})`,
+                              )
+                        }
+                        value={meta.perQty || '1'}
+                        onChangeText={(value) =>
+                          setMaterialNormField(mid, 'perQty', sanitizeDecimalInput(value))
+                        }
+                        mode="outlined"
+                        keyboardType="decimal-pad"
+                        style={styles.input}
+                        textColor={ON_CARD}
+                      />
+                      <Text style={styles.fieldLabel}>
+                        {t('org.operations.materialNormBasis', null, 'Norm basis')}
+                      </Text>
+                      <View style={styles.kindWrap}>
+                        <Pressable
+                          onPress={() => setMaterialNormField(mid, 'basis', 'output_unit')}
+                          style={[
+                            styles.kindChip,
+                            !basisIsHours && styles.kindChipActive,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.kindChipText,
+                              !basisIsHours && styles.kindChipTextActive,
+                            ]}
+                          >
+                            {t(
+                              'org.operations.basisOutputUnit',
+                              { unit: outputUnitLbl },
+                              `Per ${outputUnitLbl} (output)`,
+                            )}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => setMaterialNormField(mid, 'basis', 'work_hours')}
+                          style={[
+                            styles.kindChip,
+                            basisIsHours && styles.kindChipActive,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.kindChipText,
+                              basisIsHours && styles.kindChipTextActive,
+                            ]}
+                          >
+                            {t(
+                              'org.operations.basisWorkHours',
+                              null,
+                              'Per working hour',
+                            )}
+                          </Text>
+                        </Pressable>
+                      </View>
+                      <Text style={styles.fieldLabel}>
+                        {t('org.operations.materialUnit', null, 'Material unit (optional)')}
+                      </Text>
+                      {renderUnitChips(
+                        meta.unitId,
+                        (id) => setMaterialNormField(mid, 'unitId', id),
+                        inputUnits.length ? inputUnits : units,
+                      )}
+                    </View>
+                  );
+                })
               )}
             </>
           ) : null}
@@ -1052,8 +1233,9 @@ export default function OrgOperationsScreen({ navigation, route }) {
       sanitizeHoursInput(form.plannedHours) ||
       sanitizeHoursInput(form.laborPresetHours) ||
       t('org.operations.wizard.none', null, 'None');
+    const selectedIdsReview = form.defaultMaterialIds || [];
     const materialNames = selectedMaterials
-      .filter((m) => (form.defaultMaterialIds || []).includes(Number(m.id)))
+      .filter((m) => selectedIdsReview.includes(Number(m.id)))
       .map(materialLabel)
       .join(', ');
     let rateLine = t('org.operations.wizard.none', null, 'None');
@@ -1071,6 +1253,21 @@ export default function OrgOperationsScreen({ navigation, route }) {
             ? ` + ${form.transportPerTonRate} ${fuelUnit}/t`
             : ''),
       );
+    } else if (selectedIdsReview.length) {
+      const parts = selectedIdsReview
+        .map((mid) => {
+          const meta = (form.materialNorms && form.materialNorms[mid]) || {};
+          if (!meta.rate) return null;
+          const mat =
+            selectedMaterials.find((m) => Number(m.id) === Number(mid)) || { id: mid };
+          const basis =
+            meta.basis === 'work_hours'
+              ? t('org.operations.basisWorkHoursShort', null, 'h')
+              : unitLabel(findUnit(form.unitId)) || 'out';
+          return `${materialLabel(mat)}: ${meta.rate}/${meta.perQty || '1'} ${basis}`;
+        })
+        .filter(Boolean);
+      if (parts.length) rateLine = parts.join(' · ');
     } else if (form.normRate.trim()) {
       rateLine = `${form.normRate} ${unitLabel(findUnit(form.normInputUnitId)) || ''} / ${
         form.normBasisQty || '1'
@@ -1146,11 +1343,18 @@ export default function OrgOperationsScreen({ navigation, route }) {
             contentContainerStyle={styles.modalScroll}
             keyboardShouldPersistTaps="handled"
           >
-            <Text style={styles.sectionTitle}>
-              {editingId
-                ? t('org.operations.editOperation', null, 'Edit operation')
-                : t('org.operations.addOperation', null, 'Add operation')}
-            </Text>
+            <View style={styles.wizardHeaderRow}>
+              <Text style={[styles.sectionTitle, styles.wizardHeaderTitle]}>
+                {editingId
+                  ? t('org.operations.editOperation', null, 'Edit operation')
+                  : t('org.operations.addOperation', null, 'Add operation')}
+              </Text>
+              <Pressable onPress={closeWizard} hitSlop={8} style={styles.wizardExitBtn}>
+                <Text style={styles.wizardExitText}>
+                  {t('org.operations.wizard.exit', null, 'Exit')}
+                </Text>
+              </Pressable>
+            </View>
             <View style={styles.stepRow}>
               {stepDefs.map((s, idx) => (
                 <Pressable
@@ -1576,6 +1780,43 @@ const styles = StyleSheet.create({
   },
   navBtn: {
     flex: 1,
+  },
+  wizardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    gap: 12,
+  },
+  wizardHeaderTitle: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  wizardExitBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  wizardExitText: {
+    color: ON_CARD,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  materialNormBlock: {
+    marginTop: 8,
+    marginBottom: 12,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#CBD5E1',
+  },
+  opTitleInline: {
+    color: ON_CARD,
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 8,
   },
   reviewBlock: {
     marginBottom: 8,

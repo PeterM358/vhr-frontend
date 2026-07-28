@@ -133,6 +133,30 @@ export async function updateWorkOrder(token, organizationId, workOrderId, payloa
   return response.json();
 }
 
+export async function deleteWorkOrder(token, organizationId, workOrderId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/`,
+    {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    },
+  );
+  if (response.status === 204) return true;
+  const text = await response.text();
+  let parsed = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    parsed = null;
+  }
+  const err = new Error(
+    (parsed && (parsed.detail || parsed.message)) ||
+      messageFromApiResponseText(text, 'Failed to delete task'),
+  );
+  if (parsed?.code) err.code = parsed.code;
+  throw err;
+}
+
 export async function startWorkOrder(token, organizationId, workOrderId) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/start/`,

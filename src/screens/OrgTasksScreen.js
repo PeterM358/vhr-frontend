@@ -11,6 +11,7 @@ import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePick
 import {
   attachWorkOrderMedia,
   createWorkOrderExpense,
+  deleteWorkOrder,
   deleteWorkOrderExpense,
   endWorkOrder,
   getWorkOrder,
@@ -30,6 +31,7 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 import { pickReceiptOrInvoiceAttachment } from '../utils/pickDocumentFile';
+import { confirmMessage } from '../utils/crossPlatformAlert';
 
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
@@ -194,6 +196,67 @@ function computeExpectedFromNorms(op, outputQty) {
   return null;
 }
 
+function materialLinesForOp(op) {
+  const norms = op?.activity?.norms || {};
+  const materials = norms.materials && typeof norms.materials === 'object' ? norms.materials : {};
+  if (Array.isArray(materials.material_lines) && materials.material_lines.length) {
+    return materials.material_lines;
+  }
+  if (Array.isArray(op?.activity?.material_lines) && op.activity.material_lines.length) {
+    return op.activity.material_lines;
+  }
+  const ids = op?.activity?.default_material_ids || [];
+  return ids.map((id) => ({
+    material_id: id,
+    rate: null,
+    per_qty: '1',
+    basis: 'output_unit',
+    unit_id: null,
+  }));
+}
+
+function computeLineSuggestedQty(line, { outputQty, workHours }) {
+  if (!line || line.rate == null || String(line.rate).trim() === '') return null;
+  const rate = Number(String(line.rate).replace(',', '.'));
+  const perQty = Number(String(line.per_qty != null ? line.per_qty : 1).replace(',', '.'));
+  if (!Number.isFinite(rate) || !Number.isFinite(perQty) || perQty === 0) return null;
+  const basis = String(line.basis || 'output_unit');
+  if (basis === 'work_hours') {
+    const hours = Number(String(workHours ?? '').replace(',', '.'));
+    if (!Number.isFinite(hours)) return null;
+    return String(Number(((hours / perQty) * rate).toPrecision(12)));
+  }
+  const qty = Number(String(outputQty ?? '').replace(',', '.'));
+  if (!Number.isFinite(qty)) return null;
+  return String(Number(((qty / perQty) * rate).toPrecision(12)));
+}
+
+function collectTaskDefaultMaterials(task) {
+  const byId = new Map();
+  (task?.operations || []).forEach((op) => {
+    const lines = materialLinesForOp(op);
+    const briefs = op?.activity?.default_materials || [];
+    const briefById = new Map(briefs.map((b) => [Number(b.id), b]));
+    lines.forEach((line) => {
+      const mid = Number(line.material_id);
+      if (!mid || byId.has(mid)) return;
+      const brief = briefById.get(mid) || {};
+      byId.set(mid, {
+        material_id: mid,
+        name: brief.name || `Material #${mid}`,
+        part_number: brief.part_number || '',
+        from_operations: true,
+        norm_rate: line.rate ?? brief.norm_rate,
+        norm_per_qty: line.per_qty || brief.norm_per_qty || '1',
+        norm_basis: line.basis || brief.norm_basis || 'output_unit',
+        norm_unit_id: line.unit_id ?? brief.norm_unit_id,
+        unit_code: brief.unit_code || '',
+      });
+    });
+  });
+  return Array.from(byId.values());
+}
+
 function expectedInputUnit(op) {
   return (
     op?.expected_input_unit ||
@@ -316,6 +379,10 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [issueQty, setIssueQty] = useState('');
   const [issueUnit, setIssueUnit] = useState('');
   const [issueLocationId, setIssueLocationId] = useState(null);
+  const [plannedIssueOutput, setPlannedIssueOutput] = useState('');
+  const [plannedIssueHours, setPlannedIssueHours] = useState('');
+  const [showExtraMaterials, setShowExtraMaterials] = useState(false);
+  const [extraMaterialSearch, setExtraMaterialSearch] = useState('');
   const [expenseType, setExpenseType] = useState('fuel');
   const [expenseQty, setExpenseQty] = useState('');
   const [expenseUnit, setExpenseUnit] = useState('L');
@@ -757,6 +824,40 @@ export default function OrgTasksScreen({ navigation, route }) {
   const suggestionForMaterial = useCallback(
     (materialId) => {
       const mid = Number(materialId);
+      const plannedOut = String(plannedIssueOutput || '').trim();
+      const plannedHours = String(plannedIssueHours || '').trim();
+
+      // Boss planned wave: sum per-SKU norms across operations.
+      if (plannedOut || plannedHours) {
+        let total = 0;
+        let unit = '';
+        let any = false;
+        for (const op of selected?.operations || []) {
+          const line = materialLinesForOp(op).find(
+            (l) => Number(l.material_id) === mid,
+          );
+          if (!line) continue;
+          const hoursFallback =
+            plannedHours ||
+            (op.planned_hours != null
+              ? String(op.planned_hours)
+              : op.activity?.planned_hours != null
+                ? String(op.activity.planned_hours)
+                : '');
+          const qty = computeLineSuggestedQty(line, {
+            outputQty: plannedOut,
+            workHours: hoursFallback,
+          });
+          if (qty == null) continue;
+          total += Number(qty);
+          any = true;
+          if (!unit) unit = expectedInputUnit(op) || '';
+        }
+        if (any && Number.isFinite(total)) {
+          return { qty: String(Number(total.toPrecision(12))), unit };
+        }
+      }
+
       const fromMats = (selected?.materials || []).find(
         (m) => Number(m.material_id || m.id) === mid,
       );
@@ -776,6 +877,34 @@ export default function OrgTasksScreen({ navigation, route }) {
               : op.planned_qty != null
                 ? String(op.planned_qty)
                 : '');
+        const hoursFallback =
+          op.planned_hours != null
+            ? String(op.planned_hours)
+            : op.activity?.planned_hours != null
+              ? String(op.activity.planned_hours)
+              : '';
+        const line = materialLinesForOp(op).find((l) => Number(l.material_id) === mid);
+        if (line?.rate != null) {
+          let outputForLine = liveQty;
+          if (isDistanceOutput(op)) {
+            const start = Number(
+              String(meterStartDrafts[op.id] || op.meter_start || '').replace(',', '.'),
+            );
+            const end = Number(
+              String(meterEndDrafts[op.id] || op.meter_end || '').replace(',', '.'),
+            );
+            if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
+              outputForLine = String(end - start);
+            }
+          }
+          const qty = computeLineSuggestedQty(line, {
+            outputQty: outputForLine,
+            workHours: hoursFallback,
+          });
+          if (qty != null) {
+            return { qty, unit: expectedInputUnit(op) || '' };
+          }
+        }
         let expected = null;
         if (isDistanceOutput(op)) {
           const start = Number(String(meterStartDrafts[op.id] || op.meter_start || '').replace(',', '.'));
@@ -803,8 +932,138 @@ export default function OrgTasksScreen({ navigation, route }) {
       }
       return null;
     },
-    [selected, actualDrafts, meterStartDrafts, meterEndDrafts],
+    [
+      selected,
+      actualDrafts,
+      meterStartDrafts,
+      meterEndDrafts,
+      plannedIssueOutput,
+      plannedIssueHours,
+    ],
   );
+
+  const defaultIssueMaterials = useMemo(
+    () => collectTaskDefaultMaterials(selected),
+    [selected],
+  );
+
+  const primaryOutputUnit = useMemo(() => {
+    const ops = selected?.operations || [];
+    for (const op of ops) {
+      const label = opUnitLabel(op);
+      if (label) return label;
+    }
+    return 'm²';
+  }, [selected]);
+
+  const hasHourBasedNorms = useMemo(
+    () =>
+      defaultIssueMaterials.some(
+        (m) => String(m.norm_basis || '').toLowerCase() === 'work_hours',
+      ),
+    [defaultIssueMaterials],
+  );
+
+  const filteredExtraStock = useMemo(() => {
+    const q = String(extraMaterialSearch || '').trim().toLowerCase();
+    const defaultIds = new Set(defaultIssueMaterials.map((m) => Number(m.material_id)));
+    return (stockRows || [])
+      .filter((row) => {
+        const mid = Number(row.material_id || row.material?.id || row.id);
+        if (defaultIds.has(mid)) return false;
+        if (!q) return true;
+        const label = `${row.material?.name || row.name || ''} ${
+          row.part_number || row.material?.part_number || ''
+        }`.toLowerCase();
+        return label.includes(q);
+      })
+      .slice(0, 24);
+  }, [stockRows, defaultIssueMaterials, extraMaterialSearch]);
+
+  const stockByMaterialId = useMemo(() => {
+    const map = new Map();
+    (stockRows || []).forEach((row) => {
+      const mid = Number(row.material_id || row.material?.id || row.id);
+      if (mid) map.set(mid, row);
+    });
+    return map;
+  }, [stockRows]);
+
+  const applySuggestionToIssue = useCallback(
+    (mid, unitHint) => {
+      setIssueMaterialId(mid);
+      if (unitHint) setIssueUnit(String(unitHint));
+      const sug = suggestionForMaterial(mid);
+      if (sug?.qty) {
+        setIssueQty(sug.qty);
+        if (sug.unit) setIssueUnit(sug.unit);
+      }
+    },
+    [suggestionForMaterial],
+  );
+
+  useEffect(() => {
+    if (!issueMaterialId) return;
+    if (!String(plannedIssueOutput || '').trim() && !String(plannedIssueHours || '').trim()) {
+      return;
+    }
+    const sug = suggestionForMaterial(issueMaterialId);
+    if (sug?.qty) {
+      setIssueQty(sug.qty);
+      if (sug.unit) setIssueUnit(sug.unit);
+    }
+  }, [
+    plannedIssueOutput,
+    plannedIssueHours,
+    issueMaterialId,
+    suggestionForMaterial,
+  ]);
+
+  const deleteTask = async () => {
+    if (!orgId || !selected?.id || !canManage) return;
+    const ok = await confirmMessage(
+      t('org.tasks.deleteTitle', null, 'Delete task?'),
+      t(
+        'org.tasks.deleteConfirm',
+        null,
+        'This permanently removes the task. Blocked if finished or materials were already issued.',
+      ),
+      {
+        confirmLabel: t('common.delete', null, 'Delete'),
+        cancelLabel: t('common.cancel', null, 'Cancel'),
+        destructive: true,
+      },
+    );
+    if (!ok) return;
+    setBusyAction(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      await deleteWorkOrder(token, orgId, selected.id);
+      setSelectedId(null);
+      setSelectedDetail(null);
+      await load();
+    } catch (e) {
+      const code = e?.code;
+      let message =
+        e.message || t('org.tasks.deleteError', null, 'Could not delete the task.');
+      if (code === 'task_completed') {
+        message = t(
+          'org.tasks.deleteBlockedCompleted',
+          null,
+          'Cannot delete a completed task. Finished tasks are kept for history.',
+        );
+      } else if (code === 'task_has_issued_materials') {
+        message = t(
+          'org.tasks.deleteBlockedMaterials',
+          null,
+          'Cannot delete this task because materials were already issued or consumed. Finish the task and enter leftovers instead.',
+        );
+      }
+      Alert.alert(t('org.tasks.deleteTitle', null, 'Delete task'), message);
+    } finally {
+      setBusyAction(false);
+    }
+  };
 
   const removeExpense = async (expenseId) => {
     if (!orgId || !selected?.id || !expenseId) return;
@@ -992,6 +1251,20 @@ export default function OrgTasksScreen({ navigation, route }) {
                 <Text style={styles.instructions}>{selected.instructions}</Text>
               ) : null}
               {renderStartEndControls(selected)}
+              {canManage &&
+              selected.status !== 'done' &&
+              selected.status !== 'cancelled' ? (
+                <Button
+                  mode="outlined"
+                  loading={busyAction}
+                  disabled={busyAction}
+                  onPress={deleteTask}
+                  style={styles.secondaryBtn}
+                  textColor="#B91C1C"
+                >
+                  {t('org.tasks.deleteCta', null, 'Delete task')}
+                </Button>
+              ) : null}
             </AppCard>
 
             <AppCard style={styles.card}>
@@ -1279,42 +1552,140 @@ export default function OrgTasksScreen({ navigation, route }) {
                     {t(
                       'org.tasks.issueFromWarehouseHint',
                       null,
-                      'Storekeeper: worker shows this task — issue stock here (including depot fuel). Suggested qty from norms when output is known.',
+                      'Default list = materials from this task’s operations. Set planned output to get suggested qty, then edit qty before issuing.',
                     )}
                   </Text>
-                  <View style={styles.chipWrap}>
-                    {stockRows.slice(0, 24).map((row) => {
-                      const mid = row.material_id || row.material?.id || row.id;
-                      const active = Number(issueMaterialId) === Number(mid);
-                      const label =
-                        row.material?.name ||
-                        row.name ||
-                        row.part_number ||
-                        `#${mid}`;
-                      const onHand =
-                        row.quantity_on_hand != null ? ` (${row.quantity_on_hand})` : '';
-                      return (
-                        <Pressable
-                          key={mid}
-                          onPress={() => {
-                            setIssueMaterialId(mid);
-                            if (row.unit_code) setIssueUnit(String(row.unit_code));
-                            const sug = suggestionForMaterial(mid);
-                            if (sug?.qty) {
-                              setIssueQty(sug.qty);
-                              if (sug.unit) setIssueUnit(sug.unit);
+                  <TextInput
+                    label={t(
+                      'org.tasks.plannedIssueOutput',
+                      { unit: primaryOutputUnit },
+                      `Planned output for this issue (${primaryOutputUnit})`,
+                    )}
+                    value={plannedIssueOutput}
+                    onChangeText={setPlannedIssueOutput}
+                    mode="outlined"
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                    textColor={ON_CARD}
+                  />
+                  {hasHourBasedNorms ? (
+                    <TextInput
+                      label={t(
+                        'org.tasks.plannedIssueHours',
+                        null,
+                        'Planned working hours (for fuel norms)',
+                      )}
+                      value={plannedIssueHours}
+                      onChangeText={setPlannedIssueHours}
+                      mode="outlined"
+                      keyboardType="decimal-pad"
+                      style={styles.input}
+                      textColor={ON_CARD}
+                    />
+                  ) : null}
+                  <Text style={styles.fieldLabel}>
+                    {t('org.tasks.issueOpMaterials', null, 'From operations')}
+                  </Text>
+                  {defaultIssueMaterials.length === 0 ? (
+                    <Text style={styles.opMeta}>
+                      {t(
+                        'org.tasks.issueOpMaterialsEmpty',
+                        null,
+                        'No default materials on the operations of this task. Pick operations with materials, or use Add extra material.',
+                      )}
+                    </Text>
+                  ) : (
+                    <View style={styles.chipWrap}>
+                      {defaultIssueMaterials.map((mat) => {
+                        const mid = Number(mat.material_id);
+                        const stock = stockByMaterialId.get(mid);
+                        const active = Number(issueMaterialId) === mid;
+                        const onHand =
+                          stock?.quantity_on_hand != null
+                            ? ` (${stock.quantity_on_hand})`
+                            : '';
+                        const sug = suggestionForMaterial(mid);
+                        return (
+                          <Pressable
+                            key={mid}
+                            onPress={() =>
+                              applySuggestionToIssue(mid, stock?.unit_code || mat.unit_code)
                             }
-                          }}
-                          style={[styles.chip, active && styles.chipActive]}
-                        >
-                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                            {label}
-                            {onHand}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+                            style={[styles.chip, active && styles.chipActive]}
+                          >
+                            <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                              {mat.name || `#${mid}`}
+                              {onHand}
+                              {sug?.qty ? ` · ~${sug.qty}` : ''}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  )}
+                  <Button
+                    mode="text"
+                    onPress={() => setShowExtraMaterials((v) => !v)}
+                    style={styles.secondaryBtn}
+                  >
+                    {showExtraMaterials
+                      ? t('org.tasks.hideExtraMaterial', null, 'Hide extra material')
+                      : t('org.tasks.addExtraMaterial', null, 'Add extra material')}
+                  </Button>
+                  {showExtraMaterials ? (
+                    <>
+                      <TextInput
+                        label={t(
+                          'org.tasks.searchExtraMaterial',
+                          null,
+                          'Search full warehouse catalog',
+                        )}
+                        value={extraMaterialSearch}
+                        onChangeText={setExtraMaterialSearch}
+                        mode="outlined"
+                        style={styles.input}
+                        textColor={ON_CARD}
+                      />
+                      <View style={styles.chipWrap}>
+                        {filteredExtraStock.map((row) => {
+                          const mid = Number(row.material_id || row.material?.id || row.id);
+                          const active = Number(issueMaterialId) === mid;
+                          const label =
+                            row.material?.name ||
+                            row.name ||
+                            row.part_number ||
+                            `#${mid}`;
+                          const onHand =
+                            row.quantity_on_hand != null
+                              ? ` (${row.quantity_on_hand})`
+                              : '';
+                          return (
+                            <Pressable
+                              key={mid}
+                              onPress={() => applySuggestionToIssue(mid, row.unit_code)}
+                              style={[styles.chip, active && styles.chipActive]}
+                            >
+                              <Text
+                                style={[styles.chipText, active && styles.chipTextActive]}
+                              >
+                                {label}
+                                {onHand}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                      {filteredExtraStock.length === 0 ? (
+                        <Text style={styles.opMeta}>
+                          {t(
+                            'org.tasks.extraMaterialsEmpty',
+                            null,
+                            'No other warehouse SKUs match. Import stock or clear the search.',
+                          )}
+                        </Text>
+                      ) : null}
+                    </>
+                  ) : null}
                   {issueMaterialId && suggestionForMaterial(issueMaterialId) ? (
                     <Text style={styles.opMeta}>
                       {t(
