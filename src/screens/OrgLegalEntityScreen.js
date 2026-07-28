@@ -20,7 +20,7 @@ import {
   readOrganizationMemberships,
   resolveActiveOrganizationId,
 } from '../utils/orgWorkspace';
-import { navigateToOrgHome } from '../navigation/webNavigation';
+import { navigateToOrgHome, navigateToOrgWarehouse } from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
@@ -60,16 +60,8 @@ function hydrate(entity) {
 export default function OrgLegalEntityScreen({ navigation, route }) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
+  const returnTo = route?.params?.returnTo;
   const scrollBottomPadding = useScrollContentBottomPadding(40);
-
-  const onBack = useCallback(async () => {
-    const orgs = await readOrganizationMemberships();
-    if (orgs.length > 0) {
-      navigateToOrgHome(navigation, { orgId: routeOrgId || orgs[0]?.id });
-      return;
-    }
-    if (navigation?.canGoBack?.()) navigation.goBack();
-  }, [navigation, routeOrgId]);
 
   const [orgId, setOrgId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -79,6 +71,27 @@ export default function OrgLegalEntityScreen({ navigation, route }) {
   const [canManage, setCanManage] = useState(false);
   const [complete, setComplete] = useState(false);
   const [form, setForm] = useState(emptyForm);
+
+  const onBack = useCallback(() => {
+    const orgIdForNav = routeOrgId || orgId;
+    if (returnTo === 'OrgWarehouse' && orgIdForNav) {
+      navigateToOrgWarehouse(navigation, { orgId: orgIdForNav });
+      return;
+    }
+    if (navigation?.canGoBack?.()) {
+      navigation.goBack();
+      return;
+    }
+    if (orgIdForNav) {
+      navigateToOrgHome(navigation, { orgId: orgIdForNav });
+      return;
+    }
+    readOrganizationMemberships().then((orgs) => {
+      if (orgs.length > 0) {
+        navigateToOrgHome(navigation, { orgId: orgs[0]?.id });
+      }
+    });
+  }, [navigation, orgId, routeOrgId, returnTo]);
 
   const setField = useCallback((key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -151,8 +164,15 @@ export default function OrgLegalEntityScreen({ navigation, route }) {
   return (
     <ScreenBackground>
       <OrgAppHeader
+        mode="detail"
         title={t('org.legal.title', null, 'Company details')}
         onBack={onBack}
+        backLabel={
+          returnTo === 'OrgWarehouse'
+            ? t('org.nav.warehouse', null, 'Warehouse')
+            : t('org.legal.backHome', null, 'Organization')
+        }
+        iconOnlyBack={false}
       />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: scrollBottomPadding }]}
@@ -283,9 +303,16 @@ export default function OrgLegalEntityScreen({ navigation, route }) {
             />
 
             {canManage ? (
-              <Button mode="contained" onPress={save} loading={busy} disabled={busy}>
-                {t('common.save', null, 'Save')}
-              </Button>
+              <>
+                <Button mode="contained" onPress={save} loading={busy} disabled={busy}>
+                  {t('common.save', null, 'Save')}
+                </Button>
+                <Button mode="outlined" onPress={onBack} disabled={busy} style={styles.backBtn}>
+                  {returnTo === 'OrgWarehouse'
+                    ? t('org.legal.backWarehouse', null, 'Back to warehouse')
+                    : t('org.legal.backHome', null, 'Back to organization')}
+                </Button>
+              </>
             ) : (
               <Text style={styles.helper}>
                 {t('org.legal.readOnly', null, 'Only organization owners/admins can edit.')}
@@ -321,4 +348,5 @@ const styles = StyleSheet.create({
   switchCopy: { flex: 1 },
   switchLabel: { color: ON_CARD, fontWeight: '600', fontSize: 14 },
   helper: { color: ON_CARD_MUTED, fontSize: 12, marginTop: 2 },
+  backBtn: { marginTop: 10 },
 });

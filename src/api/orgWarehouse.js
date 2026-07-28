@@ -255,13 +255,16 @@ export async function confirmMaterialsIntake(token, organizationId, intakeId, pa
   return response.json();
 }
 
-export function materialsIntakeFileUrl(organizationId, intakeId) {
-  return `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/materials-intake/${intakeId}/file/`;
+export function materialsIntakeFileUrl(organizationId, intakeId, { stream = true } = {}) {
+  const q = stream ? '?stream=1' : '';
+  return `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/materials-intake/${intakeId}/file/${q}`;
 }
 
 /** Open original invoice PDF (auth + blob / signed URL). */
 export async function openMaterialsIntakeFile(token, organizationId, intakeId) {
-  const response = await fetch(materialsIntakeFileUrl(organizationId, intakeId), {
+  // Prefer authenticated stream so Cyrillic filenames and S3 signing quirks
+  // cannot break Content-Disposition / browser open.
+  const response = await fetch(materialsIntakeFileUrl(organizationId, intakeId, { stream: true }), {
     headers: authHeaders(token),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to open document'));
@@ -281,6 +284,26 @@ export async function openMaterialsIntakeFile(token, organizationId, intakeId) {
     window.open(objectUrl, '_blank', 'noopener,noreferrer');
   }
   return objectUrl;
+}
+
+export function warehouseLocationLabelUrl(organizationId, locationId) {
+  return `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/locations/${locationId}/label/`;
+}
+
+/** Open printable location stamp (name + id + QR) in a new tab. */
+export async function openWarehouseLocationLabel(token, organizationId, locationId) {
+  const response = await fetch(warehouseLocationLabelUrl(organizationId, locationId), {
+    headers: authHeaders(token),
+  });
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to open location label'));
+  const html = await response.text();
+  if (typeof window !== 'undefined' && window.open) {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const objectUrl = URL.createObjectURL(blob);
+    window.open(objectUrl, '_blank', 'noopener,noreferrer');
+    return objectUrl;
+  }
+  return html;
 }
 
 export async function getOrganizationLegalEntity(token, organizationId) {

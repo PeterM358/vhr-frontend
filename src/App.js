@@ -11,6 +11,7 @@ import AuthManager from './context/AuthManager';
 import { I18nProvider } from './i18n';
 import { GarageSceneProvider } from './context/GarageSceneContext';
 import MessageDialogHost from './components/ui/MessageDialog';
+import ConfirmDialogHost from './components/ui/ConfirmDialogHost';
 import PartnerInAppBannerHost from './components/partner/PartnerInAppBanner';
 import MobileWebInsetsBridge from './components/MobileWebInsetsBridge';
 import CookieConsentBanner from './components/common/CookieConsentBanner';
@@ -66,6 +67,7 @@ export default function App() {
                   <MobileWebInsetsBridge>
                     <AppNavigator />
                     <MessageDialogHost />
+                    <ConfirmDialogHost />
                     <PartnerInAppBannerHost />
                     <CookieConsentBanner />
                   </MobileWebInsetsBridge>

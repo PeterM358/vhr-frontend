@@ -11,6 +11,7 @@ import {
   createWarehouseLocation,
   deactivateWarehouseLocation,
   listWarehouseLocations,
+  openWarehouseLocationLabel,
   updateWarehouseLocation,
 } from '../api/orgWarehouse';
 import OrgMaterialsIntakePanel from '../components/org/OrgMaterialsIntakePanel';
@@ -80,6 +81,7 @@ export default function OrgWarehouseScreen({ navigation, route }) {
   const [canManage, setCanManage] = useState(false);
   const [rows, setRows] = useState([]);
   const [mode, setMode] = useState('documents');
+  const [documentsListKey, setDocumentsListKey] = useState(0);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [busy, setBusy] = useState(false);
@@ -208,7 +210,7 @@ export default function OrgWarehouseScreen({ navigation, route }) {
           {t(
             'org.warehouse.lead',
             null,
-            'Documents: import invoices. Materials: on-hand stock. Locations: bins for issue.',
+            'Documents: import invoices. Materials: on-stock quantities. Locations: bins for issue.',
           )}
         </Text>
 
@@ -218,7 +220,12 @@ export default function OrgWarehouseScreen({ navigation, route }) {
             return (
               <Pressable
                 key={item.id}
-                onPress={() => setMode(item.id)}
+                onPress={() => {
+                  if (item.id === 'documents') {
+                    setDocumentsListKey((k) => k + 1);
+                  }
+                  setMode(item.id);
+                }}
                 style={[styles.modeChip, styles.modeChipPrimary, active && styles.modeChipActive]}
               >
                 <Text style={[styles.modeChipText, styles.modeChipTextPrimary, active && styles.modeChipTextActive]}>
@@ -266,6 +273,7 @@ export default function OrgWarehouseScreen({ navigation, route }) {
               section={mode}
               locations={rows.filter((r) => r.is_active !== false)}
               navigation={navigation}
+              documentsListKey={documentsListKey}
             />
           ) : loading ? (
             <ActivityIndicator color="#fff" style={styles.loader} />
@@ -336,6 +344,24 @@ export default function OrgWarehouseScreen({ navigation, route }) {
                       <Pressable onPress={() => startEdit(row)} style={styles.rowAction}>
                         <Text style={styles.rowActionText}>{t('common.edit', null, 'Edit')}</Text>
                       </Pressable>
+                      <Pressable
+                        onPress={async () => {
+                          try {
+                            const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+                            await openWarehouseLocationLabel(token, orgId, row.id);
+                          } catch (e) {
+                            setError(
+                              e.message
+                                || t('org.warehouse.labelError', null, 'Could not open label.'),
+                            );
+                          }
+                        }}
+                        style={styles.rowAction}
+                      >
+                        <Text style={styles.rowActionText}>
+                          {t('org.warehouse.printLabel', null, 'Print stamp')}
+                        </Text>
+                      </Pressable>
                       <Pressable onPress={() => toggleActive(row)} style={styles.rowAction}>
                         <Text style={styles.rowActionText}>
                           {row.is_active
@@ -396,7 +422,7 @@ export default function OrgWarehouseScreen({ navigation, route }) {
               textColor={ON_CARD}
             />
             <TextInput
-              label={t('org.warehouse.qrCode', null, 'QR / scan code (later)')}
+              label={t('org.warehouse.qrCode', null, 'QR / scan code (optional)')}
               value={form.qrCode}
               onChangeText={(value) => setField('qrCode', value)}
               mode="outlined"
@@ -407,7 +433,7 @@ export default function OrgWarehouseScreen({ navigation, route }) {
               {t(
                 'org.warehouse.qrHelper',
                 null,
-                'Optional stub for future labels. Scanning is not available yet.',
+                'Used on the printable door stamp. Leave blank to use ORGLOC:{id}.',
               )}
             </Text>
             <View style={styles.switchRow}>

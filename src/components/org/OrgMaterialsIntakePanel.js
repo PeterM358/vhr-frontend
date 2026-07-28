@@ -281,6 +281,7 @@ export default function OrgMaterialsIntakePanel({
   section = 'documents',
   locations = [],
   navigation = null,
+  documentsListKey = 0,
 }) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
@@ -346,8 +347,20 @@ export default function OrgMaterialsIntakePanel({
     }
     if (section !== 'documents') {
       setDocQuery('');
+      // Leaving Documents must not leave a stuck detail when returning later.
+      setActiveIntake(null);
+      setConfirmSummary(null);
     }
   }, [section]);
+
+  // Documents tab press (even when already on Documents) always shows the list.
+  useEffect(() => {
+    if (section === 'documents' && documentsListKey > 0) {
+      setActiveIntake(null);
+      setConfirmSummary(null);
+      setMessage('');
+    }
+  }, [documentsListKey, section]);
 
   useEffect(() => {
     if (!confirmLocationId && activeLocations.length === 1) {
@@ -491,7 +504,11 @@ export default function OrgMaterialsIntakePanel({
     const ok = await confirmMessage(
       t('org.warehouse.intake.deleteLineTitle', null, 'Remove line?'),
       t('org.warehouse.intake.deleteLineBody', null, 'This removes the draft line only.'),
-      { confirmLabel: t('org.warehouse.intake.delete', null, 'Delete') },
+      {
+        confirmLabel: t('org.warehouse.intake.deleteLine', null, 'Remove'),
+        cancelLabel: t('common.cancel', null, 'Cancel'),
+        destructive: true,
+      },
     );
     if (!ok) return;
     setBusy(true);
@@ -603,7 +620,7 @@ export default function OrgMaterialsIntakePanel({
       t(
         'org.warehouse.intake.confirmed',
         null,
-        'Confirmed — materials are in warehouse stock (SKU + on-hand qty).',
+        'Confirmed — materials are in warehouse stock (SKU + on-stock qty).',
       ),
     );
     await load();
@@ -642,9 +659,12 @@ export default function OrgMaterialsIntakePanel({
       t(
         'org.warehouse.intake.confirmAllBody',
         { count: pending },
-        `Writes ${pending} SKU(s) to warehouse and adds quantities on hand. Original invoice stays permanently.`,
+        `Writes ${pending} SKU(s) to warehouse and adds quantities on stock. Original invoice stays permanently.`,
       ),
-      { confirmLabel: t('org.warehouse.intake.confirm', null, 'Confirm → warehouse') },
+      {
+        confirmLabel: t('org.warehouse.intake.confirm', null, 'Confirm all → warehouse'),
+        cancelLabel: t('common.cancel', null, 'Cancel'),
+      },
     );
     if (!ok) return;
     setBusy(true);
@@ -670,9 +690,12 @@ export default function OrgMaterialsIntakePanel({
       t(
         'org.warehouse.intake.confirmRowBody',
         null,
-        'Creates/updates the SKU and adds this quantity to on-hand stock.',
+        'Creates/updates the SKU and adds this quantity to on-stock quantity.',
       ),
-      { confirmLabel: t('org.warehouse.intake.confirmRow', null, 'Confirm row') },
+      {
+        confirmLabel: t('org.warehouse.intake.confirmRow', null, 'Confirm row'),
+        cancelLabel: t('common.cancel', null, 'Cancel'),
+      },
     );
     if (!ok) return;
     setBusy(true);
@@ -700,7 +723,11 @@ export default function OrgMaterialsIntakePanel({
         null,
         'This removes the unfinished import and its lines. Stock is unchanged. Confirmed invoices are never deleted.',
       ),
-      { confirmLabel: t('org.warehouse.intake.delete', null, 'Delete') },
+      {
+        confirmLabel: t('org.warehouse.intake.delete', null, 'Delete'),
+        cancelLabel: t('common.cancel', null, 'Cancel'),
+        destructive: true,
+      },
     );
     if (!ok) return;
     setBusy(true);
@@ -743,6 +770,7 @@ export default function OrgMaterialsIntakePanel({
     setActiveIntake(null);
     setConfirmSummary(null);
     setMessage('');
+    setError('');
   };
 
   const onOpenPdf = async () => {
@@ -810,7 +838,7 @@ export default function OrgMaterialsIntakePanel({
           {t(
             'org.warehouse.intake.materialsLead',
             null,
-            'On-hand stock from confirmed imports. Issuing materials to a task will decrease quantity here (next slice).',
+            'On-stock materials from confirmed imports. Issuing materials to a task will decrease quantity here (next slice).',
           )}
         </Text>
       )}
@@ -833,7 +861,12 @@ export default function OrgMaterialsIntakePanel({
           {navigation ? (
             <Button
               mode="contained"
-              onPress={() => navigateToOrgLegalEntity(navigation, { orgId: organizationId })}
+              onPress={() =>
+                navigateToOrgLegalEntity(navigation, {
+                  orgId: organizationId,
+                  returnTo: 'OrgWarehouse',
+                })
+              }
               style={styles.primaryBtn}
             >
               {t('org.warehouse.intake.openLegal', null, 'Open company details')}
@@ -851,7 +884,7 @@ export default function OrgMaterialsIntakePanel({
             {t(
               'org.warehouse.intake.confirmWrites',
               null,
-              'Wrote SKU + on-hand quantity for each confirmed line.',
+              'Wrote SKU + on-stock quantity for each confirmed line.',
             )}
           </Text>
           {confirmSummary.location_name ? (
@@ -873,7 +906,7 @@ export default function OrgMaterialsIntakePanel({
                 {m.part_number || m.part_number_alias ? ' · ' : ''}
                 +{m.quantity_added} {unitDisplay(m.unit_code, t)}
                 {' → '}
-                {t('org.warehouse.intake.onHand', null, 'On hand')}: {m.quantity_on_hand}
+                {t('org.warehouse.intake.onStock', null, 'On stock')}: {m.quantity_on_hand}
               </Text>
             </View>
           ))}
@@ -1164,7 +1197,7 @@ export default function OrgMaterialsIntakePanel({
                 {t(
                   'org.warehouse.intake.confirmHint',
                   null,
-                  'Pick a location, then Confirm. Writes each line as a warehouse SKU and adds quantity on hand. Original invoice is kept permanently.',
+                  'Pick a location, then Confirm. Writes each line as a warehouse SKU and adds quantity on stock. Original invoice is kept permanently.',
                 )}
               </Text>
               <Button
@@ -1190,79 +1223,105 @@ export default function OrgMaterialsIntakePanel({
         </AppCard>
       ) : null}
 
-      {isDocuments && !detailOpen && intakes.length > 0 ? (
+      {isDocuments && !detailOpen ? (
         <>
           <Text style={styles.chromeSectionTitle}>
             {t('org.warehouse.intake.history', null, 'Recent imports')}
           </Text>
-          <TextInput
-            label={t(
-              'org.warehouse.intake.searchDocs',
-              null,
-              'Search by number or supplier',
-            )}
-            value={docQuery}
-            onChangeText={setDocQuery}
-            mode="outlined"
-            style={styles.searchInput}
-            textColor={ON_CARD}
-            dense
-            right={
-              docQuery ? (
-                <TextInput.Icon icon="close" onPress={() => setDocQuery('')} />
-              ) : (
-                <TextInput.Icon icon="magnify" />
-              )
-            }
-          />
-          {filteredIntakes.length === 0 ? (
+          {intakes.length === 0 ? (
             <EmptyStateCard
-              title={t('org.warehouse.intake.searchDocsEmptyTitle', null, 'No matching documents')}
+              title={t('org.warehouse.intake.docsEmptyTitle', null, 'No imports yet')}
               subtitle={t(
-                'org.warehouse.intake.searchDocsEmpty',
-                { query: docQuery.trim() },
-                `Nothing matched “${docQuery.trim()}”.`,
+                'org.warehouse.intake.docsEmpty',
+                null,
+                'Import a supplier invoice PDF to review lines and add stock.',
               )}
-              icon="magnify"
+              icon="file-document-outline"
             />
           ) : (
-            filteredIntakes.map((row) => (
-              <AppCard key={row.id} style={styles.card}>
-                <Pressable onPress={() => openIntake(row)}>
-                  <Text style={styles.lineName}>
-                    {row.invoice_number || `#${row.id}`} · {row.status}
-                  </Text>
-                  <Text style={styles.lineMeta}>
-                    {row.supplier_name || '—'} · {row.lines_count || 0}{' '}
-                    {t('org.warehouse.intake.lines', null, 'lines')}
-                    {row.source_file_name ? ` · ${row.source_file_name}` : ''}
-                  </Text>
-                  <Text style={styles.openHint}>
-                    {t('org.warehouse.intake.openDetail', null, 'Open document detail')}
-                  </Text>
-                </Pressable>
-                {row.status === 'draft' && canManage ? (
-                  <Button
-                    mode="outlined"
-                    compact
-                    textColor="#B91C1C"
-                    onPress={() => onDeleteDraft(row)}
-                    disabled={busy}
-                    style={styles.deleteOutlined}
-                  >
-                    {t('org.warehouse.intake.delete', null, 'Delete draft')}
-                  </Button>
-                ) : row.status === 'confirmed' ? (
-                  <Text style={styles.keptNote}>
-                    {t(
-                      'org.warehouse.intake.keptForever',
-                      null,
-                      'Confirmed — original kept permanently',
-                    )}
-                  </Text>
-                ) : null}
-              </AppCard>
-            ))
+            <>
+              <TextInput
+                label={t(
+                  'org.warehouse.intake.searchDocs',
+                  null,
+                  'Search by number or supplier',
+                )}
+                value={docQuery}
+                onChangeText={setDocQuery}
+                mode="outlined"
+                style={styles.searchInput}
+                textColor={ON_CARD}
+                dense
+                right={
+                  docQuery ? (
+                    <TextInput.Icon icon="close" onPress={() => setDocQuery('')} />
+                  ) : (
+                    <TextInput.Icon icon="magnify" />
+                  )
+                }
+              />
+              {filteredIntakes.length === 0 ? (
+                <EmptyStateCard
+                  title={t('org.warehouse.intake.searchDocsEmptyTitle', null, 'No matching documents')}
+                  subtitle={t(
+                    'org.warehouse.intake.searchDocsEmpty',
+                    { query: docQuery.trim() },
+                    `Nothing matched “${docQuery.trim()}”.`,
+                  )}
+                  icon="magnify"
+                />
+              ) : (
+                filteredIntakes.map((row) => {
+                  const when =
+                    row.invoice_date || row.confirmed_at || row.created_at || '';
+                  const whenLabel = when ? String(when).slice(0, 10) : '';
+                  return (
+                    <AppCard key={row.id} style={styles.card}>
+                      <Pressable onPress={() => openIntake(row)} accessibilityRole="button">
+                        <Text style={styles.lineName}>
+                          {row.invoice_number
+                            ? `${t('org.warehouse.intake.invoice', null, 'Invoice')} #${row.invoice_number}`
+                            : `#${row.id}`}
+                        </Text>
+                        <Text style={styles.lineMeta}>
+                          {row.supplier_name
+                            || t('org.warehouse.intake.unknownSupplier', null, 'Supplier unknown')}
+                          {' · '}
+                          {row.status}
+                          {' · '}
+                          {row.lines_count || 0}{' '}
+                          {t('org.warehouse.intake.lines', null, 'lines')}
+                          {whenLabel ? ` · ${whenLabel}` : ''}
+                        </Text>
+                        <Text style={styles.openHint}>
+                          {t('org.warehouse.intake.openDetail', null, 'Open document detail')}
+                        </Text>
+                      </Pressable>
+                      {row.status === 'draft' && canManage ? (
+                        <Button
+                          mode="outlined"
+                          compact
+                          textColor="#B91C1C"
+                          onPress={() => onDeleteDraft(row)}
+                          disabled={busy}
+                          style={styles.deleteOutlined}
+                        >
+                          {t('org.warehouse.intake.delete', null, 'Delete draft')}
+                        </Button>
+                      ) : row.status === 'confirmed' ? (
+                        <Text style={styles.keptNote}>
+                          {t(
+                            'org.warehouse.intake.keptForever',
+                            null,
+                            'Confirmed — original kept permanently',
+                          )}
+                        </Text>
+                      ) : null}
+                    </AppCard>
+                  );
+                })
+              )}
+            </>
           )}
         </>
       ) : null}
@@ -1328,7 +1387,7 @@ export default function OrgMaterialsIntakePanel({
                 textColor={ON_CARD}
               />
               <Text style={styles.meta}>
-                {t('org.warehouse.intake.onHand', null, 'On hand')}: {editingMaterial.quantity_on_hand}
+                {t('org.warehouse.intake.onStock', null, 'On stock')}: {editingMaterial.quantity_on_hand}
                 {editingMaterial.unit_code
                   ? ` ${unitDisplay(editingMaterial.unit_code, t)}`
                   : ''}
@@ -1401,7 +1460,7 @@ export default function OrgMaterialsIntakePanel({
                     <Text style={styles.lineName}>{row.name}</Text>
                     <Text style={styles.lineMeta}>
                       {row.part_number ? `${row.part_number} · ` : ''}
-                      {t('org.warehouse.intake.onHand', null, 'On hand')}: {row.quantity_on_hand}
+                      {t('org.warehouse.intake.onStock', null, 'On stock')}: {row.quantity_on_hand}
                       {row.unit_code ? ` ${unitDisplay(row.unit_code, t)}` : ''}
                       {row.location_name
                         ? ` · ${t('org.warehouse.intake.atLocation', null, 'at')} ${row.location_name}`

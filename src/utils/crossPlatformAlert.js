@@ -1,5 +1,6 @@
 import { Alert, Platform } from 'react-native';
 
+import { invokeConfirmDialog } from './confirmDialogRef';
 import { invokeMessageDialog } from './messageDialogRef';
 
 function joinTitleMessage(title, message) {
@@ -18,20 +19,38 @@ export function showMessage(title, message, { variant = 'info' } = {}) {
   Alert.alert(title, message);
 }
 
-export async function confirmMessage(title, message, { confirmLabel = 'OK' } = {}) {
-  const text = joinTitleMessage(title, message);
+export async function confirmMessage(
+  title,
+  message,
+  { confirmLabel = 'OK', cancelLabel = 'Cancel', destructive = false } = {},
+) {
+  const hosted = invokeConfirmDialog({
+    title,
+    message,
+    confirmLabel,
+    cancelLabel,
+    destructive,
+  });
+  if (hosted) {
+    return hosted;
+  }
   if (Platform.OS === 'web') {
-    return window.confirm(text);
+    // Last-resort fallback only if ConfirmDialogHost is not mounted.
+    return window.confirm(joinTitleMessage(title, message));
   }
   return new Promise((resolve) => {
     Alert.alert(
       title,
       message,
       [
-        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-        { text: confirmLabel, onPress: () => resolve(true) },
+        { text: cancelLabel, style: 'cancel', onPress: () => resolve(false) },
+        {
+          text: confirmLabel,
+          style: destructive ? 'destructive' : 'default',
+          onPress: () => resolve(true),
+        },
       ],
-      { cancelable: true, onDismiss: () => resolve(false) }
+      { cancelable: true, onDismiss: () => resolve(false) },
     );
   });
 }
@@ -41,15 +60,19 @@ export async function confirmMessage(title, message, { confirmLabel = 'OK' } = {
  */
 export async function confirmLargeOdometerJump(message, { onAddPhoto } = {}) {
   if (Platform.OS === 'web') {
-    const addPhoto = window.confirm(
-      `${joinTitleMessage('Large odometer increase', message)}\n\nPress OK to attach an odometer photo first, or Cancel for the next step.`
+    const addPhoto = await confirmMessage(
+      'Large odometer increase',
+      `${message}\n\nAttach an odometer photo first?`,
+      { confirmLabel: 'Add photo', cancelLabel: 'Skip' },
     );
     if (addPhoto) {
       if (onAddPhoto) await onAddPhoto();
       return { proceed: false, addPhoto: true };
     }
-    const confirmed = window.confirm(
-      `${joinTitleMessage('Large odometer increase', message)}\n\nConfirm this odometer reading is correct?`
+    const confirmed = await confirmMessage(
+      'Large odometer increase',
+      `${message}\n\nConfirm this odometer reading is correct?`,
+      { confirmLabel: 'Confirm reading' },
     );
     return { proceed: confirmed, jumpAcknowledged: confirmed };
   }
@@ -72,7 +95,7 @@ export async function confirmLargeOdometerJump(message, { onAddPhoto } = {}) {
           onPress: () => resolve({ proceed: true, jumpAcknowledged: true }),
         },
       ],
-      { cancelable: true, onDismiss: () => resolve({ proceed: false }) }
+      { cancelable: true, onDismiss: () => resolve({ proceed: false }) },
     );
   });
 }
