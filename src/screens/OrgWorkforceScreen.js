@@ -39,6 +39,7 @@ const FILTER_ROLES = [
 
 const MODES = [
   { id: 'list', labelKey: 'org.workforce.allMembers' },
+  { id: 'dismissed', labelKey: 'org.workforce.dismissedMembers' },
   { id: 'add', labelKey: 'org.workforce.addMember' },
 ];
 
@@ -93,7 +94,8 @@ export default function OrgWorkforceScreen({ navigation, route }) {
         setError(t('org.workforce.loadError', null, 'Could not load workforce.'));
         return;
       }
-      const workforce = await listOrgWorkforce(token, resolved);
+      const status = mode === 'dismissed' ? 'dismissed' : 'active';
+      const workforce = await listOrgWorkforce(token, resolved, { status });
       setCanManage(Boolean(workforce?.can_manage || workforce?.can_assign_vehicles));
       setMembers(Array.isArray(workforce?.results) ? workforce.results : []);
     } catch (e) {
@@ -102,7 +104,7 @@ export default function OrgWorkforceScreen({ navigation, route }) {
     } finally {
       setLoading(false);
     }
-  }, [routeOrgId, t]);
+  }, [mode, routeOrgId, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -116,9 +118,9 @@ export default function OrgWorkforceScreen({ navigation, route }) {
   );
 
   const filteredMembers = useMemo(() => {
-    if (roleFilter === 'all') return members;
+    if (mode === 'dismissed' || roleFilter === 'all') return members;
     return members.filter((m) => m.role === roleFilter);
-  }, [members, roleFilter]);
+  }, [members, mode, roleFilter]);
 
   const createInvite = async () => {
     if (!orgId || (!inviteEmail.trim() && !invitePhone.trim())) return;
@@ -151,7 +153,9 @@ export default function OrgWorkforceScreen({ navigation, route }) {
     });
   };
 
-  const visibleModes = canManage ? MODES : MODES.filter((m) => m.id === 'list');
+  const visibleModes = canManage
+    ? MODES
+    : MODES.filter((m) => m.id === 'list' || m.id === 'dismissed');
 
   return (
     <ScreenBackground safeArea={false}>
@@ -252,34 +256,38 @@ export default function OrgWorkforceScreen({ navigation, route }) {
           </AppCard>
         ) : null}
 
-        {mode === 'list' ? (
+        {mode === 'list' || mode === 'dismissed' ? (
           <>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterRow}
-            >
-              {FILTER_ROLES.map((opt) => {
-                const selected = roleFilter === opt.value;
-                return (
-                  <Pressable
-                    key={opt.value}
-                    onPress={() => setRoleFilter(opt.value)}
-                    style={[styles.filterChip, selected && styles.filterChipActive]}
-                  >
-                    <Text style={[styles.filterChipLabel, selected && styles.filterChipLabelActive]}>
-                      {t(opt.labelKey, null, opt.value)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            {mode === 'list' ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterRow}
+              >
+                {FILTER_ROLES.map((opt) => {
+                  const selected = roleFilter === opt.value;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      onPress={() => setRoleFilter(opt.value)}
+                      style={[styles.filterChip, selected && styles.filterChipActive]}
+                    >
+                      <Text style={[styles.filterChipLabel, selected && styles.filterChipLabelActive]}>
+                        {t(opt.labelKey, null, opt.value)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            ) : null}
 
             {!loading && filteredMembers.length === 0 ? (
               <AppCard style={styles.card}>
                 <Text style={styles.helper}>
                   {members.length === 0
-                    ? t('org.workforce.empty', null, 'No members yet.')
+                    ? mode === 'dismissed'
+                      ? t('org.workforce.emptyDismissed', null, 'No dismissed members.')
+                      : t('org.workforce.empty', null, 'No members yet.')
                     : t('org.workforce.emptyFiltered', null, 'No members match this role.')}
                 </Text>
               </AppCard>
@@ -311,8 +319,13 @@ export default function OrgWorkforceScreen({ navigation, route }) {
                           {member.manage_fleet
                             ? ` · ${t('org.workforce.manageFleet', null, 'Fleet manager')}`
                             : ''}
+                          {mode === 'dismissed'
+                            ? ` · ${t('org.workforce.dismissed', null, 'Dismissed')}`
+                            : ''}
                         </Text>
-                        <Text style={styles.memberMeta}>{vehicleSummary}</Text>
+                        {mode === 'list' ? (
+                          <Text style={styles.memberMeta}>{vehicleSummary}</Text>
+                        ) : null}
                       </View>
                       <MaterialCommunityIcons name="chevron-right" size={24} color="#94a3b8" />
                     </View>

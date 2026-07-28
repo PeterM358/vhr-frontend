@@ -10,8 +10,10 @@ import OrgAppHeader from '../components/org/OrgAppHeader';
 import { listOrgFleet } from '../api/fleet';
 import {
   createVehicleAssignment,
+  dismissOrgWorkforceMember,
   endVehicleAssignment,
   listOrgWorkforce,
+  reinstateOrgWorkforceMember,
   updateOrgWorkforceMember,
 } from '../api/orgWorkforce';
 import { resolveActiveOrganizationId } from '../utils/orgWorkspace';
@@ -48,6 +50,7 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
   const [vehicleMenuOpen, setVehicleMenuOpen] = useState(false);
   const [assignBusy, setAssignBusy] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
 
   const onBack = useCallback(() => {
     navigateToOrgWorkforce(navigation, { orgId: routeOrgId || orgId });
@@ -66,7 +69,7 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
         return;
       }
       const [workforce, fleetData] = await Promise.all([
-        listOrgWorkforce(token, resolved),
+        listOrgWorkforce(token, resolved, { status: 'all' }),
         listOrgFleet(token, resolved, {}).catch(() => ({ results: [] })),
       ]);
       setCanManage(Boolean(workforce?.can_manage || workforce?.can_assign_vehicles));
@@ -154,8 +157,80 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
     }
   };
 
+  const confirmDismiss = () => {
+    if (!canManage || !orgId || !member || member.role === 'owner' || member.is_active === false) {
+      return;
+    }
+    Alert.alert(
+      t('org.workforce.dismissConfirmTitle', null, 'Dismiss member?'),
+      t(
+        'org.workforce.dismissConfirmBody',
+        null,
+        'They will be marked dismissed and removed from the active team list. You can reinstate them later.',
+      ),
+      [
+        { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
+        {
+          text: t('org.workforce.dismiss', null, 'Dismiss'),
+          style: 'destructive',
+          onPress: async () => {
+            setStatusBusy(true);
+            setError('');
+            try {
+              const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+              await dismissOrgWorkforceMember(token, orgId, member.membership_id);
+              await load();
+            } catch (e) {
+              Alert.alert(
+                t('common.error'),
+                e.message || t('org.workforce.dismissError', null, 'Could not dismiss member.'),
+              );
+            } finally {
+              setStatusBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const confirmReinstate = () => {
+    if (!canManage || !orgId || !member || member.is_active !== false) return;
+    Alert.alert(
+      t('org.workforce.reinstateConfirmTitle', null, 'Reinstate member?'),
+      t(
+        'org.workforce.reinstateConfirmBody',
+        null,
+        'They will appear again in the active team list and can be assigned to work.',
+      ),
+      [
+        { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
+        {
+          text: t('org.workforce.reinstate', null, 'Reinstate'),
+          onPress: async () => {
+            setStatusBusy(true);
+            setError('');
+            try {
+              const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+              await reinstateOrgWorkforceMember(token, orgId, member.membership_id);
+              await load();
+            } catch (e) {
+              Alert.alert(
+                t('common.error'),
+                e.message || t('org.workforce.reinstateError', null, 'Could not reinstate member.'),
+              );
+            } finally {
+              setStatusBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const assignments = Array.isArray(member?.vehicle_assignments) ? member.vehicle_assignments : [];
   const contact = [member?.email, member?.phone].filter(Boolean).join(' · ') || '—';
+  const isDismissed = member?.is_active === false;
 
   return (
     <ScreenBackground safeArea={false}>
@@ -205,9 +280,10 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
                 {member.manage_fleet
                   ? ` · ${t('org.workforce.manageFleet', null, 'Fleet manager')}`
                   : ''}
+                {isDismissed ? ` · ${t('org.workforce.dismissed', null, 'Dismissed')}` : ''}
               </Text>
 
-              {canManage && member.role !== 'owner' ? (
+              {canManage && member.role !== 'owner' && !isDismissed ? (
                 <View style={styles.memberActions}>
                   <Text style={styles.label}>
                     {t('org.workforce.changeRole', null, 'Change role')}
@@ -227,6 +303,32 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
                   </View>
                 </View>
               ) : null}
+
+              {canManage && member.role !== 'owner' ? (
+                <View style={styles.memberActions}>
+                  {isDismissed ? (
+                    <Button
+                      mode="contained"
+                      loading={statusBusy}
+                      disabled={statusBusy}
+                      onPress={confirmReinstate}
+                    >
+                      {t('org.workforce.reinstate', null, 'Reinstate')}
+                    </Button>
+                  ) : (
+                    <Button
+                      mode="outlined"
+                      loading={statusBusy}
+                      disabled={statusBusy}
+                      onPress={confirmDismiss}
+                      textColor="#b91c1c"
+                      labelStyle={styles.dismissLabel}
+                    >
+                      {t('org.workforce.dismiss', null, 'Dismiss')}
+                    </Button>
+                  )}
+                </View>
+              ) : null}
             </AppCard>
 
             <AppCard style={styles.card}>
@@ -241,7 +343,7 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
                         {row.vehicle_label || row.license_plate || `#${row.vehicle_id}`}
                         {row.role ? ` · ${assignmentRoleLabel(row.role)}` : ''}
                       </Text>
-                      {canManage ? (
+                      {canManage && !isDismissed ? (
                         <Button compact onPress={() => endAssignment(row.id)} labelStyle={styles.outlinedLabel}>
                           {t('org.workforce.endAssignment', null, 'End')}
                         </Button>
@@ -255,7 +357,7 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
                 </Text>
               )}
 
-              {canManage && member.role !== 'owner' ? (
+              {canManage && member.role !== 'owner' && !isDismissed ? (
                 <View style={styles.memberActions}>
                   {!showAssign ? (
                     <Button mode="contained-tonal" onPress={() => setShowAssign(true)}>
@@ -364,6 +466,9 @@ const styles = StyleSheet.create({
   },
   outlinedLabel: {
     color: COLORS.TEXT_DARK,
+  },
+  dismissLabel: {
+    color: '#b91c1c',
   },
   assignList: {
     marginTop: 6,

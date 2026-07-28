@@ -21,9 +21,9 @@ function buildQuery(params = {}) {
   return serialized ? `?${serialized}` : '';
 }
 
-export async function listOrgWorkforce(token, organizationId) {
+export async function listOrgWorkforce(token, organizationId, params = {}) {
   const response = await fetch(
-    `${API_BASE_URL}/api/organizations/${organizationId}/workforce/`,
+    `${API_BASE_URL}/api/organizations/${organizationId}/workforce/${buildQuery(params)}`,
     { headers: authHeaders(token) },
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load workforce'));
@@ -44,6 +44,14 @@ export async function updateOrgWorkforceMember(token, organizationId, membership
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to update member'));
   return response.json();
+}
+
+export async function dismissOrgWorkforceMember(token, organizationId, membershipId) {
+  return updateOrgWorkforceMember(token, organizationId, membershipId, { is_active: false });
+}
+
+export async function reinstateOrgWorkforceMember(token, organizationId, membershipId) {
+  return updateOrgWorkforceMember(token, organizationId, membershipId, { is_active: true });
 }
 
 export async function listVehicleAssignments(token, organizationId, params = {}) {
