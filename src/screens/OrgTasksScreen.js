@@ -12,10 +12,10 @@ import {
   attachWorkOrderMedia,
   confirmWorkOrderMaterialIssue,
   createWorkOrderExpense,
-  createWorkOrderStop,
+  createWorkOrderShipment,
   deleteWorkOrder,
   deleteWorkOrderExpense,
-  deleteWorkOrderStop,
+  deleteWorkOrderShipment,
   endWorkOrder,
   getWorkOrder,
   issueWorkOrderMaterials,
@@ -23,11 +23,11 @@ import {
   listWorkOrders,
   startWorkOrder,
   updateWorkOrder,
-  updateWorkOrderStop,
+  updateWorkOrderShipment,
 } from '../api/orgOperations';
 import ExpenseReceiptGallery from '../components/org/ExpenseReceiptGallery';
 import UnitOfMeasurePicker from '../components/org/UnitOfMeasurePicker';
-import WorkOrderStopsEditor from '../components/org/WorkOrderStopsEditor';
+import WorkOrderShipmentsEditor from '../components/org/WorkOrderShipmentsEditor';
 import { compressImageForUpload } from '../utils/compressImage';
 import { listOrgMaterials, listWarehouseLocations } from '../api/orgWarehouse';
 import { resolveActiveOrganizationId } from '../utils/orgWorkspace';
@@ -1155,51 +1155,68 @@ export default function OrgTasksScreen({ navigation, route }) {
     return detail;
   };
 
-  const addStop = async (payload) => {
+  const addShipment = async (payload) => {
     if (!orgId || !selected?.id) return;
     setBusyAction(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      await createWorkOrderStop(token, orgId, selected.id, payload);
+      await createWorkOrderShipment(token, orgId, selected.id, payload);
       await refreshSelectedDetail();
     } catch (e) {
       Alert.alert(
-        t('org.tasks.outboundLoadsTitle', null, 'Outbound loads'),
-        e.message || t('org.tasks.stopError', null, 'Could not save stop.'),
+        t('org.tasks.shipmentsTitle', null, 'Shipments'),
+        e.message || t('org.tasks.shipmentError', null, 'Could not save shipment.'),
       );
     } finally {
       setBusyAction(false);
     }
   };
 
-  const saveStop = async (stop, draft) => {
-    if (!orgId || !selected?.id || !stop?.id) return;
+  const saveShipment = async (shipment, draft) => {
+    if (!orgId || !selected?.id || !shipment?.id) return;
     setBusyAction(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      await updateWorkOrderStop(token, orgId, selected.id, stop.id, draft);
+      await updateWorkOrderShipment(token, orgId, selected.id, shipment.id, draft);
       await refreshSelectedDetail();
     } catch (e) {
       Alert.alert(
-        t('org.tasks.outboundLoadsTitle', null, 'Outbound loads'),
-        e.message || t('org.tasks.stopError', null, 'Could not save stop.'),
+        t('org.tasks.shipmentsTitle', null, 'Shipments'),
+        e.message || t('org.tasks.shipmentError', null, 'Could not save shipment.'),
       );
     } finally {
       setBusyAction(false);
     }
   };
 
-  const removeStop = async (stop) => {
-    if (!orgId || !selected?.id || !stop?.id) return;
+  const removeShipment = async (shipment) => {
+    if (!orgId || !selected?.id || !shipment?.id) return;
     setBusyAction(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      await deleteWorkOrderStop(token, orgId, selected.id, stop.id);
+      await deleteWorkOrderShipment(token, orgId, selected.id, shipment.id);
       await refreshSelectedDetail();
     } catch (e) {
       Alert.alert(
-        t('org.tasks.outboundLoadsTitle', null, 'Outbound loads'),
-        e.message || t('org.tasks.stopError', null, 'Could not save stop.'),
+        t('org.tasks.shipmentsTitle', null, 'Shipments'),
+        e.message || t('org.tasks.shipmentError', null, 'Could not save shipment.'),
+      );
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const saveLoadType = async (loadType) => {
+    if (!orgId || !selected?.id) return;
+    setBusyAction(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      await updateWorkOrder(token, orgId, selected.id, { load_type: loadType });
+      await refreshSelectedDetail();
+    } catch (e) {
+      Alert.alert(
+        t('org.tasks.shipmentsTitle', null, 'Shipments'),
+        e.message || t('org.tasks.shipmentError', null, 'Could not save shipment.'),
       );
     } finally {
       setBusyAction(false);
@@ -2493,19 +2510,31 @@ export default function OrgTasksScreen({ navigation, route }) {
 
 
             {(taskNeedsFuelTank(selected) ||
-              (selected.stops || []).length > 0 ||
-              (selected.outbound_stops || []).length > 0 ||
-              (selected.return_stops || []).length > 0) ? (
+              (selected.shipments || []).length > 0 ||
+              (selected.outbound_shipments || []).length > 0 ||
+              (selected.return_shipments || []).length > 0 ||
+              (selected.driver_route || []).length > 0) ? (
               <AppCard style={styles.card}>
-                <WorkOrderStopsEditor
+                <WorkOrderShipmentsEditor
                   t={t}
-                  outboundStops={
-                    selected.outbound_stops ||
-                    (selected.stops || []).filter((s) => s.direction === 'outbound')
+                  outboundShipments={
+                    selected.outbound_shipments ||
+                    (selected.shipments || []).filter((s) => s.direction === 'outbound')
                   }
-                  returnStops={
-                    selected.return_stops ||
-                    (selected.stops || []).filter((s) => s.direction === 'return')
+                  returnShipments={
+                    selected.return_shipments ||
+                    (selected.shipments || []).filter((s) => s.direction === 'return')
+                  }
+                  driverRoute={selected.driver_route || []}
+                  returnDriverRoute={selected.return_driver_route || []}
+                  driverRouteMapsUrl={selected.driver_route_maps_url || ''}
+                  returnDriverRouteMapsUrl={selected.return_driver_route_maps_url || ''}
+                  remainingSpace={selected.remaining_space || null}
+                  loadType={selected.load_type || 'groupage'}
+                  onLoadTypeChange={
+                    selected.status !== 'done' && selected.status !== 'cancelled'
+                      ? saveLoadType
+                      : undefined
                   }
                   editable={
                     selected.status !== 'done' &&
@@ -2513,9 +2542,9 @@ export default function OrgTasksScreen({ navigation, route }) {
                     (canManage || true)
                   }
                   busy={busyAction}
-                  onAdd={addStop}
-                  onUpdate={saveStop}
-                  onRemove={removeStop}
+                  onAdd={addShipment}
+                  onUpdate={saveShipment}
+                  onRemove={removeShipment}
                 />
               </AppCard>
             ) : null}

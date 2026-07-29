@@ -83,6 +83,10 @@ export const VEHICLE_OPTIONAL_GROUPS = [
       { key: 'max_allowed_weight_kg', label: 'Max allowed weight (kg)', kind: 'int' },
       { key: 'payload_capacity_kg', label: 'Payload capacity (kg)', kind: 'int' },
       { key: 'coupling_type', label: 'Coupling type', kind: 'choice' },
+      { key: 'cargo_length_m', label: 'Cargo length (m)', kind: 'decimal' },
+      { key: 'cargo_width_m', label: 'Cargo width (m)', kind: 'decimal' },
+      { key: 'cargo_height_m', label: 'Cargo height (m)', kind: 'decimal' },
+      { key: 'max_euro_pallets', label: 'Max euro pallets', kind: 'int' },
     ],
   },
   {

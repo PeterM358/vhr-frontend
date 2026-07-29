@@ -7,7 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
 import OrgAppHeader from '../components/org/OrgAppHeader';
-import WorkOrderStopsEditor from '../components/org/WorkOrderStopsEditor';
+import WorkOrderShipmentsEditor from '../components/org/WorkOrderShipmentsEditor';
 import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePicker';
 import {
   createWorkOrder,
@@ -112,8 +112,9 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState('all');
   const [routeFrom, setRouteFrom] = useState('');
   const [routeTo, setRouteTo] = useState('');
-  const [outboundStops, setOutboundStops] = useState([]);
-  const [returnStops, setReturnStops] = useState([]);
+  const [outboundShipments, setOutboundShipments] = useState([]);
+  const [returnShipments, setReturnShipments] = useState([]);
+  const [loadType, setLoadType] = useState('groupage');
   const [allowVehicleOverlap, setAllowVehicleOverlap] = useState(false);
   const [overallAssignees, setOverallAssignees] = useState([]);
   const [peopleQuery, setPeopleQuery] = useState('');
@@ -123,6 +124,47 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [documentRef, setDocumentRef] = useState('');
 
   const flavor = useMemo(() => detectTaskFlavor(activities), [activities]);
+
+  const localDriverRoute = useMemo(() => {
+    const build = (rows) => {
+      const ordered = [...rows];
+      const route = [];
+      let idx = 1;
+      ordered.forEach((s) => {
+        const address = s.loading_address || s.loading?.address || '';
+        if (address) {
+          route.push({
+            route_index: idx++,
+            role: 'loading',
+            shipment_id: s.id,
+            address,
+            company_name: s.loading_company_name || s.loading?.company_name || '',
+            cargo_summary: s.cargo_summary || '',
+            maps_url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`,
+          });
+        }
+      });
+      ordered.forEach((s) => {
+        const address = s.unloading_address || s.unloading?.address || '';
+        if (address) {
+          route.push({
+            route_index: idx++,
+            role: 'unloading',
+            shipment_id: s.id,
+            address,
+            company_name: s.unloading_company_name || s.unloading?.company_name || '',
+            cargo_summary: s.cargo_summary || '',
+            maps_url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`,
+          });
+        }
+      });
+      return route;
+    };
+    return {
+      outbound: build(outboundShipments),
+      return: build(returnShipments),
+    };
+  }, [outboundShipments, returnShipments]);
 
   const stepDefs = useMemo(() => {
     const taskNoun =
@@ -422,25 +464,81 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         vehicle_ids: vehicleIds,
         vehicle_id: vehicleIds[0] || null,
         assignee_user_ids: overallAssignees,
-        route_from: (outboundStops[0]?.address || routeFrom).trim() || '',
+        load_type: loadType,
+        route_from:
+          (outboundShipments[0]?.loading_address ||
+            outboundShipments[0]?.loading?.address ||
+            routeFrom).trim() || '',
         route_to:
-          (outboundStops[outboundStops.length - 1]?.address || routeTo).trim() || '',
-        stops: [
-          ...outboundStops.map((s, i) => ({
+          (outboundShipments[outboundShipments.length - 1]?.unloading_address ||
+            outboundShipments[outboundShipments.length - 1]?.unloading?.address ||
+            routeTo).trim() || '',
+        shipments: [
+          ...outboundShipments.map((s, i) => ({
             direction: 'outbound',
             sort_order: i,
-            address: String(s.address || '').trim(),
-            company_name: String(s.company_name || '').trim(),
-            notes: String(s.notes || '').trim(),
+            loading_company_name: String(
+              s.loading_company_name || s.loading?.company_name || '',
+            ).trim(),
+            loading_address: String(
+              s.loading_address || s.loading?.address || '',
+            ).trim(),
+            loading_contact_phone: String(
+              s.loading_contact_phone || s.loading?.contact_phone || '',
+            ).trim(),
+            loading_reservation_number: String(
+              s.loading_reservation_number || s.loading?.reservation_number || '',
+            ).trim(),
+            unloading_company_name: String(
+              s.unloading_company_name || s.unloading?.company_name || '',
+            ).trim(),
+            unloading_address: String(
+              s.unloading_address || s.unloading?.address || '',
+            ).trim(),
+            unloading_contact_phone: String(
+              s.unloading_contact_phone || s.unloading?.contact_phone || '',
+            ).trim(),
+            unloading_reservation_number: String(
+              s.unloading_reservation_number || s.unloading?.reservation_number || '',
+            ).trim(),
+            cargo_euro_pallets: s.cargo_euro_pallets ?? undefined,
+            cargo_crates: s.cargo_crates ?? undefined,
+            cargo_nonstandard_dims: String(s.cargo_nonstandard_dims || '').trim(),
+            cargo_note: String(s.cargo_note || '').trim(),
           })),
-          ...returnStops.map((s, i) => ({
+          ...returnShipments.map((s, i) => ({
             direction: 'return',
             sort_order: i,
-            address: String(s.address || '').trim(),
-            company_name: String(s.company_name || '').trim(),
-            notes: String(s.notes || '').trim(),
+            loading_company_name: String(
+              s.loading_company_name || s.loading?.company_name || '',
+            ).trim(),
+            loading_address: String(
+              s.loading_address || s.loading?.address || '',
+            ).trim(),
+            loading_contact_phone: String(
+              s.loading_contact_phone || s.loading?.contact_phone || '',
+            ).trim(),
+            loading_reservation_number: String(
+              s.loading_reservation_number || s.loading?.reservation_number || '',
+            ).trim(),
+            unloading_company_name: String(
+              s.unloading_company_name || s.unloading?.company_name || '',
+            ).trim(),
+            unloading_address: String(
+              s.unloading_address || s.unloading?.address || '',
+            ).trim(),
+            unloading_contact_phone: String(
+              s.unloading_contact_phone || s.unloading?.contact_phone || '',
+            ).trim(),
+            unloading_reservation_number: String(
+              s.unloading_reservation_number || s.unloading?.reservation_number || '',
+            ).trim(),
+            cargo_euro_pallets: s.cargo_euro_pallets ?? undefined,
+            cargo_crates: s.cargo_crates ?? undefined,
+            cargo_nonstandard_dims: String(s.cargo_nonstandard_dims || '').trim(),
+            cargo_note: String(s.cargo_note || '').trim(),
           })),
-        ].filter((s) => s.address),
+        ].filter((s) => s.loading_address && s.unloading_address),
         allow_vehicle_overlap: allowVehicleOverlap || undefined,
         operations: selectedOps.map((row, idx) => ({
           activity_definition_id: row.activityId,
@@ -604,30 +702,72 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
               'Optional. Use when one work card spans multiple days (e.g. 1–20 Aug) instead of creating many tasks.',
             )}
           </Text>
-          <WorkOrderStopsEditor
+          <WorkOrderShipmentsEditor
             t={t}
-            outboundStops={outboundStops}
-            returnStops={returnStops}
+            outboundShipments={outboundShipments}
+            returnShipments={returnShipments}
+            driverRoute={localDriverRoute.outbound}
+            returnDriverRoute={localDriverRoute.return}
+            loadType={loadType}
+            onLoadTypeChange={setLoadType}
             editable
             onAdd={(payload) => {
-              const row = { ...payload, id: `local-${Date.now()}-${Math.random()}` };
+              const row = {
+                ...payload,
+                id: `local-${Date.now()}-${Math.random()}`,
+                loading_company_name: payload.loading?.company_name || '',
+                loading_address: payload.loading?.address || '',
+                loading_contact_phone: payload.loading?.contact_phone || '',
+                loading_reservation_number: payload.loading?.reservation_number || '',
+                unloading_company_name: payload.unloading?.company_name || '',
+                unloading_address: payload.unloading?.address || '',
+                unloading_contact_phone: payload.unloading?.contact_phone || '',
+                unloading_reservation_number: payload.unloading?.reservation_number || '',
+                cargo_summary: [
+                  payload.cargo_euro_pallets != null
+                    ? `${payload.cargo_euro_pallets} euro pallets`
+                    : null,
+                  payload.cargo_crates != null ? `${payload.cargo_crates} crates` : null,
+                  payload.cargo_nonstandard_dims || null,
+                  payload.cargo_note || null,
+                ]
+                  .filter(Boolean)
+                  .join(', '),
+              };
               if (payload.direction === 'return') {
-                setReturnStops((prev) => [...prev, row]);
+                setReturnShipments((prev) => [...prev, row]);
               } else {
-                setOutboundStops((prev) => [...prev, row]);
+                setOutboundShipments((prev) => [...prev, row]);
               }
             }}
-            onUpdate={(stop, draft) => {
+            onUpdate={(shipment, draft) => {
               const apply = (prev) =>
-                prev.map((s) => (s.id === stop.id ? { ...s, ...draft } : s));
-              if (stop.direction === 'return') setReturnStops(apply);
-              else setOutboundStops(apply);
+                prev.map((s) =>
+                  s.id === shipment.id
+                    ? {
+                        ...s,
+                        ...draft,
+                        loading_company_name: draft.loading?.company_name || '',
+                        loading_address: draft.loading?.address || '',
+                        loading_contact_phone: draft.loading?.contact_phone || '',
+                        loading_reservation_number:
+                          draft.loading?.reservation_number || '',
+                        unloading_company_name: draft.unloading?.company_name || '',
+                        unloading_address: draft.unloading?.address || '',
+                        unloading_contact_phone: draft.unloading?.contact_phone || '',
+                        unloading_reservation_number:
+                          draft.unloading?.reservation_number || '',
+                      }
+                    : s,
+                );
+              if (shipment.direction === 'return') setReturnShipments(apply);
+              else setOutboundShipments(apply);
             }}
-            onRemove={(stop) => {
-              if (stop.direction === 'return') {
-                setReturnStops((prev) => prev.filter((s) => s.id !== stop.id));
+            onRemove={(shipment) => {
+              if (shipment.direction === 'return') {
+                setReturnShipments((prev) => prev.filter((s) => s.id !== shipment.id));
               } else {
-                setOutboundStops((prev) => prev.filter((s) => s.id !== stop.id));
+                setOutboundShipments((prev) => prev.filter((s) => s.id !== shipment.id));
               }
             }}
           />
@@ -635,7 +775,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             {t(
               'org.tasks.routeHelper',
               null,
-              'Prefer load stops above. Legacy from/to still works.',
+              'Prefer shipments above (loading + unloading + cargo).',
             )}
           </Text>
           <Text style={styles.fieldLabel}>

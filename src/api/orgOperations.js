@@ -375,6 +375,70 @@ export async function deleteWorkOrderStop(token, organizationId, workOrderId, st
   return true;
 }
 
+export async function listWorkOrderShipments(token, organizationId, workOrderId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/shipments/`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load shipments'));
+  return response.json();
+}
+
+export async function createWorkOrderShipment(token, organizationId, workOrderId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/shipments/`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to add shipment'));
+  return response.json();
+}
+
+export async function updateWorkOrderShipment(
+  token,
+  organizationId,
+  workOrderId,
+  shipmentId,
+  payload,
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/shipments/${shipmentId}/`,
+    {
+      method: 'PATCH',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to update shipment'));
+  return response.json();
+}
+
+export async function deleteWorkOrderShipment(
+  token,
+  organizationId,
+  workOrderId,
+  shipmentId,
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/shipments/${shipmentId}/`,
+    {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to delete shipment'));
+  return true;
+}
+
 export async function listProjects(token, organizationId, params = {}) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/projects/${buildQuery(params)}`,
