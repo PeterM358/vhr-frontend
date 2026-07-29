@@ -23,6 +23,7 @@ import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
+import { buildGoogleMapsDirUrl, buildGoogleMapsSearchUrl } from '../utils/googleMapsDirUrl';
 
 const MAX_PEOPLE = 10;
 const MAX_SEARCH_RESULTS = 18;
@@ -144,7 +145,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             company_name: s.loading_company_name || s.loading?.company_name || '',
             planned_at: s.loading_at || s.loading?.planned_at || null,
             cargo_summary: s.cargo_summary || '',
-            maps_url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`,
+            maps_url: buildGoogleMapsSearchUrl(address),
           });
         }
       });
@@ -160,7 +161,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             company_name: s.unloading_company_name || s.unloading?.company_name || '',
             planned_at: s.unloading_at || s.unloading?.planned_at || null,
             cargo_summary: s.cargo_summary || '',
-            maps_url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`,
+            maps_url: buildGoogleMapsSearchUrl(address),
           });
         }
       });
@@ -177,17 +178,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       unloading: 'return_unloading',
     });
     const full = [...out.route, ...ret.route];
-    const mapsUrl =
-      full.length > 1
-        ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
-            full[0].address,
-          )}&destination=${encodeURIComponent(full[full.length - 1].address)}&waypoints=${full
-            .slice(1, -1)
-            .map((s) => encodeURIComponent(s.address))
-            .join('|')}&travelmode=driving`
-        : full[0]
-          ? full[0].maps_url
-          : '';
+    const { url: mapsUrl } = buildGoogleMapsDirUrl(full);
     return { full, mapsUrl };
   }, [outboundShipments, returnShipments]);
 

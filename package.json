@@ -24,8 +24,9 @@
     "test:operation-icons": "node scripts/test-operation-icons.js",
     "test:discovery-filters": "node scripts/test-discovery-filter-taxonomy.js",
     "test:pickup-calendar": "node scripts/test-pickup-calendar-ux.js",
-    "test": "node scripts/test-analytics-consent.js",
+    "test": "node scripts/test-analytics-consent.js && node scripts/test-google-maps-dir-url.js",
     "test:consent": "node scripts/test-analytics-consent.js",
+    "test:maps-url": "node scripts/test-google-maps-dir-url.js",
     "eas-build-pre-install": "./eas-build-pre-install.sh"
   },
   "dependencies": {

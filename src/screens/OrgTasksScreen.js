@@ -1778,8 +1778,16 @@ export default function OrgTasksScreen({ navigation, route }) {
                     }
                   }}
                   onOpenMaps={(step) => {
-                    const url = step?.maps_url || selected.driver_route_maps_url;
-                    if (url) Linking.openURL(url).catch(() => {});
+                    const url =
+                      step?.maps_url ||
+                      step?.fallback_url ||
+                      selected.driver_route_maps_url;
+                    if (url) {
+                      Linking.openURL(url).catch(() => {
+                        const fb = step?.fallback_url;
+                        if (fb && fb !== url) Linking.openURL(fb).catch(() => {});
+                      });
+                    }
                   }}
                   onOpenFullDetail={() => setDriverFullDetail(true)}
                 />
