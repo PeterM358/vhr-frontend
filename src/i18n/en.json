@@ -670,7 +670,8 @@
       "hideBossFuelForm": "Hide full fuel fields",
       "driverDayPhaseStart": "1 · Start",
       "driverDayPhaseActive": "2 · On the road",
-      "driverDayPhaseEnd": "3 · End",
+      "driverDayPhaseEnd": "4 · End",
+      "driverDayPhaseStops": "3 · Stops",
       "driverDayActiveHint": "Add a receipt photo when you refuel. Tap “I’m at this stop” when you arrive. End when the trip is done.",
       "driverDayDone": "Trip finished",
       "driverDayDoneHint": "Start/end readings are saved. Ask the office if something needs correcting.",
@@ -965,6 +966,9 @@
         "stepPeopleHint": "Search and assign people for the whole task.",
         "stepOperations": "Operations",
         "stepOperationsHint": "Pick distinct operations. Add people and notes per step.",
+        "stepOperationsHintMixed": "Pick one or more operations. You can mix transport + marking on the same work card; assign people per operation.",
+        "stepShipments": "Shipments",
+        "stepShipmentsHint": "Because you selected a transport operation — add load/unload addresses, cargo, and route (пратки).",
         "stepReview": "Review",
         "stepReviewHint": "Confirm and create. You will go to the tasks list.",
         "nounTransport": "waybill / work card",
@@ -974,6 +978,34 @@
         "leadConstruction": "Site-style task (обект). Workers start and end themselves.",
         "whenLabel": "When"
       },
+      "templates": {
+        "transportDay": "Transport day",
+        "markingDay": "Marking day",
+        "mixedDay": "Mixed day"
+      },
+      "templatesLabel": "Quick templates (optional)",
+      "templatesHint": "Pre-selects operations — you can still add or remove any ops below.",
+      "templatesClear": "Clear selection",
+      "opsMixedHint": "Example: transport op (haul machine) + road marking op (m² + hours) on the same work card.",
+      "opsTransportSelectedHint": "Transport operation selected — next step asks for shipments (пратки).",
+      "opsNoTransportHint": "No transport op yet — shipments step is skipped for marking/field-only cards.",
+      "opsSummaryLabel": "Operations mix",
+      "projectOptionalAnyHint": "Optional. One-time jobs can use “No project” plus a contract/request number.",
+      "shipmentsLaterHint": "Shipments (пратки) appear after you select a transport operation.",
+      "taskKinds": {
+        "transport": "Transport",
+        "road_marking": "Road marking / field",
+        "construction": "Construction / roofs",
+        "mixed": "Mixed operations",
+        "other": "Other / generic"
+      },
+      "startOpenWizard": "Start (enter km / L)",
+      "startWizardHintRequired": "Enter starting odometer and fuel in tank, then start. These lock after save.",
+      "startReadingsLocked": "Start readings (saved)",
+      "startReadingsLockedHint": "Odometer and fuel at start are locked after save. Ask the office to correct them.",
+      "driverDayPhaseStops": "3 · Stops",
+      "driverDayPhaseEnd": "4 · End",
+      "noStopsYet": "No stops on this task yet.",
       "taskTotalsTitle": "Task totals (once)",
       "taskTotalsHint": "Enter machine hours and/or total km once for the whole work card. Fuel suggestions use these totals — not per-operation hour fields.",
       "taskTotalsHintTransport": "Report km (and optional hours) once on the work card. Fuel = tank start/end + receipts — not a free liters guess.",
@@ -3044,9 +3076,39 @@
       "reschedule_proposed": "Tap to accept or decline the new time",
       "repair_scheduled": "Tap to view appointment details",
       "repair_ready_for_pickup": "Tap to view completed service details",
-      "open_repair": "Tap to open repair"
+      "open_repair": "Tap to open repair",
+      "work_order_assigned": "Tap to open task",
+      "work_order_updated": "Tap to open task",
+      "work_order_at_address": "Tap to open task",
+      "work_order_course_finished": "Tap to open task",
+      "work_order_start_nag": "Tap to open task",
+      "work_order_start_overdue": "Tap to open task"
     },
     "templates": {
+      "work_order_assigned": {
+        "title": "New task assigned",
+        "body": "You were assigned a work card."
+      },
+      "work_order_updated": {
+        "title": "Task updated",
+        "body": "A work card assigned to you was updated."
+      },
+      "work_order_at_address": {
+        "title": "Driver at address",
+        "body": "A driver checked in at a stop."
+      },
+      "work_order_course_finished": {
+        "title": "Course finished",
+        "body": "A driver finished the course."
+      },
+      "work_order_start_nag": {
+        "title": "Have you started work?!",
+        "body": "Please tap Started on your task."
+      },
+      "work_order_start_overdue": {
+        "title": "Workers have not started",
+        "body": "Assigned workers have not started the task."
+      },
       "reschedule_proposed": {
         "title": "Reschedule proposed",
         "body": "A service center proposed a new appointment time."

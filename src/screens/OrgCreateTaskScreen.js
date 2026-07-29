@@ -74,13 +74,78 @@ function filterByQuery(items, query, getLabel) {
   return filtered.slice(0, MAX_SEARCH_RESULTS);
 }
 
+function isTransportActivityKind(kind) {
+  return String(kind || '').toLowerCase() === 'transport';
+}
+
+function isFieldActivityKind(kind) {
+  const k = String(kind || '').toLowerCase();
+  return [
+    'road_marking',
+    'construction',
+    'field_service',
+    'workshop_service',
+    'warehouse_task',
+  ].includes(k);
+}
+
 function detectTaskFlavor(activities) {
   const kinds = new Set((activities || []).map((a) => a.activity_kind).filter(Boolean));
-  const transport = kinds.has('transport');
-  const construction = kinds.has('construction') || kinds.has('road_marking');
-  if (transport && !construction) return 'transport';
-  if (construction && !transport) return 'construction';
+  const transport = [...kinds].some(isTransportActivityKind);
+  const field = [...kinds].some(isFieldActivityKind);
+  if (transport && field) return 'generic';
+  if (transport) return 'transport';
+  if (field) return 'construction';
   return 'generic';
+}
+
+function deriveTaskKindFromOps(selectedOps, activities) {
+  const byId = new Map((activities || []).map((a) => [a.id, a]));
+  const kinds = new Set();
+  (selectedOps || []).forEach((row) => {
+    const kind = byId.get(row.activityId)?.activity_kind;
+    if (kind) kinds.add(String(kind).toLowerCase());
+  });
+  const hasTransport = [...kinds].some(isTransportActivityKind);
+  const hasField = [...kinds].some(isFieldActivityKind);
+  if (hasTransport && hasField) return 'mixed';
+  if (hasTransport) return 'transport';
+  if (kinds.has('road_marking') && !kinds.has('construction')) return 'road_marking';
+  if (kinds.has('construction')) return 'construction';
+  return 'other';
+}
+
+function selectedOpsHaveTransport(selectedOps, activities) {
+  const byId = new Map((activities || []).map((a) => [a.id, a]));
+  return (selectedOps || []).some((row) =>
+    isTransportActivityKind(byId.get(row.activityId)?.activity_kind),
+  );
+}
+
+function templateOpIds(activities, templateId) {
+  const rows = activities || [];
+  if (templateId === 'transport_day') {
+    return rows.filter((a) => isTransportActivityKind(a.activity_kind)).map((a) => a.id);
+  }
+  if (templateId === 'marking_day') {
+    return rows
+      .filter((a) =>
+        ['road_marking', 'construction', 'field_service'].includes(
+          String(a.activity_kind || '').toLowerCase(),
+        ),
+      )
+      .map((a) => a.id);
+  }
+  if (templateId === 'mixed_day') {
+    const transport = rows.find((a) => isTransportActivityKind(a.activity_kind));
+    const marking = rows.find((a) =>
+      ['road_marking', 'construction', 'field_service'].includes(
+        String(a.activity_kind || '').toLowerCase(),
+      ),
+    );
+    return [transport?.id, marking?.id].filter((id) => id != null);
+  }
+  return [];
 }
 
 export default function OrgCreateTaskScreen({ navigation, route }) {
@@ -100,6 +165,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [vehicles, setVehicles] = useState([]);
   const [projects, setProjects] = useState([]);
 
+  const [templateId, setTemplateId] = useState(null);
   const [projectId, setProjectId] = useState(null);
   const [contractRef, setContractRef] = useState('');
   const [title, setTitle] = useState('');
@@ -127,6 +193,25 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [documentRef, setDocumentRef] = useState('');
 
   const flavor = useMemo(() => detectTaskFlavor(activities), [activities]);
+  const hasTransportOps = useMemo(
+    () => selectedOpsHaveTransport(selectedOps, activities),
+    [selectedOps, activities],
+  );
+  const derivedTaskKind = useMemo(
+    () => deriveTaskKindFromOps(selectedOps, activities),
+    [selectedOps, activities],
+  );
+
+  const availableTemplates = useMemo(() => {
+    const kinds = new Set((activities || []).map((a) => a.activity_kind).filter(Boolean));
+    const hasTransport = [...kinds].some(isTransportActivityKind);
+    const hasField = [...kinds].some(isFieldActivityKind);
+    const list = [];
+    if (hasTransport) list.push('transport_day');
+    if (hasField) list.push('marking_day');
+    if (hasTransport && hasField) list.push('mixed_day');
+    return list;
+  }, [activities]);
 
   const localDriverRoute = useMemo(() => {
     const buildPhase = (rows, direction, idxStart, roles) => {
@@ -189,41 +274,24 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         : flavor === 'construction'
           ? t('org.tasks.wizard.nounConstruction', null, 'site / work card')
           : t('org.tasks.wizard.nounGeneric', null, 'work card');
-    return [
+    const steps = [
       {
         id: 'project',
-        title:
-          flavor === 'transport'
-            ? t('org.tasks.wizard.stepProjectTransport', null, 'Project / request')
-            : t('org.tasks.wizard.stepProject', null, 'Project'),
-        hint:
-          flavor === 'transport'
-            ? t(
-                'org.tasks.wizard.stepProjectHintTransport',
-                null,
-                'Project is optional. Many transport jobs are one-time contracts / requests — pick “No project” and add a contract/request number.',
-              )
-            : t(
-                'org.tasks.wizard.stepProjectHint',
-                { noun: taskNoun },
-                `Link a project or create this ${taskNoun} without one.`,
-              ),
+        title: t('org.tasks.wizard.stepProject', null, 'Project'),
+        hint: t(
+          'org.tasks.wizard.stepProjectHint',
+          { noun: taskNoun },
+          `Link a project or create this ${taskNoun} without one.`,
+        ),
       },
       {
         id: 'when',
         title: t('org.tasks.wizard.stepWhen', null, 'When'),
-        hint:
-          flavor === 'transport'
-            ? t(
-                'org.tasks.wizard.stepWhenHintTransport',
-                null,
-                'Set the work-card date range. Put loading/unloading hours on each shipment — not on a generic time grid.',
-              )
-            : t(
-                'org.tasks.wizard.stepWhenHint',
-                null,
-                'Schedule date and planned start for reminders. Workers tap Start/End themselves.',
-              ),
+        hint: t(
+          'org.tasks.wizard.stepWhenHint',
+          null,
+          'Schedule date and planned start for reminders. Workers tap Start/End themselves.',
+        ),
       },
       {
         id: 'vehicle',
@@ -247,22 +315,34 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         id: 'operations',
         title: t('org.tasks.wizard.stepOperations', null, 'Operations'),
         hint: t(
-          'org.tasks.wizard.stepOperationsHint',
+          'org.tasks.wizard.stepOperationsHintMixed',
           null,
-          'Pick distinct operations. Add people and notes per step.',
-        ),
-      },
-      {
-        id: 'review',
-        title: t('org.tasks.wizard.stepReview', null, 'Review'),
-        hint: t(
-          'org.tasks.wizard.stepReviewHint',
-          null,
-          'Confirm and create. You will go to the tasks list.',
+          'Pick one or more operations. You can mix transport + marking on the same work card; assign people per operation.',
         ),
       },
     ];
-  }, [flavor, t]);
+    if (hasTransportOps) {
+      steps.push({
+        id: 'shipments',
+        title: t('org.tasks.wizard.stepShipments', null, 'Shipments'),
+        hint: t(
+          'org.tasks.wizard.stepShipmentsHint',
+          null,
+          'Because you selected a transport operation — add load/unload addresses, cargo, and route (пратки).',
+        ),
+      });
+    }
+    steps.push({
+      id: 'review',
+      title: t('org.tasks.wizard.stepReview', null, 'Review'),
+      hint: t(
+        'org.tasks.wizard.stepReviewHint',
+        null,
+        'Confirm and create. You will go to the tasks list.',
+      ),
+    });
+    return steps;
+  }, [flavor, t, hasTransportOps]);
 
   const onBack = useCallback(() => {
     if (step > 0) {
@@ -290,7 +370,8 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         listOrgFleet(token, resolved, {}).catch(() => ({ results: [] })),
         listProjects(token, resolved, { active: 1 }).catch(() => ({ results: [] })),
       ]);
-      setActivities((opsData?.results || []).filter((row) => row.is_active !== false));
+      const activeOps = (opsData?.results || []).filter((row) => row.is_active !== false);
+      setActivities(activeOps);
       setMembers(Array.isArray(workforce?.results) ? workforce.results : []);
       const fleetRows = Array.isArray(fleet?.results)
         ? fleet.results
@@ -404,9 +485,19 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   };
 
   const toggleOperation = (activityId) => {
+    setTemplateId(null);
     setSelectedOps((prev) => {
       const exists = prev.find((row) => row.activityId === activityId);
-      if (exists) return prev.filter((row) => row.activityId !== activityId);
+      if (exists) {
+        const next = prev.filter((row) => row.activityId !== activityId);
+        const stillTransport = selectedOpsHaveTransport(next, activities);
+        if (!stillTransport) {
+          setOutboundShipments([]);
+          setReturnShipments([]);
+          setLoadType('groupage');
+        }
+        return next;
+      }
       return [...prev, { activityId, notes: '', assigneeIds: [] }];
     });
   };
@@ -437,13 +528,14 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   );
 
   const validateStep = () => {
-    if (step === 0) {
+    const stepId = stepDefs[step]?.id;
+    if (stepId === 'project') {
       if (!title.trim()) {
         setFormMessage(t('org.tasks.titleRequired', null, 'Title is required.'));
         return false;
       }
     }
-    if (step === 1) {
+    if (stepId === 'when') {
       if (scheduledDate.trim() && scheduledEndDate.trim() && scheduledEndDate.trim() < scheduledDate.trim()) {
         setFormMessage(
           t(
@@ -455,7 +547,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         return false;
       }
     }
-    if (step === 4 && selectedOps.length === 0) {
+    if (stepId === 'operations' && selectedOps.length === 0) {
       setFormMessage(t('org.tasks.operationsRequired', null, 'Pick at least one operation.'));
       return false;
     }
@@ -467,6 +559,13 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     if (!validateStep()) return;
     if (step < stepDefs.length - 1) setStep((s) => s + 1);
   };
+
+  // If transport ops were removed, shipments step disappears — clamp index.
+  React.useEffect(() => {
+    if (step >= stepDefs.length) {
+      setStep(Math.max(0, stepDefs.length - 1));
+    }
+  }, [step, stepDefs.length]);
 
   const save = async () => {
     if (!orgId) return;
@@ -487,6 +586,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       const payload = {
         title: trimmed,
         instructions: instructions.trim(),
+        task_kind: derivedTaskKind,
         project_id: projectId,
         contract_ref: contractRef.trim() || '',
         needs_ack: true,
@@ -499,16 +599,26 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         vehicle_ids: vehicleIds,
         vehicle_id: vehicleIds[0] || null,
         assignee_user_ids: overallAssignees,
-        load_type: loadType,
-        route_from:
+        allow_vehicle_overlap: allowVehicleOverlap || undefined,
+        allow_assignee_overlap: allowAssigneeOverlap || undefined,
+        operations: selectedOps.map((row, idx) => ({
+          activity_definition_id: row.activityId,
+          sort_order: idx,
+          notes: row.notes.trim(),
+          assignee_user_ids: row.assigneeIds,
+        })),
+      };
+      if (hasTransportOps) {
+        payload.load_type = loadType;
+        payload.route_from =
           (outboundShipments[0]?.loading_address ||
             outboundShipments[0]?.loading?.address ||
-            routeFrom).trim() || '',
-        route_to:
+            routeFrom).trim() || '';
+        payload.route_to =
           (outboundShipments[outboundShipments.length - 1]?.unloading_address ||
             outboundShipments[outboundShipments.length - 1]?.unloading?.address ||
-            routeTo).trim() || '',
-        shipments: [
+            routeTo).trim() || '';
+        payload.shipments = [
           ...outboundShipments.map((s, i) => ({
             direction: 'outbound',
             sort_order: i,
@@ -595,16 +705,10 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             cargo_nonstandard_dims: String(s.cargo_nonstandard_dims || '').trim(),
             cargo_note: String(s.cargo_note || '').trim(),
           })),
-        ].filter((s) => s.loading_address && s.unloading_address),
-        allow_vehicle_overlap: allowVehicleOverlap || undefined,
-        allow_assignee_overlap: allowAssigneeOverlap || undefined,
-        operations: selectedOps.map((row, idx) => ({
-          activity_definition_id: row.activityId,
-          sort_order: idx,
-          notes: row.notes.trim(),
-          assignee_user_ids: row.assigneeIds,
-        })),
-      };
+        ].filter((s) => s.loading_address && s.unloading_address);
+      } else {
+        payload.shipments = [];
+      }
       await createWorkOrder(token, orgId, payload);
       navigateToOrgTasks(navigation, { orgId });
     } catch (e) {
@@ -705,24 +809,120 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     </View>
   );
 
+  const applyTemplate = (id) => {
+    setTemplateId(id);
+    const ids = templateOpIds(activities, id);
+    setSelectedOps((prev) => {
+      const keepNotes = new Map(prev.map((row) => [row.activityId, row]));
+      return ids.map((activityId) => {
+        const existing = keepNotes.get(activityId);
+        return existing || { activityId, notes: '', assigneeIds: [] };
+      });
+    });
+    if (id === 'marking_day') {
+      setOutboundShipments([]);
+      setReturnShipments([]);
+      setLoadType('groupage');
+    }
+  };
+
+  const renderShipmentsEditor = () => (
+    <WorkOrderShipmentsEditor
+      t={t}
+      outboundShipments={outboundShipments}
+      returnShipments={returnShipments}
+      driverRoute={localDriverRoute.full}
+      driverRouteMapsUrl={localDriverRoute.mapsUrl}
+      loadType={loadType}
+      onLoadTypeChange={setLoadType}
+      editable
+      onAdd={(payload) => {
+        const row = {
+          ...payload,
+          id: `local-${Date.now()}-${Math.random()}`,
+          loading_company_name: payload.loading?.company_name || '',
+          loading_address: payload.loading?.address || '',
+          loading_contact_phone: payload.loading?.contact_phone || '',
+          loading_reservation_number: payload.loading?.reservation_number || '',
+          loading_at: payload.loading?.planned_at || null,
+          unloading_company_name: payload.unloading?.company_name || '',
+          unloading_address: payload.unloading?.address || '',
+          unloading_contact_phone: payload.unloading?.contact_phone || '',
+          unloading_reservation_number: payload.unloading?.reservation_number || '',
+          unloading_at: payload.unloading?.planned_at || null,
+          cargo_kind: payload.cargo_kind || '',
+          cargo_unit_count: payload.cargo_unit_count,
+          cargo_length_cm: payload.cargo_length_cm,
+          cargo_width_cm: payload.cargo_width_cm,
+          cargo_height_cm: payload.cargo_height_cm,
+          cargo_weight_kg: payload.cargo_weight_kg,
+          cargo_weight_distribution_note: payload.cargo_weight_distribution_note || '',
+          cargo_euro_pallets: payload.cargo_euro_pallets,
+          cargo_crates: payload.cargo_crates,
+          cargo_summary: [
+            payload.cargo_kind || null,
+            payload.cargo_unit_count != null ? `×${payload.cargo_unit_count}` : null,
+            payload.cargo_weight_kg != null ? `${payload.cargo_weight_kg} kg` : null,
+            payload.cargo_note || null,
+          ]
+            .filter(Boolean)
+            .join(' '),
+        };
+        if (payload.direction === 'return') {
+          setReturnShipments((prev) => [...prev, row]);
+        } else {
+          setOutboundShipments((prev) => [...prev, row]);
+        }
+      }}
+      onUpdate={(shipment, draft) => {
+        const apply = (prev) =>
+          prev.map((s) =>
+            s.id === shipment.id
+              ? {
+                  ...s,
+                  ...draft,
+                  loading_company_name: draft.loading?.company_name || '',
+                  loading_address: draft.loading?.address || '',
+                  loading_contact_phone: draft.loading?.contact_phone || '',
+                  loading_reservation_number: draft.loading?.reservation_number || '',
+                  loading_at: draft.loading?.planned_at || null,
+                  unloading_company_name: draft.unloading?.company_name || '',
+                  unloading_address: draft.unloading?.address || '',
+                  unloading_contact_phone: draft.unloading?.contact_phone || '',
+                  unloading_reservation_number: draft.unloading?.reservation_number || '',
+                  unloading_at: draft.unloading?.planned_at || null,
+                }
+              : s,
+          );
+        if (shipment.direction === 'return') setReturnShipments(apply);
+        else setOutboundShipments(apply);
+      }}
+      onRemove={(shipment) => {
+        if (shipment.direction === 'return') {
+          setReturnShipments((prev) => prev.filter((s) => s.id !== shipment.id));
+        } else {
+          setOutboundShipments((prev) => prev.filter((s) => s.id !== shipment.id));
+        }
+      }}
+    />
+  );
+
   const renderStepBody = () => {
-    if (step === 0) {
+    const stepId = stepDefs[step]?.id;
+
+    if (stepId === 'project') {
       return (
         <>
           <Text style={styles.fieldLabel}>
-            {flavor === 'transport'
-              ? t('org.tasks.projectOptionalTransport', null, 'Project (optional)')
-              : t('org.tasks.project', null, 'Project')}
+            {t('org.tasks.project', null, 'Project')}
           </Text>
-          {flavor === 'transport' ? (
-            <Text style={styles.helper}>
-              {t(
-                'org.tasks.projectOptionalTransportHint',
-                null,
-                'Not required for one-time transport requests. Use “No project” and fill contract/request below.',
-              )}
-            </Text>
-          ) : null}
+          <Text style={styles.helper}>
+            {t(
+              'org.tasks.projectOptionalAnyHint',
+              null,
+              'Optional. One-time jobs can use “No project” plus a contract/request number.',
+            )}
+          </Text>
           <TextInput
             label={t('org.tasks.searchProjects', null, 'Search projects')}
             value={projectQuery}
@@ -789,7 +989,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       );
     }
 
-    if (step === 1) {
+    if (stepId === 'when') {
       return (
         <>
           <ServiceRecordDatePicker
@@ -816,118 +1016,26 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
               'Optional. Use when one work card spans multiple days (e.g. 1–20 Aug) instead of creating many tasks.',
             )}
           </Text>
-          <WorkOrderShipmentsEditor
-            t={t}
-            outboundShipments={outboundShipments}
-            returnShipments={returnShipments}
-            driverRoute={localDriverRoute.full}
-            driverRouteMapsUrl={localDriverRoute.mapsUrl}
-            loadType={loadType}
-            onLoadTypeChange={setLoadType}
-            editable
-            onAdd={(payload) => {
-              const row = {
-                ...payload,
-                id: `local-${Date.now()}-${Math.random()}`,
-                loading_company_name: payload.loading?.company_name || '',
-                loading_address: payload.loading?.address || '',
-                loading_contact_phone: payload.loading?.contact_phone || '',
-                loading_reservation_number: payload.loading?.reservation_number || '',
-                loading_at: payload.loading?.planned_at || null,
-                unloading_company_name: payload.unloading?.company_name || '',
-                unloading_address: payload.unloading?.address || '',
-                unloading_contact_phone: payload.unloading?.contact_phone || '',
-                unloading_reservation_number: payload.unloading?.reservation_number || '',
-                unloading_at: payload.unloading?.planned_at || null,
-                cargo_kind: payload.cargo_kind || '',
-                cargo_unit_count: payload.cargo_unit_count,
-                cargo_length_cm: payload.cargo_length_cm,
-                cargo_width_cm: payload.cargo_width_cm,
-                cargo_height_cm: payload.cargo_height_cm,
-                cargo_weight_kg: payload.cargo_weight_kg,
-                cargo_weight_distribution_note: payload.cargo_weight_distribution_note || '',
-                cargo_euro_pallets: payload.cargo_euro_pallets,
-                cargo_crates: payload.cargo_crates,
-                cargo_summary: [
-                  payload.cargo_kind || null,
-                  payload.cargo_unit_count != null ? `×${payload.cargo_unit_count}` : null,
-                  payload.cargo_weight_kg != null ? `${payload.cargo_weight_kg} kg` : null,
-                  payload.cargo_note || null,
-                ]
-                  .filter(Boolean)
-                  .join(' '),
-              };
-              if (payload.direction === 'return') {
-                setReturnShipments((prev) => [...prev, row]);
-              } else {
-                setOutboundShipments((prev) => [...prev, row]);
-              }
-            }}
-            onUpdate={(shipment, draft) => {
-              const apply = (prev) =>
-                prev.map((s) =>
-                  s.id === shipment.id
-                    ? {
-                        ...s,
-                        ...draft,
-                        loading_company_name: draft.loading?.company_name || '',
-                        loading_address: draft.loading?.address || '',
-                        loading_contact_phone: draft.loading?.contact_phone || '',
-                        loading_reservation_number:
-                          draft.loading?.reservation_number || '',
-                        loading_at: draft.loading?.planned_at || null,
-                        unloading_company_name: draft.unloading?.company_name || '',
-                        unloading_address: draft.unloading?.address || '',
-                        unloading_contact_phone: draft.unloading?.contact_phone || '',
-                        unloading_reservation_number:
-                          draft.unloading?.reservation_number || '',
-                        unloading_at: draft.unloading?.planned_at || null,
-                      }
-                    : s,
-                );
-              if (shipment.direction === 'return') setReturnShipments(apply);
-              else setOutboundShipments(apply);
-            }}
-            onRemove={(shipment) => {
-              if (shipment.direction === 'return') {
-                setReturnShipments((prev) => prev.filter((s) => s.id !== shipment.id));
-              } else {
-                setOutboundShipments((prev) => prev.filter((s) => s.id !== shipment.id));
-              }
-            }}
-          />
+          <Text style={styles.fieldLabel}>
+            {t('org.tasks.plannedStart', null, 'Start time')}
+          </Text>
+          {renderTimeChips(plannedStart, setPlannedStart)}
+          <Text style={styles.fieldLabel}>
+            {t('org.tasks.plannedEnd', null, 'End time (optional)')}
+          </Text>
+          {renderTimeChips(plannedEnd, setPlannedEnd, true)}
           <Text style={styles.helper}>
             {t(
-              'org.tasks.routeHelper',
+              'org.tasks.shipmentsLaterHint',
               null,
-              'Prefer shipments above (loading + unloading + cargo).',
+              'Shipments (пратки) appear after you select a transport operation.',
             )}
           </Text>
-          {flavor === 'transport' ? (
-            <Text style={styles.helper}>
-              {t(
-                'org.tasks.plannedHoursOnShipmentsHint',
-                null,
-                'Loading/unloading hours belong on each shipment above. Task-level start/end time is optional.',
-              )}
-            </Text>
-          ) : (
-            <>
-              <Text style={styles.fieldLabel}>
-                {t('org.tasks.plannedStart', null, 'Start time')}
-              </Text>
-              {renderTimeChips(plannedStart, setPlannedStart)}
-              <Text style={styles.fieldLabel}>
-                {t('org.tasks.plannedEnd', null, 'End time (optional)')}
-              </Text>
-              {renderTimeChips(plannedEnd, setPlannedEnd, true)}
-            </>
-          )}
         </>
       );
     }
 
-    if (step === 2) {
+    if (stepId === 'vehicle') {
       const readinessOptions = [
         { value: 'all', label: t('org.tasks.vehicleFilterReadinessAll', null, 'All') },
         { value: 'ready', label: t('org.tasks.vehicleFilterReady', null, 'Ready') },
@@ -1057,7 +1165,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       );
     }
 
-    if (step === 3) {
+    if (stepId === 'people') {
       return (
         <>
           <Text style={styles.helper}>
@@ -1096,7 +1204,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       );
     }
 
-    if (step === 4) {
+    if (stepId === 'operations') {
       if (activities.length === 0) {
         return (
           <Text style={styles.empty}>
@@ -1108,82 +1216,204 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
           </Text>
         );
       }
-      return activities.map((activity) => {
-        const selected = selectedActivityIds.has(activity.id);
-        const line = selectedOps.find((row) => row.activityId === activity.id);
-        return (
-          <View key={activity.id} style={styles.opBlock}>
-            <Pressable
-              onPress={() => toggleOperation(activity.id)}
-              style={[styles.opToggle, selected && styles.opToggleActive]}
-            >
-              <Text style={styles.opToggleText}>
-                {selected ? '✓ ' : ''}
-                {activity.name}
+      const templateLabels = {
+        transport_day: t('org.tasks.templates.transportDay', null, 'Transport day'),
+        marking_day: t('org.tasks.templates.markingDay', null, 'Marking day'),
+        mixed_day: t('org.tasks.templates.mixedDay', null, 'Mixed day'),
+      };
+      return (
+        <>
+          {availableTemplates.length ? (
+            <>
+              <Text style={styles.fieldLabel}>
+                {t('org.tasks.templatesLabel', null, 'Quick templates (optional)')}
               </Text>
-              {activity.activity_kind ? (
-                <Text style={styles.opKind}>{activity.activity_kind}</Text>
-              ) : null}
-            </Pressable>
-            {selected && line ? (
-              <View style={styles.opDetails}>
-                {(activity.default_materials || []).length > 0 ? (
-                  <Text style={styles.helper}>
-                    {t('org.tasks.materialsFromOp', null, 'Materials from this operation')}:{' '}
-                    {(activity.default_materials || [])
-                      .map((mat) => mat.name || `#${mat.id}`)
-                      .join(', ')}
-                  </Text>
-                ) : activity.consumes_materials ? (
-                  <Text style={styles.helper}>
-                    {t(
-                      'org.tasks.materialsOpNone',
-                      null,
-                      'This operation consumes materials but has no default SKUs yet.',
-                    )}
-                  </Text>
+              <Text style={styles.helper}>
+                {t(
+                  'org.tasks.templatesHint',
+                  null,
+                  'Pre-selects operations — you can still add or remove any ops below.',
+                )}
+              </Text>
+              <View style={styles.chipWrap}>
+                {availableTemplates.map((id) => {
+                  const active = templateId === id;
+                  return (
+                    <Pressable
+                      key={id}
+                      onPress={() => applyTemplate(id)}
+                      style={[styles.chip, active && styles.chipActive]}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {templateLabels[id] || id}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+                {templateId ? (
+                  <Pressable
+                    onPress={() => {
+                      setTemplateId(null);
+                      setSelectedOps([]);
+                    }}
+                    style={styles.chip}
+                  >
+                    <Text style={styles.chipText}>
+                      {t('org.tasks.templatesClear', null, 'Clear selection')}
+                    </Text>
+                  </Pressable>
                 ) : null}
-                <TextInput
-                  label={t('org.tasks.operationNotes', null, 'Notes for this step')}
-                  value={line.notes}
-                  onChangeText={(value) => updateOpNotes(activity.id, value)}
-                  mode="outlined"
-                  style={styles.input}
-                  textColor={ON_CARD}
-                />
-                <Text style={styles.fieldLabel}>
-                  {t('org.tasks.operationPeople', null, 'People for this step')}
-                </Text>
-                <View style={styles.chipWrap}>
-                  {members.slice(0, MAX_SEARCH_RESULTS).map((member) => {
-                    const uid = member.user_id;
-                    const active = line.assigneeIds.includes(uid);
-                    return (
-                      <Pressable
-                        key={`${activity.id}-${uid}`}
-                        onPress={() => toggleOpAssignee(activity.id, uid)}
-                        style={[styles.chip, active && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                          {memberLabel(member)}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
               </View>
-            ) : null}
-          </View>
-        );
-      });
+            </>
+          ) : null}
+          <Text style={styles.helper}>
+            {t(
+              'org.tasks.opsMixedHint',
+              null,
+              'Example: transport op (haul machine) + road marking op (m² + hours) on the same work card.',
+            )}
+          </Text>
+          {hasTransportOps ? (
+            <Text style={styles.helper}>
+              {t(
+                'org.tasks.opsTransportSelectedHint',
+                null,
+                'Transport operation selected — next step asks for shipments (пратки).',
+              )}
+            </Text>
+          ) : (
+            <Text style={styles.helper}>
+              {t(
+                'org.tasks.opsNoTransportHint',
+                null,
+                'No transport op yet — shipments step is skipped for marking/field-only cards.',
+              )}
+            </Text>
+          )}
+          {activities.map((activity) => {
+            const selected = selectedActivityIds.has(activity.id);
+            const line = selectedOps.find((row) => row.activityId === activity.id);
+            return (
+              <View key={activity.id} style={styles.opBlock}>
+                <Pressable
+                  onPress={() => {
+                    setTemplateId(null);
+                    toggleOperation(activity.id);
+                  }}
+                  style={[styles.opToggle, selected && styles.opToggleActive]}
+                >
+                  <Text style={styles.opToggleText}>
+                    {selected ? '✓ ' : ''}
+                    {activity.name}
+                  </Text>
+                  {activity.activity_kind ? (
+                    <Text style={styles.opKind}>{activity.activity_kind}</Text>
+                  ) : null}
+                </Pressable>
+                {selected && line ? (
+                  <View style={styles.opDetails}>
+                    {(activity.default_materials || []).length > 0 ? (
+                      <Text style={styles.helper}>
+                        {t('org.tasks.materialsFromOp', null, 'Materials from this operation')}:{' '}
+                        {(activity.default_materials || [])
+                          .map((mat) => mat.name || `#${mat.id}`)
+                          .join(', ')}
+                      </Text>
+                    ) : activity.consumes_materials ? (
+                      <Text style={styles.helper}>
+                        {t(
+                          'org.tasks.materialsOpNone',
+                          null,
+                          'This operation consumes materials but has no default SKUs yet.',
+                        )}
+                      </Text>
+                    ) : null}
+                    <TextInput
+                      label={t('org.tasks.operationNotes', null, 'Notes for this step')}
+                      value={line.notes}
+                      onChangeText={(value) => updateOpNotes(activity.id, value)}
+                      mode="outlined"
+                      style={styles.input}
+                      textColor={ON_CARD}
+                    />
+                    <Text style={styles.fieldLabel}>
+                      {t('org.tasks.operationPeople', null, 'People for this step')}
+                    </Text>
+                    <View style={styles.chipWrap}>
+                      {members.slice(0, MAX_SEARCH_RESULTS).map((member) => {
+                        const uid = member.user_id;
+                        const active = line.assigneeIds.includes(uid);
+                        return (
+                          <Pressable
+                            key={`${activity.id}-${uid}`}
+                            onPress={() => toggleOpAssignee(activity.id, uid)}
+                            style={[styles.chip, active && styles.chipActive]}
+                          >
+                            <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                              {memberLabel(member)}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </>
+      );
+    }
+
+    if (stepId === 'shipments') {
+      return (
+        <>
+          <Text style={styles.helper}>
+            {t(
+              'org.tasks.routeHelper',
+              null,
+              'Prefer shipments above (loading + unloading + cargo).',
+            )}
+          </Text>
+          {renderShipmentsEditor()}
+          <Text style={styles.helper}>
+            {t(
+              'org.tasks.plannedHoursOnShipmentsHint',
+              null,
+              'Loading/unloading hours belong on each shipment. Empty haul to site is fine as a route.',
+            )}
+          </Text>
+        </>
+      );
     }
 
     // Review
     const selectedVehicles = vehicleIds
       .map((id) => vehicles.find((v) => v.id === id))
       .filter(Boolean);
+    const kindLabels = {
+      transport: t('org.tasks.taskKinds.transport', null, 'Transport'),
+      road_marking: t(
+        'org.tasks.taskKinds.road_marking',
+        null,
+        'Road marking / field',
+      ),
+      construction: t(
+        'org.tasks.taskKinds.construction',
+        null,
+        'Construction / roofs',
+      ),
+      mixed: t('org.tasks.taskKinds.mixed', null, 'Mixed operations'),
+      other: t('org.tasks.taskKinds.other', null, 'Other / generic'),
+    };
     return (
       <>
+        <Text style={styles.reviewLine}>
+          <Text style={styles.reviewKey}>
+            {t('org.tasks.opsSummaryLabel', null, 'Operations mix')}:{' '}
+          </Text>
+          {kindLabels[derivedTaskKind] || derivedTaskKind}
+        </Text>
         <Text style={styles.reviewLine}>
           <Text style={styles.reviewKey}>{t('org.tasks.project', null, 'Project')}: </Text>
           {selectedProject?.name || t('org.tasks.noProject', null, 'No project')}

@@ -175,6 +175,7 @@ function opLocalReportUnits(op) {
 }
 
 function taskNeedsFuelTank(task) {
+  if (String(task?.task_kind || '').toLowerCase() === 'transport') return true;
   return (task?.operations || []).some(
     (op) => String(op?.activity?.activity_kind || '').toLowerCase() === 'transport',
   );
@@ -219,14 +220,27 @@ function isNumericIssueQty(raw) {
 
 function taskIsTransportFocused(task) {
   const ops = task?.operations || [];
-  if (!ops.length) return false;
+  if (!ops.length) {
+    return String(task?.task_kind || '').toLowerCase() === 'transport';
+  }
+  // Show transport driver UI when any transport op is present (mixed cards included).
+  return ops.some(
+    (op) => String(op?.activity?.activity_kind || '').toLowerCase() === 'transport',
+  );
+}
+
+function taskIsTransportOnly(task) {
+  const ops = task?.operations || [];
+  if (!ops.length) {
+    return String(task?.task_kind || '').toLowerCase() === 'transport';
+  }
   return ops.every(
     (op) => String(op?.activity?.activity_kind || '').toLowerCase() === 'transport',
   );
 }
 
 function taskUsesFullMaterialsUi(task) {
-  if (taskIsTransportFocused(task)) return false;
+  if (taskIsTransportOnly(task)) return false;
   const ops = task?.operations || [];
   return ops.some((op) => {
     if (op?.activity?.consumes_materials) return true;
@@ -1442,7 +1456,7 @@ export default function OrgTasksScreen({ navigation, route }) {
 
   const defaultIssueMaterials = useMemo(() => {
     const rows = collectTaskDefaultMaterials(selected);
-    if (!taskIsTransportFocused(selected)) return rows;
+    if (!taskIsTransportOnly(selected)) return rows;
     return rows.filter(isFuelMaterial);
   }, [selected]);
 
@@ -1466,7 +1480,7 @@ export default function OrgTasksScreen({ navigation, route }) {
   const filteredExtraStock = useMemo(() => {
     const q = String(extraMaterialSearch || '').trim().toLowerCase();
     const defaultIds = new Set(defaultIssueMaterials.map((m) => Number(m.material_id)));
-    const transportOnly = taskIsTransportFocused(selected);
+    const transportOnly = taskIsTransportOnly(selected);
     return (stockRows || [])
       .filter((row) => {
         const mid = Number(row.material_id || row.material?.id || row.id);
@@ -1752,6 +1766,7 @@ export default function OrgTasksScreen({ navigation, route }) {
                   t={t}
                   task={selected}
                   busy={busyAction}
+                  fuelRequired
                   onStart={(vals) => acknowledgeStart(selected, vals)}
                   onEnd={(vals) => acknowledgeEnd(selected, vals)}
                   onAddExpensePhoto={pickExpenseFromCamera}
@@ -2284,9 +2299,9 @@ export default function OrgTasksScreen({ navigation, route }) {
                       'Warehouse issues materials onto this task. Enter leftover after work — consumed = issued − leftover.',
                     )}
               </Text>
-              {((selected.materials || []).filter((m) => !transportFocused || isFuelMaterial(m))).length === 0 ? (
+              {((selected.materials || []).filter((m) => !taskIsTransportOnly(selected) || isFuelMaterial(m))).length === 0 ? (
                 <Text style={styles.opMeta}>
-                  {transportFocused
+                  {taskIsTransportOnly(selected)
                     ? t(
                         'org.tasks.depotRefuelEmpty',
                         null,
@@ -2299,7 +2314,7 @@ export default function OrgTasksScreen({ navigation, route }) {
                       )}
                 </Text>
               ) : (
-                (selected.materials || []).filter((m) => !transportFocused || isFuelMaterial(m)).map((mat) => {
+                (selected.materials || []).filter((m) => !taskIsTransportOnly(selected) || isFuelMaterial(m)).map((mat) => {
                   const mid = mat.material_id || mat.id;
                   const unitChip = mat.unit_code ? ` · ${mat.unit_code}` : '';
                   const editable =

@@ -654,16 +654,17 @@ export default function OrganizationHomeScreen() {
                           <Pressable
                             onPress={(e) => {
                               e?.stopPropagation?.();
-                              acknowledgeStart(currentTask);
+                              navigateToOrgTasks(navigation, {
+                                orgId: org?.id,
+                                taskId: currentTask.id,
+                              });
                             }}
                             disabled={busyStart}
                             style={[styles.startBtn, busyStart && styles.startBtnDisabled]}
                             accessibilityRole="button"
                           >
                             <Text style={styles.startBtnText}>
-                              {busyStart
-                                ? t('common.loading', null, '…')
-                                : t('org.tasks.startCta', null, 'Start')}
+                              {t('org.tasks.startOpenWizard', null, 'Start (enter km / L)')}
                             </Text>
                           </Pressable>
                         ) : null}

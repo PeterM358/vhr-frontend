@@ -3,7 +3,11 @@
  */
 
 import { Platform } from 'react-native';
-import { navigateToRepairDetail, navigateToVehicleHistoryAccess } from '../navigation/webNavigation';
+import {
+  navigateToOrgTasks,
+  navigateToRepairDetail,
+  navigateToVehicleHistoryAccess,
+} from '../navigation/webNavigation';
 import { isVehicleHistoryAccessClientEvent } from './partnerNavChrome';
 
 export function notificationEventType(item) {
@@ -24,6 +28,40 @@ function vehicleIdFromNotification(item) {
     null;
   if (raw == null || raw === '') return null;
   return String(raw);
+}
+
+function workOrderIdsFromNotification(item) {
+  const workOrderId =
+    item?.data?.work_order_id ??
+    item?.work_order_id ??
+    item?.data?.taskId ??
+    item?.data?.task_id ??
+    null;
+  const organizationId =
+    item?.data?.organization_id ??
+    item?.organization_id ??
+    item?.data?.orgId ??
+    null;
+  if (workOrderId == null || workOrderId === '') return null;
+  return {
+    taskId: Number(workOrderId) || workOrderId,
+    orgId: organizationId != null && organizationId !== '' ? organizationId : undefined,
+  };
+}
+
+const WORK_ORDER_EVENTS = new Set([
+  'work_order_assigned',
+  'work_order_updated',
+  'work_order_start_nag',
+  'work_order_start_overdue',
+  'work_order_at_address',
+  'work_order_course_finished',
+]);
+
+export function isWorkOrderNotification(item) {
+  const t = String(notificationEventType(item)).toLowerCase();
+  if (WORK_ORDER_EVENTS.has(t)) return true;
+  return workOrderIdsFromNotification(item) != null && t.startsWith('work_order_');
 }
 
 export function isRescheduleNotification(item) {
@@ -51,6 +89,17 @@ export function navigateForClientNotification(navigation, item, options = {}) {
   if (!item) return false;
 
   const returnTo = options.returnTo;
+
+  if (isWorkOrderNotification(item)) {
+    const ids = workOrderIdsFromNotification(item);
+    if (ids?.taskId != null) {
+      navigateToOrgTasks(navigation, {
+        orgId: ids.orgId,
+        taskId: ids.taskId,
+      });
+      return true;
+    }
+  }
 
   if (isVehicleHistoryAccessNotification(item)) {
     const vehicleId = vehicleIdFromNotification(item);
@@ -100,6 +149,9 @@ export function navigateForClientNotification(navigation, item, options = {}) {
 }
 
 export function notificationActionHint(item) {
+  if (isWorkOrderNotification(item)) {
+    return 'Tap to open task';
+  }
   if (isRescheduleNotification(item)) {
     return 'Tap to accept or decline the new time';
   }
