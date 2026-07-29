@@ -514,6 +514,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
   const [selectedMaterials, setSelectedMaterials] = useState([]);
   const [mode, setMode] = useState('list');
   const [wizardStep, setWizardStep] = useState(0);
+  const [maxReachedWizardStep, setMaxReachedWizardStep] = useState(0);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyFormState);
   const [busy, setBusy] = useState(false);
@@ -667,6 +668,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
     setMaterialCatalog([]);
     setFormMessage('');
     setWizardStep(0);
+    setMaxReachedWizardStep(0);
   };
 
   const startCreate = () => {
@@ -684,6 +686,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
     );
     setFormMessage('');
     setWizardStep(0);
+    setMaxReachedWizardStep(0);
     setMode('add');
     searchMaterials('');
   };
@@ -706,12 +709,22 @@ export default function OrgOperationsScreen({ navigation, route }) {
 
   const goNext = () => {
     if (!validateStep(wizardStep)) return;
-    if (wizardStep < stepDefs.length - 1) setWizardStep((s) => s + 1);
+    if (wizardStep < stepDefs.length - 1) {
+      const next = wizardStep + 1;
+      setWizardStep(next);
+      setMaxReachedWizardStep((m) => Math.max(m, next));
+    }
   };
 
   const goPrev = () => {
     setFormMessage('');
     if (wizardStep > 0) setWizardStep((s) => s - 1);
+  };
+
+  const goToWizardStep = (idx) => {
+    if (idx < 0 || idx >= stepDefs.length) return;
+    if (idx > maxReachedWizardStep) return;
+    setWizardStep(idx);
   };
 
   const toggleMaterial = (mat) => {
@@ -1822,36 +1835,46 @@ export default function OrgOperationsScreen({ navigation, route }) {
                 </Text>
               </Pressable>
             </View>
-            <View style={styles.stepRow}>
-              {stepDefs.map((s, idx) => (
-                <Pressable
-                  key={s.key}
-                  onPress={() => {
-                    if (idx <= wizardStep || (idx > 0 && validateStep(0))) {
-                      if (idx > wizardStep) {
-                        for (let i = wizardStep; i < idx; i += 1) {
-                          if (!validateStep(i)) return;
-                        }
-                      }
-                      setWizardStep(idx);
-                    }
-                  }}
-                  style={[
-                    styles.stepChip,
-                    idx === wizardStep && styles.stepChipActive,
-                    idx < wizardStep && styles.stepChipDone,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.stepChipText,
-                      idx === wizardStep && styles.stepChipTextActive,
+            <View style={styles.stepRow} accessibilityRole="tablist">
+              {stepDefs.map((s, idx) => {
+                const reachable = idx <= maxReachedWizardStep;
+                const isCurrent = idx === wizardStep;
+                const isDone = idx < wizardStep;
+                return (
+                  <Pressable
+                    key={s.key}
+                    onPress={() => goToWizardStep(idx)}
+                    disabled={!reachable}
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Step ${idx + 1}: ${s.title}`}
+                    accessibilityState={{
+                      selected: isCurrent,
+                      disabled: !reachable,
+                    }}
+                    style={({ pressed }) => [
+                      styles.stepChip,
+                      isCurrent && styles.stepChipActive,
+                      isDone && styles.stepChipDone,
+                      !reachable && styles.stepChipLocked,
+                      reachable && pressed && { opacity: 0.85 },
+                      Platform.OS === 'web'
+                        ? { cursor: reachable ? 'pointer' : 'not-allowed' }
+                        : null,
                     ]}
                   >
-                    {idx + 1}. {s.title}
-                  </Text>
-                </Pressable>
-              ))}
+                    <Text
+                      style={[
+                        styles.stepChipText,
+                        isCurrent && styles.stepChipTextActive,
+                        !reachable && styles.stepChipTextLocked,
+                      ]}
+                    >
+                      {idx + 1}. {s.title}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
             <Text style={styles.stepHint}>{currentStep?.hint}</Text>
             {renderWizardBody()}
@@ -2256,6 +2279,10 @@ const styles = StyleSheet.create({
   stepChipDone: {
     borderColor: COLORS.PRIMARY,
   },
+  stepChipLocked: {
+    opacity: 0.55,
+    backgroundColor: '#E2E8F0',
+  },
   stepChipText: {
     color: ON_CARD,
     fontSize: 11,
@@ -2263,6 +2290,9 @@ const styles = StyleSheet.create({
   },
   stepChipTextActive: {
     color: '#FFFFFF',
+  },
+  stepChipTextLocked: {
+    color: '#64748B',
   },
   stepHint: {
     color: ON_CARD_MUTED,

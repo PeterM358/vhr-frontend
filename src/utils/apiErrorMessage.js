@@ -33,10 +33,31 @@ function extractHtmlExceptionMessage(html) {
   return null;
 }
 
+/** Strip DRF override hints; keep the human conflict sentence. */
+function cleanOverlapFieldMessage(text) {
+  return String(text || '')
+    .replace(/\s*Confirm override with allow_vehicle_overlap=true if intentional\.?/gi, '')
+    .replace(/\s*Confirm override with allow_assignee_overlap=true if intentional\.?/gi, '')
+    .trim();
+}
+
+/** True for empty / HTTP status-only messages like "Bad Request". */
+export function isGenericHttpStatusMessage(msg) {
+  const s = String(msg || '').trim();
+  if (!s) return true;
+  return /^(bad request|unauthorized|forbidden|not found|internal server error|request failed with status code \d+)$/i.test(
+    s,
+  );
+}
+
 export function formatDrfErrorMessage(parsed, fallback = 'Request failed') {
-  if (typeof parsed === 'string') return parsed;
+  if (typeof parsed === 'string') {
+    const cleaned = cleanOverlapFieldMessage(parsed);
+    return isGenericHttpStatusMessage(cleaned) ? fallback : cleaned;
+  }
   if (parsed?.detail) {
-    const detail = String(parsed.detail);
+    const detail = cleanOverlapFieldMessage(parsed.detail);
+    if (isGenericHttpStatusMessage(detail)) return fallback;
     return parsed.code ? `${detail} (${parsed.code})` : detail;
   }
   if (Array.isArray(parsed) && parsed.length) return String(parsed[0]);
@@ -49,8 +70,12 @@ export function formatDrfErrorMessage(parsed, fallback = 'Request failed') {
       if (Array.isArray(val)) {
         return val.map((v) => {
           if (v && typeof v === 'object' && !Array.isArray(v)) return '';
-          const text = String(v);
+          const text = cleanOverlapFieldMessage(v);
+          if (!text || isGenericHttpStatusMessage(text)) return '';
           if (key === 'non_field_errors') return text;
+          if (key === 'vehicle_ids' || key === 'assignee_user_ids' || key === 'assignee') {
+            return text;
+          }
           if (text.toLowerCase().includes('this field is required')) {
             return `${label} is required.`;
           }
@@ -58,16 +83,37 @@ export function formatDrfErrorMessage(parsed, fallback = 'Request failed') {
         }).filter(Boolean);
       }
       if (typeof val === 'string') {
-        if (val.toLowerCase().includes('this field is required')) {
+        const text = cleanOverlapFieldMessage(val);
+        if (!text || isGenericHttpStatusMessage(text)) return [];
+        if (text.toLowerCase().includes('this field is required')) {
           return [`${label} is required.`];
         }
-        return [`${label}: ${val}`];
+        if (key === 'vehicle_ids' || key === 'assignee_user_ids' || key === 'assignee') {
+          return [text];
+        }
+        return [`${label}: ${text}`];
       }
       return [];
     });
     if (parts.length) return parts.join('\n');
   }
   return fallback;
+}
+
+/** License plates (or #id) from vehicle_overlap_conflicts payload. */
+export function platesFromVehicleOverlapConflicts(conflicts) {
+  const rows = Array.isArray(conflicts) ? conflicts : [];
+  const plates = [
+    ...new Set(
+      rows.map((c) => {
+        const plate = String(c?.license_plate || '').trim();
+        if (plate) return plate;
+        const id = c?.vehicle_id;
+        return id != null && id !== '' ? `#${id}` : '';
+      }).filter(Boolean),
+    ),
+  ];
+  return plates.sort();
 }
 
 /** Map of field → first error string from a DRF validation body. */
@@ -78,10 +124,10 @@ export function extractDrfFieldErrors(parsed) {
     if (key === 'vehicle_overlap_conflicts' || key === 'assignee_overlap_conflicts' || key === 'detail' || key === 'code') return;
     if (Array.isArray(val) && val.length) {
       const first = val.find((v) => typeof v === 'string' || typeof v === 'number');
-      if (first != null) out[key] = String(first);
+      if (first != null) out[key] = cleanOverlapFieldMessage(String(first));
       return;
     }
-    if (typeof val === 'string') out[key] = val;
+    if (typeof val === 'string') out[key] = cleanOverlapFieldMessage(val);
   });
   return out;
 }
@@ -116,8 +162,9 @@ export function enrichApiError(error, parsed, fallback) {
     }
     if (parsed.code) error.code = parsed.code;
   }
-  if (!error.message) {
-    error.message = formatDrfErrorMessage(parsed, fallback);
+  const formatted = formatDrfErrorMessage(parsed, fallback);
+  if (!error.message || isGenericHttpStatusMessage(error.message)) {
+    error.message = formatted;
   }
   return error;
 }
@@ -146,13 +193,9 @@ export function messageFromApiError(error, fallback = 'Request failed.') {
   const fromBody = messageFromApiResponseText(error?.responseText, '');
   if (fromBody) return fromBody;
   const msg = String(error?.message || '').trim();
-  if (!msg) return fallback;
+  if (!msg || isGenericHttpStatusMessage(msg)) return fallback;
   if (msg.startsWith('<!DOCTYPE') || msg.startsWith('<html')) {
     return extractHtmlExceptionMessage(msg) || fallback;
-  }
-  // Axios default "Request failed with status code 400" — prefer fallback when no body parsed.
-  if (/^Request failed with status code \d+$/i.test(msg)) {
-    return fallback;
   }
   return msg;
 }

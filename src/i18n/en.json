@@ -979,6 +979,7 @@
         "stepShipmentsHint": "Because you selected a transport operation — add load/unload addresses, cargo, and route (пратки).",
         "stepReview": "Review",
         "stepReviewHint": "Confirm and create. You will go to the tasks list.",
+        "stepA11y": "Step {n}: {title}",
         "nounTransport": "waybill / work card",
         "nounConstruction": "site / work card",
         "nounGeneric": "work card",

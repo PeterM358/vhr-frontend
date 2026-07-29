@@ -1,8 +1,9 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
@@ -24,6 +25,11 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 import { buildGoogleMapsDirUrl, buildGoogleMapsSearchUrl } from '../utils/googleMapsDirUrl';
+import { confirmMessage, showMessage } from '../utils/crossPlatformAlert';
+import {
+  isGenericHttpStatusMessage,
+  platesFromVehicleOverlapConflicts,
+} from '../utils/apiErrorMessage';
 
 const MAX_PEOPLE = 10;
 const MAX_SEARCH_RESULTS = 18;
@@ -122,6 +128,42 @@ function selectedOpsHaveTransport(selectedOps, activities) {
   );
 }
 
+function overlapHintText(value) {
+  return String(value || '').toLowerCase();
+}
+
+function isVehicleOverlapError(error) {
+  if (Array.isArray(error?.vehicleOverlapConflicts) && error.vehicleOverlapConflicts.length) {
+    return true;
+  }
+  const blob = overlapHintText(
+    [error?.message, error?.fieldErrors?.vehicle_ids].filter(Boolean).join(' '),
+  );
+  return (
+    blob.includes('vehicle') &&
+    (blob.includes('overlap') || blob.includes('already assigned') || blob.includes('already booked'))
+  );
+}
+
+function isAssigneeOverlapError(error) {
+  if (Array.isArray(error?.assigneeOverlapConflicts) && error.assigneeOverlapConflicts.length) {
+    return true;
+  }
+  const blob = overlapHintText(
+    [
+      error?.message,
+      error?.fieldErrors?.assignee_user_ids,
+      error?.fieldErrors?.assignee,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  );
+  return (
+    (blob.includes('assignee') || blob.includes('worker') || blob.includes('person')) &&
+    (blob.includes('overlap') || blob.includes('already assigned'))
+  );
+}
+
 function templateOpIds(activities, templateId) {
   const rows = activities || [];
   if (templateId === 'transport_day') {
@@ -158,6 +200,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState(0);
+  const [maxReachedStep, setMaxReachedStep] = useState(0);
   const [formMessage, setFormMessage] = useState('');
 
   const [activities, setActivities] = useState([]);
@@ -445,7 +488,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     });
   };
 
-  const requestToggleVehicle = (vehicle) => {
+  const requestToggleVehicle = async (vehicle) => {
     const id = vehicle?.id;
     if (id == null) return;
     if (vehicleIds.includes(id)) {
@@ -459,21 +502,19 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       toggleVehicle(id);
       return;
     }
-    Alert.alert(
+    const ok = await confirmMessage(
       t('org.tasks.vehicleNotReadyTitle', null, 'Vehicle not ready'),
       t(
         'org.tasks.vehicleNotReadyConfirm',
         { vehicle: vehicleLabel(vehicle) },
         'Vehicle not ready — assign anyway?',
       ),
-      [
-        { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
-        {
-          text: t('org.tasks.vehicleNotReadyAssign', null, 'Assign anyway'),
-          onPress: () => toggleVehicle(id),
-        },
-      ],
+      {
+        confirmLabel: t('org.tasks.vehicleNotReadyAssign', null, 'Assign anyway'),
+        cancelLabel: t('common.cancel', null, 'Cancel'),
+      },
     );
+    if (ok) toggleVehicle(id);
   };
 
   const toggleOverallAssignee = (userId) => {
@@ -557,17 +598,27 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
 
   const goNext = () => {
     if (!validateStep()) return;
-    if (step < stepDefs.length - 1) setStep((s) => s + 1);
+    if (step < stepDefs.length - 1) {
+      const next = step + 1;
+      setStep(next);
+      setMaxReachedStep((m) => Math.max(m, next));
+    }
+  };
+
+  const goToStep = (idx) => {
+    if (idx < 0 || idx >= stepDefs.length) return;
+    if (idx > maxReachedStep) return;
+    setStep(idx);
   };
 
   // If transport ops were removed, shipments step disappears — clamp index.
   React.useEffect(() => {
-    if (step >= stepDefs.length) {
-      setStep(Math.max(0, stepDefs.length - 1));
-    }
+    const last = Math.max(0, stepDefs.length - 1);
+    if (step > last) setStep(last);
+    setMaxReachedStep((m) => Math.min(Math.max(m, step), last));
   }, [step, stepDefs.length]);
 
-  const save = async () => {
+  const save = async (overrideFlags = {}) => {
     if (!orgId) return;
     if (!validateStep()) return;
     const trimmed = title.trim();
@@ -579,6 +630,10 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       setFormMessage(t('org.tasks.operationsRequired', null, 'Pick at least one operation.'));
       return;
     }
+    const allowVehicle =
+      overrideFlags.allowVehicleOverlap === true || allowVehicleOverlap;
+    const allowAssignee =
+      overrideFlags.allowAssigneeOverlap === true || allowAssigneeOverlap;
     setBusy(true);
     setFormMessage('');
     try {
@@ -599,8 +654,8 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         vehicle_ids: vehicleIds,
         vehicle_id: vehicleIds[0] || null,
         assignee_user_ids: overallAssignees,
-        allow_vehicle_overlap: allowVehicleOverlap || undefined,
-        allow_assignee_overlap: allowAssigneeOverlap || undefined,
+        allow_vehicle_overlap: allowVehicle || undefined,
+        allow_assignee_overlap: allowAssignee || undefined,
         operations: selectedOps.map((row, idx) => ({
           activity_definition_id: row.activityId,
           sort_order: idx,
@@ -712,70 +767,91 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       await createWorkOrder(token, orgId, payload);
       navigateToOrgTasks(navigation, { orgId });
     } catch (e) {
-      const vehicleOverlap =
-        e?.vehicleOverlapConflicts ||
-        (String(e?.message || '').toLowerCase().includes('overlapping') &&
-          e?.fieldErrors?.vehicle_ids);
-      const assigneeOverlap =
-        e?.assigneeOverlapConflicts ||
-        (e?.fieldErrors?.assignee_user_ids &&
-          String(e.message || e.fieldErrors.assignee_user_ids || '')
-            .toLowerCase()
-            .includes('overlapping'));
-      if (vehicleOverlap && !allowVehicleOverlap) {
-        Alert.alert(
-          t('org.tasks.vehicleOverlapTitle', null, 'Vehicle already booked'),
-          e.message ||
+      const vehicleOverlap = isVehicleOverlapError(e);
+      const assigneeOverlap = isAssigneeOverlapError(e);
+      if (vehicleOverlap && !allowVehicle) {
+        const plates = platesFromVehicleOverlapConflicts(e?.vehicleOverlapConflicts);
+        const plateList = plates.join(', ');
+        const body = plateList
+          ? t(
+              'org.tasks.vehicleOverlapBodyPlates',
+              { plates: plateList },
+              `Vehicle ${plateList} is already on another open task.`,
+            )
+          : e?.fieldErrors?.vehicle_ids ||
+            e?.message ||
             t(
               'org.tasks.vehicleOverlapBody',
               null,
               'This vehicle is on another open task with overlapping dates.',
-            ),
-          [
-            { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
-            {
-              text: t('org.tasks.vehicleOverlapAssign', null, 'Assign anyway'),
-              onPress: () => {
-                setAllowVehicleOverlap(true);
-                setFormMessage(
-                  t(
-                    'org.tasks.vehicleOverlapRetry',
-                    null,
-                    'Override enabled — tap Create again to confirm.',
-                  ),
-                );
-              },
-            },
-          ],
+            );
+        const cleanBody = isGenericHttpStatusMessage(body)
+          ? t(
+              'org.tasks.vehicleOverlapBody',
+              null,
+              'This vehicle is on another open task with overlapping dates.',
+            )
+          : body;
+        setFormMessage(cleanBody);
+        const proceed = await confirmMessage(
+          t('org.tasks.vehicleOverlapTitle', null, 'Vehicle already booked'),
+          cleanBody,
+          {
+            confirmLabel: t('org.tasks.vehicleOverlapAssign', null, 'Assign anyway'),
+            cancelLabel: t('common.cancel', null, 'Cancel'),
+          },
         );
-      } else if (assigneeOverlap && !allowAssigneeOverlap) {
-        Alert.alert(
-          t('org.tasks.assigneeOverlapTitle', null, 'Worker already assigned'),
-          e.message ||
-            t(
+        if (proceed) {
+          setAllowVehicleOverlap(true);
+          setBusy(false);
+          await save({
+            allowVehicleOverlap: true,
+            allowAssigneeOverlap: allowAssignee,
+          });
+          return;
+        }
+      } else if (assigneeOverlap && !allowAssignee) {
+        const body =
+          e?.fieldErrors?.assignee_user_ids ||
+          e?.fieldErrors?.assignee ||
+          e?.message ||
+          t(
+            'org.tasks.assigneeOverlapBody',
+            null,
+            'This person is already on another open task with overlapping dates.',
+          );
+        const cleanBody = isGenericHttpStatusMessage(body)
+          ? t(
               'org.tasks.assigneeOverlapBody',
               null,
               'This person is already on another open task with overlapping dates.',
-            ),
-          [
-            { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
-            {
-              text: t('org.tasks.assigneeOverlapAssign', null, 'Assign anyway'),
-              onPress: () => {
-                setAllowAssigneeOverlap(true);
-                setFormMessage(
-                  t(
-                    'org.tasks.assigneeOverlapRetry',
-                    null,
-                    'Override enabled — tap Create again to confirm.',
-                  ),
-                );
-              },
-            },
-          ],
+            )
+          : body;
+        setFormMessage(cleanBody);
+        const proceed = await confirmMessage(
+          t('org.tasks.assigneeOverlapTitle', null, 'Worker already assigned'),
+          cleanBody,
+          {
+            confirmLabel: t('org.tasks.assigneeOverlapAssign', null, 'Assign anyway'),
+            cancelLabel: t('common.cancel', null, 'Cancel'),
+          },
         );
+        if (proceed) {
+          setAllowAssigneeOverlap(true);
+          setBusy(false);
+          await save({
+            allowVehicleOverlap: allowVehicle,
+            allowAssigneeOverlap: true,
+          });
+          return;
+        }
       } else {
-        setFormMessage(e.message || t('org.tasks.saveError', null, 'Could not create task.'));
+        const raw = e?.message || e?.fieldErrors?.vehicle_ids || '';
+        const nice = isGenericHttpStatusMessage(raw)
+          ? t('org.tasks.saveError', null, 'Could not create task.')
+          : raw || t('org.tasks.saveError', null, 'Could not create task.');
+        setFormMessage(nice);
+        showMessage(t('common.error', null, 'Error'), nice, { variant: 'error' });
       }
     } finally {
       setBusy(false);
@@ -1553,29 +1629,54 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
           </AppCard>
         ) : (
           <>
-            <View style={styles.stepBar}>
-              {stepDefs.map((s, idx) => (
-                <Pressable
-                  key={s.id}
-                  onPress={() => {
-                    if (idx <= step) setStep(idx);
-                  }}
-                  style={[
-                    styles.stepDot,
-                    idx === step && styles.stepDotCurrent,
-                    idx < step && styles.stepDotDone,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.stepDotText,
-                      (idx === step || idx < step) && styles.stepDotTextActive,
+            <View style={styles.stepBar} accessibilityRole="tablist">
+              {stepDefs.map((s, idx) => {
+                const reachable = idx <= maxReachedStep;
+                const isCurrent = idx === step;
+                const isDone = idx < step;
+                return (
+                  <Pressable
+                    key={s.id}
+                    onPress={() => goToStep(idx)}
+                    disabled={!reachable}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={t(
+                      'org.tasks.wizard.stepA11y',
+                      { n: idx + 1, title: s.title },
+                      `Step ${idx + 1}: ${s.title}`,
+                    )}
+                    accessibilityState={{ selected: isCurrent, disabled: !reachable }}
+                    style={({ pressed }) => [
+                      styles.stepDot,
+                      isCurrent && styles.stepDotCurrent,
+                      isDone && styles.stepDotDone,
+                      !reachable && styles.stepDotLocked,
+                      reachable && pressed && styles.stepDotPressed,
+                      Platform.OS === 'web'
+                        ? { cursor: reachable ? 'pointer' : 'not-allowed' }
+                        : null,
                     ]}
                   >
-                    {idx + 1}
-                  </Text>
-                </Pressable>
-              ))}
+                    {reachable ? (
+                      <Text
+                        style={[
+                          styles.stepDotText,
+                          (isCurrent || isDone) && styles.stepDotTextActive,
+                        ]}
+                      >
+                        {idx + 1}
+                      </Text>
+                    ) : (
+                      <MaterialCommunityIcons
+                        name="lock-outline"
+                        size={14}
+                        color="rgba(255,255,255,0.55)"
+                      />
+                    )}
+                  </Pressable>
+                );
+              })}
             </View>
 
             <AppCard style={styles.card}>
@@ -1642,9 +1743,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   stepDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.18)',
@@ -1654,6 +1755,14 @@ const styles = StyleSheet.create({
   },
   stepDotDone: {
     backgroundColor: COLORS.ACCENT || '#22c55e',
+  },
+  stepDotLocked: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    opacity: 0.72,
+  },
+  stepDotPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.96 }],
   },
   stepDotText: {
     color: 'rgba(255,255,255,0.85)',
