@@ -100,11 +100,12 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [projects, setProjects] = useState([]);
 
   const [projectId, setProjectId] = useState(null);
+  const [contractRef, setContractRef] = useState('');
   const [title, setTitle] = useState('');
   const [instructions, setInstructions] = useState('');
   const [scheduledDate, setScheduledDate] = useState(localTodayIso());
   const [scheduledEndDate, setScheduledEndDate] = useState('');
-  const [plannedStart, setPlannedStart] = useState('08:00');
+  const [plannedStart, setPlannedStart] = useState('');
   const [plannedEnd, setPlannedEnd] = useState('');
   const [vehicleIds, setVehicleIds] = useState([]);
   const [vehicleQuery, setVehicleQuery] = useState('');
@@ -116,6 +117,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [returnShipments, setReturnShipments] = useState([]);
   const [loadType, setLoadType] = useState('groupage');
   const [allowVehicleOverlap, setAllowVehicleOverlap] = useState(false);
+  const [allowAssigneeOverlap, setAllowAssigneeOverlap] = useState(false);
   const [overallAssignees, setOverallAssignees] = useState([]);
   const [peopleQuery, setPeopleQuery] = useState('');
   const [projectQuery, setProjectQuery] = useState('');
@@ -140,6 +142,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             shipment_id: s.id,
             address,
             company_name: s.loading_company_name || s.loading?.company_name || '',
+            planned_at: s.loading_at || s.loading?.planned_at || null,
             cargo_summary: s.cargo_summary || '',
             maps_url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`,
           });
@@ -155,6 +158,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             shipment_id: s.id,
             address,
             company_name: s.unloading_company_name || s.unloading?.company_name || '',
+            planned_at: s.unloading_at || s.unloading?.planned_at || null,
             cargo_summary: s.cargo_summary || '',
             maps_url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`,
           });
@@ -197,21 +201,38 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     return [
       {
         id: 'project',
-        title: t('org.tasks.wizard.stepProject', null, 'Project'),
-        hint: t(
-          'org.tasks.wizard.stepProjectHint',
-          { noun: taskNoun },
-          `Link a project or create this ${taskNoun} without one.`,
-        ),
+        title:
+          flavor === 'transport'
+            ? t('org.tasks.wizard.stepProjectTransport', null, 'Project / request')
+            : t('org.tasks.wizard.stepProject', null, 'Project'),
+        hint:
+          flavor === 'transport'
+            ? t(
+                'org.tasks.wizard.stepProjectHintTransport',
+                null,
+                'Project is optional. Many transport jobs are one-time contracts / requests — pick “No project” and add a contract/request number.',
+              )
+            : t(
+                'org.tasks.wizard.stepProjectHint',
+                { noun: taskNoun },
+                `Link a project or create this ${taskNoun} without one.`,
+              ),
       },
       {
         id: 'when',
         title: t('org.tasks.wizard.stepWhen', null, 'When'),
-        hint: t(
-          'org.tasks.wizard.stepWhenHint',
-          null,
-          'Schedule date and planned start for reminders. Workers tap Start/End themselves.',
-        ),
+        hint:
+          flavor === 'transport'
+            ? t(
+                'org.tasks.wizard.stepWhenHintTransport',
+                null,
+                'Set the work-card date range. Put loading/unloading hours on each shipment — not on a generic time grid.',
+              )
+            : t(
+                'org.tasks.wizard.stepWhenHint',
+                null,
+                'Schedule date and planned start for reminders. Workers tap Start/End themselves.',
+              ),
       },
       {
         id: 'vehicle',
@@ -476,6 +497,8 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         title: trimmed,
         instructions: instructions.trim(),
         project_id: projectId,
+        contract_ref: contractRef.trim() || '',
+        needs_ack: true,
         scheduled_date: scheduledDate.trim() || null,
         scheduled_end_date: scheduledEndDate.trim() || null,
         planned_start: plannedStart.trim() || null,
@@ -510,6 +533,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             loading_reservation_number: String(
               s.loading_reservation_number || s.loading?.reservation_number || '',
             ).trim(),
+            loading_at: s.loading_at || s.loading?.planned_at || undefined,
             unloading_company_name: String(
               s.unloading_company_name || s.unloading?.company_name || '',
             ).trim(),
@@ -522,6 +546,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             unloading_reservation_number: String(
               s.unloading_reservation_number || s.unloading?.reservation_number || '',
             ).trim(),
+            unloading_at: s.unloading_at || s.unloading?.planned_at || undefined,
             cargo_euro_pallets: s.cargo_euro_pallets ?? undefined,
             cargo_crates: s.cargo_crates ?? undefined,
             cargo_kind: s.cargo_kind || undefined,
@@ -551,6 +576,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             loading_reservation_number: String(
               s.loading_reservation_number || s.loading?.reservation_number || '',
             ).trim(),
+            loading_at: s.loading_at || s.loading?.planned_at || undefined,
             unloading_company_name: String(
               s.unloading_company_name || s.unloading?.company_name || '',
             ).trim(),
@@ -563,6 +589,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             unloading_reservation_number: String(
               s.unloading_reservation_number || s.unloading?.reservation_number || '',
             ).trim(),
+            unloading_at: s.unloading_at || s.unloading?.planned_at || undefined,
             cargo_euro_pallets: s.cargo_euro_pallets ?? undefined,
             cargo_crates: s.cargo_crates ?? undefined,
             cargo_kind: s.cargo_kind || undefined,
@@ -579,6 +606,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
           })),
         ].filter((s) => s.loading_address && s.unloading_address),
         allow_vehicle_overlap: allowVehicleOverlap || undefined,
+        allow_assignee_overlap: allowAssigneeOverlap || undefined,
         operations: selectedOps.map((row, idx) => ({
           activity_definition_id: row.activityId,
           sort_order: idx,
@@ -589,11 +617,17 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       await createWorkOrder(token, orgId, payload);
       navigateToOrgTasks(navigation, { orgId });
     } catch (e) {
-      const overlap =
+      const vehicleOverlap =
         e?.vehicleOverlapConflicts ||
         (String(e?.message || '').toLowerCase().includes('overlapping') &&
           e?.fieldErrors?.vehicle_ids);
-      if (overlap && !allowVehicleOverlap) {
+      const assigneeOverlap =
+        e?.assigneeOverlapConflicts ||
+        (e?.fieldErrors?.assignee_user_ids &&
+          String(e.message || e.fieldErrors.assignee_user_ids || '')
+            .toLowerCase()
+            .includes('overlapping'));
+      if (vehicleOverlap && !allowVehicleOverlap) {
         Alert.alert(
           t('org.tasks.vehicleOverlapTitle', null, 'Vehicle already booked'),
           e.message ||
@@ -611,6 +645,32 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                 setFormMessage(
                   t(
                     'org.tasks.vehicleOverlapRetry',
+                    null,
+                    'Override enabled — tap Create again to confirm.',
+                  ),
+                );
+              },
+            },
+          ],
+        );
+      } else if (assigneeOverlap && !allowAssigneeOverlap) {
+        Alert.alert(
+          t('org.tasks.assigneeOverlapTitle', null, 'Worker already assigned'),
+          e.message ||
+            t(
+              'org.tasks.assigneeOverlapBody',
+              null,
+              'This person is already on another open task with overlapping dates.',
+            ),
+          [
+            { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
+            {
+              text: t('org.tasks.assigneeOverlapAssign', null, 'Assign anyway'),
+              onPress: () => {
+                setAllowAssigneeOverlap(true);
+                setFormMessage(
+                  t(
+                    'org.tasks.assigneeOverlapRetry',
                     null,
                     'Override enabled — tap Create again to confirm.',
                   ),
@@ -659,8 +719,19 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       return (
         <>
           <Text style={styles.fieldLabel}>
-            {t('org.tasks.project', null, 'Project')}
+            {flavor === 'transport'
+              ? t('org.tasks.projectOptionalTransport', null, 'Project (optional)')
+              : t('org.tasks.project', null, 'Project')}
           </Text>
+          {flavor === 'transport' ? (
+            <Text style={styles.helper}>
+              {t(
+                'org.tasks.projectOptionalTransportHint',
+                null,
+                'Not required for one-time transport requests. Use “No project” and fill contract/request below.',
+              )}
+            </Text>
+          ) : null}
           <TextInput
             label={t('org.tasks.searchProjects', null, 'Search projects')}
             value={projectQuery}
@@ -693,6 +764,19 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
               );
             })}
           </View>
+          <TextInput
+            label={t('org.tasks.contractRef', null, 'Contract / request (optional)')}
+            value={contractRef}
+            onChangeText={setContractRef}
+            mode="outlined"
+            style={styles.input}
+            textColor={ON_CARD}
+            placeholder={t(
+              'org.tasks.contractRefPlaceholder',
+              null,
+              'e.g. request number',
+            )}
+          />
           <TextInput
             label={t('org.tasks.title', null, 'Title')}
             value={title}
@@ -758,10 +842,12 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                 loading_address: payload.loading?.address || '',
                 loading_contact_phone: payload.loading?.contact_phone || '',
                 loading_reservation_number: payload.loading?.reservation_number || '',
+                loading_at: payload.loading?.planned_at || null,
                 unloading_company_name: payload.unloading?.company_name || '',
                 unloading_address: payload.unloading?.address || '',
                 unloading_contact_phone: payload.unloading?.contact_phone || '',
                 unloading_reservation_number: payload.unloading?.reservation_number || '',
+                unloading_at: payload.unloading?.planned_at || null,
                 cargo_kind: payload.cargo_kind || '',
                 cargo_unit_count: payload.cargo_unit_count,
                 cargo_length_cm: payload.cargo_length_cm,
@@ -798,11 +884,13 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                         loading_contact_phone: draft.loading?.contact_phone || '',
                         loading_reservation_number:
                           draft.loading?.reservation_number || '',
+                        loading_at: draft.loading?.planned_at || null,
                         unloading_company_name: draft.unloading?.company_name || '',
                         unloading_address: draft.unloading?.address || '',
                         unloading_contact_phone: draft.unloading?.contact_phone || '',
                         unloading_reservation_number:
                           draft.unloading?.reservation_number || '',
+                        unloading_at: draft.unloading?.planned_at || null,
                       }
                     : s,
                 );
@@ -824,14 +912,26 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
               'Prefer shipments above (loading + unloading + cargo).',
             )}
           </Text>
-          <Text style={styles.fieldLabel}>
-            {t('org.tasks.plannedStart', null, 'Start time')}
-          </Text>
-          {renderTimeChips(plannedStart, setPlannedStart)}
-          <Text style={styles.fieldLabel}>
-            {t('org.tasks.plannedEnd', null, 'End time (optional)')}
-          </Text>
-          {renderTimeChips(plannedEnd, setPlannedEnd, true)}
+          {flavor === 'transport' ? (
+            <Text style={styles.helper}>
+              {t(
+                'org.tasks.plannedHoursOnShipmentsHint',
+                null,
+                'Loading/unloading hours belong on each shipment above. Task-level start/end time is optional.',
+              )}
+            </Text>
+          ) : (
+            <>
+              <Text style={styles.fieldLabel}>
+                {t('org.tasks.plannedStart', null, 'Start time')}
+              </Text>
+              {renderTimeChips(plannedStart, setPlannedStart)}
+              <Text style={styles.fieldLabel}>
+                {t('org.tasks.plannedEnd', null, 'End time (optional)')}
+              </Text>
+              {renderTimeChips(plannedEnd, setPlannedEnd, true)}
+            </>
+          )}
         </>
       );
     }

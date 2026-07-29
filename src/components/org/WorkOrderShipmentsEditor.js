@@ -22,6 +22,8 @@ function emptySide() {
     reservation_number: '',
     latitude: '',
     longitude: '',
+    planned_date: '',
+    planned_time: '',
   };
 }
 
@@ -60,7 +62,24 @@ function sidePayload(side) {
   const lng = String(side.longitude || '').trim();
   if (lat) payload.latitude = lat;
   if (lng) payload.longitude = lng;
+  const date = String(side.planned_date || '').trim();
+  const time = String(side.planned_time || '').trim();
+  if (date && time) {
+    payload.planned_at = `${date}T${time}:00`;
+  } else if (date) {
+    payload.planned_at = date;
+  }
   return payload;
+}
+
+function splitPlannedAt(raw) {
+  if (!raw) return { planned_date: '', planned_time: '' };
+  const text = String(raw);
+  const m = text.match(/^(\d{4}-\d{2}-\d{2})[T\s](\d{2}:\d{2})/);
+  if (m) return { planned_date: m[1], planned_time: m[2] };
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return { planned_date: text, planned_time: '' };
+  if (/^\d{2}:\d{2}/.test(text)) return { planned_date: '', planned_time: text.slice(0, 5) };
+  return { planned_date: '', planned_time: '' };
 }
 
 function numOrUndef(raw) {
@@ -140,6 +159,7 @@ function draftFromShipment(s) {
           : s.loading?.longitude != null
             ? String(s.loading.longitude)
             : '',
+      ...splitPlannedAt(s.loading_at || s.loading?.planned_at),
     },
     unloading: {
       company_name: s.unloading_company_name || s.unloading?.company_name || '',
@@ -159,6 +179,7 @@ function draftFromShipment(s) {
           : s.unloading?.longitude != null
             ? String(s.unloading.longitude)
             : '',
+      ...splitPlannedAt(s.unloading_at || s.unloading?.planned_at),
     },
     cargo_kind: kind || 'europallet',
     cargo_unit_count: count,
@@ -198,6 +219,10 @@ function applyKindDefaults(setDraft, kindId) {
 }
 
 function SideFields({ t, title, side, setSide }) {
+  const TIME_OPTS = [
+    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
+    '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00',
+  ];
   return (
     <View style={styles.sideBox}>
       <Text style={styles.sideTitle}>{title}</Text>
@@ -234,6 +259,47 @@ function SideFields({ t, title, side, setSide }) {
         style={styles.input}
         textColor={ON_CARD}
       />
+      <TextInput
+        label={t('org.tasks.stopPlannedDate', null, 'Date (YYYY-MM-DD, optional)')}
+        value={side.planned_date || ''}
+        onChangeText={(v) => setSide((p) => ({ ...p, planned_date: v }))}
+        mode="outlined"
+        placeholder="2026-07-30"
+        style={styles.input}
+        textColor={ON_CARD}
+      />
+      <Text style={styles.hint}>
+        {t('org.tasks.stopPlannedTime', null, 'Time (optional)')}
+      </Text>
+      <View style={styles.chipRow}>
+        <Pressable
+          onPress={() => setSide((p) => ({ ...p, planned_time: '' }))}
+          style={[styles.chip, !(side.planned_time || '') && styles.chipActive]}
+        >
+          <Text
+            style={[
+              styles.chipText,
+              !(side.planned_time || '') && styles.chipTextActive,
+            ]}
+          >
+            {t('org.tasks.noEndTime', null, 'None')}
+          </Text>
+        </Pressable>
+        {TIME_OPTS.map((opt) => {
+          const active = side.planned_time === opt;
+          return (
+            <Pressable
+              key={opt}
+              onPress={() => setSide((p) => ({ ...p, planned_time: opt }))}
+              style={[styles.chip, active && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                {opt}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -524,6 +590,12 @@ function DriverRouteSection({ t, route = [], mapsUrl, optimizeMapsUrl, onToggleO
               {step.company_name ? ` · ${step.company_name}` : ''}
             </Text>
             <Text style={styles.stopAddress}>{step.address}</Text>
+            {step.planned_at ? (
+              <Text style={styles.stopMeta}>
+                {t('org.tasks.stopPlannedAt', null, 'Scheduled')}:{' '}
+                {String(step.planned_at).replace('T', ' ').slice(0, 16)}
+              </Text>
+            ) : null}
             {step.cargo_summary ? (
               <Text style={styles.stopMeta}>{step.cargo_summary}</Text>
             ) : null}

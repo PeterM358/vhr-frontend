@@ -356,6 +356,12 @@ export default function TransportDriverDayWizard({
                     {stepRow.company_name ? ` · ${stepRow.company_name}` : ''}
                   </Text>
                   <Text style={styles.address}>{stepRow.address}</Text>
+                  {stepRow.planned_at ? (
+                    <Text style={styles.hint}>
+                      {t('org.tasks.stopPlannedAt', null, 'Scheduled')}:{' '}
+                      {String(stepRow.planned_at).replace('T', ' ').slice(0, 16)}
+                    </Text>
+                  ) : null}
                   <View style={styles.row}>
                     <Pressable
                       onPress={() => onOpenMaps?.(stepRow)}

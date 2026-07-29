@@ -44,6 +44,7 @@ export function formatDrfErrorMessage(parsed, fallback = 'Request failed') {
     const parts = Object.entries(parsed).flatMap(([key, val]) => {
       if (key === 'mileage_requires_odometer_photo') return [];
       if (key === 'vehicle_overlap_conflicts') return [];
+      if (key === 'assignee_overlap_conflicts') return [];
       const label = labelForField(key);
       if (Array.isArray(val)) {
         return val.map((v) => {
@@ -74,7 +75,7 @@ export function extractDrfFieldErrors(parsed) {
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
   const out = {};
   Object.entries(parsed).forEach(([key, val]) => {
-    if (key === 'vehicle_overlap_conflicts' || key === 'detail' || key === 'code') return;
+    if (key === 'vehicle_overlap_conflicts' || key === 'assignee_overlap_conflicts' || key === 'detail' || key === 'code') return;
     if (Array.isArray(val) && val.length) {
       const first = val.find((v) => typeof v === 'string' || typeof v === 'number');
       if (first != null) out[key] = String(first);
@@ -109,6 +110,9 @@ export function enrichApiError(error, parsed, fallback) {
     error.fieldErrors = extractDrfFieldErrors(parsed);
     if (parsed.vehicle_overlap_conflicts) {
       error.vehicleOverlapConflicts = parsed.vehicle_overlap_conflicts;
+    }
+    if (parsed.assignee_overlap_conflicts) {
+      error.assigneeOverlapConflicts = parsed.assignee_overlap_conflicts;
     }
     if (parsed.code) error.code = parsed.code;
   }
