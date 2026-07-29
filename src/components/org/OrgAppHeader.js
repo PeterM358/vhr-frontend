@@ -93,6 +93,7 @@ export default function OrgAppHeader({
         subtitle={subtitle}
         scrolled={scrolled}
         compact={compact}
+        showLanguageSelector={false}
         style={style}
         leftAction={
           <View style={styles.leftRow}>
