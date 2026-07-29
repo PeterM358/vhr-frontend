@@ -197,7 +197,7 @@ export async function deleteWorkOrder(token, organizationId, workOrderId) {
   throw err;
 }
 
-export async function startWorkOrder(token, organizationId, workOrderId) {
+export async function startWorkOrder(token, organizationId, workOrderId, payload = {}) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/start/`,
     {
@@ -206,7 +206,7 @@ export async function startWorkOrder(token, organizationId, workOrderId) {
         ...authHeaders(token),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify(payload || {}),
     },
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to start task'));
@@ -226,6 +226,22 @@ export async function endWorkOrder(token, organizationId, workOrderId, payload =
     },
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to end task'));
+  return response.json();
+}
+
+export async function checkInWorkOrder(token, organizationId, workOrderId, payload = {}) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/check-in/`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to check in'));
   return response.json();
 }
 

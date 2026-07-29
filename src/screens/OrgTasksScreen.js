@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Button, FAB, Text, TextInput } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
@@ -10,6 +10,7 @@ import OrgAppHeader from '../components/org/OrgAppHeader';
 import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePicker';
 import {
   attachWorkOrderMedia,
+  checkInWorkOrder,
   confirmWorkOrderMaterialIssue,
   createWorkOrderExpense,
   createWorkOrderShipment,
@@ -26,6 +27,7 @@ import {
   updateWorkOrderShipment,
 } from '../api/orgOperations';
 import ExpenseReceiptGallery from '../components/org/ExpenseReceiptGallery';
+import TransportDriverDayWizard from '../components/org/TransportDriverDayWizard';
 import UnitOfMeasurePicker from '../components/org/UnitOfMeasurePicker';
 import WorkOrderShipmentsEditor from '../components/org/WorkOrderShipmentsEditor';
 import { compressImageForUpload } from '../utils/compressImage';
@@ -181,11 +183,38 @@ function taskNeedsFuelTank(task) {
 
 function isFuelMaterial(mat) {
   const unit = String(mat?.unit_code || '').trim().toLowerCase();
-  if (['l', 'л', 'lt', 'ltr', 'liter', 'litre', 'liters', 'litres'].includes(unit)) {
+  if (
+    ['l', 'л', 'lt', 'ltr', 'liter', 'litre', 'liters', 'litres', 'ml', 'мл', 'kg', 'кг'].includes(
+      unit,
+    )
+  ) {
     return true;
   }
   const name = String(mat?.name || '').toLowerCase();
-  return /fuel|diesel|petrol|gasoline|gasoil|гориво|дизел|бензин|нафта/.test(name);
+  return /fuel|diesel|petrol|gasoline|gasoil|adblue|ad.?blue|urea|freon|refrigerant|гориво|дизел|бензин|нафта|адблу|фрион|хладилен/.test(
+    name,
+  );
+}
+
+/** Liquid / fuel-ish units only for depot refuel UI (not packs, pcs, km, h…). */
+function isFuelishUnit(unit) {
+  const code = String(unit?.code || '').toUpperCase();
+  const symbol = String(unit?.symbol || unit?.name || '').toLowerCase();
+  const kind = String(unit?.measure_kind || '').toLowerCase();
+  if (['L', 'ML', 'KG'].includes(code)) return true;
+  if (['l', 'л', 'ml', 'мл', 'kg', 'кг'].includes(symbol)) return true;
+  if (kind === 'volume' && (code === 'L' || code === 'ML' || symbol === 'l' || symbol === 'ml')) {
+    return true;
+  }
+  if (kind === 'mass' && (code === 'KG' || symbol === 'kg')) return true;
+  return false;
+}
+
+function isNumericIssueQty(raw) {
+  const s = String(raw || '').trim().replace(',', '.');
+  if (!s) return false;
+  if (!/^\d+(\.\d+)?$/.test(s)) return false;
+  return Number.isFinite(Number(s)) && Number(s) > 0;
 }
 
 function taskIsTransportFocused(task) {
@@ -573,7 +602,6 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [taskFuelEnd, setTaskFuelEnd] = useState('');
   const [taskOdometerStart, setTaskOdometerStart] = useState('');
   const [taskOdometerEnd, setTaskOdometerEnd] = useState('');
-  const [taskLoadTons, setTaskLoadTons] = useState('');
   const [showExtraMaterials, setShowExtraMaterials] = useState(false);
   const [extraMaterialSearch, setExtraMaterialSearch] = useState('');
   const [showManualExpense, setShowManualExpense] = useState(false);
@@ -582,6 +610,13 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [confirmIssueDrafts, setConfirmIssueDrafts] = useState({});
   const [uomUnits, setUomUnits] = useState([]);
   const [accessToken, setAccessToken] = useState('');
+  const [startWizardOpen, setStartWizardOpen] = useState(false);
+  const [endWizardOpen, setEndWizardOpen] = useState(false);
+  const [wizardOdo, setWizardOdo] = useState('');
+  const [wizardFuel, setWizardFuel] = useState('');
+  const [wizardTask, setWizardTask] = useState(null);
+  const [showBossFuelForm, setShowBossFuelForm] = useState(false);
+  const [driverFullDetail, setDriverFullDetail] = useState(false);
 
   const onBack = useCallback(() => {
     if (selectedId) {
@@ -654,6 +689,10 @@ export default function OrgTasksScreen({ navigation, route }) {
   }, [routeTaskId]);
 
   useEffect(() => {
+    setDriverFullDetail(false);
+  }, [selectedId]);
+
+  useEffect(() => {
     if (routeTab === 'all' || routeTab === 'open' || routeTab === 'completed') {
       setActiveTab(routeTab);
     }
@@ -694,7 +733,6 @@ export default function OrgTasksScreen({ navigation, route }) {
           setTaskFuelEnd(detail.fuel_end != null ? String(detail.fuel_end) : '');
           setTaskOdometerStart(detail.odometer_start != null ? String(detail.odometer_start) : '');
           setTaskOdometerEnd(detail.odometer_end != null ? String(detail.odometer_end) : '');
-          setTaskLoadTons(detail.load_tons != null ? String(detail.load_tons) : '');
           setLeftoverDrafts(buildLeftoverDrafts(detail.operations, detail.materials));
           setConfirmIssueDrafts({});
           setShowManualExpense(false);
@@ -776,7 +814,6 @@ export default function OrgTasksScreen({ navigation, route }) {
     setTaskFuelEnd(updated.fuel_end != null ? String(updated.fuel_end) : '');
     setTaskOdometerStart(updated.odometer_start != null ? String(updated.odometer_start) : '');
     setTaskOdometerEnd(updated.odometer_end != null ? String(updated.odometer_end) : '');
-    setTaskLoadTons(updated.load_tons != null ? String(updated.load_tons) : '');
     setLeftoverDrafts(buildLeftoverDrafts(updated.operations, updated.materials));
   };
 
@@ -800,11 +837,6 @@ export default function OrgTasksScreen({ navigation, route }) {
       payload.odometer_end = String(taskOdometerEnd).trim();
     } else if (selected?.odometer_end != null) {
       payload.odometer_end = null;
-    }
-    if (String(taskLoadTons || '').trim() !== '') {
-      payload.load_tons = String(taskLoadTons).trim();
-    } else if (selected?.load_tons != null) {
-      payload.load_tons = null;
     }
     return payload;
   };
@@ -885,13 +917,24 @@ export default function OrgTasksScreen({ navigation, route }) {
     firstConsumingOpId,
   ]);
 
-  const acknowledgeStart = async (task) => {
+  const acknowledgeStart = async (task, wizardValues = null) => {
     if (!orgId || !task?.id) return;
     setBusyAction(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const updated = await startWorkOrder(token, orgId, task.id);
+      const payload = {};
+      if (wizardValues) {
+        if (String(wizardValues.odometer || '').trim()) {
+          payload.odometer_start = String(wizardValues.odometer).trim();
+        }
+        if (String(wizardValues.fuel || '').trim()) {
+          payload.fuel_start = String(wizardValues.fuel).trim();
+        }
+      }
+      const updated = await startWorkOrder(token, orgId, task.id, payload);
       replaceTask(updated);
+      setStartWizardOpen(false);
+      setWizardTask(null);
     } catch (e) {
       Alert.alert(
         t('org.tasks.startTitle', null, 'Start task'),
@@ -902,7 +945,18 @@ export default function OrgTasksScreen({ navigation, route }) {
     }
   };
 
-  const acknowledgeEnd = async (task) => {
+  const openStartWizard = (task) => {
+    if (taskNeedsFuelTank(task)) {
+      setWizardTask(task);
+      setWizardOdo(task.odometer_start != null ? String(task.odometer_start) : '');
+      setWizardFuel(task.fuel_start != null ? String(task.fuel_start) : '');
+      setStartWizardOpen(true);
+      return;
+    }
+    acknowledgeStart(task);
+  };
+
+  const acknowledgeEnd = async (task, wizardValues = null) => {
     if (!orgId || !task?.id) return;
     setBusyAction(true);
     try {
@@ -912,12 +966,33 @@ export default function OrgTasksScreen({ navigation, route }) {
       if (String(taskActualHours || '').trim() !== '') {
         payload.actual_hours = String(taskActualHours).trim();
       }
-      if (String(taskActualKm || '').trim() !== '') {
-        payload.actual_km = String(taskActualKm).trim();
+      if (wizardValues) {
+        if (String(wizardValues.odometer || '').trim()) {
+          payload.odometer_end = String(wizardValues.odometer).trim();
+        }
+        if (String(wizardValues.fuel || '').trim()) {
+          payload.fuel_end = String(wizardValues.fuel).trim();
+        }
+        const startOdo = Number(task.odometer_start || taskOdometerStart);
+        const endOdo = Number(wizardValues.odometer);
+        if (
+          Number.isFinite(startOdo) &&
+          Number.isFinite(endOdo) &&
+          endOdo >= startOdo &&
+          !String(taskActualKm || '').trim()
+        ) {
+          payload.actual_km = String(endOdo - startOdo);
+        }
+      } else {
+        if (String(taskActualKm || '').trim() !== '') {
+          payload.actual_km = String(taskActualKm).trim();
+        }
+        appendFuelPayload(payload);
       }
-      appendFuelPayload(payload);
       const updated = await endWorkOrder(token, orgId, task.id, payload);
       replaceTask(updated);
+      setEndWizardOpen(false);
+      setWizardTask(null);
     } catch (e) {
       Alert.alert(
         t('org.tasks.endTitle', null, 'End work'),
@@ -926,6 +1001,17 @@ export default function OrgTasksScreen({ navigation, route }) {
     } finally {
       setBusyAction(false);
     }
+  };
+
+  const openEndWizard = (task) => {
+    if (taskNeedsFuelTank(task)) {
+      setWizardTask(task);
+      setWizardOdo(task.odometer_end != null ? String(task.odometer_end) : taskOdometerEnd || '');
+      setWizardFuel(task.fuel_end != null ? String(task.fuel_end) : taskFuelEnd || '');
+      setEndWizardOpen(true);
+      return;
+    }
+    acknowledgeEnd(task);
   };
 
   const attachRef = async (kind) => {
@@ -993,16 +1079,31 @@ export default function OrgTasksScreen({ navigation, route }) {
       );
       return;
     }
+    const transportFocused = taskIsTransportFocused(selected);
+    if (transportFocused && !isNumericIssueQty(qty)) {
+      Alert.alert(
+        t('org.tasks.depotRefuelTitle', null, 'Refuel from base / depot'),
+        t(
+          'org.tasks.depotQtyNumericRequired',
+          null,
+          'Enter liters as a number (e.g. 400). Text like “to full” is not accepted yet.',
+        ),
+      );
+      return;
+    }
     setBusyAction(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const unitCode = transportFocused
+        ? String(issueUnit || 'L').trim() || 'L'
+        : issueUnit.trim();
       await issueWorkOrderMaterials(token, orgId, selected.id, {
         location_id: issueLocationId,
         lines: [
           {
             material_id: issueMaterialId,
-            quantity: qty,
-            unit_code: issueUnit.trim(),
+            quantity: qty.replace(',', '.'),
+            unit_code: unitCode,
           },
         ],
       });
@@ -1396,14 +1497,20 @@ export default function OrgTasksScreen({ navigation, route }) {
   const applySuggestionToIssue = useCallback(
     (mid, unitHint) => {
       setIssueMaterialId(mid);
-      if (unitHint) setIssueUnit(String(unitHint));
+      const transportFocused = taskIsTransportFocused(selected);
+      if (transportFocused) {
+        setIssueUnit(String(unitHint || 'L').trim() || 'L');
+      } else if (unitHint) {
+        setIssueUnit(String(unitHint));
+      }
       const sug = suggestionForMaterial(mid);
       if (sug?.qty) {
         setIssueQty(sug.qty);
         if (sug.unit) setIssueUnit(sug.unit);
+        else if (transportFocused) setIssueUnit('L');
       }
     },
-    [suggestionForMaterial],
+    [suggestionForMaterial, selected],
   );
 
   useEffect(() => {
@@ -1512,7 +1619,7 @@ export default function OrgTasksScreen({ navigation, route }) {
             mode="contained"
             loading={busyAction}
             disabled={busyAction}
-            onPress={() => acknowledgeStart(task)}
+            onPress={() => openStartWizard(task)}
             style={styles.startBtn}
             contentStyle={styles.startBtnContent}
             labelStyle={styles.startBtnLabel}
@@ -1526,7 +1633,7 @@ export default function OrgTasksScreen({ navigation, route }) {
             mode="contained"
             loading={busyAction}
             disabled={busyAction}
-            onPress={() => acknowledgeEnd(task)}
+            onPress={() => openEndWizard(task)}
             style={styles.endBtn}
             contentStyle={styles.startBtnContent}
             labelStyle={styles.startBtnLabel}
@@ -1639,6 +1746,59 @@ export default function OrgTasksScreen({ navigation, route }) {
 
             {selected ? (
           <>
+            {taskIsTransportFocused(selected) && !driverFullDetail ? (
+              <AppCard style={styles.card}>
+                <TransportDriverDayWizard
+                  t={t}
+                  task={selected}
+                  busy={busyAction}
+                  onStart={(vals) => acknowledgeStart(selected, vals)}
+                  onEnd={(vals) => acknowledgeEnd(selected, vals)}
+                  onAddExpensePhoto={pickExpenseFromCamera}
+                  onCheckIn={async (payload) => {
+                    if (!orgId || !selected?.id) return;
+                    setBusyAction(true);
+                    try {
+                      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+                      const updated = await checkInWorkOrder(
+                        token,
+                        orgId,
+                        selected.id,
+                        payload,
+                      );
+                      replaceTask(updated);
+                    } catch (e) {
+                      Alert.alert(
+                        t('org.tasks.atStopCta', null, 'I’m at this stop'),
+                        e.message ||
+                          t('org.tasks.atStopError', null, 'Could not check in.'),
+                      );
+                    } finally {
+                      setBusyAction(false);
+                    }
+                  }}
+                  onOpenMaps={(step) => {
+                    const url = step?.maps_url || selected.driver_route_maps_url;
+                    if (url) Linking.openURL(url).catch(() => {});
+                  }}
+                  onOpenFullDetail={() => setDriverFullDetail(true)}
+                />
+                {canManage ? (
+                  <Button
+                    mode="text"
+                    onPress={() => setDriverFullDetail(true)}
+                    style={styles.secondaryBtn}
+                  >
+                    {t(
+                      'org.tasks.bossFullDetail',
+                      null,
+                      'Manager: open full task form',
+                    )}
+                  </Button>
+                ) : null}
+              </AppCard>
+            ) : (
+              <>
             <AppCard style={styles.card}>
               <Text style={styles.title}>{selected.title}</Text>
               <Text style={styles.meta}>
@@ -1653,6 +1813,15 @@ export default function OrgTasksScreen({ navigation, route }) {
               </Text>
               {selected.instructions ? (
                 <Text style={styles.instructions}>{selected.instructions}</Text>
+              ) : null}
+              {taskIsTransportFocused(selected) ? (
+                <Button
+                  mode="text"
+                  onPress={() => setDriverFullDetail(false)}
+                  style={styles.secondaryBtn}
+                >
+                  {t('org.tasks.backToDriverWizard', null, 'Back to driver day flow')}
+                </Button>
               ) : null}
               {renderStartEndControls(selected)}
               {canManage &&
@@ -1848,6 +2017,13 @@ export default function OrgTasksScreen({ navigation, route }) {
                       </Text>
                       <Text style={styles.opMeta}>
                         {t(
+                          'org.tasks.fuelDriverFlowHint',
+                          null,
+                          'Driver: use Start (km + fuel) → mid-trip receipt photos → End (km + fuel). Expand below only if correcting paper values.',
+                        )}
+                      </Text>
+                      <Text style={styles.opMeta}>
+                        {t(
                           'org.tasks.fuelOnTruck',
                           {
                             liters:
@@ -1862,6 +2038,21 @@ export default function OrgTasksScreen({ navigation, route }) {
                           } L`,
                         )}
                       </Text>
+                      <Button
+                        mode="text"
+                        onPress={() => setShowBossFuelForm((v) => !v)}
+                        style={styles.secondaryBtn}
+                      >
+                        {showBossFuelForm
+                          ? t('org.tasks.hideBossFuelForm', null, 'Hide full fuel fields')
+                          : t(
+                              'org.tasks.showBossFuelForm',
+                              null,
+                              'Edit start/end km & fuel (manager / paper)',
+                            )}
+                      </Button>
+                      {showBossFuelForm || canManage ? (
+                        <>
                       <Text style={styles.opMeta}>
                         {t(
                           'org.tasks.fuelTankHint',
@@ -1905,15 +2096,25 @@ export default function OrgTasksScreen({ navigation, route }) {
                         style={styles.input}
                         textColor={ON_CARD}
                       />
-                      <TextInput
-                        label={t('org.tasks.loadTons', null, 'Load tons (optional)')}
-                        value={taskLoadTons}
-                        onChangeText={setTaskLoadTons}
-                        mode="outlined"
-                        keyboardType="decimal-pad"
-                        style={styles.input}
-                        textColor={ON_CARD}
-                      />
+                      {selected.fuel_summary?.load_tons != null ? (
+                        <Text style={styles.opMeta}>
+                          {t(
+                            'org.tasks.cargoTonsAuto',
+                            {
+                              tons: selected.fuel_summary.load_tons,
+                              source:
+                                selected.fuel_summary.load_tons_source === 'cargo'
+                                  ? t('org.tasks.cargoTonsFromCargo', null, 'from cargo kg')
+                                  : t('org.tasks.cargoTonsManual', null, 'manual'),
+                            },
+                            `Cargo tons for norm: ${selected.fuel_summary.load_tons} (${
+                              selected.fuel_summary.load_tons_source === 'cargo'
+                                ? 'from cargo kg'
+                                : 'manual'
+                            })`,
+                          )}
+                        </Text>
+                      ) : null}
                       {selected.fuel_summary ? (
                         <View style={{ marginTop: 6 }}>
                           <Text style={styles.opMeta}>
@@ -1993,6 +2194,8 @@ export default function OrgTasksScreen({ navigation, route }) {
                           )}
                         </View>
                       ) : null}
+                        </>
+                      ) : null}
                     </>
                   ) : null}
                 </>
@@ -2060,12 +2263,12 @@ export default function OrgTasksScreen({ navigation, route }) {
                   ? t('org.tasks.depotRefuelTitle', null, 'Refuel from base / depot')
                   : t('org.tasks.materialsTitle', null, 'Materials')}
               </Text>
-              <Text style={styles.opMeta}>
+                  <Text style={styles.opMeta}>
                 {transportFocused
                   ? t(
                       'org.tasks.depotRefuelHint',
                       null,
-                      'Optional: issue fuel SKU from warehouse (e.g. Baza) onto this task. Paint/other materials are hidden on transport.',
+                      'Issue fuel (or AdBlue / freon) from base in litres. Driver confirms received litres before it counts on the truck.',
                     )
                   : t(
                       'org.tasks.materialsHint',
@@ -2479,20 +2682,40 @@ export default function OrgTasksScreen({ navigation, route }) {
                     </>
                   ) : null}
                   <TextInput
-                    label={t('org.tasks.issueQty', null, 'Quantity to issue')}
+                    label={
+                      transportFocused
+                        ? t('org.tasks.depotIssueQtyLiters', null, 'Liters to issue (e.g. 400)')
+                        : t('org.tasks.issueQty', null, 'Quantity to issue')
+                    }
                     value={issueQty}
                     onChangeText={setIssueQty}
                     mode="outlined"
                     keyboardType="decimal-pad"
                     style={styles.input}
                     textColor={ON_CARD}
+                    placeholder={transportFocused ? '400' : undefined}
                   />
+                  {transportFocused ? (
+                    <Text style={styles.opMeta}>
+                      {t(
+                        'org.tasks.depotIssueQtyHelper',
+                        null,
+                        'Enter liters as a number. “Fill to full” is not supported yet.',
+                      )}
+                    </Text>
+                  ) : null}
                   <Text style={styles.fieldLabel}>
-                    {t('org.tasks.issueUnitSelect', null, 'Select unit')}
+                    {transportFocused
+                      ? t('org.tasks.depotIssueUnitSelect', null, 'Unit (fuel liquids)')
+                      : t('org.tasks.issueUnitSelect', null, 'Select unit')}
                   </Text>
                   <UnitOfMeasurePicker
-                    units={uomUnits}
-                    valueCode={issueUnit}
+                    units={
+                      transportFocused
+                        ? (uomUnits || []).filter(isFuelishUnit)
+                        : uomUnits
+                    }
+                    valueCode={issueUnit || (transportFocused ? 'L' : '')}
                     onChange={({ code }) => setIssueUnit(code || '')}
                   />
                   <Button
@@ -2526,9 +2749,11 @@ export default function OrgTasksScreen({ navigation, route }) {
                     (selected.shipments || []).filter((s) => s.direction === 'return')
                   }
                   driverRoute={selected.driver_route || []}
-                  returnDriverRoute={selected.return_driver_route || []}
+                  driverRouteOptimized={selected.driver_route_optimized || []}
                   driverRouteMapsUrl={selected.driver_route_maps_url || ''}
-                  returnDriverRouteMapsUrl={selected.return_driver_route_maps_url || ''}
+                  driverRouteOptimizedMapsUrl={
+                    selected.driver_route_optimized_maps_url || ''
+                  }
                   remainingSpace={selected.remaining_space || null}
                   loadType={selected.load_type || 'groupage'}
                   onLoadTypeChange={
@@ -2730,6 +2955,8 @@ export default function OrgTasksScreen({ navigation, route }) {
               ) : null}
             </AppCard>
           </>
+            )}
+          </>
             ) : (
           <>
             <Text style={styles.lead}>
@@ -2796,6 +3023,122 @@ export default function OrgTasksScreen({ navigation, route }) {
           color="#fff"
         />
       ) : null}
+
+      <Modal
+        visible={startWizardOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setStartWizardOpen(false)}
+      >
+        <View style={styles.wizardBackdrop}>
+          <View style={styles.wizardCard}>
+            <Text style={styles.wizardTitle}>
+              {t('org.tasks.startWizardTitle', null, 'Start trip')}
+            </Text>
+            <Text style={styles.wizardHint}>
+              {t(
+                'org.tasks.startWizardHint',
+                null,
+                'Enter starting odometer and fuel in tank, then start.',
+              )}
+            </Text>
+            <TextInput
+              label={t('org.tasks.odometerStart', null, 'Odometer start (km)')}
+              value={wizardOdo}
+              onChangeText={setWizardOdo}
+              mode="outlined"
+              keyboardType="decimal-pad"
+              style={styles.input}
+              textColor={ON_CARD}
+            />
+            <TextInput
+              label={t('org.tasks.fuelStart', null, 'Fuel start (L in tank)')}
+              value={wizardFuel}
+              onChangeText={setWizardFuel}
+              mode="outlined"
+              keyboardType="decimal-pad"
+              style={styles.input}
+              textColor={ON_CARD}
+            />
+            <View style={styles.wizardActions}>
+              <Button mode="text" onPress={() => setStartWizardOpen(false)}>
+                {t('common.cancel', null, 'Cancel')}
+              </Button>
+              <Button
+                mode="contained"
+                loading={busyAction}
+                disabled={busyAction || !String(wizardOdo).trim() || !String(wizardFuel).trim()}
+                onPress={() =>
+                  acknowledgeStart(wizardTask, {
+                    odometer: wizardOdo,
+                    fuel: wizardFuel,
+                  })
+                }
+              >
+                {t('org.tasks.startCta', null, 'Start')}
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={endWizardOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEndWizardOpen(false)}
+      >
+        <View style={styles.wizardBackdrop}>
+          <View style={styles.wizardCard}>
+            <Text style={styles.wizardTitle}>
+              {t('org.tasks.endWizardTitle', null, 'End trip')}
+            </Text>
+            <Text style={styles.wizardHint}>
+              {t(
+                'org.tasks.endWizardHint',
+                null,
+                'Enter ending odometer and fuel in tank. Km is calculated from start/end when possible.',
+              )}
+            </Text>
+            <TextInput
+              label={t('org.tasks.odometerEnd', null, 'Odometer end (km)')}
+              value={wizardOdo}
+              onChangeText={setWizardOdo}
+              mode="outlined"
+              keyboardType="decimal-pad"
+              style={styles.input}
+              textColor={ON_CARD}
+            />
+            <TextInput
+              label={t('org.tasks.fuelEnd', null, 'Fuel end (L in tank)')}
+              value={wizardFuel}
+              onChangeText={setWizardFuel}
+              mode="outlined"
+              keyboardType="decimal-pad"
+              style={styles.input}
+              textColor={ON_CARD}
+            />
+            <View style={styles.wizardActions}>
+              <Button mode="text" onPress={() => setEndWizardOpen(false)}>
+                {t('common.cancel', null, 'Cancel')}
+              </Button>
+              <Button
+                mode="contained"
+                loading={busyAction}
+                disabled={busyAction || !String(wizardOdo).trim() || !String(wizardFuel).trim()}
+                onPress={() =>
+                  acknowledgeEnd(wizardTask, {
+                    odometer: wizardOdo,
+                    fuel: wizardFuel,
+                  })
+                }
+              >
+                {t('org.tasks.endCta', null, 'End work')}
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
       </View>
     </ScreenBackground>
   );
@@ -2932,5 +3275,35 @@ const styles = StyleSheet.create({
     color: ON_CARD_MUTED,
     fontSize: 13,
     fontStyle: 'italic',
+  },
+  wizardBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15,23,42,0.55)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  wizardCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+  },
+  wizardTitle: {
+    color: ON_CARD,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  wizardHint: {
+    color: ON_CARD_MUTED,
+    fontSize: 13,
+    marginBottom: 10,
+    lineHeight: 18,
+  },
+  wizardActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
   },
 });

@@ -126,16 +126,17 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const flavor = useMemo(() => detectTaskFlavor(activities), [activities]);
 
   const localDriverRoute = useMemo(() => {
-    const build = (rows) => {
-      const ordered = [...rows];
+    const buildPhase = (rows, direction, idxStart, roles) => {
       const route = [];
-      let idx = 1;
+      let idx = idxStart;
+      const ordered = [...rows];
       ordered.forEach((s) => {
         const address = s.loading_address || s.loading?.address || '';
         if (address) {
           route.push({
             route_index: idx++,
-            role: 'loading',
+            role: roles.loading,
+            direction,
             shipment_id: s.id,
             address,
             company_name: s.loading_company_name || s.loading?.company_name || '',
@@ -149,7 +150,8 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         if (address) {
           route.push({
             route_index: idx++,
-            role: 'unloading',
+            role: roles.unloading,
+            direction,
             shipment_id: s.id,
             address,
             company_name: s.unloading_company_name || s.unloading?.company_name || '',
@@ -158,12 +160,31 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
           });
         }
       });
-      return route;
+      return { route, nextIdx: idx };
     };
-    return {
-      outbound: build(outboundShipments),
-      return: build(returnShipments),
-    };
+    let idx = 1;
+    const out = buildPhase(outboundShipments, 'outbound', idx, {
+      loading: 'loading',
+      unloading: 'unloading',
+    });
+    idx = out.nextIdx;
+    const ret = buildPhase(returnShipments, 'return', idx, {
+      loading: 'return_loading',
+      unloading: 'return_unloading',
+    });
+    const full = [...out.route, ...ret.route];
+    const mapsUrl =
+      full.length > 1
+        ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
+            full[0].address,
+          )}&destination=${encodeURIComponent(full[full.length - 1].address)}&waypoints=${full
+            .slice(1, -1)
+            .map((s) => encodeURIComponent(s.address))
+            .join('|')}&travelmode=driving`
+        : full[0]
+          ? full[0].maps_url
+          : '';
+    return { full, mapsUrl };
   }, [outboundShipments, returnShipments]);
 
   const stepDefs = useMemo(() => {
@@ -503,6 +524,15 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             ).trim(),
             cargo_euro_pallets: s.cargo_euro_pallets ?? undefined,
             cargo_crates: s.cargo_crates ?? undefined,
+            cargo_kind: s.cargo_kind || undefined,
+            cargo_unit_count: s.cargo_unit_count ?? undefined,
+            cargo_length_cm: s.cargo_length_cm ?? undefined,
+            cargo_width_cm: s.cargo_width_cm ?? undefined,
+            cargo_height_cm: s.cargo_height_cm ?? undefined,
+            cargo_weight_kg: s.cargo_weight_kg ?? undefined,
+            cargo_weight_distribution_note: String(
+              s.cargo_weight_distribution_note || '',
+            ).trim(),
             cargo_nonstandard_dims: String(s.cargo_nonstandard_dims || '').trim(),
             cargo_note: String(s.cargo_note || '').trim(),
           })),
@@ -535,6 +565,15 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             ).trim(),
             cargo_euro_pallets: s.cargo_euro_pallets ?? undefined,
             cargo_crates: s.cargo_crates ?? undefined,
+            cargo_kind: s.cargo_kind || undefined,
+            cargo_unit_count: s.cargo_unit_count ?? undefined,
+            cargo_length_cm: s.cargo_length_cm ?? undefined,
+            cargo_width_cm: s.cargo_width_cm ?? undefined,
+            cargo_height_cm: s.cargo_height_cm ?? undefined,
+            cargo_weight_kg: s.cargo_weight_kg ?? undefined,
+            cargo_weight_distribution_note: String(
+              s.cargo_weight_distribution_note || '',
+            ).trim(),
             cargo_nonstandard_dims: String(s.cargo_nonstandard_dims || '').trim(),
             cargo_note: String(s.cargo_note || '').trim(),
           })),
@@ -706,8 +745,8 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             t={t}
             outboundShipments={outboundShipments}
             returnShipments={returnShipments}
-            driverRoute={localDriverRoute.outbound}
-            returnDriverRoute={localDriverRoute.return}
+            driverRoute={localDriverRoute.full}
+            driverRouteMapsUrl={localDriverRoute.mapsUrl}
             loadType={loadType}
             onLoadTypeChange={setLoadType}
             editable
@@ -723,16 +762,23 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                 unloading_address: payload.unloading?.address || '',
                 unloading_contact_phone: payload.unloading?.contact_phone || '',
                 unloading_reservation_number: payload.unloading?.reservation_number || '',
+                cargo_kind: payload.cargo_kind || '',
+                cargo_unit_count: payload.cargo_unit_count,
+                cargo_length_cm: payload.cargo_length_cm,
+                cargo_width_cm: payload.cargo_width_cm,
+                cargo_height_cm: payload.cargo_height_cm,
+                cargo_weight_kg: payload.cargo_weight_kg,
+                cargo_weight_distribution_note: payload.cargo_weight_distribution_note || '',
+                cargo_euro_pallets: payload.cargo_euro_pallets,
+                cargo_crates: payload.cargo_crates,
                 cargo_summary: [
-                  payload.cargo_euro_pallets != null
-                    ? `${payload.cargo_euro_pallets} euro pallets`
-                    : null,
-                  payload.cargo_crates != null ? `${payload.cargo_crates} crates` : null,
-                  payload.cargo_nonstandard_dims || null,
+                  payload.cargo_kind || null,
+                  payload.cargo_unit_count != null ? `×${payload.cargo_unit_count}` : null,
+                  payload.cargo_weight_kg != null ? `${payload.cargo_weight_kg} kg` : null,
                   payload.cargo_note || null,
                 ]
                   .filter(Boolean)
-                  .join(', '),
+                  .join(' '),
               };
               if (payload.direction === 'return') {
                 setReturnShipments((prev) => [...prev, row]);

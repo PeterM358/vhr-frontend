@@ -1,9 +1,18 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { Button, Text, TextInput } from 'react-native-paper';
 
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
+
+export const CARGO_KINDS = [
+  { id: 'europallet', labelKey: 'org.tasks.cargoKindEuropallet', fallback: 'Euro pallet', length: 120, width: 80 },
+  { id: 'crates', labelKey: 'org.tasks.cargoKindCrates', fallback: 'Crates / скари', length: 120, width: 120 },
+  { id: 'big_bag', labelKey: 'org.tasks.cargoKindBigBag', fallback: 'Big bag', length: 90, width: 90 },
+  { id: 'bulk', labelKey: 'org.tasks.cargoKindBulk', fallback: 'Bulk / tanker', length: null, width: null },
+  { id: 'car_transporter', labelKey: 'org.tasks.cargoKindCarTransporter', fallback: 'Car transporter', length: null, width: null },
+  { id: 'custom', labelKey: 'org.tasks.cargoKindCustom', fallback: 'Custom', length: null, width: null },
+];
 
 function emptySide() {
   return {
@@ -21,6 +30,13 @@ function emptyDraft(direction = 'outbound') {
     direction,
     loading: emptySide(),
     unloading: emptySide(),
+    cargo_kind: 'europallet',
+    cargo_unit_count: '',
+    cargo_length_cm: '120',
+    cargo_width_cm: '80',
+    cargo_height_cm: '',
+    cargo_weight_kg: '',
+    cargo_weight_distribution_note: '',
     cargo_euro_pallets: '',
     cargo_crates: '',
     cargo_nonstandard_dims: '',
@@ -47,22 +63,63 @@ function sidePayload(side) {
   return payload;
 }
 
+function numOrUndef(raw) {
+  const s = String(raw || '').trim();
+  if (s === '') return undefined;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 function shipmentFields(draft) {
+  const kind = String(draft.cargo_kind || '').trim();
+  const count = numOrUndef(draft.cargo_unit_count);
   const payload = {
     direction: draft.direction || 'outbound',
     loading: sidePayload(draft.loading || {}),
     unloading: sidePayload(draft.unloading || {}),
-    cargo_nonstandard_dims: String(draft.cargo_nonstandard_dims || '').trim(),
+    cargo_kind: kind || undefined,
     cargo_note: String(draft.cargo_note || '').trim(),
+    cargo_weight_distribution_note: String(
+      draft.cargo_weight_distribution_note || '',
+    ).trim(),
+    cargo_nonstandard_dims: String(draft.cargo_nonstandard_dims || '').trim(),
   };
-  const pallets = String(draft.cargo_euro_pallets || '').trim();
-  const crates = String(draft.cargo_crates || '').trim();
-  if (pallets !== '') payload.cargo_euro_pallets = Number(pallets);
-  if (crates !== '') payload.cargo_crates = Number(crates);
+  if (count != null) payload.cargo_unit_count = count;
+  const length = numOrUndef(draft.cargo_length_cm);
+  const width = numOrUndef(draft.cargo_width_cm);
+  const height = numOrUndef(draft.cargo_height_cm);
+  const weight = numOrUndef(draft.cargo_weight_kg);
+  if (length != null) payload.cargo_length_cm = length;
+  if (width != null) payload.cargo_width_cm = width;
+  if (height != null) payload.cargo_height_cm = height;
+  if (weight != null) payload.cargo_weight_kg = weight;
+  if (kind === 'europallet' && count != null) payload.cargo_euro_pallets = count;
+  if (kind === 'crates' && count != null) payload.cargo_crates = count;
+  // Legacy fallbacks
+  const pallets = numOrUndef(draft.cargo_euro_pallets);
+  const crates = numOrUndef(draft.cargo_crates);
+  if (!kind && pallets != null) payload.cargo_euro_pallets = pallets;
+  if (!kind && crates != null) payload.cargo_crates = crates;
   return payload;
 }
 
 function draftFromShipment(s) {
+  const kind =
+    s.cargo_kind ||
+    (s.cargo_euro_pallets != null
+      ? 'europallet'
+      : s.cargo_crates != null
+        ? 'crates'
+        : '');
+  const count =
+    s.cargo_unit_count != null
+      ? String(s.cargo_unit_count)
+      : kind === 'europallet' && s.cargo_euro_pallets != null
+        ? String(s.cargo_euro_pallets)
+        : kind === 'crates' && s.cargo_crates != null
+          ? String(s.cargo_crates)
+          : '';
+  const defaults = CARGO_KINDS.find((k) => k.id === kind);
   return {
     direction: s.direction || 'outbound',
     loading: {
@@ -103,12 +160,41 @@ function draftFromShipment(s) {
             ? String(s.unloading.longitude)
             : '',
     },
+    cargo_kind: kind || 'europallet',
+    cargo_unit_count: count,
+    cargo_length_cm:
+      s.cargo_length_cm != null
+        ? String(s.cargo_length_cm)
+        : defaults?.length != null
+          ? String(defaults.length)
+          : '',
+    cargo_width_cm:
+      s.cargo_width_cm != null
+        ? String(s.cargo_width_cm)
+        : defaults?.width != null
+          ? String(defaults.width)
+          : '',
+    cargo_height_cm: s.cargo_height_cm != null ? String(s.cargo_height_cm) : '',
+    cargo_weight_kg: s.cargo_weight_kg != null ? String(s.cargo_weight_kg) : '',
+    cargo_weight_distribution_note: s.cargo_weight_distribution_note || '',
     cargo_euro_pallets:
       s.cargo_euro_pallets != null ? String(s.cargo_euro_pallets) : '',
     cargo_crates: s.cargo_crates != null ? String(s.cargo_crates) : '',
     cargo_nonstandard_dims: s.cargo_nonstandard_dims || '',
     cargo_note: s.cargo_note || '',
   };
+}
+
+function applyKindDefaults(setDraft, kindId) {
+  const kind = CARGO_KINDS.find((k) => k.id === kindId);
+  setDraft((p) => ({
+    ...p,
+    cargo_kind: kindId,
+    cargo_length_cm:
+      kind?.length != null ? String(kind.length) : p.cargo_length_cm || '',
+    cargo_width_cm:
+      kind?.width != null ? String(kind.width) : p.cargo_width_cm || '',
+  }));
 }
 
 function SideFields({ t, title, side, setSide }) {
@@ -158,30 +244,93 @@ function CargoFields({ t, draft, setDraft }) {
       <Text style={styles.sideTitle}>
         {t('org.tasks.cargoTitle', null, 'Cargo / вид на товара')}
       </Text>
+      <Text style={styles.hint}>
+        {t('org.tasks.cargoKindHint', null, 'Kind + count + dims + weight (kg).')}
+      </Text>
+      <View style={styles.chipRow}>
+        {CARGO_KINDS.map((kind) => {
+          const active = draft.cargo_kind === kind.id;
+          return (
+            <Pressable
+              key={kind.id}
+              onPress={() => applyKindDefaults(setDraft, kind.id)}
+              style={[styles.chip, active && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                {t(kind.labelKey, null, kind.fallback)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
       <TextInput
-        label={t('org.tasks.cargoEuroPallets', null, 'Euro pallets')}
-        value={draft.cargo_euro_pallets}
-        onChangeText={(v) => setDraft((p) => ({ ...p, cargo_euro_pallets: v }))}
+        label={t('org.tasks.cargoUnitCount', null, 'Count')}
+        value={draft.cargo_unit_count}
+        onChangeText={(v) => setDraft((p) => ({ ...p, cargo_unit_count: v }))}
         mode="outlined"
         keyboardType="number-pad"
         style={styles.input}
         textColor={ON_CARD}
       />
+      <View style={styles.dimRow}>
+        <TextInput
+          label={t('org.tasks.cargoLengthCm', null, 'L cm')}
+          value={draft.cargo_length_cm}
+          onChangeText={(v) => setDraft((p) => ({ ...p, cargo_length_cm: v }))}
+          mode="outlined"
+          keyboardType="number-pad"
+          style={[styles.input, styles.dimInput]}
+          textColor={ON_CARD}
+        />
+        <TextInput
+          label={t('org.tasks.cargoWidthCm', null, 'W cm')}
+          value={draft.cargo_width_cm}
+          onChangeText={(v) => setDraft((p) => ({ ...p, cargo_width_cm: v }))}
+          mode="outlined"
+          keyboardType="number-pad"
+          style={[styles.input, styles.dimInput]}
+          textColor={ON_CARD}
+        />
+        <TextInput
+          label={t('org.tasks.cargoHeightCm', null, 'H cm')}
+          value={draft.cargo_height_cm}
+          onChangeText={(v) => setDraft((p) => ({ ...p, cargo_height_cm: v }))}
+          mode="outlined"
+          keyboardType="number-pad"
+          style={[styles.input, styles.dimInput]}
+          textColor={ON_CARD}
+        />
+      </View>
+      {draft.cargo_kind === 'europallet' ? (
+        <Text style={styles.hint}>
+          {t('org.tasks.cargoEuroDimsHint', null, 'Euro pallet default: 120×80 cm')}
+        </Text>
+      ) : null}
+      {draft.cargo_kind === 'crates' ? (
+        <Text style={styles.hint}>
+          {t('org.tasks.cargoCratesDimsHint', null, 'Crates / скари default: 120×120 cm')}
+        </Text>
+      ) : null}
       <TextInput
-        label={t('org.tasks.cargoCrates', null, 'Crates / скари')}
-        value={draft.cargo_crates}
-        onChangeText={(v) => setDraft((p) => ({ ...p, cargo_crates: v }))}
+        label={t('org.tasks.cargoWeightKg', null, 'Weight (kg total)')}
+        value={draft.cargo_weight_kg}
+        onChangeText={(v) => setDraft((p) => ({ ...p, cargo_weight_kg: v }))}
         mode="outlined"
-        keyboardType="number-pad"
+        keyboardType="decimal-pad"
         style={styles.input}
         textColor={ON_CARD}
       />
       <TextInput
-        label={t('org.tasks.cargoNonstandard', null, 'Nonstandard dims')}
-        value={draft.cargo_nonstandard_dims}
-        onChangeText={(v) => setDraft((p) => ({ ...p, cargo_nonstandard_dims: v }))}
+        label={t(
+          'org.tasks.cargoWeightDistNote',
+          null,
+          'Weight distribution note (optional)',
+        )}
+        value={draft.cargo_weight_distribution_note}
+        onChangeText={(v) =>
+          setDraft((p) => ({ ...p, cargo_weight_distribution_note: v }))
+        }
         mode="outlined"
-        placeholder="5×2.30"
         style={styles.input}
         textColor={ON_CARD}
       />
@@ -197,21 +346,32 @@ function CargoFields({ t, draft, setDraft }) {
   );
 }
 
+function roleLabel(t, role) {
+  if (role === 'return_loading') {
+    return t('org.tasks.routeReturnPickup', null, 'Return loading');
+  }
+  if (role === 'return_unloading') {
+    return t('org.tasks.routeReturnDelivery', null, 'Return unloading');
+  }
+  if (role === 'loading') {
+    return t('org.tasks.routePickup', null, 'Loading');
+  }
+  return t('org.tasks.routeDelivery', null, 'Unloading');
+}
+
 function ShipmentCard({ t, shipment, index, editable, busy, onUpdate, onRemove }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(null);
   const summary =
     shipment.cargo_summary ||
     [
-      shipment.cargo_euro_pallets != null
-        ? `${shipment.cargo_euro_pallets} euro pallets`
-        : null,
-      shipment.cargo_crates != null ? `${shipment.cargo_crates} crates` : null,
-      shipment.cargo_nonstandard_dims || null,
+      shipment.cargo_kind || null,
+      shipment.cargo_unit_count != null ? `×${shipment.cargo_unit_count}` : null,
+      shipment.cargo_weight_kg != null ? `${shipment.cargo_weight_kg} kg` : null,
       shipment.cargo_note || null,
     ]
       .filter(Boolean)
-      .join(', ');
+      .join(' ');
 
   if (editing && draft) {
     return (
@@ -286,17 +446,6 @@ function ShipmentCard({ t, shipment, index, editable, busy, onUpdate, onRemove }
           .filter(Boolean)
           .join(' · ')}
       </Text>
-      {(shipment.loading_contact_phone || shipment.loading?.contact_phone) ? (
-        <Text style={styles.stopMeta}>
-          {shipment.loading_contact_phone || shipment.loading?.contact_phone}
-        </Text>
-      ) : null}
-      {(shipment.loading_reservation_number || shipment.loading?.reservation_number) ? (
-        <Text style={styles.stopMeta}>
-          {t('org.tasks.stopReservation', null, 'Reservation')}:{' '}
-          {shipment.loading_reservation_number || shipment.loading?.reservation_number}
-        </Text>
-      ) : null}
       <Text style={[styles.sideLabel, styles.sideLabelSpaced]}>
         {t('org.tasks.unloadingSide', null, 'Unloading')}
       </Text>
@@ -308,17 +457,6 @@ function ShipmentCard({ t, shipment, index, editable, busy, onUpdate, onRemove }
           .filter(Boolean)
           .join(' · ')}
       </Text>
-      {(shipment.unloading_contact_phone || shipment.unloading?.contact_phone) ? (
-        <Text style={styles.stopMeta}>
-          {shipment.unloading_contact_phone || shipment.unloading?.contact_phone}
-        </Text>
-      ) : null}
-      {(shipment.unloading_reservation_number || shipment.unloading?.reservation_number) ? (
-        <Text style={styles.stopMeta}>
-          {t('org.tasks.stopReservation', null, 'Reservation')}:{' '}
-          {shipment.unloading_reservation_number || shipment.unloading?.reservation_number}
-        </Text>
-      ) : null}
       {summary ? (
         <>
           <Text style={[styles.sideLabel, styles.sideLabelSpaced]}>
@@ -351,39 +489,52 @@ function ShipmentCard({ t, shipment, index, editable, busy, onUpdate, onRemove }
   );
 }
 
-function DriverRouteSection({ t, title, hint, route = [], mapsUrl }) {
+function DriverRouteSection({ t, route = [], mapsUrl, optimizeMapsUrl, onToggleOptimize, optimized }) {
   if (!route.length && !mapsUrl) return null;
   return (
     <View style={styles.routeBox}>
-      <Text style={styles.section}>{title}</Text>
-      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      <Text style={styles.section}>
+        {t('org.tasks.driverRouteTitle', null, 'Driver route')}
+      </Text>
+      <Text style={styles.hint}>
+        {t(
+          'org.tasks.driverRouteHintFull',
+          null,
+          'Outbound loadings → unloadings, then return loadings → unloadings. One Maps link for the full trip.',
+        )}
+      </Text>
+      {onToggleOptimize ? (
+        <Pressable
+          onPress={onToggleOptimize}
+          style={[styles.chip, optimized && styles.chipActive, styles.optimizeChip]}
+        >
+          <Text style={[styles.chipText, optimized && styles.chipTextActive]}>
+            {optimized
+              ? t('org.tasks.routeOptimizedOn', null, 'Optimized order (nearest)')
+              : t('org.tasks.routeOptimize', null, 'Optimize order')}
+          </Text>
+        </Pressable>
+      ) : null}
       {route.map((step) => (
         <View key={`${step.role}-${step.shipment_id}-${step.route_index}`} style={styles.routeRow}>
           <Text style={styles.routeIndex}>{step.route_index}.</Text>
           <View style={styles.routeBody}>
             <Text style={styles.routeRole}>
-              {step.role === 'loading'
-                ? t('org.tasks.routePickup', null, 'Pickup')
-                : t('org.tasks.routeDelivery', null, 'Delivery')}
+              {roleLabel(t, step.role)}
               {step.company_name ? ` · ${step.company_name}` : ''}
             </Text>
             <Text style={styles.stopAddress}>{step.address}</Text>
             {step.cargo_summary ? (
               <Text style={styles.stopMeta}>{step.cargo_summary}</Text>
             ) : null}
-            <Pressable onPress={() => openUrl(step.maps_url)} style={styles.linkBtn}>
-              <Text style={styles.linkText}>
-                {t('org.tasks.openInMaps', null, 'Open in Maps')}
-              </Text>
-            </Pressable>
           </View>
         </View>
       ))}
-      {mapsUrl ? (
+      {(optimized ? optimizeMapsUrl : mapsUrl) || mapsUrl ? (
         <Button
           mode="contained"
           icon="map"
-          onPress={() => openUrl(mapsUrl)}
+          onPress={() => openUrl((optimized && optimizeMapsUrl) || mapsUrl)}
           style={styles.mapBtn}
         >
           {t('org.tasks.openRouteInMaps', null, 'Open full route in Maps')}
@@ -394,17 +545,17 @@ function DriverRouteSection({ t, title, hint, route = [], mapsUrl }) {
 }
 
 /**
- * Shipments editor: each товар has loading + unloading + cargo.
- * Separate driver route (all pickups then all deliveries).
+ * Shipments editor: each commodity has loading + unloading + cargo.
+ * Single full driver route (outbound + return) for Maps.
  */
 export default function WorkOrderShipmentsEditor({
   t,
   outboundShipments = [],
   returnShipments = [],
   driverRoute = [],
-  returnDriverRoute = [],
+  driverRouteOptimized = [],
   driverRouteMapsUrl = '',
-  returnDriverRouteMapsUrl = '',
+  driverRouteOptimizedMapsUrl = '',
   remainingSpace = null,
   loadType = 'groupage',
   onLoadTypeChange,
@@ -418,6 +569,12 @@ export default function WorkOrderShipmentsEditor({
   const [draftReturn, setDraftReturn] = useState(emptyDraft('return'));
   const [showAddOutbound, setShowAddOutbound] = useState(false);
   const [showAddReturn, setShowAddReturn] = useState(false);
+  const [optimized, setOptimized] = useState(false);
+
+  const activeRoute = useMemo(() => {
+    if (optimized && driverRouteOptimized?.length) return driverRouteOptimized;
+    return driverRoute;
+  }, [optimized, driverRoute, driverRouteOptimized]);
 
   const canSubmit = (draft) =>
     String(draft.loading?.address || '').trim() &&
@@ -492,6 +649,14 @@ export default function WorkOrderShipmentsEditor({
     );
   };
 
+  const overloaded = Boolean(
+    remainingSpace?.is_overloaded || remainingSpace?.overloaded,
+  );
+  const used =
+    remainingSpace?.capacity_used ?? remainingSpace?.loaded_euro_pallets;
+  const total =
+    remainingSpace?.capacity_total ?? remainingSpace?.capacity_euro_pallets;
+
   return (
     <View>
       {onLoadTypeChange && editable ? (
@@ -558,33 +723,27 @@ export default function WorkOrderShipmentsEditor({
         setShowAddOutbound,
       )}
 
-      <DriverRouteSection
-        t={t}
-        title={t('org.tasks.driverRouteTitle', null, 'Driver route')}
-        hint={t(
-          'org.tasks.driverRouteHint',
-          null,
-          'All pickups first, then all deliveries.',
-        )}
-        route={driverRoute}
-        mapsUrl={driverRouteMapsUrl}
-      />
-
       {remainingSpace?.capacity_euro_pallets != null ? (
-        <View style={styles.spaceBox}>
+        <View style={[styles.spaceBox, overloaded && styles.spaceBoxOverload]}>
           <Text style={styles.section}>
             {t('org.tasks.remainingSpaceTitle', null, 'Trailer space')}
           </Text>
+          {overloaded ? (
+            <Text style={styles.overloadBadge}>
+              {t('org.tasks.overloaded', null, 'Overloaded')}
+            </Text>
+          ) : (
+            <Text style={styles.okBadge}>
+              {t('org.tasks.notOverloaded', null, 'Within capacity')}
+            </Text>
+          )}
           <Text style={styles.stopMeta}>
             {remainingSpace.trailer_display_name
               ? `${remainingSpace.trailer_display_name} · `
               : ''}
-            {t('org.tasks.remainingSpaceCapacity', null, 'Capacity')}:{' '}
-            {remainingSpace.capacity_euro_pallets}{' '}
+            {t('org.tasks.capacityUsedTotal', null, 'Used / total')}:{' '}
+            {used != null ? used : '—'} / {total != null ? total : '—'}{' '}
             {t('org.tasks.euroPalletsShort', null, 'EP')}
-            {remainingSpace.loaded_euro_pallets != null
-              ? ` · ${t('org.tasks.remainingSpaceLoaded', null, 'Loaded')}: ${remainingSpace.loaded_euro_pallets}`
-              : ''}
             {remainingSpace.remaining_euro_pallets != null
               ? ` · ${t('org.tasks.remainingSpaceLeft', null, 'Remaining')}: ${remainingSpace.remaining_euro_pallets}`
               : ''}
@@ -630,9 +789,15 @@ export default function WorkOrderShipmentsEditor({
 
       <DriverRouteSection
         t={t}
-        title={t('org.tasks.returnDriverRouteTitle', null, 'Return driver route')}
-        route={returnDriverRoute}
-        mapsUrl={returnDriverRouteMapsUrl}
+        route={activeRoute}
+        mapsUrl={driverRouteMapsUrl}
+        optimizeMapsUrl={driverRouteOptimizedMapsUrl}
+        optimized={optimized}
+        onToggleOptimize={
+          driverRouteOptimized?.length
+            ? () => setOptimized((v) => !v)
+            : undefined
+        }
       />
     </View>
   );
@@ -735,6 +900,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     backgroundColor: '#fff',
   },
+  dimRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  dimInput: {
+    flex: 1,
+  },
   addBtn: {
     alignSelf: 'flex-start',
     marginBottom: 12,
@@ -774,13 +946,36 @@ const styles = StyleSheet.create({
   spaceBox: {
     marginTop: 8,
     marginBottom: 8,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  spaceBoxOverload: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  overloadBadge: {
+    color: '#B91C1C',
+    fontWeight: '800',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  okBadge: {
+    color: '#047857',
+    fontWeight: '700',
+    fontSize: 13,
+    marginBottom: 4,
   },
   loadTypeRow: {
     marginBottom: 12,
   },
   chipRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
+    marginBottom: 8,
   },
   chip: {
     paddingHorizontal: 12,
@@ -801,5 +996,9 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#0F766E',
+  },
+  optimizeChip: {
+    alignSelf: 'flex-start',
+    marginBottom: 10,
   },
 });
