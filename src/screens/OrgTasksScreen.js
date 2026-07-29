@@ -10,6 +10,7 @@ import OrgAppHeader from '../components/org/OrgAppHeader';
 import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePicker';
 import {
   attachWorkOrderMedia,
+  confirmWorkOrderMaterialIssue,
   createWorkOrderExpense,
   createWorkOrderStop,
   deleteWorkOrder,
@@ -49,13 +50,6 @@ const TASK_TABS = [
   { id: 'open', labelKey: 'org.tasks.tabs.open', fallback: 'Open' },
   { id: 'completed', labelKey: 'org.tasks.tabs.completed', fallback: 'Completed' },
   { id: 'all', labelKey: 'org.tasks.tabs.all', fallback: 'All' },
-];
-
-const EXPENSE_TYPES = [
-  { id: 'fuel', labelKey: 'org.tasks.expenseTypes.fuel', fallback: 'Fuel' },
-  { id: 'toll', labelKey: 'org.tasks.expenseTypes.toll', fallback: 'Toll' },
-  { id: 'parking', labelKey: 'org.tasks.expenseTypes.parking', fallback: 'Parking' },
-  { id: 'other', labelKey: 'org.tasks.expenseTypes.other', fallback: 'Other' },
 ];
 
 function isOpenTaskStatus(status) {
@@ -577,10 +571,15 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [taskActualKm, setTaskActualKm] = useState('');
   const [taskFuelStart, setTaskFuelStart] = useState('');
   const [taskFuelEnd, setTaskFuelEnd] = useState('');
+  const [taskOdometerStart, setTaskOdometerStart] = useState('');
+  const [taskOdometerEnd, setTaskOdometerEnd] = useState('');
   const [taskLoadTons, setTaskLoadTons] = useState('');
   const [showExtraMaterials, setShowExtraMaterials] = useState(false);
   const [extraMaterialSearch, setExtraMaterialSearch] = useState('');
-  const [expenseType, setExpenseType] = useState('fuel');
+  const [showManualExpense, setShowManualExpense] = useState(false);
+  const [manualExpenseNote, setManualExpenseNote] = useState('');
+  const [manualExpenseAmount, setManualExpenseAmount] = useState('');
+  const [confirmIssueDrafts, setConfirmIssueDrafts] = useState({});
   const [uomUnits, setUomUnits] = useState([]);
   const [accessToken, setAccessToken] = useState('');
 
@@ -693,8 +692,14 @@ export default function OrgTasksScreen({ navigation, route }) {
           setTaskActualKm(detail.actual_km != null ? String(detail.actual_km) : '');
           setTaskFuelStart(detail.fuel_start != null ? String(detail.fuel_start) : '');
           setTaskFuelEnd(detail.fuel_end != null ? String(detail.fuel_end) : '');
+          setTaskOdometerStart(detail.odometer_start != null ? String(detail.odometer_start) : '');
+          setTaskOdometerEnd(detail.odometer_end != null ? String(detail.odometer_end) : '');
           setTaskLoadTons(detail.load_tons != null ? String(detail.load_tons) : '');
           setLeftoverDrafts(buildLeftoverDrafts(detail.operations, detail.materials));
+          setConfirmIssueDrafts({});
+          setShowManualExpense(false);
+          setManualExpenseNote('');
+          setManualExpenseAmount('');
         }
       } catch (e) {
         if (!cancelled) {
@@ -769,6 +774,8 @@ export default function OrgTasksScreen({ navigation, route }) {
     setTaskActualKm(updated.actual_km != null ? String(updated.actual_km) : '');
     setTaskFuelStart(updated.fuel_start != null ? String(updated.fuel_start) : '');
     setTaskFuelEnd(updated.fuel_end != null ? String(updated.fuel_end) : '');
+    setTaskOdometerStart(updated.odometer_start != null ? String(updated.odometer_start) : '');
+    setTaskOdometerEnd(updated.odometer_end != null ? String(updated.odometer_end) : '');
     setTaskLoadTons(updated.load_tons != null ? String(updated.load_tons) : '');
     setLeftoverDrafts(buildLeftoverDrafts(updated.operations, updated.materials));
   };
@@ -783,6 +790,16 @@ export default function OrgTasksScreen({ navigation, route }) {
       payload.fuel_end = String(taskFuelEnd).trim();
     } else if (selected?.fuel_end != null) {
       payload.fuel_end = null;
+    }
+    if (String(taskOdometerStart || '').trim() !== '') {
+      payload.odometer_start = String(taskOdometerStart).trim();
+    } else if (selected?.odometer_start != null) {
+      payload.odometer_start = null;
+    }
+    if (String(taskOdometerEnd || '').trim() !== '') {
+      payload.odometer_end = String(taskOdometerEnd).trim();
+    } else if (selected?.odometer_end != null) {
+      payload.odometer_end = null;
     }
     if (String(taskLoadTons || '').trim() !== '') {
       payload.load_tons = String(taskLoadTons).trim();
@@ -1011,7 +1028,7 @@ export default function OrgTasksScreen({ navigation, route }) {
       setAccessToken(token || '');
       const compressed = await compressImageForUpload(picked);
       const form = new FormData();
-      form.append('expense_type', expenseType || 'fuel');
+      form.append('expense_type', 'other');
       const file = compressed?.file;
       if (file) {
         form.append('file', file, compressed.fileName || 'receipt.jpg');
@@ -1058,6 +1075,74 @@ export default function OrgTasksScreen({ navigation, route }) {
         t('org.tasks.expensesTitle', null, 'Road expenses'),
         e.message || t('org.tasks.expenseReceiptError', null, 'Could not pick receipt.'),
       );
+    }
+  };
+
+  const submitManualExpense = async () => {
+    if (!orgId || !selected?.id) return;
+    const note = String(manualExpenseNote || '').trim();
+    const amount = String(manualExpenseAmount || '').trim().replace(',', '.');
+    if (!note && !amount) {
+      Alert.alert(
+        t('org.tasks.expensesTitle', null, 'Road expenses'),
+        t(
+          'org.tasks.expenseManualRequired',
+          null,
+          'Enter a description and/or amount (with VAT).',
+        ),
+      );
+      return;
+    }
+    if (amount && Number.isNaN(Number(amount))) {
+      Alert.alert(
+        t('org.tasks.expensesTitle', null, 'Road expenses'),
+        t('org.tasks.expenseAmountInvalid', null, 'Enter a valid amount.'),
+      );
+      return;
+    }
+    setBusyAction(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const payload = { expense_type: 'other', note };
+      if (amount) payload.amount = amount;
+      await createWorkOrderExpense(token, orgId, selected.id, payload);
+      setManualExpenseNote('');
+      setManualExpenseAmount('');
+      setShowManualExpense(false);
+      await refreshSelectedDetail();
+    } catch (e) {
+      Alert.alert(
+        t('org.tasks.expensesTitle', null, 'Road expenses'),
+        e.message || t('org.tasks.expenseError', null, 'Could not add expense.'),
+      );
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const confirmMaterialIssue = async (issue) => {
+    if (!orgId || !selected?.id || !issue?.id) return;
+    const draft = confirmIssueDrafts[issue.id] || {};
+    const received =
+      String(draft.received_qty || '').trim() ||
+      String(issue.issued_qty || '').trim() ||
+      '';
+    const odometer = String(draft.odometer_km || '').trim();
+    setBusyAction(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const payload = {};
+      if (received) payload.received_qty = received;
+      if (odometer) payload.odometer_km = odometer;
+      await confirmWorkOrderMaterialIssue(token, orgId, selected.id, issue.id, payload);
+      await refreshSelectedDetail();
+    } catch (e) {
+      Alert.alert(
+        t('org.tasks.depotConfirmTitle', null, 'Confirm depot fuel'),
+        e.message || t('org.tasks.depotConfirmError', null, 'Could not confirm receipt.'),
+      );
+    } finally {
+      setBusyAction(false);
     }
   };
 
@@ -1684,7 +1769,11 @@ export default function OrgTasksScreen({ navigation, route }) {
                 );
               })}
 
-              {(canShowEndButton(selected) || selected.status === 'in_progress') &&
+              {(selected.status !== 'done' &&
+                selected.status !== 'cancelled' &&
+                (canShowEndButton(selected) ||
+                  selected.status === 'in_progress' ||
+                  taskNeedsFuelTank(selected))) &&
               (taskNeedsMachineHours(selected) ||
                 taskNeedsKm(selected) ||
                 taskNeedsFuelTank(selected)) ? (
@@ -1705,7 +1794,8 @@ export default function OrgTasksScreen({ navigation, route }) {
                           'Enter machine hours and/or total km once for the whole work card. Fuel suggestions use these totals — not per-operation hour fields.',
                         )}
                   </Text>
-                  {taskNeedsMachineHours(selected) ? (
+                  {(canShowEndButton(selected) || selected.status === 'in_progress') &&
+                  taskNeedsMachineHours(selected) ? (
                     <TextInput
                       label={t(
                         'org.tasks.taskMachineHours',
@@ -1720,7 +1810,10 @@ export default function OrgTasksScreen({ navigation, route }) {
                       textColor={ON_CARD}
                     />
                   ) : null}
-                  {taskNeedsKm(selected) || taskNeedsFuelTank(selected) ? (
+                  {(canShowEndButton(selected) ||
+                    selected.status === 'in_progress' ||
+                    taskNeedsFuelTank(selected)) &&
+                  (taskNeedsKm(selected) || taskNeedsFuelTank(selected)) ? (
                     <TextInput
                       label={t('org.tasks.taskTotalKm', null, 'Total km driven (task)')}
                       value={taskActualKm}
@@ -1738,11 +1831,45 @@ export default function OrgTasksScreen({ navigation, route }) {
                       </Text>
                       <Text style={styles.opMeta}>
                         {t(
-                          'org.tasks.fuelTankHint',
-                          null,
-                          'Start + depot issue + road receipt photos − end leftover. System computes burn vs norm.',
+                          'org.tasks.fuelOnTruck',
+                          {
+                            liters:
+                              selected.on_truck_liters ||
+                              selected.fuel_summary?.on_truck_liters ||
+                              '0',
+                          },
+                          `Fuel on truck now: ${
+                            selected.on_truck_liters ||
+                            selected.fuel_summary?.on_truck_liters ||
+                            '0'
+                          } L`,
                         )}
                       </Text>
+                      <Text style={styles.opMeta}>
+                        {t(
+                          'org.tasks.fuelTankHint',
+                          null,
+                          'Start + confirmed depot + road receipts − end. System computes burn vs norm.',
+                        )}
+                      </Text>
+                      <TextInput
+                        label={t('org.tasks.odometerStart', null, 'Odometer start (km)')}
+                        value={taskOdometerStart}
+                        onChangeText={setTaskOdometerStart}
+                        mode="outlined"
+                        keyboardType="decimal-pad"
+                        style={styles.input}
+                        textColor={ON_CARD}
+                      />
+                      <TextInput
+                        label={t('org.tasks.odometerEnd', null, 'Odometer end (km)')}
+                        value={taskOdometerEnd}
+                        onChangeText={setTaskOdometerEnd}
+                        mode="outlined"
+                        keyboardType="decimal-pad"
+                        style={styles.input}
+                        textColor={ON_CARD}
+                      />
                       <TextInput
                         label={t('org.tasks.fuelStart', null, 'Fuel start (L in tank)')}
                         value={taskFuelStart}
@@ -1776,7 +1903,7 @@ export default function OrgTasksScreen({ navigation, route }) {
                             {t(
                               'org.tasks.fuelEquationHint',
                               null,
-                              'Burn = start + depot + road receipts − end. Compare to norm.',
+                              'Burn = start + confirmed depot + road receipts − end. Compare to norm.',
                             )}
                           </Text>
                           <Text style={styles.opMeta}>
@@ -1785,9 +1912,22 @@ export default function OrgTasksScreen({ navigation, route }) {
                               {
                                 liters: selected.fuel_summary.depot_liters || '0',
                               },
-                              `Depot issued: ${selected.fuel_summary.depot_liters || '0'} L`,
+                              `Depot confirmed: ${selected.fuel_summary.depot_liters || '0'} L`,
                             )}
                           </Text>
+                          {Number(selected.fuel_summary.depot_pending_liters || 0) > 0 ? (
+                            <Text style={styles.opMeta}>
+                              {t(
+                                'org.tasks.depotPendingSum',
+                                {
+                                  liters: selected.fuel_summary.depot_pending_liters || '0',
+                                },
+                                `Depot pending confirm: ${
+                                  selected.fuel_summary.depot_pending_liters || '0'
+                                } L`,
+                              )}
+                            </Text>
+                          ) : null}
                           <Text style={styles.opMeta}>
                             {t(
                               'org.tasks.fuelReceiptsSum',
@@ -1841,7 +1981,11 @@ export default function OrgTasksScreen({ navigation, route }) {
                 </>
               ) : null}
 
-              {(canShowEndButton(selected) || selected.status === 'in_progress') &&
+              {(canShowEndButton(selected) ||
+                selected.status === 'in_progress' ||
+                taskNeedsFuelTank(selected)) &&
+              selected.status !== 'done' &&
+              selected.status !== 'cancelled' &&
               (selected.operations || []).length > 0 ? (
                 <Button
                   mode="outlined"
@@ -2011,32 +2155,100 @@ export default function OrgTasksScreen({ navigation, route }) {
                   <Text style={styles.fieldLabel}>
                     {t('org.tasks.issueLogTitle', null, 'Issue log')}
                   </Text>
-                  {(selected.material_issues || []).map((issue) => (
-                    <Text key={issue.id} style={styles.opMeta}>
-                      {formatIssueAudit(issue, t)}
-                      {(issue.lines || [])
-                        .filter((line) => line.leftover_entered_by || line.leftover_entered_at)
-                        .map((line) => {
-                          const who =
-                            line.leftover_entered_by?.display_name ||
-                            line.leftover_entered_by?.email ||
-                            (line.leftover_entered_by_id != null
-                              ? `#${line.leftover_entered_by_id}`
-                              : '');
-                          const when = line.leftover_entered_at
-                            ? String(line.leftover_entered_at).slice(0, 16).replace('T', ' ')
-                            : '';
-                          return (
-                            `\n${t(
-                              'org.tasks.leftoverAudit',
-                              { name: who, time: when, qty: line.leftover_qty },
-                              `Leftover ${line.leftover_qty ?? '—'} by ${who || '—'} ${when}`,
-                            )}`
-                          );
-                        })
-                        .join('')}
-                    </Text>
-                  ))}
+                  {(selected.material_issues || []).map((issue) => {
+                    const draft = confirmIssueDrafts[issue.id] || {};
+                    const pending = Boolean(issue.pending_confirm || issue.status === 'issued');
+                    return (
+                      <View key={issue.id} style={styles.opRow}>
+                        <Text style={styles.opMeta}>
+                          {formatIssueAudit(issue, t)}
+                          {pending
+                            ? ` · ${t('org.tasks.depotPendingBadge', null, 'Pending driver confirm')}`
+                            : issue.status === 'confirmed'
+                              ? ` · ${t('org.tasks.depotConfirmedBadge', null, 'Confirmed')}`
+                              : ''}
+                        </Text>
+                        {pending && selected.status !== 'done' && selected.status !== 'cancelled' ? (
+                          <>
+                            <Text style={styles.opMeta}>
+                              {t(
+                                'org.tasks.depotConfirmHint',
+                                {
+                                  qty: issue.issued_qty || '—',
+                                },
+                                `Warehouse poured ${issue.issued_qty || '—'} L. Confirm what you received (dashboard).`,
+                              )}
+                            </Text>
+                            <TextInput
+                              label={t(
+                                'org.tasks.depotReceivedQty',
+                                null,
+                                'Received litres (dashboard)',
+                              )}
+                              value={
+                                draft.received_qty != null
+                                  ? draft.received_qty
+                                  : issue.issued_qty != null
+                                    ? String(issue.issued_qty)
+                                    : ''
+                              }
+                              onChangeText={(value) =>
+                                setConfirmIssueDrafts((prev) => ({
+                                  ...prev,
+                                  [issue.id]: { ...(prev[issue.id] || {}), received_qty: value },
+                                }))
+                              }
+                              mode="outlined"
+                              keyboardType="decimal-pad"
+                              style={styles.input}
+                              textColor={ON_CARD}
+                            />
+                            <TextInput
+                              label={t(
+                                'org.tasks.depotConfirmOdometer',
+                                null,
+                                'Odometer at receive (km, optional)',
+                              )}
+                              value={draft.odometer_km || ''}
+                              onChangeText={(value) =>
+                                setConfirmIssueDrafts((prev) => ({
+                                  ...prev,
+                                  [issue.id]: { ...(prev[issue.id] || {}), odometer_km: value },
+                                }))
+                              }
+                              mode="outlined"
+                              keyboardType="decimal-pad"
+                              style={styles.input}
+                              textColor={ON_CARD}
+                            />
+                            <Button
+                              mode="contained"
+                              loading={busyAction}
+                              disabled={busyAction}
+                              onPress={() => confirmMaterialIssue(issue)}
+                              style={styles.secondaryBtn}
+                            >
+                              {t('org.tasks.depotConfirmCta', null, 'Confirm received')}
+                            </Button>
+                          </>
+                        ) : null}
+                        {issue.confirmation?.received_qty != null ? (
+                          <Text style={styles.opMeta}>
+                            {t(
+                              'org.tasks.depotReceivedRead',
+                              {
+                                qty: issue.confirmation.received_qty,
+                                odo: issue.confirmation.odometer_km || '—',
+                              },
+                              `Received ${issue.confirmation.received_qty} L · odo ${
+                                issue.confirmation.odometer_km || '—'
+                              }`,
+                            )}
+                          </Text>
+                        ) : null}
+                      </View>
+                    );
+                  })}
                 </>
               ) : null}
               {canManage && selected.status !== 'done' && selected.status !== 'cancelled' ? (
@@ -2344,25 +2556,9 @@ export default function OrgTasksScreen({ navigation, route }) {
                     {t(
                       'org.tasks.expensePhotosOnly',
                       null,
-                      'Add receipt photos (camera / gallery / PDF). Type is optional.',
+                      'Add receipt photos (camera / gallery / PDF), or enter an expense without a receipt.',
                     )}
                   </Text>
-                  <View style={styles.chipWrap}>
-                    {EXPENSE_TYPES.map((item) => {
-                      const active = expenseType === item.id;
-                      return (
-                        <Pressable
-                          key={item.id}
-                          onPress={() => setExpenseType(item.id)}
-                          style={[styles.chip, active && styles.chipActive]}
-                        >
-                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                            {t(item.labelKey, null, item.fallback)}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
                   <View style={styles.chipWrap}>
                     <Button
                       mode="contained"
@@ -2382,7 +2578,49 @@ export default function OrgTasksScreen({ navigation, route }) {
                     >
                       {t('org.tasks.expenseAddFromGallery', null, 'Gallery / PDF')}
                     </Button>
+                    <Button
+                      mode="outlined"
+                      disabled={busyAction}
+                      onPress={() => setShowManualExpense((v) => !v)}
+                      style={styles.secondaryBtn}
+                    >
+                      {t('org.tasks.expenseAddManual', null, 'Add manually')}
+                    </Button>
                   </View>
+                  {showManualExpense ? (
+                    <>
+                      <TextInput
+                        label={t('org.tasks.expenseNote', null, 'Description')}
+                        value={manualExpenseNote}
+                        onChangeText={setManualExpenseNote}
+                        mode="outlined"
+                        style={styles.input}
+                        textColor={ON_CARD}
+                      />
+                      <TextInput
+                        label={t(
+                          'org.tasks.expenseAmountVat',
+                          null,
+                          'Amount with VAT (e.g. 180.00)',
+                        )}
+                        value={manualExpenseAmount}
+                        onChangeText={setManualExpenseAmount}
+                        mode="outlined"
+                        keyboardType="decimal-pad"
+                        style={styles.input}
+                        textColor={ON_CARD}
+                      />
+                      <Button
+                        mode="contained"
+                        loading={busyAction}
+                        disabled={busyAction}
+                        onPress={submitManualExpense}
+                        style={styles.secondaryBtn}
+                      >
+                        {t('org.tasks.addExpense', null, 'Add expense')}
+                      </Button>
+                    </>
+                  ) : null}
                 </>
               ) : null}
             </AppCard>

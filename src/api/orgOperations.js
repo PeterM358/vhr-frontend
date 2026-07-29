@@ -262,6 +262,28 @@ export async function issueWorkOrderMaterials(token, organizationId, workOrderId
   return response.json();
 }
 
+export async function confirmWorkOrderMaterialIssue(
+  token,
+  organizationId,
+  workOrderId,
+  issueId,
+  payload,
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/material-issues/${issueId}/confirm/`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to confirm materials'));
+  return response.json();
+}
+
 export async function listWorkOrderExpenses(token, organizationId, workOrderId) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/expenses/`,

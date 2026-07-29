@@ -52,11 +52,15 @@ export default function ExpenseReceiptGallery({
         {(expenses || []).map((exp) => {
           const ref = exp.receipt_ref;
           const thumb = urls[exp.id];
-          const typeLabel = t(
-            `org.tasks.expenseTypes.${exp.expense_type}`,
-            null,
-            exp.expense_type,
-          );
+          const amountLabel =
+            exp.amount_minor != null
+              ? `${(Number(exp.amount_minor) / 100).toFixed(2)} ${exp.currency || 'BGN'}`
+              : '';
+          const caption =
+            exp.note ||
+            (ref
+              ? t(`org.tasks.expenseTypes.${exp.expense_type}`, null, exp.expense_type)
+              : t('org.tasks.expenseManualLabel', null, 'Manual'));
           return (
             <View key={exp.id} style={styles.item}>
               <Pressable
@@ -68,7 +72,7 @@ export default function ExpenseReceiptGallery({
                       .catch(() => {});
                     return;
                   }
-                  setPreview({ uri: thumb, label: typeLabel, id: exp.id });
+                  setPreview({ uri: thumb, label: caption, id: exp.id });
                 }}
                 style={styles.thumbBtn}
               >
@@ -77,17 +81,24 @@ export default function ExpenseReceiptGallery({
                 ) : (
                   <View style={[styles.thumb, styles.thumbPlaceholder]}>
                     <Text style={styles.placeholderText}>
-                      {isPdfRef(ref) ? 'PDF' : typeLabel}
+                      {ref ? (isPdfRef(ref) ? 'PDF' : caption) : amountLabel || '—'}
                     </Text>
                   </View>
                 )}
               </Pressable>
-              <Text style={styles.caption} numberOfLines={1}>
-                {typeLabel}
+              <Text style={styles.caption} numberOfLines={2}>
+                {caption}
               </Text>
-              <Text style={styles.fileName} numberOfLines={1}>
-                {fileLabel(ref)}
-              </Text>
+              {amountLabel ? (
+                <Text style={styles.fileName} numberOfLines={1}>
+                  {amountLabel}
+                </Text>
+              ) : null}
+              {ref ? (
+                <Text style={styles.fileName} numberOfLines={1}>
+                  {fileLabel(ref)}
+                </Text>
+              ) : null}
               {canDelete ? (
                 <Pressable onPress={() => onDelete?.(exp.id)}>
                   <Text style={styles.delete}>
