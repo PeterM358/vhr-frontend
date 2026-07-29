@@ -126,6 +126,65 @@ function materialBasisLabel(meta, outputUnitLbl, t) {
   return outputUnitLbl || t('org.operations.basisOutputShort', null, 'out');
 }
 
+/** Map warehouse / master unit_code onto operations UnitOfMeasure id. */
+function resolveMaterialOpsUnitId(mat, units) {
+  if (!mat) return null;
+  const direct = mat.ops_unit_id ?? mat.norm_unit_id ?? mat.unit_id;
+  if (direct != null && direct !== '') {
+    const n = Number(direct);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const code = String(mat.unit_code || mat.unit_symbol || '')
+    .trim()
+    .toLowerCase();
+  if (!code || !Array.isArray(units)) return null;
+  const aliases = {
+    piece: 'pcs',
+    pc: 'pcs',
+    pcs: 'pcs',
+    бр: 'pcs',
+    kg: 'kg',
+    кг: 'kg',
+    g: 'g',
+    l: 'l',
+    lt: 'l',
+    liter: 'l',
+    litre: 'l',
+    ml: 'ml',
+  };
+  const want = aliases[code] || code;
+  const match = units.find((u) => {
+    const uc = String(u.code || '')
+      .trim()
+      .toLowerCase();
+    const us = String(u.symbol || '')
+      .trim()
+      .toLowerCase();
+    return uc === want || us === want || uc === code || us === code;
+  });
+  return match ? Number(match.id) : null;
+}
+
+function materialUnitDisplay(mat, findUnit, meta) {
+  const fromMeta = meta?.unitId ? findUnit(meta.unitId) : null;
+  if (fromMeta) return unitLabel(fromMeta);
+  const sym = String(mat?.unit_symbol || mat?.unit_code || '').trim();
+  return sym || '';
+}
+
+function emptyMaterialNorm(overrides = {}) {
+  return {
+    rate: '',
+    perQty: '1',
+    rateHours: '',
+    perHours: '1',
+    basis: 'output_unit',
+    unitId: null,
+    unitFromMaster: false,
+    ...overrides,
+  };
+}
+
 /** Hours field: digits + optional decimal only (no "per hour" text). */
 function sanitizeHoursInput(value) {
   const raw = String(value || '').replace(/,/g, '.');
@@ -188,12 +247,27 @@ function hydrateFromRow(row) {
   lines.forEach((line) => {
     const mid = Number(line.material_id);
     if (!mid) return;
-    materialNorms[mid] = {
-      rate: line.rate != null ? String(line.rate) : '',
-      perQty: line.per_qty != null ? String(line.per_qty) : '1',
-      basis: line.basis === 'work_hours' ? 'work_hours' : 'output_unit',
+    const basis = line.basis === 'work_hours' ? 'work_hours' : 'output_unit';
+    let rate = line.rate != null ? String(line.rate) : '';
+    let perQty = line.per_qty != null ? String(line.per_qty) : '1';
+    let rateHours = line.rate_hours != null ? String(line.rate_hours) : '';
+    let perHours = line.per_hours != null ? String(line.per_hours) : '1';
+    // Legacy: work_hours stored only in rate/per_qty — split into hour fields.
+    if (basis === 'work_hours' && !rateHours && rate) {
+      rateHours = rate;
+      perHours = perQty || '1';
+      rate = '';
+      perQty = '1';
+    }
+    materialNorms[mid] = emptyMaterialNorm({
+      rate,
+      perQty,
+      rateHours,
+      perHours,
+      basis,
       unitId: line.unit_id || null,
-    };
+      unitFromMaster: Boolean(line.unit_id),
+    });
   });
   // Legacy: apply global generic rate to every default SKU without a line rate.
   const legacyRate =
@@ -216,12 +290,27 @@ function hydrateFromRow(row) {
   materialIds.forEach((rawId) => {
     const mid = Number(rawId);
     if (!mid || materialNorms[mid]) return;
-    materialNorms[mid] = {
+    materialNorms[mid] = emptyMaterialNorm({
       rate: legacyRate,
       perQty: legacyPer,
       basis: 'output_unit',
       unitId: legacyUnit,
-    };
+    });
+  });
+  // Prefill unit from material master briefs when line had no unit_id.
+  const briefs = Array.isArray(row.default_materials) ? row.default_materials : [];
+  briefs.forEach((brief) => {
+    const mid = Number(brief.id);
+    if (!mid || !materialNorms[mid]) return;
+    if (materialNorms[mid].unitId) return;
+    const opsId = brief.ops_unit_id || brief.norm_unit_id;
+    if (opsId) {
+      materialNorms[mid] = {
+        ...materialNorms[mid],
+        unitId: Number(opsId),
+        unitFromMaster: true,
+      };
+    }
   });
   return {
     name: row.name || '',
@@ -298,18 +387,25 @@ function buildNormsPayload(form) {
     const ids = form.consumesMaterials ? (form.defaultMaterialIds || []).slice(0, 40) : [];
     const materialLines = ids.map((mid) => {
       const meta = (form.materialNorms && form.materialNorms[mid]) || {};
+      const rate = String(meta.rate || '').trim() || null;
+      const perQty = String(meta.perQty || '1').trim() || '1';
+      const rateHours = String(meta.rateHours || '').trim() || null;
+      const perHours = String(meta.perHours || '1').trim() || '1';
+      let basis = meta.basis === 'work_hours' ? 'work_hours' : 'output_unit';
+      if (rateHours && !rate) basis = 'work_hours';
+      else if (rate && !rateHours) basis = 'output_unit';
       return {
         material_id: mid,
-        rate: String(meta.rate || '').trim() || null,
-        per_qty: String(meta.perQty || form.normBasisQty || '1').trim() || '1',
-        basis: meta.basis === 'work_hours' ? 'work_hours' : 'output_unit',
+        rate,
+        per_qty: perQty,
+        rate_hours: rateHours,
+        per_hours: perHours,
+        basis,
         unit_id: meta.unitId || form.materialUnitId || form.normInputUnitId || null,
       };
     });
     // Keep a legacy generic rate from the first output_unit line for older clients.
-    const firstOutput = materialLines.find(
-      (line) => line.basis === 'output_unit' && line.rate,
-    );
+    const firstOutput = materialLines.find((line) => line.rate);
     if (firstOutput) {
       norms.generic = {
         rate: firstOutput.rate,
@@ -620,6 +716,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
 
   const toggleMaterial = (mat) => {
     const id = Number(mat.id);
+    const masterUnitId = resolveMaterialOpsUnitId(mat, units);
     setForm((prev) => {
       const exists = (prev.defaultMaterialIds || []).includes(id);
       const nextIds = exists
@@ -631,14 +728,18 @@ export default function OrgOperationsScreen({ navigation, route }) {
       } else if (!nextNorms[id]) {
         // Smart default: 1st SKU → output (m²/km); additional SKUs → work_hours (fuel).
         const alreadyHasOutput = Object.values(nextNorms).some(
-          (m) => (m?.basis || 'output_unit') === 'output_unit',
+          (m) => (m?.basis || 'output_unit') === 'output_unit' && String(m?.rate || '').trim(),
         );
-        nextNorms[id] = {
-          rate: prev.normRate || '',
-          perQty: prev.normBasisQty || '1',
-          basis: alreadyHasOutput ? 'work_hours' : 'output_unit',
-          unitId: prev.materialUnitId || prev.normInputUnitId || null,
-        };
+        const preferHours = alreadyHasOutput || Object.keys(nextNorms).length > 0;
+        nextNorms[id] = emptyMaterialNorm({
+          rate: preferHours ? '' : prev.normRate || '',
+          perQty: preferHours ? '1' : prev.normBasisQty || '1',
+          rateHours: preferHours ? prev.normRate || '' : '',
+          perHours: '1',
+          basis: preferHours ? 'work_hours' : 'output_unit',
+          unitId: masterUnitId || prev.materialUnitId || prev.normInputUnitId || null,
+          unitFromMaster: Boolean(masterUnitId),
+        });
       }
       return {
         ...prev,
@@ -661,10 +762,9 @@ export default function OrgOperationsScreen({ navigation, route }) {
       materialNorms: {
         ...(prev.materialNorms || {}),
         [mid]: {
-          rate: '',
-          perQty: '1',
-          basis: 'output_unit',
-          unitId: prev.materialUnitId || prev.normInputUnitId || null,
+          ...emptyMaterialNorm({
+            unitId: prev.materialUnitId || prev.normInputUnitId || null,
+          }),
           ...((prev.materialNorms && prev.materialNorms[mid]) || {}),
           [key]: value,
         },
@@ -1146,7 +1246,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
               null,
               form.kind === 'transport'
                 ? 'Prefer km (+ optional hours). Fuel litres come from tank start/end + receipts on the task — not as the main report chip.'
-                : 'Select every unit the worker will fill on the task (e.g. m² + hours for a marking machine, or km + hours for transport).',
+                : 'Prefer m² (or km) on the operation. Working hours once on the task. Do not pick L here for paint leftovers — leftovers go on Materials.',
             )}
           </Text>
           {renderMultiReportUnitChips(outputUnits)}
@@ -1217,27 +1317,48 @@ export default function OrgOperationsScreen({ navigation, route }) {
         const parts = selectedIds
           .map((mid) => {
             const meta = (form.materialNorms && form.materialNorms[mid]) || {};
-            if (!String(meta.rate || '').trim()) return null;
             const mat =
               selectedMaterials.find((m) => Number(m.id) === Number(mid)) ||
               catalogRows.find((m) => Number(m.id) === Number(mid));
             const inputUnit =
+              materialUnitDisplay(mat, findUnit, meta) ||
               unitLabel(findUnit(meta.unitId)) ||
               unitLabel(findUnit(form.materialUnitId)) ||
               '';
-            const basisLabel = materialBasisLabel(meta, outputUnitLbl, t);
             const name = materialLabel(mat) || `#${mid}`;
-            return t(
-              'org.operations.materialNormLineSummary',
-              {
-                rate: meta.rate,
-                input: inputUnit,
-                per: meta.perQty || '1',
-                basis: basisLabel,
-                name,
-              },
-              `${meta.rate}${inputUnit ? ` ${inputUnit}` : ''} / ${meta.perQty || '1'} ${basisLabel} (${name})`,
-            );
+            const chunks = [];
+            if (String(meta.rate || '').trim()) {
+              chunks.push(
+                t(
+                  'org.operations.materialNormLineSummary',
+                  {
+                    rate: meta.rate,
+                    input: inputUnit,
+                    per: meta.perQty || '1',
+                    basis: outputUnitLbl,
+                    name,
+                  },
+                  `${meta.rate}${inputUnit ? ` ${inputUnit}` : ''} / ${meta.perQty || '1'} ${outputUnitLbl} (${name})`,
+                ),
+              );
+            }
+            if (String(meta.rateHours || '').trim()) {
+              const hLabel = t('org.operations.basisWorkHoursShort', null, 'h');
+              chunks.push(
+                t(
+                  'org.operations.materialNormLineSummary',
+                  {
+                    rate: meta.rateHours,
+                    input: inputUnit,
+                    per: meta.perHours || '1',
+                    basis: hLabel,
+                    name,
+                  },
+                  `${meta.rateHours}${inputUnit ? ` ${inputUnit}` : ''} / ${meta.perHours || '1'} ${hLabel} (${name})`,
+                ),
+              );
+            }
+            return chunks.length ? chunks.join(' · ') : null;
           })
           .filter(Boolean);
         return parts.length ? parts.join(' + ') : '';
@@ -1337,13 +1458,13 @@ export default function OrgOperationsScreen({ navigation, route }) {
                   const mat =
                     selectedMaterials.find((m) => Number(m.id) === Number(mid)) ||
                     catalogRows.find((m) => Number(m.id) === Number(mid));
-                  const meta = (form.materialNorms && form.materialNorms[mid]) || {
-                    rate: '',
-                    perQty: '1',
-                    basis: 'output_unit',
-                    unitId: null,
-                  };
+                  const meta = (form.materialNorms && form.materialNorms[mid]) || emptyMaterialNorm();
                   const basisIsHours = meta.basis === 'work_hours';
+                  const unitLbl =
+                    materialUnitDisplay(mat, findUnit, meta) ||
+                    t('org.operations.unitNone', null, 'None');
+                  // Lock unit from master when we resolved it; rare override via chips.
+                  const showUnitOverride = !meta.unitFromMaster || !meta.unitId;
                   return (
                     <View key={mid} style={styles.materialNormCard}>
                       <Text style={styles.opTitleInline}>
@@ -1360,14 +1481,21 @@ export default function OrgOperationsScreen({ navigation, route }) {
                         {t(
                           'org.operations.materialNormCardHint',
                           null,
-                          'Independent row — set rate and basis for this SKU only. Other SKUs keep their own norms.',
+                          'Two independent norms — paint/m² and fuel/hour stay separate when you switch basis. Unit comes from the warehouse material.',
+                        )}
+                      </Text>
+                      <Text style={styles.fieldLabel}>
+                        {t(
+                          'org.operations.materialNormOutputBlock',
+                          { unit: outputUnitLbl },
+                          `Per ${outputUnitLbl} (output)`,
                         )}
                       </Text>
                       <TextInput
                         label={t(
-                          'org.operations.materialNormRate',
-                          null,
-                          'Norm rate (e.g. 0.5)',
+                          'org.operations.materialNormRateOutput',
+                          { unit: unitLbl, output: outputUnitLbl },
+                          `Rate (e.g. 0.7 ${unitLbl} / ${outputUnitLbl})`,
                         )}
                         value={meta.rate || ''}
                         onChangeText={(value) =>
@@ -1379,19 +1507,11 @@ export default function OrgOperationsScreen({ navigation, route }) {
                         textColor={ON_CARD}
                       />
                       <TextInput
-                        label={
-                          basisIsHours
-                            ? t(
-                                'org.operations.materialNormPerHours',
-                                null,
-                                'Per working hours (e.g. 1)',
-                              )
-                            : t(
-                                'org.operations.materialNormPerOutput',
-                                { unit: outputUnitLbl },
-                                `Per output qty (e.g. 1 ${outputUnitLbl})`,
-                              )
-                        }
+                        label={t(
+                          'org.operations.materialNormPerOutput',
+                          { unit: outputUnitLbl },
+                          `Per output qty (e.g. 1 ${outputUnitLbl})`,
+                        )}
                         value={meta.perQty || '1'}
                         onChangeText={(value) =>
                           setMaterialNormField(mid, 'perQty', sanitizeDecimalInput(value))
@@ -1403,9 +1523,53 @@ export default function OrgOperationsScreen({ navigation, route }) {
                       />
                       <Text style={styles.fieldLabel}>
                         {t(
+                          'org.operations.materialNormHoursBlock',
+                          null,
+                          'Per working hour',
+                        )}
+                      </Text>
+                      <TextInput
+                        label={t(
+                          'org.operations.materialNormRateHours',
+                          { unit: unitLbl },
+                          `Rate (e.g. 2.5 ${unitLbl} / h)`,
+                        )}
+                        value={meta.rateHours || ''}
+                        onChangeText={(value) =>
+                          setMaterialNormField(mid, 'rateHours', sanitizeDecimalInput(value))
+                        }
+                        mode="outlined"
+                        keyboardType="decimal-pad"
+                        style={styles.input}
+                        textColor={ON_CARD}
+                      />
+                      <TextInput
+                        label={t(
+                          'org.operations.materialNormPerHours',
+                          null,
+                          'Per working hours (e.g. 1)',
+                        )}
+                        value={meta.perHours || '1'}
+                        onChangeText={(value) =>
+                          setMaterialNormField(mid, 'perHours', sanitizeDecimalInput(value))
+                        }
+                        mode="outlined"
+                        keyboardType="decimal-pad"
+                        style={styles.input}
+                        textColor={ON_CARD}
+                      />
+                      <Text style={styles.fieldLabel}>
+                        {t(
                           'org.operations.materialNormBasis',
                           null,
-                          'Basis for this SKU',
+                          'Active basis for this SKU',
+                        )}
+                      </Text>
+                      <Text style={styles.helper}>
+                        {t(
+                          'org.operations.materialNormBasisHelper',
+                          null,
+                          'Which rate is used for expected calc. Switching does not clear the other pair.',
                         )}
                       </Text>
                       <View style={styles.kindWrap}>
@@ -1425,7 +1589,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
                             {t(
                               'org.operations.basisOutputUnit',
                               { unit: outputUnitLbl },
-                              `Per ${outputUnitLbl} (output)`,
+                              `Use ${outputUnitLbl} rate`,
                             )}
                           </Text>
                         </Pressable>
@@ -1445,19 +1609,51 @@ export default function OrgOperationsScreen({ navigation, route }) {
                             {t(
                               'org.operations.basisWorkHours',
                               null,
-                              'Per working hour',
+                              'Use working-hour rate',
                             )}
                           </Text>
                         </Pressable>
                       </View>
                       <Text style={styles.fieldLabel}>
-                        {t('org.operations.materialUnit', null, 'Material unit (optional)')}
+                        {t('org.operations.materialUnitFromMaster', null, 'Material unit')}
                       </Text>
-                      {renderUnitChips(
-                        meta.unitId,
-                        (id) => setMaterialNormField(mid, 'unitId', id),
-                        inputUnits.length ? inputUnits : units,
-                      )}
+                      <Text style={styles.helper}>
+                        {t(
+                          'org.operations.materialUnitFromMasterHint',
+                          { unit: unitLbl },
+                          `From warehouse / material master: ${unitLbl}`,
+                        )}
+                      </Text>
+                      {showUnitOverride ? (
+                        <>
+                          <Text style={styles.helper}>
+                            {t(
+                              'org.operations.materialUnitOverride',
+                              null,
+                              'Override only if the master unit is missing:',
+                            )}
+                          </Text>
+                          {renderUnitChips(
+                            meta.unitId,
+                            (id) => {
+                              const midNum = Number(mid);
+                              setForm((prev) => ({
+                                ...prev,
+                                materialNorms: {
+                                  ...(prev.materialNorms || {}),
+                                  [midNum]: {
+                                    ...emptyMaterialNorm(),
+                                    ...((prev.materialNorms && prev.materialNorms[midNum]) || {}),
+                                    unitId: id,
+                                    unitFromMaster: false,
+                                  },
+                                },
+                              }));
+                            },
+                            inputUnits.length ? inputUnits : units,
+                          )}
+                        </>
+                      ) : null}
                     </View>
                   );
                 })
@@ -1507,17 +1703,30 @@ export default function OrgOperationsScreen({ navigation, route }) {
       const parts = selectedIdsReview
         .map((mid) => {
           const meta = (form.materialNorms && form.materialNorms[mid]) || {};
-          if (!String(meta.rate || '').trim()) return null;
           const mat =
             selectedMaterials.find((m) => Number(m.id) === Number(mid)) || { id: mid };
-          const basis = materialBasisLabel(meta, reviewOutputLbl, t);
           const inputUnit =
+            materialUnitDisplay(mat, findUnit, meta) ||
             unitLabel(findUnit(meta.unitId)) ||
             unitLabel(findUnit(form.materialUnitId)) ||
             '';
-          return `${materialLabel(mat)}: ${meta.rate}${inputUnit ? ` ${inputUnit}` : ''} / ${
-            meta.perQty || '1'
-          } ${basis}`;
+          const chunks = [];
+          if (String(meta.rate || '').trim()) {
+            chunks.push(
+              `${materialLabel(mat)}: ${meta.rate}${inputUnit ? ` ${inputUnit}` : ''} / ${
+                meta.perQty || '1'
+              } ${reviewOutputLbl}`,
+            );
+          }
+          if (String(meta.rateHours || '').trim()) {
+            const hLabel = t('org.operations.basisWorkHoursShort', null, 'h');
+            chunks.push(
+              `${materialLabel(mat)}: ${meta.rateHours}${inputUnit ? ` ${inputUnit}` : ''} / ${
+                meta.perHours || '1'
+              } ${hLabel}`,
+            );
+          }
+          return chunks.length ? chunks.join(' · ') : null;
         })
         .filter(Boolean);
       if (parts.length) rateLine = parts.join(' · ');

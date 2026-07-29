@@ -440,11 +440,29 @@ function materialLinesForOp(op) {
 }
 
 function computeLineSuggestedQty(line, { outputQty, workHours }) {
-  if (!line || line.rate == null || String(line.rate).trim() === '') return null;
-  const rate = Number(String(line.rate).replace(',', '.'));
-  const perQty = Number(String(line.per_qty != null ? line.per_qty : 1).replace(',', '.'));
-  if (!Number.isFinite(rate) || !Number.isFinite(perQty) || perQty === 0) return null;
+  if (!line) return null;
   const basis = String(line.basis || 'output_unit');
+  let rateRaw = null;
+  let perRaw = '1';
+  if (basis === 'work_hours') {
+    rateRaw = line.rate_hours != null && String(line.rate_hours).trim() !== ''
+      ? line.rate_hours
+      : line.rate;
+    perRaw = line.rate_hours != null && String(line.rate_hours).trim() !== ''
+      ? line.per_hours != null
+        ? line.per_hours
+        : 1
+      : line.per_qty != null
+        ? line.per_qty
+        : 1;
+  } else {
+    rateRaw = line.rate;
+    perRaw = line.per_qty != null ? line.per_qty : 1;
+  }
+  if (rateRaw == null || String(rateRaw).trim() === '') return null;
+  const rate = Number(String(rateRaw).replace(',', '.'));
+  const perQty = Number(String(perRaw).replace(',', '.'));
+  if (!Number.isFinite(rate) || !Number.isFinite(perQty) || perQty === 0) return null;
   if (basis === 'work_hours') {
     const hours = Number(String(workHours ?? '').replace(',', '.'));
     if (!Number.isFinite(hours)) return null;
@@ -471,11 +489,17 @@ function collectTaskDefaultMaterials(task) {
         label: brief.label || stripOldMaterialSuffix(brief.name || '') || `Material #${mid}`,
         part_number: brief.part_number || '',
         from_operations: true,
-        norm_rate: line.rate ?? brief.norm_rate,
-        norm_per_qty: line.per_qty || brief.norm_per_qty || '1',
+        norm_rate:
+          String(line.basis || '').toLowerCase() === 'work_hours'
+            ? line.rate_hours ?? line.rate ?? brief.norm_rate
+            : line.rate ?? brief.norm_rate,
+        norm_per_qty:
+          String(line.basis || '').toLowerCase() === 'work_hours'
+            ? line.per_hours || line.per_qty || brief.norm_per_qty || '1'
+            : line.per_qty || brief.norm_per_qty || '1',
         norm_basis: line.basis || brief.norm_basis || 'output_unit',
-        norm_unit_id: line.unit_id ?? brief.norm_unit_id,
-        unit_code: brief.unit_code || '',
+        norm_unit_id: line.unit_id ?? brief.norm_unit_id ?? brief.ops_unit_id,
+        unit_code: brief.unit_code || brief.unit_symbol || '',
       });
     });
   });

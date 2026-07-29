@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Multi-select report units + per-SKU norms payload invariants.
+ * Multi-select report units + per-SKU dual-basis norms payload invariants.
  * Run: node scripts/test-org-operation-report-units.js
  */
 
@@ -14,17 +14,24 @@ function buildNormsPayload(form) {
     const ids = form.consumesMaterials ? (form.defaultMaterialIds || []).slice(0, 40) : [];
     const materialLines = ids.map((mid) => {
       const meta = (form.materialNorms && form.materialNorms[mid]) || {};
+      const rate = String(meta.rate || '').trim() || null;
+      const perQty = String(meta.perQty || '1').trim() || '1';
+      const rateHours = String(meta.rateHours || '').trim() || null;
+      const perHours = String(meta.perHours || '1').trim() || '1';
+      let basis = meta.basis === 'work_hours' ? 'work_hours' : 'output_unit';
+      if (rateHours && !rate) basis = 'work_hours';
+      else if (rate && !rateHours) basis = 'output_unit';
       return {
         material_id: mid,
-        rate: String(meta.rate || '').trim() || null,
-        per_qty: String(meta.perQty || form.normBasisQty || '1').trim() || '1',
-        basis: meta.basis === 'work_hours' ? 'work_hours' : 'output_unit',
+        rate,
+        per_qty: perQty,
+        rate_hours: rateHours,
+        per_hours: perHours,
+        basis,
         unit_id: meta.unitId || form.materialUnitId || form.normInputUnitId || null,
       };
     });
-    const firstOutput = materialLines.find(
-      (line) => line.basis === 'output_unit' && line.rate,
-    );
+    const firstOutput = materialLines.find((line) => line.rate);
     if (firstOutput) {
       norms.generic = {
         rate: firstOutput.rate,
@@ -62,16 +69,53 @@ const norms = buildNormsPayload({
   normBasisQty: '1',
   normInputUnitId: null,
   materialNorms: {
-    11: { rate: '0.5', perQty: '1', basis: 'output_unit', unitId: 7 },
-    22: { rate: '3', perQty: '1', basis: 'work_hours', unitId: 9 },
+    11: {
+      rate: '0.7',
+      perQty: '1',
+      rateHours: '0.1',
+      perHours: '1',
+      basis: 'output_unit',
+      unitId: 7,
+    },
+    22: {
+      rate: '',
+      perQty: '1',
+      rateHours: '3',
+      perHours: '1',
+      basis: 'work_hours',
+      unitId: 9,
+    },
   },
 });
 
 assert.strictEqual(norms.materials.material_lines.length, 2);
 assert.strictEqual(norms.materials.material_lines[0].basis, 'output_unit');
+assert.strictEqual(norms.materials.material_lines[0].rate, '0.7');
+assert.strictEqual(norms.materials.material_lines[0].rate_hours, '0.1');
 assert.strictEqual(norms.materials.material_lines[1].basis, 'work_hours');
-assert.strictEqual(norms.generic.rate, '0.5');
+assert.strictEqual(norms.materials.material_lines[1].rate_hours, '3');
+assert.strictEqual(norms.generic.rate, '0.7');
 assert.notStrictEqual(norms.generic.rate, '3');
+
+// Switching active basis must not wipe the other pair.
+const switched = buildNormsPayload({
+  kind: 'road_marking',
+  consumesMaterials: true,
+  defaultMaterialIds: [11],
+  materialNorms: {
+    11: {
+      rate: '0.7',
+      perQty: '1',
+      rateHours: '0.1',
+      perHours: '1',
+      basis: 'work_hours',
+      unitId: 7,
+    },
+  },
+});
+assert.strictEqual(switched.materials.material_lines[0].rate, '0.7');
+assert.strictEqual(switched.materials.material_lines[0].rate_hours, '0.1');
+assert.strictEqual(switched.materials.material_lines[0].basis, 'work_hours');
 
 assert.deepStrictEqual(hydrateReportUnitIds({ report_unit_ids: [1, 2, 3] }), [1, 2, 3]);
 assert.deepStrictEqual(hydrateReportUnitIds({ unit_id: 42 }), [42]);
@@ -84,14 +128,12 @@ assert.ok(
   'EN must not insist on one output',
 );
 assert.ok(
-  /Multi-select|мултиизбор/i.test(en.org.operations.wizard.stepOutputHint) ||
-    /multi-select/i.test(en.org.operations.wizard.outputUnitHelper),
-  'EN must describe multi-select reports',
+  /m²|hours once|leftover/i.test(en.org.operations.wizard.outputUnitHelper),
+  'EN must hint m² on op / hours on task / leftovers on materials',
 );
 assert.ok(
-  /мултиизбор|Мултиизбор/i.test(bg.org.operations.wizard.stepOutputHint) ||
-    /всяка единица/i.test(bg.org.operations.wizard.outputUnitHelper),
-  'BG must describe multi-select reports',
+  /m²|часове|Материали/i.test(bg.org.operations.wizard.outputUnitHelper),
+  'BG must hint m² / hours / materials leftovers',
 );
 
 const opsSrc = fs.readFileSync(
@@ -100,6 +142,9 @@ const opsSrc = fs.readFileSync(
 );
 assert.ok(opsSrc.includes('report_unit_ids'), 'wizard must save report_unit_ids');
 assert.ok(opsSrc.includes('toggleReportUnit'), 'wizard must multi-toggle report units');
+assert.ok(opsSrc.includes('rateHours'), 'wizard must keep independent hour rates');
+assert.ok(opsSrc.includes('rate_hours'), 'wizard must persist rate_hours');
+assert.ok(opsSrc.includes('ops_unit_id') || opsSrc.includes('resolveMaterialOpsUnitId'), 'unit from master');
 assert.ok(!/Do not multi-select outputs/.test(opsSrc), 'old single-select copy removed');
 
 const tasksSrc = fs.readFileSync(
@@ -108,5 +153,6 @@ const tasksSrc = fs.readFileSync(
 );
 assert.ok(tasksSrc.includes('actual_by_unit'), 'tasks must send actual_by_unit');
 assert.ok(tasksSrc.includes('reportUnitsForOp'), 'tasks must render per report unit');
+assert.ok(tasksSrc.includes('rate_hours'), 'tasks suggestions must read rate_hours');
 
 console.log('org operation report units ok');
