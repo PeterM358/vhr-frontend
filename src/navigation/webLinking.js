@@ -1061,6 +1061,31 @@ export function getPartnerNavigationStateFromPath(path) {
       index: 0,
     };
   }
+  if (
+    pathPart === 'partner/organization/invoicing' ||
+    pathPart === 'partner/organization/invoicing/'
+  ) {
+    const params = {};
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) {
+      params.organizationId = organizationId;
+    }
+    return {
+      routes: [
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [
+              { name: 'OrgOverview' },
+              { name: 'OrgInvoicing', params: Object.keys(params).length ? params : undefined },
+            ],
+          },
+        },
+      ],
+      index: 0,
+    };
+  }
   const orgWorkforceMemberMatch = pathPart.match(
     /^partner\/organization\/workforce\/member\/([^/]+)$/,
   );

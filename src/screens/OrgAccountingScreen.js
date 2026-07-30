@@ -10,9 +10,14 @@ import OrgAppHeader from '../components/org/OrgAppHeader';
 import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePicker';
 import SimpleDonutChart from '../components/charts/SimpleDonutChart';
 import SimpleMetricBars from '../components/charts/SimpleMetricBars';
-import { getAccountingSummary } from '../api/orgOperations';
+import { getAccountingSummary, listWorkOrders } from '../api/orgOperations';
 import { resolveActiveOrganizationId } from '../utils/orgWorkspace';
-import { navigateToOrgHome, navigateToOrgWarehouse, navigateToOrgWorkforce } from '../navigation/webNavigation';
+import {
+  navigateToOrgHome,
+  navigateToOrgInvoicing,
+  navigateToOrgWarehouse,
+  navigateToOrgWorkforce,
+} from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
@@ -61,6 +66,7 @@ export default function OrgAccountingScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [summary, setSummary] = useState(null);
+  const [uninvoicedCount, setUninvoicedCount] = useState(0);
   const [month, setMonth] = useState(currentMonthIso());
   const [filterFrom, setFilterFrom] = useState(() => monthBounds(currentMonthIso()).from);
   const [filterTo, setFilterTo] = useState(() => monthBounds(currentMonthIso()).to);
@@ -91,8 +97,14 @@ export default function OrgAccountingScreen({ navigation, route }) {
       const params = {};
       if (filterFrom) params.from = filterFrom;
       if (filterTo) params.to = filterTo;
-      const data = await getAccountingSummary(token, resolved, params);
+      const [data, jobsRes] = await Promise.all([
+        getAccountingSummary(token, resolved, params),
+        listWorkOrders(token, resolved, { status: 'done', uninvoiced: true }).catch(() => ({
+          results: [],
+        })),
+      ]);
       setSummary(data);
+      setUninvoicedCount(Array.isArray(jobsRes?.results) ? jobsRes.results.length : 0);
     } catch (e) {
       setError(e.message || t('org.accounting.loadError', null, 'Could not load accounting.'));
       setSummary(null);
@@ -228,6 +240,31 @@ export default function OrgAccountingScreen({ navigation, route }) {
 
         {!loading && !error && summary ? (
           <>
+            <AppCard style={styles.card}>
+              <Text style={styles.section}>
+                {t('org.invoicing.uninvoicedTitle', null, 'Completed jobs ready to invoice')}
+              </Text>
+              <Text style={styles.hint}>
+                {uninvoicedCount > 0
+                  ? t(
+                      'org.accounting.uninvoicedCount',
+                      { count: uninvoicedCount },
+                      `${uninvoicedCount} completed job(s) waiting for an invoice.`,
+                    )
+                  : t(
+                      'org.accounting.uninvoicedNone',
+                      null,
+                      'No uninvoiced completed jobs right now.',
+                    )}
+              </Text>
+              <Button
+                mode="contained"
+                style={{ marginTop: 10 }}
+                onPress={() => navigateToOrgInvoicing(navigation, { orgId })}
+              >
+                {t('org.accounting.openInvoicing', null, 'Invoice jobs')}
+              </Button>
+            </AppCard>
             <AppCard style={styles.card}>
               <Text style={styles.section}>
                 {t('org.accounting.pulseTitle', null, 'Month pulse')}

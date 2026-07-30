@@ -150,6 +150,64 @@ export async function getAccountingSummary(token, organizationId, params = {}) {
   return response.json();
 }
 
+export async function listOrgInvoices(token, organizationId, params = {}) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/invoices/${buildQuery(params)}`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load invoices'));
+  return response.json();
+}
+
+export async function getOrgInvoice(token, organizationId, invoiceId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/invoices/${invoiceId}/`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load invoice'));
+  return response.json();
+}
+
+export async function draftInvoiceFromWorkOrders(token, organizationId, workOrderIds, notes = '') {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/invoices/draft-from-work-orders/`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ work_order_ids: workOrderIds, notes }),
+    },
+  );
+  if (!response.ok) await throwApiError(response, 'Failed to create invoice draft');
+  return response.json();
+}
+
+export async function issueOrgInvoice(token, organizationId, invoiceId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/invoices/${invoiceId}/issue/`,
+    {
+      method: 'POST',
+      headers: authHeaders(token),
+    },
+  );
+  if (!response.ok) await throwApiError(response, 'Failed to issue invoice');
+  return response.json();
+}
+
+export async function markOrgInvoicePaid(token, organizationId, invoiceId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/invoices/${invoiceId}/mark-paid/`,
+    {
+      method: 'POST',
+      headers: authHeaders(token),
+    },
+  );
+  if (!response.ok) await throwApiError(response, 'Failed to mark invoice paid');
+  return response.json();
+}
+
 export async function createWorkOrder(token, organizationId, payload) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/`,

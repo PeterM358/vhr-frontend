@@ -18,6 +18,7 @@ import {
   deleteWorkOrder,
   deleteWorkOrderExpense,
   deleteWorkOrderShipment,
+  draftInvoiceFromWorkOrders,
   endWorkOrder,
   getWorkOrder,
   issueWorkOrderMaterials,
@@ -38,6 +39,7 @@ import { resolveActiveOrganizationId } from '../utils/orgWorkspace';
 import {
   navigateToOrgCreateTask,
   navigateToOrgHome,
+  navigateToOrgInvoicing,
 } from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -1191,6 +1193,46 @@ export default function OrgTasksScreen({ navigation, route }) {
       replaceTask(updated);
       setEndWizardOpen(false);
       setWizardTask(null);
+      if (canManage && !updated?.has_issued_invoice) {
+        Alert.alert(
+          t('org.invoicing.promptTitle', null, 'Create invoice for this job?'),
+          t(
+            'org.invoicing.promptBody',
+            null,
+            'The job is done. Create an invoice draft now, or leave it uninvoiced for later (Accounting → Uninvoiced jobs).',
+          ),
+          [
+            {
+              text: t('org.invoicing.promptLater', null, 'Not now'),
+              style: 'cancel',
+            },
+            {
+              text: t('org.invoicing.promptYes', null, 'Yes'),
+              onPress: async () => {
+                try {
+                  await draftInvoiceFromWorkOrders(token, orgId, [task.id]);
+                  navigateToOrgInvoicing(navigation, {
+                    orgId,
+                    tab: 'invoices',
+                    workOrderIds: [task.id],
+                  });
+                } catch (invErr) {
+                  Alert.alert(
+                    t('org.invoicing.createErrorTitle', null, 'Invoice'),
+                    invErr.message ||
+                      t('org.invoicing.createError', null, 'Could not create invoice draft.'),
+                  );
+                  navigateToOrgInvoicing(navigation, {
+                    orgId,
+                    tab: 'uninvoiced',
+                    workOrderIds: [task.id],
+                  });
+                }
+              },
+            },
+          ],
+        );
+      }
     } catch (e) {
       Alert.alert(
         t('org.tasks.endTitle', null, 'End work'),

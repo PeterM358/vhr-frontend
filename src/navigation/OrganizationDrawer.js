@@ -19,6 +19,7 @@ import OrgCreateTaskScreen from '../screens/OrgCreateTaskScreen';
 import OrgProjectsScreen from '../screens/OrgProjectsScreen';
 import OrgWarehouseScreen from '../screens/OrgWarehouseScreen';
 import OrgAccountingScreen from '../screens/OrgAccountingScreen';
+import OrgInvoicingScreen from '../screens/OrgInvoicingScreen';
 import OrgLegalEntityScreen from '../screens/OrgLegalEntityScreen';
 import OrgCalendarScreen from '../screens/OrgCalendarScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
@@ -44,6 +45,7 @@ import {
   navigateToOrgAccounting,
   navigateToOrgCalendar,
   navigateToOrgFleet,
+  navigateToOrgInvoicing,
   navigateToOrgLegalEntity,
   navigateToOrgNetwork,
   navigateToOrgOperations,
@@ -210,6 +212,16 @@ function CustomDrawerContent(props) {
       seen.add('OrgAccounting');
     }
 
+    if (canManageOps && !seen.has('OrgInvoicing')) {
+      items.push({
+        key: 'invoicing',
+        route: 'OrgInvoicing',
+        label: t('org.nav.invoicing', null, 'Invoicing'),
+        icon: 'receipt',
+      });
+      seen.add('OrgInvoicing');
+    }
+
     return items;
   }, [canManageOps, isDriver, org, t]);
 
@@ -250,6 +262,10 @@ function CustomDrawerContent(props) {
     }
     if (normalized === 'OrgAccounting') {
       navigateToOrgAccounting(navigation, { orgId: org?.id });
+      return;
+    }
+    if (normalized === 'OrgInvoicing') {
+      navigateToOrgInvoicing(navigation, { orgId: org?.id });
       return;
     }
     if (normalized === 'OrgLegalEntity') {
@@ -441,6 +457,7 @@ export default function OrganizationDrawer() {
       <Drawer.Screen name="OrgProjects" component={OrgProjectsScreen} />
       <Drawer.Screen name="OrgWarehouse" component={OrgWarehouseScreen} />
       <Drawer.Screen name="OrgAccounting" component={OrgAccountingScreen} />
+      <Drawer.Screen name="OrgInvoicing" component={OrgInvoicingScreen} />
       <Drawer.Screen name="OrgLegalEntity" component={OrgLegalEntityScreen} />
       <Drawer.Screen name="OrgCalendar" component={OrgCalendarScreen} />
       <Drawer.Screen name="OrgWorkforce" component={OrgWorkforceScreen} />

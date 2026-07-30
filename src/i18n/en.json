@@ -1125,6 +1125,38 @@
       "publicProfile": "Public profile",
       "invoicing": "Invoicing"
     },
+    "invoicing": {
+      "title": "Invoicing",
+      "loadError": "Could not load invoicing.",
+      "tabs": {
+        "uninvoiced": "Uninvoiced jobs",
+        "invoices": "Invoices"
+      },
+      "uninvoicedTitle": "Completed jobs ready to invoice",
+      "uninvoicedHint": "Select 2 or more jobs from the same project/customer to create one invoice. Example: 4 loads done — pick any 2.",
+      "emptyUninvoiced": "No uninvoiced completed jobs",
+      "emptyUninvoicedHint": "When a job is marked Done, it appears here until invoiced.",
+      "emptyInvoices": "No invoices yet",
+      "emptyInvoicesHint": "Create a draft from completed uninvoiced jobs.",
+      "invoiceOne": "Invoice this job",
+      "createCombined": "Create invoice for {count} jobs",
+      "createErrorTitle": "Invoice",
+      "createError": "Could not create invoice draft.",
+      "draftTitle": "Invoice draft",
+      "billTo": "Bill to",
+      "total": "Total",
+      "status": "Status",
+      "issue": "Issue invoice",
+      "markPaid": "Mark paid",
+      "issuedTitle": "Invoice issued",
+      "issuedBody": "Issued {number}",
+      "issueErrorTitle": "Issue invoice",
+      "issueError": "Could not issue invoice.",
+      "promptTitle": "Create invoice for this job?",
+      "promptBody": "The job is done. Create an invoice draft now, or leave it uninvoiced for later (Accounting → Uninvoiced jobs).",
+      "promptYes": "Yes",
+      "promptLater": "Not now"
+    },
     "accounting": {
       "title": "Accounting",
       "loadError": "Could not load accounting.",
@@ -1135,6 +1167,9 @@
       "filterTo": "To",
       "pulseTitle": "Month pulse",
       "periodSummary": "From–To: {area} · {km} · {hours} · {jobs} jobs",
+      "uninvoicedCount": "{count} completed job(s) waiting for an invoice.",
+      "uninvoicedNone": "No uninvoiced completed jobs right now.",
+      "openInvoicing": "Invoice jobs",
       "cards": {
         "workforce": "Workforce cost",
         "workforceHint": "{count} with salary set",
