@@ -1,0 +1,17 @@
+---
+description: Always document product changes — see backend docs and vhr rule
+alwaysApply: true
+---
+
+# Document product changes in MD
+
+Same rule as backend: product/architecture changes must land in `/Users/client/vhr/docs/` (canonical). Cross-link from frontend only if a FE-specific note is needed.
+
+Canonical:
+
+- `docs/unified-occupancy-board-vision.md`
+- `docs/org-fleet-planning-vision.md`
+- `docs/org-erp-launch-checklist.md`
+- `docs/implementation-priority.md`
+
+Do not rely on chat memory for ERP calendar / planning decisions.
