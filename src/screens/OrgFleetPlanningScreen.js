@@ -175,6 +175,7 @@ export default function OrgFleetPlanningScreen({ navigation, route }) {
   return (
     <ScreenBackground>
       <OrgAppHeader
+        mode="detail"
         title={t('org.fleetPlanning.title', null, 'Fleet planning')}
         onBack={onBack}
       />
