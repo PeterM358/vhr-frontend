@@ -19,6 +19,7 @@ import {
 } from '../../notifications/notificationDedup';
 import { getNotificationNavigationRef } from '../../notifications/notificationOpenRouting';
 import { navigateShopNotification } from '../../utils/shopNotificationRouting';
+import { navigateForClientNotification, isWorkOrderNotification } from '../../utils/clientNotificationRouting';
 import {
   notificationEventKey,
   shouldShowPartnerDeliveryBanner,
@@ -28,6 +29,11 @@ import { STORAGE_KEYS } from '../../constants/storageKeys';
 
 const DISPLAY_MS = 5000;
 
+/**
+ * Global foreground banner for important inbox events.
+ * Partners: shop critical/important alerts.
+ * Org / client: work-order boss/warehouse/driver events (badge + toast while app open).
+ */
 export default function PartnerInAppBannerHost() {
   const insets = useSafeAreaInsets();
   const { notifications } = useContext(WebSocketContext) || {};
@@ -83,14 +89,15 @@ export default function PartnerInAppBannerHost() {
   );
 
   useEffect(() => {
-    if (!isPartner) return;
     const latest = Array.isArray(notifications) ? notifications[0] : null;
     if (!latest) return;
     const key = notificationEventKey(latest);
     if (!key || key === lastHandledKey.current) return;
     lastHandledKey.current = key;
-    if (!shouldShowPartnerDeliveryBanner(latest)) return;
     if (latest.is_read) return;
+    const showPartner = isPartner && shouldShowPartnerDeliveryBanner(latest);
+    const showOrgWorkOrder = !isPartner && isWorkOrderNotification(latest);
+    if (!showPartner && !showOrgWorkOrder) return;
     show(latest);
   }, [notifications, show, isPartner]);
 
@@ -107,7 +114,12 @@ export default function PartnerInAppBannerHost() {
     if (!item) return;
     try {
       const nav = getNotificationNavigationRef()?.current;
-      if (nav) navigateShopNotification(nav, item);
+      if (!nav) return;
+      if (isPartner) {
+        navigateShopNotification(nav, item);
+      } else {
+        navigateForClientNotification(nav, item, { returnTo: 'OrgHome' });
+      }
     } catch {
       /* routing best-effort */
     }

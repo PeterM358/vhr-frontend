@@ -62,6 +62,9 @@ const WORK_ORDER_EVENTS = new Set([
   'work_order_start_overdue',
   'work_order_at_address',
   'work_order_course_finished',
+  'work_order_materials_prep',
+  'work_order_materials_issued',
+  'work_order_materials_confirmed',
 ]);
 
 export function isWorkOrderNotification(item) {

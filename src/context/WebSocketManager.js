@@ -213,6 +213,10 @@ export const WebSocketProvider = ({ children }) => {
             devLog('[notification] websocket inbox update', normalized.id);
           }
           setNotifications((prev) => mergeNotificationLists(prev, [normalized]));
+          // Optimistic badge bump so OrgAppHeader updates on every screen immediately.
+          if (normalized && normalized.is_read !== true) {
+            setUnreadCount((prev) => Math.max(0, (prev || 0) + 1));
+          }
           refreshUnreadFromRest();
         } catch (error) {
           safeError('WebSocket message parse failed', error);
@@ -280,8 +284,15 @@ export const WebSocketProvider = ({ children }) => {
       devLog(wsSkipReason());
     }
 
+    // When WS is off or drops, keep navbar badge fresh via REST (all org screens).
+    const pollMs = WS_ENABLED ? 60000 : 20000;
+    const pollId = setInterval(() => {
+      if (!cancelled) refreshUnreadFromRest();
+    }, pollMs);
+
     return () => {
       cancelled = true;
+      clearInterval(pollId);
       clearReconnectTimer();
       closeSocket({ intentional: true });
     };

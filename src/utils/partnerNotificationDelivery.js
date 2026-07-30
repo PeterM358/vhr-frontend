@@ -38,6 +38,21 @@ const IMPORTANT_EVENTS = new Set([
   'review',
   'offer_booking_cancelled',
   'promotion_booking_cancelled',
+  'work_order_assigned',
+  'work_order_updated',
+  'work_order_schedule_changed',
+  'work_order_seen_by_worker',
+  'work_order_started',
+  'work_order_not_started_overdue',
+  'work_order_ended',
+  'work_order_end_overdue',
+  'work_order_at_address',
+  'work_order_course_finished',
+  'work_order_start_nag',
+  'work_order_start_overdue',
+  'work_order_materials_prep',
+  'work_order_materials_issued',
+  'work_order_materials_confirmed',
 ]);
 
 export function notificationEventKey(item) {

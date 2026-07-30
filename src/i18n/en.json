@@ -1033,9 +1033,13 @@
       "driverDayPhaseEnd": "4 · End",
       "noStopsYet": "No stops on this task yet.",
       "taskTotalsTitle": "Task totals (once)",
-      "taskTotalsHint": "Enter machine hours and/or total km once for the whole work card. Fuel suggestions use these totals — not per-operation hour fields.",
+      "taskTotalsHint": "Enter machine hour-meter readings (previous → current) and/or total km once for the whole work card — not per marking operation. Per-op fields are for m² and similar outputs only.",
       "taskTotalsHintTransport": "Report km (and optional hours) once on the work card. Fuel = tank start/end + receipts — not a free liters guess.",
       "taskMachineHours": "Machine / working hours (task total)",
+      "taskHourMeterHint": "Enter previous and current machine hour-meter readings once for the whole task (not per marking). Hours worked = current − previous.",
+      "taskHoursPrevious": "Previous hour-meter reading",
+      "taskHoursCurrent": "Current hour-meter reading",
+      "taskHoursDelta": "Hours worked: {hours}",
       "taskTotalKm": "Total km driven (task)",
       "taskMachineHoursRead": "Machine hours: {hours}",
       "taskTotalKmRead": "Total km: {km}",
@@ -3114,7 +3118,10 @@
       "work_order_at_address": "Tap to open task",
       "work_order_course_finished": "Tap to open task",
       "work_order_start_nag": "Tap to open task",
-      "work_order_start_overdue": "Tap to open task"
+      "work_order_start_overdue": "Tap to open task",
+      "work_order_materials_prep": "Tap to open task",
+      "work_order_materials_issued": "Tap to confirm materials",
+      "work_order_materials_confirmed": "Tap to open task"
     },
     "templates": {
       "work_order_assigned": {
@@ -3164,6 +3171,18 @@
       "work_order_start_overdue": {
         "title": "Workers have not started",
         "body": "Assigned workers have not started the task."
+      },
+      "work_order_materials_prep": {
+        "title": "Prepare materials",
+        "body": "Prepare materials for a work card."
+      },
+      "work_order_materials_issued": {
+        "title": "Materials issued",
+        "body": "Confirm you received materials from warehouse."
+      },
+      "work_order_materials_confirmed": {
+        "title": "Materials received",
+        "body": "Driver confirmed materials receipt."
       },
       "reschedule_proposed": {
         "title": "Reschedule proposed",

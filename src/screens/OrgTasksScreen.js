@@ -45,9 +45,19 @@ import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 import { pickReceiptFromCamera, pickReceiptOrInvoiceAttachment } from '../utils/pickDocumentFile';
 import { confirmMessage } from '../utils/crossPlatformAlert';
 import { formatMaterialListLabel, stripOldMaterialSuffix } from '../utils/materialDisplayLabel';
+import { formatLocalClock, localDateTimeFromParts } from '../utils/formatLocalClock';
 
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
+
+function hoursMeterDelta(prevRaw, currRaw) {
+  const prev = Number(String(prevRaw || '').trim().replace(',', '.'));
+  const curr = Number(String(currRaw || '').trim().replace(',', '.'));
+  if (!Number.isFinite(prev) || !Number.isFinite(curr)) return null;
+  if (curr < prev) return null;
+  const delta = curr - prev;
+  return String(Math.round(delta * 100) / 100);
+}
 
 const TIME_OPTIONS = [
   '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
@@ -135,11 +145,9 @@ function isWaitingForStartTime(task) {
   if (!task?.scheduled_date || !task?.planned_start) return false;
   if (task.start_acknowledged_at || task.started_at) return false;
   if (viewerNeedsAck(task)) return false;
-  const clock = String(task.planned_start).slice(0, 8);
-  const iso = `${task.scheduled_date}T${clock.length === 5 ? `${clock}:00` : clock}`;
-  const startMs = Date.parse(iso);
-  if (!Number.isFinite(startMs)) return false;
-  return Date.now() < startMs;
+  const start = localDateTimeFromParts(task.scheduled_date, task.planned_start);
+  if (!start) return false;
+  return Date.now() < start.getTime();
 }
 
 function timeChipValue(raw) {
@@ -653,7 +661,8 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [issueLocationId, setIssueLocationId] = useState(null);
   const [plannedIssueOutput, setPlannedIssueOutput] = useState('');
   const [plannedIssueHours, setPlannedIssueHours] = useState('');
-  const [taskActualHours, setTaskActualHours] = useState('');
+  const [taskHoursStart, setTaskHoursStart] = useState('');
+  const [taskHoursEnd, setTaskHoursEnd] = useState('');
   const [taskActualKm, setTaskActualKm] = useState('');
   const [taskFuelStart, setTaskFuelStart] = useState('');
   const [taskFuelEnd, setTaskFuelEnd] = useState('');
@@ -788,7 +797,8 @@ export default function OrgTasksScreen({ navigation, route }) {
           setActualByUnitDrafts(hydrateActualByUnitDrafts(detail.operations));
           setMeterStartDrafts(meterStarts);
           setMeterEndDrafts(meterEnds);
-          setTaskActualHours(detail.actual_hours != null ? String(detail.actual_hours) : '');
+          setTaskHoursStart(detail.hours_start != null ? String(detail.hours_start) : '');
+          setTaskHoursEnd(detail.hours_end != null ? String(detail.hours_end) : '');
           setTaskActualKm(detail.actual_km != null ? String(detail.actual_km) : '');
           setTaskFuelStart(detail.fuel_start != null ? String(detail.fuel_start) : '');
           setTaskFuelEnd(detail.fuel_end != null ? String(detail.fuel_end) : '');
@@ -873,7 +883,8 @@ export default function OrgTasksScreen({ navigation, route }) {
     setActualByUnitDrafts(hydrateActualByUnitDrafts(updated.operations));
     setMeterStartDrafts(meterStarts);
     setMeterEndDrafts(meterEnds);
-    setTaskActualHours(updated.actual_hours != null ? String(updated.actual_hours) : '');
+    setTaskHoursStart(updated.hours_start != null ? String(updated.hours_start) : '');
+    setTaskHoursEnd(updated.hours_end != null ? String(updated.hours_end) : '');
     setTaskActualKm(updated.actual_km != null ? String(updated.actual_km) : '');
     setTaskFuelStart(updated.fuel_start != null ? String(updated.fuel_start) : '');
     setTaskFuelEnd(updated.fuel_end != null ? String(updated.fuel_end) : '');
@@ -1124,6 +1135,21 @@ export default function OrgTasksScreen({ navigation, route }) {
     acknowledgeStart(task);
   };
 
+  const appendHoursMeterPayload = (payload, task = selected) => {
+    const startVal = String(taskHoursStart || '').trim();
+    const endVal = String(taskHoursEnd || '').trim();
+    if (startVal !== '') {
+      payload.hours_start = startVal;
+    } else if (task?.hours_start != null) {
+      payload.hours_start = null;
+    }
+    if (endVal !== '') {
+      payload.hours_end = endVal;
+    } else if (task?.hours_end != null) {
+      payload.hours_end = null;
+    }
+  };
+
   const acknowledgeEnd = async (task, wizardValues = null) => {
     if (!orgId || !task?.id) return;
     setBusyAction(true);
@@ -1131,9 +1157,7 @@ export default function OrgTasksScreen({ navigation, route }) {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const operations = buildOperationsPayload();
       const payload = { operations };
-      if (String(taskActualHours || '').trim() !== '') {
-        payload.actual_hours = String(taskActualHours).trim();
-      }
+      appendHoursMeterPayload(payload, task);
       if (wizardValues) {
         if (String(wizardValues.odometer || '').trim()) {
           payload.odometer_end = String(wizardValues.odometer).trim();
@@ -1214,11 +1238,7 @@ export default function OrgTasksScreen({ navigation, route }) {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const operations = buildOperationsPayload();
       const payload = { operations };
-      if (String(taskActualHours || '').trim() !== '') {
-        payload.actual_hours = String(taskActualHours).trim();
-      } else if (selected.actual_hours != null) {
-        payload.actual_hours = null;
-      }
+      appendHoursMeterPayload(payload, selected);
       if (String(taskActualKm || '').trim() !== '') {
         payload.actual_km = String(taskActualKm).trim();
       } else if (selected.actual_km != null) {
@@ -1497,7 +1517,11 @@ export default function OrgTasksScreen({ navigation, route }) {
       const mid = Number(materialId);
       const plannedOut = String(plannedIssueOutput || '').trim();
       const taskHours = String(
-        taskActualHours || plannedIssueHours || selected?.actual_hours || '',
+        taskHoursStart ||
+          taskHoursEnd ||
+          plannedIssueHours ||
+          selected?.actual_hours ||
+          '',
       ).trim();
       const taskKm = String(taskActualKm || selected?.actual_km || '').trim();
 
@@ -1601,7 +1625,8 @@ export default function OrgTasksScreen({ navigation, route }) {
       meterEndDrafts,
       plannedIssueOutput,
       plannedIssueHours,
-      taskActualHours,
+      taskHoursStart,
+      taskHoursEnd,
       taskActualKm,
     ],
   );
@@ -1794,7 +1819,7 @@ export default function OrgTasksScreen({ navigation, route }) {
           <Text style={styles.startedBadge}>
             {t(
               'org.tasks.startedAt',
-              { time: String(task.start_acknowledged_at || task.started_at).slice(11, 16) },
+              { time: formatLocalClock(task.start_acknowledged_at || task.started_at) },
               'Started',
             )}
           </Text>
@@ -1838,7 +1863,7 @@ export default function OrgTasksScreen({ navigation, route }) {
           <Text style={styles.endedBadge}>
             {t(
               'org.tasks.endedAt',
-              { time: String(task.ended_at).slice(11, 16) },
+              { time: formatLocalClock(task.ended_at) },
               'Ended',
             )}
           </Text>
@@ -2309,24 +2334,63 @@ export default function OrgTasksScreen({ navigation, route }) {
                       : t(
                           'org.tasks.taskTotalsHint',
                           null,
-                          'Enter machine hours and/or total km once for the whole work card. Fuel suggestions use these totals — not per-operation hour fields.',
+                          'Enter machine hour-meter readings (previous → current) and/or total km once for the whole work card — not per marking operation. Per-op fields are for m² and similar outputs only.',
                         )}
                   </Text>
                   {(canShowEndButton(selected) || selected.status === 'in_progress') &&
                   taskNeedsMachineHours(selected) ? (
-                    <TextInput
-                      label={t(
-                        'org.tasks.taskMachineHours',
-                        null,
-                        'Machine / working hours (task total)',
-                      )}
-                      value={taskActualHours}
-                      onChangeText={setTaskActualHours}
-                      mode="outlined"
-                      keyboardType="decimal-pad"
-                      style={styles.input}
-                      textColor={ON_CARD}
-                    />
+                    <>
+                      <Text style={styles.opMeta}>
+                        {t(
+                          'org.tasks.taskHourMeterHint',
+                          null,
+                          'Enter previous and current machine hour-meter readings once for the whole task (not per marking). Hours worked = current − previous.',
+                        )}
+                      </Text>
+                      <TextInput
+                        label={t(
+                          'org.tasks.taskHoursPrevious',
+                          null,
+                          'Previous hour-meter reading',
+                        )}
+                        value={taskHoursStart}
+                        onChangeText={setTaskHoursStart}
+                        mode="outlined"
+                        keyboardType="decimal-pad"
+                        style={styles.input}
+                        textColor={ON_CARD}
+                      />
+                      <TextInput
+                        label={t(
+                          'org.tasks.taskHoursCurrent',
+                          null,
+                          'Current hour-meter reading',
+                        )}
+                        value={taskHoursEnd}
+                        onChangeText={setTaskHoursEnd}
+                        mode="outlined"
+                        keyboardType="decimal-pad"
+                        style={styles.input}
+                        textColor={ON_CARD}
+                      />
+                      {hoursMeterDelta(taskHoursStart, taskHoursEnd) != null ? (
+                        <Text style={styles.opTitle}>
+                          {t(
+                            'org.tasks.taskHoursDelta',
+                            { hours: hoursMeterDelta(taskHoursStart, taskHoursEnd) },
+                            `Hours worked: ${hoursMeterDelta(taskHoursStart, taskHoursEnd)}`,
+                          )}
+                        </Text>
+                      ) : selected.actual_hours != null ? (
+                        <Text style={styles.opMeta}>
+                          {t(
+                            'org.tasks.taskMachineHoursRead',
+                            { hours: selected.actual_hours },
+                            `Machine hours: ${selected.actual_hours}`,
+                          )}
+                        </Text>
+                      ) : null}
+                    </>
                   ) : null}
                   {(canShowEndButton(selected) ||
                     selected.status === 'in_progress' ||
@@ -2832,7 +2896,11 @@ export default function OrgTasksScreen({ navigation, route }) {
                     textColor={ON_CARD}
                   />
                   ) : null}
-                  {!transportFocused && hasHourBasedNorms && !String(taskActualHours || '').trim() ? (
+                  {!transportFocused &&
+                  hasHourBasedNorms &&
+                  !String(taskHoursStart || '').trim() &&
+                  !String(taskHoursEnd || '').trim() &&
+                  selected?.actual_hours == null ? (
                     <TextInput
                       label={t(
                         'org.tasks.plannedIssueHours',
