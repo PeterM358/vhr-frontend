@@ -25,12 +25,18 @@ import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
 
-const SHARE_COLORS = {
-  workforce: '#0EA5E9',
-  fleet: '#F59E0B',
+const COST_COLORS = {
   materials: '#10B981',
+  workforce: '#0EA5E9',
+  task_expenses: '#8B5CF6',
   other: '#8B5CF6',
+  fleet: '#F59E0B',
+  services: '#64748B',
+  facility: '#94A3B8',
+  utilities: '#CBD5E1',
 };
+
+const REVENUE_COLOR = '#059669';
 
 function currentMonthIso() {
   const d = new Date();
@@ -121,21 +127,66 @@ export default function OrgAccountingScreen({ navigation, route }) {
 
   const currency = summary?.totals?.currency || 'BGN';
 
-  const shareSlices = useMemo(() => {
-    const rows = Array.isArray(summary?.cost_shares) ? summary.cost_shares : [];
-    const labels = {
-      workforce: t('org.accounting.shares.workforce', null, 'Workforce'),
-      fleet: t('org.accounting.shares.fleet', null, 'Fleet maintenance'),
-      materials: t('org.accounting.shares.materials', null, 'Materials'),
-      other: t('org.accounting.shares.other', null, 'Other expenses'),
-    };
-    return rows.map((row) => ({
-      key: row.key,
-      label: labels[row.key] || row.key,
-      value: Number(row.amount) || 0,
-      color: SHARE_COLORS[row.key],
-    }));
-  }, [summary, t]);
+  const costLabel = useCallback(
+    (key, fallback) => {
+      const map = {
+        materials: t('org.accounting.shares.materials', null, 'Materials'),
+        workforce: t('org.accounting.shares.workforce', null, 'Workforce'),
+        task_expenses: t('org.accounting.shares.taskExpenses', null, 'Task expenses'),
+        other: t('org.accounting.shares.other', null, 'Other expenses'),
+        fleet: t('org.accounting.shares.fleet', null, 'Fleet maintenance'),
+        services: t('org.accounting.shares.services', null, 'Services'),
+        facility: t('org.accounting.shares.facility', null, 'Facility rent'),
+        utilities: t('org.accounting.shares.utilities', null, 'Utilities'),
+      };
+      return map[key] || fallback || key;
+    },
+    [t],
+  );
+
+  const costPieSlices = useMemo(() => {
+    const rows = Array.isArray(summary?.cost_breakdown)
+      ? summary.cost_breakdown
+      : Array.isArray(summary?.cost_shares)
+        ? summary.cost_shares
+        : [];
+    return rows
+      .filter((row) => !row.stub)
+      .map((row) => ({
+        key: row.key,
+        label: costLabel(row.key, row.label),
+        value: Number(row.amount) || 0,
+        color: COST_COLORS[row.key],
+      }));
+  }, [summary, costLabel]);
+
+  const periodCompareBars = useMemo(() => {
+    if (!summary) return [];
+    const liveCosts = (Array.isArray(summary.cost_breakdown) ? summary.cost_breakdown : [])
+      .filter((row) => !row.stub && Number(row.amount) > 0)
+      .map((row) => ({
+        key: `cost-${row.key}`,
+        label: costLabel(row.key, row.label),
+        value: Number(row.amount) || 0,
+        color: COST_COLORS[row.key] || '#64748B',
+      }));
+    const revenue = Number(summary.totals?.revenue_amount ?? summary.issued_invoices?.amount) || 0;
+    const bars = [...liveCosts];
+    if (revenue > 0 || liveCosts.length) {
+      bars.push({
+        key: 'revenue',
+        label: t('org.accounting.bars.revenue', null, 'Issued invoices'),
+        value: revenue,
+        color: REVENUE_COLOR,
+      });
+    }
+    return bars;
+  }, [summary, costLabel, t]);
+
+  const stubCostRows = useMemo(() => {
+    const rows = Array.isArray(summary?.cost_breakdown) ? summary.cost_breakdown : [];
+    return rows.filter((row) => row.stub);
+  }, [summary]);
 
   const outputBars = useMemo(() => {
     const ops = summary?.operations || {};
@@ -242,31 +293,6 @@ export default function OrgAccountingScreen({ navigation, route }) {
           <>
             <AppCard style={styles.card}>
               <Text style={styles.section}>
-                {t('org.invoicing.uninvoicedTitle', null, 'Completed jobs ready to invoice')}
-              </Text>
-              <Text style={styles.hint}>
-                {uninvoicedCount > 0
-                  ? t(
-                      'org.accounting.uninvoicedCount',
-                      { count: uninvoicedCount },
-                      `${uninvoicedCount} completed job(s) waiting for an invoice.`,
-                    )
-                  : t(
-                      'org.accounting.uninvoicedNone',
-                      null,
-                      'No uninvoiced completed jobs right now.',
-                    )}
-              </Text>
-              <Button
-                mode="contained"
-                style={{ marginTop: 10 }}
-                onPress={() => navigateToOrgInvoicing(navigation, { orgId })}
-              >
-                {t('org.accounting.openInvoicing', null, 'Invoice jobs')}
-              </Button>
-            </AppCard>
-            <AppCard style={styles.card}>
-              <Text style={styles.section}>
                 {t('org.accounting.pulseTitle', null, 'Month pulse')}
               </Text>
               <Text style={styles.pulseLine}>
@@ -283,54 +309,81 @@ export default function OrgAccountingScreen({ navigation, route }) {
                   `From–To: ${summary.operations?.total_m2 ?? '0'} m² · ${summary.operations?.total_km ?? '0'} km · ${summary.operations?.total_hours ?? '0'} h · ${summary.operations?.jobs_done ?? 0} jobs`,
                 )}
               </Text>
+
+              <View style={styles.stripRow}>
+                <View style={[styles.stripCell, styles.stripRevenue]}>
+                  <Text style={styles.stripValue}>
+                    {formatMoney(summary.totals?.revenue_amount, currency)}
+                  </Text>
+                  <Text style={styles.stripLabel}>
+                    {t('org.accounting.strip.revenue', null, 'Revenue')}
+                  </Text>
+                  <Text style={styles.stripHint}>
+                    {t(
+                      'org.accounting.strip.revenueHint',
+                      { count: summary.issued_invoices?.count ?? 0 },
+                      `${summary.issued_invoices?.count ?? 0} issued invoice(s)`,
+                    )}
+                  </Text>
+                </View>
+                <View style={styles.stripCell}>
+                  <Text style={styles.stripValue}>
+                    {formatMoney(summary.totals?.cost_amount, currency)}
+                  </Text>
+                  <Text style={styles.stripLabel}>
+                    {t('org.accounting.strip.costs', null, 'Costs')}
+                  </Text>
+                  <Text style={styles.stripHint}>
+                    {t(
+                      'org.accounting.strip.costsHint',
+                      null,
+                      'Materials + workforce + task expenses',
+                    )}
+                  </Text>
+                </View>
+                <View style={styles.stripCell}>
+                  <Text style={styles.stripValue}>
+                    {formatMoney(summary.totals?.margin_amount, currency)}
+                  </Text>
+                  <Text style={styles.stripLabel}>
+                    {t('org.accounting.strip.margin', null, 'Margin ≈')}
+                  </Text>
+                  <Text style={styles.stripHint}>
+                    {t(
+                      'org.accounting.strip.marginHint',
+                      null,
+                      'Approximate — revenue minus period costs',
+                    )}
+                  </Text>
+                </View>
+              </View>
+
               <View style={styles.cardsGrid}>
                 <View style={styles.metricCard}>
                   <Text style={styles.metricValue}>
-                    {formatMoney(summary.workforce_cost?.amount, currency)}
+                    {formatMoney(summary.issued_invoices?.amount, currency)}
                   </Text>
                   <Text style={styles.metricLabel}>
-                    {t('org.accounting.cards.workforce', null, 'Workforce cost')}
+                    {t(
+                      'org.accounting.cards.issuedInvoices',
+                      null,
+                      'Issued invoices (to clients)',
+                    )}
                   </Text>
                   <Text style={styles.metricHint}>
                     {t(
-                      'org.accounting.cards.workforceHint',
-                      { count: summary.workforce_cost?.employees_with_salary ?? 0 },
-                      `${summary.workforce_cost?.employees_with_salary ?? 0} with salary set`,
+                      'org.accounting.cards.issuedInvoicesHint',
+                      { count: summary.issued_invoices?.count ?? 0 },
+                      `${summary.issued_invoices?.count ?? 0} invoice(s) in period`,
                     )}
                   </Text>
                   <Button
                     compact
                     mode="text"
-                    onPress={() => navigateToOrgWorkforce(navigation, { orgId })}
+                    onPress={() => navigateToOrgInvoicing(navigation, { orgId })}
                   >
-                    {t('org.accounting.setSalaries', null, 'Set salaries')}
+                    {t('org.accounting.openInvoices', null, 'Open invoicing')}
                   </Button>
-                </View>
-                <View style={styles.metricCard}>
-                  <Text style={styles.metricValue}>
-                    {formatMoney(summary.estimated_payroll?.amount, currency)}
-                  </Text>
-                  <Text style={styles.metricLabel}>
-                    {t('org.accounting.cards.estimatedPayroll', null, 'Estimated payroll')}
-                  </Text>
-                  <Text style={styles.metricHint}>
-                    {t(
-                      'org.accounting.cards.estimatedPayrollHint',
-                      null,
-                      'Prorated base + optional m²/km rates (Phase 1).',
-                    )}
-                  </Text>
-                </View>
-                <View style={styles.metricCard}>
-                  <Text style={styles.metricValue}>
-                    {formatMoney(summary.fleet_maintenance?.amount, currency)}
-                  </Text>
-                  <Text style={styles.metricLabel}>
-                    {t('org.accounting.cards.fleet', null, 'Fleet maintenance')}
-                  </Text>
-                  <Text style={styles.metricHint}>
-                    {t('org.accounting.comingSoon', null, 'Coming soon')}
-                  </Text>
                 </View>
                 <View style={styles.metricCard}>
                   <Text style={styles.metricValue}>
@@ -356,11 +409,25 @@ export default function OrgAccountingScreen({ navigation, route }) {
                 </View>
                 <View style={styles.metricCard}>
                   <Text style={styles.metricValue}>
-                    {formatMoney(summary.project_expected_revenue?.amount, currency)}
+                    {formatMoney(summary.workforce_cost?.amount, currency)}
                   </Text>
                   <Text style={styles.metricLabel}>
-                    {t('org.accounting.cards.projects', null, 'Project expected value')}
+                    {t('org.accounting.cards.workforce', null, 'Workforce cost')}
                   </Text>
+                  <Text style={styles.metricHint}>
+                    {t(
+                      'org.accounting.cards.workforceHint',
+                      { count: summary.workforce_cost?.employees_with_salary ?? 0 },
+                      `${summary.workforce_cost?.employees_with_salary ?? 0} with salary set`,
+                    )}
+                  </Text>
+                  <Button
+                    compact
+                    mode="text"
+                    onPress={() => navigateToOrgWorkforce(navigation, { orgId })}
+                  >
+                    {t('org.accounting.setSalaries', null, 'Set salaries')}
+                  </Button>
                 </View>
                 <View style={styles.metricCard}>
                   <Text style={styles.metricValue}>
@@ -368,6 +435,40 @@ export default function OrgAccountingScreen({ navigation, route }) {
                   </Text>
                   <Text style={styles.metricLabel}>
                     {t('org.accounting.cards.other', null, 'Task expenses')}
+                  </Text>
+                </View>
+                <View style={styles.metricCard}>
+                  <Text style={styles.metricValue}>
+                    {formatMoney(summary.estimated_payroll?.amount, currency)}
+                  </Text>
+                  <Text style={styles.metricLabel}>
+                    {t('org.accounting.cards.estimatedPayroll', null, 'Estimated payroll')}
+                  </Text>
+                  <Text style={styles.metricHint}>
+                    {t(
+                      'org.accounting.cards.estimatedPayrollHint',
+                      null,
+                      'Prorated base + optional m²/km rates (Phase 1).',
+                    )}
+                  </Text>
+                </View>
+                <View style={styles.metricCard}>
+                  <Text style={styles.metricValue}>
+                    {formatMoney(summary.project_expected_revenue?.amount, currency)}
+                  </Text>
+                  <Text style={styles.metricLabel}>
+                    {t(
+                      'org.accounting.cards.projects',
+                      null,
+                      'Project portfolio (expected value)',
+                    )}
+                  </Text>
+                  <Text style={styles.metricHint}>
+                    {t(
+                      'org.accounting.cards.projectsHint',
+                      null,
+                      'Not this period’s turnover — active project stock.',
+                    )}
                   </Text>
                 </View>
                 <View style={styles.metricCard}>
@@ -383,20 +484,84 @@ export default function OrgAccountingScreen({ navigation, route }) {
 
             <AppCard style={styles.card}>
               <Text style={styles.section}>
-                {t('org.accounting.pieTitle', null, 'Budget share (pie)')}
+                {t('org.invoicing.uninvoicedTitle', null, 'Completed jobs ready to invoice')}
+              </Text>
+              <Text style={styles.hint}>
+                {uninvoicedCount > 0
+                  ? t(
+                      'org.accounting.uninvoicedCount',
+                      { count: uninvoicedCount },
+                      `${uninvoicedCount} completed job(s) waiting for an invoice.`,
+                    )
+                  : t(
+                      'org.accounting.uninvoicedNone',
+                      null,
+                      'No uninvoiced completed jobs right now.',
+                    )}
+              </Text>
+              <Button
+                mode="contained"
+                style={{ marginTop: 10 }}
+                onPress={() => navigateToOrgInvoicing(navigation, { orgId })}
+              >
+                {t('org.accounting.openInvoicing', null, 'Invoice jobs')}
+              </Button>
+            </AppCard>
+
+            <AppCard style={styles.card}>
+              <Text style={styles.section}>
+                {t('org.accounting.pieTitle', null, 'Cost mix (period)')}
               </Text>
               <Text style={styles.hint}>
                 {t(
                   'org.accounting.pieHint',
                   null,
-                  'Cost mix for planning next year — workforce, fleet, materials, other.',
+                  'Costs only — materials, workforce, task expenses. Revenue is shown separately.',
                 )}
               </Text>
               <SimpleDonutChart
-                slices={shareSlices}
+                slices={costPieSlices}
                 emptyLabel={t('org.accounting.pieEmpty', null, 'Set salaries or costs to see shares')}
                 centerLabel={formatMoney(summary.totals?.cost_amount, currency)}
                 centerSubLabel={t('org.accounting.totalCost', null, 'Total cost')}
+              />
+              {stubCostRows.length ? (
+                <View style={styles.stubBlock}>
+                  <Text style={styles.stubTitle}>
+                    {t(
+                      'org.accounting.stubCategoriesTitle',
+                      null,
+                      'Not tracked yet',
+                    )}
+                  </Text>
+                  {stubCostRows.map((row) => (
+                    <View key={row.key} style={styles.stubRow}>
+                      <Text style={styles.stubLabel}>{costLabel(row.key, row.label)}</Text>
+                      <Text style={styles.stubBadge}>—</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </AppCard>
+
+            <AppCard style={styles.card}>
+              <Text style={styles.section}>
+                {t('org.accounting.compareTitle', null, 'Period picture')}
+              </Text>
+              <Text style={styles.hint}>
+                {t(
+                  'org.accounting.compareHint',
+                  null,
+                  'Live cost categories vs issued invoice revenue for this From–To.',
+                )}
+              </Text>
+              <SimpleMetricBars
+                bars={periodCompareBars}
+                emptyLabel={t(
+                  'org.accounting.compareEmpty',
+                  null,
+                  'No costs or issued invoices in this period',
+                )}
               />
             </AppCard>
 
@@ -418,7 +583,7 @@ export default function OrgAccountingScreen({ navigation, route }) {
                 {t(
                   'org.accounting.phase2Hint',
                   null,
-                  'Richer analytics, sells, taxes, insurance, and bank sync — Phase 2.',
+                  'Rent, utilities, richer analytics, taxes, insurance, and bank sync — later.',
                 )}
               </Text>
               {phase2.map((row) => (
@@ -466,6 +631,39 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 12,
   },
+  stripRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+  stripCell: {
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 100,
+    backgroundColor: 'rgba(148,163,184,0.12)',
+    borderRadius: 12,
+    padding: 10,
+  },
+  stripRevenue: {
+    backgroundColor: 'rgba(16,185,129,0.12)',
+  },
+  stripValue: {
+    color: ON_CARD,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  stripLabel: {
+    color: ON_CARD_MUTED,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  stripHint: {
+    color: '#64748B',
+    fontSize: 11,
+    marginTop: 2,
+  },
   monthRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -510,6 +708,33 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontSize: 11,
     marginTop: 4,
+  },
+  stubBlock: {
+    marginTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(15,23,42,0.12)',
+    paddingTop: 8,
+  },
+  stubTitle: {
+    color: ON_CARD_MUTED,
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  stubRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  stubLabel: {
+    color: ON_CARD,
+    fontSize: 13,
+    flex: 1,
+    paddingRight: 8,
+  },
+  stubBadge: {
+    color: '#94A3B8',
+    fontSize: 13,
   },
   phase2Row: {
     flexDirection: 'row',

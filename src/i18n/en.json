@@ -1214,6 +1214,15 @@
       "uninvoicedCount": "{count} completed job(s) waiting for an invoice.",
       "uninvoicedNone": "No uninvoiced completed jobs right now.",
       "openInvoicing": "Invoice jobs",
+      "openInvoices": "Open invoicing",
+      "strip": {
+        "revenue": "Revenue",
+        "revenueHint": "{count} issued invoice(s)",
+        "costs": "Costs",
+        "costsHint": "Materials + workforce + task expenses",
+        "margin": "Margin ≈",
+        "marginHint": "Approximate — revenue minus period costs"
+      },
       "cards": {
         "workforce": "Workforce cost",
         "workforceHint": "{count} with salary set",
@@ -1222,26 +1231,40 @@
         "fleet": "Fleet maintenance",
         "materials": "Materials (intake)",
         "documentsHint": "{count} confirmed docs",
-        "projects": "Project expected value",
+        "issuedInvoices": "Issued invoices (to clients)",
+        "issuedInvoicesHint": "{count} invoice(s) in period",
+        "projects": "Project portfolio (expected value)",
+        "projectsHint": "Not this period’s turnover — active project stock.",
         "other": "Task expenses",
         "documents": "Intake documents"
       },
       "setSalaries": "Set salaries",
       "openWarehouse": "Warehouse",
       "comingSoon": "Coming soon",
-      "pieTitle": "Budget share (pie)",
-      "pieHint": "Cost mix for planning next year — workforce, fleet, materials, other.",
+      "pieTitle": "Cost mix (period)",
+      "pieHint": "Costs only — materials, workforce, task expenses. Revenue is shown separately.",
       "pieEmpty": "Set salaries or costs to see shares",
       "totalCost": "Total cost",
+      "stubCategoriesTitle": "Not tracked yet",
+      "compareTitle": "Period picture",
+      "compareHint": "Live cost categories vs issued invoice revenue for this From–To.",
+      "compareEmpty": "No costs or issued invoices in this period",
+      "bars": {
+        "revenue": "Issued invoices"
+      },
       "outputTitle": "Operational output",
       "outputEmpty": "No m² / km / hours in this period",
       "phase2Title": "Coming later",
-      "phase2Hint": "Richer analytics, sells, taxes, insurance, and bank sync — Phase 2.",
+      "phase2Hint": "Rent, utilities, richer analytics, taxes, insurance, and bank sync — later.",
       "shares": {
         "workforce": "Workforce",
         "fleet": "Fleet maintenance",
         "materials": "Materials",
-        "other": "Other expenses"
+        "taskExpenses": "Task expenses",
+        "other": "Other expenses",
+        "services": "Services",
+        "facility": "Facility rent",
+        "utilities": "Utilities"
       },
       "metrics": {
         "m2": "m²",
