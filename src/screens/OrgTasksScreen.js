@@ -23,6 +23,7 @@ import {
   issueWorkOrderMaterials,
   listUnitsOfMeasure,
   listWorkOrders,
+  getOperationsSummary,
   startWorkOrder,
   updateWorkOrder,
   updateWorkOrderShipment,
@@ -643,6 +644,7 @@ export default function OrgTasksScreen({ navigation, route }) {
   );
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
+  const [periodSummary, setPeriodSummary] = useState(null);
   const [selectedId, setSelectedId] = useState(routeTaskId);
   const [selectedDetail, setSelectedDetail] = useState(null);
   const [busyAction, setBusyAction] = useState(false);
@@ -733,13 +735,17 @@ export default function OrgTasksScreen({ navigation, route }) {
       if (filterFrom) params.from = filterFrom;
       if (filterTo) params.to = filterTo;
       setAccessToken(token || '');
-      const [data, unitsData] = await Promise.all([
+      const [data, unitsData, summaryData] = await Promise.all([
         listWorkOrders(token, resolved, params),
         listUnitsOfMeasure(token, resolved).catch(() => ({ results: [] })),
+        filterFrom || filterTo
+          ? getOperationsSummary(token, resolved, params).catch(() => null)
+          : Promise.resolve(null),
       ]);
       setCanManage(Boolean(data?.can_manage));
       setRows(Array.isArray(data?.results) ? data.results : []);
       setUomUnits(Array.isArray(unitsData?.results) ? unitsData.results : []);
+      setPeriodSummary(summaryData);
     } catch (e) {
       setError(e.message || t('org.tasks.loadError', null, 'Could not load tasks.'));
       setRows([]);
@@ -2085,6 +2091,32 @@ export default function OrgTasksScreen({ navigation, route }) {
                   </Button>
                 ) : null}
               </AppCard>
+              {periodSummary && (filterFrom || filterTo) ? (
+                <AppCard style={styles.card}>
+                  <Text style={styles.section}>
+                    {t('org.tasks.periodSummaryTitle', null, 'Period pulse')}
+                  </Text>
+                  <Text style={styles.periodSummaryLine}>
+                    {t(
+                      'org.tasks.periodSummary',
+                      {
+                        area: `${periodSummary.total_m2 ?? '0'} m²`,
+                        km: `${periodSummary.total_km ?? '0'} km`,
+                        hours: `${periodSummary.total_hours ?? '0'} h`,
+                        jobs: periodSummary.jobs_done ?? 0,
+                      },
+                      `From–To: ${periodSummary.total_m2 ?? '0'} m² · ${periodSummary.total_km ?? '0'} km · ${periodSummary.total_hours ?? '0'} h · ${periodSummary.jobs_done ?? 0} jobs`,
+                    )}
+                  </Text>
+                  <Text style={styles.opMeta}>
+                    {t(
+                      'org.tasks.periodSummaryHint',
+                      null,
+                      'Totals from scheduled work in the selected range (actuals).',
+                    )}
+                  </Text>
+                </AppCard>
+              ) : null}
               </>
             ) : null}
 
@@ -3645,6 +3677,13 @@ const styles = StyleSheet.create({
   },
   opTitle: { color: ON_CARD, fontSize: 14, fontWeight: '700' },
   opMeta: { color: ON_CARD_MUTED, fontSize: 12, marginTop: 4 },
+  periodSummaryLine: {
+    color: ON_CARD,
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 4,
+    lineHeight: 22,
+  },
   input: { marginTop: 8, marginBottom: 4, backgroundColor: '#fff' },
   row: {
     borderTopWidth: StyleSheet.hairlineWidth,

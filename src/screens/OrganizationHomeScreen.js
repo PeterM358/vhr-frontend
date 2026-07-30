@@ -1,6 +1,6 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Button, Text } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,6 +36,7 @@ import {
   navigateToOrgFleet,
   navigateToOrgOperations,
   navigateToOrgProjects,
+  navigateToOrgAccounting,
   navigateToOrgTasks,
   navigateToOrgWarehouse,
   navigateToOrgWorkforce,
@@ -477,6 +478,20 @@ export default function OrganizationHomeScreen() {
       });
     }
 
+    if (canManageOps || navRoutes.has('OrgAccounting') || navRoutes.has('OrgLedger')) {
+      tiles.push({
+        key: 'accounting',
+        icon: 'book-open-outline',
+        title: t('org.nav.accounting', null, 'Accounting'),
+        subtitle: t(
+          'org.home.actions.accountingSubtitle',
+          null,
+          'Month pulse, workforce cost, and budget share pie.',
+        ),
+        onPress: () => navigateToOrgAccounting(navigation, { orgId: org?.id }),
+      });
+    }
+
     if (org?.has_shop_locations) {
       tiles.push({
         key: 'shop',
@@ -814,9 +829,16 @@ export default function OrganizationHomeScreen() {
                   {t(
                     'org.home.stats.moneyFootnote',
                     null,
-                    'Prepaid / expenses coming later.',
+                    'Open Accounting for m² / km / hours, salaries, and budget pie.',
                   )}
                 </Text>
+                <Button
+                  mode="text"
+                  compact
+                  onPress={() => navigateToOrgAccounting(navigation, { orgId: org?.id })}
+                >
+                  {t('org.home.stats.openAccounting', null, 'Open accounting')}
+                </Button>
               </DashboardCard>
             ) : null}
           </>

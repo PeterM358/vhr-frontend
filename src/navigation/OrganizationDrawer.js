@@ -18,6 +18,7 @@ import OrgTasksScreen from '../screens/OrgTasksScreen';
 import OrgCreateTaskScreen from '../screens/OrgCreateTaskScreen';
 import OrgProjectsScreen from '../screens/OrgProjectsScreen';
 import OrgWarehouseScreen from '../screens/OrgWarehouseScreen';
+import OrgAccountingScreen from '../screens/OrgAccountingScreen';
 import OrgLegalEntityScreen from '../screens/OrgLegalEntityScreen';
 import OrgCalendarScreen from '../screens/OrgCalendarScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
@@ -40,6 +41,7 @@ import {
 import { buildShopAuthReset } from '../utils/shopAuthNavigation';
 import {
   navigateToNotifications,
+  navigateToOrgAccounting,
   navigateToOrgCalendar,
   navigateToOrgFleet,
   navigateToOrgLegalEntity,
@@ -84,12 +86,14 @@ const ROUTE_ICONS = {
   OrgConstruction: 'hard-hat',
   OrgInvoicing: 'receipt',
   OrgLedger: 'book-open-outline',
+  OrgAccounting: 'book-open-outline',
   OrgPublicProfile: 'earth',
   OrgCalendar: 'calendar-month-outline',
 };
 
 function normalizeOrgRoute(route) {
   if (route === 'OrgWorkOrders') return 'OrgTasks';
+  if (route === 'OrgLedger') return 'OrgAccounting';
   return route;
 }
 
@@ -196,6 +200,16 @@ function CustomDrawerContent(props) {
       seen.add('OrgWarehouse');
     }
 
+    if (canManageOps && !seen.has('OrgAccounting')) {
+      items.push({
+        key: 'accounting',
+        route: 'OrgAccounting',
+        label: t('org.nav.accounting', null, 'Accounting'),
+        icon: 'book-open-outline',
+      });
+      seen.add('OrgAccounting');
+    }
+
     return items;
   }, [canManageOps, isDriver, org, t]);
 
@@ -232,6 +246,10 @@ function CustomDrawerContent(props) {
     }
     if (normalized === 'OrgWarehouse') {
       navigateToOrgWarehouse(navigation, { orgId: org?.id });
+      return;
+    }
+    if (normalized === 'OrgAccounting') {
+      navigateToOrgAccounting(navigation, { orgId: org?.id });
       return;
     }
     if (normalized === 'OrgLegalEntity') {
@@ -422,6 +440,7 @@ export default function OrganizationDrawer() {
       />
       <Drawer.Screen name="OrgProjects" component={OrgProjectsScreen} />
       <Drawer.Screen name="OrgWarehouse" component={OrgWarehouseScreen} />
+      <Drawer.Screen name="OrgAccounting" component={OrgAccountingScreen} />
       <Drawer.Screen name="OrgLegalEntity" component={OrgLegalEntityScreen} />
       <Drawer.Screen name="OrgCalendar" component={OrgCalendarScreen} />
       <Drawer.Screen name="OrgWorkforce" component={OrgWorkforceScreen} />

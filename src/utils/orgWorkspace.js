@@ -79,8 +79,6 @@ const FLEET_FOCUSED_ROLE_TYPES = new Set(['TRANSPORT_COMPANY', 'FLEET_OPERATOR']
 const SHOP_B2B_ORG_ROUTES = new Set([
   'OrgNetwork',
   'OrgLocations',
-  'OrgInvoicing',
-  'OrgLedger',
 ]);
 
 /**
@@ -116,7 +114,8 @@ export function buildOrgNavItems(org, t) {
     OrgWarehouse: t('org.nav.warehouse', null, 'Warehouse'),
     OrgWorkforce: t('org.nav.workforce', null, 'Workforce'),
     OrgDocuments: t('org.nav.documents', null, 'Documents'),
-    OrgLedger: t('org.nav.ledger', null, 'Ledger'),
+    OrgLedger: t('org.nav.accounting', null, 'Accounting'),
+    OrgAccounting: t('org.nav.accounting', null, 'Accounting'),
     OrgNetwork: t('org.nav.network', null, 'Business network'),
     OrgTransport: t('org.nav.transport', null, 'Transport'),
     OrgConstruction: t('org.nav.construction', null, 'Construction'),
@@ -126,12 +125,15 @@ export function buildOrgNavItems(org, t) {
   const fleetFocused = isFleetFocusedOrg(org);
   return sections
     .filter((section) => !(fleetFocused && SHOP_B2B_ORG_ROUTES.has(section.route)))
-    .map((section) => ({
-      key: section.key,
-      route: section.route,
-      module: section.module,
-      label: labels[section.route] || section.key,
-    }));
+    .map((section) => {
+      const route = section.route === 'OrgLedger' ? 'OrgAccounting' : section.route;
+      return {
+        key: section.key,
+        route,
+        module: section.module,
+        label: labels[route] || labels[section.route] || section.key,
+      };
+    });
 }
 
 export function orgHasModule(org, moduleKey) {

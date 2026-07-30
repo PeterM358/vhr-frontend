@@ -712,6 +712,10 @@ export function partnerOrganizationWarehouse(params = {}) {
   return buildPathWithQuery(`${PARTNER}/organization/warehouse`, params);
 }
 
+export function partnerOrganizationAccounting(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/organization/accounting`, params);
+}
+
 export function partnerOrganizationLegalEntity(params = {}) {
   return buildPathWithQuery(`${PARTNER}/organization/company`, params);
 }

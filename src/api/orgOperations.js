@@ -132,6 +132,24 @@ export async function listWorkOrders(token, organizationId, params = {}) {
   return response.json();
 }
 
+export async function getOperationsSummary(token, organizationId, params = {}) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/operations/summary/${buildQuery(params)}`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load operations summary'));
+  return response.json();
+}
+
+export async function getAccountingSummary(token, organizationId, params = {}) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/accounting/summary/${buildQuery(params)}`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load accounting summary'));
+  return response.json();
+}
+
 export async function createWorkOrder(token, organizationId, payload) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/`,

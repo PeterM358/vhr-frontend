@@ -266,7 +266,8 @@
         "hint": "Simple pulse — are we finishing work day by day.",
         "jobsDone": "Jobs done",
         "expectedValue": "Project expected value",
-        "moneyFootnote": "Prepaid / expenses coming later."
+        "moneyFootnote": "Open Accounting for m² / km / hours, salaries, and budget pie.",
+        "openAccounting": "Open accounting"
       },
       "tasks": {
         "title": "Tasks",
@@ -308,7 +309,8 @@
         "createTaskSubtitle": "Assign multiple operations and people on one work card.",
         "tasksSubtitle": "Open, all, and add work cards.",
         "warehouseSubtitle": "Import supplier invoices and stock materials for operations.",
-        "projectsSubtitle": "Volume, value, contacts, and counterparties."
+        "projectsSubtitle": "Volume, value, contacts, and counterparties.",
+        "accountingSubtitle": "Month pulse, workforce cost, and budget share pie."
       }
     },
     "operations": {
@@ -634,6 +636,9 @@
       "filterFrom": "From",
       "filterTo": "To",
       "clearDateFilter": "Clear dates",
+      "periodSummaryTitle": "Period pulse",
+      "periodSummary": "From–To: {area} · {km} · {hours} · {jobs} jobs",
+      "periodSummaryHint": "Totals from scheduled work in the selected range (actuals).",
       "completedEmpty": "No completed tasks.",
       "createLead": "Create a multi-step work card. Workers tap Start and End themselves.",
       "detailsTitle": "Task details",
@@ -1113,11 +1118,55 @@
       "workforce": "Workforce",
       "documents": "Documents",
       "ledger": "Ledger",
+      "accounting": "Accounting",
       "network": "Business network",
       "transport": "Transport",
       "construction": "Construction",
       "publicProfile": "Public profile",
       "invoicing": "Invoicing"
+    },
+    "accounting": {
+      "title": "Accounting",
+      "loadError": "Could not load accounting.",
+      "periodTitle": "Period",
+      "periodHint": "Pick a month or custom From–To for the company pulse.",
+      "thisMonth": "This month",
+      "filterFrom": "From",
+      "filterTo": "To",
+      "pulseTitle": "Month pulse",
+      "periodSummary": "From–To: {area} · {km} · {hours} · {jobs} jobs",
+      "cards": {
+        "workforce": "Workforce cost",
+        "workforceHint": "{count} with salary set",
+        "fleet": "Fleet maintenance",
+        "materials": "Materials (intake)",
+        "documentsHint": "{count} confirmed docs",
+        "projects": "Project expected value",
+        "other": "Task expenses",
+        "documents": "Intake documents"
+      },
+      "setSalaries": "Set salaries",
+      "openWarehouse": "Warehouse",
+      "comingSoon": "Coming soon",
+      "pieTitle": "Budget share (pie)",
+      "pieHint": "Cost mix for planning next year — workforce, fleet, materials, other.",
+      "pieEmpty": "Set salaries or costs to see shares",
+      "totalCost": "Total cost",
+      "outputTitle": "Operational output",
+      "outputEmpty": "No m² / km / hours in this period",
+      "phase2Title": "Coming later",
+      "phase2Hint": "Richer analytics, sells, taxes, insurance, and bank sync — Phase 2.",
+      "shares": {
+        "workforce": "Workforce",
+        "fleet": "Fleet maintenance",
+        "materials": "Materials",
+        "other": "Other expenses"
+      },
+      "metrics": {
+        "m2": "m²",
+        "km": "km",
+        "hours": "h"
+      }
     },
     "workforce": {
       "title": "Workforce",
@@ -1166,6 +1215,10 @@
       "email": "Email",
       "phoneLabel": "Phone",
       "notFound": "Member not found.",
+      "monthlySalary": "Monthly salary",
+      "monthlySalaryHint": "Planned month cost for accounting pulse — not full payroll.",
+      "saveSalary": "Save salary",
+      "salarySaveError": "Could not save salary.",
       "roles": {
         "owner": "Owner",
         "admin": "Manager",

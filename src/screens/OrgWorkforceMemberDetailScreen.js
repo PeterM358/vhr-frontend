@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, Button, Menu, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Menu, Text, TextInput } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 
 import ScreenBackground from '../components/ScreenBackground';
@@ -51,6 +51,8 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
   const [assignBusy, setAssignBusy] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
+  const [salaryDraft, setSalaryDraft] = useState('');
+  const [salaryBusy, setSalaryBusy] = useState(false);
 
   const onBack = useCallback(() => {
     navigateToOrgWorkforce(navigation, { orgId: routeOrgId || orgId });
@@ -76,6 +78,11 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
       const rows = Array.isArray(workforce?.results) ? workforce.results : [];
       const found = rows.find((row) => String(row.membership_id) === String(membershipId)) || null;
       setMember(found);
+      setSalaryDraft(
+        found?.monthly_salary != null && found?.monthly_salary !== ''
+          ? String(found.monthly_salary)
+          : '',
+      );
       setFleet(Array.isArray(fleetData?.results) ? fleetData.results : []);
       if (!found) {
         setError(t('org.workforce.notFound', null, 'Member not found.'));
@@ -119,6 +126,26 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
       await load();
     } catch (e) {
       Alert.alert(t('common.error'), e.message || t('org.workforce.roleError', null, 'Could not update role.'));
+    }
+  };
+
+  const saveSalary = async () => {
+    if (!canManage || !orgId || !member || member.is_active === false) return;
+    setSalaryBusy(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const trimmed = String(salaryDraft || '').trim();
+      await updateOrgWorkforceMember(token, orgId, member.membership_id, {
+        monthly_salary: trimmed === '' ? null : trimmed,
+      });
+      await load();
+    } catch (e) {
+      Alert.alert(
+        t('common.error'),
+        e.message || t('org.workforce.salarySaveError', null, 'Could not save salary.'),
+      );
+    } finally {
+      setSalaryBusy(false);
     }
   };
 
@@ -304,6 +331,46 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
                 </View>
               ) : null}
 
+              {canManage && !isDismissed ? (
+                <View style={styles.memberActions}>
+                  <Text style={styles.label}>
+                    {t('org.workforce.monthlySalary', null, 'Monthly salary')}
+                  </Text>
+                  <Text style={styles.helper}>
+                    {t(
+                      'org.workforce.monthlySalaryHint',
+                      null,
+                      'Planned month cost for accounting pulse — not full payroll.',
+                    )}
+                  </Text>
+                  <TextInput
+                    mode="outlined"
+                    value={salaryDraft}
+                    onChangeText={setSalaryDraft}
+                    keyboardType="decimal-pad"
+                    placeholder="0.00"
+                    style={styles.salaryInput}
+                  />
+                  <Button
+                    mode="contained-tonal"
+                    loading={salaryBusy}
+                    disabled={salaryBusy}
+                    onPress={saveSalary}
+                  >
+                    {t('org.workforce.saveSalary', null, 'Save salary')}
+                  </Button>
+                </View>
+              ) : member?.monthly_salary != null ? (
+                <View style={styles.memberActions}>
+                  <Text style={styles.label}>
+                    {t('org.workforce.monthlySalary', null, 'Monthly salary')}
+                  </Text>
+                  <Text style={styles.value}>
+                    {member.monthly_salary} {member.currency || 'BGN'}
+                  </Text>
+                </View>
+              ) : null}
+
               {canManage && member.role !== 'owner' ? (
                 <View style={styles.memberActions}>
                   {isDismissed ? (
@@ -449,6 +516,10 @@ const styles = StyleSheet.create({
   },
   helper: {
     color: COLORS.TEXT_MUTED,
+    marginTop: 4,
+  },
+  salaryInput: {
+    backgroundColor: '#fff',
     marginTop: 4,
   },
   error: {
