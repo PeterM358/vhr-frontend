@@ -1039,6 +1039,20 @@
       "waitingStart": "Изчаква до {time}",
       "startTitle": "Старт на задача",
       "startError": "Задачата не можа да се стартира.",
+      "confirmSeenCta": "Потвърждавам, че видях задачата",
+      "confirmSeenBanner": "Потвърдете, че сте видели задачата, преди да можете да стартирате.",
+      "confirmSeenDone": "Потвърдихте, че сте видели задачата",
+      "confirmSeenError": "Неуспешно потвърждение на задачата.",
+      "confirmSeenRequired": "Потвърдете, че сте видели задачата, преди старт.",
+      "scheduleEditTitle": "График",
+      "scheduleSaveCta": "Запази графика",
+      "scheduleSaveError": "Графикът не можа да се запази.",
+      "scheduleSaved": "Графикът е обновен. Работниците трябва да потвърдят отново.",
+      "ackStatusTitle": "Видяно от работниците",
+      "ackStatusPending": "Непотвърдено",
+      "ackStatusConfirmed": "Потвърдено",
+      "ackStatusAllPending": "Никой все още не е потвърдил",
+      "ackStatusAllConfirmed": "Всички са потвърдили",
       "endCta": "Край на работа",
       "endTitle": "Край на работа",
       "endError": "Задачата не можа да се приключи.",
@@ -3045,6 +3059,7 @@
       "open_repair": "Докоснете, за да отворите ремонта",
       "work_order_assigned": "Докоснете, за да отворите задачата",
       "work_order_updated": "Докоснете, за да отворите задачата",
+      "work_order_schedule_changed": "Докоснете, за да потвърдите, че сте видели новия график",
       "work_order_at_address": "Докоснете, за да отворите задачата",
       "work_order_course_finished": "Докоснете, за да отворите задачата",
       "work_order_start_nag": "Докоснете, за да отворите задачата",
@@ -3058,6 +3073,10 @@
       "work_order_updated": {
         "title": "Задачата е обновена",
         "body": "Работна карта, за която сте назначени, е обновена."
+      },
+      "work_order_schedule_changed": {
+        "title": "Променен график на задачата",
+        "body": "Потвърдете, че сте видели новата дата или час."
       },
       "work_order_at_address": {
         "title": "Шофьор на адрес",

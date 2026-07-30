@@ -24,7 +24,14 @@ function canShowStart(task) {
   if (!task) return false;
   if (task.start_acknowledged_at || task.started_at) return false;
   if (task.status === 'done' || task.status === 'cancelled') return false;
+  if (viewerNeedsAck(task)) return false;
   return true;
+}
+
+function viewerNeedsAck(task) {
+  if (!task) return false;
+  if (typeof task.viewer_needs_ack === 'boolean') return task.viewer_needs_ack;
+  return Boolean(task.needs_ack);
 }
 
 function canShowEnd(task) {
@@ -65,6 +72,7 @@ export default function TransportDriverDayWizard({
   fuelRequired = true,
   onStart,
   onEnd,
+  onConfirmSeen,
   onAddExpensePhoto,
   onCheckIn,
   onOpenMaps,
@@ -72,14 +80,16 @@ export default function TransportDriverDayWizard({
 }) {
   const started = Boolean(task?.start_acknowledged_at || task?.started_at);
   const finished = Boolean(task?.ended_at || task?.status === 'done');
+  const needsSeen = viewerNeedsAck(task);
 
   const phase = useMemo(() => {
     if (!task) return 'none';
     if (finished) return 'done';
+    if (needsSeen) return 'confirm_seen';
     if (canShowStart(task)) return 'start';
     if (canShowEnd(task)) return 'active';
     return 'waiting';
-  }, [task, finished]);
+  }, [task, finished, needsSeen]);
 
   const [odo, setOdo] = useState('');
   const [fuel, setFuel] = useState('');
@@ -182,6 +192,37 @@ export default function TransportDriverDayWizard({
         {onOpenFullDetail ? (
           <Button mode="text" onPress={onOpenFullDetail}>
             {t('org.tasks.openFullDetail', null, 'Open full task detail')}
+          </Button>
+        ) : null}
+      </View>
+    );
+  }
+
+  if (phase === 'confirm_seen') {
+    return (
+      <View style={styles.wrap}>
+        <Text style={styles.title}>
+          {t('org.tasks.confirmSeenCta', null, "Confirm I've seen this task")}
+        </Text>
+        <Text style={styles.hint}>
+          {t(
+            'org.tasks.confirmSeenBanner',
+            null,
+            'Please confirm you have seen this task before you can start.',
+          )}
+        </Text>
+        <Button
+          mode="contained"
+          loading={busy}
+          disabled={busy}
+          onPress={() => onConfirmSeen?.(task)}
+          style={styles.primaryBtn}
+        >
+          {t('org.tasks.confirmSeenCta', null, "Confirm I've seen this task")}
+        </Button>
+        {onOpenFullDetail ? (
+          <Button mode="text" onPress={onOpenFullDetail}>
+            {t('org.tasks.openFullDetail', null, 'Open full task')}
           </Button>
         ) : null}
       </View>

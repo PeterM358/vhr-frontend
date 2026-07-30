@@ -213,6 +213,24 @@ export async function startWorkOrder(token, organizationId, workOrderId, payload
   return response.json();
 }
 
+export async function ackWorkOrder(token, organizationId, workOrderId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/ack/`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(await parseError(response, 'Failed to confirm task'));
+  }
+  return response.json();
+}
+
 export async function endWorkOrder(token, organizationId, workOrderId, payload = {}) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/end/`,

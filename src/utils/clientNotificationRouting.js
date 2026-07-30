@@ -52,6 +52,7 @@ function workOrderIdsFromNotification(item) {
 const WORK_ORDER_EVENTS = new Set([
   'work_order_assigned',
   'work_order_updated',
+  'work_order_schedule_changed',
   'work_order_start_nag',
   'work_order_start_overdue',
   'work_order_at_address',

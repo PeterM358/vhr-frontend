@@ -933,6 +933,20 @@
       "waitingStart": "Waiting until {time}",
       "startTitle": "Start task",
       "startError": "Could not start the task.",
+      "confirmSeenCta": "Confirm I've seen this task",
+      "confirmSeenBanner": "Please confirm you have seen this task before you can start.",
+      "confirmSeenDone": "You confirmed you have seen this task",
+      "confirmSeenError": "Could not confirm this task.",
+      "confirmSeenRequired": "Confirm you've seen this task before starting.",
+      "scheduleEditTitle": "Schedule",
+      "scheduleSaveCta": "Save schedule",
+      "scheduleSaveError": "Could not save schedule.",
+      "scheduleSaved": "Schedule updated. Workers must confirm again.",
+      "ackStatusTitle": "Seen by workers",
+      "ackStatusPending": "Not confirmed",
+      "ackStatusConfirmed": "Confirmed",
+      "ackStatusAllPending": "Nobody has confirmed yet",
+      "ackStatusAllConfirmed": "Everyone has confirmed",
       "endCta": "End work",
       "endTitle": "End work",
       "endError": "Could not end the task.",
@@ -3088,6 +3102,7 @@
       "open_repair": "Tap to open repair",
       "work_order_assigned": "Tap to open task",
       "work_order_updated": "Tap to open task",
+      "work_order_schedule_changed": "Tap to confirm you have seen the new schedule",
       "work_order_at_address": "Tap to open task",
       "work_order_course_finished": "Tap to open task",
       "work_order_start_nag": "Tap to open task",
@@ -3101,6 +3116,10 @@
       "work_order_updated": {
         "title": "Task updated",
         "body": "A work card assigned to you was updated."
+      },
+      "work_order_schedule_changed": {
+        "title": "Task schedule changed",
+        "body": "Confirm you have seen the new date or time."
       },
       "work_order_at_address": {
         "title": "Driver at address",

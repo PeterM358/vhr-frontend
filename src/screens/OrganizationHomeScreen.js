@@ -15,7 +15,7 @@ import { appNavBarTotalHeight } from '../components/common/appNavBarMetrics';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
 import { listOrgFleet } from '../api/fleet';
-import { listProjects, listWorkOrders, startWorkOrder } from '../api/orgOperations';
+import { ackWorkOrder, listProjects, listWorkOrders, startWorkOrder } from '../api/orgOperations';
 import {
   buildOrgNavItems,
   organizationMembershipFor,
@@ -650,6 +650,52 @@ export default function OrganizationHomeScreen() {
                           <Text style={styles.startedBadge}>
                             {t('org.tasks.startedDone', null, 'You started this task')}
                           </Text>
+                        ) : currentTask.viewer_needs_ack ||
+                          (currentTask.needs_ack &&
+                            (currentTask.status === 'assigned' || currentTask.status === 'draft')) ? (
+                          <Pressable
+                            onPress={async (e) => {
+                              e?.stopPropagation?.();
+                              if (!org?.id || !currentTask?.id) return;
+                              setBusyStart(true);
+                              try {
+                                const token =
+                                  authToken ||
+                                  (await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN));
+                                const updated = await ackWorkOrder(token, org.id, currentTask.id);
+                                setTasks((prev) =>
+                                  prev.map((row) => (row.id === updated.id ? updated : row)),
+                                );
+                              } catch (err) {
+                                Alert.alert(
+                                  t(
+                                    'org.tasks.confirmSeenCta',
+                                    null,
+                                    "Confirm I've seen this task",
+                                  ),
+                                  err.message ||
+                                    t(
+                                      'org.tasks.confirmSeenError',
+                                      null,
+                                      'Could not confirm this task.',
+                                    ),
+                                );
+                              } finally {
+                                setBusyStart(false);
+                              }
+                            }}
+                            disabled={busyStart}
+                            style={[styles.startBtn, busyStart && styles.startBtnDisabled]}
+                            accessibilityRole="button"
+                          >
+                            <Text style={styles.startBtnText}>
+                              {t(
+                                'org.tasks.confirmSeenCta',
+                                null,
+                                "Confirm I've seen this task",
+                              )}
+                            </Text>
+                          </Pressable>
                         ) : currentTask.status === 'assigned' || currentTask.status === 'draft' ? (
                           <Pressable
                             onPress={(e) => {

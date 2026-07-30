@@ -9,6 +9,7 @@ import AppCard from '../components/ui/AppCard';
 import OrgAppHeader from '../components/org/OrgAppHeader';
 import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePicker';
 import {
+  ackWorkOrder,
   attachWorkOrderMedia,
   checkInWorkOrder,
   confirmWorkOrderMaterialIssue,
@@ -47,6 +48,11 @@ import { formatMaterialListLabel, stripOldMaterialSuffix } from '../utils/materi
 
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
+
+const TIME_OPTIONS = [
+  '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
+  '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00',
+];
 
 const TASK_TABS = [
   { id: 'open', labelKey: 'org.tasks.tabs.open', fallback: 'Open' },
@@ -104,10 +110,17 @@ function scheduledStartLabel(task) {
   return scheduledRangeLabel(task);
 }
 
+function viewerNeedsAck(task) {
+  if (!task) return false;
+  if (typeof task.viewer_needs_ack === 'boolean') return task.viewer_needs_ack;
+  return Boolean(task.needs_ack);
+}
+
 function canShowStartButton(task) {
   if (!task) return false;
   if (task.start_acknowledged_at || task.started_at) return false;
   if (task.status === 'done' || task.status === 'cancelled') return false;
+  if (viewerNeedsAck(task)) return false;
   return task.status === 'assigned' || task.status === 'draft';
 }
 
@@ -121,11 +134,17 @@ function canShowEndButton(task) {
 function isWaitingForStartTime(task) {
   if (!task?.scheduled_date || !task?.planned_start) return false;
   if (task.start_acknowledged_at || task.started_at) return false;
+  if (viewerNeedsAck(task)) return false;
   const clock = String(task.planned_start).slice(0, 8);
   const iso = `${task.scheduled_date}T${clock.length === 5 ? `${clock}:00` : clock}`;
   const startMs = Date.parse(iso);
   if (!Number.isFinite(startMs)) return false;
   return Date.now() < startMs;
+}
+
+function timeChipValue(raw) {
+  if (!raw) return '';
+  return String(raw).slice(0, 5);
 }
 
 function opUnitLabel(op) {
@@ -655,6 +674,10 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [wizardTask, setWizardTask] = useState(null);
   const [showBossFuelForm, setShowBossFuelForm] = useState(false);
   const [driverFullDetail, setDriverFullDetail] = useState(false);
+  const [editScheduledDate, setEditScheduledDate] = useState('');
+  const [editScheduledEndDate, setEditScheduledEndDate] = useState('');
+  const [editPlannedStart, setEditPlannedStart] = useState('');
+  const [editPlannedEnd, setEditPlannedEnd] = useState('');
 
   const onBack = useCallback(() => {
     if (selectedId) {
@@ -776,6 +799,10 @@ export default function OrgTasksScreen({ navigation, route }) {
           setShowManualExpense(false);
           setManualExpenseNote('');
           setManualExpenseAmount('');
+          setEditScheduledDate(detail.scheduled_date || '');
+          setEditScheduledEndDate(detail.scheduled_end_date || '');
+          setEditPlannedStart(timeChipValue(detail.planned_start));
+          setEditPlannedEnd(timeChipValue(detail.planned_end));
         }
       } catch (e) {
         if (!cancelled) {
@@ -957,6 +984,17 @@ export default function OrgTasksScreen({ navigation, route }) {
 
   const acknowledgeStart = async (task, wizardValues = null) => {
     if (!orgId || !task?.id) return;
+    if (viewerNeedsAck(task)) {
+      Alert.alert(
+        t('org.tasks.startTitle', null, 'Start task'),
+        t(
+          'org.tasks.confirmSeenRequired',
+          null,
+          "Confirm you've seen this task before starting.",
+        ),
+      );
+      return;
+    }
     setBusyAction(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
@@ -983,7 +1021,69 @@ export default function OrgTasksScreen({ navigation, route }) {
     }
   };
 
+  const confirmSeenTask = async (task) => {
+    if (!orgId || !task?.id) return;
+    setBusyAction(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const updated = await ackWorkOrder(token, orgId, task.id);
+      replaceTask(updated);
+    } catch (e) {
+      Alert.alert(
+        t('org.tasks.confirmSeenCta', null, "Confirm I've seen this task"),
+        e.message || t('org.tasks.confirmSeenError', null, 'Could not confirm this task.'),
+      );
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const saveTaskSchedule = async () => {
+    if (!orgId || !selected?.id) return;
+    setBusyAction(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const updated = await updateWorkOrder(token, orgId, selected.id, {
+        scheduled_date: editScheduledDate || null,
+        scheduled_end_date: editScheduledEndDate || null,
+        planned_start: editPlannedStart || null,
+        planned_end: editPlannedEnd || null,
+      });
+      replaceTask(updated);
+      setEditScheduledDate(updated.scheduled_date || '');
+      setEditScheduledEndDate(updated.scheduled_end_date || '');
+      setEditPlannedStart(timeChipValue(updated.planned_start));
+      setEditPlannedEnd(timeChipValue(updated.planned_end));
+      Alert.alert(
+        t('org.tasks.scheduleEditTitle', null, 'Schedule'),
+        t(
+          'org.tasks.scheduleSaved',
+          null,
+          'Schedule updated. Workers must confirm again.',
+        ),
+      );
+    } catch (e) {
+      Alert.alert(
+        t('org.tasks.scheduleEditTitle', null, 'Schedule'),
+        e.message || t('org.tasks.scheduleSaveError', null, 'Could not save schedule.'),
+      );
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
   const openStartWizard = (task) => {
+    if (viewerNeedsAck(task)) {
+      Alert.alert(
+        t('org.tasks.startTitle', null, 'Start task'),
+        t(
+          'org.tasks.confirmSeenRequired',
+          null,
+          "Confirm you've seen this task before starting.",
+        ),
+      );
+      return;
+    }
     if (taskNeedsFuelTank(task)) {
       setWizardTask(task);
       setWizardOdo(task.odometer_start != null ? String(task.odometer_start) : '');
@@ -1634,8 +1734,32 @@ export default function OrgTasksScreen({ navigation, route }) {
 
   const renderStartEndControls = (task) => {
     if (!task) return null;
+    const needsSeen = viewerNeedsAck(task);
     return (
       <View style={styles.actionBlock}>
+        {needsSeen ? (
+          <View style={styles.ackBanner}>
+            <Text style={styles.waitingText}>
+              {t(
+                'org.tasks.confirmSeenBanner',
+                null,
+                'Please confirm you have seen this task before you can start.',
+              )}
+            </Text>
+            <Button
+              mode="contained"
+              loading={busyAction}
+              disabled={busyAction}
+              onPress={() => confirmSeenTask(task)}
+              style={styles.startBtn}
+              contentStyle={styles.startBtnContent}
+              labelStyle={styles.startBtnLabel}
+            >
+              {t('org.tasks.confirmSeenCta', null, "Confirm I've seen this task")}
+            </Button>
+          </View>
+        ) : null}
+
         {task.start_acknowledged_at || task.started_at ? (
           <Text style={styles.startedBadge}>
             {t(
@@ -1690,6 +1814,110 @@ export default function OrgTasksScreen({ navigation, route }) {
           </Text>
         ) : null}
       </View>
+    );
+  };
+
+  const renderScheduleEditor = (task) => {
+    if (!canManage || !task || task.status === 'done' || task.status === 'cancelled') {
+      return null;
+    }
+    const renderTimeChips = (value, onSelect, includeNone = false) => (
+      <View style={styles.chipWrap}>
+        {includeNone ? (
+          <Pressable
+            onPress={() => onSelect('')}
+            style={[styles.chip, !value && styles.chipActive]}
+          >
+            <Text style={[styles.chipText, !value && styles.chipTextActive]}>
+              {t('org.tasks.noEndTime', null, 'None')}
+            </Text>
+          </Pressable>
+        ) : null}
+        {TIME_OPTIONS.map((opt) => {
+          const active = value === opt;
+          return (
+            <Pressable
+              key={opt}
+              onPress={() => onSelect(opt)}
+              style={[styles.chip, active && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+    return (
+      <AppCard style={styles.card}>
+        <Text style={styles.section}>
+          {t('org.tasks.scheduleEditTitle', null, 'Schedule')}
+        </Text>
+        <ServiceRecordDatePicker
+          label={t('org.tasks.scheduledDate', null, 'Start date')}
+          valueIso={editScheduledDate || null}
+          onChangeIso={setEditScheduledDate}
+          optional
+        />
+        <ServiceRecordDatePicker
+          label={t('org.tasks.scheduledEndDate', null, 'End date (optional)')}
+          valueIso={editScheduledEndDate || null}
+          onChangeIso={setEditScheduledEndDate}
+          optional
+          minIso={editScheduledDate || undefined}
+        />
+        <Text style={styles.opMeta}>{t('org.tasks.plannedStart', null, 'Start time')}</Text>
+        {renderTimeChips(editPlannedStart, setEditPlannedStart)}
+        <Text style={styles.opMeta}>
+          {t('org.tasks.plannedEnd', null, 'End time (optional)')}
+        </Text>
+        {renderTimeChips(editPlannedEnd, setEditPlannedEnd, true)}
+        <Button
+          mode="contained"
+          loading={busyAction}
+          disabled={busyAction}
+          onPress={saveTaskSchedule}
+          style={styles.secondaryBtn}
+        >
+          {t('org.tasks.scheduleSaveCta', null, 'Save schedule')}
+        </Button>
+      </AppCard>
+    );
+  };
+
+  const renderAckStatus = (task) => {
+    if (!canManage || !task) return null;
+    const people = Array.isArray(task.assignees) ? task.assignees : [];
+    if (!people.length) return null;
+    const pending = people.filter((p) => p.needs_ack !== false && !p.acked_at);
+    const confirmed = people.filter((p) => p.acked_at || p.needs_ack === false);
+    return (
+      <AppCard style={styles.card}>
+        <Text style={styles.section}>
+          {t('org.tasks.ackStatusTitle', null, 'Seen by workers')}
+        </Text>
+        {pending.length === people.length ? (
+          <Text style={styles.opMeta}>
+            {t('org.tasks.ackStatusAllPending', null, 'Nobody has confirmed yet')}
+          </Text>
+        ) : confirmed.length === people.length ? (
+          <Text style={styles.opMeta}>
+            {t('org.tasks.ackStatusAllConfirmed', null, 'Everyone has confirmed')}
+          </Text>
+        ) : null}
+        {people.map((person) => {
+          const seen = Boolean(person.acked_at) || person.needs_ack === false;
+          return (
+            <View key={person.user_id || person.email} style={styles.ackRow}>
+              <Text style={styles.opTitle}>{personLabel(person)}</Text>
+              <Text style={seen ? styles.ackBadgeOk : styles.ackBadgePending}>
+                {seen
+                  ? t('org.tasks.ackStatusConfirmed', null, 'Confirmed')
+                  : t('org.tasks.ackStatusPending', null, 'Not confirmed')}
+              </Text>
+            </View>
+          );
+        })}
+      </AppCard>
     );
   };
 
@@ -1793,6 +2021,7 @@ export default function OrgTasksScreen({ navigation, route }) {
                   fuelRequired
                   onStart={(vals) => acknowledgeStart(selected, vals)}
                   onEnd={(vals) => acknowledgeEnd(selected, vals)}
+                  onConfirmSeen={() => confirmSeenTask(selected)}
                   onAddExpensePhoto={pickExpenseFromCamera}
                   onCheckIn={async (payload) => {
                     if (!orgId || !selected?.id) return;
@@ -1886,6 +2115,9 @@ export default function OrgTasksScreen({ navigation, route }) {
                 </Button>
               ) : null}
             </AppCard>
+
+            {renderScheduleEditor(selected)}
+            {renderAckStatus(selected)}
 
             <AppCard style={styles.card}>
               <Text style={styles.section}>
@@ -3303,6 +3535,34 @@ const styles = StyleSheet.create({
   empty: { color: ON_CARD_MUTED, fontSize: 14, lineHeight: 20 },
   error: { color: '#b91c1c', marginBottom: 10 },
   actionBlock: { marginBottom: 4, gap: 8 },
+  ackBanner: {
+    gap: 8,
+    marginBottom: 4,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(180, 83, 9, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(180, 83, 9, 0.25)',
+  },
+  ackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingVertical: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(15,23,42,0.12)',
+  },
+  ackBadgeOk: {
+    color: '#166534',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  ackBadgePending: {
+    color: '#b45309',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   startBtn: { backgroundColor: COLORS.PRIMARY },
   endBtn: { backgroundColor: '#0f766e' },
   startBtnContent: { paddingVertical: 8 },
