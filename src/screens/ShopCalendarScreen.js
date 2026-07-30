@@ -62,6 +62,15 @@ import {
   isPendingAppointmentRequest,
   isPendingReschedule,
 } from '../utils/shopCalendarJob';
+import {
+  applyDateKeepingTime,
+  buildShopBayOccupancyRows,
+} from '../utils/shopOccupancyBoard';
+import OccupancyMonthBoard from '../components/calendar/OccupancyMonthBoard';
+import {
+  currentMonthIso,
+  shiftMonth,
+} from '../utils/occupancyCalendar';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useTranslation } from '../i18n';
@@ -130,6 +139,16 @@ function startOfWeek(date) {
   d.setDate(d.getDate() + diff);
   d.setHours(0, 0, 0, 0);
   return d;
+}
+
+function monthStartFromIso(monthIso) {
+  const [y, m] = String(monthIso).split('-').map(Number);
+  return new Date(y, m - 1, 1, 0, 0, 0, 0);
+}
+
+function monthEndExclusiveFromIso(monthIso) {
+  const [y, m] = String(monthIso).split('-').map(Number);
+  return new Date(y, m, 1, 0, 0, 0, 0);
 }
 
 function toApiIso(date) {
@@ -573,6 +592,9 @@ export default function ShopCalendarScreen() {
     navigation.navigate(returnTo);
   };
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  /** Same Expo screen (web + apps): Month occupancy board default; Days/timeline is alternate. */
+  const [layoutMode, setLayoutMode] = useState('month');
+  const [monthIso, setMonthIso] = useState(() => currentMonthIso());
   const [loading, setLoading] = useState(true);
   const [calendar, setCalendar] = useState({
     scheduled: [],
@@ -625,7 +647,17 @@ export default function ShopCalendarScreen() {
     [t]
   );
 
-  const rangeEnd = useMemo(() => addCalendarDays(weekStart, CALENDAR_DAY_COUNT), [weekStart]);
+  const rangeStart = useMemo(
+    () => (layoutMode === 'month' ? monthStartFromIso(monthIso) : weekStart),
+    [layoutMode, monthIso, weekStart],
+  );
+  const rangeEnd = useMemo(
+    () =>
+      layoutMode === 'month'
+        ? monthEndExclusiveFromIso(monthIso)
+        : addCalendarDays(weekStart, CALENDAR_DAY_COUNT),
+    [layoutMode, monthIso, weekStart],
+  );
   const dayBuckets = useMemo(
     () => groupByDay(calendar.scheduled, weekStart, CALENDAR_DAY_COUNT),
     [calendar.scheduled, weekStart]
@@ -633,6 +665,18 @@ export default function ShopCalendarScreen() {
   const bayByJobId = useMemo(
     () => assignShopBayNumbers(calendar.scheduled),
     [calendar.scheduled]
+  );
+  const occupancyBoard = useMemo(
+    () =>
+      buildShopBayOccupancyRows(calendar.scheduled, {
+        bayLabel: (n) => t('partnerDashboard.calendar.occupancy.bay', { n }, `Bay ${n}`),
+        unassignedLabel: t(
+          'partnerDashboard.calendar.occupancy.unassigned',
+          null,
+          'Unassigned',
+        ),
+      }),
+    [calendar.scheduled, t],
   );
   const dailyLoadMap = useMemo(
     () => buildDailyLoadMap(calendar.daily_load),
@@ -646,7 +690,7 @@ export default function ShopCalendarScreen() {
     try {
       const token = await AsyncStorage.getItem('@access_token');
       const data = await fetchShopCalendarCached(token, {
-        from: toApiIso(weekStart),
+        from: toApiIso(rangeStart),
         to: toApiIso(rangeEnd),
         force,
       });
@@ -674,7 +718,7 @@ export default function ShopCalendarScreen() {
         setLoading(false);
       }
     }
-  }, [weekStart, rangeEnd, t]);
+  }, [rangeStart, rangeEnd, t]);
 
   loadCalendarRef.current = loadCalendar;
 
@@ -722,6 +766,9 @@ export default function ShopCalendarScreen() {
       if (!Number.isNaN(parsed.getTime())) {
         const next = startOfWeek(parsed);
         setWeekStart((prev) => (sameCalendarDay(prev, next) ? prev : next));
+        const y = parsed.getFullYear();
+        const m = String(parsed.getMonth() + 1).padStart(2, '0');
+        setMonthIso(`${y}-${m}`);
       }
     }
 
@@ -800,6 +847,91 @@ export default function ShopCalendarScreen() {
     setPickupDate(basePickup);
     syncPickupPickerMeta(basePickup, baseBring);
   };
+
+  const openMoveModalForDay = useCallback(
+    (job, startDayIso, endDayIso) => {
+      if (!job) return;
+      openMoveModal(job);
+      const startSrc = job.display_start || job.scheduled_start || job.client_preferred_start;
+      const endSrc = job.display_end || job.scheduled_end || job.client_preferred_end || startSrc;
+      const nextBring = new Date(applyDateKeepingTime(startSrc, startDayIso));
+      const nextPickup = new Date(
+        applyDateKeepingTime(endSrc || startSrc, endDayIso || startDayIso),
+      );
+      applyBringChange(nextBring, { preservePickup: false });
+      applyPickupChange(ensurePickupAfterBring(nextBring, nextPickup));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- openMoveModal/apply* are stable enough for this screen
+    [],
+  );
+
+  const onOccupancyCreateRange = useCallback(
+    ({ start, end }) => {
+      const queue = calendar.unscheduled || [];
+      if (!queue.length) {
+        Alert.alert(
+          t('partnerDashboard.calendar.occupancy.noQueueTitle', null, 'Nothing to schedule'),
+          t(
+            'partnerDashboard.calendar.occupancy.noQueueBody',
+            null,
+            'Add or receive a repair first, then place it on the board from the unscheduled queue.',
+          ),
+        );
+        return;
+      }
+      if (queue.length === 1) {
+        openMoveModalForDay(queue[0], start, end || start);
+        return;
+      }
+      Alert.alert(
+        t('partnerDashboard.calendar.occupancy.pickJobTitle', null, 'Schedule a job'),
+        t(
+          'partnerDashboard.calendar.occupancy.pickJobBody',
+          null,
+          'Choose a job from the unscheduled list below, then set the visit window.',
+        ),
+      );
+    },
+    [calendar.unscheduled, openMoveModalForDay, t],
+  );
+
+  const onOccupancyReschedule = useCallback(
+    async ({ span, start, end }) => {
+      const job = span?.job || (calendar.scheduled || []).find((row) => row.id === span?.id);
+      if (!job) return;
+      const startSrc = job.display_start || job.scheduled_start || job.client_preferred_start;
+      const endSrc = job.display_end || job.scheduled_end || job.client_preferred_end || startSrc;
+      const scheduledStart = applyDateKeepingTime(startSrc, start);
+      const scheduledEnd = applyDateKeepingTime(endSrc || startSrc, end || start);
+      setSaving(true);
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        const result = await proposeRepairSchedule(token, job.id, {
+          scheduledStart,
+          scheduledEnd,
+          note: '',
+        });
+        invalidateShopCalendarCache();
+        await loadCalendar({ force: true });
+        if (result.mode === 'proposal') {
+          Alert.alert(
+            t('partnerDashboard.calendar.sentToClientTitle'),
+            t('partnerDashboard.calendar.sentToClientBody'),
+          );
+        } else {
+          Alert.alert(
+            t('partnerDashboard.calendar.scheduledTitle'),
+            t('partnerDashboard.calendar.scheduledBody'),
+          );
+        }
+      } catch (err) {
+        Alert.alert(t('common.error'), err.message || t('partnerDashboard.calendar.scheduleError'));
+      } finally {
+        setSaving(false);
+      }
+    },
+    [calendar.scheduled, loadCalendar, t],
+  );
 
   const closeMoveModal = () => {
     // Session dismiss: Cancel must not re-force the modal for this job status.
@@ -1100,30 +1232,78 @@ export default function ShopCalendarScreen() {
       />
 
       <View style={styles.weekLabelWrap}>
-        <Button
-          compact
-          mode="text"
-          textColor="#fff"
-          onPress={() => setWeekStart((w) => addCalendarDays(w, -CALENDAR_DAY_COUNT))}
-          accessibilityLabel="Previous period"
-        >
-          ‹
-        </Button>
-        <Text style={styles.weekLabel}>
-          {formatDayLabel(weekStart, locale)} – {formatDayLabel(addCalendarDays(weekStart, CALENDAR_DAY_COUNT - 1), locale)}
-        </Text>
-        <Button
-          compact
-          mode="text"
-          textColor="#fff"
-          onPress={() => setWeekStart((w) => addCalendarDays(w, CALENDAR_DAY_COUNT))}
-          accessibilityLabel="Next period"
-        >
-          ›
-        </Button>
-        <Button compact mode="text" textColor="#fff" onPress={() => setWeekStart(startOfWeek(new Date()))}>
-          {t('partnerDashboard.calendar.today')}
-        </Button>
+        <View style={styles.layoutToggle}>
+          <Button
+            compact
+            mode={layoutMode === 'month' ? 'contained' : 'text'}
+            textColor={layoutMode === 'month' ? undefined : '#fff'}
+            onPress={() => setLayoutMode('month')}
+          >
+            {t('partnerDashboard.calendar.occupancy.month', null, 'Month')}
+          </Button>
+          <Button
+            compact
+            mode={layoutMode === 'timeline' ? 'contained' : 'text'}
+            textColor={layoutMode === 'timeline' ? undefined : '#fff'}
+            onPress={() => setLayoutMode('timeline')}
+          >
+            {t('partnerDashboard.calendar.occupancy.timeline', null, 'Days')}
+          </Button>
+        </View>
+        {layoutMode === 'month' ? (
+          <>
+            <Button
+              compact
+              mode="text"
+              textColor="#fff"
+              onPress={() => setMonthIso((m) => shiftMonth(m, -1))}
+              accessibilityLabel="Previous month"
+            >
+              ‹
+            </Button>
+            <Text style={styles.weekLabel}>{monthIso}</Text>
+            <Button
+              compact
+              mode="text"
+              textColor="#fff"
+              onPress={() => setMonthIso((m) => shiftMonth(m, 1))}
+              accessibilityLabel="Next month"
+            >
+              ›
+            </Button>
+            <Button compact mode="text" textColor="#fff" onPress={() => setMonthIso(currentMonthIso())}>
+              {t('partnerDashboard.calendar.today')}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              compact
+              mode="text"
+              textColor="#fff"
+              onPress={() => setWeekStart((w) => addCalendarDays(w, -CALENDAR_DAY_COUNT))}
+              accessibilityLabel="Previous period"
+            >
+              ‹
+            </Button>
+            <Text style={styles.weekLabel}>
+              {formatDayLabel(weekStart, locale)} –{' '}
+              {formatDayLabel(addCalendarDays(weekStart, CALENDAR_DAY_COUNT - 1), locale)}
+            </Text>
+            <Button
+              compact
+              mode="text"
+              textColor="#fff"
+              onPress={() => setWeekStart((w) => addCalendarDays(w, CALENDAR_DAY_COUNT))}
+              accessibilityLabel="Next period"
+            >
+              ›
+            </Button>
+            <Button compact mode="text" textColor="#fff" onPress={() => setWeekStart(startOfWeek(new Date()))}>
+              {t('partnerDashboard.calendar.today')}
+            </Button>
+          </>
+        )}
       </View>
 
       {unscheduledCount > 0 ? (
@@ -1136,6 +1316,58 @@ export default function ShopCalendarScreen() {
 
       {loading ? (
         <ActivityIndicator style={styles.loader} color="#fff" />
+      ) : layoutMode === 'month' ? (
+        <ScrollView contentContainerStyle={styles.scroll}>
+          {unscheduledCount > 0 ? (
+            <View style={styles.section}>
+              <View style={styles.sectionTitleRow}>
+                <Text style={styles.sectionTitle}>{t('partnerDashboard.calendar.noDateYet')}</Text>
+                <Badge style={styles.countBadge}>{unscheduledCount}</Badge>
+              </View>
+              <Text style={styles.sectionHint}>
+                {t(
+                  'partnerDashboard.calendar.occupancy.monthHint',
+                  null,
+                  'Tap an empty day to place an unscheduled job; long-press a bar to move it (client confirm if already booked).',
+                )}
+              </Text>
+              {calendar.unscheduled.map((job) => (
+                <QueueJobRow
+                  key={`u-${job.id}`}
+                  item={job}
+                  onSchedule={openMoveModal}
+                  onDismiss={dismissUnscheduled}
+                  dismissing={dismissingId === job.id}
+                  t={t}
+                  locale={locale}
+                />
+              ))}
+            </View>
+          ) : null}
+          <View style={[styles.section, styles.occupancySection]}>
+            <OccupancyMonthBoard
+              month={monthIso}
+              rows={occupancyBoard.rows}
+              canEdit
+              rowColLabel={t('partnerDashboard.calendar.occupancy.bayCol', null, 'Bay')}
+              createHint={t('partnerDashboard.calendar.occupancy.selected', null, 'Selected')}
+              moveHint={t(
+                'partnerDashboard.calendar.occupancy.moveHint',
+                null,
+                'Move mode: tap an empty day on the same bay to drop. Tap this banner to cancel.',
+              )}
+              emptyHint={t(
+                'partnerDashboard.calendar.occupancy.empty',
+                null,
+                'No repairs in this month yet.',
+              )}
+              onOpenSpan={(span) => openRepairDetail(span.job || { id: span.id })}
+              onCreateRange={onOccupancyCreateRange}
+              onRescheduleSpan={onOccupancyReschedule}
+            />
+            {saving ? <ActivityIndicator style={{ marginTop: 12 }} color="#fff" /> : null}
+          </View>
+        </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
           {unscheduledCount > 0 ? (
@@ -1419,13 +1651,24 @@ export default function ShopCalendarScreen() {
 const styles = StyleSheet.create({
   weekLabelWrap: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  weekLabel: { color: '#fff', fontSize: 15, fontWeight: '600', flex: 1, textAlign: 'center' },
+  layoutToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginRight: 8,
+  },
+  weekLabel: { color: '#fff', fontSize: 15, fontWeight: '600', flex: 1, textAlign: 'center', minWidth: 96 },
+  occupancySection: {
+    paddingBottom: 24,
+    overflow: 'hidden',
+  },
   unscheduledBanner: {
     marginHorizontal: 12,
     marginBottom: 8,
