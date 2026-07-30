@@ -47,6 +47,7 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
   const [canEditSalaries, setCanEditSalaries] = useState(false);
   const [member, setMember] = useState(null);
   const [fleet, setFleet] = useState([]);
+  const [fleetLoadError, setFleetLoadError] = useState('');
 
   const [assignVehicleId, setAssignVehicleId] = useState(null);
   const [vehicleMenuOpen, setVehicleMenuOpen] = useState(false);
@@ -74,9 +75,11 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
         setError(t('org.workforce.notFound', null, 'Member not found.'));
         return;
       }
-      const [workforce, fleetData] = await Promise.all([
+      const [workforce, fleetResult] = await Promise.all([
         listOrgWorkforce(token, resolved, { status: 'all' }),
-        listOrgFleet(token, resolved, {}).catch(() => ({ results: [] })),
+        listOrgFleet(token, resolved, {})
+          .then((data) => ({ ok: true, data }))
+          .catch((e) => ({ ok: false, error: e })),
       ]);
       setCanManage(Boolean(workforce?.can_manage || workforce?.can_assign_vehicles));
       setCanEditSalaries(Boolean(workforce?.can_edit_salaries));
@@ -98,7 +101,17 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
           ? String(found.pay_component.rate_per_km)
           : '',
       );
-      setFleet(Array.isArray(fleetData?.results) ? fleetData.results : []);
+      if (fleetResult.ok) {
+        const fleetData = fleetResult.data;
+        setFleet(Array.isArray(fleetData?.results) ? fleetData.results : []);
+        setFleetLoadError('');
+      } else {
+        setFleet([]);
+        setFleetLoadError(
+          fleetResult.error?.message ||
+            t('org.workforce.fleetLoadError', null, 'Could not load fleet vehicles for assignment.'),
+        );
+      }
       if (!found) {
         setError(t('org.workforce.notFound', null, 'Member not found.'));
       }
@@ -479,7 +492,19 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
                 </View>
               ) : (
                 <Text style={styles.helper}>
-                  {t('org.workforce.noVehicles', null, 'No vehicle assigned')}
+                  {fleetLoadError
+                    ? fleetLoadError
+                    : fleet.length === 0
+                      ? t(
+                          'org.workforce.noVehiclesFleetEmpty',
+                          null,
+                          'No fleet vehicles loaded. Open Fleet or check permissions, then assign here.',
+                        )
+                      : t(
+                          'org.workforce.noVehicles',
+                          null,
+                          'No vehicle assigned — trucks live in Fleet; assign a driver↔vehicle link here.',
+                        )}
                 </Text>
               )}
 

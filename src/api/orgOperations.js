@@ -208,6 +208,15 @@ export async function markOrgInvoicePaid(token, organizationId, invoiceId) {
   return response.json();
 }
 
+export async function getFleetPlanning(token, organizationId, params = {}) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/fleet-planning/${buildQuery(params)}`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load fleet planning'));
+  return response.json();
+}
+
 export async function createWorkOrder(token, organizationId, payload) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/`,

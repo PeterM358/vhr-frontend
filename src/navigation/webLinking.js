@@ -1062,6 +1062,34 @@ export function getPartnerNavigationStateFromPath(path) {
     };
   }
   if (
+    pathPart === 'partner/organization/fleet-planning' ||
+    pathPart === 'partner/organization/fleet-planning/'
+  ) {
+    const params = {};
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) {
+      params.organizationId = organizationId;
+    }
+    if (query?.month) {
+      params.month = String(query.month);
+    }
+    return {
+      routes: [
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [
+              { name: 'OrgOverview' },
+              { name: 'OrgFleetPlanning', params: Object.keys(params).length ? params : undefined },
+            ],
+          },
+        },
+      ],
+      index: 0,
+    };
+  }
+  if (
     pathPart === 'partner/organization/invoicing' ||
     pathPart === 'partner/organization/invoicing/'
   ) {

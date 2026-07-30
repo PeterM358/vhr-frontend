@@ -37,6 +37,7 @@ import {
   navigateToOrgOperations,
   navigateToOrgProjects,
   navigateToOrgAccounting,
+  navigateToOrgFleetPlanning,
   navigateToOrgTasks,
   navigateToOrgWarehouse,
   navigateToOrgWorkforce,
@@ -270,6 +271,7 @@ export default function OrganizationHomeScreen() {
   const orgName = org?.display_name || t('org.home.title');
   const today = localTodayIso();
   const canManageOps = Boolean(org?.manage_org_operations || org?.manage_fleet);
+  const canPlanFleet = Boolean(org?.can_plan_fleet || canManageOps);
   const canViewAccounting = Boolean(org?.view_org_accounting);
 
   const { todayTasks, upcomingTasks } = useMemo(() => {
@@ -428,6 +430,20 @@ export default function OrganizationHomeScreen() {
       });
     }
 
+    if (canPlanFleet || navRoutes.has('OrgFleetPlanning')) {
+      tiles.push({
+        key: 'fleet-planning',
+        icon: 'table-clock',
+        title: t('org.nav.fleetPlanning', null, 'Fleet planning'),
+        subtitle: t(
+          'org.home.actions.fleetPlanningSubtitle',
+          null,
+          'Month board: see truck occupancy and create tasks from the grid.',
+        ),
+        onPress: () => navigateToOrgFleetPlanning(navigation, { orgId: org?.id }),
+      });
+    }
+
     // Fleet lives on the summary strip — avoid duplicating the department tile.
 
     if (canManageOps) {
@@ -510,6 +526,7 @@ export default function OrganizationHomeScreen() {
     return tiles;
   }, [
     canManageOps,
+    canPlanFleet,
     canViewAccounting,
     isDriver,
     navRoutes,

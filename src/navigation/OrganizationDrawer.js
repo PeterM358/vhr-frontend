@@ -19,6 +19,7 @@ import OrgCreateTaskScreen from '../screens/OrgCreateTaskScreen';
 import OrgProjectsScreen from '../screens/OrgProjectsScreen';
 import OrgWarehouseScreen from '../screens/OrgWarehouseScreen';
 import OrgAccountingScreen from '../screens/OrgAccountingScreen';
+import OrgFleetPlanningScreen from '../screens/OrgFleetPlanningScreen';
 import OrgInvoicingScreen from '../screens/OrgInvoicingScreen';
 import OrgLegalEntityScreen from '../screens/OrgLegalEntityScreen';
 import OrgCalendarScreen from '../screens/OrgCalendarScreen';
@@ -45,6 +46,7 @@ import {
   navigateToOrgAccounting,
   navigateToOrgCalendar,
   navigateToOrgFleet,
+  navigateToOrgFleetPlanning,
   navigateToOrgInvoicing,
   navigateToOrgLegalEntity,
   navigateToOrgNetwork,
@@ -89,6 +91,7 @@ const ROUTE_ICONS = {
   OrgInvoicing: 'receipt',
   OrgLedger: 'book-open-outline',
   OrgAccounting: 'book-open-outline',
+  OrgFleetPlanning: 'table-clock',
   OrgPublicProfile: 'earth',
   OrgCalendar: 'calendar-month-outline',
 };
@@ -124,6 +127,7 @@ function CustomDrawerContent(props) {
   const isDriver = isDriverMembership(org);
   const personalUnread = isDriver ? unreadNotifications || 0 : 0;
   const canManageOps = Boolean(org?.manage_org_operations || org?.manage_fleet);
+  const canPlanFleet = Boolean(org?.can_plan_fleet || canManageOps);
   const canViewAccounting = Boolean(org?.view_org_accounting);
 
   const departmentItems = useMemo(() => {
@@ -167,6 +171,20 @@ function CustomDrawerContent(props) {
         icon: 'clipboard-check-outline',
       });
       seen.add('OrgTasks');
+    }
+
+    if (canPlanFleet && !seen.has('OrgFleetPlanning')) {
+      const tasksIdx = items.findIndex((row) => row.route === 'OrgTasks');
+      const fleetIdx = items.findIndex((row) => row.route === 'OrgFleet');
+      const insertAt =
+        tasksIdx >= 0 ? tasksIdx + 1 : fleetIdx >= 0 ? fleetIdx + 1 : items.length;
+      items.splice(insertAt, 0, {
+        key: 'fleet-planning',
+        route: 'OrgFleetPlanning',
+        label: t('org.nav.fleetPlanning', null, 'Fleet planning'),
+        icon: 'table-clock',
+      });
+      seen.add('OrgFleetPlanning');
     }
 
     if (canManageOps && !seen.has('OrgProjects')) {
@@ -224,7 +242,7 @@ function CustomDrawerContent(props) {
     }
 
     return items;
-  }, [canManageOps, canViewAccounting, isDriver, org, t]);
+  }, [canManageOps, canPlanFleet, canViewAccounting, isDriver, org, t]);
 
   const openRoute = (route) => {
     props.navigation.closeDrawer();
@@ -247,6 +265,10 @@ function CustomDrawerContent(props) {
     }
     if (normalized === 'OrgTasks') {
       navigateToOrgTasks(navigation, { orgId: org?.id });
+      return;
+    }
+    if (normalized === 'OrgFleetPlanning') {
+      navigateToOrgFleetPlanning(navigation, { orgId: org?.id });
       return;
     }
     if (normalized === 'OrgProjects') {
@@ -455,6 +477,7 @@ export default function OrganizationDrawer() {
         component={OrgCreateTaskScreen}
         options={{ drawerItemStyle: { display: 'none' } }}
       />
+      <Drawer.Screen name="OrgFleetPlanning" component={OrgFleetPlanningScreen} />
       <Drawer.Screen name="OrgProjects" component={OrgProjectsScreen} />
       <Drawer.Screen name="OrgWarehouse" component={OrgWarehouseScreen} />
       <Drawer.Screen name="OrgAccounting" component={OrgAccountingScreen} />

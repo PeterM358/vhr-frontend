@@ -29,6 +29,7 @@ export const linkingScreens = {
       OrgProjects: 'projects',
       OrgWarehouse: 'warehouse',
       OrgAccounting: 'accounting',
+      OrgFleetPlanning: 'fleet-planning',
       OrgInvoicing: 'invoicing',
       OrgLegalEntity: 'company',
       OrgCalendar: 'calendar',

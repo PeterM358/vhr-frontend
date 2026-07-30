@@ -18,7 +18,7 @@ import {
 import { listOrgFleet } from '../api/fleet';
 import { listOrgWorkforce } from '../api/orgWorkforce';
 import { resolveActiveOrganizationId } from '../utils/orgWorkspace';
-import { navigateToOrgTasks } from '../navigation/webNavigation';
+import { navigateToOrgFleetPlanning, navigateToOrgTasks } from '../navigation/webNavigation';
 import { mapFleetReadiness } from '../utils/fleetReadinessStatus';
 import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -193,6 +193,8 @@ function templateOpIds(activities, templateId) {
 export default function OrgCreateTaskScreen({ navigation, route }) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
+  const returnTo = route?.params?.returnTo;
+  const returnMonth = route?.params?.returnMonth;
   const scrollBottomPadding = useScrollContentBottomPadding(40);
 
   const [orgId, setOrgId] = useState(null);
@@ -387,14 +389,26 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     return steps;
   }, [flavor, t, hasTransportOps]);
 
+  const goAfterLeave = useCallback(() => {
+    const id = routeOrgId || orgId;
+    if (returnTo === 'OrgFleetPlanning') {
+      navigateToOrgFleetPlanning(navigation, {
+        orgId: id,
+        month: returnMonth || undefined,
+      });
+      return;
+    }
+    navigateToOrgTasks(navigation, { orgId: id });
+  }, [navigation, orgId, returnMonth, returnTo, routeOrgId]);
+
   const onBack = useCallback(() => {
     if (step > 0) {
       setStep((s) => s - 1);
       setFormMessage('');
       return;
     }
-    navigateToOrgTasks(navigation, { orgId: routeOrgId || orgId });
-  }, [navigation, orgId, routeOrgId, step]);
+    goAfterLeave();
+  }, [goAfterLeave, step]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -423,12 +437,32 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
           : [];
       setVehicles(fleetRows);
       setProjects((projectData?.results || []).filter((row) => row.is_active !== false));
+
+      const prefVehicle =
+        route?.params?.vehicleId ??
+        route?.params?.vehicle_id ??
+        (Array.isArray(route?.params?.vehicleIds) ? route.params.vehicleIds[0] : null);
+      if (prefVehicle != null && prefVehicle !== '') {
+        const vid = Number(prefVehicle) || prefVehicle;
+        setVehicleIds([vid]);
+        setVehicleReadinessFilter('all');
+      }
+      const prefStart =
+        route?.params?.scheduledDate || route?.params?.scheduled_date || '';
+      if (prefStart) {
+        setScheduledDate(String(prefStart).slice(0, 10));
+      }
+      const prefEnd =
+        route?.params?.scheduledEndDate || route?.params?.scheduled_end_date || '';
+      if (prefEnd) {
+        setScheduledEndDate(String(prefEnd).slice(0, 10));
+      }
     } catch (e) {
       setError(e.message || t('org.tasks.loadError', null, 'Could not load task form.'));
     } finally {
       setLoading(false);
     }
-  }, [routeOrgId, t]);
+  }, [route?.params, routeOrgId, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -765,7 +799,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         payload.shipments = [];
       }
       await createWorkOrder(token, orgId, payload);
-      navigateToOrgTasks(navigation, { orgId });
+      goAfterLeave();
     } catch (e) {
       const vehicleOverlap = isVehicleOverlapError(e);
       const assigneeOverlap = isAssigneeOverlapError(e);

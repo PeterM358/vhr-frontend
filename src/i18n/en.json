@@ -308,6 +308,7 @@
         "profileSubtitle": "Open your account profile.",
         "createTaskSubtitle": "Assign multiple operations and people on one work card.",
         "tasksSubtitle": "Open, all, and add work cards.",
+        "fleetPlanningSubtitle": "Month board: see truck occupancy and create tasks from the grid.",
         "warehouseSubtitle": "Import supplier invoices and stock materials for operations.",
         "projectsSubtitle": "Volume, value, contacts, and counterparties.",
         "accountingSubtitle": "Month pulse, workforce cost, and budget share pie."
@@ -1123,7 +1124,21 @@
       "transport": "Transport",
       "construction": "Construction",
       "publicProfile": "Public profile",
-      "invoicing": "Invoicing"
+      "invoicing": "Invoicing",
+      "fleetPlanning": "Fleet planning"
+    },
+    "fleetPlanning": {
+      "title": "Fleet planning",
+      "hint": "Vehicles × days. Tap an empty day (twice for a range) to create a task — the bar is the task.",
+      "today": "Today",
+      "idleOnly": "Idle only",
+      "newTask": "New task",
+      "createSelected": "Create task",
+      "selectionHint": "Selected {start} → {end}. Tap another day on the same truck for a range, or Create.",
+      "vehicleCol": "Vehicle",
+      "idleDays": "{count} idle",
+      "empty": "No vehicles in this fleet yet. Add vehicles in Fleet first.",
+      "loadError": "Could not load planning."
     },
     "invoicing": {
       "title": "Invoicing",
@@ -1235,7 +1250,9 @@
       "pickVehicle": "Choose vehicle",
       "confirmAssign": "Assign",
       "endAssignment": "End",
-      "noVehicles": "No vehicle assigned",
+      "noVehicles": "No vehicle assigned — trucks live in Fleet; assign a driver↔vehicle link here.",
+      "noVehiclesFleetEmpty": "No fleet vehicles loaded. Open Fleet or check permissions, then assign here.",
+      "fleetLoadError": "Could not load fleet vehicles for assignment.",
       "noDriver": "No driver assigned",
       "loadError": "Could not load workforce.",
       "inviteError": "Could not create invite.",

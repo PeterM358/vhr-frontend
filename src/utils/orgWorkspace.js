@@ -116,6 +116,7 @@ export function buildOrgNavItems(org, t) {
     OrgDocuments: t('org.nav.documents', null, 'Documents'),
     OrgLedger: t('org.nav.accounting', null, 'Accounting'),
     OrgAccounting: t('org.nav.accounting', null, 'Accounting'),
+    OrgFleetPlanning: t('org.nav.fleetPlanning', null, 'Fleet planning'),
     OrgNetwork: t('org.nav.network', null, 'Business network'),
     OrgTransport: t('org.nav.transport', null, 'Transport'),
     OrgConstruction: t('org.nav.construction', null, 'Construction'),
