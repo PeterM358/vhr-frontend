@@ -389,6 +389,8 @@
       "cards": {
         "workforce": "Разход персонал",
         "workforceHint": "{count} със зададена заплата",
+        "estimatedPayroll": "Очаквани възнаграждения",
+        "estimatedPayrollHint": "Проратирана база + по избор ставки м²/км (Фаза 1).",
         "fleet": "Поддръжка автопарк",
         "materials": "Материали (доставки)",
         "documentsHint": "{count} потвърдени документа",
@@ -468,12 +470,15 @@
       "notFound": "Членът не е намерен.",
       "monthlySalary": "Месечна заплата",
       "monthlySalaryHint": "Планирана месечна стойност за счетоводния пулс — не пълен ТРЗ.",
+      "ratePerM2": "Ставка на м² (по избор)",
+      "ratePerKm": "Ставка на км (по избор)",
       "saveSalary": "Запази заплата",
       "salarySaveError": "Заплатата не бе запазена.",
       "roles": {
         "owner": "Собственик",
         "admin": "Мениджър",
         "transport": "Шофьор",
+        "dispatcher": "Диспечер",
         "viewer": "Член",
         "warehouse": "Склад",
         "accounting": "Счетоводство",
@@ -1376,6 +1381,7 @@
       "sales": "Продажби",
       "warehouse": "Склад",
       "transport": "Шофьор / Транспорт",
+      "dispatcher": "Диспечер",
       "accounting": "Счетоводство",
       "viewer": "Преглед"
     }

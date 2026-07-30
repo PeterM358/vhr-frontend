@@ -124,6 +124,7 @@ function CustomDrawerContent(props) {
   const isDriver = isDriverMembership(org);
   const personalUnread = isDriver ? unreadNotifications || 0 : 0;
   const canManageOps = Boolean(org?.manage_org_operations || org?.manage_fleet);
+  const canViewAccounting = Boolean(org?.view_org_accounting);
 
   const departmentItems = useMemo(() => {
     if (isDriver) {
@@ -202,7 +203,7 @@ function CustomDrawerContent(props) {
       seen.add('OrgWarehouse');
     }
 
-    if (canManageOps && !seen.has('OrgAccounting')) {
+    if (canViewAccounting && !seen.has('OrgAccounting')) {
       items.push({
         key: 'accounting',
         route: 'OrgAccounting',
@@ -212,7 +213,7 @@ function CustomDrawerContent(props) {
       seen.add('OrgAccounting');
     }
 
-    if (canManageOps && !seen.has('OrgInvoicing')) {
+    if ((canViewAccounting || org?.membership_role === 'accounting') && !seen.has('OrgInvoicing')) {
       items.push({
         key: 'invoicing',
         route: 'OrgInvoicing',
@@ -223,7 +224,7 @@ function CustomDrawerContent(props) {
     }
 
     return items;
-  }, [canManageOps, isDriver, org, t]);
+  }, [canManageOps, canViewAccounting, isDriver, org, t]);
 
   const openRoute = (route) => {
     props.navigation.closeDrawer();

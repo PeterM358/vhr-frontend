@@ -26,6 +26,7 @@ import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 
 const ROLE_OPTIONS = [
   { value: 'transport', labelKey: 'org.workforce.roles.transport' },
+  { value: 'dispatcher', labelKey: 'org.workforce.roles.dispatcher' },
   { value: 'admin', labelKey: 'org.workforce.roles.admin' },
   { value: 'viewer', labelKey: 'org.workforce.roles.viewer' },
   { value: 'warehouse', labelKey: 'org.workforce.roles.warehouse' },

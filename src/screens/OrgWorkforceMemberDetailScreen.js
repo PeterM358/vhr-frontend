@@ -27,6 +27,7 @@ import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 
 const ROLE_OPTIONS = [
   { value: 'transport', labelKey: 'org.workforce.roles.transport' },
+  { value: 'dispatcher', labelKey: 'org.workforce.roles.dispatcher' },
   { value: 'admin', labelKey: 'org.workforce.roles.admin' },
   { value: 'viewer', labelKey: 'org.workforce.roles.viewer' },
   { value: 'warehouse', labelKey: 'org.workforce.roles.warehouse' },
@@ -43,6 +44,7 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [canManage, setCanManage] = useState(false);
+  const [canEditSalaries, setCanEditSalaries] = useState(false);
   const [member, setMember] = useState(null);
   const [fleet, setFleet] = useState([]);
 
@@ -52,6 +54,8 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
   const [showAssign, setShowAssign] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const [salaryDraft, setSalaryDraft] = useState('');
+  const [rateM2Draft, setRateM2Draft] = useState('');
+  const [rateKmDraft, setRateKmDraft] = useState('');
   const [salaryBusy, setSalaryBusy] = useState(false);
 
   const onBack = useCallback(() => {
@@ -75,12 +79,23 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
         listOrgFleet(token, resolved, {}).catch(() => ({ results: [] })),
       ]);
       setCanManage(Boolean(workforce?.can_manage || workforce?.can_assign_vehicles));
+      setCanEditSalaries(Boolean(workforce?.can_edit_salaries));
       const rows = Array.isArray(workforce?.results) ? workforce.results : [];
       const found = rows.find((row) => String(row.membership_id) === String(membershipId)) || null;
       setMember(found);
       setSalaryDraft(
         found?.monthly_salary != null && found?.monthly_salary !== ''
           ? String(found.monthly_salary)
+          : '',
+      );
+      setRateM2Draft(
+        found?.pay_component?.rate_per_m2 != null && found?.pay_component?.rate_per_m2 !== ''
+          ? String(found.pay_component.rate_per_m2)
+          : '',
+      );
+      setRateKmDraft(
+        found?.pay_component?.rate_per_km != null && found?.pay_component?.rate_per_km !== ''
+          ? String(found.pay_component.rate_per_km)
           : '',
       );
       setFleet(Array.isArray(fleetData?.results) ? fleetData.results : []);
@@ -130,14 +145,24 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
   };
 
   const saveSalary = async () => {
-    if (!canManage || !orgId || !member || member.is_active === false) return;
+    if (!canEditSalaries || !orgId || !member || member.is_active === false) return;
     setSalaryBusy(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const trimmed = String(salaryDraft || '').trim();
-      await updateOrgWorkforceMember(token, orgId, member.membership_id, {
+      const payload = {
         monthly_salary: trimmed === '' ? null : trimmed,
-      });
+      };
+      const m2 = String(rateM2Draft || '').trim();
+      const km = String(rateKmDraft || '').trim();
+      if (m2 !== '' || km !== '' || member?.pay_component) {
+        payload.pay_component = {
+          monthly_base: trimmed === '' ? null : trimmed,
+          rate_per_m2: m2 === '' ? null : m2,
+          rate_per_km: km === '' ? null : km,
+        };
+      }
+      await updateOrgWorkforceMember(token, orgId, member.membership_id, payload);
       await load();
     } catch (e) {
       Alert.alert(
@@ -331,7 +356,7 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
                 </View>
               ) : null}
 
-              {canManage && !isDismissed ? (
+              {canEditSalaries && !isDismissed ? (
                 <View style={styles.memberActions}>
                   <Text style={styles.label}>
                     {t('org.workforce.monthlySalary', null, 'Monthly salary')}
@@ -347,6 +372,28 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
                     mode="outlined"
                     value={salaryDraft}
                     onChangeText={setSalaryDraft}
+                    keyboardType="decimal-pad"
+                    placeholder="0.00"
+                    style={styles.salaryInput}
+                  />
+                  <Text style={styles.label}>
+                    {t('org.workforce.ratePerM2', null, 'Rate per m² (optional)')}
+                  </Text>
+                  <TextInput
+                    mode="outlined"
+                    value={rateM2Draft}
+                    onChangeText={setRateM2Draft}
+                    keyboardType="decimal-pad"
+                    placeholder="0.00"
+                    style={styles.salaryInput}
+                  />
+                  <Text style={styles.label}>
+                    {t('org.workforce.ratePerKm', null, 'Rate per km (optional)')}
+                  </Text>
+                  <TextInput
+                    mode="outlined"
+                    value={rateKmDraft}
+                    onChangeText={setRateKmDraft}
                     keyboardType="decimal-pad"
                     placeholder="0.00"
                     style={styles.salaryInput}
@@ -368,6 +415,18 @@ export default function OrgWorkforceMemberDetailScreen({ navigation, route }) {
                   <Text style={styles.value}>
                     {member.monthly_salary} {member.currency || 'BGN'}
                   </Text>
+                  {member?.pay_component?.rate_per_m2 != null ? (
+                    <Text style={styles.helper}>
+                      {t('org.workforce.ratePerM2', null, 'Rate per m² (optional)')}
+                      {`: ${member.pay_component.rate_per_m2}`}
+                    </Text>
+                  ) : null}
+                  {member?.pay_component?.rate_per_km != null ? (
+                    <Text style={styles.helper}>
+                      {t('org.workforce.ratePerKm', null, 'Rate per km (optional)')}
+                      {`: ${member.pay_component.rate_per_km}`}
+                    </Text>
+                  ) : null}
                 </View>
               ) : null}
 

@@ -308,6 +308,21 @@ export default function OrgAccountingScreen({ navigation, route }) {
                 </View>
                 <View style={styles.metricCard}>
                   <Text style={styles.metricValue}>
+                    {formatMoney(summary.estimated_payroll?.amount, currency)}
+                  </Text>
+                  <Text style={styles.metricLabel}>
+                    {t('org.accounting.cards.estimatedPayroll', null, 'Estimated payroll')}
+                  </Text>
+                  <Text style={styles.metricHint}>
+                    {t(
+                      'org.accounting.cards.estimatedPayrollHint',
+                      null,
+                      'Prorated base + optional m²/km rates (Phase 1).',
+                    )}
+                  </Text>
+                </View>
+                <View style={styles.metricCard}>
+                  <Text style={styles.metricValue}>
                     {formatMoney(summary.fleet_maintenance?.amount, currency)}
                   </Text>
                   <Text style={styles.metricLabel}>

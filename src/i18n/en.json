@@ -1173,6 +1173,8 @@
       "cards": {
         "workforce": "Workforce cost",
         "workforceHint": "{count} with salary set",
+        "estimatedPayroll": "Estimated payroll",
+        "estimatedPayrollHint": "Prorated base + optional m²/km rates (Phase 1).",
         "fleet": "Fleet maintenance",
         "materials": "Materials (intake)",
         "documentsHint": "{count} confirmed docs",
@@ -1252,12 +1254,15 @@
       "notFound": "Member not found.",
       "monthlySalary": "Monthly salary",
       "monthlySalaryHint": "Planned month cost for accounting pulse — not full payroll.",
+      "ratePerM2": "Rate per m² (optional)",
+      "ratePerKm": "Rate per km (optional)",
       "saveSalary": "Save salary",
       "salarySaveError": "Could not save salary.",
       "roles": {
         "owner": "Owner",
         "admin": "Manager",
         "transport": "Driver",
+        "dispatcher": "Dispatcher",
         "viewer": "Member",
         "warehouse": "Warehouse",
         "accounting": "Accounting",
@@ -1377,6 +1382,7 @@
       "sales": "Sales",
       "warehouse": "Warehouse",
       "transport": "Driver / Transport",
+      "dispatcher": "Dispatcher",
       "accounting": "Accounting",
       "viewer": "Viewer"
     }

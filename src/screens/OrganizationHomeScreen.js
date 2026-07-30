@@ -270,6 +270,7 @@ export default function OrganizationHomeScreen() {
   const orgName = org?.display_name || t('org.home.title');
   const today = localTodayIso();
   const canManageOps = Boolean(org?.manage_org_operations || org?.manage_fleet);
+  const canViewAccounting = Boolean(org?.view_org_accounting);
 
   const { todayTasks, upcomingTasks } = useMemo(() => {
     const open = tasks.filter((row) => isOpenTaskStatus(row.status));
@@ -478,7 +479,7 @@ export default function OrganizationHomeScreen() {
       });
     }
 
-    if (canManageOps || navRoutes.has('OrgAccounting') || navRoutes.has('OrgLedger')) {
+    if (canViewAccounting || navRoutes.has('OrgAccounting') || navRoutes.has('OrgLedger')) {
       tiles.push({
         key: 'accounting',
         icon: 'book-open-outline',
@@ -509,6 +510,7 @@ export default function OrganizationHomeScreen() {
     return tiles;
   }, [
     canManageOps,
+    canViewAccounting,
     isDriver,
     navRoutes,
     navigation,
@@ -825,20 +827,24 @@ export default function OrganizationHomeScreen() {
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.statsFootnote}>
-                  {t(
-                    'org.home.stats.moneyFootnote',
-                    null,
-                    'Open Accounting for m² / km / hours, salaries, and budget pie.',
-                  )}
-                </Text>
-                <Button
-                  mode="text"
-                  compact
-                  onPress={() => navigateToOrgAccounting(navigation, { orgId: org?.id })}
-                >
-                  {t('org.home.stats.openAccounting', null, 'Open accounting')}
-                </Button>
+                {canViewAccounting ? (
+                  <>
+                    <Text style={styles.statsFootnote}>
+                      {t(
+                        'org.home.stats.moneyFootnote',
+                        null,
+                        'Open Accounting for m² / km / hours, salaries, and budget pie.',
+                      )}
+                    </Text>
+                    <Button
+                      mode="text"
+                      compact
+                      onPress={() => navigateToOrgAccounting(navigation, { orgId: org?.id })}
+                    >
+                      {t('org.home.stats.openAccounting', null, 'Open accounting')}
+                    </Button>
+                  </>
+                ) : null}
               </DashboardCard>
             ) : null}
           </>
