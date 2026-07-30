@@ -25,6 +25,7 @@ import {
   VehicleSpecsScreen,
   EditVehicleDetailsScreen,
   ShopDetailScreen,
+  PublicBusinessProfileScreen,
   AuthLoadingScreen,
   PromotionDetailScreen,
   ClientRepairsList,
@@ -396,6 +397,11 @@ export default function AppNavigator() {
           name="ShopDetail"
           component={ShopDetailScreen}
           options={{ ...appNavBarScreenOptions, title: 'Service Center Details' }}
+        />
+        <Stack.Screen
+          name="PublicBusinessProfile"
+          component={PublicBusinessProfileScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Company' }}
         />
         <Stack.Screen name="PromotionDetail" component={PromotionDetailScreen} options={{ title: 'Promotion Details' }}/>
         <Stack.Screen

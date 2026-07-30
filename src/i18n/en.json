@@ -1127,6 +1127,32 @@
       "invoicing": "Invoicing",
       "fleetPlanning": "Fleet planning"
     },
+    "publicProfile": {
+      "title": "Public profile",
+      "publicTitle": "Company",
+      "lead": "Optional B2B page for partners and Google — like service centers, but for your company. Off by default. Never shows tasks, salaries, or fleet ERP.",
+      "publish": "Publish public page",
+      "publishHint": "Opt-in only. You can turn it off anytime.",
+      "slug": "Public URL slug",
+      "preview": "Open public page",
+      "savedTitle": "Public profile",
+      "published": "Your B2B page is public. ERP data stays private.",
+      "unpublished": "Public page is hidden.",
+      "loadError": "Could not load public profile settings.",
+      "saveError": "Could not save.",
+      "notFound": "Organization not found.",
+      "whatWeDo": "Business roles",
+      "locations": "Linked locations",
+      "openShop": "Open",
+      "noLocations": "No public service locations linked.",
+      "privacyNote": "Public company page — operational ERP data is not shown here.",
+      "roles": {
+        "transport": "Transport",
+        "fleet": "Fleet",
+        "serviceCenter": "Service center",
+        "construction": "Construction"
+      }
+    },
     "fleetPlanning": {
       "title": "Fleet planning",
       "hint": "Vehicles × days. Tap an empty day (twice for a range) to create a task — the bar is the task.",

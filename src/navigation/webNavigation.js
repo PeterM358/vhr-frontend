@@ -70,6 +70,7 @@ import {
   partnerOrganizationFleetPlanning,
   partnerOrganizationInvoicing,
   partnerOrganizationLegalEntity,
+  partnerOrganizationPublicProfile,
   partnerOrganizationWorkforce,
   partnerOrganizationWorkforceMember,
   partnerBusinessNetwork,
@@ -1339,6 +1340,32 @@ export function navigateToOrgLegalEntity(navigation, params = {}) {
     return;
   }
   navigation.navigate('OrgHome', { screen: 'OrgLegalEntity', params: routeParams });
+}
+
+export function navigateToOrgPublicProfile(navigation, params = {}) {
+  const routeParams = params.orgId != null ? { organizationId: params.orgId, ...params } : params;
+  const orgPublicRoute = {
+    name: 'OrgHome',
+    state: {
+      index: 1,
+      routes: [
+        { name: 'OrgOverview' },
+        { name: 'OrgPublicProfile', params: Object.keys(routeParams).length ? routeParams : undefined },
+      ],
+    },
+  };
+  if (Platform.OS === 'web') {
+    const pathParams = {};
+    if (params.orgId != null) pathParams.organizationId = params.orgId;
+    else if (params.organizationId != null) pathParams.organizationId = params.organizationId;
+    resetPartnerStackWebRoutes(
+      navigation,
+      [orgPublicRoute],
+      partnerOrganizationPublicProfile(pathParams),
+    );
+    return;
+  }
+  navigation.navigate('OrgHome', { screen: 'OrgPublicProfile', params: routeParams });
 }
 
 export function navigateToOrgWorkforceMember(navigation, params = {}) {

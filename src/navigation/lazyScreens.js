@@ -10,6 +10,7 @@ export { default as VehicleDetailScreen } from '../screens/VehicleDetailScreen';
 export { default as VehicleSpecsScreen } from '../screens/VehicleSpecsScreen';
 export { default as EditVehicleDetailsScreen } from '../screens/EditVehicleDetailsScreen';
 export { default as ShopDetailScreen } from '../screens/ShopDetailScreen';
+export { default as PublicBusinessProfileScreen } from '../screens/PublicBusinessProfileScreen';
 export { default as AuthLoadingScreen } from '../screens/AuthLoadingScreen';
 export { default as PromotionDetailScreen } from '../screens/PromotionDetailScreen';
 export { default as ClientRepairsList } from '../components/client/ClientRepairsList';

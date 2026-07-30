@@ -22,6 +22,7 @@ import OrgAccountingScreen from '../screens/OrgAccountingScreen';
 import OrgFleetPlanningScreen from '../screens/OrgFleetPlanningScreen';
 import OrgInvoicingScreen from '../screens/OrgInvoicingScreen';
 import OrgLegalEntityScreen from '../screens/OrgLegalEntityScreen';
+import OrgPublicProfileScreen from '../screens/OrgPublicProfileScreen';
 import OrgCalendarScreen from '../screens/OrgCalendarScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
 
@@ -49,6 +50,7 @@ import {
   navigateToOrgFleetPlanning,
   navigateToOrgInvoicing,
   navigateToOrgLegalEntity,
+  navigateToOrgPublicProfile,
   navigateToOrgNetwork,
   navigateToOrgOperations,
   navigateToOrgProjects,
@@ -295,6 +297,10 @@ function CustomDrawerContent(props) {
       navigateToOrgLegalEntity(navigation, { orgId: org?.id });
       return;
     }
+    if (normalized === 'OrgPublicProfile') {
+      navigateToOrgPublicProfile(navigation, { orgId: org?.id });
+      return;
+    }
     if (Platform.OS === 'web') {
       if (normalized === 'OrgOverview') {
         navigation.navigate('OrgOverview');
@@ -381,6 +387,15 @@ function CustomDrawerContent(props) {
           onPress={() => openRoute('OrgLegalEntity')}
           icon={({ color, size }) => (
             <DrawerMenuIcon name="domain" color={color} size={size} />
+          )}
+          {...itemProps}
+        />
+
+        <DrawerItem
+          label={t('org.nav.publicProfile', null, 'Public profile')}
+          onPress={() => openRoute('OrgPublicProfile')}
+          icon={({ color, size }) => (
+            <DrawerMenuIcon name="earth" color={color} size={size} />
           )}
           {...itemProps}
         />
@@ -483,6 +498,7 @@ export default function OrganizationDrawer() {
       <Drawer.Screen name="OrgAccounting" component={OrgAccountingScreen} />
       <Drawer.Screen name="OrgInvoicing" component={OrgInvoicingScreen} />
       <Drawer.Screen name="OrgLegalEntity" component={OrgLegalEntityScreen} />
+      <Drawer.Screen name="OrgPublicProfile" component={OrgPublicProfileScreen} />
       <Drawer.Screen name="OrgCalendar" component={OrgCalendarScreen} />
       <Drawer.Screen name="OrgWorkforce" component={OrgWorkforceScreen} />
       <Drawer.Screen name="OrgNetwork" component={NetworkOrganizationScreen} />

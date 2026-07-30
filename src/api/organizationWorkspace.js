@@ -44,3 +44,28 @@ export async function getPublicOrganizationProfile(slug) {
   if (!response.ok) throw new Error(await parseError(response, 'Organization not found'));
   return response.json();
 }
+
+export async function getOrganizationPublicProfileSettings(token, organizationId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/public-profile/`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load public profile settings'));
+  return response.json();
+}
+
+export async function updateOrganizationPublicProfileSettings(token, organizationId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/public-profile/`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to update public profile'));
+  return response.json();
+}

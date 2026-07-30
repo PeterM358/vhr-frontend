@@ -31,6 +31,7 @@ const PUBLIC_ESCAPE_ROUTE_NAMES = new Set([
   'ShopMap',
   'PublicHome',
   'ShopDetail',
+  'PublicBusinessProfile',
   'PartnerShopMap',
 ]);
 
