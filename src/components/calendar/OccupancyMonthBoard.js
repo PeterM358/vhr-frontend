@@ -10,7 +10,7 @@ import {
   defaultStatusColor,
   isoDay,
   spanDurationDays,
-} from '../utils/occupancyCalendar';
+} from '../../utils/occupancyCalendar';
 
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
