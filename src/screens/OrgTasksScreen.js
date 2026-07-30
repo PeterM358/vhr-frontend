@@ -1040,6 +1040,36 @@ export default function OrgTasksScreen({ navigation, route }) {
 
   const saveTaskSchedule = async () => {
     if (!orgId || !selected?.id) return;
+    const startDate = editScheduledDate || '';
+    const endDate = editScheduledEndDate || '';
+    if (startDate && endDate && endDate < startDate) {
+      Alert.alert(
+        t('org.tasks.scheduleEditTitle', null, 'Schedule'),
+        t(
+          'org.tasks.endDateBeforeStart',
+          null,
+          'End date must be on or after the start date.',
+        ),
+      );
+      return;
+    }
+    const sameDay = startDate && (!endDate || endDate === startDate);
+    if (
+      sameDay &&
+      editPlannedStart &&
+      editPlannedEnd &&
+      editPlannedEnd < editPlannedStart
+    ) {
+      Alert.alert(
+        t('org.tasks.scheduleEditTitle', null, 'Schedule'),
+        t(
+          'org.tasks.endTimeBeforeStart',
+          null,
+          'End time must be on or after the start time when on the same day.',
+        ),
+      );
+      return;
+    }
     setBusyAction(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
@@ -1855,11 +1885,16 @@ export default function OrgTasksScreen({ navigation, route }) {
         <ServiceRecordDatePicker
           label={t('org.tasks.scheduledDate', null, 'Start date')}
           valueIso={editScheduledDate || null}
-          onChangeIso={setEditScheduledDate}
+          onChangeIso={(iso) => {
+            setEditScheduledDate(iso || '');
+            if (iso && editScheduledEndDate && editScheduledEndDate < iso) {
+              setEditScheduledEndDate('');
+            }
+          }}
           optional
         />
         <ServiceRecordDatePicker
-          label={t('org.tasks.scheduledEndDate', null, 'End date (optional)')}
+          label={t('org.tasks.scheduledEndDateLabel', null, 'End date')}
           valueIso={editScheduledEndDate || null}
           onChangeIso={setEditScheduledEndDate}
           optional
@@ -1868,9 +1903,27 @@ export default function OrgTasksScreen({ navigation, route }) {
         <Text style={styles.opMeta}>{t('org.tasks.plannedStart', null, 'Start time')}</Text>
         {renderTimeChips(editPlannedStart, setEditPlannedStart)}
         <Text style={styles.opMeta}>
-          {t('org.tasks.plannedEnd', null, 'End time (optional)')}
+          {t('org.tasks.plannedEndLabel', null, 'End time')}
         </Text>
-        {renderTimeChips(editPlannedEnd, setEditPlannedEnd, true)}
+        {renderTimeChips(editPlannedEnd, (val) => {
+          if (
+            val &&
+            editPlannedStart &&
+            (!editScheduledEndDate || editScheduledEndDate === editScheduledDate) &&
+            val < editPlannedStart
+          ) {
+            Alert.alert(
+              t('org.tasks.scheduleEditTitle', null, 'Schedule'),
+              t(
+                'org.tasks.endTimeBeforeStart',
+                null,
+                'End time must be on or after the start time when on the same day.',
+              ),
+            );
+            return;
+          }
+          setEditPlannedEnd(val);
+        }, true)}
         <Button
           mode="contained"
           loading={busyAction}

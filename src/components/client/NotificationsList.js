@@ -21,6 +21,7 @@ import {
 } from '../../constants/colors';
 import {
   navigateForClientNotification,
+  notificationEventType,
 } from '../../utils/clientNotificationRouting';
 import {
   translateNotificationBody,
@@ -29,6 +30,31 @@ import {
 } from '../../utils/translateClientNotification';
 import { formatNotificationTimestamp } from '../../utils/formatNotificationTimestamp';
 import { useTranslation } from '../../i18n';
+
+function notificationUiStyle(item) {
+  const explicit = String(
+    item?.data?.ui_style || item?.ui_style || item?.data?.severity || '',
+  ).toLowerCase();
+  if (explicit === 'success' || explicit === 'danger' || explicit === 'warning') {
+    return explicit;
+  }
+  const et = String(notificationEventType(item) || '').toLowerCase();
+  if (et === 'work_order_started') return 'success';
+  if (
+    et === 'work_order_not_started_overdue' ||
+    et === 'work_order_start_overdue' ||
+    et === 'work_order_end_overdue'
+  ) {
+    return 'danger';
+  }
+  return null;
+}
+
+const UI_STYLE_BORDER = {
+  success: '#16A34A',
+  danger: '#DC2626',
+  warning: '#D97706',
+};
 
 export default function NotificationsList({
   activityReturnTo = 'ClientActivity',
@@ -113,11 +139,15 @@ export default function NotificationsList({
     const hint = translateNotificationHint(item, t);
     const title = translateNotificationTitle(item, t);
     const body = translateNotificationBody(item, t);
+    const uiStyle = notificationUiStyle(item);
+    const styleBorder = uiStyle
+      ? { borderLeftWidth: 4, borderLeftColor: UI_STYLE_BORDER[uiStyle] }
+      : null;
     return (
       <FloatingCard
         onPress={() => handlePress(item)}
-        accent={unread}
-        style={!unread && styles.readCard}
+        accent={unread && !uiStyle}
+        style={[!unread && styles.readCard, styleBorder]}
       >
         <View style={styles.titleRow}>
           {unread && <View style={styles.unreadDot} />}

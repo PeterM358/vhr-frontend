@@ -648,11 +648,14 @@
       "contractRefPlaceholder": "e.g. request number",
       "scheduledDate": "Start date",
       "scheduledEndDate": "End date (optional)",
+      "scheduledEndDateLabel": "End date",
       "scheduledEndDateHint": "Leave blank for a single day",
       "scheduledEndDateHelper": "Optional. Use when one work card spans multiple days (e.g. 1–20 Aug) instead of creating many tasks.",
       "endDateBeforeStart": "End date must be on or after the start date.",
+      "endTimeBeforeStart": "End time must be on or after the start time when on the same day.",
       "plannedStart": "Start time",
       "plannedEnd": "End time (optional)",
+      "plannedEndLabel": "End time",
       "plannedHoursOnShipmentsHint": "Loading/unloading hours belong on each shipment above. Task-level start/end time is optional.",
       "noEndTime": "None",
       "stopPlannedDate": "Date (YYYY-MM-DD, optional)",
@@ -3103,6 +3106,11 @@
       "work_order_assigned": "Tap to open task",
       "work_order_updated": "Tap to open task",
       "work_order_schedule_changed": "Tap to confirm you have seen the new schedule",
+      "work_order_seen_by_worker": "Tap to open task",
+      "work_order_started": "Tap to open task",
+      "work_order_not_started_overdue": "Tap to open task",
+      "work_order_ended": "Tap to open task",
+      "work_order_end_overdue": "Tap to open task",
       "work_order_at_address": "Tap to open task",
       "work_order_course_finished": "Tap to open task",
       "work_order_start_nag": "Tap to open task",
@@ -3120,6 +3128,26 @@
       "work_order_schedule_changed": {
         "title": "Task schedule changed",
         "body": "Confirm you have seen the new date or time."
+      },
+      "work_order_seen_by_worker": {
+        "title": "Worker confirmed task",
+        "body": "A worker confirmed they have seen the task."
+      },
+      "work_order_started": {
+        "title": "Worker started task",
+        "body": "A worker started the task."
+      },
+      "work_order_not_started_overdue": {
+        "title": "Workers have not started",
+        "body": "Assigned workers have not started the task."
+      },
+      "work_order_ended": {
+        "title": "Task finished",
+        "body": "A worker finished the task."
+      },
+      "work_order_end_overdue": {
+        "title": "Task past end time",
+        "body": "The task was not finished by the planned end time."
       },
       "work_order_at_address": {
         "title": "Driver at address",
