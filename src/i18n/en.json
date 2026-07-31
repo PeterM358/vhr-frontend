@@ -1166,6 +1166,8 @@
       "moveError": "Could not move this task.",
       "vehicleCol": "Vehicle",
       "idleDays": "{count} idle",
+      "busySummary": "{count} scheduled task(s) on this month board",
+      "noBusyTasks": "No scheduled vehicle tasks in this month yet.",
       "empty": "No vehicles in this fleet yet. Add vehicles in Fleet first.",
       "loadError": "Could not load planning."
     },

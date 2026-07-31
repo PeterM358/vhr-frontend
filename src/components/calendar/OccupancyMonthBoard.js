@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
@@ -32,6 +32,7 @@ export default function OccupancyMonthBoard({
   labelWidth = 108,
   rowHeight = 36,
   canEdit = false,
+  scrollToToday = false,
   statusColor = defaultStatusColor,
   rowColLabel = 'Row',
   moveHint,
@@ -44,6 +45,22 @@ export default function OccupancyMonthBoard({
   const days = useMemo(() => daysInMonth(month), [month]);
   const [selection, setSelection] = useState(null);
   const [moving, setMoving] = useState(null);
+  const hScrollRef = useRef(null);
+
+  useEffect(() => {
+    if (!scrollToToday || !hScrollRef.current || !days.length) return;
+    const today = new Date();
+    const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    if (String(month) !== monthKey) return;
+    const day = today.getDate();
+    // Keep a few days of context to the left of "today".
+    const offsetDays = Math.max(0, day - 4);
+    const x = offsetDays * dayWidth;
+    const timer = setTimeout(() => {
+      hScrollRef.current?.scrollTo?.({ x, animated: false });
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [dayWidth, days.length, month, scrollToToday]);
 
   const clearModes = useCallback(() => {
     setSelection(null);
@@ -131,7 +148,7 @@ export default function OccupancyMonthBoard({
           </Text>
         </Pressable>
       ) : null}
-      <ScrollView horizontal showsHorizontalScrollIndicator>
+      <ScrollView ref={hScrollRef} horizontal showsHorizontalScrollIndicator>
         <View style={{ minWidth: gridMinWidth }}>
           <View style={styles.headerRow}>
             <View style={[styles.labelCell, { width: labelWidth, minHeight: 28 }]}>
@@ -144,7 +161,7 @@ export default function OccupancyMonthBoard({
             ))}
           </View>
           {rows.map((row) => (
-            <View key={row.id} style={[styles.row, { minHeight: rowHeight }]}>
+            <View key={String(row.id)} style={[styles.row, { minHeight: rowHeight }]}>
               <View style={[styles.labelCell, { width: labelWidth }]}>
                 <Text style={styles.rowLabel} numberOfLines={2}>
                   {row.label}

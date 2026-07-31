@@ -84,9 +84,17 @@ export default function OrgFleetPlanningScreen({ navigation, route }) {
   const rows = useMemo(() => {
     const list = Array.isArray(payload?.vehicles) ? payload.vehicles : [];
     const filtered = idleOnly ? list.filter((row) => Number(row.idle_days) > 0) : list;
-    return filtered.map((v) => ({
+    // Busy rows first so a newly scheduled task is not buried below idle trucks.
+    const sorted = [...filtered].sort((a, b) => {
+      const aBusy = (a.spans || []).length;
+      const bBusy = (b.spans || []).length;
+      if (aBusy !== bBusy) return bBusy - aBusy;
+      return 0;
+    });
+    return sorted.map((v) => ({
       id: v.id,
       label: v.label || v.license_plate || `#${v.id}`,
+      isUnassigned: Boolean(v.is_unassigned) || v.id === 'unassigned',
       subtitle: t(
         'org.fleetPlanning.idleDays',
         { count: v.idle_days },
@@ -102,10 +110,17 @@ export default function OrgFleetPlanningScreen({ navigation, route }) {
   const openCreate = useCallback(
     ({ vehicleId, scheduledDate, scheduledEndDate } = {}) => {
       const id = routeOrgId || orgId;
+      const resolvedVehicle =
+        vehicleId != null &&
+        vehicleId !== '' &&
+        vehicleId !== 'unassigned' &&
+        !Number.isNaN(Number(vehicleId))
+          ? vehicleId
+          : undefined;
       navigateToOrgCreateTask(navigation, {
         orgId: id,
         organizationId: id,
-        vehicleId: vehicleId || undefined,
+        vehicleId: resolvedVehicle,
         scheduledDate: scheduledDate || undefined,
         scheduledEndDate: scheduledEndDate || undefined,
         returnTo: 'OrgFleetPlanning',
@@ -218,6 +233,23 @@ export default function OrgFleetPlanningScreen({ navigation, route }) {
               </Button>
             ) : null}
           </View>
+          {payload != null && Number(payload.busy_task_count) > 0 ? (
+            <Text style={styles.busySummary}>
+              {t(
+                'org.fleetPlanning.busySummary',
+                { count: payload.busy_task_count },
+                `${payload.busy_task_count} scheduled task(s) on this month board`,
+              )}
+            </Text>
+          ) : payload != null && !loading ? (
+            <Text style={styles.busySummary}>
+              {t(
+                'org.fleetPlanning.noBusyTasks',
+                null,
+                'No scheduled vehicle tasks in this month yet.',
+              )}
+            </Text>
+          ) : null}
           {busy ? <ActivityIndicator style={{ marginTop: 8 }} /> : null}
         </AppCard>
 
@@ -234,6 +266,7 @@ export default function OrgFleetPlanningScreen({ navigation, route }) {
               month={month}
               rows={rows}
               canEdit={Boolean(payload?.can_create_task)}
+              scrollToToday
               rowColLabel={t('org.fleetPlanning.vehicleCol', null, 'Vehicle')}
               createHint={t('org.fleetPlanning.selected', null, 'Selected')}
               moveHint={t(
@@ -272,6 +305,7 @@ const styles = StyleSheet.create({
   },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
   outlinedLabel: { color: ON_CARD },
+  busySummary: { color: ON_CARD_MUTED, fontSize: 12, lineHeight: 16 },
   loader: { marginTop: 24 },
   error: { color: '#b91c1c', marginBottom: 8 },
 });
