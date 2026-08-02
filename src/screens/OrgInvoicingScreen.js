@@ -29,10 +29,40 @@ import {
   invoiceDisplayNumber,
   invoiceListSubtitle,
   invoiceTotalLabel,
+  invoiceWorkOrderSummary,
 } from '../utils/billingInvoices';
 
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
+
+function majorStringToMinor(raw) {
+  const text = String(raw ?? '').trim().replace(',', '.');
+  if (!text) return 0;
+  const value = Number(text);
+  if (!Number.isFinite(value) || value < 0) return null;
+  return Math.round(value * 100);
+}
+
+function projectRemainingHint(row, t) {
+  const remaining = row?.project_remaining_unbilled_minor;
+  const expected = row?.project_expected_revenue_minor;
+  if (expected == null && remaining == null) return '';
+  if (remaining == null) {
+    return t(
+      'org.invoicing.projectExpectedHint',
+      { amount: formatMoneyMinor(expected, 'BGN') },
+      `Project expected (hint): ${formatMoneyMinor(expected, 'BGN')}`,
+    );
+  }
+  return t(
+    'org.invoicing.projectRemainingHint',
+    {
+      remaining: formatMoneyMinor(remaining, 'BGN'),
+      expected: formatMoneyMinor(expected, 'BGN'),
+    },
+    `Project remaining unbilled (hint): ${formatMoneyMinor(remaining, 'BGN')} of ${formatMoneyMinor(expected, 'BGN')}`,
+  );
+}
 
 export default function OrgInvoicingScreen({ navigation, route }) {
   const { t } = useTranslation();
@@ -51,6 +81,7 @@ export default function OrgInvoicingScreen({ navigation, route }) {
   const [uninvoiced, setUninvoiced] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [selectedIds, setSelectedIds] = useState(preselectIds);
+  const [amountDrafts, setAmountDrafts] = useState({});
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState(null);
   const [emailDraft, setEmailDraft] = useState('');
@@ -108,14 +139,33 @@ export default function OrgInvoicingScreen({ navigation, route }) {
     );
   };
 
+  const setAmountDraft = (id, value) => {
+    const key = String(id);
+    setAmountDrafts((prev) => ({ ...prev, [key]: value }));
+  };
+
   const createDraft = async (ids) => {
     if (!orgId || !ids.length) return;
+    const lineAmounts = [];
+    for (const id of ids) {
+      const minor = majorStringToMinor(amountDrafts[String(id)]);
+      if (minor == null) {
+        Alert.alert(
+          t('org.invoicing.createErrorTitle', null, 'Invoice'),
+          t('org.invoicing.amountInvalid', null, 'Enter a valid non-negative amount for each job.'),
+        );
+        return;
+      }
+      lineAmounts.push({ work_order_id: Number(id), amount_minor: minor });
+    }
     setBusy(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const invoice = await draftInvoiceFromWorkOrders(token, orgId, ids);
+      const invoice = await draftInvoiceFromWorkOrders(token, orgId, ids, '', lineAmounts);
       setDetail(invoice);
       setTab('invoices');
+      setSelectedIds([]);
+      setAmountDrafts({});
       await load();
     } catch (e) {
       Alert.alert(
@@ -261,6 +311,29 @@ export default function OrgInvoicingScreen({ navigation, route }) {
               {t('org.invoicing.status', null, 'Status')}: {detail.status}
               {detail.payment_status ? ` · ${detail.payment_status}` : ''}
             </Text>
+            {(detail.invoice_work_orders || []).length ? (
+              <View style={styles.jobsBlock}>
+                <Text style={styles.jobsHeading}>
+                  {t('org.invoicing.jobsOnInvoice', null, 'Jobs on this invoice')}
+                </Text>
+                {(detail.invoice_work_orders || []).map((row) => (
+                  <View key={row.id || row.work_order_id} style={styles.jobItem}>
+                    <Text style={styles.jobTitle}>{row.title || `Job #${row.work_order_id}`}</Text>
+                    <Text style={styles.meta}>
+                      {[
+                        row.project_name,
+                        (row.operation_titles || []).join(', '),
+                        row.task_kind && row.task_kind !== 'other' && row.task_kind !== 'mixed'
+                          ? row.task_kind.replace(/_/g, ' ')
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || '—'}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
             {(detail.lines || []).map((line) => (
               <View key={line.id} style={styles.lineRow}>
                 <Text style={styles.lineDesc}>{line.description}</Text>
@@ -376,7 +449,7 @@ export default function OrgInvoicingScreen({ navigation, route }) {
                 {t(
                   'org.invoicing.uninvoicedHint',
                   null,
-                  'Select 2 or more jobs from the same project/customer to create one invoice. Example: 4 loads done — pick any 2.',
+                  'Select jobs from the same project/customer. Enter how much to bill per job — project expected value is only a hint, not an automatic split.',
                 )}
               </Text>
             </AppCard>
@@ -392,6 +465,10 @@ export default function OrgInvoicingScreen({ navigation, route }) {
             ) : (
               uninvoiced.map((row) => {
                 const selected = selectedIds.includes(Number(row.id));
+                const ops = (row.operations || [])
+                  .map((op) => op?.activity?.name || op?.name || op?.activity_definition?.name)
+                  .filter(Boolean);
+                const hint = projectRemainingHint(row, t);
                 return (
                   <Pressable key={row.id} onPress={() => toggleSelect(row.id)}>
                     <AppCard style={styles.card}>
@@ -407,15 +484,35 @@ export default function OrgInvoicingScreen({ navigation, route }) {
                               .filter(Boolean)
                               .join(' · ')}
                           </Text>
-                          <Text style={styles.meta}>
-                            {formatMoneyMinor(row.suggested_billable_minor, 'BGN')}
-                          </Text>
+                          {ops.length ? (
+                            <Text style={styles.meta}>
+                              {t('org.invoicing.operationsLabel', null, 'Operations')}:{' '}
+                              {ops.join(', ')}
+                            </Text>
+                          ) : null}
+                          {hint ? <Text style={styles.hintInline}>{hint}</Text> : null}
+                          {selected ? (
+                            <TextInput
+                              mode="outlined"
+                              dense
+                              label={t('org.invoicing.amountLabel', null, 'Amount to invoice')}
+                              value={amountDrafts[String(row.id)] ?? ''}
+                              onChangeText={(value) => setAmountDraft(row.id, value)}
+                              keyboardType="decimal-pad"
+                              style={styles.amountInput}
+                              placeholder="0"
+                              onPressIn={(e) => e?.stopPropagation?.()}
+                            />
+                          ) : null}
                         </View>
                       </View>
                       <Button
                         compact
                         mode="text"
-                        onPress={() => createDraft([row.id])}
+                        onPress={() => {
+                          if (!selected) toggleSelect(row.id);
+                          createDraft([row.id]);
+                        }}
                         disabled={busy}
                       >
                         {t('org.invoicing.invoiceOne', null, 'Invoice this job')}
@@ -440,15 +537,19 @@ export default function OrgInvoicingScreen({ navigation, route }) {
                 )}
               />
             ) : (
-              invoices.map((invoice) => (
-                <Pressable key={invoice.id} onPress={() => openInvoice(invoice.id)}>
-                  <AppCard style={styles.card}>
-                    <Text style={styles.jobTitle}>{invoiceDisplayNumber(invoice)}</Text>
-                    <Text style={styles.meta}>{invoiceListSubtitle(invoice)}</Text>
-                    <Text style={styles.meta}>{invoiceTotalLabel(invoice)}</Text>
-                  </AppCard>
-                </Pressable>
-              ))
+              invoices.map((invoice) => {
+                const jobsLine = invoiceWorkOrderSummary(invoice);
+                return (
+                  <Pressable key={invoice.id} onPress={() => openInvoice(invoice.id)}>
+                    <AppCard style={styles.card}>
+                      <Text style={styles.jobTitle}>{invoiceDisplayNumber(invoice)}</Text>
+                      <Text style={styles.meta}>{invoiceListSubtitle(invoice)}</Text>
+                      {jobsLine ? <Text style={styles.meta}>{jobsLine}</Text> : null}
+                      <Text style={styles.meta}>{invoiceTotalLabel(invoice)}</Text>
+                    </AppCard>
+                  </Pressable>
+                );
+              })
             )}
           </>
         ) : null}
@@ -498,6 +599,11 @@ const styles = StyleSheet.create({
   rowBody: { flex: 1 },
   jobTitle: { color: ON_CARD, fontSize: 16, fontWeight: '700' },
   meta: { color: ON_CARD_MUTED, fontSize: 13, marginTop: 2 },
+  hintInline: { color: ON_CARD_MUTED, fontSize: 12, marginTop: 4, fontStyle: 'italic' },
+  amountInput: { marginTop: 8, backgroundColor: '#fff' },
+  jobsBlock: { marginTop: 12, gap: 8 },
+  jobsHeading: { color: ON_CARD, fontSize: 15, fontWeight: '700' },
+  jobItem: { gap: 2 },
   lineRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

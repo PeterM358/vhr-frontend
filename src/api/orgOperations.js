@@ -168,7 +168,17 @@ export async function getOrgInvoice(token, organizationId, invoiceId) {
   return response.json();
 }
 
-export async function draftInvoiceFromWorkOrders(token, organizationId, workOrderIds, notes = '') {
+export async function draftInvoiceFromWorkOrders(
+  token,
+  organizationId,
+  workOrderIds,
+  notes = '',
+  lineAmounts = null,
+) {
+  const body = { work_order_ids: workOrderIds, notes };
+  if (Array.isArray(lineAmounts)) {
+    body.line_amounts = lineAmounts;
+  }
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/invoices/draft-from-work-orders/`,
     {
@@ -177,7 +187,7 @@ export async function draftInvoiceFromWorkOrders(token, organizationId, workOrde
         ...authHeaders(token),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ work_order_ids: workOrderIds, notes }),
+      body: JSON.stringify(body),
     },
   );
   if (!response.ok) await throwApiError(response, 'Failed to create invoice draft');

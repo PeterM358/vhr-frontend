@@ -39,6 +39,31 @@ export function invoiceTotalLabel(invoice) {
   return formatMoneyMinor(invoice?.total_minor, invoice?.currency);
 }
 
+/** Linked org jobs for list/detail cards. */
+export function invoiceWorkOrderSummary(invoice, { maxTitles = 3 } = {}) {
+  const rows = Array.isArray(invoice?.invoice_work_orders) ? invoice.invoice_work_orders : [];
+  if (!rows.length) return '';
+  const titles = rows
+    .map((row) => String(row?.title || '').trim())
+    .filter(Boolean);
+  const count = rows.length;
+  const shown = titles.slice(0, maxTitles);
+  const extra = titles.length > maxTitles ? ` +${titles.length - maxTitles}` : '';
+  const titlePart = shown.length ? shown.join(', ') + extra : '';
+  const opTitles = [];
+  rows.forEach((row) => {
+    (row.operation_titles || []).forEach((name) => {
+      const n = String(name || '').trim();
+      if (n && !opTitles.includes(n)) opTitles.push(n);
+    });
+  });
+  const jobsLabel = count === 1 ? '1 job' : `${count} jobs`;
+  const opsLabel = opTitles.length
+    ? ` · ${opTitles.slice(0, 4).join(', ')}${opTitles.length > 4 ? '…' : ''}`
+    : '';
+  return titlePart ? `${jobsLabel}: ${titlePart}${opsLabel}` : `${jobsLabel}${opsLabel}`;
+}
+
 export function formatInvoiceLine(line, currency) {
   const qty = line?.quantity != null ? Number(line.quantity) : 1;
   const total = formatMoneyMinor(line?.line_total_minor, currency);
