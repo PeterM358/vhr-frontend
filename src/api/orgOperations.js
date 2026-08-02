@@ -208,6 +208,56 @@ export async function markOrgInvoicePaid(token, organizationId, invoiceId) {
   return response.json();
 }
 
+function invoiceExportFilename(invoice, fallbackExt) {
+  const raw = String(invoice?.number || invoice?.id || 'draft').replace(/[^\w.-]+/g, '_');
+  return `invoice-${raw}.${fallbackExt}`;
+}
+
+/** Download / open org invoice sheet (PDF when available, else printable HTML). */
+export async function downloadOrgInvoicePdf(token, organizationId, invoiceId, invoice = null) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/invoices/${invoiceId}/pdf/`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) await throwApiError(response, 'Failed to download invoice');
+  const contentType = (response.headers.get('content-type') || '').toLowerCase();
+  const blob = await response.blob();
+  const isHtml = contentType.includes('text/html');
+  const filename = invoiceExportFilename(invoice, isHtml ? 'html' : 'pdf');
+  if (typeof window !== 'undefined') {
+    const objectUrl = URL.createObjectURL(blob);
+    if (isHtml && window.open) {
+      window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      return { url: objectUrl, contentType, filename };
+    }
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    return { url: objectUrl, contentType, filename };
+  }
+  return { blob, contentType, filename };
+}
+
+export async function sendOrgInvoiceEmail(token, organizationId, invoiceId, email = '') {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/invoices/${invoiceId}/send-email/`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(email ? { email } : {}),
+    },
+  );
+  if (!response.ok) await throwApiError(response, 'Failed to send invoice email');
+  return response.json();
+}
+
 export async function getFleetPlanning(token, organizationId, params = {}) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/fleet-planning/${buildQuery(params)}`,

@@ -1202,7 +1202,20 @@
       "promptTitle": "Create invoice for this job?",
       "promptBody": "The job is done. Create an invoice draft now, or leave it uninvoiced for later (Accounting → Uninvoiced jobs).",
       "promptYes": "Yes",
-      "promptLater": "Not now"
+      "promptLater": "Not now",
+      "downloadPdf": "Download PDF",
+      "downloadErrorTitle": "Download",
+      "downloadError": "Could not download invoice sheet.",
+      "sendEmail": "Send email",
+      "sendEmailConfirm": "Send invoice",
+      "emailLabel": "Customer email",
+      "emailHint": "Sends the invoice sheet to the bill-to address. Override below if needed.",
+      "emailRequiredTitle": "Email required",
+      "emailRequired": "Enter the customer email address to send this invoice.",
+      "emailSentTitle": "Invoice sent",
+      "emailSentBody": "Sent to {email}",
+      "emailErrorTitle": "Send email",
+      "emailError": "Could not send invoice email."
     },
     "accounting": {
       "title": "Accounting",

@@ -1,20 +1,23 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { ActivityIndicator, Button, Checkbox, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Checkbox, Text, TextInput } from 'react-native-paper';
 
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
 import OrgAppHeader from '../components/org/OrgAppHeader';
+import InvoiceDocumentPreview from '../components/shop/InvoiceDocumentPreview';
 import {
+  downloadOrgInvoicePdf,
   draftInvoiceFromWorkOrders,
   getOrgInvoice,
   issueOrgInvoice,
   listOrgInvoices,
   listWorkOrders,
   markOrgInvoicePaid,
+  sendOrgInvoiceEmail,
 } from '../api/orgOperations';
 import { resolveActiveOrganizationId } from '../utils/orgWorkspace';
 import { navigateToOrgHome } from '../navigation/webNavigation';
@@ -50,6 +53,8 @@ export default function OrgInvoicingScreen({ navigation, route }) {
   const [selectedIds, setSelectedIds] = useState(preselectIds);
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [emailDraft, setEmailDraft] = useState('');
+  const [showEmailForm, setShowEmailForm] = useState(false);
 
   const onBack = useCallback(() => {
     if (detail) {
@@ -129,8 +134,65 @@ export default function OrgInvoicingScreen({ navigation, route }) {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const invoice = await getOrgInvoice(token, orgId, invoiceId);
       setDetail(invoice);
+      setEmailDraft(invoice?.bill_to_email || '');
+      setShowEmailForm(false);
     } catch (e) {
       Alert.alert(t('common.error', null, 'Error'), e.message || t('org.invoicing.loadError'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const downloadPdf = async () => {
+    if (!orgId || !detail?.id) return;
+    setBusy(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      await downloadOrgInvoicePdf(token, orgId, detail.id, detail);
+    } catch (e) {
+      Alert.alert(
+        t('org.invoicing.downloadErrorTitle', null, 'Download'),
+        e.message || t('org.invoicing.downloadError', null, 'Could not download invoice sheet.'),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendEmail = async () => {
+    if (!orgId || !detail?.id) return;
+    const target = String(emailDraft || detail.bill_to_email || '').trim();
+    if (!target) {
+      setShowEmailForm(true);
+      Alert.alert(
+        t('org.invoicing.emailRequiredTitle', null, 'Email required'),
+        t(
+          'org.invoicing.emailRequired',
+          null,
+          'Enter the customer email address to send this invoice.',
+        ),
+      );
+      return;
+    }
+    setBusy(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const result = await sendOrgInvoiceEmail(token, orgId, detail.id, target);
+      setShowEmailForm(false);
+      Alert.alert(
+        t('org.invoicing.emailSentTitle', null, 'Invoice sent'),
+        t(
+          'org.invoicing.emailSentBody',
+          { email: result?.to || target },
+          `Sent to ${result?.to || target}`,
+        ),
+      );
+    } catch (e) {
+      setShowEmailForm(true);
+      Alert.alert(
+        t('org.invoicing.emailErrorTitle', null, 'Send email'),
+        e.message || t('org.invoicing.emailError', null, 'Could not send invoice email.'),
+      );
     } finally {
       setBusy(false);
     }
@@ -217,7 +279,51 @@ export default function OrgInvoicingScreen({ navigation, route }) {
                 {t('org.invoicing.markPaid', null, 'Mark paid')}
               </Button>
             ) : null}
+            <Button mode="outlined" loading={busy} disabled={busy} onPress={downloadPdf} style={styles.actionBtn}>
+              {t('org.invoicing.downloadPdf', null, 'Download PDF')}
+            </Button>
+            <Button
+              mode="outlined"
+              loading={busy}
+              disabled={busy}
+              onPress={() => {
+                setEmailDraft(detail.bill_to_email || emailDraft || '');
+                setShowEmailForm(true);
+              }}
+              style={styles.actionBtn}
+            >
+              {t('org.invoicing.sendEmail', null, 'Send email')}
+            </Button>
+            {showEmailForm ? (
+              <View style={styles.emailBox}>
+                <Text style={styles.hint}>
+                  {t(
+                    'org.invoicing.emailHint',
+                    null,
+                    'Sends the invoice sheet to the bill-to address. Override below if needed.',
+                  )}
+                </Text>
+                <TextInput
+                  mode="outlined"
+                  label={t('org.invoicing.emailLabel', null, 'Customer email')}
+                  value={emailDraft}
+                  onChangeText={setEmailDraft}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  style={styles.emailInput}
+                  disabled={busy}
+                />
+                <Button mode="contained" loading={busy} disabled={busy} onPress={sendEmail}>
+                  {t('org.invoicing.sendEmailConfirm', null, 'Send invoice')}
+                </Button>
+              </View>
+            ) : null}
           </AppCard>
+          {Platform.OS === 'web' ? (
+            <View style={styles.previewWrap}>
+              <InvoiceDocumentPreview invoice={detail} />
+            </View>
+          ) : null}
         </ScrollView>
       </ScreenBackground>
     );
@@ -404,6 +510,9 @@ const styles = StyleSheet.create({
   lineDesc: { flex: 1, color: ON_CARD, fontSize: 14 },
   lineAmt: { color: ON_CARD, fontWeight: '600' },
   actionBtn: { marginTop: 12 },
+  emailBox: { marginTop: 12, gap: 8 },
+  emailInput: { backgroundColor: '#fff' },
+  previewWrap: { marginTop: 4 },
   fabBar: {
     position: 'absolute',
     left: 16,
