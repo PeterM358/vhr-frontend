@@ -174,9 +174,12 @@ export async function draftInvoiceFromWorkOrders(
   workOrderIds,
   notes = '',
   lineAmounts = null,
+  lines = null,
 ) {
   const body = { work_order_ids: workOrderIds, notes };
-  if (Array.isArray(lineAmounts)) {
+  if (Array.isArray(lines) && lines.length) {
+    body.lines = lines;
+  } else if (Array.isArray(lineAmounts)) {
     body.line_amounts = lineAmounts;
   }
   const response = await fetch(

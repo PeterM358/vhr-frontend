@@ -43,6 +43,38 @@ function majorStringToMinor(raw) {
   return Math.round(value * 100);
 }
 
+function minorToMajorInput(minor) {
+  const n = Number(minor || 0);
+  if (!Number.isFinite(n) || n === 0) return '';
+  const major = n / 100;
+  return Number.isInteger(major) ? String(major) : major.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+function lineDraftKey(draft) {
+  const wo = draft?.work_order_id ?? draft?.work_order;
+  const op = draft?.operation_id ?? draft?.work_order_operation ?? 'wo';
+  return `${wo}:${op}`;
+}
+
+function draftsForJob(row) {
+  if (Array.isArray(row?.invoice_line_drafts) && row.invoice_line_drafts.length) {
+    return row.invoice_line_drafts;
+  }
+  return [
+    {
+      work_order_id: row.id,
+      operation_id: null,
+      description: row.title || `Job #${row.id}`,
+      quantity: '1',
+      unit_code: '',
+      unit_symbol: '',
+      unit_price_minor: 0,
+      line_total_minor: 0,
+      activity_name: '',
+    },
+  ];
+}
+
 function projectRemainingHint(row, t) {
   const remaining = row?.project_remaining_unbilled_minor;
   const expected = row?.project_expected_revenue_minor;
@@ -81,7 +113,8 @@ export default function OrgInvoicingScreen({ navigation, route }) {
   const [uninvoiced, setUninvoiced] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [selectedIds, setSelectedIds] = useState(preselectIds);
-  const [amountDrafts, setAmountDrafts] = useState({});
+  /** { [lineKey]: { quantity: string, unit_price: string } } */
+  const [lineEdits, setLineEdits] = useState({});
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState(null);
   const [emailDraft, setEmailDraft] = useState('');
@@ -94,6 +127,25 @@ export default function OrgInvoicingScreen({ navigation, route }) {
     }
     navigateToOrgHome(navigation, { orgId: routeOrgId || orgId });
   }, [detail, navigation, orgId, routeOrgId]);
+
+  const seedLineEditsForJobs = useCallback((jobs, ids) => {
+    setLineEdits((prev) => {
+      const next = { ...prev };
+      for (const id of ids) {
+        const row = jobs.find((j) => Number(j.id) === Number(id));
+        if (!row) continue;
+        for (const draft of draftsForJob(row)) {
+          const key = lineDraftKey(draft);
+          if (next[key]) continue;
+          next[key] = {
+            quantity: String(draft.quantity ?? '1'),
+            unit_price: minorToMajorInput(draft.unit_price_minor),
+          };
+        }
+      }
+      return next;
+    });
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,17 +166,21 @@ export default function OrgInvoicingScreen({ navigation, route }) {
       setUninvoiced(jobs);
       setInvoices(Array.isArray(invRes?.results) ? invRes.results : []);
       setSelectedIds((prev) => {
+        let next;
         if (preselectIds.length) {
-          return preselectIds.filter((id) => jobs.some((row) => Number(row.id) === Number(id)));
+          next = preselectIds.filter((id) => jobs.some((row) => Number(row.id) === Number(id)));
+        } else {
+          next = prev.filter((id) => jobs.some((row) => Number(row.id) === Number(id)));
         }
-        return prev.filter((id) => jobs.some((row) => Number(row.id) === Number(id)));
+        seedLineEditsForJobs(jobs, next);
+        return next;
       });
     } catch (e) {
       setError(e.message || t('org.invoicing.loadError', null, 'Could not load invoicing.'));
     } finally {
       setLoading(false);
     }
-  }, [preselectIds, routeOrgId, t]);
+  }, [preselectIds, routeOrgId, seedLineEditsForJobs, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -134,38 +190,94 @@ export default function OrgInvoicingScreen({ navigation, route }) {
 
   const toggleSelect = (id) => {
     const num = Number(id);
-    setSelectedIds((prev) =>
-      prev.includes(num) ? prev.filter((row) => row !== num) : [...prev, num],
-    );
+    setSelectedIds((prev) => {
+      if (prev.includes(num)) {
+        return prev.filter((row) => row !== num);
+      }
+      seedLineEditsForJobs(uninvoiced, [num]);
+      return [...prev, num];
+    });
   };
 
-  const setAmountDraft = (id, value) => {
-    const key = String(id);
-    setAmountDrafts((prev) => ({ ...prev, [key]: value }));
+  const setLineEdit = (key, field, value) => {
+    setLineEdits((prev) => ({
+      ...prev,
+      [key]: {
+        quantity: prev[key]?.quantity ?? '1',
+        unit_price: prev[key]?.unit_price ?? '',
+        [field]: value,
+      },
+    }));
+  };
+
+  const buildLinesPayload = (ids) => {
+    const lines = [];
+    for (const id of ids) {
+      const row = uninvoiced.find((j) => Number(j.id) === Number(id));
+      if (!row) continue;
+      for (const draft of draftsForJob(row)) {
+        const key = lineDraftKey(draft);
+        const edit = lineEdits[key] || {};
+        const qtyText = String(edit.quantity ?? draft.quantity ?? '1').trim().replace(',', '.');
+        const qty = Number(qtyText);
+        if (!Number.isFinite(qty) || qty <= 0) {
+          return {
+            error: t(
+              'org.invoicing.qtyInvalid',
+              null,
+              'Enter a valid positive quantity for each operation line.',
+            ),
+          };
+        }
+        const priceInput =
+          edit.unit_price != null && String(edit.unit_price).trim() !== ''
+            ? edit.unit_price
+            : minorToMajorInput(draft.unit_price_minor);
+        const unitPriceMinor = majorStringToMinor(priceInput);
+        if (unitPriceMinor == null) {
+          return {
+            error: t(
+              'org.invoicing.rateInvalid',
+              null,
+              'Enter a valid non-negative unit price for each operation line.',
+            ),
+          };
+        }
+        const payload = {
+          work_order_id: Number(id),
+          quantity: qtyText,
+          unit_price_minor: unitPriceMinor,
+        };
+        if (draft.operation_id) payload.operation_id = draft.operation_id;
+        if (draft.description) payload.description = draft.description;
+        lines.push(payload);
+      }
+    }
+    return { lines };
   };
 
   const createDraft = async (ids) => {
     if (!orgId || !ids.length) return;
-    const lineAmounts = [];
-    for (const id of ids) {
-      const minor = majorStringToMinor(amountDrafts[String(id)]);
-      if (minor == null) {
-        Alert.alert(
-          t('org.invoicing.createErrorTitle', null, 'Invoice'),
-          t('org.invoicing.amountInvalid', null, 'Enter a valid non-negative amount for each job.'),
-        );
-        return;
-      }
-      lineAmounts.push({ work_order_id: Number(id), amount_minor: minor });
+    const built = buildLinesPayload(ids);
+    if (built.error) {
+      Alert.alert(t('org.invoicing.createErrorTitle', null, 'Invoice'), built.error);
+      return;
     }
     setBusy(true);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const invoice = await draftInvoiceFromWorkOrders(token, orgId, ids, '', lineAmounts);
+      const invoice = await draftInvoiceFromWorkOrders(
+        token,
+        orgId,
+        ids,
+        '',
+        null,
+        built.lines,
+      );
       setDetail(invoice);
       setTab('invoices');
       setSelectedIds([]);
-      setAmountDrafts({});
+      setLineEdits({});
       await load();
     } catch (e) {
       Alert.alert(
@@ -334,14 +446,28 @@ export default function OrgInvoicingScreen({ navigation, route }) {
                 ))}
               </View>
             ) : null}
-            {(detail.lines || []).map((line) => (
-              <View key={line.id} style={styles.lineRow}>
-                <Text style={styles.lineDesc}>{line.description}</Text>
-                <Text style={styles.lineAmt}>
-                  {formatMoneyMinor(line.line_total_minor, detail.currency)}
-                </Text>
-              </View>
-            ))}
+            {(detail.lines || []).map((line) => {
+              const qty = Number(line.quantity || 1);
+              const unit = line.unit_symbol || line.unit_code || '';
+              const rate = formatMoneyMinor(line.unit_price_minor, detail.currency);
+              return (
+                <View key={line.id} style={styles.lineRow}>
+                  <View style={styles.lineBody}>
+                    <Text style={styles.lineDesc}>{line.description}</Text>
+                    <Text style={styles.meta}>
+                      {t(
+                        'org.invoicing.lineQtyRate',
+                        { qty, unit: unit ? ` ${unit}` : '', rate },
+                        `${qty}${unit ? ` ${unit}` : ''} × ${rate}`,
+                      )}
+                    </Text>
+                  </View>
+                  <Text style={styles.lineAmt}>
+                    {formatMoneyMinor(line.line_total_minor, detail.currency)}
+                  </Text>
+                </View>
+              );
+            })}
             {detail.status === 'draft' ? (
               <Button mode="contained" loading={busy} disabled={busy} onPress={issueCurrent} style={styles.actionBtn}>
                 {t('org.invoicing.issue', null, 'Issue invoice')}
@@ -449,7 +575,7 @@ export default function OrgInvoicingScreen({ navigation, route }) {
                 {t(
                   'org.invoicing.uninvoicedHint',
                   null,
-                  'Select jobs from the same project/customer. Enter how much to bill per job — project expected value is only a hint, not an automatic split.',
+                  'Select jobs from the same project/customer. Edit quantity and unit price per operation — project expected value is only a hint, not an automatic split.',
                 )}
               </Text>
             </AppCard>
@@ -465,6 +591,7 @@ export default function OrgInvoicingScreen({ navigation, route }) {
             ) : (
               uninvoiced.map((row) => {
                 const selected = selectedIds.includes(Number(row.id));
+                const drafts = draftsForJob(row);
                 const ops = (row.operations || [])
                   .map((op) => op?.activity?.name || op?.name || op?.activity_definition?.name)
                   .filter(Boolean);
@@ -491,19 +618,67 @@ export default function OrgInvoicingScreen({ navigation, route }) {
                             </Text>
                           ) : null}
                           {hint ? <Text style={styles.hintInline}>{hint}</Text> : null}
-                          {selected ? (
-                            <TextInput
-                              mode="outlined"
-                              dense
-                              label={t('org.invoicing.amountLabel', null, 'Amount to invoice')}
-                              value={amountDrafts[String(row.id)] ?? ''}
-                              onChangeText={(value) => setAmountDraft(row.id, value)}
-                              keyboardType="decimal-pad"
-                              style={styles.amountInput}
-                              placeholder="0"
-                              onPressIn={(e) => e?.stopPropagation?.()}
-                            />
-                          ) : null}
+                          {selected
+                            ? drafts.map((draft) => {
+                                const key = lineDraftKey(draft);
+                                const edit = lineEdits[key] || {
+                                  quantity: String(draft.quantity ?? '1'),
+                                  unit_price: minorToMajorInput(draft.unit_price_minor),
+                                };
+                                const qty = Number(String(edit.quantity || '0').replace(',', '.'));
+                                const rateMinor = majorStringToMinor(edit.unit_price) ?? 0;
+                                const lineTotal =
+                                  Number.isFinite(qty) && qty > 0
+                                    ? Math.round(qty * rateMinor)
+                                    : 0;
+                                const unit = draft.unit_symbol || draft.unit_code || '';
+                                return (
+                                  <View key={key} style={styles.opLineBox}>
+                                    <Text style={styles.opLineTitle}>
+                                      {draft.activity_name ||
+                                        draft.description ||
+                                        t('org.invoicing.operationsLabel', null, 'Operations')}
+                                      {unit ? ` (${unit})` : ''}
+                                    </Text>
+                                    <View style={styles.opLineInputs}>
+                                      <TextInput
+                                        mode="outlined"
+                                        dense
+                                        label={t('org.invoicing.qtyLabel', null, 'Qty')}
+                                        value={edit.quantity}
+                                        onChangeText={(value) => setLineEdit(key, 'quantity', value)}
+                                        keyboardType="decimal-pad"
+                                        style={styles.qtyInput}
+                                        onPressIn={(e) => e?.stopPropagation?.()}
+                                      />
+                                      <TextInput
+                                        mode="outlined"
+                                        dense
+                                        label={
+                                          unit
+                                            ? t(
+                                                'org.invoicing.unitPriceLabelWithUnit',
+                                                { unit },
+                                                `Price / ${unit}`,
+                                              )
+                                            : t('org.invoicing.unitPriceLabel', null, 'Unit price')
+                                        }
+                                        value={edit.unit_price}
+                                        onChangeText={(value) => setLineEdit(key, 'unit_price', value)}
+                                        keyboardType="decimal-pad"
+                                        style={styles.rateInput}
+                                        placeholder="0"
+                                        onPressIn={(e) => e?.stopPropagation?.()}
+                                      />
+                                    </View>
+                                    <Text style={styles.lineTotalPreview}>
+                                      {t('org.invoicing.lineTotal', null, 'Line total')}:{' '}
+                                      {formatMoneyMinor(lineTotal, 'BGN')}
+                                    </Text>
+                                  </View>
+                                );
+                              })
+                            : null}
                         </View>
                       </View>
                       <Button
@@ -600,7 +775,18 @@ const styles = StyleSheet.create({
   jobTitle: { color: ON_CARD, fontSize: 16, fontWeight: '700' },
   meta: { color: ON_CARD_MUTED, fontSize: 13, marginTop: 2 },
   hintInline: { color: ON_CARD_MUTED, fontSize: 12, marginTop: 4, fontStyle: 'italic' },
-  amountInput: { marginTop: 8, backgroundColor: '#fff' },
+  opLineBox: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#CBD5E1',
+    gap: 6,
+  },
+  opLineTitle: { color: ON_CARD, fontSize: 13, fontWeight: '600' },
+  opLineInputs: { flexDirection: 'row', gap: 8 },
+  qtyInput: { flex: 0.4, backgroundColor: '#fff', minWidth: 88 },
+  rateInput: { flex: 1, backgroundColor: '#fff' },
+  lineTotalPreview: { color: ON_CARD, fontSize: 13, fontWeight: '600' },
   jobsBlock: { marginTop: 12, gap: 8 },
   jobsHeading: { color: ON_CARD, fontSize: 15, fontWeight: '700' },
   jobItem: { gap: 2 },
@@ -613,6 +799,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#CBD5E1',
   },
+  lineBody: { flex: 1 },
   lineDesc: { flex: 1, color: ON_CARD, fontSize: 14 },
   lineAmt: { color: ON_CARD, fontWeight: '600' },
   actionBtn: { marginTop: 12 },
