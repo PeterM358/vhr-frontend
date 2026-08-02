@@ -728,6 +728,10 @@ export function partnerOrganizationLegalEntity(params = {}) {
   return buildPathWithQuery(`${PARTNER}/organization/company`, params);
 }
 
+export function partnerOrganizationActivities(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/organization/activities`, params);
+}
+
 export function partnerOrganizationPublicProfile(params = {}) {
   return buildPathWithQuery(`${PARTNER}/organization/public-profile`, params);
 }

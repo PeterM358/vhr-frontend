@@ -508,6 +508,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [canManage, setCanManage] = useState(false);
+  const [allowedActivityKinds, setAllowedActivityKinds] = useState(null);
   const [rows, setRows] = useState([]);
   const [units, setUnits] = useState([]);
   const [materialCatalog, setMaterialCatalog] = useState([]);
@@ -530,6 +531,15 @@ export default function OrgOperationsScreen({ navigation, route }) {
     });
     setForm((prev) => ({ ...prev, [key]: value }));
   }, []);
+
+  const visibleKindOptions = useMemo(() => {
+    if (!Array.isArray(allowedActivityKinds) || allowedActivityKinds.length === 0) {
+      return KIND_OPTIONS;
+    }
+    const allowed = new Set(allowedActivityKinds);
+    const filtered = KIND_OPTIONS.filter((option) => allowed.has(option.value));
+    return filtered.length ? filtered : KIND_OPTIONS;
+  }, [allowedActivityKinds]);
 
   const stepDefs = useMemo(
     () => [
@@ -592,6 +602,9 @@ export default function OrgOperationsScreen({ navigation, route }) {
         listUnitsOfMeasure(token, resolved).catch(() => ({ results: [] })),
       ]);
       setCanManage(Boolean(data?.can_manage));
+      setAllowedActivityKinds(
+        Array.isArray(data?.allowed_activity_kinds) ? data.allowed_activity_kinds : null,
+      );
       setRows(Array.isArray(data?.results) ? data.results : []);
       setUnits(Array.isArray(unitsData?.results) ? unitsData.results : []);
     } catch (e) {
@@ -1193,7 +1206,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
           {fieldErrors.code ? <Text style={styles.fieldError}>{fieldErrors.code}</Text> : null}
           <Text style={styles.fieldLabel}>{t('org.operations.kind', null, 'Kind')}</Text>
           <View style={styles.kindWrap}>
-            {KIND_OPTIONS.map((option) => {
+            {visibleKindOptions.map((option) => {
               const active = form.kind === option.value;
               return (
                 <Pressable

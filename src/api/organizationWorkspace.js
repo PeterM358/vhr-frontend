@@ -69,3 +69,28 @@ export async function updateOrganizationPublicProfileSettings(token, organizatio
   if (!response.ok) throw new Error(await parseError(response, 'Failed to update public profile'));
   return response.json();
 }
+
+export async function getOrganizationActivities(token, organizationId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/activities/`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load organization activities'));
+  return response.json();
+}
+
+export async function updateOrganizationActivities(token, organizationId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/activities/`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to update organization activities'));
+  return response.json();
+}

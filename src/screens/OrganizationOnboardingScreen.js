@@ -20,7 +20,7 @@ import {
 import { COLORS } from '../constants/colors';
 import BaseStyles from '../styles/base';
 
-const BUSINESS_TYPES = ['transport', 'construction', 'service_center', 'other'];
+const ACTIVITY_OPTIONS = ['transport', 'construction', 'service_center', 'other'];
 
 export default function OrganizationOnboardingScreen({ navigation }) {
   const theme = useTheme();
@@ -28,7 +28,7 @@ export default function OrganizationOnboardingScreen({ navigation }) {
   const { authToken, setAuthToken, setIsAuthenticated, setUserEmailOrPhone, userEmailOrPhone } =
     useContext(AuthContext);
   const [companyName, setCompanyName] = useState('');
-  const [businessType, setBusinessType] = useState('other');
+  const [selectedActivities, setSelectedActivities] = useState(['other']);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [resending, setResending] = useState(false);
@@ -61,6 +61,16 @@ export default function OrganizationOnboardingScreen({ navigation }) {
     }),
     [t],
   );
+
+  const toggleActivity = (type) => {
+    setSelectedActivities((prev) => {
+      if (prev.includes(type)) {
+        if (prev.length <= 1) return prev;
+        return prev.filter((item) => item !== type);
+      }
+      return [...prev, type];
+    });
+  };
 
   const syncEmailVerified = useCallback(async () => {
     setRefreshing(true);
@@ -142,7 +152,7 @@ export default function OrganizationOnboardingScreen({ navigation }) {
       const token = authToken || (await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN));
       const org = await createOrganizationOnboarding(token, {
         display_name: name,
-        business_type: businessType,
+        activities: selectedActivities,
         country_iso2: 'BG',
       });
       await refreshOrganizationMemberships(token);
@@ -240,29 +250,42 @@ export default function OrganizationOnboardingScreen({ navigation }) {
           />
 
           <Text style={styles.sectionLabel}>
-            {t('org.onboarding.businessType', null, 'Business type')}
+            {t('org.onboarding.activities', null, 'What does your company do?')}
+          </Text>
+          <Text style={styles.activitiesHint}>
+            {t(
+              'org.onboarding.activitiesHint',
+              null,
+              'Select all that apply — e.g. transport and construction.',
+            )}
           </Text>
           <View style={styles.typeGrid}>
-            {BUSINESS_TYPES.map((type) => (
-              <Pressable
-                key={type}
-                onPress={() => setBusinessType(type)}
-                style={({ pressed }) => [
-                  styles.typeButton,
-                  businessType === type && styles.typeButtonSelected,
-                  pressed && styles.typeButtonPressed,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.typeLabel,
-                    businessType === type && styles.typeLabelSelected,
+            {ACTIVITY_OPTIONS.map((type) => {
+              const isOn = selectedActivities.includes(type);
+              return (
+                <Pressable
+                  key={type}
+                  onPress={() => toggleActivity(type)}
+                  style={({ pressed }) => [
+                    styles.typeButton,
+                    isOn && styles.typeButtonSelected,
+                    pressed && styles.typeButtonPressed,
                   ]}
                 >
-                  {typeLabels[type]}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text style={[styles.checkMark, isOn && styles.checkMarkSelected]}>
+                    {isOn ? '☑' : '☐'}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.typeLabel,
+                      isOn && styles.typeLabelSelected,
+                    ]}
+                  >
+                    {typeLabels[type]}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -356,6 +379,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   typeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     borderWidth: 1.5,
     borderColor: 'rgba(148,163,184,0.45)',
     borderRadius: 14,
@@ -369,14 +395,29 @@ const styles = StyleSheet.create({
   typeButtonPressed: {
     opacity: 0.88,
   },
+  checkMark: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 18,
+    width: 22,
+  },
+  checkMarkSelected: {
+    color: '#ffffff',
+  },
   typeLabel: {
     color: 'rgba(255,255,255,0.82)',
     fontWeight: '600',
     fontSize: 16,
+    flex: 1,
   },
   typeLabelSelected: {
     color: '#ffffff',
     fontWeight: '700',
+  },
+  activitiesHint: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 10,
   },
   error: {
     color: '#fca5a5',

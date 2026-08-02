@@ -215,6 +215,7 @@
       "calendar": "Calendar",
       "notifications": "Notifications",
       "company": "Company details",
+      "activities": "Activities",
       "profile": "Profile"
     },
     "chrome": {
@@ -1351,6 +1352,8 @@
       "subtitle": "Set up your company workspace. You can import a fleet later when you are ready.",
       "companyName": "Company name",
       "businessType": "Business type",
+      "activities": "What does your company do?",
+      "activitiesHint": "Select all that apply — e.g. transport and construction.",
       "create": "Create organization",
       "nameRequired": "Enter your company name.",
       "failed": "Could not create organization.",
@@ -1360,6 +1363,23 @@
         "construction": "Construction",
         "serviceCenter": "Service center",
         "other": "Other business"
+      }
+    },
+    "activities": {
+      "title": "Activities",
+      "lead": "Choose what your company does. This enables modules and filters the task catalog.",
+      "shopHint": "Service center marketplace / SEO stays on the shop profile when linked.",
+      "save": "Save activities",
+      "saved": "Activities saved. Modules updated.",
+      "loadError": "Could not load activities.",
+      "saveError": "Could not save activities.",
+      "selectOne": "Select at least one activity.",
+      "ownerOnly": "Only organization owners/admins can edit activities.",
+      "types": {
+        "transport": "Transport",
+        "construction": "Construction",
+        "serviceCenter": "Service center",
+        "other": "Other"
       }
     }
   },

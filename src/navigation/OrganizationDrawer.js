@@ -22,6 +22,7 @@ import OrgAccountingScreen from '../screens/OrgAccountingScreen';
 import OrgFleetPlanningScreen from '../screens/OrgFleetPlanningScreen';
 import OrgInvoicingScreen from '../screens/OrgInvoicingScreen';
 import OrgLegalEntityScreen from '../screens/OrgLegalEntityScreen';
+import OrgActivitiesScreen from '../screens/OrgActivitiesScreen';
 import OrgPublicProfileScreen from '../screens/OrgPublicProfileScreen';
 import OrgCalendarScreen from '../screens/OrgCalendarScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
@@ -50,6 +51,7 @@ import {
   navigateToOrgFleetPlanning,
   navigateToOrgInvoicing,
   navigateToOrgLegalEntity,
+  navigateToOrgActivities,
   navigateToOrgPublicProfile,
   navigateToOrgNetwork,
   navigateToOrgOperations,
@@ -84,6 +86,7 @@ const ROUTE_ICONS = {
   OrgProjects: 'briefcase-outline',
   OrgWarehouse: 'warehouse',
   OrgLegalEntity: 'domain',
+  OrgActivities: 'briefcase-check-outline',
   OrgWorkforce: 'account-hard-hat',
   OrgNetwork: 'transit-connection-variant',
   OrgDocuments: 'file-document-outline',
@@ -297,6 +300,10 @@ function CustomDrawerContent(props) {
       navigateToOrgLegalEntity(navigation, { orgId: org?.id });
       return;
     }
+    if (normalized === 'OrgActivities') {
+      navigateToOrgActivities(navigation, { orgId: org?.id });
+      return;
+    }
     if (normalized === 'OrgPublicProfile') {
       navigateToOrgPublicProfile(navigation, { orgId: org?.id });
       return;
@@ -387,6 +394,15 @@ function CustomDrawerContent(props) {
           onPress={() => openRoute('OrgLegalEntity')}
           icon={({ color, size }) => (
             <DrawerMenuIcon name="domain" color={color} size={size} />
+          )}
+          {...itemProps}
+        />
+
+        <DrawerItem
+          label={t('org.drawer.activities', null, 'Activities')}
+          onPress={() => openRoute('OrgActivities')}
+          icon={({ color, size }) => (
+            <DrawerMenuIcon name="briefcase-outline" color={color} size={size} />
           )}
           {...itemProps}
         />
@@ -498,6 +514,7 @@ export default function OrganizationDrawer() {
       <Drawer.Screen name="OrgAccounting" component={OrgAccountingScreen} />
       <Drawer.Screen name="OrgInvoicing" component={OrgInvoicingScreen} />
       <Drawer.Screen name="OrgLegalEntity" component={OrgLegalEntityScreen} />
+      <Drawer.Screen name="OrgActivities" component={OrgActivitiesScreen} />
       <Drawer.Screen name="OrgPublicProfile" component={OrgPublicProfileScreen} />
       <Drawer.Screen name="OrgCalendar" component={OrgCalendarScreen} />
       <Drawer.Screen name="OrgWorkforce" component={OrgWorkforceScreen} />
