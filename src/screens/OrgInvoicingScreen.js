@@ -104,6 +104,7 @@ export default function OrgInvoicingScreen({ navigation, route }) {
     return Array.isArray(raw) ? raw.map((id) => Number(id)).filter(Boolean) : [];
   }, [route?.params?.workOrderIds, route?.params?.preselectIds]);
   const initialTab = route?.params?.tab === 'invoices' ? 'invoices' : 'uninvoiced';
+  const routeInvoiceId = route?.params?.invoiceId || route?.params?.invoice_id;
   const scrollBottomPadding = useScrollContentBottomPadding(80);
 
   const [orgId, setOrgId] = useState(null);
@@ -186,6 +187,30 @@ export default function OrgInvoicingScreen({ navigation, route }) {
     useCallback(() => {
       load();
     }, [load]),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!orgId || !routeInvoiceId) return undefined;
+      let cancelled = false;
+      (async () => {
+        try {
+          const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+          const invoice = await getOrgInvoice(token, orgId, routeInvoiceId);
+          if (!cancelled && invoice) {
+            setTab('invoices');
+            setDetail(invoice);
+            setEmailDraft(invoice?.bill_to_email || '');
+            setShowEmailForm(false);
+          }
+        } catch {
+          /* list still usable */
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [orgId, routeInvoiceId]),
   );
 
   const toggleSelect = (id) => {
@@ -605,7 +630,14 @@ export default function OrgInvoicingScreen({ navigation, route }) {
                           onPress={() => toggleSelect(row.id)}
                         />
                         <View style={styles.rowBody}>
-                          <Text style={styles.jobTitle}>{row.title}</Text>
+                          <View style={styles.jobTitleRow}>
+                            <Text style={[styles.jobTitle, { flex: 1 }]}>{row.title}</Text>
+                            {row.invoiced_status === 'partially_invoiced' ? (
+                              <Text style={styles.partialBadge}>
+                                {t('org.invoicing.partialBadge', null, 'Partially invoiced')}
+                              </Text>
+                            ) : null}
+                          </View>
                           <Text style={styles.meta}>
                             {[row.project?.name, row.task_kind, row.ended_at?.slice?.(0, 10)]
                               .filter(Boolean)
@@ -632,6 +664,7 @@ export default function OrgInvoicingScreen({ navigation, route }) {
                                     ? Math.round(qty * rateMinor)
                                     : 0;
                                 const unit = draft.unit_symbol || draft.unit_code || '';
+                                const unitBit = unit ? ` ${unit}` : '';
                                 return (
                                   <View key={key} style={styles.opLineBox}>
                                     <Text style={styles.opLineTitle}>
@@ -640,18 +673,48 @@ export default function OrgInvoicingScreen({ navigation, route }) {
                                         t('org.invoicing.operationsLabel', null, 'Operations')}
                                       {unit ? ` (${unit})` : ''}
                                     </Text>
+                                    {draft.completed_qty != null || draft.remaining_qty != null ? (
+                                      <Text style={styles.meta}>
+                                        {[
+                                          draft.completed_qty != null
+                                            ? t(
+                                                'org.invoicing.completedQtyHint',
+                                                { qty: draft.completed_qty, unit: unitBit },
+                                                `Completed ${draft.completed_qty}${unitBit}`,
+                                              )
+                                            : null,
+                                          draft.remaining_qty != null &&
+                                          String(draft.remaining_qty) !== String(draft.completed_qty)
+                                            ? t(
+                                                'org.invoicing.remainingQtyHint',
+                                                { qty: draft.remaining_qty, unit: unitBit },
+                                                `Remaining unbilled ${draft.remaining_qty}${unitBit}`,
+                                              )
+                                            : null,
+                                        ]
+                                          .filter(Boolean)
+                                          .join(' · ')}
+                                      </Text>
+                                    ) : null}
                                     <View style={styles.opLineInputs}>
                                       <TextInput
                                         mode="outlined"
                                         dense
-                                        label={t('org.invoicing.qtyLabel', null, 'Qty')}
+                                        label={
+                                          unit
+                                            ? t(
+                                                'org.invoicing.qtyLabelWithUnit',
+                                                { unit },
+                                                `Qty (${unit})`,
+                                              )
+                                            : t('org.invoicing.qtyLabel', null, 'Qty')
+                                        }
                                         value={edit.quantity}
                                         onChangeText={(value) => setLineEdit(key, 'quantity', value)}
                                         keyboardType="decimal-pad"
                                         style={styles.qtyInput}
                                         onPressIn={(e) => e?.stopPropagation?.()}
-                                      />
-                                      <TextInput
+                                      />                                      <TextInput
                                         mode="outlined"
                                         dense
                                         label={
@@ -773,6 +836,17 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
   rowBody: { flex: 1 },
   jobTitle: { color: ON_CARD, fontSize: 16, fontWeight: '700' },
+  jobTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  partialBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1E40AF',
+    backgroundColor: 'rgba(59, 130, 246, 0.16)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    overflow: 'hidden',
+  },
   meta: { color: ON_CARD_MUTED, fontSize: 13, marginTop: 2 },
   hintInline: { color: ON_CARD_MUTED, fontSize: 12, marginTop: 4, fontStyle: 'italic' },
   opLineBox: {

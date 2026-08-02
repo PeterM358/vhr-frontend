@@ -87,6 +87,33 @@ function statusLabel(status, t) {
   return t(`org.home.tasks.status.${status}`, null, status || '');
 }
 
+function taskInvoicedStatus(task) {
+  const raw = String(task?.invoiced_status || '').toLowerCase();
+  if (raw === 'fully_invoiced' || raw === 'partially_invoiced' || raw === 'uninvoiced') {
+    return raw;
+  }
+  if (task?.has_issued_invoice) return 'fully_invoiced';
+  return 'uninvoiced';
+}
+
+function invoicedStatusLabel(status, t) {
+  const key = String(status || 'uninvoiced');
+  const fallbacks = {
+    uninvoiced: 'Uninvoiced',
+    partially_invoiced: 'Partial',
+    fully_invoiced: 'Invoiced',
+  };
+  return t(`org.tasks.invoiceBadge.${key}`, null, fallbacks[key] || key);
+}
+
+function formatQtyByUnitMap(map) {
+  if (!map || typeof map !== 'object') return '';
+  return Object.entries(map)
+    .map(([unit, qty]) => `${qty}${unit && unit !== 'qty' ? ` ${unit}` : ''}`)
+    .filter(Boolean)
+    .join(' · ');
+}
+
 function personLabel(person) {
   return person?.display_name || person?.email || `#${person?.user_id || person?.id || ''}`;
 }
@@ -1193,7 +1220,7 @@ export default function OrgTasksScreen({ navigation, route }) {
       replaceTask(updated);
       setEndWizardOpen(false);
       setWizardTask(null);
-      if (canManage && !updated?.has_issued_invoice) {
+      if (canManage && taskInvoicedStatus(updated) !== 'fully_invoiced') {
         Alert.alert(
           t('org.invoicing.promptTitle', null, 'Create invoice for this job?'),
           t(
@@ -2270,6 +2297,107 @@ export default function OrgTasksScreen({ navigation, route }) {
 
             {renderScheduleEditor(selected)}
             {renderAckStatus(selected)}
+
+            {selected.status === 'done' ? (
+              <AppCard style={styles.card}>
+                <Text style={styles.section}>
+                  {t('org.tasks.invoicingSection', null, 'Invoicing')}
+                </Text>
+                <View style={styles.invoiceBadgeRow}>
+                  <Text
+                    style={[
+                      styles.invoiceBadge,
+                      taskInvoicedStatus(selected) === 'fully_invoiced' && styles.invoiceBadgeFull,
+                      taskInvoicedStatus(selected) === 'partially_invoiced' &&
+                        styles.invoiceBadgePartial,
+                      taskInvoicedStatus(selected) === 'uninvoiced' && styles.invoiceBadgeNone,
+                    ]}
+                  >
+                    {invoicedStatusLabel(taskInvoicedStatus(selected), t)}
+                  </Text>
+                </View>
+                {formatQtyByUnitMap(selected.completed_qty_by_unit) ||
+                formatQtyByUnitMap(selected.remaining_unbilled_qty_by_unit) ? (
+                  <Text style={styles.opMeta}>
+                    {t(
+                      'org.tasks.invoicingTotals',
+                      {
+                        completed: formatQtyByUnitMap(selected.completed_qty_by_unit) || '—',
+                        remaining:
+                          formatQtyByUnitMap(selected.remaining_unbilled_qty_by_unit) || '0',
+                      },
+                      `Completed: ${formatQtyByUnitMap(selected.completed_qty_by_unit) || '—'} · Remaining unbilled: ${formatQtyByUnitMap(selected.remaining_unbilled_qty_by_unit) || '0'}`,
+                    )}
+                  </Text>
+                ) : null}
+                <Text style={[styles.fieldLabel, { marginTop: 8 }]}>
+                  {t('org.tasks.invoicingLinked', null, 'Linked invoices')}
+                </Text>
+                {(selected.invoices || []).length ? (
+                  (selected.invoices || []).map((inv) => (
+                    <Button
+                      key={inv.id}
+                      mode="text"
+                      compact
+                      onPress={() =>
+                        navigateToOrgInvoicing(navigation, {
+                          orgId,
+                          tab: 'invoices',
+                          invoiceId: inv.id,
+                        })
+                      }
+                      style={styles.secondaryBtn}
+                    >
+                      {t(
+                        'org.tasks.invoicingOpenInvoice',
+                        { number: inv.display_number || inv.number || `#${inv.id}` },
+                        `Open ${inv.display_number || inv.number || `#${inv.id}`}`,
+                      )}
+                    </Button>
+                  ))
+                ) : (
+                  <Text style={styles.opMeta}>
+                    {t('org.tasks.invoicingNoInvoices', null, 'No invoices linked yet.')}
+                  </Text>
+                )}
+                {(selected.invoicing_operations || []).map((op) => {
+                  const unit = op.unit_symbol || op.unit_code || '';
+                  const unitBit = unit ? ` ${unit}` : '';
+                  return (
+                    <Text key={op.operation_id} style={styles.opMeta}>
+                      {t(
+                        'org.tasks.invoicingOpRow',
+                        {
+                          name: op.activity_name || '—',
+                          completed: op.completed_qty || '0',
+                          billed: op.billed_qty || '0',
+                          remaining: op.remaining_qty || '0',
+                          unit: unitBit,
+                        },
+                        `${op.activity_name || '—'}: ${op.completed_qty || '0'}${unitBit} completed · ${op.billed_qty || '0'} billed · ${op.remaining_qty || '0'} left`,
+                      )}
+                      {' · '}
+                      {invoicedStatusLabel(op.invoiced_status, t)}
+                    </Text>
+                  );
+                })}
+                {canManage && taskInvoicedStatus(selected) !== 'fully_invoiced' ? (
+                  <Button
+                    mode="outlined"
+                    onPress={() =>
+                      navigateToOrgInvoicing(navigation, {
+                        orgId,
+                        tab: 'uninvoiced',
+                        workOrderIds: [selected.id],
+                      })
+                    }
+                    style={styles.secondaryBtn}
+                  >
+                    {t('org.tasks.invoicingGoInvoice', null, 'Invoice remaining')}
+                  </Button>
+                ) : null}
+              </AppCard>
+            ) : null}
 
             <AppCard style={styles.card}>
               <Text style={styles.section}>
@@ -3462,7 +3590,22 @@ export default function OrgTasksScreen({ navigation, route }) {
                     onPress={() => setSelectedId(row.id)}
                     style={styles.row}
                   >
-                    <Text style={styles.rowTitle}>{row.title}</Text>
+                    <View style={styles.rowTitleRow}>
+                      <Text style={[styles.rowTitle, { flex: 1 }]}>{row.title}</Text>
+                      {isCompletedTaskStatus(row.status) ? (
+                        <Text
+                          style={[
+                            styles.invoiceBadge,
+                            taskInvoicedStatus(row) === 'fully_invoiced' && styles.invoiceBadgeFull,
+                            taskInvoicedStatus(row) === 'partially_invoiced' &&
+                              styles.invoiceBadgePartial,
+                            taskInvoicedStatus(row) === 'uninvoiced' && styles.invoiceBadgeNone,
+                          ]}
+                        >
+                          {invoicedStatusLabel(taskInvoicedStatus(row), t)}
+                        </Text>
+                      ) : null}
+                    </View>
                     <Text style={styles.rowMeta}>
                       {[
                         statusLabel(row.status, t),
@@ -3659,6 +3802,33 @@ const styles = StyleSheet.create({
   loader: { marginVertical: 24 },
   card: { padding: 14, marginBottom: 12 },
   title: { color: ON_CARD, fontSize: 18, fontWeight: '700', marginBottom: 6 },
+  rowTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  invoiceBadgeRow: { flexDirection: 'row', marginBottom: 8 },
+  invoiceBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    overflow: 'hidden',
+  },
+  invoiceBadgeNone: {
+    color: '#92400E',
+    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+  },
+  invoiceBadgePartial: {
+    color: '#1E40AF',
+    backgroundColor: 'rgba(59, 130, 246, 0.16)',
+  },
+  invoiceBadgeFull: {
+    color: '#166534',
+    backgroundColor: 'rgba(34, 197, 94, 0.16)',
+  },
   meta: { color: ON_CARD_MUTED, fontSize: 13, marginBottom: 10 },
   instructions: { color: ON_CARD, fontSize: 14, lineHeight: 20, marginBottom: 12 },
   section: {
