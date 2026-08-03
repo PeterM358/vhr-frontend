@@ -150,13 +150,6 @@ export default function OrgActivitiesScreen({ navigation, route }) {
               'Choose what your company does. This enables modules and filters the task catalog.',
             )}
           </Text>
-          <Text style={styles.hint}>
-            {t(
-              'org.activities.shopHint',
-              null,
-              'Service center marketplace / SEO stays on the shop profile when linked.',
-            )}
-          </Text>
 
           {loading ? (
             <ActivityIndicator animating style={styles.spinner} />
