@@ -42,6 +42,7 @@ import {
   navigateToOrgWarehouse,
   navigateToOrgWorkforce,
   navigateToPartnerDashboard,
+  navigateToOrgPublicProfile,
   navigateToProfile,
 } from '../navigation/webNavigation';
 
@@ -152,6 +153,11 @@ export default function OrganizationHomeScreen() {
   const scrollBottomPadding = useScrollContentBottomPadding(40);
   const toastTop = appNavBarTotalHeight(insets) + 8;
   const isDriver = isDriverMembership(org);
+  const needsServiceListing = useMemo(() => {
+    if (isDriver || !org) return false;
+    const activities = Array.isArray(org.activities) ? org.activities : [];
+    return activities.includes('service_center') && !org.has_shop_locations;
+  }, [isDriver, org]);
 
   const showGreetingToast = useCallback((name, company) => {
     if (toastTimerRef.current) {
@@ -813,6 +819,30 @@ export default function OrganizationHomeScreen() {
               </DashboardCard>
             ) : null}
 
+            {needsServiceListing ? (
+              <DashboardCard style={styles.listingCard}>
+                <Text style={styles.listingTitle}>
+                  {t('org.home.serviceListingTitle', null, 'Public listing')}
+                </Text>
+                <Text style={styles.listingBody}>
+                  {t(
+                    'org.home.serviceListingBody',
+                    null,
+                    'You provide service — complete your public listing so customers can find you.',
+                  )}
+                </Text>
+                <Button
+                  mode="contained"
+                  onPress={() => navigateToOrgPublicProfile(navigation, { orgId: org?.id })}
+                  style={styles.listingBtn}
+                  buttonColor={COLORS.PRIMARY}
+                  textColor={COLORS.ON_PRIMARY}
+                >
+                  {t('org.home.serviceListingButton', null, 'Complete public listing')}
+                </Button>
+              </DashboardCard>
+            ) : null}
+
             <DashboardActionGrid tiles={actionTiles} />
 
             {!isDriver ? (
@@ -915,6 +945,26 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingVertical: 14,
     paddingHorizontal: 14,
+  },
+  listingCard: {
+    marginBottom: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+  },
+  listingTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  listingBody: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  listingBtn: {
+    alignSelf: 'flex-start',
   },
   switcherLabel: {
     color: 'rgba(255,255,255,0.7)',

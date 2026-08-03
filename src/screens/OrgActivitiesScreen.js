@@ -21,7 +21,7 @@ import {
   refreshOrganizationMemberships,
   resolveActiveOrganizationId,
 } from '../utils/orgWorkspace';
-import { navigateToOrgHome } from '../navigation/webNavigation';
+import { navigateToOrgHome, navigateToOrgPublicProfile } from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
@@ -44,6 +44,7 @@ export default function OrgActivitiesScreen({ navigation, route }) {
   const [message, setMessage] = useState('');
   const [canManage, setCanManage] = useState(false);
   const [selected, setSelected] = useState([]);
+  const [showPublicListingCta, setShowPublicListingCta] = useState(false);
 
   const labels = useMemo(
     () => ({
@@ -51,6 +52,32 @@ export default function OrgActivitiesScreen({ navigation, route }) {
       construction: t('org.activities.types.construction', null, 'Construction'),
       service_center: t('org.activities.types.serviceCenter', null, 'Service center'),
       other: t('org.activities.types.other', null, 'Other'),
+    }),
+    [t],
+  );
+
+  const hints = useMemo(
+    () => ({
+      transport: t(
+        'org.activities.typeHints.transport',
+        null,
+        'Fleet & jobs; request repairs from service centers',
+      ),
+      construction: t(
+        'org.activities.typeHints.construction',
+        null,
+        'Sites & fleet; request repairs from service centers',
+      ),
+      service_center: t(
+        'org.activities.typeHints.serviceCenter',
+        null,
+        'Provide service; appear on the map and public listing',
+      ),
+      other: t(
+        'org.activities.typeHints.other',
+        null,
+        'Company that needs service from shops',
+      ),
     }),
     [t],
   );
@@ -75,6 +102,7 @@ export default function OrgActivitiesScreen({ navigation, route }) {
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
+    setShowPublicListingCta(false);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const resolved = await resolveActiveOrganizationId(routeOrgId);
@@ -111,6 +139,7 @@ export default function OrgActivitiesScreen({ navigation, route }) {
     });
     setMessage('');
     setError('');
+    setShowPublicListingCta(false);
   };
 
   const save = async () => {
@@ -122,12 +151,18 @@ export default function OrgActivitiesScreen({ navigation, route }) {
     setBusy(true);
     setError('');
     setMessage('');
+    setShowPublicListingCta(false);
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const data = await updateOrganizationActivities(token, orgId, { activities: selected });
-      setSelected(Array.isArray(data?.activities) ? data.activities : selected);
-      await refreshOrganizationMemberships(token);
+      const next = Array.isArray(data?.activities) ? data.activities : selected;
+      setSelected(next);
+      const memberships = await refreshOrganizationMemberships(token);
+      const org = memberships.find((row) => Number(row?.id) === Number(orgId));
+      const needsListing =
+        next.includes('service_center') && !org?.has_shop_locations;
       setMessage(t('org.activities.saved', null, 'Activities saved. Modules updated.'));
+      setShowPublicListingCta(needsListing);
     } catch (e) {
       setError(e.message || t('org.activities.saveError', null, 'Could not save activities.'));
     } finally {
@@ -147,7 +182,7 @@ export default function OrgActivitiesScreen({ navigation, route }) {
             {t(
               'org.activities.lead',
               null,
-              'Choose what your company does. This enables modules and filters the task catalog.',
+              'Tell us what you do so we show the right tools and who can find you.',
             )}
           </Text>
 
@@ -172,9 +207,12 @@ export default function OrgActivitiesScreen({ navigation, route }) {
                     <Text style={[styles.checkbox, isOn && styles.checkboxOn]}>
                       {isOn ? '☑' : '☐'}
                     </Text>
-                    <Text style={[styles.optionLabel, isOn && styles.optionLabelOn]}>
-                      {labels[key]}
-                    </Text>
+                    <View style={styles.optionTextCol}>
+                      <Text style={[styles.optionLabel, isOn && styles.optionLabelOn]}>
+                        {labels[key]}
+                      </Text>
+                      <Text style={styles.optionHint}>{hints[key]}</Text>
+                    </View>
                   </Pressable>
                 );
               })}
@@ -193,6 +231,25 @@ export default function OrgActivitiesScreen({ navigation, route }) {
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {message ? <Text style={styles.success}>{message}</Text> : null}
+          {showPublicListingCta ? (
+            <View style={styles.ctaBox}>
+              <Text style={styles.ctaText}>
+                {t(
+                  'org.activities.publicListingCta',
+                  null,
+                  'Set up your public listing so customers can find your service center.',
+                )}
+              </Text>
+              <Button
+                mode="outlined"
+                onPress={() => navigateToOrgPublicProfile(navigation, { orgId })}
+                style={styles.ctaBtn}
+                textColor={COLORS.PRIMARY}
+              >
+                {t('org.activities.publicListingButton', null, 'Complete public listing')}
+              </Button>
+            </View>
+          ) : null}
 
           {canManage ? (
             <Button
@@ -224,12 +281,6 @@ const styles = StyleSheet.create({
     color: ON_CARD,
     fontSize: 15,
     lineHeight: 22,
-    marginBottom: 8,
-  },
-  hint: {
-    color: ON_CARD_MUTED,
-    fontSize: 13,
-    lineHeight: 18,
     marginBottom: 16,
   },
   grid: {
@@ -238,7 +289,7 @@ const styles = StyleSheet.create({
   },
   option: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 10,
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
@@ -261,9 +312,14 @@ const styles = StyleSheet.create({
     color: ON_CARD_MUTED,
     fontSize: 18,
     width: 22,
+    marginTop: 1,
   },
   checkboxOn: {
     color: COLORS.PRIMARY,
+  },
+  optionTextCol: {
+    flex: 1,
+    gap: 2,
   },
   optionLabel: {
     color: ON_CARD,
@@ -273,6 +329,11 @@ const styles = StyleSheet.create({
   optionLabelOn: {
     color: ON_CARD,
     fontWeight: '700',
+  },
+  optionHint: {
+    color: ON_CARD_MUTED,
+    fontSize: 12,
+    lineHeight: 16,
   },
   muted: {
     color: ON_CARD_MUTED,
@@ -286,6 +347,23 @@ const styles = StyleSheet.create({
   success: {
     color: '#15803D',
     marginBottom: 8,
+  },
+  ctaBox: {
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(15,76,129,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(15,76,129,0.18)',
+    gap: 8,
+  },
+  ctaText: {
+    color: ON_CARD,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  ctaBtn: {
+    alignSelf: 'flex-start',
   },
   spinner: {
     marginVertical: 16,

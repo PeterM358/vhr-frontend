@@ -241,6 +241,9 @@
       "pleasantWork": "Pleasant work with {org}",
       "modules": "Workspace",
       "openServiceCenter": "Open service center workspace",
+      "serviceListingTitle": "Public listing",
+      "serviceListingBody": "You provide service — complete your public listing so customers can find you.",
+      "serviceListingButton": "Complete public listing",
       "importFleetLater": "Import fleet later",
       "requestRepair": "Service request",
       "needVehicleTitle": "Add vehicles first",
@@ -1411,23 +1414,32 @@
       "companyName": "Company name",
       "businessType": "Business type",
       "activities": "What does your company do?",
-      "activitiesHint": "Select all that apply — e.g. transport and construction.",
+      "activitiesHint": "Tell us what you do so we show the right tools and who can find you.",
+      "serviceCenterTip": "You provide service — after create, set up your public listing so customers can find you.",
       "create": "Create organization",
       "nameRequired": "Enter your company name.",
       "failed": "Could not create organization.",
       "verifyEmailFirst": "Verify your email before creating the organization. Check your inbox for the confirmation link.",
       "types": {
-        "transport": "Transport company",
+        "transport": "Transport",
         "construction": "Construction",
         "serviceCenter": "Service center",
-        "other": "Other business"
+        "other": "Other"
+      },
+      "typeHints": {
+        "transport": "Fleet & jobs; request repairs from service centers",
+        "construction": "Sites & fleet; request repairs from service centers",
+        "serviceCenter": "Provide service; appear on the map and public listing",
+        "other": "Company that needs service from shops"
       }
     },
     "activities": {
       "title": "Activities",
-      "lead": "Choose what your company does. This enables modules and filters the task catalog.",
+      "lead": "Tell us what you do so we show the right tools and who can find you.",
       "save": "Save activities",
       "saved": "Activities saved. Modules updated.",
+      "publicListingCta": "Set up your public listing so customers can find your service center.",
+      "publicListingButton": "Complete public listing",
       "loadError": "Could not load activities.",
       "saveError": "Could not save activities.",
       "selectOne": "Select at least one activity.",
@@ -1437,6 +1449,12 @@
         "construction": "Construction",
         "serviceCenter": "Service center",
         "other": "Other"
+      },
+      "typeHints": {
+        "transport": "Fleet & jobs; request repairs from service centers",
+        "construction": "Sites & fleet; request repairs from service centers",
+        "serviceCenter": "Provide service; appear on the map and public listing",
+        "other": "Company that needs service from shops"
       }
     }
   },

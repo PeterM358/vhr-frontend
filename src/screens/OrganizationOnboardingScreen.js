@@ -54,13 +54,41 @@ export default function OrganizationOnboardingScreen({ navigation }) {
 
   const typeLabels = useMemo(
     () => ({
-      transport: t('org.onboarding.types.transport', null, 'Transport company'),
+      transport: t('org.onboarding.types.transport', null, 'Transport'),
       construction: t('org.onboarding.types.construction', null, 'Construction'),
       service_center: t('org.onboarding.types.serviceCenter', null, 'Service center'),
-      other: t('org.onboarding.types.other', null, 'Other business'),
+      other: t('org.onboarding.types.other', null, 'Other'),
     }),
     [t],
   );
+
+  const typeHints = useMemo(
+    () => ({
+      transport: t(
+        'org.onboarding.typeHints.transport',
+        null,
+        'Fleet & jobs; request repairs from service centers',
+      ),
+      construction: t(
+        'org.onboarding.typeHints.construction',
+        null,
+        'Sites & fleet; request repairs from service centers',
+      ),
+      service_center: t(
+        'org.onboarding.typeHints.serviceCenter',
+        null,
+        'Provide service; appear on the map and public listing',
+      ),
+      other: t(
+        'org.onboarding.typeHints.other',
+        null,
+        'Company that needs service from shops',
+      ),
+    }),
+    [t],
+  );
+
+  const wantsServiceCenter = selectedActivities.includes('service_center');
 
   const toggleActivity = (type) => {
     setSelectedActivities((prev) => {
@@ -256,7 +284,7 @@ export default function OrganizationOnboardingScreen({ navigation }) {
             {t(
               'org.onboarding.activitiesHint',
               null,
-              'Select all that apply — e.g. transport and construction.',
+              'Tell us what you do so we show the right tools and who can find you.',
             )}
           </Text>
           <View style={styles.typeGrid}>
@@ -275,18 +303,32 @@ export default function OrganizationOnboardingScreen({ navigation }) {
                   <Text style={[styles.checkMark, isOn && styles.checkMarkSelected]}>
                     {isOn ? '☑' : '☐'}
                   </Text>
-                  <Text
-                    style={[
-                      styles.typeLabel,
-                      isOn && styles.typeLabelSelected,
-                    ]}
-                  >
-                    {typeLabels[type]}
-                  </Text>
+                  <View style={styles.typeTextCol}>
+                    <Text
+                      style={[
+                        styles.typeLabel,
+                        isOn && styles.typeLabelSelected,
+                      ]}
+                    >
+                      {typeLabels[type]}
+                    </Text>
+                    <Text style={[styles.typeHint, isOn && styles.typeHintSelected]}>
+                      {typeHints[type]}
+                    </Text>
+                  </View>
                 </Pressable>
               );
             })}
           </View>
+          {wantsServiceCenter ? (
+            <Text style={styles.serviceCenterTip}>
+              {t(
+                'org.onboarding.serviceCenterTip',
+                null,
+                'You provide service — after create, set up your public listing so customers can find you.',
+              )}
+            </Text>
+          ) : null}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {info ? <Text style={styles.info}>{info}</Text> : null}
@@ -403,21 +445,39 @@ const styles = StyleSheet.create({
   checkMarkSelected: {
     color: '#ffffff',
   },
+  typeTextCol: {
+    flex: 1,
+    gap: 2,
+  },
   typeLabel: {
     color: 'rgba(255,255,255,0.82)',
     fontWeight: '600',
     fontSize: 16,
-    flex: 1,
   },
   typeLabelSelected: {
     color: '#ffffff',
     fontWeight: '700',
+  },
+  typeHint: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  typeHintSelected: {
+    color: 'rgba(255,255,255,0.72)',
   },
   activitiesHint: {
     color: 'rgba(255,255,255,0.65)',
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 10,
+  },
+  serviceCenterTip: {
+    color: 'rgba(186,230,253,0.95)',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: -8,
+    marginBottom: 16,
   },
   error: {
     color: '#fca5a5',
