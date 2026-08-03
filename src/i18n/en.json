@@ -2677,7 +2677,8 @@
       "cityRequired": "Choose your city.",
       "phoneRequired": "Enter a contact phone.",
       "mapPinRequired": "Set your map pin.",
-      "operationsRequired": "Select at least one operation."
+      "operationsRequired": "Select at least one operation.",
+      "pricesRequired": "Publish at least one operation price before continuing."
     },
     "locationTitle": "Where customers find you",
     "locationHint": "Address and map pin power discovery, SEO, and incoming requests.",

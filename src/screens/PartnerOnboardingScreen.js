@@ -155,8 +155,23 @@ export default function PartnerOnboardingScreen({ navigation }) {
       {
         id: 'prices',
         titleKey: 'partnerOnboarding.step.prices',
-        optional: true,
+        // Required for publish — matches backend profile_completion.operation_pricing.
         dirtyFields: [],
+        validate: (_v, ctx) => {
+          const completion = ctx?.getCompletion ? ctx.getCompletion() : null;
+          const pricesSection = (completion?.step_states || completion?.sections || []).find(
+            (s) => s.key === 'prices'
+          );
+          if (pricesSection?.complete) return { ok: true };
+          return {
+            ok: false,
+            message: t(
+              'partnerOnboarding.errors.pricesRequired',
+              null,
+              'Publish at least one operation price before continuing.'
+            ),
+          };
+        },
         Component: PartnerPricesStep,
       },
       {

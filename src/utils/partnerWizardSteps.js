@@ -16,4 +16,6 @@ export const WIZARD_STEP_IDS = [
   'publish',
 ];
 
-export const OPTIONAL_WIZARD_STEPS = new Set(['prices', 'photos', 'about', 'preview']);
+// Keep in sync with backend required_for_publish in profile_completion._SECTIONS.
+// prices is required (published ShopServiceMenuItem); photos/about/preview are soft.
+export const OPTIONAL_WIZARD_STEPS = new Set(['photos', 'about', 'preview']);
