@@ -275,14 +275,17 @@ export function WizardProvider({
   //     Context-driven flows (vehicle create) keep state outside `values`, so
   //     dirty-tracking alone must not skip validation.
   //   - clean, non-final step -> advance without PATCH after validation
-  //   - dirty step            -> validate, then persist
-  //   - last step             -> validate + save (when dirty) then onFinish
+  //     (unless step.alwaysPersist — e.g. legal hydrates from public address
+  //     so values look "clean" while backend invoice_address_line1 is empty)
+  //   - dirty / alwaysPersist step -> validate, then persist
+  //   - last step             -> validate + save (when dirty/alwaysPersist) then onFinish
   // Free jump without validation uses goTo() (step bar); Back never saves.
   const goNext = useCallback(async () => {
     if (!currentStep) return { ok: false };
     setError(null);
 
     const dirty = isStepDirty(currentStep, valuesRef.current, savedValuesRef.current);
+    const mustPersist = dirty || currentStep.alwaysPersist === true;
 
     setStatus('saving');
     try {
@@ -297,13 +300,13 @@ export function WizardProvider({
       }
 
       // Nothing changed on a non-final step: advance without touching the API.
-      if (!dirty && !isLast) {
+      if (!mustPersist && !isLast) {
         setStatus('idle');
         goTo(index + 1);
         return { ok: true };
       }
 
-      if (dirty) {
+      if (mustPersist) {
         await persistStep(currentStep, valuesRef.current);
         markStepSaved(currentStep, valuesRef.current);
         markCompleted(currentStep.id);
@@ -351,10 +354,13 @@ export function WizardProvider({
   const finishLater = useCallback(async () => {
     try {
       setStatus('saving');
-      // Best-effort save of the current step so nothing is lost — but only when
-      // the user actually changed something, so exiting a clean step never
-      // triggers (and gets blocked by) a needless PATCH.
-      if (currentStep && isStepDirty(currentStep, valuesRef.current, savedValuesRef.current)) {
+      // Best-effort save so Finish later never drops legal/invoice fields that
+      // look "clean" only because they were hydrated from public address.
+      const shouldPersist =
+        currentStep &&
+        (isStepDirty(currentStep, valuesRef.current, savedValuesRef.current) ||
+          currentStep.alwaysPersist === true);
+      if (shouldPersist) {
         await persistStep(currentStep, valuesRef.current);
         markStepSaved(currentStep, valuesRef.current);
       }

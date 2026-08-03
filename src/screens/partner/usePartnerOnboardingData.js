@@ -67,8 +67,10 @@ const STEP_PATCH_BUILDERS = {
   }),
   legal: (v) => ({
     invoice_branch_name: v.invoice_branch_name || v.name || '',
-    invoice_address_line1: v.invoice_address_line1 || '',
-    invoice_city: v.invoice_city || '',
+    // Persist prefilled public address onto the branch invoice line so
+    // completion and invoices stay in sync even after a "clean" continue.
+    invoice_address_line1: v.invoice_address_line1 || v.address || '',
+    invoice_city: v.invoice_city || v.city_name || '',
   }),
   preview: () => ({}),
   publish: () => ({}),
@@ -301,12 +303,18 @@ export function usePartnerOnboardingData({ preferredStepId = null } = {}) {
     const token = await AsyncStorage.getItem('@access_token');
     if (!token) throw new Error('You are not logged in.');
     const profile = profileRef.current;
+    const countryRaw = values.country ?? profile?.country ?? profile?.country_id ?? null;
+    const countryId =
+      countryRaw != null && typeof countryRaw === 'object' ? countryRaw.id : countryRaw;
     const entityPayload = {
       legal_name: values.legal_name || profile?.name || '',
       vat_registered: values.vat_registered !== false,
       vat_number: values.vat_number || '',
       eik_number: values.eik_number || '',
-      country: profile?.country || null,
+      registered_address_line1:
+        values.invoice_address_line1 || values.address || profile?.address || '',
+      registered_city: values.invoice_city || values.city_name || profile?.city_name || '',
+      country: countryId || null,
       prices_include_vat: true,
     };
     const existingId = legalEntityIdRef.current || values.legalEntityId || null;

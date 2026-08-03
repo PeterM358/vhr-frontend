@@ -1805,7 +1805,8 @@
       "title": "Finish setting up your service center to go live and receive repair requests",
       "missing": "Still needed: {fields}",
       "completeButton": "Complete profile",
-      "continueButton": "Continue setup"
+      "continueButton": "Continue setup",
+      "resumeHint": "You can finish anytime from Center details or this banner."
     },
     "comingSoonDialog": {
       "title": "Coming soon",
@@ -2533,6 +2534,7 @@
     "continue": "Continue",
     "finish": "Finish",
     "finishLater": "Finish later",
+    "finishLaterHint": "You can finish anytime from Center details or the setup banner.",
     "noSteps": "Nothing to show yet."
   },
   "vehicleWizard": {

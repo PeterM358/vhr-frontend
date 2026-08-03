@@ -288,16 +288,24 @@ export default function WizardChrome({
           </View>
         </View>
         {!isFirst && showFinishLater ? (
-          <Button
-            mode="text"
-            onPress={finishLater}
-            disabled={saving}
-            textColor={COLORS.TEXT_MUTED}
-            compact
-            style={styles.finishLaterUnder}
-          >
-            {t('wizard.finishLater', null, 'Finish later')}
-          </Button>
+          <View style={styles.finishLaterUnder}>
+            <Button
+              mode="text"
+              onPress={finishLater}
+              disabled={saving}
+              textColor={COLORS.TEXT_MUTED}
+              compact
+            >
+              {t('wizard.finishLater', null, 'Finish later')}
+            </Button>
+            <Text style={styles.finishLaterHint}>
+              {t(
+                'wizard.finishLaterHint',
+                null,
+                'You can finish anytime from Center details or the setup banner.'
+              )}
+            </Text>
+          </View>
         ) : null}
       </View>
     </View>
@@ -409,5 +417,12 @@ const styles = StyleSheet.create({
   skipBtn: { marginRight: 2 },
   nextBtn: { borderRadius: 22 },
   nextBtnContent: { height: 46, paddingHorizontal: 8 },
-  finishLaterUnder: { marginTop: 6 },
+  finishLaterUnder: { marginTop: 6, alignItems: 'center', gap: 2 },
+  finishLaterHint: {
+    fontSize: 11,
+    color: COLORS.TEXT_MUTED,
+    textAlign: 'center',
+    paddingHorizontal: 12,
+    lineHeight: 14,
+  },
 });

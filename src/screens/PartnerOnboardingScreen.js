@@ -206,6 +206,10 @@ export default function PartnerOnboardingScreen({ navigation }) {
       {
         id: 'legal',
         titleKey: 'partnerOnboarding.step.legal',
+        // Always PATCH: invoice address is often prefilled from public address
+        // without dirtying fields, which previously skipped save and left
+        // profile_completion.legal incomplete.
+        alwaysPersist: true,
         dirtyFields: [
           'legal_name',
           'vat_registered',

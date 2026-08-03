@@ -36,6 +36,13 @@ export default function ShopProfileSetupBanner({
           <Text style={styles.cta} numberOfLines={1}>
             {t('partnerDashboard.profileSetup.continueButton')}
           </Text>
+          <Text style={styles.resumeHint} numberOfLines={2}>
+            {t(
+              'partnerDashboard.profileSetup.resumeHint',
+              null,
+              'You can finish anytime from Center details or this banner.'
+            )}
+          </Text>
         </View>
         {showPercent ? <Text style={styles.percent}>{percent}%</Text> : null}
         <MaterialCommunityIcons
@@ -99,6 +106,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     marginTop: 1,
+  },
+  resumeHint: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 14,
   },
   percent: {
     color: COLORS.PRIMARY,
