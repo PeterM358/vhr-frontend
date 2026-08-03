@@ -283,12 +283,14 @@ function EditableLineCard({
 export default function OrgMaterialsIntakePanel({
   organizationId,
   canManage,
+  canPostIntake = null,
   section = 'documents',
   locations = [],
   navigation = null,
   documentsListKey = 0,
 }) {
   const { t } = useTranslation();
+  const canPost = canPostIntake == null ? Boolean(canManage) : Boolean(canPostIntake);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -432,7 +434,7 @@ export default function OrgMaterialsIntakePanel({
     || activeIntake?.legal_entity_complete === false;
 
   const onUpload = async () => {
-    if (!canManage || !organizationId) return;
+    if (!canPost || !organizationId) return;
     setBusy(true);
     setError('');
     setMessage('');
@@ -736,7 +738,7 @@ export default function OrgMaterialsIntakePanel({
   };
 
   const onDeleteDraft = async (row) => {
-    if (!canManage || !row?.id || row.status !== 'draft') return;
+    if (!canPost || !row?.id || row.status !== 'draft') return;
     const ok = await confirmMessage(
       t('org.warehouse.intake.deleteDraftTitle', null, 'Delete draft?'),
       t(
@@ -930,9 +932,9 @@ export default function OrgMaterialsIntakePanel({
         </AppCard>
       ) : null}
 
-      {isDocuments && canManage && !detailOpen ? (
+      {isDocuments && canPost && !detailOpen ? (
         <Button mode="contained" onPress={onUpload} loading={busy} disabled={busy}>
-          {t('org.warehouse.intake.upload', null, 'Import invoice PDF')}
+          {t('org.warehouse.intake.upload', null, 'Add invoice')}
         </Button>
       ) : null}
 
@@ -1056,7 +1058,7 @@ export default function OrgMaterialsIntakePanel({
             {activeIntake.layout_id ? ` · ${activeIntake.layout_id}` : ''}
           </Text>
 
-          {activeIntake.status === 'draft' && canManage ? (
+          {activeIntake.status === 'draft' && canPost ? (
             <View style={styles.supplierRow}>
               <TextInput
                 label={t('org.warehouse.intake.supplier', null, 'Supplier')}
@@ -1091,7 +1093,7 @@ export default function OrgMaterialsIntakePanel({
             </Text>
           ) : null}
 
-          {activeIntake.status === 'draft' && canManage ? (
+          {activeIntake.status === 'draft' && canPost ? (
             <View style={styles.locationBox}>
               <Text style={styles.sectionLabel}>
                 {t('org.warehouse.intake.storeLocation', null, 'Store into location')}
@@ -1149,7 +1151,7 @@ export default function OrgMaterialsIntakePanel({
                     key={line.id}
                     units={catalogUnits}
                     line={line}
-                    canEdit={activeIntake.status === 'draft' && canManage}
+                    canEdit={activeIntake.status === 'draft' && canPost}
                     busy={busy}
                     t={t}
                     onSave={onSaveLine}
@@ -1162,7 +1164,7 @@ export default function OrgMaterialsIntakePanel({
             </ScrollView>
           )}
 
-          {activeIntake.status === 'draft' && canManage ? (
+          {activeIntake.status === 'draft' && canPost ? (
             <View style={styles.manualBox}>
               <Text style={styles.sectionLabel}>
                 {t('org.warehouse.intake.addManual', null, 'Add line manually')}
@@ -1317,7 +1319,7 @@ export default function OrgMaterialsIntakePanel({
                           {t('org.warehouse.intake.openDetail', null, 'Open document detail')}
                         </Text>
                       </Pressable>
-                      {row.status === 'draft' && canManage ? (
+                      {row.status === 'draft' && canPost ? (
                         <Button
                           mode="outlined"
                           compact

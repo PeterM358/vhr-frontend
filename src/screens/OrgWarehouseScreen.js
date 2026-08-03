@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Button, Switch, TextInput } from 'react-native-paper';
@@ -10,13 +10,16 @@ import OrgAppHeader from '../components/org/OrgAppHeader';
 import {
   createWarehouseLocation,
   deactivateWarehouseLocation,
+  getWarehouseSettings,
   listWarehouseLocations,
   openWarehouseLocationLabel,
   updateWarehouseLocation,
+  updateWarehouseSettings,
 } from '../api/orgWarehouse';
 import OrgMaterialsIntakePanel from '../components/org/OrgMaterialsIntakePanel';
 import {
   readOrganizationMemberships,
+  refreshOrganizationMemberships,
   resolveActiveOrganizationId,
 } from '../utils/orgWorkspace';
 import { navigateToOrgHome } from '../navigation/webNavigation';
@@ -37,6 +40,24 @@ const PRIMARY_MODES = [
 const SECONDARY_MODES = [
   { id: 'list', labelKey: 'org.warehouse.tabLocations', fallback: 'Locations' },
   { id: 'add', labelKey: 'org.warehouse.addLocation', fallback: 'Add location' },
+];
+
+const INTAKE_POSTING_MODES = [
+  {
+    id: 'both',
+    labelKey: 'org.warehouse.settings.modeBoth',
+    fallback: 'Warehouse or accounting',
+  },
+  {
+    id: 'warehouse',
+    labelKey: 'org.warehouse.settings.modeWarehouse',
+    fallback: 'Warehouse only',
+  },
+  {
+    id: 'accounting',
+    labelKey: 'org.warehouse.settings.modeAccounting',
+    fallback: 'Accounting only',
+  },
 ];
 
 function emptyForm() {
@@ -75,21 +96,44 @@ export default function OrgWarehouseScreen({ navigation, route }) {
     if (navigation?.canGoBack?.()) navigation.goBack();
   }, [navigation, routeOrgId]);
 
+  const routeInitialTab =
+    route?.params?.initialTab || route?.params?.tab || route?.params?.section || null;
+
   const [orgId, setOrgId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [canManage, setCanManage] = useState(false);
+  const [canPostIntake, setCanPostIntake] = useState(false);
+  const [canManageSettings, setCanManageSettings] = useState(false);
+  const [intakePostingMode, setIntakePostingMode] = useState('both');
   const [rows, setRows] = useState([]);
-  const [mode, setMode] = useState('documents');
+  const [mode, setMode] = useState(() => {
+    if (routeInitialTab === 'materials' || routeInitialTab === 'list' || routeInitialTab === 'add') {
+      return routeInitialTab;
+    }
+    return 'documents';
+  });
   const [documentsListKey, setDocumentsListKey] = useState(0);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [busy, setBusy] = useState(false);
   const [formMessage, setFormMessage] = useState('');
+  const [settingsBusy, setSettingsBusy] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState('');
 
   const setField = useCallback((key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   }, []);
+
+  useEffect(() => {
+    const tab = route?.params?.initialTab || route?.params?.tab || route?.params?.section;
+    if (tab === 'documents' || tab === 'materials' || tab === 'list' || tab === 'add') {
+      setMode(tab);
+      if (tab === 'documents') {
+        setDocumentsListKey((k) => k + 1);
+      }
+    }
+  }, [route?.params?.initialTab, route?.params?.tab, route?.params?.section]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -101,11 +145,23 @@ export default function OrgWarehouseScreen({ navigation, route }) {
       if (!resolved) {
         setRows([]);
         setCanManage(false);
+        setCanPostIntake(false);
+        setCanManageSettings(false);
         setError(t('org.warehouse.loadError', null, 'Could not load warehouse.'));
         return;
       }
-      const data = await listWarehouseLocations(token, resolved);
-      setCanManage(Boolean(data?.can_manage));
+      const [data, settings] = await Promise.all([
+        listWarehouseLocations(token, resolved),
+        getWarehouseSettings(token, resolved).catch(() => null),
+      ]);
+      setCanManage(Boolean(data?.can_manage ?? settings?.can_manage_warehouse));
+      setCanPostIntake(
+        Boolean(data?.can_post_materials_intake ?? settings?.can_post_materials_intake),
+      );
+      setIntakePostingMode(
+        data?.intake_posting_mode || settings?.intake_posting_mode || 'both',
+      );
+      setCanManageSettings(Boolean(settings?.can_manage_settings));
       setRows(Array.isArray(data?.results) ? data.results : []);
     } catch (e) {
       setError(e.message || t('org.warehouse.loadError', null, 'Could not load warehouse.'));
@@ -114,6 +170,32 @@ export default function OrgWarehouseScreen({ navigation, route }) {
       setLoading(false);
     }
   }, [routeOrgId, t]);
+
+  const saveIntakePostingMode = async (nextMode) => {
+    if (!orgId || !canManageSettings || nextMode === intakePostingMode) return;
+    setSettingsBusy(true);
+    setSettingsMessage('');
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const data = await updateWarehouseSettings(token, orgId, {
+        intake_posting_mode: nextMode,
+      });
+      setIntakePostingMode(data?.intake_posting_mode || nextMode);
+      setCanPostIntake(Boolean(data?.can_post_materials_intake));
+      setCanManage(Boolean(data?.can_manage_warehouse ?? canManage));
+      setSettingsMessage(
+        t('org.warehouse.settings.saved', null, 'Intake posting mode updated.'),
+      );
+      await refreshOrganizationMemberships(token).catch(() => null);
+      await load();
+    } catch (e) {
+      setSettingsMessage(
+        e.message || t('org.warehouse.settings.saveError', null, 'Could not save setting.'),
+      );
+    } finally {
+      setSettingsBusy(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -270,6 +352,7 @@ export default function OrgWarehouseScreen({ navigation, route }) {
             <OrgMaterialsIntakePanel
               organizationId={orgId}
               canManage={canManage}
+              canPostIntake={canPostIntake}
               section={mode}
               locations={rows.filter((r) => r.is_active !== false)}
               navigation={navigation}
@@ -378,6 +461,45 @@ export default function OrgWarehouseScreen({ navigation, route }) {
               <Button mode="contained" onPress={startCreate} style={styles.primaryBtn}>
                 {t('org.warehouse.addLocation', null, 'Add location')}
               </Button>
+            ) : null}
+            {canManageSettings ? (
+              <View style={styles.settingsBox}>
+                <Text style={styles.sectionTitle}>
+                  {t('org.warehouse.settings.title', null, 'Who can add invoices')}
+                </Text>
+                <Text style={styles.meta}>
+                  {t(
+                    'org.warehouse.settings.lead',
+                    null,
+                    'Controls who may upload and confirm supplier invoices into stock. Outbound issue on tasks stays warehouse/ops.',
+                  )}
+                </Text>
+                <View style={styles.settingsModes}>
+                  {INTAKE_POSTING_MODES.map((item) => {
+                    const active = intakePostingMode === item.id;
+                    return (
+                      <Pressable
+                        key={item.id}
+                        disabled={settingsBusy}
+                        onPress={() => saveIntakePostingMode(item.id)}
+                        style={[styles.settingsChip, active && styles.settingsChipActive]}
+                      >
+                        <Text
+                          style={[
+                            styles.settingsChipText,
+                            active && styles.settingsChipTextActive,
+                          ]}
+                        >
+                          {t(item.labelKey, null, item.fallback)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {settingsMessage ? (
+                  <Text style={styles.formMessage}>{settingsMessage}</Text>
+                ) : null}
+              </View>
             ) : null}
           </AppCard>
         ) : (
@@ -629,5 +751,37 @@ const styles = StyleSheet.create({
   primaryBtn: {
     marginTop: 4,
     marginBottom: 4,
+  },
+  settingsBox: {
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(15,23,42,0.12)',
+  },
+  settingsModes: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  settingsChip: {
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(15,23,42,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.12)',
+  },
+  settingsChipActive: {
+    backgroundColor: 'rgba(14,165,233,0.14)',
+    borderColor: COLORS.PRIMARY,
+  },
+  settingsChipText: {
+    color: ON_CARD_MUTED,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  settingsChipTextActive: {
+    color: ON_CARD,
   },
 });

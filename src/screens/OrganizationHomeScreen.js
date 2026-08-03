@@ -481,7 +481,12 @@ export default function OrganizationHomeScreen() {
       });
     }
 
-    if (canManageOps || org?.manage_org_warehouse || navRoutes.has('OrgWarehouse')) {
+    if (
+      canManageOps
+      || org?.manage_org_warehouse
+      || org?.can_post_materials_intake
+      || navRoutes.has('OrgWarehouse')
+    ) {
       tiles.push({
         key: 'warehouse',
         icon: 'warehouse',
@@ -534,6 +539,7 @@ export default function OrganizationHomeScreen() {
     org?.has_shop_locations,
     org?.id,
     org?.manage_org_warehouse,
+    org?.can_post_materials_intake,
     t,
   ]);
 

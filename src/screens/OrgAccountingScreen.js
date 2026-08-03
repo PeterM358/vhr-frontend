@@ -11,7 +11,7 @@ import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePick
 import SimpleDonutChart from '../components/charts/SimpleDonutChart';
 import SimpleMetricBars from '../components/charts/SimpleMetricBars';
 import { getAccountingSummary, listWorkOrders } from '../api/orgOperations';
-import { resolveActiveOrganizationId } from '../utils/orgWorkspace';
+import { resolveActiveOrganizationId, readOrganizationMemberships } from '../utils/orgWorkspace';
 import {
   navigateToOrgHome,
   navigateToOrgInvoicing,
@@ -73,6 +73,7 @@ export default function OrgAccountingScreen({ navigation, route }) {
   const [error, setError] = useState('');
   const [summary, setSummary] = useState(null);
   const [uninvoicedCount, setUninvoicedCount] = useState(0);
+  const [canPostIntake, setCanPostIntake] = useState(false);
   const [month, setMonth] = useState(currentMonthIso());
   const [filterFrom, setFilterFrom] = useState(() => monthBounds(currentMonthIso()).from);
   const [filterTo, setFilterTo] = useState(() => monthBounds(currentMonthIso()).to);
@@ -103,14 +104,17 @@ export default function OrgAccountingScreen({ navigation, route }) {
       const params = {};
       if (filterFrom) params.from = filterFrom;
       if (filterTo) params.to = filterTo;
-      const [data, jobsRes] = await Promise.all([
+      const [data, jobsRes, memberships] = await Promise.all([
         getAccountingSummary(token, resolved, params),
         listWorkOrders(token, resolved, { status: 'done', uninvoiced: true }).catch(() => ({
           results: [],
         })),
+        readOrganizationMemberships().catch(() => []),
       ]);
       setSummary(data);
       setUninvoicedCount(Array.isArray(jobsRes?.results) ? jobsRes.results.length : 0);
+      const membership = (memberships || []).find((row) => Number(row?.id) === Number(resolved));
+      setCanPostIntake(Boolean(membership?.can_post_materials_intake));
     } catch (e) {
       setError(e.message || t('org.accounting.loadError', null, 'Could not load accounting.'));
       setSummary(null);
@@ -402,10 +406,29 @@ export default function OrgAccountingScreen({ navigation, route }) {
                   <Button
                     compact
                     mode="text"
-                    onPress={() => navigateToOrgWarehouse(navigation, { orgId })}
+                    onPress={() =>
+                      navigateToOrgWarehouse(navigation, {
+                        orgId,
+                        initialTab: 'documents',
+                      })
+                    }
                   >
                     {t('org.accounting.openWarehouse', null, 'Warehouse')}
                   </Button>
+                  {canPostIntake ? (
+                    <Button
+                      compact
+                      mode="contained"
+                      onPress={() =>
+                        navigateToOrgWarehouse(navigation, {
+                          orgId,
+                          initialTab: 'documents',
+                        })
+                      }
+                    >
+                      {t('org.accounting.addInvoice', null, 'Add invoice')}
+                    </Button>
+                  ) : null}
                 </View>
                 <View style={styles.metricCard}>
                   <Text style={styles.metricValue}>

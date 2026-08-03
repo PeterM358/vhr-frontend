@@ -30,6 +30,31 @@ export async function listWarehouseLocations(token, organizationId, params = {})
   return response.json();
 }
 
+export async function getWarehouseSettings(token, organizationId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/settings/`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load warehouse settings'));
+  return response.json();
+}
+
+export async function updateWarehouseSettings(token, organizationId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/settings/`,
+    {
+      method: 'PATCH',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to update warehouse settings'));
+  return response.json();
+}
+
 export async function createWarehouseLocation(token, organizationId, payload) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/locations/`,

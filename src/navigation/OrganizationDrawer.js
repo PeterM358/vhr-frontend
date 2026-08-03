@@ -204,7 +204,9 @@ function CustomDrawerContent(props) {
       seen.add('OrgProjects');
     }
 
-    const canWarehouse = Boolean(canManageOps || org?.manage_org_warehouse);
+    const canWarehouse = Boolean(
+      canManageOps || org?.manage_org_warehouse || org?.can_post_materials_intake,
+    );
     if (canWarehouse && !seen.has('OrgWarehouse')) {
       const workforceIdx = items.findIndex((row) => row.route === 'OrgWorkforce');
       const projectsIdx = items.findIndex((row) => row.route === 'OrgProjects');
