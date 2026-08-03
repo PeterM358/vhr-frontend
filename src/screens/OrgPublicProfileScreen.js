@@ -1,6 +1,7 @@
 /**
- * Owner settings: opt-in B2B public profile (default OFF).
- * Safe page only — no ERP data. Works on web + mobile.
+ * Owner settings: org B2B public profile.
+ * Service-center orgs: auto-enabled on activity select (toggle still available).
+ * Other orgs: optional / off by default.
  */
 
 import React, { useCallback, useState } from 'react';
@@ -40,6 +41,7 @@ export default function OrgPublicProfileScreen({ navigation, route }) {
   const [slug, setSlug] = useState('');
   const [canonicalPath, setCanonicalPath] = useState(null);
   const [displayName, setDisplayName] = useState('');
+  const [isServiceCenter, setIsServiceCenter] = useState(false);
 
   const onBack = useCallback(() => {
     navigateToOrgHome(navigation, { orgId: routeOrgId || orgId });
@@ -61,6 +63,10 @@ export default function OrgPublicProfileScreen({ navigation, route }) {
       setSlug(data.public_slug || '');
       setCanonicalPath(data.canonical_path || null);
       setDisplayName(data.display_name || '');
+      const activities = Array.isArray(data.activities) ? data.activities : [];
+      setIsServiceCenter(
+        Boolean(data.is_service_center) || activities.includes('service_center'),
+      );
     } catch (e) {
       setError(
         e.message || t('org.publicProfile.loadError', null, 'Could not load public profile settings.'),
@@ -89,6 +95,10 @@ export default function OrgPublicProfileScreen({ navigation, route }) {
       setEnabled(Boolean(data.public_profile_enabled));
       setSlug(data.public_slug || '');
       setCanonicalPath(data.canonical_path || null);
+      const activities = Array.isArray(data.activities) ? data.activities : [];
+      setIsServiceCenter(
+        Boolean(data.is_service_center) || activities.includes('service_center'),
+      );
       await refreshOrganizationMemberships(token).catch(() => null);
       showMessage(
         t('org.publicProfile.savedTitle', null, 'Public profile'),
@@ -127,11 +137,17 @@ export default function OrgPublicProfileScreen({ navigation, route }) {
         ) : (
           <AppCard style={styles.card}>
             <Text style={styles.lead}>
-              {t(
-                'org.publicProfile.lead',
-                null,
-                'Optional B2B page for partners and Google — like service centers, but for your company. Off by default. Never shows tasks, salaries, or fleet ERP.',
-              )}
+              {isServiceCenter
+                ? t(
+                    'org.publicProfile.leadServiceCenter',
+                    null,
+                    'Public listing is enabled for service centers so customers can find you. You can turn it off anytime. Never shows tasks, salaries, or fleet ERP.',
+                  )
+                : t(
+                    'org.publicProfile.lead',
+                    null,
+                    'Optional B2B page for partners and Google. Off by default for non–service-center companies. Never shows tasks, salaries, or fleet ERP.',
+                  )}
             </Text>
             {displayName ? (
               <Text style={styles.name}>{displayName}</Text>
@@ -142,7 +158,17 @@ export default function OrgPublicProfileScreen({ navigation, route }) {
                   {t('org.publicProfile.publish', null, 'Publish public page')}
                 </Text>
                 <Text style={styles.hint}>
-                  {t('org.publicProfile.publishHint', null, 'Opt-in only. You can turn it off anytime.')}
+                  {isServiceCenter
+                    ? t(
+                        'org.publicProfile.publishHintServiceCenter',
+                        null,
+                        'Enabled for service centers. You can turn it off if you insist.',
+                      )
+                    : t(
+                        'org.publicProfile.publishHint',
+                        null,
+                        'Optional for your company. You can turn it off anytime.',
+                      )}
                 </Text>
               </View>
               <Switch

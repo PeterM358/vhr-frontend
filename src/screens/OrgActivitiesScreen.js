@@ -76,7 +76,7 @@ export default function OrgActivitiesScreen({ navigation, route }) {
       other: t(
         'org.activities.typeHints.other',
         null,
-        'Company that needs service from shops',
+        'Company that needs service from service centers',
       ),
     }),
     [t],
@@ -159,6 +159,8 @@ export default function OrgActivitiesScreen({ navigation, route }) {
       setSelected(next);
       const memberships = await refreshOrganizationMemberships(token);
       const org = memberships.find((row) => Number(row?.id) === Number(orgId));
+      // Soft CTA only for service_center orgs without a linked shop location.
+      // Public profile is auto-enabled for service centers — never block the user.
       const needsListing =
         next.includes('service_center') && !org?.has_shop_locations;
       setMessage(t('org.activities.saved', null, 'Activities saved. Modules updated.'));
@@ -182,7 +184,7 @@ export default function OrgActivitiesScreen({ navigation, route }) {
             {t(
               'org.activities.lead',
               null,
-              'Tell us what you do so we show the right tools and who can find you.',
+              'Tell us what you do so we show the right tools and who can find you. You can change this later anytime.',
             )}
           </Text>
 
@@ -237,17 +239,26 @@ export default function OrgActivitiesScreen({ navigation, route }) {
                 {t(
                   'org.activities.publicListingCta',
                   null,
-                  'Set up your public listing so customers can find your service center.',
+                  'Public listing is on for your service center. Review it anytime — this is optional.',
                 )}
               </Text>
-              <Button
-                mode="outlined"
-                onPress={() => navigateToOrgPublicProfile(navigation, { orgId })}
-                style={styles.ctaBtn}
-                textColor={COLORS.PRIMARY}
-              >
-                {t('org.activities.publicListingButton', null, 'Complete public listing')}
-              </Button>
+              <View style={styles.ctaActions}>
+                <Button
+                  mode="outlined"
+                  onPress={() => navigateToOrgPublicProfile(navigation, { orgId })}
+                  style={styles.ctaBtn}
+                  textColor={COLORS.PRIMARY}
+                >
+                  {t('org.activities.publicListingButton', null, 'Review public listing')}
+                </Button>
+                <Button
+                  mode="text"
+                  onPress={() => setShowPublicListingCta(false)}
+                  textColor={ON_CARD_MUTED}
+                >
+                  {t('org.activities.publicListingDismiss', null, 'Not now')}
+                </Button>
+              </View>
             </View>
           ) : null}
 
@@ -361,6 +372,12 @@ const styles = StyleSheet.create({
     color: ON_CARD,
     fontSize: 14,
     lineHeight: 20,
+  },
+  ctaActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 4,
   },
   ctaBtn: {
     alignSelf: 'flex-start',

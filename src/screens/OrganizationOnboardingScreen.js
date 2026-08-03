@@ -82,7 +82,7 @@ export default function OrganizationOnboardingScreen({ navigation }) {
       other: t(
         'org.onboarding.typeHints.other',
         null,
-        'Company that needs service from shops',
+        'Company that needs service from service centers',
       ),
     }),
     [t],
@@ -242,7 +242,7 @@ export default function OrganizationOnboardingScreen({ navigation }) {
             {t(
               'org.onboarding.subtitle',
               null,
-              'Set up your company workspace. You can import a fleet later when you are ready.',
+              'Company name and at least one activity are enough. You can change this later in Activities / settings.',
             )}
           </Text>
 
@@ -284,7 +284,7 @@ export default function OrganizationOnboardingScreen({ navigation }) {
             {t(
               'org.onboarding.activitiesHint',
               null,
-              'Tell us what you do so we show the right tools and who can find you.',
+              'Select at least one. Legal details and public listing can wait — change this later in Activities / settings.',
             )}
           </Text>
           <View style={styles.typeGrid}>
@@ -325,7 +325,7 @@ export default function OrganizationOnboardingScreen({ navigation }) {
               {t(
                 'org.onboarding.serviceCenterTip',
                 null,
-                'You provide service — after create, set up your public listing so customers can find you.',
+                'Service centers get a public listing automatically. You can review or turn it off later in Public profile.',
               )}
             </Text>
           ) : null}

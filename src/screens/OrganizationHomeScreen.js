@@ -153,11 +153,13 @@ export default function OrganizationHomeScreen() {
   const scrollBottomPadding = useScrollContentBottomPadding(40);
   const toastTop = appNavBarTotalHeight(insets) + 8;
   const isDriver = isDriverMembership(org);
+  const [listingCtaDismissed, setListingCtaDismissed] = useState(false);
   const needsServiceListing = useMemo(() => {
-    if (isDriver || !org) return false;
+    if (isDriver || !org || listingCtaDismissed) return false;
     const activities = Array.isArray(org.activities) ? org.activities : [];
+    // Soft, non-blocking tip — only when service_center is selected and no shop location yet.
     return activities.includes('service_center') && !org.has_shop_locations;
-  }, [isDriver, org]);
+  }, [isDriver, listingCtaDismissed, org]);
 
   const showGreetingToast = useCallback((name, company) => {
     if (toastTimerRef.current) {
@@ -828,18 +830,27 @@ export default function OrganizationHomeScreen() {
                   {t(
                     'org.home.serviceListingBody',
                     null,
-                    'You provide service — complete your public listing so customers can find you.',
+                    'Your service center listing is on. Review or edit it anytime — you can keep working without this.',
                   )}
                 </Text>
-                <Button
-                  mode="contained"
-                  onPress={() => navigateToOrgPublicProfile(navigation, { orgId: org?.id })}
-                  style={styles.listingBtn}
-                  buttonColor={COLORS.PRIMARY}
-                  textColor={COLORS.ON_PRIMARY}
-                >
-                  {t('org.home.serviceListingButton', null, 'Complete public listing')}
-                </Button>
+                <View style={styles.listingActions}>
+                  <Button
+                    mode="contained"
+                    onPress={() => navigateToOrgPublicProfile(navigation, { orgId: org?.id })}
+                    style={styles.listingBtn}
+                    buttonColor={COLORS.PRIMARY}
+                    textColor={COLORS.ON_PRIMARY}
+                  >
+                    {t('org.home.serviceListingButton', null, 'Review public listing')}
+                  </Button>
+                  <Button
+                    mode="text"
+                    onPress={() => setListingCtaDismissed(true)}
+                    textColor="rgba(255,255,255,0.72)"
+                  >
+                    {t('org.home.serviceListingDismiss', null, 'Not now')}
+                  </Button>
+                </View>
               </DashboardCard>
             ) : null}
 
@@ -962,6 +973,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 12,
+  },
+  listingActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 4,
   },
   listingBtn: {
     alignSelf: 'flex-start',

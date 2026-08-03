@@ -242,8 +242,9 @@
       "modules": "Workspace",
       "openServiceCenter": "Open service center workspace",
       "serviceListingTitle": "Public listing",
-      "serviceListingBody": "You provide service — complete your public listing so customers can find you.",
-      "serviceListingButton": "Complete public listing",
+      "serviceListingBody": "Your service center listing is on. Review or edit it anytime — you can keep working without this.",
+      "serviceListingButton": "Review public listing",
+      "serviceListingDismiss": "Not now",
       "importFleetLater": "Import fleet later",
       "requestRepair": "Service request",
       "needVehicleTitle": "Add vehicles first",
@@ -1159,9 +1160,11 @@
     "publicProfile": {
       "title": "Public profile",
       "publicTitle": "Company",
-      "lead": "Optional B2B page for partners and Google — like service centers, but for your company. Off by default. Never shows tasks, salaries, or fleet ERP.",
+      "lead": "Optional B2B page for partners and Google. Off by default for non–service-center companies. Never shows tasks, salaries, or fleet ERP.",
+      "leadServiceCenter": "Public listing is enabled for service centers so customers can find you. You can turn it off anytime. Never shows tasks, salaries, or fleet ERP.",
       "publish": "Publish public page",
-      "publishHint": "Opt-in only. You can turn it off anytime.",
+      "publishHint": "Optional for your company. You can turn it off anytime.",
+      "publishHintServiceCenter": "Enabled for service centers. You can turn it off if you insist.",
       "slug": "Public URL slug",
       "preview": "Open public page",
       "savedTitle": "Public profile",
@@ -1185,7 +1188,7 @@
     "fleetPlanning": {
       "title": "Fleet planning",
       "hint": "Vehicles × days. Tap an empty day (twice for a range) to create a task — the bar is the task.",
-      "hintPro": "Base calendar for the fleet: tap empty days to create, long-press a bar to move it. Same board pattern shops will use for bays later.",
+      "hintPro": "Base calendar for the fleet: tap empty days to create, long-press a bar to move it. Same board pattern service centers will use for bays later.",
       "today": "Today",
       "idleOnly": "Idle only",
       "newTask": "New task",
@@ -1410,12 +1413,13 @@
     },
     "onboarding": {
       "title": "Create your organization",
-      "subtitle": "Set up your company workspace. You can import a fleet later when you are ready.",
+      "subtitle": "Company name and at least one activity are enough. You can change this later in Activities / settings.",
       "companyName": "Company name",
       "businessType": "Business type",
       "activities": "What does your company do?",
-      "activitiesHint": "Tell us what you do so we show the right tools and who can find you.",
-      "serviceCenterTip": "You provide service — after create, set up your public listing so customers can find you.",
+      "activitiesHint": "Select at least one. Legal details and public listing can wait — change this later in Activities / settings.",
+      "changeLaterHint": "You can change this later in Activities / settings.",
+      "serviceCenterTip": "Service centers get a public listing automatically. You can review or turn it off later in Public profile.",
       "create": "Create organization",
       "nameRequired": "Enter your company name.",
       "failed": "Could not create organization.",
@@ -1430,16 +1434,17 @@
         "transport": "Fleet & jobs; request repairs from service centers",
         "construction": "Sites & fleet; request repairs from service centers",
         "serviceCenter": "Provide service; appear on the map and public listing",
-        "other": "Company that needs service from shops"
+        "other": "Company that needs service from service centers"
       }
     },
     "activities": {
       "title": "Activities",
-      "lead": "Tell us what you do so we show the right tools and who can find you.",
+      "lead": "Tell us what you do so we show the right tools and who can find you. You can change this later anytime.",
       "save": "Save activities",
       "saved": "Activities saved. Modules updated.",
-      "publicListingCta": "Set up your public listing so customers can find your service center.",
-      "publicListingButton": "Complete public listing",
+      "publicListingCta": "Public listing is on for your service center. Review it anytime — this is optional.",
+      "publicListingButton": "Review public listing",
+      "publicListingDismiss": "Not now",
       "loadError": "Could not load activities.",
       "saveError": "Could not save activities.",
       "selectOne": "Select at least one activity.",
@@ -1454,7 +1459,7 @@
         "transport": "Fleet & jobs; request repairs from service centers",
         "construction": "Sites & fleet; request repairs from service centers",
         "serviceCenter": "Provide service; appear on the map and public listing",
-        "other": "Company that needs service from shops"
+        "other": "Company that needs service from service centers"
       }
     }
   },

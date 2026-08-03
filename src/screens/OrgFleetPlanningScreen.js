@@ -203,7 +203,7 @@ export default function OrgFleetPlanningScreen({ navigation, route }) {
             {t(
               'org.fleetPlanning.hintPro',
               null,
-              'Base calendar for the fleet: tap empty days to create, long-press a bar to move it. Same board pattern shops will use for bays later.',
+              'Base calendar for the fleet: tap empty days to create, long-press a bar to move it. Same board pattern service centers will use for bays later.',
             )}
           </Text>
           <View style={styles.monthRow}>
