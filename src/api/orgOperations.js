@@ -391,7 +391,7 @@ export async function endWorkOrder(token, organizationId, workOrderId, payload =
       body: JSON.stringify(payload || {}),
     },
   );
-  if (!response.ok) throw new Error(await parseError(response, 'Failed to end task'));
+  if (!response.ok) await throwApiError(response, 'Failed to end task');
   return response.json();
 }
 

@@ -171,6 +171,27 @@ function canShowEndButton(task) {
   return Boolean(task.start_acknowledged_at || task.started_at || task.status === 'in_progress');
 }
 
+/** True when warehouse issued materials that the driver/worker has not confirmed yet. */
+function taskHasPendingMaterialConfirm(task) {
+  if (!task) return false;
+  if (typeof task.materials_pending_confirm === 'boolean') {
+    return task.materials_pending_confirm;
+  }
+  const issues = Array.isArray(task.material_issues) ? task.material_issues : [];
+  return issues.some(
+    (issue) => Boolean(issue?.pending_confirm) || issue?.status === 'issued',
+  );
+}
+
+function firstPendingMaterialIssue(task) {
+  const issues = Array.isArray(task?.material_issues) ? task.material_issues : [];
+  return (
+    issues.find(
+      (issue) => Boolean(issue?.pending_confirm) || issue?.status === 'issued',
+    ) || null
+  );
+}
+
 function isWaitingForStartTime(task) {
   if (!task?.scheduled_date || !task?.planned_start) return false;
   if (task.start_acknowledged_at || task.started_at) return false;
@@ -1261,16 +1282,32 @@ export default function OrgTasksScreen({ navigation, route }) {
         );
       }
     } catch (e) {
-      Alert.alert(
-        t('org.tasks.endTitle', null, 'End work'),
-        e.message || t('org.tasks.endError', null, 'Could not end the task.'),
-      );
+      const message =
+        e?.code === 'materials_pending_confirm'
+          ? t(
+              'org.tasks.confirmMaterialsFirst',
+              null,
+              'Confirm warehouse materials first',
+            )
+          : e.message || t('org.tasks.endError', null, 'Could not end the task.');
+      Alert.alert(t('org.tasks.endTitle', null, 'End work'), message);
     } finally {
       setBusyAction(false);
     }
   };
 
   const openEndWizard = (task) => {
+    if (taskHasPendingMaterialConfirm(task)) {
+      Alert.alert(
+        t('org.tasks.endTitle', null, 'End work'),
+        t(
+          'org.tasks.confirmMaterialsFirst',
+          null,
+          'Confirm warehouse materials first',
+        ),
+      );
+      return;
+    }
     if (taskNeedsFuelTank(task)) {
       setWizardTask(task);
       setWizardOdo(task.odometer_end != null ? String(task.odometer_end) : taskOdometerEnd || '');
@@ -1865,6 +1902,9 @@ export default function OrgTasksScreen({ navigation, route }) {
   const renderStartEndControls = (task) => {
     if (!task) return null;
     const needsSeen = viewerNeedsAck(task);
+    const pendingMaterials = taskHasPendingMaterialConfirm(task);
+    const pendingIssue = pendingMaterials ? firstPendingMaterialIssue(task) : null;
+    const showEnd = canShowEndButton(task);
     return (
       <View style={styles.actionBlock}>
         {needsSeen ? (
@@ -1920,7 +1960,39 @@ export default function OrgTasksScreen({ navigation, route }) {
           </Button>
         ) : null}
 
-        {canShowEndButton(task) ? (
+        {showEnd && pendingMaterials ? (
+          <View style={styles.ackBanner}>
+            <Text style={styles.materialsGateTitle}>
+              {t(
+                'org.tasks.confirmMaterialsFirst',
+                null,
+                'Confirm warehouse materials first',
+              )}
+            </Text>
+            <Text style={styles.waitingText}>
+              {t(
+                'org.tasks.confirmMaterialsGateHint',
+                null,
+                'Confirm what you took from the warehouse, then enter leftovers / actuals and End work.',
+              )}
+            </Text>
+            {pendingIssue && task.id === selected?.id ? (
+              <Button
+                mode="contained"
+                loading={busyAction}
+                disabled={busyAction}
+                onPress={() => confirmMaterialIssue(pendingIssue)}
+                style={styles.startBtn}
+                contentStyle={styles.startBtnContent}
+                labelStyle={styles.startBtnLabel}
+              >
+                {t('org.tasks.confirmMaterialsCta', null, 'Confirm warehouse materials')}
+              </Button>
+            ) : null}
+          </View>
+        ) : null}
+
+        {showEnd && !pendingMaterials ? (
           <Button
             mode="contained"
             loading={busyAction}
@@ -2874,6 +2946,24 @@ export default function OrgTasksScreen({ navigation, route }) {
                       'Warehouse issues materials onto this task. Enter leftover after work — consumed = issued − leftover.',
                     )}
               </Text>
+              {taskHasPendingMaterialConfirm(selected) ? (
+                <View style={styles.ackBanner}>
+                  <Text style={styles.materialsGateTitle}>
+                    {t(
+                      'org.tasks.confirmMaterialsFirst',
+                      null,
+                      'Confirm warehouse materials first',
+                    )}
+                  </Text>
+                  <Text style={styles.waitingText}>
+                    {t(
+                      'org.tasks.leftoverAfterConfirmHint',
+                      null,
+                      'Confirm receipt below. Then enter leftovers / m² / km / hours and End work.',
+                    )}
+                  </Text>
+                </View>
+              ) : null}
               {((selected.materials || []).filter((m) => !taskIsTransportOnly(selected) || isFuelMaterial(m))).length === 0 ? (
                 <Text style={styles.opMeta}>
                   {taskIsTransportOnly(selected)
@@ -2893,7 +2983,8 @@ export default function OrgTasksScreen({ navigation, route }) {
                   const mid = mat.material_id || mat.id;
                   const unitChip = mat.unit_code ? ` · ${mat.unit_code}` : '';
                   const editable =
-                    canShowEndButton(selected) || selected.status === 'in_progress';
+                    !taskHasPendingMaterialConfirm(selected) &&
+                    (canShowEndButton(selected) || selected.status === 'in_progress');
                   const issued = mat.issued_qty != null;
                   return (
                     <View key={mid} style={styles.opRow}>
@@ -3044,9 +3135,15 @@ export default function OrgTasksScreen({ navigation, route }) {
                               loading={busyAction}
                               disabled={busyAction}
                               onPress={() => confirmMaterialIssue(issue)}
-                              style={styles.secondaryBtn}
+                              style={styles.startBtn}
+                              contentStyle={styles.startBtnContent}
+                              labelStyle={styles.startBtnLabel}
                             >
-                              {t('org.tasks.depotConfirmCta', null, 'Confirm received')}
+                              {t(
+                                'org.tasks.confirmMaterialsCta',
+                                null,
+                                'Confirm warehouse materials',
+                              )}
                             </Button>
                           </>
                         ) : null}
@@ -3915,6 +4012,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(180, 83, 9, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(180, 83, 9, 0.25)',
+  },
+  materialsGateTitle: {
+    color: '#b45309',
+    fontSize: 15,
+    fontWeight: '800',
   },
   ackRow: {
     flexDirection: 'row',
