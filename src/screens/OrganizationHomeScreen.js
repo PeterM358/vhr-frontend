@@ -196,6 +196,14 @@ export default function OrganizationHomeScreen() {
       const orgId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_ORGANIZATION_ID);
       const active = organizationMembershipFor(rows, orgId) || rows[0] || null;
       setOrg(active);
+      if (active?.id) {
+        const dismissed = await AsyncStorage.getItem(
+          STORAGE_KEYS.orgListingCtaDismissedKey(active.id),
+        );
+        setListingCtaDismissed(dismissed === '1');
+      } else {
+        setListingCtaDismissed(false);
+      }
       if (!active?.id) {
         setFleetCount(0);
         setNotReadyCount(0);
@@ -830,25 +838,31 @@ export default function OrganizationHomeScreen() {
                   {t(
                     'org.home.serviceListingBody',
                     null,
-                    'Your service center listing is on. Review or edit it anytime — you can keep working without this.',
+                    'Your service center can appear publicly. Find settings under Company / Profile → Public profile when you need them.',
                   )}
                 </Text>
                 <View style={styles.listingActions}>
                   <Button
-                    mode="contained"
+                    mode="text"
                     onPress={() => navigateToOrgPublicProfile(navigation, { orgId: org?.id })}
-                    style={styles.listingBtn}
-                    buttonColor={COLORS.PRIMARY}
-                    textColor={COLORS.ON_PRIMARY}
+                    textColor={COLORS.PRIMARY}
                   >
-                    {t('org.home.serviceListingButton', null, 'Review public listing')}
+                    {t('org.home.serviceListingButton', null, 'Open public profile')}
                   </Button>
                   <Button
                     mode="text"
-                    onPress={() => setListingCtaDismissed(true)}
+                    onPress={async () => {
+                      setListingCtaDismissed(true);
+                      if (org?.id) {
+                        await AsyncStorage.setItem(
+                          STORAGE_KEYS.orgListingCtaDismissedKey(org.id),
+                          '1',
+                        );
+                      }
+                    }}
                     textColor="rgba(255,255,255,0.72)"
                   >
-                    {t('org.home.serviceListingDismiss', null, 'Not now')}
+                    {t('org.home.serviceListingDismiss', null, 'Dismiss')}
                   </Button>
                 </View>
               </DashboardCard>

@@ -18,6 +18,8 @@ export const STORAGE_KEYS = {
   LOCALE: '@veversal_locale',
   /** JSON ConsentState (or legacy 'accepted'|'rejected') — web analytics/cookie consent */
   COOKIE_CONSENT: '@cookie_consent',
+  /** Soft org-home public-listing tip dismissed for this organization */
+  orgListingCtaDismissedKey: (orgId) => `@org_listing_cta_dismissed_${orgId}`,
   logServiceRecordDraftKey: (vehicleId) => `@log_service_record_draft_${vehicleId}`,
   serviceRecordDraftKey: (vehicleId) => `serviceRecordDraft:${vehicleId}`,
   serviceRecordManualDraftKey: (vehicleId) => `serviceRecordManualDraft:${vehicleId}`,

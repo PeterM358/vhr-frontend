@@ -114,6 +114,17 @@ export const drawerGlassStyles = StyleSheet.create({
     textTransform: 'uppercase',
     color: DRAWER_TINT.title,
   },
+  /** Section label above a grouped block of drawer items (e.g. Company / Profile). */
+  drawerSectionTitle: {
+    marginLeft: 20,
+    marginTop: 14,
+    marginBottom: 4,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+    color: DRAWER_TINT.title,
+  },
   itemLabel: {
     fontSize: 15,
     fontWeight: '500',

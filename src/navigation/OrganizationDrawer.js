@@ -101,6 +101,9 @@ const ROUTE_ICONS = {
   OrgCalendar: 'calendar-month-outline',
 };
 
+/** Shown once under Company / Profile — strip from backend nav_sections to avoid duplicates. */
+const COMPANY_PROFILE_ROUTES = new Set(['OrgLegalEntity', 'OrgActivities', 'OrgPublicProfile']);
+
 function normalizeOrgRoute(route) {
   if (route === 'OrgWorkOrders') return 'OrgTasks';
   if (route === 'OrgLedger') return 'OrgAccounting';
@@ -154,6 +157,11 @@ function CustomDrawerContent(props) {
     fromNav.forEach((item) => {
       const route = normalizeOrgRoute(item.route);
       if (seen.has(route)) return;
+      // Company/legal/public profile live in the dedicated section below — never duplicate.
+      if (COMPANY_PROFILE_ROUTES.has(route)) {
+        seen.add(route);
+        return;
+      }
       seen.add(route);
       items.push({
         key: item.key || route,
@@ -391,45 +399,66 @@ function CustomDrawerContent(props) {
           {...itemProps}
         />
 
-        <DrawerItem
-          label={t('org.drawer.company', null, 'Company details')}
-          onPress={() => openRoute('OrgLegalEntity')}
-          icon={({ color, size }) => (
-            <DrawerMenuIcon name="domain" color={color} size={size} />
-          )}
-          {...itemProps}
-        />
+        {!isDriver ? (
+          <>
+            <Text style={drawerGlassStyles.drawerSectionTitle}>
+              {t('org.drawer.companySection', null, 'Company / Profile')}
+            </Text>
 
-        <DrawerItem
-          label={t('org.drawer.activities', null, 'Activities')}
-          onPress={() => openRoute('OrgActivities')}
-          icon={({ color, size }) => (
-            <DrawerMenuIcon name="briefcase-outline" color={color} size={size} />
-          )}
-          {...itemProps}
-        />
+            <DrawerItem
+              label={t('org.drawer.company', null, 'Company details')}
+              onPress={() => openRoute('OrgLegalEntity')}
+              icon={({ color, size }) => (
+                <DrawerMenuIcon name="domain" color={color} size={size} />
+              )}
+              {...itemProps}
+            />
 
-        <DrawerItem
-          label={t('org.nav.publicProfile', null, 'Public profile')}
-          onPress={() => openRoute('OrgPublicProfile')}
-          icon={({ color, size }) => (
-            <DrawerMenuIcon name="earth" color={color} size={size} />
-          )}
-          {...itemProps}
-        />
+            <DrawerItem
+              label={t('org.drawer.activities', null, 'Company activities')}
+              onPress={() => openRoute('OrgActivities')}
+              icon={({ color, size }) => (
+                <DrawerMenuIcon name="briefcase-check-outline" color={color} size={size} />
+              )}
+              {...itemProps}
+            />
 
-        <DrawerItem
-          label={t('org.drawer.profile', null, 'Profile')}
-          onPress={() => {
-            props.navigation.closeDrawer();
-            const root = navigation.getParent?.() || navigation;
-            navigateToProfile(root);
-          }}
-          icon={({ color, size }) => (
-            <DrawerMenuIcon name="account-circle-outline" color={color} size={size} />
-          )}
-          {...itemProps}
-        />
+            <DrawerItem
+              label={t('org.nav.publicProfile', null, 'Public profile')}
+              onPress={() => openRoute('OrgPublicProfile')}
+              icon={({ color, size }) => (
+                <DrawerMenuIcon name="earth" color={color} size={size} />
+              )}
+              {...itemProps}
+            />
+
+            <DrawerItem
+              label={t('org.drawer.account', null, 'My account')}
+              onPress={() => {
+                props.navigation.closeDrawer();
+                const root = navigation.getParent?.() || navigation;
+                navigateToProfile(root);
+              }}
+              icon={({ color, size }) => (
+                <DrawerMenuIcon name="account-circle-outline" color={color} size={size} />
+              )}
+              {...itemProps}
+            />
+          </>
+        ) : (
+          <DrawerItem
+            label={t('org.drawer.account', null, 'My account')}
+            onPress={() => {
+              props.navigation.closeDrawer();
+              const root = navigation.getParent?.() || navigation;
+              navigateToProfile(root);
+            }}
+            icon={({ color, size }) => (
+              <DrawerMenuIcon name="account-circle-outline" color={color} size={size} />
+            )}
+            {...itemProps}
+          />
+        )}
 
         {!isDriver && org?.has_shop_locations ? (
           <DrawerItem
