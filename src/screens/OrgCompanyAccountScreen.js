@@ -66,6 +66,20 @@ function checklistLabel(id, t) {
   }
 }
 
+function tabLabel(tab, t) {
+  switch (tab) {
+    case 'activities':
+      return t('org.companyAccount.tabs.activities', null, 'Activities');
+    case 'public':
+      return t('org.companyAccount.tabs.public', null, 'Public');
+    case 'account':
+      return t('org.companyAccount.tabs.account', null, 'Account');
+    case 'company':
+    default:
+      return t('org.companyAccount.tabs.company', null, 'Company');
+  }
+}
+
 function networkErrorMessage(err, fallback) {
   const msg = String(err?.message || '').trim();
   if (!msg || /failed to fetch|network request failed|load failed/i.test(msg)) {
@@ -288,9 +302,8 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
         ) : (
           <>
             <AppCard style={styles.summaryCard}>
-              <View style={styles.summaryHeader}>
-                <Text style={styles.percent}>{checklist.percent}%</Text>
-                <View style={styles.summaryCopy}>
+              <View style={styles.summaryTop}>
+                <View style={styles.summaryMeta}>
                   <Text style={styles.summaryTitle} numberOfLines={1}>
                     {orgName || t('org.companyAccount.title', null, 'Company account')}
                   </Text>
@@ -308,6 +321,7 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
                         )}
                   </Text>
                 </View>
+                <Text style={styles.percent}>{checklist.percent}%</Text>
               </View>
               <ProgressBar
                 progress={Math.max(0, Math.min(1, checklist.percent / 100))}
@@ -315,41 +329,49 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
                 style={styles.progress}
               />
               {error ? <Text style={styles.error}>{error}</Text> : null}
-              <View style={styles.checkList}>
-                {checklist.scored.map((row) => (
-                  <Pressable
-                    key={row.id}
-                    onPress={() => openTab(row.tab)}
-                    style={({ pressed }) => [styles.checkRow, pressed && styles.checkPressed]}
-                    accessibilityRole="button"
-                  >
-                    <MaterialCommunityIcons
-                      name={row.done ? 'check-circle' : 'circle-outline'}
-                      size={18}
-                      color={row.done ? '#15803d' : ON_CARD_MUTED}
-                    />
-                    <Text style={[styles.checkLabel, row.done && styles.checkDone]}>
-                      {checklistLabel(row.id, t)}
-                    </Text>
-                    {!row.done ? (
-                      <Text style={styles.checkFix}>
-                        {t('org.companyAccount.fix', null, 'Fix')}
-                      </Text>
-                    ) : null}
-                  </Pressable>
-                ))}
-              </View>
-              {checklist.next ? (
-                <Button
-                  mode="contained"
-                  onPress={() => openTab(checklist.next.tab)}
-                  buttonColor={COLORS.PRIMARY}
-                  textColor={COLORS.ON_PRIMARY}
-                  compact
-                  style={styles.continueBtn}
-                >
-                  {t('org.companyAccount.continueSetup', null, 'Continue setup')}
-                </Button>
+              {checklist.listingReady ? (
+                <View style={styles.completeRow}>
+                  <MaterialCommunityIcons name="check-circle" size={16} color="#15803d" />
+                  <Text style={styles.completeText}>
+                    {t('org.companyAccount.allComplete', null, 'All required steps done')}
+                  </Text>
+                </View>
+              ) : checklist.missing.length ? (
+                <View style={styles.todoList}>
+                  {checklist.missing.map((row) => (
+                    <Pressable
+                      key={row.id}
+                      onPress={() => openTab(row.tab)}
+                      style={({ pressed }) => [
+                        styles.todoRow,
+                        pressed && styles.todoRowPressed,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={t(
+                        'org.companyAccount.openTabFor',
+                        { item: checklistLabel(row.id, t), tab: tabLabel(row.tab, t) },
+                        `Fix ${checklistLabel(row.id, t)} — open ${tabLabel(row.tab, t)} tab`,
+                      )}
+                    >
+                      <MaterialCommunityIcons
+                        name="alert-circle-outline"
+                        size={16}
+                        color="#C2410C"
+                      />
+                      <View style={styles.todoCopy}>
+                        <Text style={styles.todoLabel}>{checklistLabel(row.id, t)}</Text>
+                        <Text style={styles.todoTab}>
+                          {t(
+                            'org.companyAccount.goToTab',
+                            { tab: tabLabel(row.tab, t) },
+                            `Open ${tabLabel(row.tab, t)} tab`,
+                          )}
+                        </Text>
+                      </View>
+                      <MaterialCommunityIcons name="chevron-right" size={18} color="#C2410C" />
+                    </Pressable>
+                  ))}
+                </View>
               ) : null}
             </AppCard>
 
@@ -440,30 +462,50 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   scroll: { padding: 16, gap: 10 },
   loader: { marginTop: 40 },
-  summaryCard: { paddingVertical: 12, paddingHorizontal: 14, gap: 6 },
-  summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  summaryCard: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    gap: 8,
+  },
+  summaryTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  summaryMeta: { flex: 1, gap: 2 },
   percent: {
     color: COLORS.PRIMARY,
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
-    minWidth: 48,
+    lineHeight: 22,
   },
-  summaryCopy: { flex: 1, gap: 1 },
-  summaryTitle: { color: ON_CARD, fontSize: 15, fontWeight: '700' },
+  summaryTitle: { color: ON_CARD, fontSize: 14, fontWeight: '700' },
   summaryStatus: { color: ON_CARD_MUTED, fontSize: 12, lineHeight: 16 },
-  progress: { height: 6, borderRadius: 999, backgroundColor: '#E2E8F0' },
-  checkList: { gap: 2, marginTop: 2 },
-  checkRow: {
+  progress: { height: 5, borderRadius: 999, backgroundColor: '#E2E8F0' },
+  todoList: { gap: 6 },
+  todoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FDBA74',
   },
-  checkPressed: { opacity: 0.85 },
-  checkLabel: { flex: 1, color: ON_CARD, fontSize: 13 },
-  checkDone: { color: ON_CARD_MUTED },
-  checkFix: { color: COLORS.PRIMARY, fontWeight: '700', fontSize: 12 },
-  continueBtn: { marginTop: 2, alignSelf: 'flex-start' },
+  todoRowPressed: { opacity: 0.88 },
+  todoCopy: { flex: 1, gap: 1 },
+  todoLabel: { color: '#9A3412', fontSize: 13, fontWeight: '700', lineHeight: 17 },
+  todoTab: { color: '#C2410C', fontSize: 11, lineHeight: 14 },
+  completeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  completeText: { color: '#15803d', fontSize: 12, fontWeight: '600' },
   tabsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
