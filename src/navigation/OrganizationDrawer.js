@@ -3,7 +3,7 @@
  */
 
 import React, { useCallback, useContext, useMemo, useState } from 'react';
-import { View, Platform } from 'react-native';
+import { View } from 'react-native';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Text } from 'react-native-paper';
@@ -35,6 +35,7 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 import {
   buildOrgNavItems,
   isServiceCenterOnlyOrg,
+  orgHasModule,
   orgHasServiceCenterActivity,
   orgShowsConstructionOpsSurfaces,
   orgShowsFleetSurfaces,
@@ -54,6 +55,7 @@ import {
   navigateToOrgCalendar,
   navigateToOrgFleet,
   navigateToOrgFleetPlanning,
+  navigateToOrgHome,
   navigateToOrgInvoicing,
   navigateToOrgCompanyAccount,
   navigateToOrgNetwork,
@@ -62,7 +64,9 @@ import {
   navigateToOrgTasks,
   navigateToOrgWarehouse,
   navigateToOrgWorkforce,
+  navigateToPartnerAddServiceCenter,
   navigateToPartnerDashboard,
+  navigateToPartnerOnboarding,
   navigateToPartnerSwitchCenter,
   navigateToProfile,
 } from '../navigation/webNavigation';
@@ -343,13 +347,30 @@ function CustomDrawerContent(props) {
       navigateToOrgCompanyAccount(navigation, { orgId: org?.id, tab });
       return;
     }
-    if (Platform.OS === 'web') {
-      if (normalized === 'OrgOverview') {
-        navigation.navigate('OrgOverview');
-      }
+    if (normalized === 'OrgOverview') {
+      navigateToOrgHome(navigation, { orgId: org?.id });
       return;
     }
-    props.navigation.navigate(normalized === 'OrgOverview' ? 'OrgOverview' : normalized);
+    if (normalized === 'OrgLocations') {
+      if (orgHasServiceCenterActivity(org)) {
+        if (org?.has_shop_locations) {
+          navigateToPartnerOnboarding(navigation, {
+            stepId: 'location',
+            orgId: org?.id,
+          });
+        } else {
+          navigateToPartnerAddServiceCenter(navigation, { orgId: org?.id });
+        }
+        return;
+      }
+      if (orgHasModule(org, 'warehouse')) {
+        navigateToOrgWarehouse(navigation, { orgId: org?.id, tab: 'list' });
+        return;
+      }
+      navigateToOrgCompanyAccount(navigation, { orgId: org?.id, tab: 'company' });
+      return;
+    }
+    props.navigation.navigate(normalized);
   };
 
   const switchToPersonal = async () => {
