@@ -10,10 +10,11 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
+  Pressable,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { FAB, useTheme } from 'react-native-paper';
+import { FAB, Text, useTheme } from 'react-native-paper';
 import { logout } from '../api/auth';
 import { getCachedVehicles, getVehicles } from '../api/vehicles';
 import { getRepairs } from '../api/repairs';
@@ -26,6 +27,7 @@ import DashboardSection from '../components/dashboard/DashboardSection';
 import DashboardHeroCard from '../components/dashboard/DashboardHeroCard';
 import DashboardSummaryRow from '../components/dashboard/DashboardSummaryRow';
 import DashboardActionGrid from '../components/dashboard/DashboardActionGrid';
+import DashboardCard from '../components/dashboard/DashboardCard';
 import VehicleHealthSection from '../components/dashboard/VehicleHealthSection';
 import RecommendedActionsSection from '../components/dashboard/RecommendedActionsSection';
 import { buildRecommendedActions } from '../utils/dashboardFormatters';
@@ -45,9 +47,17 @@ import { API_BASE_URL } from '../api/config';
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import { resetToPublicHome } from '../navigation/authNavigation';
 import { resolveIsPartnerSession } from '../utils/partnerSession';
-import { resolveIsOrgOnlySession } from '../utils/orgWorkspace';
+import { readOrganizationMemberships, resolveIsOrgOnlySession } from '../utils/orgWorkspace';
+import {
+  WORKSPACE_MODE,
+  getWorkspaceMode,
+  isDriverMembership,
+  pickActiveOrganization,
+  setWorkspaceMode,
+} from '../utils/orgRoleHome';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import { toCanonicalAppPath } from '../navigation/localizedRoutes';
+import { COLORS } from '../constants/colors';
 import { useTranslation } from '../i18n';
 
 
@@ -93,13 +103,25 @@ export default function HomeScreen({ navigation }) {
   const [pendingOffersCount, setPendingOffersCount] = useState(0);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [sessionChecked, setSessionChecked] = useState(false);
+  const [driverOrg, setDriverOrg] = useState(null);
   const scrollBottomPadding = useScrollContentBottomPadding(80);
 
   useFocusEffect(
     useCallback(() => {
+      let cancelled = false;
+
       const loadUser = async () => {
         const last = await AsyncStorage.getItem('@user_email_or_phone');
         if (setUserEmailOrPhone) setUserEmailOrPhone(last || '');
+      };
+
+      const resolveDriverOrg = async () => {
+        const rows = await readOrganizationMemberships();
+        const active = pickActiveOrganization(rows);
+        if (!cancelled) {
+          setDriverOrg(isDriverMembership(active) ? active : null);
+        }
+        return active;
       };
 
       const ensureAuthOrPublicHome = async () => {
@@ -130,7 +152,7 @@ export default function HomeScreen({ navigation }) {
               const route = await resolveShopEntryRoute();
               // Drivers in personal mode intentionally stay on client Home.
               if (route?.name === 'Home') {
-                setSessionChecked(true);
+                if (!cancelled) setSessionChecked(true);
                 return;
               }
               navigation.reset(buildShopAuthReset(route));
@@ -141,14 +163,14 @@ export default function HomeScreen({ navigation }) {
             setAuthToken?.(token);
             setIsAuthenticated?.(true);
           }
-          setSessionChecked(true);
+          if (!cancelled) setSessionChecked(true);
           return;
         }
 
         if (!hasSession) {
           resetToPublicHome(navigation);
         }
-        setSessionChecked(true);
+        if (!cancelled) setSessionChecked(true);
       };
 
       const cachedVehicleRows = getCachedVehicles();
@@ -157,9 +179,29 @@ export default function HomeScreen({ navigation }) {
       }
 
       const loadDashboard = async () => {
-        if (!hasSession) return;
-        if (await resolveIsOrgOnlySession()) return;
-        setDashboardLoading(true);
+        if (!hasSession) {
+          if (!cancelled) setDashboardLoading(false);
+          return;
+        }
+
+        // Org-only users normally leave client Home via ensureAuthOrPublicHome.
+        // Drivers in personal mode stay — they need personal vehicle/repair data.
+        // The previous early return left dashboardLoading stuck true forever.
+        const isOrgOnly = await resolveIsOrgOnlySession();
+        if (isOrgOnly) {
+          const active = await resolveDriverOrg();
+          const mode = await getWorkspaceMode();
+          const allowPersonalDriver =
+            isDriverMembership(active) && mode === WORKSPACE_MODE.PERSONAL;
+          if (!allowPersonalDriver) {
+            if (!cancelled) setDashboardLoading(false);
+            return;
+          }
+        } else {
+          await resolveDriverOrg();
+        }
+
+        if (!cancelled) setDashboardLoading(true);
         try {
           const token = await AsyncStorage.getItem('@access_token');
           const [vehicleRows, repairRows, offersRes] = await Promise.all([
@@ -169,6 +211,7 @@ export default function HomeScreen({ navigation }) {
               headers: { Authorization: `Bearer ${token}` },
             }).catch(() => null),
           ]);
+          if (cancelled) return;
           const safeVehicles = Array.isArray(vehicleRows)
             ? vehicleRows
             : getCachedVehicles();
@@ -191,13 +234,17 @@ export default function HomeScreen({ navigation }) {
           setOpenRequestsCount(openRepairRows.length);
           setPendingOffersCount(offersCount);
         } finally {
-          setDashboardLoading(false);
+          if (!cancelled) setDashboardLoading(false);
         }
       };
 
       loadUser();
       ensureAuthOrPublicHome();
       loadDashboard();
+
+      return () => {
+        cancelled = true;
+      };
     }, [
       authToken,
       hasSession,
@@ -211,6 +258,19 @@ export default function HomeScreen({ navigation }) {
   );
 
   const hasVehicles = vehicles.length > 0;
+
+  const switchToWorking = async () => {
+    await setWorkspaceMode(WORKSPACE_MODE.WORKING);
+    navigation.reset(
+      buildShopAuthReset({
+        name: 'OrgHome',
+        params:
+          driverOrg?.id != null
+            ? { organizationId: driverOrg.id, screen: 'OrgOverview' }
+            : { screen: 'OrgOverview' },
+      }),
+    );
+  };
 
   const handleLogout = async () => {
     await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
@@ -400,6 +460,36 @@ export default function HomeScreen({ navigation }) {
         contentContainerStyle={[styles.scroll, { paddingBottom: scrollBottomPadding }]}
         keyboardShouldPersistTaps="handled"
       >
+        {driverOrg ? (
+          <DashboardCard style={styles.switcherCard}>
+            <Text style={styles.switcherLabel}>{t('org.mode.label', null, 'Mode')}</Text>
+            <View style={styles.switcherList}>
+              <Pressable
+                onPress={switchToWorking}
+                style={({ pressed }) => [
+                  styles.switcherChip,
+                  pressed && styles.switcherChipPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={t('org.mode.switchToWorking', null, 'Working mode')}
+              >
+                <Text style={styles.switcherChipText}>
+                  {t('org.mode.working', null, 'Working')}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.switcherChip, styles.switcherChipActive]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: true }}
+              >
+                <Text style={[styles.switcherChipText, styles.switcherChipTextActive]}>
+                  {t('org.mode.personal', null, 'Personal')}
+                </Text>
+              </Pressable>
+            </View>
+          </DashboardCard>
+        ) : null}
+
         <DashboardHeroCard
           title={t('dashboard.greeting', { name: heroName })}
           subtitle={t('dashboard.heroSubtitle')}
@@ -463,6 +553,48 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: 14,
     paddingTop: 12,
+  },
+  switcherCard: {
+    marginBottom: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+  },
+  switcherLabel: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  switcherList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  switcherChip: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: COLORS.BORDER_SOFT,
+    maxWidth: '100%',
+  },
+  switcherChipActive: {
+    backgroundColor: COLORS.PRIMARY_GLASS,
+    borderColor: COLORS.ACCENT,
+  },
+  switcherChipPressed: {
+    opacity: 0.88,
+  },
+  switcherChipText: {
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  switcherChipTextActive: {
+    color: '#fff',
   },
   gridLoader: {
     marginVertical: 24,
