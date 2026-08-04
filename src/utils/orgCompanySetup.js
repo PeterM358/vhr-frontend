@@ -116,3 +116,22 @@ export function isOrgLocationComplete({
   if (hasShopLocations) return true;
   return Boolean(String(addressLine || '').trim() && String(city || '').trim());
 }
+
+/**
+ * Mirrors backend `org_legal_entity_completeness`: legal name, VAT or EIK,
+ * registered address line + city. Prefer field derivation when entity is present;
+ * otherwise fall back to the API `legal_entity_complete` flag.
+ */
+export function isOrgLegalEntityComplete(entity, { apiComplete } = {}) {
+  if (entity != null && typeof entity === 'object') {
+    const legalName = String(entity.legal_name || '').trim();
+    const address = String(entity.registered_address_line1 || '').trim();
+    const city = String(entity.registered_city || '').trim();
+    if (!legalName || !address || !city) return false;
+    if (entity.vat_registered !== false) {
+      return Boolean(String(entity.vat_number || '').trim());
+    }
+    return Boolean(String(entity.eik_number || '').trim());
+  }
+  return Boolean(apiComplete);
+}

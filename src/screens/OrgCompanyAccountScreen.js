@@ -6,7 +6,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, Button, ProgressBar, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Text } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -27,6 +27,7 @@ import {
 } from '../utils/orgWorkspace';
 import {
   buildOrgCompanySetupChecklist,
+  isOrgLegalEntityComplete,
   isOrgLocationComplete,
   normalizeOrgAccountTab,
 } from '../utils/orgCompanySetup';
@@ -42,6 +43,20 @@ const TAB_ACTIVE_BG = COLORS.PRIMARY;
 const TAB_INACTIVE_BG = '#F1F5F9';
 const TAB_INACTIVE_TEXT = '#0F172A';
 const TAB_ACTIVE_TEXT = '#FFFFFF';
+
+function SetupProgressBar({ progress, color }) {
+  const clamped = Math.max(0, Math.min(1, Number(progress) || 0));
+  return (
+    <View style={styles.progressTrack} accessibilityRole="progressbar">
+      <View
+        style={[
+          styles.progressFill,
+          { width: `${Math.round(clamped * 100)}%`, backgroundColor: color },
+        ]}
+      />
+    </View>
+  );
+}
 
 function checklistLabel(id, t) {
   switch (id) {
@@ -195,7 +210,10 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
         activities: mergedActivities,
         publicEnabled,
         publicSlug,
-        legalComplete: Boolean(legalData?.legal_entity_complete),
+        // Derive from fields when entity payload exists so hub matches Company-tab incomplete banner.
+        legalComplete: isOrgLegalEntityComplete(legalEntity, {
+          apiComplete: legalData?.legal_entity_complete,
+        }),
         locationComplete,
         isServiceCenter:
           Boolean(publicData?.is_service_center) || mergedActivities.includes('service_center'),
@@ -323,10 +341,9 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
                 </View>
                 <Text style={styles.percent}>{checklist.percent}%</Text>
               </View>
-              <ProgressBar
-                progress={Math.max(0, Math.min(1, checklist.percent / 100))}
+              <SetupProgressBar
+                progress={checklist.percent / 100}
                 color={checklist.listingReady ? '#15803d' : COLORS.PRIMARY}
-                style={styles.progress}
               />
               {error ? <Text style={styles.error}>{error}</Text> : null}
               {checklist.listingReady ? (
@@ -336,43 +353,63 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
                     {t('org.companyAccount.allComplete', null, 'All required steps done')}
                   </Text>
                 </View>
-              ) : checklist.missing.length ? (
+              ) : (
                 <View style={styles.todoList}>
-                  {checklist.missing.map((row) => (
-                    <Pressable
-                      key={row.id}
-                      onPress={() => openTab(row.tab)}
-                      style={({ pressed }) => [
-                        styles.todoRow,
-                        pressed && styles.todoRowPressed,
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityLabel={t(
-                        'org.companyAccount.openTabFor',
-                        { item: checklistLabel(row.id, t), tab: tabLabel(row.tab, t) },
-                        `Fix ${checklistLabel(row.id, t)} — open ${tabLabel(row.tab, t)} tab`,
-                      )}
-                    >
-                      <MaterialCommunityIcons
-                        name="alert-circle-outline"
-                        size={16}
-                        color="#C2410C"
-                      />
-                      <View style={styles.todoCopy}>
-                        <Text style={styles.todoLabel}>{checklistLabel(row.id, t)}</Text>
-                        <Text style={styles.todoTab}>
-                          {t(
-                            'org.companyAccount.goToTab',
-                            { tab: tabLabel(row.tab, t) },
-                            `Open ${tabLabel(row.tab, t)} tab`,
-                          )}
-                        </Text>
-                      </View>
-                      <MaterialCommunityIcons name="chevron-right" size={18} color="#C2410C" />
-                    </Pressable>
-                  ))}
+                  {checklist.missing.length ? (
+                    <Text style={styles.stillNeeded}>
+                      {t('org.companyAccount.stillNeeded', null, 'Still needed:')}
+                    </Text>
+                  ) : null}
+                  {checklist.scored.map((row) => {
+                    const label = checklistLabel(row.id, t);
+                    if (row.done) {
+                      return (
+                        <View key={row.id} style={styles.doneRow}>
+                          <MaterialCommunityIcons
+                            name="check-circle"
+                            size={16}
+                            color="#15803d"
+                          />
+                          <Text style={styles.doneLabel}>{label}</Text>
+                        </View>
+                      );
+                    }
+                    return (
+                      <Pressable
+                        key={row.id}
+                        onPress={() => openTab(row.tab)}
+                        style={({ pressed }) => [
+                          styles.todoRow,
+                          pressed && styles.todoRowPressed,
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={t(
+                          'org.companyAccount.openTabFor',
+                          { item: label, tab: tabLabel(row.tab, t) },
+                          `Fix ${label} — open ${tabLabel(row.tab, t)} tab`,
+                        )}
+                      >
+                        <MaterialCommunityIcons
+                          name="alert-circle-outline"
+                          size={16}
+                          color="#C2410C"
+                        />
+                        <View style={styles.todoCopy}>
+                          <Text style={styles.todoLabel}>{label}</Text>
+                          <Text style={styles.todoTab}>
+                            {t(
+                              'org.companyAccount.goToTab',
+                              { tab: tabLabel(row.tab, t) },
+                              `Open ${tabLabel(row.tab, t)} tab`,
+                            )}
+                          </Text>
+                        </View>
+                        <MaterialCommunityIcons name="chevron-right" size={18} color="#C2410C" />
+                      </Pressable>
+                    );
+                  })}
                 </View>
-              ) : null}
+              )}
             </AppCard>
 
             <View style={styles.tabsRow}>
@@ -463,17 +500,19 @@ const styles = StyleSheet.create({
   scroll: { padding: 16, gap: 10 },
   loader: { marginTop: 40 },
   summaryCard: {
+    alignSelf: 'stretch',
+    flexGrow: 0,
+    flexShrink: 0,
     paddingVertical: 10,
     paddingHorizontal: 12,
     marginBottom: 8,
-    gap: 8,
   },
   summaryTop: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    marginBottom: 8,
   },
-  summaryMeta: { flex: 1, gap: 2 },
+  summaryMeta: { flex: 1, marginRight: 8 },
   percent: {
     color: COLORS.PRIMARY,
     fontSize: 18,
@@ -481,31 +520,63 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   summaryTitle: { color: ON_CARD, fontSize: 14, fontWeight: '700' },
-  summaryStatus: { color: ON_CARD_MUTED, fontSize: 12, lineHeight: 16 },
-  progress: { height: 5, borderRadius: 999, backgroundColor: '#E2E8F0' },
-  todoList: { gap: 6 },
+  summaryStatus: { color: ON_CARD_MUTED, fontSize: 12, lineHeight: 16, marginTop: 2 },
+  progressTrack: {
+    alignSelf: 'stretch',
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: '#E2E8F0',
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: 5,
+    borderRadius: 999,
+  },
+  stillNeeded: {
+    color: ON_CARD_MUTED,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+    marginBottom: 4,
+  },
+  todoList: { marginTop: 0 },
   todoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
     paddingVertical: 7,
     paddingHorizontal: 8,
     borderRadius: 8,
     backgroundColor: '#FFF7ED',
     borderWidth: 1,
     borderColor: '#FDBA74',
+    marginBottom: 6,
   },
   todoRowPressed: { opacity: 0.88 },
-  todoCopy: { flex: 1, gap: 1 },
+  todoCopy: { flex: 1, marginLeft: 8, marginRight: 4 },
   todoLabel: { color: '#9A3412', fontSize: 13, fontWeight: '700', lineHeight: 17 },
-  todoTab: { color: '#C2410C', fontSize: 11, lineHeight: 14 },
+  todoTab: { color: '#C2410C', fontSize: 11, lineHeight: 14, marginTop: 1 },
+  doneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+    marginBottom: 4,
+  },
+  doneLabel: {
+    color: '#166534',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 17,
+    marginLeft: 8,
+    flex: 1,
+  },
   completeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     paddingVertical: 2,
   },
-  completeText: { color: '#15803d', fontSize: 12, fontWeight: '600' },
+  completeText: { color: '#15803d', fontSize: 12, fontWeight: '600', marginLeft: 6 },
   tabsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
