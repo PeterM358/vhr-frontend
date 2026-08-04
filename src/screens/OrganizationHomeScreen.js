@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthManager';
 import ScreenBackground from '../components/ScreenBackground';
 import OrgAppHeader from '../components/org/OrgAppHeader';
+import OrgServiceCenterRepairsHub from '../components/org/OrgServiceCenterRepairsHub';
 import DashboardSummaryRow from '../components/dashboard/DashboardSummaryRow';
 import DashboardActionGrid from '../components/dashboard/DashboardActionGrid';
 import DashboardCard from '../components/dashboard/DashboardCard';
@@ -19,6 +20,7 @@ import { ackWorkOrder, listProjects, listWorkOrders, startWorkOrder } from '../a
 import {
   buildOrgNavItems,
   isServiceCenterOnlyOrg,
+  orgHasServiceCenterActivity,
   orgShowsConstructionOpsSurfaces,
   orgShowsFleetSurfaces,
   organizationMembershipFor,
@@ -157,12 +159,25 @@ export default function OrganizationHomeScreen() {
   const toastTop = appNavBarTotalHeight(insets) + 8;
   const isDriver = isDriverMembership(org);
   const [listingCtaDismissed, setListingCtaDismissed] = useState(false);
+  const [repairCounts, setRepairCounts] = useState({
+    open: 0,
+    ongoing: 0,
+    done: 0,
+    canLoad: false,
+  });
   const needsServiceListing = useMemo(() => {
     if (isDriver || !org || listingCtaDismissed) return false;
-    const activities = Array.isArray(org.activities) ? org.activities : [];
     // Soft, non-blocking tip — only when service_center is selected and no shop location yet.
-    return activities.includes('service_center') && !org.has_shop_locations;
+    return orgHasServiceCenterActivity(org) && !org.has_shop_locations;
   }, [isDriver, listingCtaDismissed, org]);
+  const onRepairCountsChange = useCallback((next) => {
+    setRepairCounts({
+      open: Number(next?.open) || 0,
+      ongoing: Number(next?.ongoing) || 0,
+      done: Number(next?.done) || 0,
+      canLoad: Boolean(next?.canLoad),
+    });
+  }, []);
 
   const showGreetingToast = useCallback((name, company) => {
     if (toastTimerRef.current) {
@@ -236,7 +251,7 @@ export default function OrganizationHomeScreen() {
           setJobsDoneWeek(null);
           setExpectedValueSum(null);
         } else if (scOnly || (!showFleet && !showOpsSurfaces)) {
-          // Service-center-only: skip fleet/ops API spam — home is company + warehouse/workforce.
+          // Service-center-only: skip fleet/ops API spam — repairs hub loads separately.
           setFleetCount(null);
           setNotReadyCount(null);
           setJobsDoneWeek(null);
@@ -310,6 +325,9 @@ export default function OrganizationHomeScreen() {
   const orgName = org?.display_name || t('org.home.title');
   const today = localTodayIso();
   const scOnly = isServiceCenterOnlyOrg(org);
+  const showServiceCenterRepairs = Boolean(
+    !isDriver && orgHasServiceCenterActivity(org),
+  );
   const showFleetSurfaces = orgShowsFleetSurfaces(org);
   const showOpsSurfaces = orgShowsConstructionOpsSurfaces(org);
   const canManageOps = Boolean(org?.manage_org_operations || org?.manage_fleet);
@@ -387,6 +405,44 @@ export default function OrganizationHomeScreen() {
         },
       ];
     }
+    if (showServiceCenterRepairs) {
+      const openRepairs = () => {
+        if (repairCounts.canLoad || org?.has_shop_locations) {
+          navigateToPartnerDashboard(navigation);
+          return;
+        }
+        navigateToOrgCompanyAccount(navigation, { orgId: org?.id });
+      };
+      const items = [
+        {
+          key: 'openRepairs',
+          value: repairCounts.canLoad ? repairCounts.open : '·',
+          label: t('org.home.summary.openRequests', null, 'Open requests'),
+          onPress: openRepairs,
+        },
+        {
+          key: 'activeRepairs',
+          value: repairCounts.canLoad ? repairCounts.ongoing : '·',
+          label: t('org.home.summary.activeRepairs', null, 'In progress'),
+          onPress: openRepairs,
+        },
+        {
+          key: 'doneRepairs',
+          value: repairCounts.canLoad ? repairCounts.done : '·',
+          label: t('org.home.summary.completedRepairs', null, 'Completed'),
+          onPress: openRepairs,
+        },
+      ];
+      if (showFleetSurfaces) {
+        items.push({
+          key: 'fleet',
+          value: fleetCount == null ? '—' : fleetCount,
+          label: t('org.home.summary.fleetTotal', null, 'Fleet total'),
+          onPress: () => navigateToOrgFleet(navigation, { orgId: org?.id }),
+        });
+      }
+      return items;
+    }
     if (!showFleetSurfaces) {
       return [
         {
@@ -428,7 +484,12 @@ export default function OrganizationHomeScreen() {
     org?.has_shop_locations,
     org?.id,
     org?.public_profile_enabled,
+    repairCounts.canLoad,
+    repairCounts.done,
+    repairCounts.ongoing,
+    repairCounts.open,
     showFleetSurfaces,
+    showServiceCenterRepairs,
     t,
     todayTasks.length,
   ]);
@@ -478,6 +539,7 @@ export default function OrganizationHomeScreen() {
 
     const tiles = [];
 
+    // Company setup stays available but secondary to repairs for SC homes.
     tiles.push({
       key: 'company-account',
       icon: 'domain',
@@ -588,7 +650,8 @@ export default function OrganizationHomeScreen() {
       });
     }
 
-    if (org?.has_shop_locations) {
+    // Shop workspace CTA lives in OrgServiceCenterRepairsHub for SC homes.
+    if (!showServiceCenterRepairs && org?.has_shop_locations) {
       tiles.push({
         key: 'shop',
         icon: 'storefront-outline',
@@ -616,6 +679,7 @@ export default function OrganizationHomeScreen() {
     org?.can_post_materials_intake,
     showFleetSurfaces,
     showOpsSurfaces,
+    showServiceCenterRepairs,
     t,
   ]);
 
@@ -933,9 +997,22 @@ export default function OrganizationHomeScreen() {
               </DashboardCard>
             ) : null}
 
+            {showServiceCenterRepairs ? (
+              <OrgServiceCenterRepairsHub
+                org={org}
+                onCountsChange={onRepairCountsChange}
+              />
+            ) : null}
+
+            {showServiceCenterRepairs ? (
+              <Text style={styles.modulesHeading}>
+                {t('org.home.companyModules', null, 'Company modules')}
+              </Text>
+            ) : null}
+
             <DashboardActionGrid tiles={actionTiles} />
 
-            {!isDriver ? (
+            {!isDriver && !scOnly ? (
               <DashboardCard style={styles.statsCard}>
                 <Text style={styles.statsHeading}>
                   {t('org.home.stats.title', null, 'This week')}
@@ -1058,6 +1135,16 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: 4,
+  },
+  modulesHeading: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginBottom: 8,
+    marginTop: 4,
+    paddingHorizontal: 2,
   },
   listingBtn: {
     alignSelf: 'flex-start',

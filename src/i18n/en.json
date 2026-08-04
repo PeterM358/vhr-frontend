@@ -219,7 +219,8 @@
       "companyAccount": "Company account",
       "activities": "Company activities",
       "account": "My account",
-      "profile": "My account"
+      "profile": "My account",
+      "repairs": "Repairs"
     },
     "chrome": {
       "calendar": "Calendar",
@@ -300,7 +301,10 @@
         "todayTasks": "Today",
         "upcomingTasks": "Upcoming",
         "companySetup": "Company setup",
-        "publicListing": "Public listing"
+        "publicListing": "Public listing",
+        "openRequests": "Open requests",
+        "activeRepairs": "In progress",
+        "completedRepairs": "Completed"
       },
       "stats": {
         "title": "This week",
@@ -354,6 +358,18 @@
         "warehouseSubtitle": "Import supplier invoices and stock materials for operations.",
         "projectsSubtitle": "Volume, value, contacts, and counterparties.",
         "accountingSubtitle": "Month pulse, workforce cost, and budget share pie."
+      },
+      "companyModules": "Company modules",
+      "repairs": {
+        "viewRequestsSubtitle": "Open, in progress, and completed repair jobs.",
+        "operationsSubtitle": "Requests, open repairs, and calendar — company modules stay below.",
+        "needShopTitle": "Connect your service center",
+        "needShopSubtitle": "Repairs live on your service center location. Link or open it to see requests.",
+        "needShopBody": "Add a service center location to receive customer requests, run open repairs, and use the bay calendar.",
+        "needMembershipBody": "This company has a linked location, but your account needs the service center workspace to open the repair inbox.",
+        "setupTitle": "Set up service center",
+        "setupSubtitle": "Link a shop location to receive requests and run bay repairs.",
+        "setupCta": "Set up"
       }
     },
     "operations": {

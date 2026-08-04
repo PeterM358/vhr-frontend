@@ -83,15 +83,22 @@ const SHOP_B2B_ORG_ROUTES = new Set([
 
 const FLEET_ACTIVITY_KEYS = new Set(['transport', 'construction']);
 
+/** True when the org selected service_center (alone or mixed with transport/construction). */
+export function orgHasServiceCenterActivity(org) {
+  if (!org) return false;
+  const activities = Array.isArray(org.activities) ? org.activities : [];
+  return activities.includes('service_center');
+}
+
 /**
  * Service-center-only org: has service_center and no transport/construction.
  * These should not see fleet planning, fleet totals, or construction-style
- * Org Operations / Projects / Tasks — repair work lives in the shop later.
+ * Org Operations / Projects / Tasks — home is repair-centric (ShopHome-style).
  */
 export function isServiceCenterOnlyOrg(org) {
   if (!org) return false;
+  if (!orgHasServiceCenterActivity(org)) return false;
   const activities = Array.isArray(org.activities) ? org.activities : [];
-  if (!activities.includes('service_center')) return false;
   return !activities.some((key) => FLEET_ACTIVITY_KEYS.has(key));
 }
 

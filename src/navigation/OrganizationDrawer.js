@@ -35,6 +35,7 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 import {
   buildOrgNavItems,
   isServiceCenterOnlyOrg,
+  orgHasServiceCenterActivity,
   orgShowsConstructionOpsSurfaces,
   orgShowsFleetSurfaces,
   organizationMembershipFor,
@@ -452,6 +453,24 @@ function CustomDrawerContent(props) {
             {...itemProps}
           />
         )}
+
+        {!isDriver && orgHasServiceCenterActivity(org) ? (
+          <DrawerItem
+            label={t('org.drawer.repairs', null, 'Repairs')}
+            onPress={() => {
+              props.navigation.closeDrawer();
+              if (org?.has_shop_locations) {
+                navigateToPartnerDashboard(navigation);
+                return;
+              }
+              props.navigation.navigate('OrgOverview');
+            }}
+            icon={({ color, size }) => (
+              <DrawerMenuIcon name="car-wrench" color={color} size={size} />
+            )}
+            {...itemProps}
+          />
+        ) : null}
 
         {!isDriver && org?.has_shop_locations ? (
           <DrawerItem
