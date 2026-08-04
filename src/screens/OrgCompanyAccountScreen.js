@@ -6,7 +6,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, Button, ProgressBar, SegmentedButtons, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, ProgressBar, Text } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -27,6 +27,7 @@ import {
 } from '../utils/orgWorkspace';
 import {
   buildOrgCompanySetupChecklist,
+  isOrgLocationComplete,
   normalizeOrgAccountTab,
 } from '../utils/orgCompanySetup';
 import { navigateToOrgHome, navigateToProfile } from '../navigation/webNavigation';
@@ -37,26 +38,40 @@ import { COLORS } from '../constants/colors';
 
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
+const TAB_ACTIVE_BG = COLORS.PRIMARY;
+const TAB_INACTIVE_BG = '#F1F5F9';
+const TAB_INACTIVE_TEXT = '#0F172A';
+const TAB_ACTIVE_TEXT = '#FFFFFF';
 
 function checklistLabel(id, t) {
   switch (id) {
     case 'activities':
       return t('org.companyAccount.check.activities', null, 'Choose company activities');
-    case 'service_center':
+    case 'public_listing':
       return t(
-        'org.companyAccount.check.serviceCenter',
+        'org.companyAccount.check.publicListing',
         null,
-        'Include service center activity',
+        'Public listing on (URL slug set)',
       );
-    case 'public_enabled':
-      return t('org.companyAccount.check.publicEnabled', null, 'Public listing enabled');
-    case 'public_slug':
-      return t('org.companyAccount.check.publicSlug', null, 'Public URL slug set');
+    case 'location':
+      return t(
+        'org.companyAccount.check.location',
+        null,
+        'Location: address or map pin',
+      );
     case 'legal':
       return t('org.companyAccount.check.legal', null, 'Company legal details filled');
     default:
       return id;
   }
+}
+
+function networkErrorMessage(err, fallback) {
+  const msg = String(err?.message || '').trim();
+  if (!msg || /failed to fetch|network request failed|load failed/i.test(msg)) {
+    return fallback;
+  }
+  return msg;
 }
 
 export default function OrgCompanyAccountScreen({ navigation, route }) {
@@ -67,6 +82,7 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
 
   const [orgId, setOrgId] = useState(null);
   const [orgName, setOrgName] = useState('');
+  const [hasShopLocations, setHasShopLocations] = useState(false);
   const [tab, setTab] = useState(initialTab);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -75,7 +91,9 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
     publicEnabled: false,
     publicSlug: '',
     legalComplete: false,
+    locationComplete: false,
     isServiceCenter: false,
+    loadFailed: false,
   });
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -92,17 +110,49 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
       setOrgId(resolved);
       if (!resolved) {
         setError(t('org.companyAccount.loadError', null, 'Could not load company account.'));
+        setSetupInput((prev) => ({ ...prev, loadFailed: true }));
+        return;
+      }
+      if (!token) {
+        setError(
+          t(
+            'org.companyAccount.sessionError',
+            null,
+            'Session expired — sign in again to load company details.',
+          ),
+        );
+        setSetupInput((prev) => ({ ...prev, loadFailed: true }));
         return;
       }
       const memberships = await readOrganizationMemberships();
       const membership = memberships.find((row) => Number(row?.id) === Number(resolved));
       setOrgName(membership?.display_name || '');
+      const shopLocations = Boolean(membership?.has_shop_locations);
+      setHasShopLocations(shopLocations);
 
-      const [activitiesData, publicData, legalData] = await Promise.all([
-        getOrganizationActivities(token, resolved).catch(() => null),
-        getOrganizationPublicProfileSettings(token, resolved).catch(() => null),
-        getOrganizationLegalEntity(token, resolved).catch(() => null),
+      const results = await Promise.allSettled([
+        getOrganizationActivities(token, resolved),
+        getOrganizationPublicProfileSettings(token, resolved),
+        getOrganizationLegalEntity(token, resolved),
       ]);
+
+      const activitiesData = results[0].status === 'fulfilled' ? results[0].value : null;
+      const publicData = results[1].status === 'fulfilled' ? results[1].value : null;
+      const legalData = results[2].status === 'fulfilled' ? results[2].value : null;
+      const failures = results.filter((row) => row.status === 'rejected');
+      const anyFailed = failures.length > 0;
+
+      if (anyFailed) {
+        const firstMsg = networkErrorMessage(
+          failures[0].reason,
+          t(
+            'org.companyAccount.partialLoadError',
+            null,
+            'Some company settings could not load. Check your connection and try again.',
+          ),
+        );
+        setError(firstMsg);
+      }
 
       const activities = Array.isArray(activitiesData?.activities)
         ? activitiesData.activities
@@ -111,19 +161,41 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
           : [];
       const publicActivities = Array.isArray(publicData?.activities) ? publicData.activities : [];
       const mergedActivities = activities.length ? activities : publicActivities;
+      const legalEntity = legalData?.legal_entity || null;
+      const locationComplete = isOrgLocationComplete({
+        hasShopLocations: shopLocations,
+        addressLine: legalEntity?.registered_address_line1,
+        city: legalEntity?.registered_city,
+      });
+
+      // Prefer live API for public/legal; membership fallback only when API succeeded with empty
+      // or when API failed use membership public flags so we don't invent "done".
+      const publicEnabled = publicData
+        ? Boolean(publicData.public_profile_enabled)
+        : Boolean(membership?.public_profile_enabled);
+      const publicSlug = publicData
+        ? publicData.public_slug || ''
+        : membership?.public_slug || '';
 
       setSetupInput({
         activities: mergedActivities,
-        publicEnabled: Boolean(publicData?.public_profile_enabled),
-        publicSlug: publicData?.public_slug || '',
+        publicEnabled,
+        publicSlug,
         legalComplete: Boolean(legalData?.legal_entity_complete),
+        locationComplete,
         isServiceCenter:
           Boolean(publicData?.is_service_center) || mergedActivities.includes('service_center'),
+        // Only mark loadFailed when public/legal APIs failed (activities can fall back to membership).
+        loadFailed: results[1].status === 'rejected' || results[2].status === 'rejected',
       });
     } catch (e) {
       setError(
-        e.message || t('org.companyAccount.loadError', null, 'Could not load company account.'),
+        networkErrorMessage(
+          e,
+          t('org.companyAccount.loadError', null, 'Could not load company account.'),
+        ),
       );
+      setSetupInput((prev) => ({ ...prev, loadFailed: true }));
     } finally {
       setLoading(false);
     }
@@ -231,8 +303,8 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
                         )
                       : t(
                           'org.companyAccount.statusProgress',
-                          null,
-                          'Finish the checklist to complete your company setup',
+                          { done: checklist.doneCount, total: checklist.total },
+                          `Finish the checklist (${checklist.doneCount}/${checklist.total})`,
                         )}
                   </Text>
                 </View>
@@ -253,7 +325,7 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
                   >
                     <MaterialCommunityIcons
                       name={row.done ? 'check-circle' : 'circle-outline'}
-                      size={20}
+                      size={18}
                       color={row.done ? '#15803d' : ON_CARD_MUTED}
                     />
                     <Text style={[styles.checkLabel, row.done && styles.checkDone]}>
@@ -273,6 +345,7 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
                   onPress={() => openTab(checklist.next.tab)}
                   buttonColor={COLORS.PRIMARY}
                   textColor={COLORS.ON_PRIMARY}
+                  compact
                   style={styles.continueBtn}
                 >
                   {t('org.companyAccount.continueSetup', null, 'Continue setup')}
@@ -280,21 +353,47 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
               ) : null}
             </AppCard>
 
-            <SegmentedButtons
-              value={tab}
-              onValueChange={openTab}
-              buttons={tabButtons}
-              style={styles.tabs}
-            />
+            <View style={styles.tabsRow}>
+              {tabButtons.map((btn) => {
+                const active = tab === btn.value;
+                return (
+                  <Pressable
+                    key={btn.value}
+                    onPress={() => openTab(btn.value)}
+                    style={[styles.tabChip, active ? styles.tabChipActive : styles.tabChipInactive]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: active }}
+                  >
+                    <Text
+                      style={[styles.tabChipLabel, active ? styles.tabChipLabelActive : null]}
+                      numberOfLines={1}
+                    >
+                      {btn.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
 
             <View style={styles.tabBody} key={`${tab}-${refreshKey}`}>
               {tab === 'company' ? (
-                <OrgLegalEntityScreen
-                  navigation={navigation}
-                  route={embeddedRoute}
-                  embedded
-                  onSaved={onEmbeddedSaved}
-                />
+                <>
+                  {checklist.isServiceCenter && !hasShopLocations ? (
+                    <Text style={styles.locationHint}>
+                      {t(
+                        'org.companyAccount.locationHint',
+                        null,
+                        'Add your registered address below so customers can find you. A map pin comes when you link a service-center location.',
+                      )}
+                    </Text>
+                  ) : null}
+                  <OrgLegalEntityScreen
+                    navigation={navigation}
+                    route={embeddedRoute}
+                    embedded
+                    onSaved={onEmbeddedSaved}
+                  />
+                </>
               ) : null}
               {tab === 'activities' ? (
                 <OrgActivitiesScreen
@@ -311,6 +410,9 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
                   route={embeddedRoute}
                   embedded
                   onSaved={onEmbeddedSaved}
+                  onOpenCompanyTab={() => openTab('company')}
+                  hasShopLocations={hasShopLocations}
+                  locationComplete={setupInput.locationComplete}
                 />
               ) : null}
               {tab === 'account' ? (
@@ -336,35 +438,63 @@ export default function OrgCompanyAccountScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  scroll: { padding: 16, gap: 12 },
+  scroll: { padding: 16, gap: 10 },
   loader: { marginTop: 40 },
-  summaryCard: { padding: 16, gap: 10 },
-  summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  summaryCard: { paddingVertical: 12, paddingHorizontal: 14, gap: 6 },
+  summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   percent: {
     color: COLORS.PRIMARY,
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: '800',
-    minWidth: 64,
+    minWidth: 48,
   },
-  summaryCopy: { flex: 1, gap: 2 },
-  summaryTitle: { color: ON_CARD, fontSize: 16, fontWeight: '700' },
-  summaryStatus: { color: ON_CARD_MUTED, fontSize: 13, lineHeight: 18 },
-  progress: { height: 8, borderRadius: 999, backgroundColor: '#E2E8F0' },
-  checkList: { gap: 6, marginTop: 4 },
+  summaryCopy: { flex: 1, gap: 1 },
+  summaryTitle: { color: ON_CARD, fontSize: 15, fontWeight: '700' },
+  summaryStatus: { color: ON_CARD_MUTED, fontSize: 12, lineHeight: 16 },
+  progress: { height: 6, borderRadius: 999, backgroundColor: '#E2E8F0' },
+  checkList: { gap: 2, marginTop: 2 },
   checkRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
   checkPressed: { opacity: 0.85 },
-  checkLabel: { flex: 1, color: ON_CARD, fontSize: 14 },
+  checkLabel: { flex: 1, color: ON_CARD, fontSize: 13 },
   checkDone: { color: ON_CARD_MUTED },
   checkFix: { color: COLORS.PRIMARY, fontWeight: '700', fontSize: 12 },
-  continueBtn: { marginTop: 4 },
-  tabs: { backgroundColor: 'transparent' },
-  tabBody: { minHeight: 120 },
+  continueBtn: { marginTop: 2, alignSelf: 'flex-start' },
+  tabsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 12,
+    padding: 8,
+  },
+  tabChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    minWidth: 72,
+    alignItems: 'center',
+  },
+  tabChipActive: { backgroundColor: TAB_ACTIVE_BG },
+  tabChipInactive: { backgroundColor: TAB_INACTIVE_BG },
+  tabChipLabel: {
+    color: TAB_INACTIVE_TEXT,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  tabChipLabelActive: { color: TAB_ACTIVE_TEXT },
+  tabBody: { minHeight: 120, gap: 8 },
+  locationHint: {
+    color: '#E2E8F0',
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 4,
+  },
   accountCard: { padding: 16, gap: 12 },
   accountLead: { color: ON_CARD_MUTED, fontSize: 14, lineHeight: 20 },
-  error: { color: '#B91C1C', fontSize: 13 },
+  error: { color: '#B91C1C', fontSize: 12, lineHeight: 16 },
 });

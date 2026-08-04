@@ -1,9 +1,8 @@
 /**
- * Org workspace header actions: calendar, notifications, profile + unread badge.
+ * Org workspace header actions: calendar, notifications, company account + unread badge.
  */
 
 import { useCallback, useContext, useState } from 'react';
-import { Platform } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -13,10 +12,12 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 import {
   navigateToNotifications,
   navigateToOrgCalendar,
-  navigateToProfile,
+  navigateToOrgCompanyAccount,
 } from '../navigation/webNavigation';
 import {
+  isServiceCenterOnlyOrg,
   organizationMembershipFor,
+  orgShowsFleetSurfaces,
   readOrganizationMemberships,
   resolveActiveOrganizationId,
 } from '../utils/orgWorkspace';
@@ -34,6 +35,7 @@ export default function useOrgHeaderChrome({ loadCalendarBadge = true } = {}) {
   const { unreadCount, refreshUnreadFromRest } = useContext(WebSocketContext);
   const [calendarBadgeCount, setCalendarBadgeCount] = useState(0);
   const [isDriver, setIsDriver] = useState(false);
+  const [activeOrgId, setActiveOrgId] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -44,11 +46,20 @@ export default function useOrgHeaderChrome({ loadCalendarBadge = true } = {}) {
           const rows = await readOrganizationMemberships();
           const orgId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_ORGANIZATION_ID);
           const active = organizationMembershipFor(rows, orgId) || rows[0] || null;
-          if (!cancelled) setIsDriver(isDriverMembership(active));
+          if (!cancelled) {
+            setIsDriver(isDriverMembership(active));
+            setActiveOrgId(active?.id ?? null);
+          }
 
           if (loadCalendarBadge) {
             const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-            if (active?.id && token && !isDriverMembership(active)) {
+            const skipFleetBadge =
+              !active?.id ||
+              !token ||
+              isDriverMembership(active) ||
+              isServiceCenterOnlyOrg(active) ||
+              !orgShowsFleetSurfaces(active);
+            if (!skipFleetBadge) {
               const resolved = await resolveActiveOrganizationId(active.id);
               const data = await listOrgFleet(token, resolved, {});
               const list = Array.isArray(data?.results)
@@ -88,13 +99,9 @@ export default function useOrgHeaderChrome({ loadCalendarBadge = true } = {}) {
   }, [navigation]);
 
   const openProfile = useCallback(() => {
-    if (Platform.OS === 'web') {
-      navigateToProfile(navigation);
-      return;
-    }
-    const root = navigation.getParent?.() || navigation;
-    navigateToProfile(root);
-  }, [navigation]);
+    // Org chrome profile → Company account hub (not personal Client Profile).
+    navigateToOrgCompanyAccount(navigation, { orgId: activeOrgId });
+  }, [activeOrgId, navigation]);
 
   const openMenu = useCallback(() => {
     const drawer = navigation.getParent?.() || navigation;

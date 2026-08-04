@@ -7,8 +7,22 @@ async function parseError(response, fallback) {
   return messageFromApiResponseText(text, fallback);
 }
 
+async function orgFetch(url, options = {}) {
+  try {
+    return await fetch(url, options);
+  } catch (err) {
+    const msg = String(err?.message || '');
+    if (/failed to fetch|network request failed|load failed/i.test(msg)) {
+      throw new Error(
+        'Could not reach the server. Check your connection and try again.',
+      );
+    }
+    throw err;
+  }
+}
+
 export async function createOrganizationOnboarding(token, payload) {
-  const response = await fetch(`${API_BASE_URL}/api/organizations/onboarding/`, {
+  const response = await orgFetch(`${API_BASE_URL}/api/organizations/onboarding/`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -21,7 +35,7 @@ export async function createOrganizationOnboarding(token, payload) {
 }
 
 export async function listOrganizationWorkspace(token) {
-  const response = await fetch(`${API_BASE_URL}/api/organizations/workspace/`, {
+  const response = await orgFetch(`${API_BASE_URL}/api/organizations/workspace/`, {
     headers: await orgScopedHeaders(token),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load organizations'));
@@ -29,7 +43,7 @@ export async function listOrganizationWorkspace(token) {
 }
 
 export async function getOrganizationWorkspaceContext(token, organizationId) {
-  const response = await fetch(
+  const response = await orgFetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/workspace/`,
     { headers: await orgScopedHeaders(token) },
   );
@@ -38,7 +52,7 @@ export async function getOrganizationWorkspaceContext(token, organizationId) {
 }
 
 export async function getPublicOrganizationProfile(slug) {
-  const response = await fetch(
+  const response = await orgFetch(
     `${API_BASE_URL}/api/organizations/public/${encodeURIComponent(slug)}/`,
   );
   if (!response.ok) throw new Error(await parseError(response, 'Organization not found'));
@@ -46,21 +60,21 @@ export async function getPublicOrganizationProfile(slug) {
 }
 
 export async function getOrganizationPublicProfileSettings(token, organizationId) {
-  const response = await fetch(
+  const response = await orgFetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/public-profile/`,
-    { headers: { Authorization: `Bearer ${token}` } },
+    { headers: await orgScopedHeaders(token) },
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load public profile settings'));
   return response.json();
 }
 
 export async function updateOrganizationPublicProfileSettings(token, organizationId, payload) {
-  const response = await fetch(
+  const response = await orgFetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/public-profile/`,
     {
       method: 'PATCH',
       headers: {
-        Authorization: `Bearer ${token}`,
+        ...(await orgScopedHeaders(token)),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
@@ -71,21 +85,21 @@ export async function updateOrganizationPublicProfileSettings(token, organizatio
 }
 
 export async function getOrganizationActivities(token, organizationId) {
-  const response = await fetch(
+  const response = await orgFetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/activities/`,
-    { headers: { Authorization: `Bearer ${token}` } },
+    { headers: await orgScopedHeaders(token) },
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load organization activities'));
   return response.json();
 }
 
 export async function updateOrganizationActivities(token, organizationId, payload) {
-  const response = await fetch(
+  const response = await orgFetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/activities/`,
     {
       method: 'PATCH',
       headers: {
-        Authorization: `Bearer ${token}`,
+        ...(await orgScopedHeaders(token)),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),

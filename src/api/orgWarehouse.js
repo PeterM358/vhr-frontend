@@ -1,5 +1,6 @@
 import { API_BASE_URL } from './config';
 import { messageFromApiResponseText } from '../utils/apiErrorMessage';
+import { orgScopedHeaders } from '../utils/orgWorkspace';
 
 async function parseError(response, fallback) {
   const text = await response.text();
@@ -8,6 +9,20 @@ async function parseError(response, fallback) {
 
 function authHeaders(token) {
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function orgAuthFetch(url, options = {}) {
+  try {
+    return await fetch(url, options);
+  } catch (err) {
+    const msg = String(err?.message || '');
+    if (/failed to fetch|network request failed|load failed/i.test(msg)) {
+      throw new Error(
+        'Could not reach the server. Check your connection and try again.',
+      );
+    }
+    throw err;
+  }
 }
 
 function buildQuery(params = {}) {
@@ -332,21 +347,21 @@ export async function openWarehouseLocationLabel(token, organizationId, location
 }
 
 export async function getOrganizationLegalEntity(token, organizationId) {
-  const response = await fetch(
+  const response = await orgAuthFetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/legal-entity/`,
-    { headers: authHeaders(token) },
+    { headers: await orgScopedHeaders(token) },
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load legal entity'));
   return response.json();
 }
 
 export async function updateOrganizationLegalEntity(token, organizationId, payload) {
-  const response = await fetch(
+  const response = await orgAuthFetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/legal-entity/`,
     {
       method: 'PATCH',
       headers: {
-        ...authHeaders(token),
+        ...(await orgScopedHeaders(token)),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload || {}),

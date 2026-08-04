@@ -13,16 +13,22 @@ export function normalizeOrgAccountTab(raw) {
     return 'public';
   }
   if (value === 'profile' || value === 'my-account' || value === 'account') return 'account';
+  if (value === 'location' || value === 'address' || value === 'map') return 'company';
   return ORG_ACCOUNT_TABS.includes(value) ? value : 'company';
 }
 
 /**
+ * Honest setup checklist. Does not double-count activities + service_center.
+ * Public enabled+slug is one listing item. Location uses shop pin or legal address.
+ *
  * @param {object} input
  * @param {string[]} [input.activities]
  * @param {boolean} [input.publicEnabled]
  * @param {string} [input.publicSlug]
  * @param {boolean} [input.legalComplete]
+ * @param {boolean} [input.locationComplete]
  * @param {boolean} [input.isServiceCenter]
+ * @param {boolean} [input.loadFailed] — when APIs failed, never inflate % from guesses
  */
 export function buildOrgCompanySetupChecklist(input = {}) {
   const activities = Array.isArray(input.activities) ? input.activities : [];
@@ -33,7 +39,10 @@ export function buildOrgCompanySetupChecklist(input = {}) {
   const publicEnabled = Boolean(input.publicEnabled);
   const slug = String(input.publicSlug || '').trim();
   const hasSlug = Boolean(slug);
+  const publicReady = publicEnabled && hasSlug;
   const legalComplete = Boolean(input.legalComplete);
+  const locationComplete = Boolean(input.locationComplete);
+  const loadFailed = Boolean(input.loadFailed);
 
   const items = [
     {
@@ -43,28 +52,6 @@ export function buildOrgCompanySetupChecklist(input = {}) {
       required: true,
     },
     {
-      id: 'service_center',
-      tab: 'activities',
-      done: hasServiceCenter,
-      required: isServiceCenter || !hasActivity,
-      // Only treat as required when user is aiming for SC listing, or none selected yet.
-      soft: !isServiceCenter && hasActivity,
-    },
-    {
-      id: 'public_enabled',
-      tab: 'public',
-      done: publicEnabled,
-      required: isServiceCenter,
-      soft: !isServiceCenter,
-    },
-    {
-      id: 'public_slug',
-      tab: 'public',
-      done: hasSlug,
-      required: isServiceCenter,
-      soft: !isServiceCenter,
-    },
-    {
       id: 'legal',
       tab: 'company',
       done: legalComplete,
@@ -72,13 +59,39 @@ export function buildOrgCompanySetupChecklist(input = {}) {
     },
   ];
 
+  if (isServiceCenter || hasServiceCenter || !hasActivity) {
+    items.push({
+      id: 'location',
+      tab: 'company',
+      done: locationComplete,
+      required: isServiceCenter || hasServiceCenter || !hasActivity,
+      soft: !(isServiceCenter || hasServiceCenter) && hasActivity,
+    });
+    items.push({
+      id: 'public_listing',
+      tab: 'public',
+      // One item: both enabled + slug — avoids 40% from activity alone looking “half done”.
+      done: publicReady,
+      required: isServiceCenter || hasServiceCenter,
+      soft: !(isServiceCenter || hasServiceCenter),
+    });
+  }
+
   const scored = items.filter((row) => row.required && !row.soft);
   const doneCount = scored.filter((row) => row.done).length;
   const total = scored.length || 1;
-  const percent = Math.round((doneCount / total) * 100);
+  // If hub APIs failed, cap displayed progress at completed known items but never
+  // claim listing-ready; percent still reflects only items we can verify as done.
+  const percent = loadFailed && doneCount === 0
+    ? 0
+    : Math.round((doneCount / total) * 100);
   const next = scored.find((row) => !row.done) || null;
   const listingReady =
-    hasServiceCenter && publicEnabled && hasSlug && legalComplete;
+    !loadFailed &&
+    hasServiceCenter &&
+    publicReady &&
+    legalComplete &&
+    locationComplete;
 
   return {
     isServiceCenter,
@@ -90,5 +103,16 @@ export function buildOrgCompanySetupChecklist(input = {}) {
     next,
     listingReady,
     missing: scored.filter((row) => !row.done),
+    loadFailed,
   };
+}
+
+/** Location done when a shop pin exists or registered address+city is filled. */
+export function isOrgLocationComplete({
+  hasShopLocations = false,
+  addressLine = '',
+  city = '',
+} = {}) {
+  if (hasShopLocations) return true;
+  return Boolean(String(addressLine || '').trim() && String(city || '').trim());
 }

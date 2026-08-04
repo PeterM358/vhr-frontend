@@ -74,7 +74,7 @@ export default function OrgAppHeader({
         <GlassNavIconButton
           icon="account-circle-outline"
           onPress={chrome.openProfile}
-          accessibilityLabel={t('org.chrome.profile', null, 'Profile')}
+          accessibilityLabel={t('org.chrome.companyAccount', null, 'Company account')}
         />
       ) : null}
       {rightAction}

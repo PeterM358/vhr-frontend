@@ -34,6 +34,9 @@ import { logout } from '../api/auth';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import {
   buildOrgNavItems,
+  isServiceCenterOnlyOrg,
+  orgShowsConstructionOpsSurfaces,
+  orgShowsFleetSurfaces,
   organizationMembershipFor,
   readOrganizationMemberships,
   setCurrentOrganizationId,
@@ -139,8 +142,15 @@ function CustomDrawerContent(props) {
   const itemProps = drawerMenuItemProps;
   const isDriver = isDriverMembership(org);
   const personalUnread = isDriver ? unreadNotifications || 0 : 0;
-  const canManageOps = Boolean(org?.manage_org_operations || org?.manage_fleet);
-  const canPlanFleet = Boolean(org?.can_plan_fleet || canManageOps);
+  const scOnly = isServiceCenterOnlyOrg(org);
+  const showFleetSurfaces = orgShowsFleetSurfaces(org);
+  const showOpsSurfaces = orgShowsConstructionOpsSurfaces(org);
+  const canManageOps = Boolean(
+    showOpsSurfaces && (org?.manage_org_operations || org?.manage_fleet),
+  );
+  const canPlanFleet = Boolean(
+    showFleetSurfaces && (org?.can_plan_fleet || org?.manage_org_operations || org?.manage_fleet),
+  );
   const canViewAccounting = Boolean(org?.view_org_accounting);
 
   const departmentItems = useMemo(() => {
@@ -179,7 +189,7 @@ function CustomDrawerContent(props) {
       });
     });
 
-    if (canManageOps && !seen.has('OrgTasks')) {
+    if (showOpsSurfaces && canManageOps && !seen.has('OrgTasks')) {
       const overviewIdx = items.findIndex((row) => row.route === 'OrgOverview');
       const insertAt = overviewIdx >= 0 ? overviewIdx + 1 : 0;
       items.splice(insertAt, 0, {
@@ -205,7 +215,7 @@ function CustomDrawerContent(props) {
       seen.add('OrgFleetPlanning');
     }
 
-    if (canManageOps && !seen.has('OrgProjects')) {
+    if (showOpsSurfaces && canManageOps && !seen.has('OrgProjects')) {
       const opsIdx = items.findIndex((row) => row.route === 'OrgOperations');
       const insertAt = opsIdx >= 0 ? opsIdx + 1 : items.length;
       items.splice(insertAt, 0, {
@@ -218,7 +228,11 @@ function CustomDrawerContent(props) {
     }
 
     const canWarehouse = Boolean(
-      canManageOps || org?.manage_org_warehouse || org?.can_post_materials_intake,
+      canManageOps ||
+        org?.manage_org_warehouse ||
+        org?.can_post_materials_intake ||
+        // SC-only owners still get warehouse intake without construction ops surfaces.
+        (scOnly && (org?.manage_org_operations || org?.membership_role === 'owner' || org?.membership_role === 'admin')),
     );
     if (canWarehouse && !seen.has('OrgWarehouse')) {
       const workforceIdx = items.findIndex((row) => row.route === 'OrgWorkforce');
@@ -262,7 +276,7 @@ function CustomDrawerContent(props) {
     }
 
     return items;
-  }, [canManageOps, canPlanFleet, canViewAccounting, isDriver, org, t]);
+  }, [canManageOps, canPlanFleet, canViewAccounting, isDriver, org, scOnly, showOpsSurfaces, t]);
 
   const openRoute = (route) => {
     props.navigation.closeDrawer();

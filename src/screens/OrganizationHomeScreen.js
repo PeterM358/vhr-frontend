@@ -18,6 +18,9 @@ import { listOrgFleet } from '../api/fleet';
 import { ackWorkOrder, listProjects, listWorkOrders, startWorkOrder } from '../api/orgOperations';
 import {
   buildOrgNavItems,
+  isServiceCenterOnlyOrg,
+  orgShowsConstructionOpsSurfaces,
+  orgShowsFleetSurfaces,
   organizationMembershipFor,
   readOrganizationMemberships,
   resolveActiveOrganizationId,
@@ -215,6 +218,9 @@ export default function OrganizationHomeScreen() {
       const token = authToken || (await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN));
       const resolved = await resolveActiveOrganizationId(active.id);
       const driverLike = isDriverMembership(active);
+      const scOnly = isServiceCenterOnlyOrg(active);
+      const showFleet = orgShowsFleetSurfaces(active);
+      const showOpsSurfaces = orgShowsConstructionOpsSurfaces(active);
       const displayOrg = active.display_name || t('org.home.title');
       const person =
         extractFirstName(userEmailOrPhone) ||
@@ -229,34 +235,51 @@ export default function OrganizationHomeScreen() {
           setNotReadyCount(null);
           setJobsDoneWeek(null);
           setExpectedValueSum(null);
+        } else if (scOnly || (!showFleet && !showOpsSurfaces)) {
+          // Service-center-only: skip fleet/ops API spam — home is company + warehouse/workforce.
+          setFleetCount(null);
+          setNotReadyCount(null);
+          setJobsDoneWeek(null);
+          setExpectedValueSum(null);
+          setTasks([]);
         } else {
           const weekStart = startOfWeekDate();
           const [fleetData, workOrdersData, projectsData] = await Promise.all([
-            listOrgFleet(token, resolved, {}),
-            listWorkOrders(token, resolved, {}).catch(() => ({ results: [] })),
-            listProjects(token, resolved, { active: 1 }).catch(() => ({ results: [] })),
+            showFleet
+              ? listOrgFleet(token, resolved, {}).catch(() => ({ results: [] }))
+              : Promise.resolve({ results: [] }),
+            showOpsSurfaces
+              ? listWorkOrders(token, resolved, {}).catch(() => ({ results: [] }))
+              : Promise.resolve({ results: [] }),
+            showOpsSurfaces
+              ? listProjects(token, resolved, { active: 1 }).catch(() => ({ results: [] }))
+              : Promise.resolve({ results: [] }),
           ]);
           const list = Array.isArray(fleetData?.results)
             ? fleetData.results
             : Array.isArray(fleetData)
               ? fleetData
               : [];
-          setFleetCount(list.length);
+          setFleetCount(showFleet ? list.length : null);
           setNotReadyCount(
-            list.filter((row) => isFleetIssueStatus(row?.readiness?.status)).length,
+            showFleet
+              ? list.filter((row) => isFleetIssueStatus(row?.readiness?.status)).length
+              : null,
           );
           const orders = Array.isArray(workOrdersData?.results)
             ? workOrdersData.results
             : Array.isArray(workOrdersData)
               ? workOrdersData
               : [];
-          setJobsDoneWeek(orders.filter((row) => isDoneThisWeek(row, weekStart)).length);
+          setJobsDoneWeek(
+            showOpsSurfaces ? orders.filter((row) => isDoneThisWeek(row, weekStart)).length : null,
+          );
           const projects = Array.isArray(projectsData?.results)
             ? projectsData.results
             : Array.isArray(projectsData)
               ? projectsData
               : [];
-          setExpectedValueSum(sumExpectedRevenue(projects));
+          setExpectedValueSum(showOpsSurfaces ? sumExpectedRevenue(projects) : null);
           setTasks([]);
         }
       } catch {
@@ -286,8 +309,11 @@ export default function OrganizationHomeScreen() {
   );
   const orgName = org?.display_name || t('org.home.title');
   const today = localTodayIso();
+  const scOnly = isServiceCenterOnlyOrg(org);
+  const showFleetSurfaces = orgShowsFleetSurfaces(org);
+  const showOpsSurfaces = orgShowsConstructionOpsSurfaces(org);
   const canManageOps = Boolean(org?.manage_org_operations || org?.manage_fleet);
-  const canPlanFleet = Boolean(org?.can_plan_fleet || canManageOps);
+  const canPlanFleet = Boolean(!scOnly && showFleetSurfaces && (org?.can_plan_fleet || canManageOps));
   const canViewAccounting = Boolean(org?.view_org_accounting);
 
   const { todayTasks, upcomingTasks } = useMemo(() => {
@@ -361,6 +387,23 @@ export default function OrganizationHomeScreen() {
         },
       ];
     }
+    if (!showFleetSurfaces) {
+      return [
+        {
+          key: 'setup',
+          value: org?.has_shop_locations ? '✓' : '·',
+          label: t('org.home.summary.companySetup', null, 'Company setup'),
+          onPress: () => navigateToOrgCompanyAccount(navigation, { orgId: org?.id }),
+        },
+        {
+          key: 'listing',
+          value: org?.public_profile_enabled ? '✓' : '·',
+          label: t('org.home.summary.publicListing', null, 'Public listing'),
+          onPress: () =>
+            navigateToOrgCompanyAccount(navigation, { orgId: org?.id, tab: 'public' }),
+        },
+      ];
+    }
     return [
       {
         key: 'fleet',
@@ -382,7 +425,10 @@ export default function OrganizationHomeScreen() {
     isDriver,
     navigation,
     notReadyCount,
+    org?.has_shop_locations,
     org?.id,
+    org?.public_profile_enabled,
+    showFleetSurfaces,
     t,
     todayTasks.length,
   ]);
@@ -432,7 +478,19 @@ export default function OrganizationHomeScreen() {
 
     const tiles = [];
 
-    if (canManageOps || navRoutes.has('OrgTasks')) {
+    tiles.push({
+      key: 'company-account',
+      icon: 'domain',
+      title: t('org.drawer.companyAccount', null, 'Company account'),
+      subtitle: t(
+        'org.home.actions.companyAccountSubtitle',
+        null,
+        'Legal details, activities, public listing, and setup checklist.',
+      ),
+      onPress: () => navigateToOrgCompanyAccount(navigation, { orgId: org?.id }),
+    });
+
+    if (showOpsSurfaces && (canManageOps || navRoutes.has('OrgTasks'))) {
       tiles.push({
         key: 'tasks',
         icon: 'clipboard-check-outline',
@@ -446,7 +504,7 @@ export default function OrganizationHomeScreen() {
       });
     }
 
-    if (canPlanFleet || navRoutes.has('OrgFleetPlanning')) {
+    if (canPlanFleet || (showFleetSurfaces && navRoutes.has('OrgFleetPlanning'))) {
       tiles.push({
         key: 'fleet-planning',
         icon: 'table-clock',
@@ -462,7 +520,7 @@ export default function OrganizationHomeScreen() {
 
     // Fleet lives on the summary strip — avoid duplicating the department tile.
 
-    if (canManageOps) {
+    if (showOpsSurfaces && canManageOps) {
       tiles.push({
         key: 'projects',
         icon: 'briefcase-outline',
@@ -556,6 +614,8 @@ export default function OrganizationHomeScreen() {
     org?.id,
     org?.manage_org_warehouse,
     org?.can_post_materials_intake,
+    showFleetSurfaces,
+    showOpsSurfaces,
     t,
   ]);
 

@@ -33,6 +33,9 @@ export default function OrgPublicProfileScreen({
   route,
   embedded = false,
   onSaved,
+  onOpenCompanyTab,
+  hasShopLocations = false,
+  locationComplete = false,
 }) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
@@ -151,6 +154,28 @@ export default function OrgPublicProfileScreen({
                   'Optional B2B page for partners and Google. Off by default for non–service-center companies. Never shows tasks, salaries, or fleet ERP.',
                 )}
           </Text>
+          {isServiceCenter && !locationComplete ? (
+            <View style={styles.locationCallout}>
+              <Text style={styles.locationCalloutText}>
+                {hasShopLocations
+                  ? t(
+                      'org.publicProfile.locationReview',
+                      null,
+                      'Review your company address under Company so the listing stays accurate.',
+                    )
+                  : t(
+                      'org.publicProfile.locationNeeded',
+                      null,
+                      'Add your address under Company (registered address + city). Map pin arrives when you link a service-center location.',
+                    )}
+              </Text>
+              {typeof onOpenCompanyTab === 'function' ? (
+                <Button mode="outlined" onPress={onOpenCompanyTab} labelStyle={styles.outlinedLabel} compact>
+                  {t('org.publicProfile.openCompany', null, 'Set location on Company')}
+                </Button>
+              ) : null}
+            </View>
+          ) : null}
           {displayName ? (
             <Text style={styles.name}>{displayName}</Text>
           ) : null}
@@ -238,6 +263,15 @@ const styles = StyleSheet.create({
   content: { padding: 16 },
   card: { padding: 16, gap: 12 },
   lead: { color: ON_CARD_MUTED, fontSize: 13, lineHeight: 18 },
+  locationCallout: {
+    gap: 8,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#CBD5E1',
+  },
+  locationCalloutText: { color: ON_CARD, fontSize: 13, lineHeight: 18 },
   name: { color: ON_CARD, fontSize: 18, fontWeight: '700' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   label: { color: ON_CARD, fontWeight: '600', fontSize: 14 },

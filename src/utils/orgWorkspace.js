@@ -81,12 +81,49 @@ const SHOP_B2B_ORG_ROUTES = new Set([
   'OrgLocations',
 ]);
 
+const FLEET_ACTIVITY_KEYS = new Set(['transport', 'construction']);
+
+/**
+ * Service-center-only org: has service_center and no transport/construction.
+ * These should not see fleet planning, fleet totals, or construction-style
+ * Org Operations / Projects / Tasks — repair work lives in the shop later.
+ */
+export function isServiceCenterOnlyOrg(org) {
+  if (!org) return false;
+  const activities = Array.isArray(org.activities) ? org.activities : [];
+  if (!activities.includes('service_center')) return false;
+  return !activities.some((key) => FLEET_ACTIVITY_KEYS.has(key));
+}
+
+/** True when fleet ERP surfaces (fleet list, planning, fleet summary) belong on home/drawer. */
+export function orgShowsFleetSurfaces(org) {
+  if (!org || isServiceCenterOnlyOrg(org)) return false;
+  const activities = Array.isArray(org.activities) ? org.activities : [];
+  if (activities.some((key) => FLEET_ACTIVITY_KEYS.has(key))) return true;
+  if (activities.includes('other') && !activities.includes('service_center')) return true;
+  const modules = Array.isArray(org.enabled_modules) ? org.enabled_modules : [];
+  return modules.includes('fleet');
+}
+
+/**
+ * Construction-style ops catalog / projects / task cards — not shop repair ops.
+ * Hide for service-center-only orgs.
+ */
+export function orgShowsConstructionOpsSurfaces(org) {
+  if (!org || isServiceCenterOnlyOrg(org)) return false;
+  const activities = Array.isArray(org.activities) ? org.activities : [];
+  if (activities.some((key) => FLEET_ACTIVITY_KEYS.has(key) || key === 'other')) return true;
+  const modules = Array.isArray(org.enabled_modules) ? org.enabled_modules : [];
+  return modules.includes('operations') && modules.includes('fleet');
+}
+
 /**
  * Transport / fleet orgs without service-center locations should see fleet home,
  * not shop B2B network (partners, claims, packaging, SKU mapping).
  */
 export function isFleetFocusedOrg(org) {
   if (!org) return false;
+  if (isServiceCenterOnlyOrg(org)) return false;
   if (org.has_shop_locations) return false;
   const roles = Array.isArray(org.roles) ? org.roles : [];
   const activeRoleTypes = roles
@@ -124,8 +161,20 @@ export function buildOrgNavItems(org, t) {
     OrgInvoicing: t('org.nav.invoicing', null, 'Invoicing'),
   };
   const fleetFocused = isFleetFocusedOrg(org);
+  const scOnly = isServiceCenterOnlyOrg(org);
+  const SC_ONLY_HIDDEN_ROUTES = new Set([
+    'OrgFleet',
+    'OrgFleetPlanning',
+    'OrgOperations',
+    'OrgTasks',
+    'OrgWorkOrders',
+    'OrgProjects',
+    'OrgTransport',
+    'OrgConstruction',
+  ]);
   return sections
     .filter((section) => !(fleetFocused && SHOP_B2B_ORG_ROUTES.has(section.route)))
+    .filter((section) => !(scOnly && SC_ONLY_HIDDEN_ROUTES.has(section.route)))
     .map((section) => {
       const route = section.route === 'OrgLedger' ? 'OrgAccounting' : section.route;
       return {

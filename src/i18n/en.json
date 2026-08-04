@@ -224,17 +224,21 @@
     "chrome": {
       "calendar": "Calendar",
       "notifications": "Notifications",
-      "profile": "Profile"
+      "profile": "Profile",
+      "companyAccount": "Company account"
     },
     "companyAccount": {
       "title": "Company account",
       "backHome": "Dashboard",
       "backHub": "Company account",
       "loadError": "Could not load company account.",
+      "partialLoadError": "Some company settings could not load. Check your connection and try again.",
+      "sessionError": "Session expired — sign in again to load company details.",
       "statusReady": "Setup complete — public listing can go live",
-      "statusProgress": "Finish the checklist to complete your company setup",
+      "statusProgress": "Finish the checklist ({done}/{total})",
       "continueSetup": "Continue setup",
       "fix": "Fix",
+      "locationHint": "Add your registered address below so customers can find you. A map pin comes when you link a service-center location.",
       "accountLead": "Personal login, nickname, and notification preferences for your user — separate from company details.",
       "openMyAccount": "Open my account",
       "tabs": {
@@ -248,6 +252,8 @@
         "serviceCenter": "Include service center activity",
         "publicEnabled": "Public listing enabled",
         "publicSlug": "Public URL slug set",
+        "publicListing": "Public listing on (URL slug set)",
+        "location": "Location: address or map pin",
         "legal": "Company legal details filled"
       }
     },
@@ -292,7 +298,9 @@
         "needVehicles": "Add cars",
         "needAssigned": "Awaiting",
         "todayTasks": "Today",
-        "upcomingTasks": "Upcoming"
+        "upcomingTasks": "Upcoming",
+        "companySetup": "Company setup",
+        "publicListing": "Public listing"
       },
       "stats": {
         "title": "This week",
@@ -332,6 +340,7 @@
         "repairSubtitle": "Request service for a fleet vehicle like a customer.",
         "operationsSubtitle": "Define company operations used on work cards.",
         "openSection": "Open this workspace section.",
+        "companyAccountSubtitle": "Legal details, activities, public listing, and setup checklist.",
         "shopSubtitle": "Switch to bay operations, offers, and shop tools.",
         "calendar": "Calendar",
         "calendarSubtitle": "Fleet readiness deadlines and reminders.",
@@ -1190,6 +1199,9 @@
       "publicTitle": "Company",
       "lead": "Optional B2B page for partners and Google. Off by default for non–service-center companies. Never shows tasks, salaries, or fleet ERP.",
       "leadServiceCenter": "Public listing is enabled for service centers so customers can find you. You can turn it off anytime. Never shows tasks, salaries, or fleet ERP.",
+      "locationNeeded": "Add your address under Company (registered address + city). Map pin arrives when you link a service-center location.",
+      "locationReview": "Review your company address under Company so the listing stays accurate.",
+      "openCompany": "Set location on Company",
       "publish": "Publish public page",
       "publishHint": "Optional for your company. You can turn it off anytime.",
       "publishHintServiceCenter": "Enabled for service centers. You can turn it off if you insist.",
