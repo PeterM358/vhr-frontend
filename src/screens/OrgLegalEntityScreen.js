@@ -20,13 +20,18 @@ import {
   readOrganizationMemberships,
   resolveActiveOrganizationId,
 } from '../utils/orgWorkspace';
-import { navigateToOrgHome, navigateToOrgWarehouse } from '../navigation/webNavigation';
+import {
+  navigateToOrgCompanyAccount,
+  navigateToOrgHome,
+  navigateToOrgWarehouse,
+} from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
+const LOADER_COLOR = '#0F4C81';
 
 function emptyForm() {
   return {
@@ -57,10 +62,16 @@ function hydrate(entity) {
   };
 }
 
-export default function OrgLegalEntityScreen({ navigation, route }) {
+export default function OrgLegalEntityScreen({
+  navigation,
+  route,
+  embedded = false,
+  onSaved,
+}) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
   const returnTo = route?.params?.returnTo;
+  const isEmbedded = embedded || Boolean(route?.params?.embedded);
   const scrollBottomPadding = useScrollContentBottomPadding(40);
 
   const [orgId, setOrgId] = useState(null);
@@ -76,6 +87,13 @@ export default function OrgLegalEntityScreen({ navigation, route }) {
     const orgIdForNav = routeOrgId || orgId;
     if (returnTo === 'OrgWarehouse' && orgIdForNav) {
       navigateToOrgWarehouse(navigation, { orgId: orgIdForNav });
+      return;
+    }
+    if (returnTo === 'OrgCompanyAccount' || !returnTo) {
+      navigateToOrgCompanyAccount(navigation, {
+        orgId: orgIdForNav,
+        tab: 'company',
+      });
       return;
     }
     if (navigation?.canGoBack?.()) {
@@ -154,12 +172,154 @@ export default function OrgLegalEntityScreen({ navigation, route }) {
           ? t('org.legal.savedComplete', null, 'Company details saved — ready for invoicing and warehouse confirm.')
           : t('org.legal.savedIncomplete', null, 'Saved. Still missing required legal fields.'),
       );
+      if (typeof onSaved === 'function') onSaved();
     } catch (e) {
       setError(e.message || t('org.legal.saveError', null, 'Could not save company details.'));
     } finally {
       setBusy(false);
     }
   };
+
+  const body = loading ? (
+    <ActivityIndicator color={isEmbedded ? LOADER_COLOR : '#fff'} style={styles.loader} />
+  ) : (
+    <AppCard style={styles.card}>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {message ? <Text style={styles.message}>{message}</Text> : null}
+      <Text style={[styles.status, complete ? styles.statusOk : styles.statusWarn]}>
+        {complete
+          ? t('org.legal.complete', null, 'Legal entity complete')
+          : t('org.legal.incomplete', null, 'Legal entity incomplete — required for Confirm')}
+      </Text>
+
+      <TextInput
+        label={t('org.legal.legalName', null, 'Legal company name')}
+        value={form.legal_name}
+        onChangeText={(v) => setField('legal_name', v)}
+        mode="outlined"
+        style={styles.input}
+        textColor={ON_CARD}
+        editable={canManage}
+      />
+
+      <View style={styles.switchRow}>
+        <View style={styles.switchCopy}>
+          <Text style={styles.switchLabel}>
+            {t('org.legal.vatRegistered', null, 'VAT registered')}
+          </Text>
+          <Text style={styles.helper}>
+            {t(
+              'org.legal.vatRegisteredHint',
+              null,
+              'When off, company ID (EIK) is used instead of VAT.',
+            )}
+          </Text>
+        </View>
+        <Switch
+          value={form.vat_registered !== false}
+          onValueChange={(v) => setField('vat_registered', v)}
+          disabled={!canManage}
+        />
+      </View>
+
+      {form.vat_registered !== false ? (
+        <TextInput
+          label={t('org.legal.vatNumber', null, 'VAT / ДДС number')}
+          value={form.vat_number}
+          onChangeText={(v) => setField('vat_number', v)}
+          mode="outlined"
+          style={styles.input}
+          textColor={ON_CARD}
+          editable={canManage}
+          autoCapitalize="characters"
+        />
+      ) : (
+        <TextInput
+          label={t('org.legal.eikNumber', null, 'EIK / company ID')}
+          value={form.eik_number}
+          onChangeText={(v) => setField('eik_number', v)}
+          mode="outlined"
+          style={styles.input}
+          textColor={ON_CARD}
+          editable={canManage}
+        />
+      )}
+
+      <TextInput
+        label={t('org.legal.address', null, 'Registered address')}
+        value={form.registered_address_line1}
+        onChangeText={(v) => setField('registered_address_line1', v)}
+        mode="outlined"
+        style={styles.input}
+        textColor={ON_CARD}
+        editable={canManage}
+      />
+      <View style={styles.row2}>
+        <TextInput
+          label={t('org.legal.city', null, 'City')}
+          value={form.registered_city}
+          onChangeText={(v) => setField('registered_city', v)}
+          mode="outlined"
+          style={[styles.input, styles.flex1]}
+          textColor={ON_CARD}
+          editable={canManage}
+        />
+        <TextInput
+          label={t('org.legal.postal', null, 'Postal code')}
+          value={form.registered_postal_code}
+          onChangeText={(v) => setField('registered_postal_code', v)}
+          mode="outlined"
+          style={[styles.input, styles.flex1]}
+          textColor={ON_CARD}
+          editable={canManage}
+        />
+      </View>
+      <TextInput
+        label={t('org.legal.billingEmail', null, 'Billing email (optional)')}
+        value={form.billing_email}
+        onChangeText={(v) => setField('billing_email', v)}
+        mode="outlined"
+        style={styles.input}
+        textColor={ON_CARD}
+        editable={canManage}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
+      <TextInput
+        label={t('org.legal.billingPhone', null, 'Billing phone (optional)')}
+        value={form.billing_phone}
+        onChangeText={(v) => setField('billing_phone', v)}
+        mode="outlined"
+        style={styles.input}
+        textColor={ON_CARD}
+        editable={canManage}
+        keyboardType="phone-pad"
+      />
+
+      {canManage ? (
+        <>
+          <Button mode="contained" onPress={save} loading={busy} disabled={busy}>
+            {t('common.save', null, 'Save')}
+          </Button>
+          {!isEmbedded ? (
+            <Button mode="outlined" onPress={onBack} disabled={busy} style={styles.backBtn}>
+              {returnTo === 'OrgWarehouse'
+                ? t('org.legal.backWarehouse', null, 'Back to warehouse')
+                : t('org.companyAccount.backHub', null, 'Company account')}
+            </Button>
+          ) : null}
+        </>
+      ) : (
+        <Text style={styles.helper}>
+          {t('org.legal.readOnly', null, 'Only organization owners/admins can edit.')}
+        </Text>
+      )}
+    </AppCard>
+  );
+
+  if (isEmbedded) {
+    return body;
+  }
 
   return (
     <ScreenBackground>
@@ -170,7 +330,7 @@ export default function OrgLegalEntityScreen({ navigation, route }) {
         backLabel={
           returnTo === 'OrgWarehouse'
             ? t('org.nav.warehouse', null, 'Warehouse')
-            : t('org.legal.backHome', null, 'Organization')
+            : t('org.companyAccount.backHub', null, 'Company account')
         }
         iconOnlyBack={false}
       />
@@ -185,141 +345,7 @@ export default function OrgLegalEntityScreen({ navigation, route }) {
             'Legal entity for invoices and warehouse buyer-VAT checks. Separate from your personal Profile nickname.',
           )}
         </Text>
-
-        {loading ? (
-          <ActivityIndicator color="#fff" style={styles.loader} />
-        ) : (
-          <AppCard style={styles.card}>
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-            {message ? <Text style={styles.message}>{message}</Text> : null}
-            <Text style={[styles.status, complete ? styles.statusOk : styles.statusWarn]}>
-              {complete
-                ? t('org.legal.complete', null, 'Legal entity complete')
-                : t('org.legal.incomplete', null, 'Legal entity incomplete — required for Confirm')}
-            </Text>
-
-            <TextInput
-              label={t('org.legal.legalName', null, 'Legal company name')}
-              value={form.legal_name}
-              onChangeText={(v) => setField('legal_name', v)}
-              mode="outlined"
-              style={styles.input}
-              textColor={ON_CARD}
-              editable={canManage}
-            />
-
-            <View style={styles.switchRow}>
-              <View style={styles.switchCopy}>
-                <Text style={styles.switchLabel}>
-                  {t('org.legal.vatRegistered', null, 'VAT registered')}
-                </Text>
-                <Text style={styles.helper}>
-                  {t(
-                    'org.legal.vatRegisteredHint',
-                    null,
-                    'When off, company ID (EIK) is used instead of VAT.',
-                  )}
-                </Text>
-              </View>
-              <Switch
-                value={form.vat_registered !== false}
-                onValueChange={(v) => setField('vat_registered', v)}
-                disabled={!canManage}
-              />
-            </View>
-
-            {form.vat_registered !== false ? (
-              <TextInput
-                label={t('org.legal.vatNumber', null, 'VAT / ДДС number')}
-                value={form.vat_number}
-                onChangeText={(v) => setField('vat_number', v)}
-                mode="outlined"
-                style={styles.input}
-                textColor={ON_CARD}
-                editable={canManage}
-                autoCapitalize="characters"
-              />
-            ) : (
-              <TextInput
-                label={t('org.legal.eikNumber', null, 'EIK / company ID')}
-                value={form.eik_number}
-                onChangeText={(v) => setField('eik_number', v)}
-                mode="outlined"
-                style={styles.input}
-                textColor={ON_CARD}
-                editable={canManage}
-              />
-            )}
-
-            <TextInput
-              label={t('org.legal.address', null, 'Registered address')}
-              value={form.registered_address_line1}
-              onChangeText={(v) => setField('registered_address_line1', v)}
-              mode="outlined"
-              style={styles.input}
-              textColor={ON_CARD}
-              editable={canManage}
-            />
-            <View style={styles.row2}>
-              <TextInput
-                label={t('org.legal.city', null, 'City')}
-                value={form.registered_city}
-                onChangeText={(v) => setField('registered_city', v)}
-                mode="outlined"
-                style={[styles.input, styles.flex1]}
-                textColor={ON_CARD}
-                editable={canManage}
-              />
-              <TextInput
-                label={t('org.legal.postal', null, 'Postal code')}
-                value={form.registered_postal_code}
-                onChangeText={(v) => setField('registered_postal_code', v)}
-                mode="outlined"
-                style={[styles.input, styles.flex1]}
-                textColor={ON_CARD}
-                editable={canManage}
-              />
-            </View>
-            <TextInput
-              label={t('org.legal.billingEmail', null, 'Billing email (optional)')}
-              value={form.billing_email}
-              onChangeText={(v) => setField('billing_email', v)}
-              mode="outlined"
-              style={styles.input}
-              textColor={ON_CARD}
-              editable={canManage}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <TextInput
-              label={t('org.legal.billingPhone', null, 'Billing phone (optional)')}
-              value={form.billing_phone}
-              onChangeText={(v) => setField('billing_phone', v)}
-              mode="outlined"
-              style={styles.input}
-              textColor={ON_CARD}
-              editable={canManage}
-              keyboardType="phone-pad"
-            />
-
-            {canManage ? (
-              <>
-                <Button mode="contained" onPress={save} loading={busy} disabled={busy}>
-                  {t('common.save', null, 'Save')}
-                </Button>
-                <Button mode="outlined" onPress={onBack} disabled={busy} style={styles.backBtn}>
-                  {returnTo === 'OrgWarehouse'
-                    ? t('org.legal.backWarehouse', null, 'Back to warehouse')
-                    : t('org.legal.backHome', null, 'Back to organization')}
-                </Button>
-              </>
-            ) : (
-              <Text style={styles.helper}>
-                {t('org.legal.readOnly', null, 'Only organization owners/admins can edit.')}
-              </Text>
-            )}
-          </AppCard>
-        )}
+        {body}
       </ScrollView>
     </ScreenBackground>
   );

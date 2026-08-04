@@ -18,7 +18,7 @@ import {
   updateOrganizationPublicProfileSettings,
 } from '../api/organizationWorkspace';
 import { resolveActiveOrganizationId, refreshOrganizationMemberships } from '../utils/orgWorkspace';
-import { navigateToOrgHome } from '../navigation/webNavigation';
+import { navigateToOrgCompanyAccount } from '../navigation/webNavigation';
 import { publicBusinessProfile } from '../navigation/webRoutes';
 import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -28,9 +28,15 @@ import { showMessage } from '../utils/crossPlatformAlert';
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
 
-export default function OrgPublicProfileScreen({ navigation, route }) {
+export default function OrgPublicProfileScreen({
+  navigation,
+  route,
+  embedded = false,
+  onSaved,
+}) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
+  const isEmbedded = embedded || Boolean(route?.params?.embedded);
   const scrollBottomPadding = useScrollContentBottomPadding(40);
 
   const [orgId, setOrgId] = useState(null);
@@ -44,7 +50,10 @@ export default function OrgPublicProfileScreen({ navigation, route }) {
   const [isServiceCenter, setIsServiceCenter] = useState(false);
 
   const onBack = useCallback(() => {
-    navigateToOrgHome(navigation, { orgId: routeOrgId || orgId });
+    navigateToOrgCompanyAccount(navigation, {
+      orgId: routeOrgId || orgId,
+      tab: 'public',
+    });
   }, [navigation, orgId, routeOrgId]);
 
   const load = useCallback(async () => {
@@ -100,6 +109,7 @@ export default function OrgPublicProfileScreen({ navigation, route }) {
         Boolean(data.is_service_center) || activities.includes('service_center'),
       );
       await refreshOrganizationMemberships(token).catch(() => null);
+      if (typeof onSaved === 'function') onSaved();
       showMessage(
         t('org.publicProfile.savedTitle', null, 'Public profile'),
         nextEnabled
@@ -122,90 +132,103 @@ export default function OrgPublicProfileScreen({ navigation, route }) {
     navigation.navigate('PublicBusinessProfile', { orgSlug: slug });
   };
 
+  const body = (
+    <>
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 24 }} />
+      ) : (
+        <AppCard style={styles.card}>
+          <Text style={styles.lead}>
+            {isServiceCenter
+              ? t(
+                  'org.publicProfile.leadServiceCenter',
+                  null,
+                  'Public listing is enabled for service centers so customers can find you. You can turn it off anytime. Never shows tasks, salaries, or fleet ERP.',
+                )
+              : t(
+                  'org.publicProfile.lead',
+                  null,
+                  'Optional B2B page for partners and Google. Off by default for non–service-center companies. Never shows tasks, salaries, or fleet ERP.',
+                )}
+          </Text>
+          {displayName ? (
+            <Text style={styles.name}>{displayName}</Text>
+          ) : null}
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>
+                {t('org.publicProfile.publish', null, 'Publish public page')}
+              </Text>
+              <Text style={styles.hint}>
+                {isServiceCenter
+                  ? t(
+                      'org.publicProfile.publishHintServiceCenter',
+                      null,
+                      'Enabled for service centers. You can turn it off if you insist.',
+                    )
+                  : t(
+                      'org.publicProfile.publishHint',
+                      null,
+                      'Optional for your company. You can turn it off anytime.',
+                    )}
+              </Text>
+            </View>
+            <Switch
+              value={enabled}
+              onValueChange={(v) => {
+                setEnabled(v);
+                save(v);
+              }}
+              disabled={busy}
+            />
+          </View>
+          <Text style={styles.label}>{t('org.publicProfile.slug', null, 'Public URL slug')}</Text>
+          <TextInput
+            mode="outlined"
+            value={slug}
+            onChangeText={setSlug}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="my-transport-company"
+            style={styles.input}
+          />
+          {canonicalPath ? (
+            <Text style={styles.path}>{canonicalPath}</Text>
+          ) : null}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          <View style={styles.actions}>
+            <Button mode="contained" loading={busy} disabled={busy} onPress={() => save(enabled)}>
+              {t('common.save', null, 'Save')}
+            </Button>
+            {enabled && slug ? (
+              <Button mode="outlined" onPress={openPublic} labelStyle={styles.outlinedLabel}>
+                {t('org.publicProfile.preview', null, 'Open public page')}
+              </Button>
+            ) : null}
+          </View>
+        </AppCard>
+      )}
+    </>
+  );
+
+  if (isEmbedded) {
+    return body;
+  }
+
   return (
     <ScreenBackground>
       <OrgAppHeader
+        mode="detail"
         title={t('org.publicProfile.title', null, 'Public profile')}
         onBack={onBack}
+        backLabel={t('org.companyAccount.backHub', null, 'Company account')}
+        iconOnlyBack={false}
       />
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}
         keyboardShouldPersistTaps="handled"
       >
-        {loading ? (
-          <ActivityIndicator style={{ marginTop: 24 }} />
-        ) : (
-          <AppCard style={styles.card}>
-            <Text style={styles.lead}>
-              {isServiceCenter
-                ? t(
-                    'org.publicProfile.leadServiceCenter',
-                    null,
-                    'Public listing is enabled for service centers so customers can find you. You can turn it off anytime. Never shows tasks, salaries, or fleet ERP.',
-                  )
-                : t(
-                    'org.publicProfile.lead',
-                    null,
-                    'Optional B2B page for partners and Google. Off by default for non–service-center companies. Never shows tasks, salaries, or fleet ERP.',
-                  )}
-            </Text>
-            {displayName ? (
-              <Text style={styles.name}>{displayName}</Text>
-            ) : null}
-            <View style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>
-                  {t('org.publicProfile.publish', null, 'Publish public page')}
-                </Text>
-                <Text style={styles.hint}>
-                  {isServiceCenter
-                    ? t(
-                        'org.publicProfile.publishHintServiceCenter',
-                        null,
-                        'Enabled for service centers. You can turn it off if you insist.',
-                      )
-                    : t(
-                        'org.publicProfile.publishHint',
-                        null,
-                        'Optional for your company. You can turn it off anytime.',
-                      )}
-                </Text>
-              </View>
-              <Switch
-                value={enabled}
-                onValueChange={(v) => {
-                  setEnabled(v);
-                  save(v);
-                }}
-                disabled={busy}
-              />
-            </View>
-            <Text style={styles.label}>{t('org.publicProfile.slug', null, 'Public URL slug')}</Text>
-            <TextInput
-              mode="outlined"
-              value={slug}
-              onChangeText={setSlug}
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholder="my-transport-company"
-              style={styles.input}
-            />
-            {canonicalPath ? (
-              <Text style={styles.path}>{canonicalPath}</Text>
-            ) : null}
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-            <View style={styles.actions}>
-              <Button mode="contained" loading={busy} disabled={busy} onPress={() => save(enabled)}>
-                {t('common.save', null, 'Save')}
-              </Button>
-              {enabled && slug ? (
-                <Button mode="outlined" onPress={openPublic} labelStyle={styles.outlinedLabel}>
-                  {t('org.publicProfile.preview', null, 'Open public page')}
-                </Button>
-              ) : null}
-            </View>
-          </AppCard>
-        )}
+        {body}
       </ScrollView>
     </ScreenBackground>
   );

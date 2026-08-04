@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BackHeaderButton from '../navigation/BackHeaderButton';
 import {
@@ -58,6 +58,7 @@ export default function AppNavigationBar({
   showBack = true,
   backLabel = 'Back',
   onBack,
+  onTitlePress,
   leftAction,
   rightAction,
   variant = 'glass',
@@ -127,18 +128,48 @@ export default function AppNavigationBar({
           </View>
 
           {!largeTitle ? (
-            <View pointerEvents="none" style={styles.titleWrap}>
-              <Text style={[styles.title, compact && styles.titleCompact, { color: theme.titleColor }]} numberOfLines={1}>
-                {title}
-              </Text>
-              {subtitle ? (
-                <Text
-                  style={[styles.subtitle, { color: theme.subtitleColor }]}
-                  numberOfLines={1}
+            <View
+              pointerEvents={onTitlePress ? 'box-none' : 'none'}
+              style={styles.titleWrap}
+            >
+              {onTitlePress ? (
+                <Pressable
+                  onPress={onTitlePress}
+                  accessibilityRole="button"
+                  accessibilityLabel={typeof title === 'string' ? title : 'Title'}
+                  hitSlop={8}
+                  style={({ pressed }) => [pressed && styles.titlePressed]}
                 >
-                  {subtitle}
-                </Text>
-              ) : null}
+                  <Text
+                    style={[styles.title, compact && styles.titleCompact, styles.titlePressable, { color: theme.titleColor }]}
+                    numberOfLines={1}
+                  >
+                    {title}
+                  </Text>
+                  {subtitle ? (
+                    <Text
+                      style={[styles.subtitle, { color: theme.subtitleColor }]}
+                      numberOfLines={1}
+                    >
+                      {subtitle}
+                    </Text>
+                  ) : null}
+                </Pressable>
+              ) : (
+                <>
+                  <Text style={[styles.title, compact && styles.titleCompact, { color: theme.titleColor }]} numberOfLines={1}>
+                    {title}
+                  </Text>
+                  {subtitle ? (
+                    <Text
+                      style={[styles.subtitle, { color: theme.subtitleColor }]}
+                      numberOfLines={1}
+                    >
+                      {subtitle}
+                    </Text>
+                  ) : null}
+                </>
+              )}
             </View>
           ) : (
             <View style={styles.largeTitleSpacer} />
@@ -261,6 +292,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     letterSpacing: -0.35,
+  },
+  titlePressable: {
+    textDecorationLine: Platform.OS === 'web' ? 'underline' : 'none',
+    textDecorationColor: 'rgba(255,255,255,0.35)',
+  },
+  titlePressed: {
+    opacity: 0.82,
   },
   titleCompact: {
     fontSize: 17,

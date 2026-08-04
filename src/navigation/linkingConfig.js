@@ -34,6 +34,7 @@ export const linkingScreens = {
       OrgLegalEntity: 'company',
       OrgActivities: 'activities',
       OrgPublicProfile: 'public-profile',
+      OrgCompanyAccount: 'account',
       OrgCalendar: 'calendar',
       OrgWorkforce: 'workforce',
       OrgNetwork: 'network',

@@ -24,6 +24,7 @@ import OrgInvoicingScreen from '../screens/OrgInvoicingScreen';
 import OrgLegalEntityScreen from '../screens/OrgLegalEntityScreen';
 import OrgActivitiesScreen from '../screens/OrgActivitiesScreen';
 import OrgPublicProfileScreen from '../screens/OrgPublicProfileScreen';
+import OrgCompanyAccountScreen from '../screens/OrgCompanyAccountScreen';
 import OrgCalendarScreen from '../screens/OrgCalendarScreen';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
 
@@ -50,9 +51,7 @@ import {
   navigateToOrgFleet,
   navigateToOrgFleetPlanning,
   navigateToOrgInvoicing,
-  navigateToOrgLegalEntity,
-  navigateToOrgActivities,
-  navigateToOrgPublicProfile,
+  navigateToOrgCompanyAccount,
   navigateToOrgNetwork,
   navigateToOrgOperations,
   navigateToOrgProjects,
@@ -98,11 +97,17 @@ const ROUTE_ICONS = {
   OrgAccounting: 'book-open-outline',
   OrgFleetPlanning: 'table-clock',
   OrgPublicProfile: 'earth',
+  OrgCompanyAccount: 'domain',
   OrgCalendar: 'calendar-month-outline',
 };
 
-/** Shown once under Company / Profile — strip from backend nav_sections to avoid duplicates. */
-const COMPANY_PROFILE_ROUTES = new Set(['OrgLegalEntity', 'OrgActivities', 'OrgPublicProfile']);
+/** Company settings live in OrgCompanyAccount hub — strip from backend nav_sections. */
+const COMPANY_PROFILE_ROUTES = new Set([
+  'OrgLegalEntity',
+  'OrgActivities',
+  'OrgPublicProfile',
+  'OrgCompanyAccount',
+]);
 
 function normalizeOrgRoute(route) {
   if (route === 'OrgWorkOrders') return 'OrgTasks';
@@ -306,16 +311,21 @@ function CustomDrawerContent(props) {
       navigateToOrgInvoicing(navigation, { orgId: org?.id });
       return;
     }
-    if (normalized === 'OrgLegalEntity') {
-      navigateToOrgLegalEntity(navigation, { orgId: org?.id });
-      return;
-    }
-    if (normalized === 'OrgActivities') {
-      navigateToOrgActivities(navigation, { orgId: org?.id });
-      return;
-    }
-    if (normalized === 'OrgPublicProfile') {
-      navigateToOrgPublicProfile(navigation, { orgId: org?.id });
+    if (
+      normalized === 'OrgLegalEntity' ||
+      normalized === 'OrgActivities' ||
+      normalized === 'OrgPublicProfile' ||
+      normalized === 'OrgCompanyAccount'
+    ) {
+      const tab =
+        normalized === 'OrgActivities'
+          ? 'activities'
+          : normalized === 'OrgPublicProfile'
+            ? 'public'
+            : normalized === 'OrgLegalEntity'
+              ? 'company'
+              : undefined;
+      navigateToOrgCompanyAccount(navigation, { orgId: org?.id, tab });
       return;
     }
     if (Platform.OS === 'web') {
@@ -406,41 +416,10 @@ function CustomDrawerContent(props) {
             </Text>
 
             <DrawerItem
-              label={t('org.drawer.company', null, 'Company details')}
-              onPress={() => openRoute('OrgLegalEntity')}
+              label={t('org.drawer.companyAccount', null, 'Company account')}
+              onPress={() => openRoute('OrgCompanyAccount')}
               icon={({ color, size }) => (
                 <DrawerMenuIcon name="domain" color={color} size={size} />
-              )}
-              {...itemProps}
-            />
-
-            <DrawerItem
-              label={t('org.drawer.activities', null, 'Company activities')}
-              onPress={() => openRoute('OrgActivities')}
-              icon={({ color, size }) => (
-                <DrawerMenuIcon name="briefcase-check-outline" color={color} size={size} />
-              )}
-              {...itemProps}
-            />
-
-            <DrawerItem
-              label={t('org.nav.publicProfile', null, 'Public profile')}
-              onPress={() => openRoute('OrgPublicProfile')}
-              icon={({ color, size }) => (
-                <DrawerMenuIcon name="earth" color={color} size={size} />
-              )}
-              {...itemProps}
-            />
-
-            <DrawerItem
-              label={t('org.drawer.account', null, 'My account')}
-              onPress={() => {
-                props.navigation.closeDrawer();
-                const root = navigation.getParent?.() || navigation;
-                navigateToProfile(root);
-              }}
-              icon={({ color, size }) => (
-                <DrawerMenuIcon name="account-circle-outline" color={color} size={size} />
               )}
               {...itemProps}
             />
@@ -547,6 +526,7 @@ export default function OrganizationDrawer() {
       <Drawer.Screen name="OrgLegalEntity" component={OrgLegalEntityScreen} />
       <Drawer.Screen name="OrgActivities" component={OrgActivitiesScreen} />
       <Drawer.Screen name="OrgPublicProfile" component={OrgPublicProfileScreen} />
+      <Drawer.Screen name="OrgCompanyAccount" component={OrgCompanyAccountScreen} />
       <Drawer.Screen name="OrgCalendar" component={OrgCalendarScreen} />
       <Drawer.Screen name="OrgWorkforce" component={OrgWorkforceScreen} />
       <Drawer.Screen name="OrgNetwork" component={NetworkOrganizationScreen} />

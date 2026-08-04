@@ -42,7 +42,7 @@ import {
   navigateToOrgWarehouse,
   navigateToOrgWorkforce,
   navigateToPartnerDashboard,
-  navigateToOrgPublicProfile,
+  navigateToOrgCompanyAccount,
   navigateToProfile,
 } from '../navigation/webNavigation';
 
@@ -564,6 +564,11 @@ export default function OrganizationHomeScreen() {
       <OrgAppHeader
         mode="dashboard"
         title={orgName}
+        onTitlePress={
+          isDriver
+            ? undefined
+            : () => navigateToOrgCompanyAccount(navigation, { orgId: org?.id })
+        }
       />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: scrollBottomPadding }]}
@@ -832,22 +837,22 @@ export default function OrganizationHomeScreen() {
             {needsServiceListing ? (
               <DashboardCard style={styles.listingCard}>
                 <Text style={styles.listingTitle}>
-                  {t('org.home.serviceListingTitle', null, 'Public listing')}
+                  {t('org.home.serviceListingTitle', null, 'Company setup')}
                 </Text>
                 <Text style={styles.listingBody}>
                   {t(
                     'org.home.serviceListingBody',
                     null,
-                    'Your service center can appear publicly. Find settings under Company / Profile → Public profile when you need them.',
+                    'Finish company setup (legal details, public URL) so customers can find your service center.',
                   )}
                 </Text>
                 <View style={styles.listingActions}>
                   <Button
                     mode="text"
-                    onPress={() => navigateToOrgPublicProfile(navigation, { orgId: org?.id })}
+                    onPress={() => navigateToOrgCompanyAccount(navigation, { orgId: org?.id })}
                     textColor={COLORS.PRIMARY}
                   >
-                    {t('org.home.serviceListingButton', null, 'Open public profile')}
+                    {t('org.home.serviceListingButton', null, 'Open setup')}
                   </Button>
                   <Button
                     mode="text"

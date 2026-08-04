@@ -17,11 +17,10 @@ import {
   updateOrganizationActivities,
 } from '../api/organizationWorkspace';
 import {
-  readOrganizationMemberships,
   refreshOrganizationMemberships,
   resolveActiveOrganizationId,
 } from '../utils/orgWorkspace';
-import { navigateToOrgHome, navigateToOrgPublicProfile } from '../navigation/webNavigation';
+import { navigateToOrgCompanyAccount } from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
@@ -32,9 +31,16 @@ const ON_CARD_MUTED = '#475569';
 
 const ACTIVITY_OPTIONS = ['transport', 'construction', 'service_center', 'other'];
 
-export default function OrgActivitiesScreen({ navigation, route }) {
+export default function OrgActivitiesScreen({
+  navigation,
+  route,
+  embedded = false,
+  onSaved,
+  onOpenPublicTab,
+}) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
+  const isEmbedded = embedded || Boolean(route?.params?.embedded);
   const scrollBottomPadding = useScrollContentBottomPadding(40);
 
   const [orgId, setOrgId] = useState(null);
@@ -83,19 +89,9 @@ export default function OrgActivitiesScreen({ navigation, route }) {
   );
 
   const onBack = useCallback(() => {
-    const orgIdForNav = routeOrgId || orgId;
-    if (navigation?.canGoBack?.()) {
-      navigation.goBack();
-      return;
-    }
-    if (orgIdForNav) {
-      navigateToOrgHome(navigation, { orgId: orgIdForNav });
-      return;
-    }
-    readOrganizationMemberships().then((orgs) => {
-      if (orgs.length > 0) {
-        navigateToOrgHome(navigation, { orgId: orgs[0]?.id });
-      }
+    navigateToOrgCompanyAccount(navigation, {
+      orgId: routeOrgId || orgId,
+      tab: 'activities',
     });
   }, [navigation, orgId, routeOrgId]);
 
@@ -165,6 +161,7 @@ export default function OrgActivitiesScreen({ navigation, route }) {
         next.includes('service_center') && !org?.has_shop_locations;
       setMessage(t('org.activities.saved', null, 'Activities saved. Modules updated.'));
       setShowPublicListingCta(needsListing);
+      if (typeof onSaved === 'function') onSaved();
     } catch (e) {
       setError(e.message || t('org.activities.saveError', null, 'Could not save activities.'));
     } finally {
@@ -172,110 +169,129 @@ export default function OrgActivitiesScreen({ navigation, route }) {
     }
   };
 
+  const openPublicListing = () => {
+    if (typeof onOpenPublicTab === 'function') {
+      onOpenPublicTab();
+      return;
+    }
+    navigateToOrgCompanyAccount(navigation, { orgId, tab: 'public' });
+  };
+
+  const body = (
+    <AppCard style={styles.card}>
+      <Text style={styles.lead}>
+        {t(
+          'org.activities.lead',
+          null,
+          'Tell us what you do so we show the right tools and who can find you. You can change this later anytime.',
+        )}
+      </Text>
+
+      {loading ? (
+        <ActivityIndicator animating style={styles.spinner} />
+      ) : (
+        <View style={styles.grid}>
+          {ACTIVITY_OPTIONS.map((key) => {
+            const isOn = selected.includes(key);
+            return (
+              <Pressable
+                key={key}
+                onPress={() => toggle(key)}
+                disabled={!canManage}
+                style={({ pressed }) => [
+                  styles.option,
+                  isOn && styles.optionSelected,
+                  pressed && canManage && styles.optionPressed,
+                  !canManage && styles.optionDisabled,
+                ]}
+              >
+                <Text style={[styles.checkbox, isOn && styles.checkboxOn]}>
+                  {isOn ? '☑' : '☐'}
+                </Text>
+                <View style={styles.optionTextCol}>
+                  <Text style={[styles.optionLabel, isOn && styles.optionLabelOn]}>
+                    {labels[key]}
+                  </Text>
+                  <Text style={styles.optionHint}>{hints[key]}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
+      {!canManage ? (
+        <Text style={styles.muted}>
+          {t(
+            'org.activities.ownerOnly',
+            null,
+            'Only organization owners/admins can edit activities.',
+          )}
+        </Text>
+      ) : null}
+
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {message ? <Text style={styles.success}>{message}</Text> : null}
+      {showPublicListingCta ? (
+        <View style={styles.ctaBox}>
+          <Text style={styles.ctaText}>
+            {t(
+              'org.activities.publicListingCta',
+              null,
+              'Public listing is on for your service center. Review it anytime — this is optional.',
+            )}
+          </Text>
+          <View style={styles.ctaActions}>
+            <Button
+              mode="outlined"
+              onPress={openPublicListing}
+              style={styles.ctaBtn}
+              textColor={COLORS.PRIMARY}
+            >
+              {t('org.activities.publicListingButton', null, 'Review public listing')}
+            </Button>
+            <Button
+              mode="text"
+              onPress={() => setShowPublicListingCta(false)}
+              textColor={ON_CARD_MUTED}
+            >
+              {t('org.activities.publicListingDismiss', null, 'Not now')}
+            </Button>
+          </View>
+        </View>
+      ) : null}
+
+      {canManage ? (
+        <Button
+          mode="contained"
+          onPress={save}
+          loading={busy}
+          disabled={busy || loading || selected.length === 0}
+          style={styles.save}
+          buttonColor={COLORS.PRIMARY}
+          textColor={COLORS.ON_PRIMARY}
+        >
+          {t('org.activities.save', null, 'Save activities')}
+        </Button>
+      ) : null}
+    </AppCard>
+  );
+
+  if (isEmbedded) {
+    return body;
+  }
+
   return (
     <ScreenBackground>
       <OrgAppHeader
+        mode="detail"
         title={t('org.activities.title', null, 'Activities')}
         onBack={onBack}
+        backLabel={t('org.companyAccount.backHub', null, 'Company account')}
+        iconOnlyBack={false}
       />
       <ScrollView contentContainerStyle={[styles.container, { paddingBottom: scrollBottomPadding }]}>
-        <AppCard style={styles.card}>
-          <Text style={styles.lead}>
-            {t(
-              'org.activities.lead',
-              null,
-              'Tell us what you do so we show the right tools and who can find you. You can change this later anytime.',
-            )}
-          </Text>
-
-          {loading ? (
-            <ActivityIndicator animating style={styles.spinner} />
-          ) : (
-            <View style={styles.grid}>
-              {ACTIVITY_OPTIONS.map((key) => {
-                const isOn = selected.includes(key);
-                return (
-                  <Pressable
-                    key={key}
-                    onPress={() => toggle(key)}
-                    disabled={!canManage}
-                    style={({ pressed }) => [
-                      styles.option,
-                      isOn && styles.optionSelected,
-                      pressed && canManage && styles.optionPressed,
-                      !canManage && styles.optionDisabled,
-                    ]}
-                  >
-                    <Text style={[styles.checkbox, isOn && styles.checkboxOn]}>
-                      {isOn ? '☑' : '☐'}
-                    </Text>
-                    <View style={styles.optionTextCol}>
-                      <Text style={[styles.optionLabel, isOn && styles.optionLabelOn]}>
-                        {labels[key]}
-                      </Text>
-                      <Text style={styles.optionHint}>{hints[key]}</Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-
-          {!canManage ? (
-            <Text style={styles.muted}>
-              {t(
-                'org.activities.ownerOnly',
-                null,
-                'Only organization owners/admins can edit activities.',
-              )}
-            </Text>
-          ) : null}
-
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          {message ? <Text style={styles.success}>{message}</Text> : null}
-          {showPublicListingCta ? (
-            <View style={styles.ctaBox}>
-              <Text style={styles.ctaText}>
-                {t(
-                  'org.activities.publicListingCta',
-                  null,
-                  'Public listing is on for your service center. Review it anytime — this is optional.',
-                )}
-              </Text>
-              <View style={styles.ctaActions}>
-                <Button
-                  mode="outlined"
-                  onPress={() => navigateToOrgPublicProfile(navigation, { orgId })}
-                  style={styles.ctaBtn}
-                  textColor={COLORS.PRIMARY}
-                >
-                  {t('org.activities.publicListingButton', null, 'Review public listing')}
-                </Button>
-                <Button
-                  mode="text"
-                  onPress={() => setShowPublicListingCta(false)}
-                  textColor={ON_CARD_MUTED}
-                >
-                  {t('org.activities.publicListingDismiss', null, 'Not now')}
-                </Button>
-              </View>
-            </View>
-          ) : null}
-
-          {canManage ? (
-            <Button
-              mode="contained"
-              onPress={save}
-              loading={busy}
-              disabled={busy || loading || selected.length === 0}
-              style={styles.save}
-              buttonColor={COLORS.PRIMARY}
-              textColor={COLORS.ON_PRIMARY}
-            >
-              {t('org.activities.save', null, 'Save activities')}
-            </Button>
-          ) : null}
-        </AppCard>
+        {body}
       </ScrollView>
     </ScreenBackground>
   );

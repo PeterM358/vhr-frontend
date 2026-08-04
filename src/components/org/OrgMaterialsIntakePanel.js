@@ -37,7 +37,7 @@ import { STORAGE_KEYS } from '../../constants/storageKeys';
 import { useTranslation } from '../../i18n';
 import { fetchUnits } from '../../api/partCatalog';
 import UnitOfMeasurePicker from './UnitOfMeasurePicker';
-import { navigateToOrgLegalEntity } from '../../navigation/webNavigation';
+import { navigateToOrgCompanyAccount } from '../../navigation/webNavigation';
 
 /** Text on light AppCard / FloatingCard surfaces. */
 const ON_CARD = '#0F172A';
@@ -885,9 +885,9 @@ export default function OrgMaterialsIntakePanel({
             <Button
               mode="contained"
               onPress={() =>
-                navigateToOrgLegalEntity(navigation, {
+                navigateToOrgCompanyAccount(navigation, {
                   orgId: organizationId,
-                  returnTo: 'OrgWarehouse',
+                  tab: 'company',
                 })
               }
               style={styles.primaryBtn}

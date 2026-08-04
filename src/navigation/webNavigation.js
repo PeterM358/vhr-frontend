@@ -72,6 +72,7 @@ import {
   partnerOrganizationLegalEntity,
   partnerOrganizationActivities,
   partnerOrganizationPublicProfile,
+  partnerOrganizationCompanyAccount,
   partnerOrganizationWorkforce,
   partnerOrganizationWorkforceMember,
   partnerBusinessNetwork,
@@ -1393,6 +1394,37 @@ export function navigateToOrgPublicProfile(navigation, params = {}) {
     return;
   }
   navigation.navigate('OrgHome', { screen: 'OrgPublicProfile', params: routeParams });
+}
+
+export function navigateToOrgCompanyAccount(navigation, params = {}) {
+  const routeParams = params.orgId != null ? { organizationId: params.orgId, ...params } : { ...params };
+  if (params.tab) routeParams.tab = params.tab;
+  const orgAccountRoute = {
+    name: 'OrgHome',
+    state: {
+      index: 1,
+      routes: [
+        { name: 'OrgOverview' },
+        {
+          name: 'OrgCompanyAccount',
+          params: Object.keys(routeParams).length ? routeParams : undefined,
+        },
+      ],
+    },
+  };
+  if (Platform.OS === 'web') {
+    const pathParams = {};
+    if (params.orgId != null) pathParams.organizationId = params.orgId;
+    else if (params.organizationId != null) pathParams.organizationId = params.organizationId;
+    if (params.tab) pathParams.tab = params.tab;
+    resetPartnerStackWebRoutes(
+      navigation,
+      [orgAccountRoute],
+      partnerOrganizationCompanyAccount(pathParams),
+    );
+    return;
+  }
+  navigation.navigate('OrgHome', { screen: 'OrgCompanyAccount', params: routeParams });
 }
 
 export function navigateToOrgWorkforceMember(navigation, params = {}) {

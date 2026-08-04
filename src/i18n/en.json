@@ -216,6 +216,7 @@
       "notifications": "Notifications",
       "companySection": "Company / Profile",
       "company": "Company details",
+      "companyAccount": "Company account",
       "activities": "Company activities",
       "account": "My account",
       "profile": "My account"
@@ -224,6 +225,31 @@
       "calendar": "Calendar",
       "notifications": "Notifications",
       "profile": "Profile"
+    },
+    "companyAccount": {
+      "title": "Company account",
+      "backHome": "Dashboard",
+      "backHub": "Company account",
+      "loadError": "Could not load company account.",
+      "statusReady": "Setup complete — public listing can go live",
+      "statusProgress": "Finish the checklist to complete your company setup",
+      "continueSetup": "Continue setup",
+      "fix": "Fix",
+      "accountLead": "Personal login, nickname, and notification preferences for your user — separate from company details.",
+      "openMyAccount": "Open my account",
+      "tabs": {
+        "company": "Company",
+        "activities": "Activities",
+        "public": "Public",
+        "account": "Account"
+      },
+      "check": {
+        "activities": "Choose company activities",
+        "serviceCenter": "Include service center activity",
+        "publicEnabled": "Public listing enabled",
+        "publicSlug": "Public URL slug set",
+        "legal": "Company legal details filled"
+      }
     },
     "calendar": {
       "title": "Org calendar",
@@ -243,9 +269,9 @@
       "pleasantWork": "Pleasant work with {org}",
       "modules": "Workspace",
       "openServiceCenter": "Open service center workspace",
-      "serviceListingTitle": "Public listing",
-      "serviceListingBody": "Your service center can appear publicly. Find settings under Company / Profile → Public profile when you need them.",
-      "serviceListingButton": "Open public profile",
+      "serviceListingTitle": "Company setup",
+      "serviceListingBody": "Finish company setup (legal details, public URL) so customers can find your service center.",
+      "serviceListingButton": "Open setup",
       "serviceListingDismiss": "Dismiss",
       "importFleetLater": "Import fleet later",
       "requestRepair": "Service request",
