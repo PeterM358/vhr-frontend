@@ -244,7 +244,11 @@ export default function OrganizationHomeScreen() {
       showGreetingToast(person, displayOrg);
       try {
         if (driverLike) {
-          const data = await listWorkOrders(token, resolved, { mine: 1 });
+          const data = await listWorkOrders(token, resolved, {
+            mine: 1,
+            status: 'open',
+            compact: 1,
+          });
           setTasks(Array.isArray(data?.results) ? data.results : []);
           setFleetCount(null);
           setNotReadyCount(null);

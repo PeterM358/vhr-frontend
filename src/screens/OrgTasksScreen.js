@@ -781,7 +781,7 @@ export default function OrgTasksScreen({ navigation, route }) {
         setRows([]);
         return;
       }
-      const params = {};
+      const params = { compact: 1 };
       if (filterFrom) params.from = filterFrom;
       if (filterTo) params.to = filterTo;
       setAccessToken(token || '');
