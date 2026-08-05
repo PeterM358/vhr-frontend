@@ -2573,6 +2573,15 @@
     "providerTitle": "Provider",
     "notesTitle": "Notes & evidence"
   },
+  "repairWizard": {
+    "overviewTitle": "Overview",
+    "operationsTitle": "Operations",
+    "partsTitle": "Parts & labor",
+    "finalizeTitle": "Finalize",
+    "finalize": "Finalize repair",
+    "done": "Done",
+    "finalizeTypeRequired": "Choose a final service type before finalizing."
+  },
   "addObligationPayment": {
     "title": "Obligation",
     "sectionTitle": "Obligation or payment",

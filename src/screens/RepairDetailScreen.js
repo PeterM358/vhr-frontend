@@ -127,6 +127,8 @@ import {
 } from '../utils/shopErpAccess';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import FinalizeOdometerEvidenceSheet from '../components/repair/FinalizeOdometerEvidenceSheet';
+import { WizardEngine, createMemoryAdapter } from '../wizard';
+import { SHOP_REPAIR_WIZARD_STEPS } from './repair/ShopRepairWizardSteps';
 import RepairInvoicingCard from '../components/shop/RepairInvoicingCard';
 
 function resolveEffectiveServiceTypeId(finalRepairTypeId, repair) {
@@ -268,6 +270,7 @@ export default function RepairDetailScreen({ route, navigation }) {
   const onBack = returnTo || route.params?.backLabel || route.params?.backLabelKey ? handleBack : fallbackBack;
   const { setNotifications, refreshUnreadFromRest } = useContext(WebSocketContext);
   const theme = useTheme();
+  const shopRepairWizardAdapter = useMemo(() => createMemoryAdapter({}), []);
 
   const [repair, setRepair] = useState(null);
   const [repairParts, setRepairParts] = useState([]);
@@ -2651,39 +2654,7 @@ export default function RepairDetailScreen({ route, navigation }) {
     );
   };
 
-  return (
-    <>
-    <ScreenBackground safeArea={false}>
-      {isShop ? (
-        <PartnerAppHeader
-          title={navTitle}
-          backLabel={backLabel}
-          onBack={onBack}
-          iconOnlyBack={Boolean(backLabel && String(backLabel).length > 8)}
-          showBack={Boolean(returnTo || route.params?.backLabel || route.params?.backLabelKey || navigation.canGoBack?.())}
-          scrolled={scrolled}
-        />
-      ) : (
-        <AppNavigationBar
-          title={navTitle}
-          backLabel={backLabel}
-          onBack={onBack}
-          iconOnlyBack={Boolean(backLabel && String(backLabel).length > 8)}
-          showBack={Boolean(returnTo || route.params?.backLabel || route.params?.backLabelKey || navigation.canGoBack?.())}
-          scrolled={scrolled}
-        />
-      )}
-      <ScrollView
-        key={`repair-${repair.id}-${repair.status}`}
-        onScroll={onScroll}
-        scrollEventThrottle={scrollEventThrottle}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[
-          styles.listContent,
-          { paddingTop: 12 },
-        ]}
-      >
-          <View>
+  const renderHeroSummaryCard = () => (
             <AppCard variant="dark" style={styles.heroWrap} contentStyle={styles.heroInner}>
               <Pressable
                 disabled={!canOpenVehicleProfile}
@@ -2753,6 +2724,536 @@ export default function RepairDetailScreen({ route, navigation }) {
                 </View>
               </Pressable>
             </AppCard>
+  );
+
+  const useShopRepairWizard = Boolean(isShop && isMyShopRepair && !isDone);
+
+  const renderShopWizardOverviewStep = () => (
+    <>
+      {renderHeroSummaryCard()}
+      {isShop && pendingReschedule?.status === 'pending' && pendingFromOwner ? (
+        <FloatingCard style={styles.rescheduleCard}>
+          <Text style={styles.cardTitle}>Client suggested new time</Text>
+          <Text style={styles.detailLine}>
+            Proposed:{' '}
+            {pendingReschedule.proposed_start
+              ? new Date(pendingReschedule.proposed_start).toLocaleString()
+              : '—'}
+          </Text>
+          {pendingReschedule.note ? (
+            <Text style={styles.mutedText}>Note: {pendingReschedule.note}</Text>
+          ) : null}
+          <View style={styles.rescheduleActions}>
+            <Button
+              mode="contained"
+              onPress={() => handleShopRescheduleResponse('accept')}
+              loading={respondingReschedule}
+              disabled={respondingReschedule}
+            >
+              Accept
+            </Button>
+            <Button
+              mode="outlined"
+              onPress={() => handleShopRescheduleResponse('decline')}
+              disabled={respondingReschedule}
+            >
+              Decline
+            </Button>
+          </View>
+        </FloatingCard>
+      ) : null}
+      {!isDone &&
+      isShop &&
+      isMyShopRepair &&
+      !vehicleAtShop &&
+      repair.scheduled_start ? (
+        <FloatingCard style={styles.rescheduleCard}>
+          <Text style={styles.cardTitle}>Awaiting arrival</Text>
+          <Text style={styles.detailLine}>
+            Appointment: {new Date(repair.scheduled_start).toLocaleString()}
+          </Text>
+          {repair.client_arrival_reported_at ? (
+            <Text style={styles.mutedText}>
+              Client checked in at{' '}
+              {new Date(repair.client_arrival_reported_at).toLocaleString()}. Confirm when the
+              vehicle is on site.
+            </Text>
+          ) : (
+            <Text style={styles.mutedText}>
+              Mark arrived once the vehicle is physically at your center.
+            </Text>
+          )}
+          <Button
+            mode="contained"
+            onPress={handleShopArrival}
+            loading={respondingArrival}
+            disabled={respondingArrival || cancelingAppointment}
+            style={styles.arrivalButton}
+          >
+            Vehicle arrived
+          </Button>
+          {showCancelAppointment ? (
+            <Button
+              mode="outlined"
+              onPress={handleCancelAppointment}
+              loading={cancelingAppointment}
+              disabled={cancelingAppointment || respondingArrival}
+              style={styles.cancelAppointmentButton}
+              textColor="#B91C1C"
+            >
+              {t('repairs.detail.cancelAppointment')}
+            </Button>
+          ) : null}
+        </FloatingCard>
+      ) : null}
+      {isShop &&
+      isMyShopRepair &&
+      !isDone &&
+      repair?.shop_data_access_scope !== 'owner_grant' &&
+      repair?.shop_data_access_scope !== 'authorized_mechanical' ? (
+        <FloatingCard style={styles.rescheduleCard}>
+          <Text style={styles.cardTitle}>{t('repairs.detail.historyAccess.cardTitle')}</Text>
+          {!historyAccessRequest ? (
+            <>
+              <Text style={styles.mutedText}>{t('repairs.detail.historyAccess.cardHint')}</Text>
+              <Button
+                mode="contained"
+                onPress={handleRequestVehicleHistory}
+                loading={requestingHistoryAccess}
+                disabled={requestingHistoryAccess}
+                style={styles.arrivalButton}
+              >
+                {t('repairs.detail.historyAccess.requestButton')}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Text style={styles.detailLine}>
+                {t('repairs.detail.historyAccess.scope')}: {historyAccessRequest.requested_scope}
+              </Text>
+              <Text style={styles.detailLine}>
+                {t('repairs.detail.historyAccess.duration')}:{' '}
+                {historyAccessRequest.requested_duration}
+              </Text>
+              <Text style={styles.detailLine}>
+                {t('repairs.detail.historyAccess.status')}:{' '}
+                {historyAccessRequest.status === 'pending'
+                  ? t('repairs.detail.historyAccess.waiting')
+                  : historyAccessRequest.status}
+              </Text>
+              {historyAccessRequest.authorization_code ? (
+                <Text style={[styles.cardTitle, { marginTop: 8 }]}>
+                  {historyAccessRequest.authorization_code}
+                </Text>
+              ) : null}
+              {historyAccessRequest.qr_payload ? (
+                <Text style={styles.mutedText} selectable>
+                  {historyAccessRequest.qr_payload}
+                </Text>
+              ) : null}
+              {historyAccessRequest.status === 'pending' ? (
+                <Button
+                  mode="outlined"
+                  onPress={refreshHistoryAccessRequest}
+                  style={styles.arrivalButton}
+                >
+                  {t('repairs.detail.historyAccess.refresh')}
+                </Button>
+              ) : null}
+            </>
+          )}
+        </FloatingCard>
+      ) : null}
+      <FloatingCard>
+        <Text style={styles.cardTitle}>Request details</Text>
+        {repair.symptoms ? <Text style={styles.detailLine}>Symptoms: {repair.symptoms}</Text> : null}
+        {repair.description ? (
+          <Text style={styles.detailLine}>Description: {repair.description}</Text>
+        ) : null}
+        {visitDisplayText ? <Text style={styles.detailLine}>{visitDisplayText}</Text> : null}
+        <Text style={styles.detailLine}>
+          Guarantee requested: {repair.requires_guarantee ? 'Yes' : 'No'}
+        </Text>
+        {repair.preferred_radius_km ? (
+          <Text style={styles.detailLine}>Preferred radius: {repair.preferred_radius_km} km</Text>
+        ) : null}
+        <Text style={styles.detailLine}>Targeting mode: {targetingLabel}</Text>
+      </FloatingCard>
+      {isOpenStatus && isShop
+        ? (() => {
+            const guide = getPartnerRequestGuide(repair, {
+              offers,
+              shopProfileId,
+              vehicleAtShop,
+              isMyShopRepair,
+            });
+            if (!guide) return null;
+            return (
+              <FloatingCard>
+                <Text style={styles.cardTitle}>{guide.title}</Text>
+                <Text style={styles.mutedText}>{guide.body}</Text>
+              </FloatingCard>
+            );
+          })()
+        : null}
+      {isShop && (repair.shop_data_access_scope || canViewerSeeVehiclePlate) ? (
+        <RelatedServiceHistoryCard
+          payload={relatedServiceHistory}
+          loading={relatedHistoryLoading}
+          onOpenFullRecord={openHistoryRepair}
+        />
+      ) : null}
+      <FloatingCard style={styles.mediaCardCompact}>
+        <Text style={styles.cardTitle}>{t('repairs.detail.photosAndVideos')}</Text>
+        <Text style={styles.mutedText}>
+          {isOpenStatus
+            ? 'Photos and videos attached to this request.'
+            : 'Documentation shared during this repair.'}
+        </Text>
+        {mediaItems.length > 0 ? (
+          <>
+            {imageMediaItems.length > 0 ? (
+              <View style={styles.mediaGrid}>
+                {imageMediaItems.map((m, imgIdx) => (
+                  <View
+                    key={m.id != null ? `img-${m.id}` : `img-legacy-${imgIdx}`}
+                    style={styles.imageMediaCard}
+                  >
+                    <View style={styles.imageMediaCardInner}>
+                      <RepairMediaThumbnail
+                        sourcePath={mediaUrl(m)}
+                        onPress={setSelectedImageUri}
+                        style={styles.imageMediaThumb}
+                      />
+                    </View>
+                    <View style={styles.mediaMetaRow}>
+                      <Text style={styles.mediaType}>Image</Text>
+                      <Text style={styles.mediaDateText}>
+                        {m.created_at ? new Date(m.created_at).toLocaleDateString() : '—'}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            {videoMediaItems.length > 0 ? (
+              <View style={{ marginTop: imageMediaItems.length > 0 ? 10 : 8 }}>
+                {videoMediaItems.map((m, vidIdx) => (
+                  <View
+                    key={m.id != null ? `vid-${m.id}` : `vid-legacy-${vidIdx}`}
+                    style={styles.videoMediaCard}
+                  >
+                    <View style={styles.videoMediaHeaderRow}>
+                      <View style={[styles.videoMediaTop, styles.videoMediaTopGrow]}>
+                        <MaterialCommunityIcons
+                          name="video-outline"
+                          size={20}
+                          color={COLORS.PRIMARY}
+                        />
+                        <Text style={styles.mediaType}>Video</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.mediaCaption} numberOfLines={2}>
+                      {m.description || m.caption || mediaUrl(m)?.split('/').pop() || 'Video'}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </>
+        ) : (
+          <Text style={styles.detailLine}>{t('repairs.detail.noPhotosOrVideos')}</Text>
+        )}
+      </FloatingCard>
+      {renderOffersSection()}
+    </>
+  );
+
+  const renderShopWizardOperationsStep = () => (
+    <>
+      {renderOperationsSection()}
+      {renderRepairTotalsFooter()}
+    </>
+  );
+
+  const renderShopWizardPartsLaborStep = () => (
+    <Card mode="outlined" style={styles.headerCard}>
+      <Card.Title title={t('repairWizard.partsTitle', null, 'Parts & labor')} />
+      <Card.Content>
+        <Text style={styles.mutedText}>Track parts, notes, and labor for this repair.</Text>
+        {vehicleAtShop ? (
+          <View style={styles.serviceStateChip}>
+            <Text style={styles.serviceStateChipText}>Vehicle at service center</Text>
+          </View>
+        ) : null}
+        {shopCanManagePartsOnRepair ? (
+          <View style={{ alignItems: 'flex-start', marginBottom: 8 }}>
+            <Button mode="outlined" onPress={navigateToManageParts}>
+              Manage Parts
+            </Button>
+          </View>
+        ) : null}
+        <Text style={styles.partsSectionLabel}>Parts used</Text>
+        {(selectedParts.length > 0 ? selectedParts : repairParts).length === 0 ? (
+          <Text style={{ fontStyle: 'italic', color: 'gray' }}>No parts recorded yet.</Text>
+        ) : (
+          <>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+              <Text style={{ flex: 2, fontWeight: 'bold' }}>Part</Text>
+              <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>Qty</Text>
+              <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>Price</Text>
+              <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>Labor</Text>
+            </View>
+            {displayPartsList.map((item, index) => (
+              <View key={item.id || index}>{renderRepairPartItem({ item })}</View>
+            ))}
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10 }}>
+              <Text style={{ fontWeight: 'bold', marginRight: 10 }}>Total:</Text>
+              <Text>{formatMoneyAmount(displayPartsTotals.total, DEFAULT_CURRENCY)}</Text>
+            </View>
+          </>
+        )}
+        {renderPartsSupplierSection()}
+        {shopCanFinalizeOngoing ? (
+          <>
+            <Text style={styles.partsSectionLabel}>Repair financial summary</Text>
+            {hasPartsLines ? (
+              <>
+                <Text style={styles.detailLine}>
+                  Parts (from list): {formatMoneyAmount(displayPartsTotals.partsSum, DEFAULT_CURRENCY)}
+                </Text>
+                <Text style={styles.detailLine}>
+                  Labor (from list): {formatMoneyAmount(displayPartsTotals.laborSum, DEFAULT_CURRENCY)}
+                </Text>
+                <Text style={[styles.detailLine, { fontWeight: '600' }]}>
+                  Total: {formatMoneyAmount(displayPartsTotals.total, DEFAULT_CURRENCY)}
+                </Text>
+                <Text style={styles.mutedText}>
+                  Amounts come from your parts list. Edit line items via Manage parts.
+                </Text>
+              </>
+            ) : (
+              <>
+                <TextInput
+                  mode="outlined"
+                  label="Labor price"
+                  keyboardType="numeric"
+                  value={laborPrice}
+                  onChangeText={handleLaborChange}
+                  style={styles.input}
+                />
+                <TextInput
+                  mode="outlined"
+                  label="Parts price"
+                  keyboardType="numeric"
+                  value={partsPrice}
+                  onChangeText={handlePartsChange}
+                  style={styles.input}
+                />
+                <TextInput
+                  mode="outlined"
+                  label="Total price"
+                  keyboardType="numeric"
+                  value={totalPrice}
+                  onChangeText={handleTotalChange}
+                  style={styles.input}
+                />
+                <Text style={styles.mutedText}>
+                  Total updates from labor + parts unless you edit it directly.
+                </Text>
+              </>
+            )}
+            <Text style={styles.mutedText}>All amounts are in {DEFAULT_CURRENCY}.</Text>
+            <Button
+              mode="contained"
+              onPress={() => handleUpdateRepair()}
+              style={styles.progressButton}
+            >
+              Save repair progress
+            </Button>
+          </>
+        ) : isOpenStatus ? (
+          <Text style={styles.mutedText}>
+            Parts and labor editing unlocks once this repair is ongoing at your center.
+          </Text>
+        ) : null}
+      </Card.Content>
+    </Card>
+  );
+
+  const renderShopWizardFinalizeStep = () => (
+    <>
+      {renderShopFinalizeServiceTypeCard()}
+      {shopCanFinalizeOngoing ? (
+        <FloatingCard style={styles.lightActionCard}>
+          <Text style={styles.cardSectionTitle}>
+            {t('repairWizard.finalizeTitle', null, 'Finalize')}
+          </Text>
+          <TextInput
+            mode="outlined"
+            placeholder="Shop notes"
+            value={shopDescription}
+            onChangeText={setShopDescription}
+            style={styles.input}
+            multiline
+          />
+          <TextInput
+            mode="outlined"
+            label="Final vehicle kilometers"
+            keyboardType="numeric"
+            value={finalKilometers}
+            onChangeText={(text) => {
+              setFinalKilometers(text);
+              if (finalizeKmError) setFinalizeKmError('');
+            }}
+            style={styles.input}
+            error={Boolean(finalizeKmError)}
+          />
+          {finalizeKmError ? <Text style={styles.errorText}>{finalizeKmError}</Text> : null}
+          <Button
+            mode="outlined"
+            icon="camera"
+            onPress={handlePickDashboardPhoto}
+            style={styles.dashboardPhotoBtn}
+          >
+            {pendingOdometerPhoto ? 'Change dashboard photo' : 'Upload dashboard photo'}
+          </Button>
+          {pendingOdometerPhoto ? (
+            <Text style={styles.mutedText}>
+              Dashboard photo ready — will upload when you save or finalize.
+            </Text>
+          ) : null}
+          <Text style={styles.mutedText}>
+            Used for vehicle history and future service reminders. Defaults to the vehicle odometer
+            (
+            {repair?.vehicle_kilometers != null
+              ? `${Number(repair.vehicle_kilometers).toLocaleString()} km`
+              : 'from profile'}
+            ).
+            {repair?.prior_max_odometer_km != null
+              ? ` Previous service record: ${Number(repair.prior_max_odometer_km).toLocaleString()} km.`
+              : ''}
+          </Text>
+          {renderPaymentStatusSelector()}
+          <TextInput
+            mode="outlined"
+            label="Warranty months"
+            keyboardType="numeric"
+            value={warrantyMonths}
+            onChangeText={setWarrantyMonths}
+            style={styles.input}
+          />
+          <Button
+            mode="contained"
+            onPress={() => handleUpdateRepair()}
+            style={styles.progressButton}
+          >
+            Save repair progress
+          </Button>
+          <Button
+            mode="contained"
+            onPress={() => handleFinalizeRepair()}
+            style={styles.progressButton}
+          >
+            {t('repairWizard.finalize', null, 'Finalize repair')}
+          </Button>
+          <Text style={styles.mutedText}>
+            You can finalize before payment is collected — update payment status later from the
+            completed record when needed.
+          </Text>
+        </FloatingCard>
+      ) : (
+        <FloatingCard style={styles.lightActionCard}>
+          <Text style={styles.cardTitle}>
+            {t('repairWizard.finalizeTitle', null, 'Finalize')}
+          </Text>
+          <Text style={styles.mutedText}>
+            Finalize unlocks when the repair is ongoing at your center. Use Overview for arrival
+            and booking steps first.
+          </Text>
+        </FloatingCard>
+      )}
+    </>
+  );
+
+  const validateShopFinalizeStep = () => {
+    if (!shopCanFinalizeOngoing) return { ok: true };
+    if (!String(finalRepairTypeId || '').trim()) {
+      const msg = t(
+        'repairWizard.finalizeTypeRequired',
+        null,
+        'Choose a final service type before finalizing.'
+      );
+      setFinalizeTypeError(msg);
+      return { ok: false, message: msg };
+    }
+    return { ok: true };
+  };
+
+  const shopRepairWizardContext = {
+    renderOverviewStep: renderShopWizardOverviewStep,
+    renderOperationsStep: renderShopWizardOperationsStep,
+    renderPartsLaborStep: renderShopWizardPartsLaborStep,
+    renderFinalizeStep: renderShopWizardFinalizeStep,
+    validateFinalizeStep: validateShopFinalizeStep,
+  };
+
+  const onShopRepairWizardFinish = async () => {
+    if (shopCanFinalizeOngoing) {
+      await handleFinalizeRepair();
+    }
+  };
+
+  return (
+    <>
+    <ScreenBackground safeArea={false}>
+      {isShop ? (
+        <PartnerAppHeader
+          title={navTitle}
+          backLabel={backLabel}
+          onBack={onBack}
+          iconOnlyBack={Boolean(backLabel && String(backLabel).length > 8)}
+          showBack={Boolean(returnTo || route.params?.backLabel || route.params?.backLabelKey || navigation.canGoBack?.())}
+          scrolled={scrolled}
+        />
+      ) : (
+        <AppNavigationBar
+          title={navTitle}
+          backLabel={backLabel}
+          onBack={onBack}
+          iconOnlyBack={Boolean(backLabel && String(backLabel).length > 8)}
+          showBack={Boolean(returnTo || route.params?.backLabel || route.params?.backLabelKey || navigation.canGoBack?.())}
+          scrolled={scrolled}
+        />
+      )}
+      {useShopRepairWizard ? (
+        <View style={{ flex: 1 }}>
+          <WizardEngine
+            steps={SHOP_REPAIR_WIZARD_STEPS}
+            adapter={shopRepairWizardAdapter}
+            context={shopRepairWizardContext}
+            onFinish={onShopRepairWizardFinish}
+            onExit={onBack}
+            showFinishLater={false}
+            finishLabelKey={
+              shopCanFinalizeOngoing ? 'repairWizard.finalize' : 'repairWizard.done'
+            }
+            nextLabelKey="wizard.continue"
+          />
+        </View>
+      ) : (
+      <ScrollView
+        key={`repair-${repair.id}-${repair.status}`}
+        onScroll={onScroll}
+        scrollEventThrottle={scrollEventThrottle}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingTop: 12 },
+        ]}
+      >
+          <View>
+            {renderHeroSummaryCard()}
 
             {renderShopFinalizeServiceTypeCard()}
 
@@ -3795,6 +4296,7 @@ export default function RepairDetailScreen({ route, navigation }) {
 
           </View>
       </ScrollView>
+      )}
     </ScreenBackground>
     <Modal
       visible={Boolean(selectedImageUri)}

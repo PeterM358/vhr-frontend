@@ -2545,6 +2545,15 @@
     "providerTitle": "Изпълнител",
     "notesTitle": "Бележки и доказателства"
   },
+  "repairWizard": {
+    "overviewTitle": "Преглед",
+    "operationsTitle": "Операции",
+    "partsTitle": "Части и труд",
+    "finalizeTitle": "Финализиране",
+    "finalize": "Финализирай ремонта",
+    "done": "Готово",
+    "finalizeTypeRequired": "Избери финален тип услуга преди финализиране."
+  },
   "addObligationPayment": {
     "title": "Задължение",
     "sectionTitle": "Задължение или плащане",
