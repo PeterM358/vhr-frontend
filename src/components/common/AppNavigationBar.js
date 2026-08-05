@@ -66,6 +66,7 @@ export default function AppNavigationBar({
   scrolled = false,
   compact = false,
   iconOnlyBack = false,
+  showLanguageSelector = false,
   style,
 }) {
   const insets = useSafeAreaInsets();

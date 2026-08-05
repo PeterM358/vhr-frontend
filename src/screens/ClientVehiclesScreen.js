@@ -7,15 +7,19 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 
 import ScreenBackground from '../components/ScreenBackground';
 import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useFabBottomOffset } from '../components/common/StickyFormFooter';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import { useClientDashboardBack } from '../navigation/appNavBarBack';
 import { navigateToVehicleAdd, navigateToVehicleDetail } from '../navigation/webNavigation';
+import { useScrollContentBottomPaddingWithFab } from '../utils/mobileWebInsets';
 import { useTranslation } from '../i18n';
 
 export default function ClientVehiclesScreen({ navigation }) {
   const { t } = useTranslation();
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useClientDashboardBack(navigation);
+  const listBottomPadding = useScrollContentBottomPaddingWithFab(72, 24);
+  const fabBottom = useFabBottomOffset(16);
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isShop, setIsShop] = useState(false);
@@ -122,7 +126,7 @@ export default function ClientVehiclesScreen({ navigation }) {
           keyExtractor={(item) => item.id.toString()}
           onScroll={onScroll}
           scrollEventThrottle={scrollEventThrottle}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPadding }]}
           renderItem={renderVehicle}
           ListEmptyComponent={
             <Text style={styles.emptyText}>{t('vehicles.emptyList')}</Text>
@@ -131,7 +135,7 @@ export default function ClientVehiclesScreen({ navigation }) {
 
         <FAB
           icon="plus"
-          style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+          style={[styles.fab, { backgroundColor: theme.colors.primary, bottom: fabBottom }]}
           onPress={() => navigateToVehicleAdd(navigation)}
           label={t('vehicles.addVehicle')}
           color={theme.colors.onPrimary}
@@ -152,7 +156,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: {
-    paddingBottom: 100,
+    paddingBottom: 24,
   },
   card: {
     backgroundColor: 'rgba(255,255,255,0.94)',
@@ -225,6 +229,5 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 20,
   },
 });

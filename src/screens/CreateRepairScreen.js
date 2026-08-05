@@ -24,7 +24,6 @@ import {
   Portal,
   Dialog,
 } from 'react-native-paper';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 import { API_BASE_URL } from '../api/config';
@@ -54,12 +53,12 @@ import { navigateToRepairRequestDetail } from '../navigation/webNavigation';
 import {
   useScrollContentBottomPaddingWithFooter,
 } from '../utils/mobileWebInsets';
+import StickyFormFooter, { STICKY_FORM_FOOTER_HEIGHT } from '../components/common/StickyFormFooter';
 import { useTranslation } from '../i18n';
 
 export default function CreateRepairScreen({ navigation, route }) {
   const { t, locale } = useTranslation();
-  const insets = useSafeAreaInsets();
-  const scrollBottomPadding = useScrollContentBottomPaddingWithFooter(110);
+  const scrollBottomPadding = useScrollContentBottomPaddingWithFooter(STICKY_FORM_FOOTER_HEIGHT, 24);
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useServiceCentersBack(navigation);
 
@@ -1006,7 +1005,9 @@ export default function CreateRepairScreen({ navigation, route }) {
           ) : null}
         </KeyboardAwareScrollView>
 
-        <View style={[styles.bottomActionBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+        <StickyFormFooter
+          style={styles.bottomActionBar}
+        >
           <Button
             mode="contained"
             onPress={handleSubmitRequest}
@@ -1017,7 +1018,7 @@ export default function CreateRepairScreen({ navigation, route }) {
           >
             {isEditMode ? t('requestService.saveChanges') : t('repairs.sendRequest')}
           </Button>
-        </View>
+        </StickyFormFooter>
       </View>
 
       <Portal>
@@ -1216,15 +1217,9 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   bottomActionBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 12,
-    paddingTop: 10,
     backgroundColor: 'rgba(4,14,30,0.88)',
-    borderTopWidth: 1,
     borderTopColor: 'rgba(148,163,184,0.26)',
+    borderTopWidth: 1,
   },
   sendButton: {
     borderRadius: 12,

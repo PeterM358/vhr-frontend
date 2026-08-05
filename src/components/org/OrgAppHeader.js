@@ -1,6 +1,10 @@
 /**
  * Org workspace chrome: menu + calendar + notifications + profile + logout
  * (mirrors client/partner headers).
+ *
+ * Layout rule (match Bitulait home professionalism):
+ * - Dashboard: hamburger + language on the left; action icons on the right — one row.
+ * - Nested/detail: back on the left; language + action icons in one right cluster — no wrap/stack.
  */
 
 import React, { useCallback, useContext } from 'react';
@@ -46,8 +50,17 @@ export default function OrgAppHeader({
     await logout(navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone);
   }, [navigation, setAuthToken, setIsAuthenticated, setUserEmailOrPhone]);
 
-  const chromeActions = (
-    <View style={styles.rightRow}>
+  const languageSelector = (
+    <CompactLanguageSelector
+      variant="dark"
+      compact
+      presentation={Platform.OS === 'web' ? 'portalDropdown' : 'modal'}
+      style={styles.languageSelector}
+    />
+  );
+
+  const iconActions = (
+    <>
       {showCalendar ? (
         <View style={styles.iconWrap}>
           <GlassNavIconButton
@@ -83,7 +96,7 @@ export default function OrgAppHeader({
         onPress={handleLogout}
         accessibilityLabel={t('common.logout')}
       />
-    </View>
+    </>
   );
 
   if (isDashboard) {
@@ -107,15 +120,10 @@ export default function OrgAppHeader({
               />
               {chrome.menuBadge > 0 ? <Badge style={styles.badge}>{chrome.menuBadge}</Badge> : null}
             </View>
-            <CompactLanguageSelector
-              variant="dark"
-              compact
-              presentation={Platform.OS === 'web' ? 'portalDropdown' : 'modal'}
-              style={styles.languageSelector}
-            />
+            {languageSelector}
           </View>
         }
-        rightAction={chromeActions}
+        rightAction={<View style={styles.rightRow}>{iconActions}</View>}
       />
     );
   }
@@ -131,8 +139,14 @@ export default function OrgAppHeader({
       iconOnlyBack={iconOnlyBack}
       scrolled={scrolled}
       compact={compact}
+      showLanguageSelector={false}
       style={style}
-      rightAction={chromeActions}
+      rightAction={
+        <View style={styles.rightRow}>
+          {languageSelector}
+          {iconActions}
+        </View>
+      }
     />
   );
 }
@@ -142,16 +156,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
   },
   languageSelector: {
-    maxWidth: 92,
+    maxWidth: 80,
+    flexShrink: 0,
   },
   rightRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     justifyContent: 'flex-end',
   },
   iconWrap: {

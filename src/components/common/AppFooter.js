@@ -3,7 +3,7 @@ import { Linking, Platform, StyleSheet, Text, View, useWindowDimensions } from '
 import { useNavigation } from '@react-navigation/native';
 
 import { useTranslation } from '../../i18n';
-import { FOOTER_POLICY_LINKS, localizedPolicyPath, openPolicyPath } from '../../policies/policyPaths';
+import { localizedPolicyPath, openPolicyPath } from '../../policies/policyPaths';
 import { POLICY_SLUGS } from '../../policies/policySlugs';
 
 const CONTACT_HREF = 'mailto:[SUPPORT_EMAIL_PLACEHOLDER]';
@@ -55,29 +55,6 @@ export default function AppFooter() {
     [t]
   );
 
-  const placeholderLinks = useMemo(
-    () => [
-      { label: t('footer.privacyPolicy'), policySlug: POLICY_SLUGS.privacy },
-      { label: t('footer.termsOfService'), policySlug: POLICY_SLUGS.terms },
-      { label: t('footer.cookiePolicy'), policySlug: POLICY_SLUGS.cookies },
-      { label: t('footer.contact'), href: CONTACT_HREF },
-      { label: t('footer.helpCenter'), policySlug: POLICY_SLUGS.support },
-      { label: t('footer.faq') },
-      { label: t('footer.careers') },
-      { label: t('footer.about') },
-      { label: t('footer.twitter') },
-      { label: t('footer.instagram') },
-      { label: t('footer.linkedin') },
-      { label: t('footer.facebook') },
-      { label: t('footer.youtube') },
-      { label: t('footer.github') },
-      { label: t('footer.blog') },
-      { label: t('footer.apiDocs') },
-      { label: t('footer.languageRegion') },
-    ],
-    [t]
-  );
-
   const mainItems = isMobile ? mobileMain : desktopMain;
 
   const renderItem = (item, idx, items, textStyle) => {
@@ -115,12 +92,6 @@ export default function AppFooter() {
       <View style={styles.inner}>
         <View style={styles.mainRow}>
           {mainItems.map((item, idx) => renderItem(item, idx, mainItems, styles.mainText))}
-        </View>
-
-        <View style={styles.placeholderRow}>
-          {placeholderLinks.map((item, idx) =>
-            renderItem(item, idx, placeholderLinks, styles.placeholderText)
-          )}
         </View>
       </View>
     </View>
@@ -169,18 +140,5 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     lineHeight: 16,
     marginHorizontal: 6,
-  },
-  placeholderRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  placeholderText: {
-    color: 'rgba(255,255,255,0.46)',
-    fontSize: 10,
-    fontWeight: '500',
-    lineHeight: 14,
   },
 });

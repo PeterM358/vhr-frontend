@@ -1,28 +1,23 @@
 /**
  * PATH: src/screens/LogServiceRecordScreen.js
  * Completed maintenance/repair work only — not obligations (see AddObligationPaymentScreen).
+ * Multi-step flow via WizardEngine (src/wizard) — same pattern as CreateVehicleScreen.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { StyleSheet, View, Alert, Pressable, Platform } from 'react-native';
+import { StyleSheet, View, Alert, Platform } from 'react-native';
 import ScreenBackground from '../components/ScreenBackground';
 import AppNavigationBar from '../components/common/AppNavigationBar';
-import { useScrollShadow } from '../hooks/useScrollShadow';
 import { useVehicleDetailBack } from '../navigation/appNavBarBack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Picker } from '@react-native-picker/picker';
 import {
   Text,
-  TextInput,
   Button,
   ActivityIndicator,
   Portal,
   Dialog,
 } from 'react-native-paper';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { API_BASE_URL } from '../api/config';
 import { createRepair, requestOwnerLoggedRepairConfirmation } from '../api/repairs';
@@ -44,7 +39,6 @@ import {
 } from '../utils/logServiceRecordFormDraft';
 import {
   knownWorkshopsFromVehicleRepairs,
-  parseProviderPickerValue,
 } from '../utils/knownVehicleWorkshops';
 import * as Location from 'expo-location';
 import {
@@ -52,16 +46,11 @@ import {
   buildProviderPickerOptions,
   distinctProviderCities,
   filterProviderPickerOptions,
-  formatProviderOptionLabel,
   providerOptionsHaveCoordinates,
 } from '../utils/serviceProviderPicker';
 import { STORAGE_KEYS } from '../constants/storageKeys';
-import FloatingCard from '../components/ui/FloatingCard';
-import { COLORS } from '../constants/colors';
-import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePicker';
 import { localDateToIso, isSaneServiceIso } from '../components/vehicle/dateFieldUtils';
 import {
-  OIL_INTERVAL_KM_OPTIONS,
   DEFAULT_OIL_INTERVAL_KM,
   computeNextOilDueKm,
   computeNextOilDueDateIso,
@@ -78,9 +67,6 @@ import {
   pickReceiptOrInvoiceAttachment,
   pickVehiclePhotoAttachment,
 } from '../utils/pickDocumentFile';
-import DocumentAttachmentList, {
-  DocumentAttachmentActions,
-} from '../components/documents/DocumentAttachmentList';
 import { DEFAULT_CURRENCY } from '../constants/currency';
 import {
   analyzeFinalizeKilometers,
@@ -93,13 +79,20 @@ import {
   navigateToVehicleServiceRecordCenterAdd,
 } from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
-import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 import {
   saveServiceRecordFormDraft,
   loadServiceRecordFormDraft,
   loadServiceRecordManualCenterDraft,
   clearServiceRecordDrafts,
 } from '../utils/serviceRecordDraftStorage';
+import { WizardEngine, createMemoryAdapter } from '../wizard';
+import {
+  ServiceRecordTypeStep,
+  ServiceRecordWhenMileageStep,
+  ServiceRecordCostsStep,
+  ServiceRecordProviderStep,
+  ServiceRecordNotesStep,
+} from './serviceRecord/ServiceRecordWizardSteps';
 
 async function applyPostCreateReminderPatches({
   token,
@@ -133,10 +126,8 @@ async function applyPostCreateReminderPatches({
 }
 
 export default function LogServiceRecordScreen({ navigation, route }) {
-  const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const vehicleId = route.params?.vehicleId != null ? String(route.params.vehicleId) : '';
-  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useVehicleDetailBack(navigation, vehicleId);
 
   const todayIso = useMemo(() => localDateToIso(new Date()), []);
@@ -1071,47 +1062,181 @@ export default function LogServiceRecordScreen({ navigation, route }) {
     return { plate, name, km };
   }, [vehicle]);
 
-  const renderCostFields = (showLaborParts) => (
-    <>
-      {showLaborParts ? (
-        <>
-          <Text variant="labelLarge" style={styles.label}>
-            {t('logServiceRecord.labor')}
-          </Text>
-          <TextInput
-            mode="outlined"
-            value={laborPrice}
-            onChangeText={handleLaborChange}
-            keyboardType="decimal-pad"
-            style={styles.input}
-          />
-          <Text variant="labelLarge" style={styles.label}>
-            {t('logServiceRecord.parts')}
-          </Text>
-          <TextInput
-            mode="outlined"
-            value={partsPrice}
-            onChangeText={handlePartsChange}
-            keyboardType="decimal-pad"
-            style={styles.input}
-          />
-        </>
-      ) : null}
-      <Text variant="labelLarge" style={styles.label}>
-        {showLaborParts ? t('logServiceRecord.total') : t('logServiceRecord.totalPaid')}
-      </Text>
-      <TextInput
-        mode="outlined"
-        value={totalPrice}
-        onChangeText={handleTotalChange}
-        keyboardType="decimal-pad"
-        style={styles.input}
-      />
-      <Text style={styles.sectionHint}>
-        {t('logServiceRecord.costsHint')}
-      </Text>
-    </>
+  const validateTypeStep = useCallback(() => {
+    if (!repairTypeId) {
+      return { ok: false, message: t('logServiceRecord.errors.selectType', null, 'Select a service type.') };
+    }
+    return { ok: true };
+  }, [repairTypeId, t]);
+
+  const validateWhenMileageStep = useCallback(() => {
+    const dateIso = resolvedCompletedIso();
+    if (dateIso === undefined) {
+      return { ok: false, message: 'Choose a valid completed date.' };
+    }
+    if (!dateIso) {
+      return { ok: false, message: 'Completed date is required.' };
+    }
+    if (dateIso > todayIso) {
+      return { ok: false, message: 'Completed date cannot be in the future.' };
+    }
+    const fkRaw = parseOdometerKm(finalKilometers);
+    const fk = fkRaw == null && String(finalKilometers ?? '').trim() ? undefined : fkRaw;
+    if (fk === undefined) {
+      return { ok: false, message: 'Kilometers at service must be a whole number or empty.' };
+    }
+    if (variant === 'oil' && fk == null) {
+      return { ok: false, message: 'Kilometers at service are required for an oil service record.' };
+    }
+    if (variant === 'brake_service' && fk == null) {
+      return { ok: false, message: 'Kilometers at service are required for a brake service record.' };
+    }
+    if (variant === 'technical_inspection') {
+      const techValid = resolvedTechnicalValidIso();
+      if (techValid === undefined || !techValid) {
+        return { ok: false, message: 'Valid until / next inspection due date is required.' };
+      }
+    }
+    return { ok: true };
+  }, [
+    resolvedCompletedIso,
+    resolvedTechnicalValidIso,
+    finalKilometers,
+    variant,
+    todayIso,
+  ]);
+
+  const formContext = useMemo(
+    () => ({
+      vehicleSummary,
+      repairTypeId,
+      setRepairTypeId,
+      filteredTypes,
+      variant,
+      todayIso,
+      completedAtIso,
+      setCompletedAtIso,
+      finalKilometers,
+      setFinalKilometers,
+      technicalValidIso,
+      setTechnicalValidIso,
+      oilIntervalKm,
+      setOilIntervalKm,
+      setOilNextDueKmEdited,
+      nextDueKm,
+      setNextDueKm,
+      nextOilDueIso,
+      setNextOilDueIso,
+      setOilNextDueDateEdited,
+      brakeNextCheckKm,
+      setBrakeNextCheckKm,
+      laborPrice,
+      partsPrice,
+      totalPrice,
+      handleLaborChange,
+      handlePartsChange,
+      handleTotalChange,
+      providerMode,
+      setProviderMode,
+      selectedProviderLabel,
+      workshopSummary,
+      manualPhone,
+      manualEmail,
+      openEditManualCenter,
+      openServiceCenterHub,
+      setSelectedShopProfileId,
+      clearManualProviderFields,
+      notes,
+      setNotes,
+      pendingAttachments,
+      handlePickReceipt,
+      handlePickOdometerPhoto,
+      handlePickPhoto,
+      removeAttachment,
+      saving,
+    }),
+    [
+      vehicleSummary,
+      repairTypeId,
+      filteredTypes,
+      variant,
+      todayIso,
+      completedAtIso,
+      finalKilometers,
+      technicalValidIso,
+      oilIntervalKm,
+      nextDueKm,
+      nextOilDueIso,
+      brakeNextCheckKm,
+      laborPrice,
+      partsPrice,
+      totalPrice,
+      handleLaborChange,
+      handlePartsChange,
+      handleTotalChange,
+      providerMode,
+      selectedProviderLabel,
+      workshopSummary,
+      manualPhone,
+      manualEmail,
+      openEditManualCenter,
+      openServiceCenterHub,
+      clearManualProviderFields,
+      notes,
+      pendingAttachments,
+      handlePickReceipt,
+      handlePickOdometerPhoto,
+      handlePickPhoto,
+      saving,
+    ]
   );
+
+  const wizardSteps = useMemo(
+    () => [
+      {
+        id: 'service',
+        titleKey: 'serviceRecordWizard.serviceTitle',
+        title: 'Service type',
+        validate: () => validateTypeStep(),
+        Component: ServiceRecordTypeStep,
+      },
+      {
+        id: 'whenMileage',
+        titleKey: 'serviceRecordWizard.whenMileageTitle',
+        title: 'Date & mileage',
+        validate: () => validateWhenMileageStep(),
+        Component: ServiceRecordWhenMileageStep,
+      },
+      {
+        id: 'costs',
+        titleKey: 'serviceRecordWizard.costsTitle',
+        title: 'Costs',
+        optional: true,
+        Component: ServiceRecordCostsStep,
+      },
+      {
+        id: 'provider',
+        titleKey: 'serviceRecordWizard.providerTitle',
+        title: 'Provider',
+        optional: true,
+        Component: ServiceRecordProviderStep,
+      },
+      {
+        id: 'notes',
+        titleKey: 'serviceRecordWizard.notesTitle',
+        title: 'Notes & evidence',
+        optional: true,
+        Component: ServiceRecordNotesStep,
+      },
+    ],
+    [validateTypeStep, validateWhenMileageStep]
+  );
+
+  const adapter = useMemo(() => createMemoryAdapter({}), []);
+
+  const onWizardFinish = useCallback(async () => {
+    await handleSubmit();
+  }, [handleSubmit]);
 
   if (loading) {
     return <ActivityIndicator animating size="large" style={{ flex: 1 }} />;
@@ -1124,316 +1249,16 @@ export default function LogServiceRecordScreen({ navigation, route }) {
           title={t('vehicles.nav.serviceRecord')}
           backLabel={t('vehicles.vehicle')}
           onBack={handleBack}
-          scrolled={scrolled}
         />
-        <KeyboardAwareScrollView
-          onScroll={onScroll}
-          scrollEventThrottle={scrollEventThrottle}
-          contentContainerStyle={[
-            styles.container,
-            { paddingTop: 12, paddingBottom: 110 + Math.max(insets.bottom, 10) },
-          ]}
-          keyboardShouldPersistTaps="handled"
-          enableResetScrollToCoords={false}
-          enableAutomaticScroll
-          extraScrollHeight={24}
-        >
-          <FloatingCard>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              {t('vehicles.nav.serviceRecord')}
-            </Text>
-            <Text style={styles.subtitle}>
-              {t('logServiceRecord.subtitle')}
-            </Text>
-            {vehicleSummary ? (
-              <View style={styles.vehicleSummaryCard}>
-                <Text style={styles.vehicleSummaryPlate}>{vehicleSummary.plate}</Text>
-                <Text style={styles.vehicleSummaryName}>{vehicleSummary.name}</Text>
-                <Text style={styles.vehicleSummaryKm}>{vehicleSummary.km}</Text>
-              </View>
-            ) : (
-              <Text style={styles.sectionHint}>{t('logServiceRecord.vehicleNotLoaded')}</Text>
-            )}
-          </FloatingCard>
-
-          <FloatingCard>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              {t('logServiceRecord.sections.service')}
-            </Text>
-            <Text variant="labelLarge" style={styles.label}>
-              {t('logServiceRecord.serviceTypeLabel')}
-            </Text>
-            <View style={styles.pickerContainer}>
-              <Picker selectedValue={repairTypeId} onValueChange={setRepairTypeId} style={styles.picker}>
-                <Picker.Item label={t('logServiceRecord.selectType')} value="" />
-                {filteredTypes.map((repairType) => (
-                  <Picker.Item
-                    key={repairType.id}
-                    label={
-                      translateRepairTypeLabel(repairType, t) ||
-                      repairType.name ||
-                      `Type ${repairType.id}`
-                    }
-                    value={String(repairType.id)}
-                  />
-                ))}
-              </Picker>
-            </View>
-          </FloatingCard>
-
-          <FloatingCard>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              {t('logServiceRecord.sections.serviceDateMileage')}
-            </Text>
-            <ServiceRecordDatePicker
-              label={t('logServiceRecord.completedDate')}
-              valueIso={completedAtIso}
-              onChangeIso={setCompletedAtIso}
-              optional={false}
-              maxIso={todayIso}
-              minIso="1950-01-01"
-            />
-            <Text style={styles.sectionHint}>
-              {t('logServiceRecord.completedDateHint')}
-            </Text>
-
-            {(variant === 'oil' || variant === 'brake_service' || variant === 'generic') && (
-              <>
-                <Text variant="labelLarge" style={styles.label}>
-                  {variant === 'generic'
-                    ? t('logServiceRecord.kilometersAtService')
-                    : t('logServiceRecord.kilometersAtServiceRequired')}
-                </Text>
-                <TextInput
-                  mode="outlined"
-                  value={finalKilometers}
-                  onChangeText={setFinalKilometers}
-                  placeholder={t('logServiceRecord.kilometersPlaceholder')}
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-                <Text style={styles.kmHelper}>
-                  {t('logServiceRecord.kilometersHelper')}
-                </Text>
-              </>
-            )}
-
-            {variant === 'technical_inspection' ? (
-              <>
-                <ServiceRecordDatePicker
-                  label={t('logServiceRecord.validUntilInspection')}
-                  valueIso={technicalValidIso}
-                  onChangeIso={setTechnicalValidIso}
-                  optional={false}
-                />
-                <Text style={styles.sectionHint}>
-                  {t('logServiceRecord.inspectionReminderHint')}
-                </Text>
-              </>
-            ) : null}
-
-            {variant === 'oil' ? (
-              <>
-                <Text variant="labelLarge" style={styles.label}>
-                  {t('logServiceRecord.oilChangeInterval')}
-                </Text>
-                <View style={styles.oilIntervalRow}>
-                  {OIL_INTERVAL_KM_OPTIONS.map((opt) => {
-                    const on = oilIntervalKm === opt.km;
-                    return (
-                      <Pressable
-                        key={opt.km}
-                        onPress={() => {
-                          setOilIntervalKm(opt.km);
-                          setOilNextDueKmEdited(false);
-                        }}
-                        style={[styles.oilIntervalChip, on && styles.oilIntervalChipOn]}
-                      >
-                        <Text style={[styles.oilIntervalChipText, on && styles.oilIntervalChipTextOn]}>
-                          {opt.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                <Text variant="labelLarge" style={styles.label}>
-                  {t('logServiceRecord.nextDueKm')}
-                </Text>
-                <TextInput
-                  mode="outlined"
-                  value={nextDueKm}
-                  onChangeText={(text) => {
-                    setOilNextDueKmEdited(true);
-                    setNextDueKm(text);
-                  }}
-                  placeholder={t('logServiceRecord.nextDueKmPlaceholder')}
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-                <ServiceRecordDatePicker
-                  label={t('logServiceRecord.nextDueDate')}
-                  valueIso={nextOilDueIso}
-                  onChangeIso={(iso) => {
-                    setOilNextDueDateEdited(true);
-                    setNextOilDueIso(iso);
-                  }}
-                  optional
-                  minIso={completedAtIso || todayIso}
-                />
-                <Text style={styles.sectionHint}>
-                  {t('logServiceRecord.oilDefaultsHint', {
-                    interval: oilIntervalKm.toLocaleString(),
-                  })}
-                </Text>
-              </>
-            ) : null}
-
-            {variant === 'brake_service' ? (
-              <>
-                <Text variant="labelLarge" style={styles.label}>
-                  {t('logServiceRecord.brakeNextCheckKm')}
-                </Text>
-                <TextInput
-                  mode="outlined"
-                  value={brakeNextCheckKm}
-                  onChangeText={setBrakeNextCheckKm}
-                  placeholder={t('logServiceRecord.brakeNextCheckPlaceholder')}
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-              </>
-            ) : null}
-          </FloatingCard>
-
-          <FloatingCard>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              {t('logServiceRecord.sections.costs')}
-            </Text>
-            {renderCostFields(variant !== 'technical_inspection')}
-          </FloatingCard>
-
-          <FloatingCard>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              {t('logServiceRecord.sections.serviceProvider')}
-            </Text>
-            <Text style={styles.sectionHint}>
-              {t('logServiceRecord.providerHint')}
-            </Text>
-
-            {selectedProviderLabel ? (
-              <View style={styles.manualSummaryCard}>
-                <Text variant="titleSmall" style={styles.unlistedTitle}>
-                  {providerMode === 'self' ? t('logServiceRecord.selfPerformed') : t('logServiceRecord.serviceCenter')}
-                </Text>
-                <Text style={styles.manualSummaryName}>{selectedProviderLabel}</Text>
-                {providerMode === 'manual'
-                  ? workshopSummary.lines.map((line) => (
-                      <Text key={line} style={styles.manualSummaryMeta}>
-                        {line}
-                      </Text>
-                    ))
-                  : null}
-                {providerMode === 'manual' && String(manualPhone || '').trim() ? (
-                  <Text style={styles.manualSummaryMeta}>{manualPhone}</Text>
-                ) : null}
-                {providerMode === 'manual' && String(manualEmail || '').trim() ? (
-                  <Text style={styles.manualSummaryMeta}>{manualEmail}</Text>
-                ) : null}
-                {providerMode === 'manual' ? (
-                  <Text style={styles.manualSummaryHint}>
-                    {t('logServiceRecord.manualCenterHint')}
-                  </Text>
-                ) : null}
-                <View style={styles.manualSummaryActions}>
-                  {providerMode === 'manual' ? (
-                    <Button mode="outlined" compact onPress={openEditManualCenter}>
-                      {t('logServiceRecord.edit')}
-                    </Button>
-                  ) : null}
-                  <Button mode="outlined" compact onPress={openServiceCenterHub}>
-                    {t('logServiceRecord.change')}
-                  </Button>
-                  <Button
-                    mode="text"
-                    compact
-                    onPress={() => {
-                      setProviderMode(null);
-                      setSelectedShopProfileId('');
-                      clearManualProviderFields();
-                    }}
-                  >
-                    {t('logServiceRecord.remove')}
-                  </Button>
-                </View>
-              </View>
-            ) : (
-              <Button
-                mode="outlined"
-                icon={() => (
-                  <MaterialCommunityIcons name="account-hard-hat" size={20} color={COLORS.PRIMARY} />
-                )}
-                onPress={openServiceCenterHub}
-                style={styles.unlistedToggleBtn}
-              >
-                {t('logServiceRecord.whoPerformed')}
-              </Button>
-            )}
-          </FloatingCard>
-
-          <FloatingCard>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              {t('logServiceRecord.sections.notesEvidence')}
-            </Text>
-            <Text variant="labelLarge" style={styles.label}>
-              {t('logServiceRecord.notes')}
-            </Text>
-            <TextInput
-              mode="outlined"
-              value={notes}
-              onChangeText={setNotes}
-              placeholder={
-                variant === 'technical_inspection'
-                  ? t('logServiceRecord.notesPlaceholderInspection')
-                  : t('logServiceRecord.notesPlaceholderDefault')
-              }
-              style={styles.input}
-              multiline
-            />
-            <Text variant="labelLarge" style={[styles.label, styles.attachmentsLabel]}>
-              {t('logServiceRecord.attachmentsOptional')}
-            </Text>
-            <Text style={styles.sectionHint}>
-              {t('logServiceRecord.odometerPhotoHint')}
-            </Text>
-            <DocumentAttachmentActions
-              onAddReceipt={handlePickReceipt}
-              onAddOdometerPhoto={handlePickOdometerPhoto}
-              onAddPhoto={handlePickPhoto}
-              disabled={saving}
-            />
-            <DocumentAttachmentList
-              attachments={pendingAttachments}
-              onRemove={removeAttachment}
-              emptyHint={t('logServiceRecord.attachmentsEmptyHint')}
-            />
-            <Text style={styles.sectionHint}>
-              {t('logServiceRecord.attachmentsAfterSaveHint')}
-            </Text>
-          </FloatingCard>
-        </KeyboardAwareScrollView>
-
-        <View style={[styles.bottomActionBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-          <Button
-            mode="contained"
-            onPress={handleSubmit}
-            loading={saving}
-            disabled={saving}
-            style={styles.sendButton}
-            contentStyle={styles.sendButtonContent}
-          >
-            {t('logServiceRecord.save')}
-          </Button>
-        </View>
+        <WizardEngine
+          steps={wizardSteps}
+          adapter={adapter}
+          context={formContext}
+          onFinish={onWizardFinish}
+          onExit={handleBack}
+          showFinishLater={false}
+          finishLabelKey="logServiceRecord.save"
+        />
       </View>
 
       <Portal>
@@ -1455,182 +1280,4 @@ export default function LogServiceRecordScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  container: {
-    padding: 12,
-    gap: 8,
-  },
-  sectionTitle: {
-    color: COLORS.TEXT_DARK,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  subtitle: {
-    color: COLORS.TEXT_MUTED,
-    fontSize: 14,
-    marginBottom: 10,
-    lineHeight: 20,
-  },
-  sectionHint: {
-    color: COLORS.TEXT_MUTED,
-    marginBottom: 10,
-    fontSize: 13,
-  },
-  kmHelper: {
-    color: COLORS.TEXT_MUTED,
-    fontSize: 13,
-    marginBottom: 8,
-    lineHeight: 18,
-  },
-  label: {
-    marginTop: 10,
-    marginBottom: 4,
-    fontWeight: '600',
-  },
-  input: {
-    marginBottom: 8,
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    marginBottom: 10,
-    backgroundColor: '#fff',
-  },
-  picker: {
-    width: '100%',
-  },
-  providerFilterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  providerFilterHint: {
-    flex: 1,
-    color: COLORS.TEXT_MUTED,
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  providerFilterCount: {
-    color: COLORS.TEXT_MUTED,
-    fontSize: 12,
-    marginBottom: 6,
-  },
-  oilIntervalRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  oilIntervalChip: {
-    borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.15)',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#fff',
-  },
-  oilIntervalChipOn: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(15,76,129,0.08)',
-  },
-  oilIntervalChipText: {
-    color: COLORS.TEXT_DARK,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  oilIntervalChipTextOn: {
-    color: COLORS.PRIMARY,
-  },
-  vehicleSummaryCard: {
-    borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.1)',
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    padding: 10,
-  },
-  vehicleSummaryPlate: {
-    color: COLORS.TEXT_DARK,
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  vehicleSummaryName: {
-    color: COLORS.TEXT_DARK,
-    marginTop: 2,
-  },
-  vehicleSummaryKm: {
-    color: COLORS.TEXT_MUTED,
-    marginTop: 2,
-    fontSize: 12,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  switchLabel: {
-    fontWeight: '600',
-    color: COLORS.TEXT_DARK,
-  },
-  unlistedToggleBtn: {
-    marginTop: 4,
-    alignSelf: 'stretch',
-  },
-  unlistedTitle: {
-    color: COLORS.TEXT_DARK,
-    fontWeight: '700',
-  },
-  manualSummaryCard: {
-    marginTop: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.1)',
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    padding: 12,
-  },
-  manualSummaryName: {
-    color: COLORS.TEXT_DARK,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  manualSummaryMeta: {
-    color: COLORS.TEXT_MUTED,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  manualSummaryHint: {
-    color: COLORS.TEXT_MUTED,
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: 8,
-  },
-  manualSummaryActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 10,
-  },
-  attachmentsLabel: {
-    marginTop: 12,
-  },
-  bottomActionBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    backgroundColor: 'rgba(245,247,250,0.96)',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(15,23,42,0.12)',
-  },
-  sendButton: {
-    borderRadius: 12,
-  },
-  sendButtonContent: {
-    paddingVertical: 10,
-  },
 });

@@ -65,11 +65,23 @@ export function useScrollContentBottomPadding(extraBottom = 0) {
 
 /**
  * Bottom padding for scroll content above a sticky footer.
- * @param {number} footerHeight — height of the fixed bottom bar (e.g. 110)
+ * @param {number} footerHeight — height of the fixed bottom bar (e.g. 72–110)
  * @param {number} [extraBottom=0]
  */
 export function useScrollContentBottomPaddingWithFooter(footerHeight, extraBottom = 0) {
   const insets = useSafeAreaInsets();
   const chromeBottom = useMobileWebBrowserChromeBottom();
   return footerHeight + Math.max(insets.bottom, chromeBottom, 10) + extraBottom;
+}
+
+/**
+ * Bottom padding for scroll content above a FAB (and optional AppFooter on web).
+ * @param {number} [fabReserve=72]
+ * @param {number} [extraBottom=0]
+ */
+export function useScrollContentBottomPaddingWithFab(fabReserve = 72, extraBottom = 0) {
+  const insets = useSafeAreaInsets();
+  const chromeBottom = useMobileWebBrowserChromeBottom();
+  const footerReserve = Platform.OS === 'web' ? 56 : 0;
+  return fabReserve + footerReserve + Math.max(insets.bottom, chromeBottom, 10) + extraBottom;
 }

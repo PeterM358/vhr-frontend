@@ -2519,10 +2519,18 @@
     "attachmentsAfterSaveHint": "Файловете се свързват със сервизния запис след запис. Можеш да добавиш още от екрана с детайли.",
     "backToRecord": "Запис",
     "errors": {
+      "selectType": "Избери тип услуга.",
       "selectCenter": "Избери оторизиран сервиз или друга опция за изпълнител.",
       "noRepairId": "Записано, но не е върнат идентификатор на ремонта."
     },
     "documentsSavedPartial": "Сервизният запис е запазен, но някои документи не се качиха."
+  },
+  "serviceRecordWizard": {
+    "serviceTitle": "Тип услуга",
+    "whenMileageTitle": "Дата и пробег",
+    "costsTitle": "Разходи",
+    "providerTitle": "Изпълнител",
+    "notesTitle": "Бележки и доказателства"
   },
   "addObligationPayment": {
     "title": "Задължение",

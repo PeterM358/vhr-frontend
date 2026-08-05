@@ -268,28 +268,29 @@ const styles = StyleSheet.create({
   sideSlotRightWide: {
     width: 'auto',
     minWidth: 52,
-    maxWidth: 220,
+    maxWidth: 360,
     flexShrink: 0,
   },
   rightRow: {
     flexDirection: 'row',
+    flexWrap: 'nowrap',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: 8,
+    gap: 6,
   },
   rightRowLanguageOnly: {
-    flexWrap: 'nowrap',
     maxWidth: 120,
   },
   rightRowWithAction: {
-    flexWrap: 'wrap',
-    maxWidth: 220,
+    maxWidth: 360,
   },
   languageSelector: {
-    maxWidth: 120,
+    maxWidth: 88,
+    flexShrink: 0,
   },
   languageSelectorCompact: {
-    maxWidth: 96,
+    maxWidth: 80,
+    flexShrink: 0,
   },
   titleWrap: {
     flex: 1,

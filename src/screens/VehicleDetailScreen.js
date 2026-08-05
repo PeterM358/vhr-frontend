@@ -26,8 +26,10 @@ import { getOrgFleetVehicle } from '../api/fleet';
 import ScreenBackground from '../components/ScreenBackground';
 import AppNavigationBar from '../components/common/AppNavigationBar';
 import OrgAppHeader from '../components/org/OrgAppHeader';
+import { useFabBottomOffset } from '../components/common/StickyFormFooter';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import { useVehicleListBack } from '../navigation/appNavBarBack';
+import { useScrollContentBottomPaddingWithFab } from '../utils/mobileWebInsets';
 import AppCard from '../components/ui/AppCard';
 import FloatingCard from '../components/ui/FloatingCard';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -101,6 +103,8 @@ function isObligationReminderType(reminderType) {
 export default function VehicleDetailScreen({ route, navigation }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const scrollBottomPadding = useScrollContentBottomPaddingWithFab(72, 24);
+  const fabBottom = useFabBottomOffset(16);
   const {
     vehicleId,
     mileageIntent: mileageIntentParam,
@@ -1223,7 +1227,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
           scrollEventThrottle={scrollEventThrottle}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingTop: 12 },
+            { paddingTop: 12, paddingBottom: scrollBottomPadding },
           ]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
@@ -1679,7 +1683,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
         <FAB
           icon="plus"
           label={t('vehicles.detail.addActivity')}
-          style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+          style={[styles.fab, { backgroundColor: theme.colors.primary, bottom: fabBottom }]}
           color={theme.colors.onPrimary}
           onPress={handleAddActivity}
         />
@@ -1820,7 +1824,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 12,
-    paddingBottom: 96,
   },
   center: {
     flex: 1,
@@ -2271,6 +2274,5 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 20,
   },
 });

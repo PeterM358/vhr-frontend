@@ -1,6 +1,10 @@
 /**
  * Unified partner chrome: dashboard (menu/logout) or nested (back) + calendar + bell.
  * Wraps AppNavigationBar — does not replace DashboardHero.
+ *
+ * Same chrome layout rule as OrgAppHeader:
+ * - Dashboard: menu + language left; icons right — one row.
+ * - Nested: back left; language + icons in one right cluster — no wrap/stack.
  */
 
 import React from 'react';
@@ -51,8 +55,17 @@ export default function PartnerAppHeader({
   const handleNotifications = onNotificationsPress || chrome.openNotifications;
   const handleMenu = onMenuPress || chrome.openMenu;
 
-  const chromeActions = (
-    <View style={styles.rightRow}>
+  const languageSelector = (
+    <CompactLanguageSelector
+      variant="dark"
+      compact
+      presentation={Platform.OS === 'web' ? 'portalDropdown' : 'modal'}
+      style={styles.languageSelector}
+    />
+  );
+
+  const iconActions = (
+    <>
       {showCalendar ? (
         <View style={styles.iconWrap}>
           <GlassNavIconButton
@@ -90,7 +103,7 @@ export default function PartnerAppHeader({
         />
       ) : null}
       {rightAction}
-    </View>
+    </>
   );
 
   if (isDashboard) {
@@ -112,15 +125,10 @@ export default function PartnerAppHeader({
                 accessibilityLabel="Open menu"
               />
             ) : null}
-            <CompactLanguageSelector
-              variant="dark"
-              compact
-              presentation={Platform.OS === 'web' ? 'portalDropdown' : 'modal'}
-              style={styles.languageSelector}
-            />
+            {languageSelector}
           </View>
         }
-        rightAction={chromeActions}
+        rightAction={<View style={styles.rightRow}>{iconActions}</View>}
         {...rest}
       />
     );
@@ -136,7 +144,13 @@ export default function PartnerAppHeader({
       iconOnlyBack={iconOnlyBack}
       scrolled={scrolled}
       compact={compact}
-      rightAction={chromeActions}
+      showLanguageSelector={false}
+      rightAction={
+        <View style={styles.rightRow}>
+          {languageSelector}
+          {iconActions}
+        </View>
+      }
       style={style}
       {...rest}
     />
@@ -148,16 +162,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
   },
   languageSelector: {
-    maxWidth: 92,
+    maxWidth: 80,
+    flexShrink: 0,
   },
   rightRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     justifyContent: 'flex-end',
   },
   iconWrap: {

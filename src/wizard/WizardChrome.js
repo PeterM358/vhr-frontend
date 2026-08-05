@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '../constants/colors';
 import { useTranslation } from '../i18n';
+import { useMobileWebBrowserChromeBottom } from '../utils/mobileWebInsets';
 import { useWizard } from './WizardContext';
 
 const STATE_COLORS = {
@@ -114,7 +115,10 @@ export default function WizardChrome({
 }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const chromeBottom = useMobileWebBrowserChromeBottom();
+  const footerSafeBottom = Math.max(insets.bottom, chromeBottom, 12);
   const {
+
     steps,
     currentStep,
     index,
@@ -219,7 +223,7 @@ export default function WizardChrome({
         style={{ flex: 1 }}
         contentContainerStyle={[
           styles.body,
-          { paddingBottom: Math.max(insets.bottom, 16) + 120 },
+          { paddingBottom: footerSafeBottom + 120 },
           contentContainerStyle,
         ]}
         keyboardShouldPersistTaps="always"
@@ -233,7 +237,7 @@ export default function WizardChrome({
       {/* Sticky bottom actions */}
       <View
         pointerEvents="box-none"
-        style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}
+        style={[styles.footer, { paddingBottom: footerSafeBottom }]}
       >
         <View style={styles.footerBar}>
           <View style={styles.footerLeft}>

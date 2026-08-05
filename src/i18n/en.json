@@ -2547,10 +2547,18 @@
     "attachmentsAfterSaveHint": "Files are linked to this service record after save. You can add more from the record detail screen later.",
     "backToRecord": "Record",
     "errors": {
+      "selectType": "Select a service type.",
       "selectCenter": "Select an authorized service center or choose another provider option.",
       "noRepairId": "Saved, but no repair id returned."
     },
     "documentsSavedPartial": "Service record saved, but some documents failed to upload."
+  },
+  "serviceRecordWizard": {
+    "serviceTitle": "Service type",
+    "whenMileageTitle": "Date & mileage",
+    "costsTitle": "Costs",
+    "providerTitle": "Provider",
+    "notesTitle": "Notes & evidence"
   },
   "addObligationPayment": {
     "title": "Obligation",

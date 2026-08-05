@@ -32,6 +32,7 @@ import VehicleHealthSection from '../components/dashboard/VehicleHealthSection';
 import RecommendedActionsSection from '../components/dashboard/RecommendedActionsSection';
 import { buildRecommendedActions } from '../utils/dashboardFormatters';
 import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
+import { useFabBottomOffset } from '../components/common/StickyFormFooter';
 import {
   navigateToDocuments,
   navigateToNotifications,
@@ -105,6 +106,7 @@ export default function HomeScreen({ navigation }) {
   const [sessionChecked, setSessionChecked] = useState(false);
   const [driverOrg, setDriverOrg] = useState(null);
   const scrollBottomPadding = useScrollContentBottomPadding(80);
+  const fabBottom = useFabBottomOffset(16);
 
   useFocusEffect(
     useCallback(() => {
@@ -535,7 +537,7 @@ export default function HomeScreen({ navigation }) {
 
       <FAB
         label={fabConfig.label}
-        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+        style={[styles.fab, { backgroundColor: theme.colors.primary, bottom: fabBottom }]}
         color="#fff"
         onPress={fabConfig.onPress}
       />
@@ -602,6 +604,5 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 16,
-    bottom: 20,
   },
 });
