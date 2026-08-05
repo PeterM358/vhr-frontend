@@ -316,14 +316,23 @@ export default function OrgProjectsScreen({ navigation, route }) {
         />
       ) : null}
       <TextInput
-        label={t('org.projects.expectedRevenue', null, 'Expected value (стойност)')}
+        label={t('org.projects.expectedRevenue', null, 'Expected value (€)')}
         value={form.expectedRevenue}
         onChangeText={(v) => setField('expectedRevenue', v)}
         mode="outlined"
         keyboardType="decimal-pad"
+        placeholder={t('org.projects.expectedRevenuePlaceholder', null, '5000')}
+        right={<TextInput.Affix text="€" />}
         style={styles.input}
         textColor={ON_CARD}
       />
+      <Text style={styles.fieldHint}>
+        {t(
+          'org.projects.expectedRevenueHint',
+          null,
+          'Amount in Euro (EUR). Example: 5000',
+        )}
+      </Text>
       <TextInput
         label={t('org.projects.companies', null, 'Companies / counterparties')}
         value={form.companies}
@@ -333,6 +342,13 @@ export default function OrgProjectsScreen({ navigation, route }) {
         style={styles.input}
         textColor={ON_CARD}
       />
+      <Text style={styles.fieldHint}>
+        {t(
+          'org.projects.companiesClientNote',
+          null,
+          'Free-text for now. A shared org client directory (search existing or add new) is planned for projects and invoicing.',
+        )}
+      </Text>
       <Text style={styles.fieldLabel}>{t('org.projects.contact', null, 'Contact')}</Text>
       <TextInput
         label={t('org.projects.contactName', null, 'Contact name')}
@@ -463,7 +479,7 @@ export default function OrgProjectsScreen({ navigation, route }) {
                           ? t(
                               'org.projects.revenueValue',
                               { value: row.expected_revenue },
-                              `Value ${row.expected_revenue}`,
+                              `Value ${row.expected_revenue} €`,
                             )
                           : null,
                       ]
@@ -520,6 +536,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 8,
     textTransform: 'uppercase',
+  },
+  fieldHint: {
+    color: ON_CARD_MUTED,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: -4,
+    marginBottom: 10,
   },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
   chip: {
