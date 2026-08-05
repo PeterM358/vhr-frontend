@@ -1213,6 +1213,14 @@
       "invoicing": "Invoicing",
       "fleetPlanning": "Fleet planning"
     },
+    "fleet": {
+      "area": {
+        "vehicles": "Vehicles",
+        "planning": "Planning table",
+        "vehiclesA11y": "Fleet vehicles",
+        "planningA11y": "Fleet planning table"
+      }
+    },
     "publicProfile": {
       "title": "Public profile",
       "publicTitle": "Company",

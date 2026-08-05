@@ -63,8 +63,10 @@ function isFleetFocusedOrg(org) {
 function buildOrgNavItems(org) {
   const sections = Array.isArray(org?.nav_sections) ? org.nav_sections : [];
   const fleetFocused = isFleetFocusedOrg(org);
+  const FLEET_NESTED_ROUTES = new Set(['OrgFleetPlanning']);
   return sections
     .filter((section) => !(fleetFocused && SHOP_B2B_ORG_ROUTES.has(section.route)))
+    .filter((section) => !FLEET_NESTED_ROUTES.has(section.route))
     .map((section) => section.route);
 }
 
@@ -151,6 +153,18 @@ assert.deepStrictEqual(
     ],
   }),
   ['OrgOverview', 'OrgFleet', 'OrgWarehouse'],
+);
+
+assert.deepStrictEqual(
+  buildOrgNavItems({
+    has_shop_locations: false,
+    roles: [{ role_type: 'TRANSPORT_COMPANY', is_active: true }],
+    nav_sections: [
+      { key: 'fleet', route: 'OrgFleet' },
+      { key: 'planning', route: 'OrgFleetPlanning' },
+    ],
+  }),
+  ['OrgFleet'],
 );
 
 console.log('org workspace nav helpers ok');

@@ -37,6 +37,13 @@ function orgShowsConstructionOpsSurfaces(org) {
   return modules.includes('operations') && modules.includes('fleet');
 }
 
+function orgCanPlanFleet(org) {
+  if (!org || !orgShowsFleetSurfaces(org)) return false;
+  return Boolean(
+    org.can_plan_fleet || org.manage_org_operations || org.manage_fleet,
+  );
+}
+
 assert(orgHasServiceCenterActivity({ activities: ['service_center'] }));
 assert(orgHasServiceCenterActivity({ activities: ['transport', 'service_center'] }));
 assert(!orgHasServiceCenterActivity({ activities: ['transport'] }));
@@ -45,5 +52,7 @@ assert(!isServiceCenterOnlyOrg({ activities: ['transport', 'service_center'] }))
 assert(!orgShowsFleetSurfaces({ activities: ['service_center'], enabled_modules: ['fleet'] }));
 assert(orgShowsFleetSurfaces({ activities: ['transport', 'service_center'] }));
 assert(orgShowsConstructionOpsSurfaces({ activities: ['transport', 'service_center'] }));
+assert(!orgCanPlanFleet({ activities: ['service_center'], manage_fleet: true }));
+assert(orgCanPlanFleet({ activities: ['transport'], can_plan_fleet: true }));
 
 console.log('org workspace SC helpers: OK');

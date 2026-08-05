@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
 import OrgAppHeader from '../components/org/OrgAppHeader';
+import FleetAreaSwitch, { FLEET_AREA } from '../components/org/FleetAreaSwitch';
 import OccupancyMonthBoard from '../components/calendar/OccupancyMonthBoard';
 import { getFleetPlanning, updateWorkOrder } from '../api/orgOperations';
 import { resolveActiveOrganizationId } from '../utils/orgWorkspace';
@@ -16,6 +17,7 @@ import {
 } from '../utils/occupancyCalendar';
 import {
   navigateToOrgCreateTask,
+  navigateToOrgFleet,
   navigateToOrgHome,
   navigateToOrgTasks,
 } from '../navigation/webNavigation';
@@ -191,8 +193,16 @@ export default function OrgFleetPlanningScreen({ navigation, route }) {
     <ScreenBackground>
       <OrgAppHeader
         mode="detail"
-        title={t('org.fleetPlanning.title', null, 'Fleet planning')}
+        title={t('fleet.dashboard.title', null, 'Fleet')}
         onBack={onBack}
+      />
+      <FleetAreaSwitch
+        activeArea={FLEET_AREA.PLANNING}
+        showPlanning
+        onSelectVehicles={() =>
+          navigateToOrgFleet(navigation, { orgId: routeOrgId || orgId })
+        }
+        onSelectPlanning={() => {}}
       />
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}

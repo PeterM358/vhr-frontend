@@ -404,6 +404,14 @@
       "projects": "Проекти",
       "fleetPlanning": "Планиране"
     },
+    "fleet": {
+      "area": {
+        "vehicles": "МПС",
+        "planning": "Планиране",
+        "vehiclesA11y": "Автопарк — превозни средства",
+        "planningA11y": "Автопарк — таблица за планиране"
+      }
+    },
     "publicProfile": {
       "title": "Публичен профил",
       "publicTitle": "Фирма",

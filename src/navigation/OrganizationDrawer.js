@@ -35,6 +35,7 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 import {
   buildOrgNavItems,
   isServiceCenterOnlyOrg,
+  orgCanPlanFleet,
   orgHasModule,
   orgHasServiceCenterActivity,
   orgShowsConstructionOpsSurfaces,
@@ -153,9 +154,7 @@ function CustomDrawerContent(props) {
   const canManageOps = Boolean(
     showOpsSurfaces && (org?.manage_org_operations || org?.manage_fleet),
   );
-  const canPlanFleet = Boolean(
-    showFleetSurfaces && (org?.can_plan_fleet || org?.manage_org_operations || org?.manage_fleet),
-  );
+  const canPlanFleet = orgCanPlanFleet(org);
   const canViewAccounting = Boolean(org?.view_org_accounting);
 
   const departmentItems = useMemo(() => {
@@ -177,6 +176,11 @@ function CustomDrawerContent(props) {
     fromNav.forEach((item) => {
       const route = normalizeOrgRoute(item.route);
       if (seen.has(route)) return;
+      // Planning nests under Fleet (Vehicles | Planning) — never a top-level row.
+      if (route === 'OrgFleetPlanning') {
+        seen.add(route);
+        return;
+      }
       // Company/legal/public profile live in the dedicated section below — never duplicate.
       if (COMPANY_PROFILE_ROUTES.has(route)) {
         seen.add(route);
@@ -206,18 +210,17 @@ function CustomDrawerContent(props) {
       seen.add('OrgTasks');
     }
 
-    if (canPlanFleet && !seen.has('OrgFleetPlanning')) {
-      const tasksIdx = items.findIndex((row) => row.route === 'OrgTasks');
-      const fleetIdx = items.findIndex((row) => row.route === 'OrgFleet');
-      const insertAt =
-        tasksIdx >= 0 ? tasksIdx + 1 : fleetIdx >= 0 ? fleetIdx + 1 : items.length;
+    // Planning nests under Fleet (Vehicles | Planning). Ensure Fleet exists when planners need it.
+    if (canPlanFleet && !seen.has('OrgFleet') && showFleetSurfaces) {
+      const overviewIdx = items.findIndex((row) => row.route === 'OrgOverview');
+      const insertAt = overviewIdx >= 0 ? overviewIdx + 1 : 0;
       items.splice(insertAt, 0, {
-        key: 'fleet-planning',
-        route: 'OrgFleetPlanning',
-        label: t('org.nav.fleetPlanning', null, 'Fleet planning'),
-        icon: 'table-clock',
+        key: 'fleet',
+        route: 'OrgFleet',
+        label: t('org.nav.fleet', null, 'Fleet'),
+        icon: 'truck',
       });
-      seen.add('OrgFleetPlanning');
+      seen.add('OrgFleet');
     }
 
     if (showOpsSurfaces && canManageOps && !seen.has('OrgProjects')) {
@@ -281,7 +284,17 @@ function CustomDrawerContent(props) {
     }
 
     return items;
-  }, [canManageOps, canPlanFleet, canViewAccounting, isDriver, org, scOnly, showOpsSurfaces, t]);
+  }, [
+    canManageOps,
+    canPlanFleet,
+    canViewAccounting,
+    isDriver,
+    org,
+    scOnly,
+    showFleetSurfaces,
+    showOpsSurfaces,
+    t,
+  ]);
 
   const openRoute = (route) => {
     props.navigation.closeDrawer();

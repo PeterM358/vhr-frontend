@@ -7,11 +7,17 @@ import { useFocusEffect } from '@react-navigation/native';
 
 import ScreenBackground from '../components/ScreenBackground';
 import OrgAppHeader from '../components/org/OrgAppHeader';
+import FleetAreaSwitch, { FLEET_AREA } from '../components/org/FleetAreaSwitch';
 import { listOrgFleet, listOrganizations } from '../api/fleet';
 import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
-import { readOrganizationMemberships, resolveIsOrgOnlySession } from '../utils/orgWorkspace';
+import {
+  orgCanPlanFleet,
+  organizationMembershipFor,
+  readOrganizationMemberships,
+  resolveIsOrgOnlySession,
+} from '../utils/orgWorkspace';
 import { resolveIsPartnerSession } from '../utils/partnerSession';
-import { navigateToOrgHome } from '../navigation/webNavigation';
+import { navigateToOrgFleetPlanning, navigateToOrgHome } from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 import { fleetVehicleTitle, mapFleetReadiness } from '../utils/fleetReadinessStatus';
 import { COLORS } from '../styles/colors';
@@ -98,6 +104,7 @@ export default function FleetDashboardScreen({ navigation, route }) {
   const [orgMenuVisible, setOrgMenuVisible] = useState(false);
   const [deptMenuVisible, setDeptMenuVisible] = useState(false);
   const [statusMenuVisible, setStatusMenuVisible] = useState(false);
+  const [canPlanFleet, setCanPlanFleet] = useState(false);
 
   const visibleOrgs = useMemo(
     () => organizations.filter((org) => org.can_view_fleet !== false),
@@ -252,6 +259,20 @@ export default function FleetDashboardScreen({ navigation, route }) {
     ? mapFleetReadiness({ status: readinessStatus }, t).label
     : t('fleet.dashboard.allStatuses');
 
+  useEffect(() => {
+    if (!selectedOrg?.id) return;
+    let cancelled = false;
+    (async () => {
+      const memberships = await readOrganizationMemberships();
+      if (cancelled) return;
+      const membership = organizationMembershipFor(memberships, selectedOrg.id);
+      setCanPlanFleet(orgCanPlanFleet(membership));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedOrg?.id]);
+
   const goServiceRequest = async () => {
     const orgId = selectedOrg?.id || initialOrgId;
     const isOrgOnly = await resolveIsOrgOnlySession();
@@ -272,6 +293,16 @@ export default function FleetDashboardScreen({ navigation, route }) {
   return (
     <ScreenBackground>
       <OrgAppHeader mode="nested" title={t('fleet.dashboard.title')} onBack={onBack} />
+      <FleetAreaSwitch
+        activeArea={FLEET_AREA.VEHICLES}
+        showPlanning={canPlanFleet}
+        onSelectVehicles={() => {}}
+        onSelectPlanning={() =>
+          navigateToOrgFleetPlanning(navigation, {
+            orgId: selectedOrg?.id || initialOrgId,
+          })
+        }
+      />
       <View style={styles.container}>
         <View style={styles.toolbar}>
           <View style={styles.modeRow}>

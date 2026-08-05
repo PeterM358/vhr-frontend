@@ -3,6 +3,7 @@
  */
 import {
   isServiceCenterOnlyOrg,
+  orgCanPlanFleet,
   orgHasServiceCenterActivity,
   orgShowsConstructionOpsSurfaces,
   orgShowsFleetSurfaces,
@@ -23,6 +24,7 @@ describe('org service center workspace helpers', () => {
     expect(isServiceCenterOnlyOrg(scOnly)).toBe(true);
     expect(orgShowsFleetSurfaces(scOnly)).toBe(false);
     expect(orgShowsConstructionOpsSurfaces(scOnly)).toBe(false);
+    expect(orgCanPlanFleet({ ...scOnly, manage_fleet: true })).toBe(false);
   });
 
   it('keeps fleet + ops for transport+SC mixed orgs', () => {
@@ -34,5 +36,6 @@ describe('org service center workspace helpers', () => {
     expect(orgHasServiceCenterActivity(mixed)).toBe(true);
     expect(orgShowsFleetSurfaces(mixed)).toBe(true);
     expect(orgShowsConstructionOpsSurfaces(mixed)).toBe(true);
+    expect(orgCanPlanFleet({ ...mixed, can_plan_fleet: true })).toBe(true);
   });
 });
