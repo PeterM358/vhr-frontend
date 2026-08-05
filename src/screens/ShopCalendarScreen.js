@@ -240,14 +240,16 @@ function groupByDay(items, rangeStart, dayCount = CALENDAR_DAY_COUNT) {
       }
     });
   });
-  buckets.forEach((bucket) => {
-    bucket.items.sort((a, b) => {
-      const aStart = new Date(a.display_start || a.scheduled_start || a.client_preferred_start || 0).getTime();
-      const bStart = new Date(b.display_start || b.scheduled_start || b.client_preferred_start || 0).getTime();
-      return aStart - bStart;
+    buckets.forEach((bucket) => {
+      bucket.items.sort((a, b) => {
+        const aBounds = getJobDayBounds(a);
+        const bBounds = getJobDayBounds(b);
+        const aStart = aBounds ? new Date(aBounds.startIso).getTime() : 0;
+        const bStart = bBounds ? new Date(bBounds.startIso).getTime() : 0;
+        return aStart - bStart;
+      });
     });
-  });
-  return buckets;
+    return buckets;
 }
 
 function BayChip({ bayNumber, t }) {
@@ -729,6 +731,13 @@ export default function ShopCalendarScreen() {
   }, [rangeStart, rangeEnd, t]);
 
   loadCalendarRef.current = loadCalendar;
+
+  // Range changes (Days ‹› / Month ‹› / layout toggle) must refetch. Focus effect
+  // intentionally uses [] + ref to avoid reload storms; without this effect the UI
+  // kept a stale empty payload when navigating toward past ongoing jobs.
+  useEffect(() => {
+    loadCalendarRef.current?.({ force: true });
+  }, [rangeStart, rangeEnd]);
 
   useFocusEffect(
     useCallback(() => {

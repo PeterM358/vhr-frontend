@@ -48,11 +48,17 @@ export function isActiveShopStay(job) {
 /**
  * Bring→ready window used for calendar occupancy (prefers pending proposal display).
  * Active stays extend through today when scheduled_end is missing or already past.
+ * Ongoing / arrived jobs without schedule fields fall back to arrival / created_at
+ * so in-progress cars stay visible on Month + Days.
  * @returns {{ startIso: string, endIso: string, startDay: Date, endDay: Date } | null}
  */
 export function getJobDayBounds(job) {
   if (!job) return null;
-  const startIso = job.display_start || job.scheduled_start || job.client_preferred_start;
+  let startIso = job.display_start || job.scheduled_start || job.client_preferred_start;
+  // In-progress stay with no booking slot: still occupy from arrival / create day.
+  if (!startIso && isActiveShopStay(job)) {
+    startIso = job.vehicle_arrived_at || job.created_at || null;
+  }
   if (!startIso) return null;
   // Prefer display/proposal end; fall back to start when scheduled_end is null.
   let endIso = job.display_end || job.scheduled_end || job.client_preferred_end || startIso;

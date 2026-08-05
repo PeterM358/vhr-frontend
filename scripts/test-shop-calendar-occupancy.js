@@ -31,7 +31,10 @@ function isActiveShopStay(job) {
 
 function getJobDayBounds(job) {
   if (!job) return null;
-  const startIso = job.display_start || job.scheduled_start || job.client_preferred_start;
+  let startIso = job.display_start || job.scheduled_start || job.client_preferred_start;
+  if (!startIso && isActiveShopStay(job)) {
+    startIso = job.vehicle_arrived_at || job.created_at || null;
+  }
   if (!startIso) return null;
   let endIso = job.display_end || job.scheduled_end || job.client_preferred_end || startIso;
   const startDay = dayStartLocal(startIso);
@@ -46,6 +49,18 @@ function getJobDayBounds(job) {
     }
   }
   return { startIso, endIso, startDay, endDay };
+}
+
+/** Mirrors ShopCalendarScreen groupByDay intersection (visibility regression guard). */
+function jobIntersectsRange(job, rangeStart, dayCount) {
+  const bounds = getJobDayBounds(job);
+  if (!bounds) return false;
+  const rangeStartDay = dayStartLocal(rangeStart);
+  const rangeEndDay = dayStartLocal(
+    new Date(rangeStart.getFullYear(), rangeStart.getMonth(), rangeStart.getDate() + dayCount - 1),
+  );
+  if (bounds.endDay < rangeStartDay || bounds.startDay > rangeEndDay) return false;
+  return true;
 }
 
 function getOccupancyRoleForDay(job, dayDate) {
@@ -137,6 +152,29 @@ if (today && today.getTime() > dayStartLocal(new Date(2026, 6, 24)).getTime()) {
     assert.strictEqual(getOccupancyRoleForDay(ongoing, mid), 'stay');
   }
 }
+
+// Ongoing with no schedule fields → created_at / arrived fallback (Mercedes-style)
+const ongoingNoSlot = {
+  id: 100,
+  status: 'ongoing',
+  scheduled_start: null,
+  scheduled_end: null,
+  created_at: new Date(2026, 6, 24, 10, 0).toISOString(),
+};
+assert.strictEqual(getOccupancyRoleForDay(ongoingNoSlot, new Date(2026, 6, 24)), 'bring');
+assert.ok(jobIntersectsRange(ongoingNoSlot, new Date(2026, 6, 20), 14));
+assert.strictEqual(getOccupancyRoleForDay(ongoingNoSlot, new Date(2026, 6, 20)), null);
+
+// Plain single-day booked job must still appear (do not drop non-ongoing)
+const bookedSingle = {
+  id: 101,
+  status: 'open',
+  scheduled_start: new Date(2026, 6, 22, 9, 0).toISOString(),
+  scheduled_end: new Date(2026, 6, 22, 11, 0).toISOString(),
+};
+assert.strictEqual(getOccupancyRoleForDay(bookedSingle, new Date(2026, 6, 22)), 'single');
+assert.ok(jobIntersectsRange(bookedSingle, new Date(2026, 6, 20), 14));
+assert.strictEqual(jobIntersectsRange(bookedSingle, new Date(2026, 7, 3), 14), false);
 
 // Two overlapping multi-day stays → Bay 1 and Bay 2
 const carA = {
