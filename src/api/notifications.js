@@ -10,8 +10,31 @@ import { safeWarn } from '../utils/logger';
 // after a mutation still fetches fresh data.
 const notificationsInFlight = new Map();
 
-export async function getNotifications(token) {
+/** Short TTL so focus + interval + WS confirm do not each hit the network. */
+const NOTIFICATIONS_TTL_MS = 30_000;
+const notificationsCache = new Map();
+
+export function invalidateNotificationsCache(token) {
+  if (token) {
+    notificationsCache.delete(token);
+    return;
+  }
+  notificationsCache.clear();
+}
+
+/**
+ * @param {string} token
+ * @param {{ force?: boolean }} [options] — `force: true` bypasses TTL (after mutations).
+ */
+export async function getNotifications(token, { force = false } = {}) {
   const key = token || '';
+  if (!force) {
+    const cached = notificationsCache.get(key);
+    if (cached && Date.now() - cached.at < NOTIFICATIONS_TTL_MS) {
+      return cached.data;
+    }
+  }
+
   const pending = notificationsInFlight.get(key);
   if (pending) return pending;
 
@@ -20,7 +43,9 @@ export async function getNotifications(token) {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) throw new Error('Failed to fetch notifications');
-    return await response.json();
+    const data = await response.json();
+    notificationsCache.set(key, { at: Date.now(), data });
+    return data;
   })().finally(() => {
     notificationsInFlight.delete(key);
   });
@@ -59,6 +84,7 @@ export async function markNotificationRead(token, id) {
     body: JSON.stringify({ is_read: true }),
   });
   if (!response.ok) throw new Error('Failed to mark as read');
+  invalidateNotificationsCache(token);
   return await response.json();
 }
 
@@ -70,6 +96,7 @@ export async function markAllNotificationsRead(token) {
     },
   });
   if (!response.ok) throw new Error('Failed to mark all as read');
+  invalidateNotificationsCache(token);
   return await response.json();
 }
 
@@ -188,7 +215,7 @@ export async function markRepairNotificationsRead(
   }
 
   if (typeof refreshUnreadFromRest === 'function') {
-    await refreshUnreadFromRest();
+    await refreshUnreadFromRest({ force: true });
   }
 
   return unread.length;

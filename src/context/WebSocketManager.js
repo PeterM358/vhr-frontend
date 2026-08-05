@@ -8,9 +8,10 @@ import React, {
   useContext,
   useCallback,
 } from 'react';
+import { AppState, Platform } from 'react-native';
 import { AuthContext } from './AuthManager';
 import { WS_BASE_URL, WS_ENABLED, wsSkipReason } from '../env';
-import { getNotifications } from '../api/notifications';
+import { getNotifications, invalidateNotificationsCache } from '../api/notifications';
 import { normalizeNotification } from '../utils/normalizeNotification';
 import { devLog, safeError, safeWarn } from '../utils/logger';
 import { markNotificationSeen, resetNotificationDedup } from '../notifications/notificationDedup';
@@ -23,6 +24,17 @@ const MAX_RECONNECT_ATTEMPTS = 8;
 const RECONNECT_BASE_MS = 1000;
 const ABNORMAL_CLOSE_CODE = 1006;
 const RAPID_1006_HINT_THRESHOLD = 3;
+/** Shared REST badge backup — WS is primary when connected. */
+const NOTIFICATIONS_POLL_MS = 60_000;
+/** Coalesce WS-triggered REST confirms so bursts do not spam GET /notifications/. */
+const WS_UNREAD_CONFIRM_DEBOUNCE_MS = 2_500;
+
+function isUiVisible() {
+  if (Platform.OS === 'web' && typeof document !== 'undefined' && document.visibilityState) {
+    return document.visibilityState === 'visible';
+  }
+  return AppState.currentState === 'active';
+}
 
 function redactWsUrl(url) {
   return typeof url === 'string' ? url.replace(/token=[^&]+/, 'token=[redacted]') : '';
@@ -84,14 +96,15 @@ export const WebSocketProvider = ({ children }) => {
   const abnormalCloseCount = useRef(0);
   const intentionalClose = useRef(false);
   const suppressReconnect = useRef(false);
+  const unreadConfirmTimer = useRef(null);
 
-  const refreshUnreadFromRest = useCallback(async () => {
+  const refreshUnreadFromRest = useCallback(async ({ force = false } = {}) => {
     if (!authToken) {
       setUnreadCount(0);
       return;
     }
     try {
-      const data = await getNotifications(authToken);
+      const data = await getNotifications(authToken, { force });
       const rows = (Array.isArray(data) ? data : data?.results ?? []).map(normalizeNotification);
       const unread = rows.filter((row) => !row.is_read).length;
       setUnreadCount(unread);
@@ -101,13 +114,13 @@ export const WebSocketProvider = ({ children }) => {
     }
   }, [authToken]);
 
-  const refreshNotifications = useCallback(async () => {
+  const refreshNotifications = useCallback(async ({ force = false } = {}) => {
     if (!authToken) return;
     try {
-      const data = await getNotifications(authToken);
+      const data = await getNotifications(authToken, { force });
       const rows = (Array.isArray(data) ? data : data?.results ?? []).map(normalizeNotification);
       setNotifications((prev) => mergeNotificationLists(prev, rows));
-      await refreshUnreadFromRest();
+      await refreshUnreadFromRest({ force });
     } catch (error) {
       safeWarn('Failed to refresh notifications', error);
     }
@@ -127,6 +140,7 @@ export const WebSocketProvider = ({ children }) => {
       setUnreadCount(0);
       resetNotificationDedup();
       setWsConnected(false);
+      invalidateNotificationsCache();
       return undefined;
     }
 
@@ -140,6 +154,24 @@ export const WebSocketProvider = ({ children }) => {
         clearTimeout(reconnectTimer.current);
         reconnectTimer.current = null;
       }
+    };
+
+    const clearUnreadConfirmTimer = () => {
+      if (unreadConfirmTimer.current) {
+        clearTimeout(unreadConfirmTimer.current);
+        unreadConfirmTimer.current = null;
+      }
+    };
+
+    /** Optimistic WS badge bump is enough for UX; REST confirm is debounced. */
+    const scheduleUnreadConfirm = () => {
+      clearUnreadConfirmTimer();
+      unreadConfirmTimer.current = setTimeout(() => {
+        unreadConfirmTimer.current = null;
+        if (!cancelled && isUiVisible()) {
+          refreshUnreadFromRest();
+        }
+      }, WS_UNREAD_CONFIRM_DEBOUNCE_MS);
     };
 
     const closeSocket = ({ intentional = true } = {}) => {
@@ -217,7 +249,7 @@ export const WebSocketProvider = ({ children }) => {
           if (normalized && normalized.is_read !== true) {
             setUnreadCount((prev) => Math.max(0, (prev || 0) + 1));
           }
-          refreshUnreadFromRest();
+          scheduleUnreadConfirm();
         } catch (error) {
           safeError('WebSocket message parse failed', error);
         }
@@ -284,16 +316,32 @@ export const WebSocketProvider = ({ children }) => {
       devLog(wsSkipReason());
     }
 
-    // When WS is off or drops, keep navbar badge fresh via REST (all org screens).
-    const pollMs = WS_ENABLED ? 60000 : 20000;
+    // Backup REST poll for badge freshness when WS is off / dropped.
+    // Pause while the tab/app is hidden — was a major source of Network spam.
     const pollId = setInterval(() => {
-      if (!cancelled) refreshUnreadFromRest();
-    }, pollMs);
+      if (!cancelled && isUiVisible()) refreshUnreadFromRest();
+    }, NOTIFICATIONS_POLL_MS);
+
+    const onBecameVisible = () => {
+      if (!cancelled && isUiVisible()) refreshUnreadFromRest();
+    };
+    const onAppStateChange = (next) => {
+      if (next === 'active') onBecameVisible();
+    };
+    const appStateSub = AppState.addEventListener('change', onAppStateChange);
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onBecameVisible);
+    }
 
     return () => {
       cancelled = true;
       clearInterval(pollId);
       clearReconnectTimer();
+      clearUnreadConfirmTimer();
+      appStateSub?.remove?.();
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onBecameVisible);
+      }
       closeSocket({ intentional: true });
     };
   }, [authToken, isAuthenticated, refreshUnreadFromRest]);
