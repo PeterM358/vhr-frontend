@@ -212,7 +212,7 @@
       "title": "Organization",
       "serviceCenter": "Service center",
       "switchCenter": "Switch service center",
-      "calendar": "Calendar",
+      "calendar": "Fleet deadlines",
       "notifications": "Notifications",
       "companySection": "Company / Profile",
       "company": "Company details",
@@ -223,7 +223,7 @@
       "repairs": "Repairs"
     },
     "chrome": {
-      "calendar": "Calendar",
+      "calendar": "Fleet deadlines",
       "notifications": "Notifications",
       "profile": "Profile",
       "companyAccount": "Company account"
@@ -262,7 +262,7 @@
       }
     },
     "calendar": {
-      "title": "Org calendar",
+      "title": "Fleet deadlines",
       "lead": "Fleet readiness deadlines and reminders for your organization.",
       "empty": "No fleet deadlines yet. Add vehicles to see reminders here.",
       "noDeadline": "No deadline set",
@@ -349,7 +349,7 @@
         "openSection": "Open this workspace section.",
         "companyAccountSubtitle": "Legal details, activities, public listing, and setup checklist.",
         "shopSubtitle": "Switch to bay operations, offers, and shop tools.",
-        "calendar": "Calendar",
+        "calendar": "Fleet deadlines",
         "calendarSubtitle": "Fleet readiness deadlines and reminders.",
         "notifications": "Notifications",
         "notificationsSubtitle": "Open your notification inbox.",

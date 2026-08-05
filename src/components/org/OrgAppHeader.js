@@ -66,7 +66,7 @@ export default function OrgAppHeader({
           <GlassNavIconButton
             icon="calendar-month-outline"
             onPress={chrome.openCalendar}
-            accessibilityLabel={t('org.chrome.calendar', null, 'Calendar')}
+            accessibilityLabel={t('org.chrome.calendar', null, 'Fleet deadlines')}
           />
           {chrome.calendarBadgeCount > 0 ? (
             <Badge style={styles.badge}>{chrome.calendarBadgeCount}</Badge>

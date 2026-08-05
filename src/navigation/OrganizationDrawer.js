@@ -431,7 +431,7 @@ function CustomDrawerContent(props) {
         ))}
 
         <DrawerItem
-          label={t('org.drawer.calendar', null, 'Calendar')}
+          label={t('org.drawer.calendar', null, 'Fleet deadlines')}
           onPress={() => openRoute('OrgCalendar')}
           icon={({ color, size }) => (
             <DrawerMenuIcon name="calendar-month-outline" color={color} size={size} />

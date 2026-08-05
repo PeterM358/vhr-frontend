@@ -1,5 +1,5 @@
 /**
- * Org calendar — fleet readiness deadlines and reminders (not shop bay schedule).
+ * Fleet deadlines — readiness deadlines and reminders (not shop bay schedule).
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
@@ -143,7 +143,7 @@ export default function OrgCalendarScreen() {
     <ScreenBackground safeArea={false}>
       <OrgAppHeader
         mode="nested"
-        title={t('org.calendar.title', null, 'Org calendar')}
+        title={t('org.calendar.title', null, 'Fleet deadlines')}
         onBack={onBack}
         showCalendar={false}
       />
