@@ -1,6 +1,6 @@
 /**
- * Vehicles | Planning switcher for the unified Fleet area.
- * Shown on fleet list and fleet planning so both live under one drawer entry.
+ * Vehicles | Planning | Deadlines switcher for the unified Fleet area.
+ * Shown on fleet list, planning, and deadlines so all three live under one drawer entry.
  */
 
 import React from 'react';
@@ -13,6 +13,7 @@ import { useTranslation } from '../../i18n';
 export const FLEET_AREA = {
   VEHICLES: 'vehicles',
   PLANNING: 'planning',
+  DEADLINES: 'deadlines',
 };
 
 function AreaChip({ label, active, onPress, accessibilityLabel }) {
@@ -40,11 +41,13 @@ export default function FleetAreaSwitch({
   activeArea,
   onSelectVehicles,
   onSelectPlanning,
+  onSelectDeadlines,
   showPlanning = true,
+  showDeadlines = true,
   style,
 }) {
   const { t } = useTranslation();
-  if (!showPlanning) return null;
+  if (!showPlanning && !showDeadlines) return null;
 
   return (
     <View style={[styles.wrap, style]} accessibilityRole="tablist">
@@ -54,16 +57,30 @@ export default function FleetAreaSwitch({
         onPress={onSelectVehicles}
         accessibilityLabel={t('org.fleet.area.vehiclesA11y', null, 'Fleet vehicles')}
       />
-      <AreaChip
-        label={t('org.fleet.area.planning', null, 'Planning table')}
-        active={activeArea === FLEET_AREA.PLANNING}
-        onPress={onSelectPlanning}
-        accessibilityLabel={t(
-          'org.fleet.area.planningA11y',
-          null,
-          'Fleet planning table',
-        )}
-      />
+      {showPlanning ? (
+        <AreaChip
+          label={t('org.fleet.area.planning', null, 'Planning table')}
+          active={activeArea === FLEET_AREA.PLANNING}
+          onPress={onSelectPlanning}
+          accessibilityLabel={t(
+            'org.fleet.area.planningA11y',
+            null,
+            'Fleet planning table',
+          )}
+        />
+      ) : null}
+      {showDeadlines ? (
+        <AreaChip
+          label={t('org.fleet.area.deadlines', null, 'Deadlines')}
+          active={activeArea === FLEET_AREA.DEADLINES}
+          onPress={onSelectDeadlines}
+          accessibilityLabel={t(
+            'org.fleet.area.deadlinesA11y',
+            null,
+            'Fleet deadlines',
+          )}
+        />
+      ) : null}
     </View>
   );
 }

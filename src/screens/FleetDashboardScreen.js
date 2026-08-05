@@ -17,7 +17,11 @@ import {
   resolveIsOrgOnlySession,
 } from '../utils/orgWorkspace';
 import { resolveIsPartnerSession } from '../utils/partnerSession';
-import { navigateToOrgFleetPlanning, navigateToOrgHome } from '../navigation/webNavigation';
+import {
+  navigateToOrgCalendar,
+  navigateToOrgFleetPlanning,
+  navigateToOrgHome,
+} from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 import { fleetVehicleTitle, mapFleetReadiness } from '../utils/fleetReadinessStatus';
 import { COLORS } from '../styles/colors';
@@ -84,6 +88,15 @@ export default function FleetDashboardScreen({ navigation, route }) {
   const isWide = width >= 900;
   const initialOrgId = route.params?.organizationId;
   const routeTab = String(route.params?.tab || '').toLowerCase();
+
+  useFocusEffect(
+    useCallback(() => {
+      if (routeTab !== 'deadlines') return undefined;
+      const orgId = route.params?.organizationId || route.params?.orgId || initialOrgId;
+      navigateToOrgCalendar(navigation, orgId != null ? { orgId } : {});
+      return undefined;
+    }, [initialOrgId, navigation, route.params?.orgId, route.params?.organizationId, routeTab]),
+  );
 
   const [organizations, setOrganizations] = useState([]);
   const [selectedOrg, setSelectedOrg] = useState(null);
@@ -299,6 +312,11 @@ export default function FleetDashboardScreen({ navigation, route }) {
         onSelectVehicles={() => {}}
         onSelectPlanning={() =>
           navigateToOrgFleetPlanning(navigation, {
+            orgId: selectedOrg?.id || initialOrgId,
+          })
+        }
+        onSelectDeadlines={() =>
+          navigateToOrgCalendar(navigation, {
             orgId: selectedOrg?.id || initialOrgId,
           })
         }

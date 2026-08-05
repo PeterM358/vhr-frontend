@@ -16,6 +16,7 @@ import {
   shiftMonth,
 } from '../utils/occupancyCalendar';
 import {
+  navigateToOrgCalendar,
   navigateToOrgCreateTask,
   navigateToOrgFleet,
   navigateToOrgHome,
@@ -203,6 +204,9 @@ export default function OrgFleetPlanningScreen({ navigation, route }) {
           navigateToOrgFleet(navigation, { orgId: routeOrgId || orgId })
         }
         onSelectPlanning={() => {}}
+        onSelectDeadlines={() =>
+          navigateToOrgCalendar(navigation, { orgId: routeOrgId || orgId })
+        }
       />
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}

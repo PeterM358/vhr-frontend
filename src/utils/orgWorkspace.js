@@ -112,7 +112,7 @@ export function orgShowsFleetSurfaces(org) {
   return modules.includes('fleet');
 }
 
-/** True when membership may open the fleet planning table (Vehicles | Planning switcher). */
+/** True when membership may open the fleet planning table (Vehicles | Planning | Deadlines). */
 export function orgCanPlanFleet(org) {
   if (!org || !orgShowsFleetSurfaces(org)) return false;
   return Boolean(
@@ -168,8 +168,9 @@ export function buildOrgNavItems(org, t) {
     OrgDocuments: t('org.nav.documents', null, 'Documents'),
     OrgLedger: t('org.nav.accounting', null, 'Accounting'),
     OrgAccounting: t('org.nav.accounting', null, 'Accounting'),
-    // OrgFleetPlanning stays nested under Fleet (Vehicles | Planning) — not a top-level label.
+    // OrgFleetPlanning / OrgCalendar stay nested under Fleet — not top-level labels.
     OrgFleetPlanning: t('org.nav.fleet', null, 'Fleet'),
+    OrgCalendar: t('org.nav.fleet', null, 'Fleet'),
     OrgNetwork: t('org.nav.network', null, 'Business network'),
     OrgTransport: t('org.nav.transport', null, 'Transport'),
     OrgConstruction: t('org.nav.construction', null, 'Construction'),
@@ -181,6 +182,7 @@ export function buildOrgNavItems(org, t) {
   const SC_ONLY_HIDDEN_ROUTES = new Set([
     'OrgFleet',
     'OrgFleetPlanning',
+    'OrgCalendar',
     'OrgOperations',
     'OrgTasks',
     'OrgWorkOrders',
@@ -188,8 +190,8 @@ export function buildOrgNavItems(org, t) {
     'OrgTransport',
     'OrgConstruction',
   ]);
-  // Planning is nested under Fleet — never emit a separate top-level drawer/home nav row.
-  const FLEET_NESTED_ROUTES = new Set(['OrgFleetPlanning']);
+  // Planning + deadlines nest under Fleet — never emit a separate top-level drawer/home nav row.
+  const FLEET_NESTED_ROUTES = new Set(['OrgFleetPlanning', 'OrgCalendar']);
   return sections
     .filter((section) => !(fleetFocused && SHOP_B2B_ORG_ROUTES.has(section.route)))
     .filter((section) => !(scOnly && SC_ONLY_HIDDEN_ROUTES.has(section.route)))

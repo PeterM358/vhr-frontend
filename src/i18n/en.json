@@ -1220,8 +1220,10 @@
       "area": {
         "vehicles": "Vehicles",
         "planning": "Planning table",
+        "deadlines": "Deadlines",
         "vehiclesA11y": "Fleet vehicles",
-        "planningA11y": "Fleet planning table"
+        "planningA11y": "Fleet planning table",
+        "deadlinesA11y": "Fleet deadlines"
       }
     },
     "publicProfile": {

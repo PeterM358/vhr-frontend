@@ -1152,6 +1152,31 @@ export function getPartnerNavigationStateFromPath(path) {
     if (organizationId) {
       params.organizationId = organizationId;
     }
+    const tab = String(query?.tab || '').toLowerCase();
+    // Fleet → Deadlines: prefer calendar screen (same content); keep ?tab=deadlines deep link.
+    if (tab === 'deadlines') {
+      return {
+        routes: [
+          {
+            name: 'OrgHome',
+            state: {
+              index: 1,
+              routes: [
+                { name: 'OrgOverview' },
+                {
+                  name: 'OrgCalendar',
+                  params: Object.keys(params).length ? params : undefined,
+                },
+              ],
+            },
+          },
+        ],
+        index: 0,
+      };
+    }
+    if (tab) {
+      params.tab = tab;
+    }
     return {
       routes: [
         {

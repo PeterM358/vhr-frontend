@@ -176,8 +176,8 @@ function CustomDrawerContent(props) {
     fromNav.forEach((item) => {
       const route = normalizeOrgRoute(item.route);
       if (seen.has(route)) return;
-      // Planning nests under Fleet (Vehicles | Planning) — never a top-level row.
-      if (route === 'OrgFleetPlanning') {
+      // Planning + deadlines nest under Fleet — never a top-level row.
+      if (route === 'OrgFleetPlanning' || route === 'OrgCalendar') {
         seen.add(route);
         return;
       }
@@ -210,7 +210,7 @@ function CustomDrawerContent(props) {
       seen.add('OrgTasks');
     }
 
-    // Planning nests under Fleet (Vehicles | Planning). Ensure Fleet exists when planners need it.
+    // Planning + deadlines nest under Fleet. Ensure Fleet exists when planners need it.
     if (canPlanFleet && !seen.has('OrgFleet') && showFleetSurfaces) {
       const overviewIdx = items.findIndex((row) => row.route === 'OrgOverview');
       const insertAt = overviewIdx >= 0 ? overviewIdx + 1 : 0;
@@ -429,15 +429,6 @@ function CustomDrawerContent(props) {
             {...itemProps}
           />
         ))}
-
-        <DrawerItem
-          label={t('org.drawer.calendar', null, 'Fleet deadlines')}
-          onPress={() => openRoute('OrgCalendar')}
-          icon={({ color, size }) => (
-            <DrawerMenuIcon name="calendar-month-outline" color={color} size={size} />
-          )}
-          {...itemProps}
-        />
 
         <DrawerItem
           label={() => (

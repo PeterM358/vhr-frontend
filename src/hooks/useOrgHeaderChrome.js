@@ -1,5 +1,5 @@
 /**
- * Org workspace header actions: calendar, notifications, company account + unread badge.
+ * Org workspace header actions: calendar (→ Fleet Deadlines), notifications, company account + unread badge.
  */
 
 import { useCallback, useContext, useState } from 'react';

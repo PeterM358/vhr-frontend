@@ -1025,6 +1025,7 @@ export function navigateToOrgHome(navigation, params = {}) {
 }
 
 export function navigateToOrgCalendar(navigation, params = {}) {
+  // Fleet Deadlines segment — same OrgCalendar screen; drawer no longer lists it separately.
   const routeParams = params.orgId != null ? { organizationId: params.orgId, ...params } : params;
   const orgCalendarRoute = {
     name: 'OrgHome',

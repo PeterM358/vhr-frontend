@@ -1,5 +1,6 @@
 /**
  * Fleet deadlines — readiness deadlines and reminders (not shop bay schedule).
+ * Nested under Fleet (Vehicles | Planning | Deadlines); deep link /calendar still works.
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
@@ -7,16 +8,22 @@ import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Text } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 
 import ScreenBackground from '../components/ScreenBackground';
 import OrgAppHeader from '../components/org/OrgAppHeader';
+import FleetAreaSwitch, { FLEET_AREA } from '../components/org/FleetAreaSwitch';
 import { listOrgFleet } from '../api/fleet';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
 import { useTranslation } from '../i18n';
-import { navigateToOrgHome } from '../navigation/webNavigation';
 import {
+  navigateToOrgFleet,
+  navigateToOrgFleetPlanning,
+  navigateToOrgHome,
+} from '../navigation/webNavigation';
+import {
+  orgCanPlanFleet,
   organizationMembershipFor,
   readOrganizationMemberships,
   resolveActiveOrganizationId,
@@ -49,19 +56,25 @@ function formatDeadline(iso, t) {
 
 export default function OrgCalendarScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
   const { t } = useTranslation();
+  const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [org, setOrg] = useState(null);
   const [fleet, setFleet] = useState([]);
+
+  const canPlanFleet = orgCanPlanFleet(org);
+  const orgId = routeOrgId || org?.id;
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const rows = await readOrganizationMemberships();
-      const orgId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_ORGANIZATION_ID);
-      const active = organizationMembershipFor(rows, orgId) || rows[0] || null;
+      const storedOrgId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_ORGANIZATION_ID);
+      const active =
+        organizationMembershipFor(rows, routeOrgId || storedOrgId) || rows[0] || null;
       setOrg(active);
       if (!active?.id) {
         setFleet([]);
@@ -78,7 +91,7 @@ export default function OrgCalendarScreen() {
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [routeOrgId, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -96,8 +109,8 @@ export default function OrgCalendarScreen() {
   }, [fleet]);
 
   const onBack = useCallback(() => {
-    navigateToOrgHome(navigation, { orgId: org?.id });
-  }, [navigation, org?.id]);
+    navigateToOrgHome(navigation, { orgId });
+  }, [navigation, orgId]);
 
   const renderItem = ({ item }) => {
     const readiness = mapFleetReadiness(item.readiness, t);
@@ -111,7 +124,7 @@ export default function OrgCalendarScreen() {
       <Pressable
         onPress={() =>
           navigation.navigate('OrgFleetVehicleDetail', {
-            organizationId: org?.id,
+            organizationId: orgId,
             vehicleId: item.id,
           })
         }
@@ -143,9 +156,16 @@ export default function OrgCalendarScreen() {
     <ScreenBackground safeArea={false}>
       <OrgAppHeader
         mode="nested"
-        title={t('org.calendar.title', null, 'Fleet deadlines')}
+        title={t('fleet.dashboard.title', null, 'Fleet')}
         onBack={onBack}
         showCalendar={false}
+      />
+      <FleetAreaSwitch
+        activeArea={FLEET_AREA.DEADLINES}
+        showPlanning={canPlanFleet}
+        onSelectVehicles={() => navigateToOrgFleet(navigation, { orgId })}
+        onSelectPlanning={() => navigateToOrgFleetPlanning(navigation, { orgId })}
+        onSelectDeadlines={() => {}}
       />
       {loading ? <ActivityIndicator color="#fff" style={styles.loader} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
