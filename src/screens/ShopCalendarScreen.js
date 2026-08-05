@@ -10,6 +10,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
@@ -58,6 +59,7 @@ import {
   assignShopBayNumbers,
   getBayAccent,
   getCalendarJobKind,
+  getJobDayBounds,
   getOccupancyRoleForDay,
   isPendingAppointmentRequest,
   isPendingReschedule,
@@ -69,6 +71,7 @@ import {
 import OccupancyMonthBoard from '../components/calendar/OccupancyMonthBoard';
 import {
   currentMonthIso,
+  daysInMonth,
   shiftMonth,
 } from '../utils/occupancyCalendar';
 import { WebSocketContext } from '../context/WebSocketManager';
@@ -225,16 +228,9 @@ function groupByDay(items, rangeStart, dayCount = CALENDAR_DAY_COUNT) {
   const rangeStartDay = dayStart(rangeStart);
   const rangeEndDay = dayStart(addCalendarDays(rangeStart, dayCount - 1));
   (items || []).forEach((item) => {
-    const startIso = item.display_start || item.scheduled_start || item.client_preferred_start;
-    if (!startIso) return;
-    const startDay = dayStart(new Date(startIso));
-    if (Number.isNaN(startDay.getTime())) return;
-    // Null / missing scheduled_end → same-day occupancy (do not crash or hang).
-    const endIso = item.display_end || item.scheduled_end || item.client_preferred_end || startIso;
-    let endDay = dayStart(new Date(endIso));
-    if (Number.isNaN(endDay.getTime()) || endDay < startDay) {
-      endDay = startDay;
-    }
+    const bounds = getJobDayBounds(item);
+    if (!bounds) return;
+    const { startDay, endDay } = bounds;
     // Skip jobs that cannot intersect the visible range.
     if (endDay < rangeStartDay || startDay > rangeEndDay) return;
     buckets.forEach((bucket) => {
@@ -580,6 +576,7 @@ export default function ShopCalendarScreen() {
   const { t, locale } = useTranslation();
   const navigation = useNavigation();
   const route = useRoute();
+  const { width: windowWidth } = useWindowDimensions();
   const { refreshNotifications, setNotifications, notifications } = useContext(WebSocketContext);
   const backLabel = route.params?.backLabel || t('common.home');
   const returnTo = normalizeReturnToRoute(route.params?.returnTo) || 'ShopDashboard';
@@ -678,6 +675,17 @@ export default function ShopCalendarScreen() {
       }),
     [calendar.scheduled, t],
   );
+  /** Web: fit the month in one viewport when possible; native keeps a compact strip + scroll-to-today. */
+  const occupancyDayWidth = useMemo(() => {
+    const dayCount = daysInMonth(monthIso).length || 31;
+    const labelWidth = 108;
+    const horizontalPad = 48;
+    if (Platform.OS === 'web' && windowWidth >= 720) {
+      const usable = Math.max(320, windowWidth - labelWidth - horizontalPad);
+      return Math.max(28, Math.min(44, Math.floor(usable / dayCount)));
+    }
+    return 28;
+  }, [monthIso, windowWidth]);
   const dailyLoadMap = useMemo(
     () => buildDailyLoadMap(calendar.daily_load),
     [calendar.daily_load]
@@ -1348,7 +1356,9 @@ export default function ShopCalendarScreen() {
             <OccupancyMonthBoard
               month={monthIso}
               rows={occupancyBoard.rows}
+              dayWidth={occupancyDayWidth}
               canEdit
+              scrollToToday
               rowColLabel={t('partnerDashboard.calendar.occupancy.bayCol', null, 'Bay')}
               createHint={t('partnerDashboard.calendar.occupancy.selected', null, 'Selected')}
               moveHint={t(

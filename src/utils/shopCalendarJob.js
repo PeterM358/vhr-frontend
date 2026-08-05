@@ -25,8 +25,29 @@ export function isPendingReschedule(job) {
   return job?.pending_reschedule?.status === 'pending';
 }
 
+function isoFromDayStart(day) {
+  if (!day || Number.isNaN(day.getTime())) return null;
+  const y = day.getFullYear();
+  const m = String(day.getMonth() + 1).padStart(2, '0');
+  const d = String(day.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}T12:00:00`;
+}
+
+/**
+ * Active shop stay: Repair.status uses `ongoing` (dashboard "in progress").
+ * Also treat arrived-but-not-finished cars as occupying the bay.
+ */
+export function isActiveShopStay(job) {
+  if (!job) return false;
+  const status = String(job.status || '').toLowerCase();
+  if (status === 'done' || status === 'canceled' || status === 'denied') return false;
+  if (status === 'ongoing' || status === 'in_progress') return true;
+  return Boolean(job.vehicle_arrived_at);
+}
+
 /**
  * Bring→ready window used for calendar occupancy (prefers pending proposal display).
+ * Active stays extend through today when scheduled_end is missing or already past.
  * @returns {{ startIso: string, endIso: string, startDay: Date, endDay: Date } | null}
  */
 export function getJobDayBounds(job) {
@@ -34,11 +55,21 @@ export function getJobDayBounds(job) {
   const startIso = job.display_start || job.scheduled_start || job.client_preferred_start;
   if (!startIso) return null;
   // Prefer display/proposal end; fall back to start when scheduled_end is null.
-  const endIso = job.display_end || job.scheduled_end || job.client_preferred_end || startIso;
+  let endIso = job.display_end || job.scheduled_end || job.client_preferred_end || startIso;
   const startDay = dayStartLocal(startIso);
   let endDay = dayStartLocal(endIso);
   if (!startDay) return null;
   if (!endDay || Number.isNaN(endDay.getTime()) || endDay < startDay) endDay = startDay;
+
+  // In-progress / at-shop jobs stay visible every day until finished.
+  if (isActiveShopStay(job)) {
+    const today = dayStartLocal(new Date());
+    if (today && today.getTime() > endDay.getTime()) {
+      endDay = today;
+      endIso = isoFromDayStart(today) || endIso;
+    }
+  }
+
   return { startIso, endIso, startDay, endDay };
 }
 

@@ -60,7 +60,8 @@ export function clampRange(startIso, endIso) {
 export function defaultStatusColor(status) {
   const s = String(status || '').toLowerCase();
   if (s === 'done' || s === 'completed' || s === 'ready') return '#94A3B8';
-  if (s === 'in_progress' || s === 'in-progress') return '#0EA5E9';
+  // Repair uses `ongoing`; WorkOrder / board spans may use `in_progress`.
+  if (s === 'in_progress' || s === 'in-progress' || s === 'ongoing') return '#0EA5E9';
   if (s === 'assigned' || s === 'confirmed') return '#6366F1';
   return '#F59E0B';
 }

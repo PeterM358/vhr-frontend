@@ -13,15 +13,38 @@ function dayStartLocal(value) {
   return d;
 }
 
+function isoFromDayStart(day) {
+  if (!day || Number.isNaN(day.getTime())) return null;
+  const y = day.getFullYear();
+  const m = String(day.getMonth() + 1).padStart(2, '0');
+  const d = String(day.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}T12:00:00`;
+}
+
+function isActiveShopStay(job) {
+  if (!job) return false;
+  const status = String(job.status || '').toLowerCase();
+  if (status === 'done' || status === 'canceled' || status === 'denied') return false;
+  if (status === 'ongoing' || status === 'in_progress') return true;
+  return Boolean(job.vehicle_arrived_at);
+}
+
 function getJobDayBounds(job) {
   if (!job) return null;
   const startIso = job.display_start || job.scheduled_start || job.client_preferred_start;
   if (!startIso) return null;
-  const endIso = job.display_end || job.scheduled_end || job.client_preferred_end || startIso;
+  let endIso = job.display_end || job.scheduled_end || job.client_preferred_end || startIso;
   const startDay = dayStartLocal(startIso);
   let endDay = dayStartLocal(endIso);
   if (!startDay) return null;
   if (!endDay || endDay < startDay) endDay = startDay;
+  if (isActiveShopStay(job)) {
+    const today = dayStartLocal(new Date());
+    if (today && today.getTime() > endDay.getTime()) {
+      endDay = today;
+      endIso = isoFromDayStart(today) || endIso;
+    }
+  }
   return { startIso, endIso, startDay, endDay };
 }
 
@@ -97,6 +120,23 @@ const nullEnd = {
 };
 assert.strictEqual(getOccupancyRoleForDay(nullEnd, new Date(2026, 6, 17)), 'single');
 assert.strictEqual(getOccupancyRoleForDay(nullEnd, new Date(2026, 6, 18)), null);
+
+// Ongoing (shop "in progress") with past/null end → span through today
+const ongoing = {
+  id: 99,
+  status: 'ongoing',
+  scheduled_start: new Date(2026, 6, 24, 9, 0).toISOString(),
+  scheduled_end: new Date(2026, 6, 24, 11, 0).toISOString(),
+};
+const today = dayStartLocal(new Date());
+assert.strictEqual(getOccupancyRoleForDay(ongoing, new Date(2026, 6, 24)), 'bring');
+if (today && today.getTime() > dayStartLocal(new Date(2026, 6, 24)).getTime()) {
+  assert.strictEqual(getOccupancyRoleForDay(ongoing, today), 'ready');
+  const mid = new Date(2026, 6, 25);
+  if (mid.getTime() < today.getTime()) {
+    assert.strictEqual(getOccupancyRoleForDay(ongoing, mid), 'stay');
+  }
+}
 
 // Two overlapping multi-day stays → Bay 1 and Bay 2
 const carA = {

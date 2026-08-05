@@ -51,16 +51,32 @@ export default function OccupancyMonthBoard({
     if (!scrollToToday || !hScrollRef.current || !days.length) return;
     const today = new Date();
     const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-    if (String(month) !== monthKey) return;
-    const day = today.getDate();
-    // Keep a few days of context to the left of "today".
-    const offsetDays = Math.max(0, day - 4);
+    let targetDay = null;
+    if (String(month) === monthKey) {
+      targetDay = today.getDate();
+    } else {
+      // Past/future month: land near the first busy day so users do not hunt left→right.
+      let minDay = null;
+      (rows || []).forEach((row) => {
+        (row.spans || []).forEach((span) => {
+          const start = String(span?.start || span?.scheduled_date || '');
+          if (!start.startsWith(String(month))) return;
+          const d = Number(start.slice(8, 10));
+          if (!Number.isFinite(d)) return;
+          if (minDay == null || d < minDay) minDay = d;
+        });
+      });
+      targetDay = minDay;
+    }
+    if (!targetDay) return;
+    // Keep a few days of context to the left of the target.
+    const offsetDays = Math.max(0, targetDay - 4);
     const x = offsetDays * dayWidth;
     const timer = setTimeout(() => {
       hScrollRef.current?.scrollTo?.({ x, animated: false });
     }, 50);
     return () => clearTimeout(timer);
-  }, [dayWidth, days.length, month, scrollToToday]);
+  }, [dayWidth, days.length, month, rows, scrollToToday]);
 
   const clearModes = useCallback(() => {
     setSelection(null);
