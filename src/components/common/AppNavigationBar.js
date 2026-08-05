@@ -6,7 +6,10 @@
 import React, { useMemo } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import BackHeaderButton from '../navigation/BackHeaderButton';
+import BackHeaderButton, {
+  backControlAccessibilityLabel,
+  useEffectiveIconOnlyBack,
+} from '../navigation/BackHeaderButton';
 import {
   APP_NAV_BAR_CONTENT_HEIGHT,
   APP_NAV_BAR_LARGE_TITLE_EXTRA,
@@ -70,6 +73,7 @@ export default function AppNavigationBar({
   style,
 }) {
   const insets = useSafeAreaInsets();
+  const effectiveIconOnlyBack = useEffectiveIconOnlyBack(iconOnlyBack);
 
   const theme = useMemo(() => VARIANT_STYLES[variant] || VARIANT_STYLES.glass, [variant]);
 
@@ -109,7 +113,7 @@ export default function AppNavigationBar({
             style={[
               styles.sideSlot,
               compact && styles.sideSlotCompact,
-              iconOnlyBack && styles.sideSlotIconOnly,
+              effectiveIconOnlyBack && styles.sideSlotIconOnly,
             ]}
           >
             {leftAction ??
@@ -118,12 +122,8 @@ export default function AppNavigationBar({
                   onPress={onBack}
                   label={backLabel}
                   variant={theme.backVariant}
-                  iconOnly={iconOnlyBack}
-                  accessibilityLabel={
-                    iconOnlyBack
-                      ? 'Back'
-                      : `Back to ${backLabel}`
-                  }
+                  iconOnly={effectiveIconOnlyBack}
+                  accessibilityLabel={backControlAccessibilityLabel(backLabel)}
                 />
               ) : null)}
           </View>
@@ -182,7 +182,7 @@ export default function AppNavigationBar({
               styles.sideSlotRight,
               compact && styles.sideSlotCompact,
               // Keep right slot wide enough for labeled actions (e.g. Select to invoice).
-              !rightAction && iconOnlyBack && styles.sideSlotIconOnly,
+              !rightAction && effectiveIconOnlyBack && styles.sideSlotIconOnly,
               rightAction && styles.sideSlotRightWide,
               rightAction && styles.sideSlotRightExtraWide,
             ]}

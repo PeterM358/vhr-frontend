@@ -1,10 +1,12 @@
 /**
  * Glass-pill back control for transparent stack headers over mixed backgrounds.
+ * Narrow viewports are always chevron-only — labels collide with centered titles.
  */
 
 import React, { useMemo } from 'react';
 import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { APP_NAV_BACK_LABEL_MIN_WIDTH } from '../common/appNavBarMetrics';
 
 const VARIANT_THEME = {
   glass: {
@@ -27,11 +29,24 @@ const VARIANT_THEME = {
   },
 };
 
-function shouldShowLabel(label, width, iconOnly) {
+/** Accessible name for chevron-only (and labeled) back controls. */
+export function backControlAccessibilityLabel(label) {
+  const trimmed = String(label || '').trim();
+  if (!trimmed) return 'Back';
+  if (/^back\b/i.test(trimmed)) return trimmed;
+  return `Back to ${trimmed}`;
+}
+
+export function shouldShowBackLabel(label, width, iconOnly) {
   if (!label || iconOnly) return false;
-  if (width >= 600) return true;
-  if (width < 360) return label.length <= 4;
-  return label.length <= 14;
+  // Phones / narrow web: arrow only — long "Back to …" pills overlap titles.
+  if (width < APP_NAV_BACK_LABEL_MIN_WIDTH) return false;
+  return true;
+}
+
+export function useEffectiveIconOnlyBack(iconOnlyBack = false) {
+  const { width } = useWindowDimensions();
+  return iconOnlyBack || width < APP_NAV_BACK_LABEL_MIN_WIDTH;
 }
 
 export default function BackHeaderButton({
@@ -45,13 +60,17 @@ export default function BackHeaderButton({
 }) {
   const { width } = useWindowDimensions();
   const theme = VARIANT_THEME[variant] || VARIANT_THEME.glass;
-  const showLabel = useMemo(() => shouldShowLabel(label, width, iconOnly), [label, width, iconOnly]);
+  const showLabel = useMemo(
+    () => shouldShowBackLabel(label, width, iconOnly),
+    [label, width, iconOnly],
+  );
+  const a11yLabel = accessibilityLabel || backControlAccessibilityLabel(label);
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel || label || 'Back'}
+      accessibilityLabel={a11yLabel}
       hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
       style={({ pressed }) => [styles.outer, containerStyle, pressed && styles.outerPressed]}
     >

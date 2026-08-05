@@ -5,7 +5,10 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import BackHeaderButton from '../navigation/BackHeaderButton';
+import BackHeaderButton, {
+  backControlAccessibilityLabel,
+  useEffectiveIconOnlyBack,
+} from '../navigation/BackHeaderButton';
 import CompactLanguageSelector from './CompactLanguageSelector';
 import {
   APP_NAV_BAR_CONTENT_HEIGHT,
@@ -67,6 +70,7 @@ export default function AppNavigationBar({
 }) {
   const insets = useSafeAreaInsets();
   const [hovered, setHovered] = useState(false);
+  const effectiveIconOnlyBack = useEffectiveIconOnlyBack(iconOnlyBack);
 
   const theme = useMemo(() => VARIANT_STYLES[variant] || VARIANT_STYLES.glass, [variant]);
 
@@ -112,7 +116,7 @@ export default function AppNavigationBar({
             style={[
               styles.sideSlot,
               compact && styles.sideSlotCompact,
-              iconOnlyBack && styles.sideSlotIconOnly,
+              effectiveIconOnlyBack && styles.sideSlotIconOnly,
             ]}
           >
             {leftAction ??
@@ -121,12 +125,8 @@ export default function AppNavigationBar({
                   onPress={onBack}
                   label={backLabel}
                   variant={theme.backVariant}
-                  iconOnly={iconOnlyBack}
-                  accessibilityLabel={
-                    iconOnlyBack
-                      ? 'Back'
-                      : `Back to ${backLabel}`
-                  }
+                  iconOnly={effectiveIconOnlyBack}
+                  accessibilityLabel={backControlAccessibilityLabel(backLabel)}
                 />
               ) : null)}
           </View>
@@ -154,7 +154,7 @@ export default function AppNavigationBar({
               styles.sideSlot,
               styles.sideSlotRight,
               compact && styles.sideSlotCompact,
-              iconOnlyBack && !hasRightChrome && styles.sideSlotIconOnly,
+              effectiveIconOnlyBack && !hasRightChrome && styles.sideSlotIconOnly,
               hasRightChrome && styles.sideSlotRightWide,
             ]}
           >
