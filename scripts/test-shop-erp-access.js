@@ -13,7 +13,7 @@ const PARTNER_ERP_ROUTES = {
   ShopWorkforce: { capability: 'uses_employee_time_tracking', requiresAccess: true },
   ShopDocumentImports: { capability: 'uses_document_import', roleIn: ACCOUNTANT_ARCHIVE_ROLES },
   ShopComplaints: { requiresManage: true },
-  ShopWarehouse: { capability: 'uses_inventory', requiresAccess: true },
+  ShopWarehouse: { requiresAccess: true },
   ShopInvoicing: {
     permissionAny: ['post_financial_document', 'view_margin'],
     requiresAccess: true,
@@ -82,7 +82,10 @@ const bareProfile = {
 
 assert.strictEqual(canAccessPartnerRoute('ShopAnalytics', { profile: fullProfile, membership: ownerMembership }), true);
 assert.strictEqual(canAccessPartnerRoute('ShopAnalytics', { profile: fullProfile, membership: mechanicMembership }), false);
-assert.strictEqual(canAccessPartnerRoute('ShopWarehouse', { profile: bareProfile, membership: ownerMembership }), false);
+// Warehouse hub always reachable when user has shop membership (opt-in toggle on screen).
+assert.strictEqual(canAccessPartnerRoute('ShopWarehouse', { profile: bareProfile, membership: ownerMembership }), true);
+assert.strictEqual(canAccessPartnerRoute('ShopWarehouse', { profile: bareProfile, membership: mechanicMembership }), true);
+assert.strictEqual(canAccessPartnerRoute('ShopWarehouse', { profile: bareProfile, membership: null }), false);
 assert.strictEqual(canAccessPartnerRoute('ShopDocumentImports', { profile: fullProfile, membership: ownerMembership }), true);
 assert.strictEqual(canAccessPartnerRoute('ShopDocumentImports', { profile: fullProfile, membership: mechanicMembership }), false);
 // Invoicing stays visible for owners even when uses_invoicing capability is off.

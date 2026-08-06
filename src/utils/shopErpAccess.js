@@ -39,9 +39,10 @@ export const PARTNER_ERP_ROUTES = {
     drawerKey: 'complaints',
     requiresManage: true,
   },
+  // Always reachable for shop staff with access — hub has the stock opt-in toggle.
+  // Hiding behind uses_inventory was a chicken-and-egg (enable lives on that screen).
   ShopWarehouse: {
     drawerKey: 'warehouse',
-    capability: 'uses_inventory',
     requiresAccess: true,
   },
   ShopPurchaseOrders: {
