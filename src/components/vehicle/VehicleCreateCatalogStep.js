@@ -9,7 +9,7 @@ import {
   generationForYear,
   enginesForFuel,
 } from './useVehicleMaintenanceSpec';
-import { mergeCatalogAndLegacyModels } from './resolveLegacyModel';
+import { modelsForVehiclePicker } from './resolveLegacyModel';
 import { useTranslation } from '../../i18n';
 
 export default function VehicleCreateCatalogStep({
@@ -43,8 +43,8 @@ export default function VehicleCreateCatalogStep({
 }) {
   const { t } = useTranslation();
   const mergedModels = useMemo(
-    () => mergeCatalogAndLegacyModels(catalogModels, legacyModels),
-    [catalogModels, legacyModels]
+    () => modelsForVehiclePicker(catalogModels, legacyModels, selectedVehicleType),
+    [catalogModels, legacyModels, selectedVehicleType]
   );
   const yearOptions = useMemo(() => yearsFromGenerations(catalogGenerations), [catalogGenerations]);
   const matchingEngines = useMemo(

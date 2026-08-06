@@ -146,7 +146,7 @@ export function useVehicleCatalogLists({
   }, [manualMode, catalogGeneration]);
 
   useEffect(() => {
-    if (!legacyMakeId) {
+    if (!legacyMakeId || selectedVehicleType) {
       setLegacyModels([]);
       return undefined;
     }
@@ -163,7 +163,7 @@ export function useVehicleCatalogLists({
     return () => {
       cancelled = true;
     };
-  }, [legacyMakeId]);
+  }, [legacyMakeId, selectedVehicleType]);
 
   return {
     catalogBrands: catalogBrandsList,

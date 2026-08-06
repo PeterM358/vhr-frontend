@@ -4015,6 +4015,7 @@
   "vehicleTypes": {
     "car": "Car",
     "truck": "Truck",
+    "bus": "Bus",
     "motorcycle": "Motorcycle",
     "bicycle": "Bike",
     "ebike": "E-bike",
@@ -4027,6 +4028,7 @@
     "public": {
       "car": "cars",
       "truck": "trucks",
+      "bus": "buses",
       "motorcycle": "motorcycles",
       "bicycle": "bicycles",
       "ebike": "e-bikes",
