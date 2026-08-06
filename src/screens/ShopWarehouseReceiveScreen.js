@@ -259,8 +259,11 @@ export default function ShopWarehouseReceiveScreen({
     if (!shopId || warehouseToggling) return;
     setWarehouseToggling(true);
     try {
-      await updateShopProfile(shopId, { warehouse_enabled: enabled });
-      setWarehouseEnabled(enabled);
+      // warehouse_enabled is read-only on the API; uses_inventory is the source of truth.
+      const updated = await updateShopProfile(shopId, { uses_inventory: enabled });
+      setWarehouseEnabled(
+        Boolean(updated?.uses_inventory || updated?.warehouse_enabled || enabled),
+      );
     } catch (err) {
       showMessage('Warehouse', err.message || 'Could not update stock tracking');
     } finally {
