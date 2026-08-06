@@ -18,6 +18,7 @@ import {
   Text,
   TextInput,
   Button,
+  Switch,
   useTheme,
 } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
@@ -282,6 +283,8 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [operationActionId, setOperationActionId] = useState(null);
   const [opLaborDrafts, setOpLaborDrafts] = useState({});
   const [opLaborSavingId, setOpLaborSavingId] = useState(null);
+  /** Default on: writing labor also updates ShopServiceMenuItem price list. */
+  const [opLaborSyncPriceList, setOpLaborSyncPriceList] = useState(true);
   const [shopEmployees, setShopEmployees] = useState([]);
   const [shopUsesWorkforce, setShopUsesWorkforce] = useState(false);
   const [assignPickerOpId, setAssignPickerOpId] = useState(null);
@@ -1132,6 +1135,7 @@ export default function RepairDetailScreen({ route, navigation }) {
       await updateRepairOperation(token, repairId, operation.id, {
         pricing_mode: 'fixed',
         fixed_price_minor: minor,
+        sync_menu_labor: opLaborSyncPriceList,
       });
       await refreshRepair();
       await refreshParts();
@@ -1414,11 +1418,33 @@ export default function RepairDetailScreen({ route, navigation }) {
                       }
                       style={{ marginTop: 4 }}
                     />
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginTop: 4,
+                        gap: 8,
+                      }}
+                    >
+                      <Text style={[styles.mutedText, { flex: 1 }]}>
+                        {t(
+                          'repairs.detail.operationsPicker.alsoUpdatePriceList',
+                          null,
+                          'Also update price list'
+                        )}
+                      </Text>
+                      <Switch
+                        value={opLaborSyncPriceList}
+                        onValueChange={setOpLaborSyncPriceList}
+                        disabled={opLaborSavingId != null || operationActionId != null}
+                      />
+                    </View>
                     <Text style={styles.mutedText}>
                       {t(
                         'repairs.detail.operationsPicker.laborPriceHint',
                         null,
-                        'Prefills from your price list. Edit here for this job.'
+                        'Prefills from your price list. Saving also updates the price list unless you turn that off.'
                       )}
                     </Text>
                     {shopUsesWorkforce ? (
