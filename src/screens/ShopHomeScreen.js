@@ -35,7 +35,13 @@ import {
   countByLifecycle,
   formatLifecycleCounterLine,
 } from '../utils/partnerRepairLifecycle';
-import { navigateToPartnerPublicPreview, navigateToPartnerCalendar, navigateToPartnerRepairOffer, navigateToPartnerRepairDetail } from '../navigation/webNavigation';
+import {
+  navigateToPartnerPublicPreview,
+  navigateToPartnerCalendar,
+  navigateToPartnerRepairOffer,
+  navigateToPartnerRepairDetail,
+  navigateToPartnerWarehouse,
+} from '../navigation/webNavigation';
 import {
   isPartnerSetupComplete,
   partnerSetupPercent,
@@ -370,6 +376,23 @@ export default function ShopHomeScreen() {
         },
       },
       {
+        key: 'warehouse',
+        icon: 'warehouse',
+        title: t('drawer.partner.warehouse', null, 'Warehouse'),
+        subtitle: t(
+          'partnerDashboard.warehouseSubtitle',
+          null,
+          'Receive supplier invoices, stock and materials.',
+        ),
+        onPress: () => {
+          if (Platform.OS === 'web') {
+            navigateToPartnerWarehouse(navigation);
+            return;
+          }
+          navigation.navigate('ShopWarehouse');
+        },
+      },
+      {
         key: 'profile',
         icon: 'store-cog-outline',
         title: t('partnerDashboard.serviceCenterProfileTitle'),
@@ -408,16 +431,6 @@ export default function ShopHomeScreen() {
         subtitle: t('partnerDashboard.modules.documents.subtitle'),
         onPress: () =>
           showMessage(t('partnerDashboard.comingSoonDialog.title'), t('partnerDashboard.comingSoonDialog.documentsBody'), {
-            variant: 'info',
-          }),
-      },
-      {
-        key: 'inventory',
-        icon: 'warehouse',
-        title: t('partnerDashboard.modules.inventory.title'),
-        subtitle: t('partnerDashboard.modules.inventory.subtitle'),
-        onPress: () =>
-          showMessage(t('partnerDashboard.comingSoonDialog.title'), t('partnerDashboard.comingSoonDialog.inventoryBody'), {
             variant: 'info',
           }),
       },
