@@ -6,6 +6,9 @@
  *
  * Adds MaterialMaster (platform materials catalog) lines; shop OrgMaterial
  * listings are created/updated when the repair saves via prepareRepairPartsData.
+ *
+ * Labor for shop repairs lives on operations — this picker only sets
+ * material qty / price / note. labor_cost is still sent as 0 for API compat.
  */
 
 import React, { useState, useEffect, useLayoutEffect } from 'react';
@@ -172,12 +175,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
           price: item.shop_part?.price != null && item.shop_part.price !== ''
             ? String(item.shop_part.price)
             : '0',
-          labor:
-            item.shop_part?.default_labor_cost != null && item.shop_part.default_labor_cost !== ''
-              ? String(item.shop_part.default_labor_cost)
-              : item.shop_part?.labor_cost != null && item.shop_part.labor_cost !== ''
-                ? String(item.shop_part.labor_cost)
-                : '0',
+          labor: '0',
           note: '',
           partsMaster: item,
         },
@@ -213,11 +211,10 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
     for (let part of selected) {
       const qty = parseInt(part.quantity, 10);
       const price = normalizeMoneyField(part.price);
-      const labor = normalizeMoneyField(part.labor);
-      if (!qty || Number.isNaN(qty) || price === null || labor === null) {
+      if (!qty || Number.isNaN(qty) || price === null) {
         showMessage(
           'Validation',
-          'Quantity must be a number. Leave Price/Labor empty to save as 0, or enter valid amounts.',
+          'Quantity must be a number. Leave Price empty to save as 0, or enter a valid amount.',
           { variant: 'error' },
         );
         return;
@@ -230,7 +227,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
       shopPartId: p.shopPartId ?? null,
       quantity: parseInt(p.quantity, 10),
       price: normalizeMoneyField(p.price),
-      labor: normalizeMoneyField(p.labor),
+      labor: '0',
       note: p.note,
     }));
 
@@ -313,8 +310,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
 
   const getBorderStyle = (part) => {
     const price = normalizeMoneyField(part.price);
-    const labor = normalizeMoneyField(part.labor);
-    const fields = [part.quantity, price, labor];
+    const fields = [part.quantity, price];
     if (fields.some(v => v === '' || v === null)) {
       return { borderColor: theme.colors.error, borderWidth: 2 };
     }
@@ -338,7 +334,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
           BASE_STYLES.formScreenScroll,
           {
             paddingTop: stackContentPaddingTop(insets, 4),
-            paddingBottom: 24,
+            paddingBottom: 96,
           },
         ]}
         keyboardShouldPersistTaps="handled"
@@ -387,11 +383,13 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
 
         {results.map((item, idx) => {
           const expanded = expandedCatalogIndexes.includes(idx);
+          const picked = selected.some((p) => p.partsMasterId === item.id);
           return (
             <Card key={item.id ?? idx} style={styles.catalogCard}>
               <Card.Title
                 title={item.name}
                 subtitle={partCatalogSubtitle(item)}
+                titleNumberOfLines={2}
                 left={(props) => (
                   <IconButton
                     {...props}
@@ -399,12 +397,18 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
                     onPress={() => toggleCatalogExpand(idx)}
                   />
                 )}
-                right={(props) => (
-                  <IconButton
-                    {...props}
-                    icon="plus"
+                right={() => (
+                  <Button
+                    mode={picked ? 'contained-tonal' : 'contained'}
+                    compact
+                    disabled={picked}
                     onPress={() => handleSelectFromCatalog(item)}
-                  />
+                    style={styles.selectButton}
+                    contentStyle={styles.selectButtonContent}
+                    labelStyle={styles.selectButtonLabel}
+                  >
+                    {picked ? 'Selected' : 'Add to repair'}
+                  </Button>
                 )}
               />
               {expanded && (
@@ -416,7 +420,6 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
                     <>
                       <Divider style={{ marginVertical: 8 }} />
                       <Text>Shop Price: {item.shop_part.price}</Text>
-                      <Text>Labor Cost: {item.shop_part.labor_cost}</Text>
                       <Text>Shop SKU: {item.shop_part.shop_sku || 'N/A'}</Text>
                     </>
                   ) : (
@@ -486,14 +489,6 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
                   />
                   <TextInput
                     mode="outlined"
-                    label="Labor (empty = 0)"
-                    keyboardType="numeric"
-                    value={part.labor}
-                    onChangeText={(val) => handleSelectedChange(index, 'labor', val)}
-                    style={styles.input}
-                  />
-                  <TextInput
-                    mode="outlined"
                     label="Note"
                     value={part.note}
                     onChangeText={(val) => handleSelectedChange(index, 'note', val)}
@@ -508,7 +503,8 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
         <Button
           mode="outlined"
           onPress={navigateToAddNewPartScreen}
-          style={{ marginTop: 8, marginBottom: 8 }}
+          style={styles.addCustomButton}
+          textColor="#F8FAFC"
         >
           Add custom material
         </Button>
@@ -540,7 +536,7 @@ const styles = StyleSheet.create({
   helperText: {
     marginBottom: 8,
     textAlign: 'center',
-    color: '#64748B',
+    color: '#CBD5E1',
     fontSize: 13,
   },
   input: { marginVertical: 8 },
@@ -554,22 +550,46 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   emptyStateText: {
-    color: '#64748B',
+    color: '#CBD5E1',
     fontStyle: 'italic',
     marginBottom: 6,
   },
   suggestedBlock: { marginBottom: 12 },
-  suggestedTitle: { fontWeight: '600', marginBottom: 8, color: '#334155' },
+  suggestedTitle: { fontWeight: '600', marginBottom: 8, color: '#E2E8F0' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   suggestChip: { marginBottom: 4 },
+  selectButton: {
+    marginRight: 8,
+    alignSelf: 'center',
+  },
+  selectButtonContent: {
+    minHeight: 36,
+    paddingHorizontal: 4,
+  },
+  selectButtonLabel: {
+    fontSize: 12,
+    marginVertical: 0,
+  },
+  addCustomButton: {
+    marginTop: 8,
+    marginBottom: 8,
+    borderColor: 'rgba(248, 250, 252, 0.72)',
+    borderWidth: 1.5,
+  },
   stickyFooter: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#CBD5E1',
-    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderTopColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: 'rgba(15, 23, 42, 0.92)',
     paddingHorizontal: 16,
     paddingTop: 10,
     zIndex: 20,
     elevation: 8,
+    ...(Platform.OS === 'web'
+      ? {
+          backdropFilter: 'saturate(180%) blur(18px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(18px)',
+        }
+      : null),
   },
   saveButton: { marginBottom: 0 },
   saveButtonContent: { minHeight: 48 },

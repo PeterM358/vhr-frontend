@@ -45,6 +45,7 @@ export default function CreateMasterPartScreen({ navigation, route }) {
     brand: '',
     category: '',
     description: '',
+    part_number: '',
   });
   const [categoryChoice, setCategoryChoice] = useState('');
   const [customCategory, setCustomCategory] = useState('');
@@ -86,9 +87,13 @@ export default function CreateMasterPartScreen({ navigation, route }) {
     setCreating(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
+      const partNumber = (newPartData.part_number || '').trim();
       const created = await createPartsMaster(token, {
-        ...newPartData,
+        name: newPartData.name.trim(),
+        brand: newPartData.brand.trim(),
         category: resolvedCategory,
+        description: newPartData.description || '',
+        ...(partNumber ? { part_number: partNumber } : {}),
       });
       showMessage('Success', 'New material added to catalog.', { variant: 'success' });
       navigation.navigate({
@@ -136,6 +141,15 @@ export default function CreateMasterPartScreen({ navigation, route }) {
           value={newPartData.brand}
           onChangeText={(val) => setNewPartData({ ...newPartData, brand: val })}
           style={styles.input}
+        />
+
+        <TextInput
+          mode="outlined"
+          label="Part number (optional)"
+          value={newPartData.part_number}
+          onChangeText={(val) => setNewPartData({ ...newPartData, part_number: val })}
+          style={styles.input}
+          autoCapitalize="characters"
         />
 
         <Text style={styles.fieldLabel}>Category *</Text>
