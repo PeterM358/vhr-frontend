@@ -16,7 +16,6 @@ import AuthorizedClients from '../components/shop/AuthorizedClients';
 import ShopPromotions from '../components/shop/ShopPromotions';
 import NotificationsList from '../components/shop/NotificationsList';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
-import ShopWarehouseHubScreen from '../screens/ShopWarehouseHubScreen';
 
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
@@ -224,14 +223,7 @@ function CustomDrawerContent(props) {
         {showWarehouse ? (
           <DrawerItem
             label={t('drawer.partner.warehouse')}
-            onPress={() => {
-              if (Platform.OS === 'web') {
-                navigateToPartnerWarehouse(navigation);
-              } else {
-                props.navigation.navigate('ShopWarehouse');
-              }
-              props.navigation.closeDrawer();
-            }}
+            onPress={() => openStackRoute(navigateToPartnerWarehouse, 'ShopWarehouse')}
             icon={({ color, size }) => <DrawerMenuIcon name="warehouse" color={color} size={size} />}
             {...itemProps}
           />
@@ -397,7 +389,6 @@ export default function ShopDrawer() {
       <Drawer.Screen name="ShopPromotions" component={ShopPromotions} />
       <Drawer.Screen name="NotificationsList" component={NotificationsList} />
       <Drawer.Screen name="ChooseShop" component={ChooseShopScreen} />
-      <Drawer.Screen name="ShopWarehouse" component={ShopWarehouseHubScreen} />
     </Drawer.Navigator>
   );
 }

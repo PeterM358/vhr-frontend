@@ -58,12 +58,12 @@ export const linkingScreens = {
       RepairsList: 'repairs',
       AuthorizedClients: 'clients',
       ShopPromotions: 'promotions',
-      ShopWarehouse: 'warehouse',
       NotificationsList: 'notifications',
       ChooseShop: 'switch-center',
       AddPartnerServiceCenter: 'switch-center/add',
     },
   },
+  ShopWarehouse: 'partner/warehouse',
   ShopMap: 'service-centers',
   PublicBusinessProfile: {
     path: 'business/:orgSlug',

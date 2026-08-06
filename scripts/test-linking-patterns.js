@@ -84,4 +84,16 @@ assert.strictEqual(orgFleet.pattern, 'partner/organization/fleet');
 assert.ok(legacyFleet, 'FleetDashboard must exist');
 assert.strictEqual(legacyFleet.pattern, 'partner/fleet');
 
+const shopWarehouse = patterns.find((row) => row.screen === 'ShopWarehouse');
+const shopInvoicing = patterns.find((row) => row.screen === 'ShopInvoicing');
+assert.ok(shopWarehouse, 'ShopWarehouse must exist as stack linking route');
+assert.strictEqual(shopWarehouse.pattern, 'partner/warehouse');
+assert.ok(shopInvoicing, 'ShopInvoicing must exist');
+assert.strictEqual(shopInvoicing.pattern, 'partner/invoicing');
+// Must not nest warehouse under ShopHome (collided with root Stack.Screen name).
+assert.ok(
+  !patterns.some((row) => row.route === 'ShopHome > ShopWarehouse'),
+  'ShopWarehouse must not be nested under ShopHome drawer linking'
+);
+
 console.log(`linking patterns ok (${patterns.length} routes, no duplicates)`);

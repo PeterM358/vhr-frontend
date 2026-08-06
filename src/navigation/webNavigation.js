@@ -837,10 +837,13 @@ export function navigateToPartnerPromotions(navigation) {
 
 export function navigateToPartnerWarehouse(navigation) {
   if (Platform.OS === 'web') {
-    resetPartnerDrawerWebRoutes(navigation, 'ShopWarehouse', undefined, partnerWarehouse());
+    // Stack route (like Invoicing) — drawer nesting collided with the root
+    // Stack.Screen of the same name and silently no-op'd on web.
+    resetPartnerStackWebRoutes(navigation, [{ name: 'ShopWarehouse' }], partnerWarehouse());
     return;
   }
-  navigation.navigate('ShopWarehouse');
+  const root = getRootNavigation(navigation);
+  root.navigate('ShopWarehouse');
 }
 
 export function navigateToPartnerInvoicing(navigation) {

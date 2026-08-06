@@ -42,7 +42,7 @@ export { default as ShopSubscriptionUpgradeScreen } from '../screens/ShopSubscri
 export { default as ShopSubscriptionSuccessScreen } from '../screens/ShopSubscriptionSuccessScreen';
 export { default as ShopServiceMenuScreen } from '../screens/ShopServiceMenuScreen';
 export { default as ShopInvoicingScreen } from '../screens/ShopInvoicingScreen';
-export { default as ShopWarehouseReceiveScreen } from '../screens/ShopWarehouseReceiveScreen';
+export { default as ShopWarehouseHubScreen } from '../screens/ShopWarehouseHubScreen';
 export { default as ShopAnalyticsScreen } from '../screens/ShopAnalyticsScreen';
 export { default as ShopComplaintsScreen } from '../screens/ShopComplaintsScreen';
 export { default as ShopDocumentImportsScreen } from '../screens/ShopDocumentImportsScreen';

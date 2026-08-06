@@ -62,7 +62,7 @@ import {
   ShopSubscriptionSuccessScreen,
   ShopServiceMenuScreen,
   ShopInvoicingScreen,
-  ShopWarehouseReceiveScreen,
+  ShopWarehouseHubScreen,
   ShopInvoiceDetailScreen,
   ShopAnalyticsScreen,
   ShopComplaintsScreen,
@@ -588,8 +588,8 @@ export default function AppNavigator() {
         />
         <Stack.Screen
           name="ShopWarehouse"
-          component={ShopWarehouseReceiveScreen}
-          options={{ ...appNavBarScreenOptions, title: 'Warehouse' }}
+          component={ShopWarehouseHubScreen}
+          options={{ ...appNavBarScreenOptions, title: t('drawer.partner.warehouse', null, 'Warehouse') }}
         />
         <Stack.Screen
           name="ShopAnalytics"

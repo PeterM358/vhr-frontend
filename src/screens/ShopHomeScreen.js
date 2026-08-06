@@ -385,11 +385,7 @@ export default function ShopHomeScreen() {
           'Receive supplier invoices, stock and materials.',
         ),
         onPress: () => {
-          if (Platform.OS === 'web') {
-            navigateToPartnerWarehouse(navigation);
-            return;
-          }
-          navigation.navigate('ShopWarehouse');
+          navigateToPartnerWarehouse(navigation);
         },
       },
       {

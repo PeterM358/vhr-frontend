@@ -791,15 +791,8 @@ export function getPartnerNavigationStateFromPath(path) {
   }
   if (pathPart === 'partner/warehouse') {
     return {
-      routes: [
-        {
-          name: 'ShopHome',
-          state: {
-            index: 1,
-            routes: [{ name: 'ShopDashboard' }, { name: 'ShopWarehouse' }],
-          },
-        },
-      ],
+      routes: [partnerHome, { name: 'ShopWarehouse' }],
+      index: 1,
     };
   }
   if (pathPart === 'partner/clients') {
