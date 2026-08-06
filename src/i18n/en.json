@@ -3293,7 +3293,8 @@
         "paid": "Paid",
         "included_in_invoice": "Included in invoice"
       },
-      "operationsFinancialHint": "Labor and parts totals are filled from your operation lines unless you edit them here.",
+      "operationsFinancialHint": "Parts come from your parts list. Labor starts from your price list (lowest) when you add an operation — edit here if this job differs.",
+      "laborFromPriceListHint": "Labor from price list (lowest) — adjust if this job differs.",
       "operationsPicker": {
         "title": "Choose service type",
         "subtitle": "Pick the work line for this operation. Defaults to the repair's final service type.",
@@ -3312,7 +3313,8 @@
         "removeOperation": "Remove operation",
         "removeOperationConfirm": "Remove this operation from the repair? This cannot be undone.",
         "removeOperationBlocked": "Remove parts, labor, and mechanic assignments from this operation before deleting it.",
-        "couldNotRemove": "Could not remove operation"
+        "couldNotRemove": "Could not remove operation",
+        "laborFromPriceList": "From {amount} labor (price list)"
       }
     }
   },

@@ -97,6 +97,10 @@ export default function OperationTypePickerSheet({
                   {group.types.map((type) => {
                     const selected = String(type.id) === String(pendingTypeId);
                     const label = translateRepairTypeLabel(type, t);
+                    const laborFrom =
+                      type.labor_from != null && String(type.labor_from).trim() !== ''
+                        ? String(type.labor_from)
+                        : null;
                     return (
                       <Pressable
                         key={type.id}
@@ -110,9 +114,18 @@ export default function OperationTypePickerSheet({
                           size={20}
                           color={selected ? COLORS.PRIMARY : COLORS.TEXT_MUTED}
                         />
-                        <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
-                          {label}
-                        </Text>
+                        <View style={styles.optionTextWrap}>
+                          <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
+                            {label}
+                          </Text>
+                          {laborFrom ? (
+                            <Text style={styles.optionHint}>
+                              {t('repairs.detail.operationsPicker.laborFromPriceList', {
+                                amount: laborFrom,
+                              })}
+                            </Text>
+                          ) : null}
+                        </View>
                         {selected ? (
                           <MaterialCommunityIcons name="check" size={20} color={COLORS.PRIMARY} />
                         ) : null}
@@ -218,8 +231,10 @@ const styles = StyleSheet.create({
   optionRowSelected: {
     backgroundColor: 'rgba(15,76,129,0.1)',
   },
-  optionText: {
+  optionTextWrap: {
     flex: 1,
+  },
+  optionText: {
     fontSize: 15,
     color: '#0f172a',
     fontWeight: '500',
@@ -227,6 +242,11 @@ const styles = StyleSheet.create({
   optionTextSelected: {
     color: '#1e40af',
     fontWeight: '700',
+  },
+  optionHint: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#64748b',
   },
   emptyText: {
     paddingVertical: 24,

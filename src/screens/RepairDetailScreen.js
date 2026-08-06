@@ -484,6 +484,9 @@ export default function RepairDetailScreen({ route, navigation }) {
     skipMileageGate = false,
     odometerNote = '',
     partsOverride = null,
+    laborPriceOverride = undefined,
+    partsPriceOverride = undefined,
+    totalPriceOverride = undefined,
   } = {}) => {
     if (repair.status === 'done') {
       Alert.alert("This repair is completed and can no longer be edited.");
@@ -491,6 +494,12 @@ export default function RepairDetailScreen({ route, navigation }) {
     }
     const partsToSend = partsOverride ?? (selectedParts.length > 0 ? selectedParts : repairParts);
     const partsTotals = computePartsTotals(partsToSend);
+    const laborPriceForSave =
+      laborPriceOverride !== undefined ? laborPriceOverride : laborPrice;
+    const partsPriceForSave =
+      partsPriceOverride !== undefined ? partsPriceOverride : partsPrice;
+    const totalPriceForSave =
+      totalPriceOverride !== undefined ? totalPriceOverride : totalPrice;
     try {
       if (finalize) {
         const effectiveTypeId = resolveEffectiveServiceTypeId(finalRepairTypeId, repair);
@@ -565,34 +574,28 @@ export default function RepairDetailScreen({ route, navigation }) {
       } else if (parsedFinalRepairTypeId === null) {
         body.final_repair_type = null;
       }
-      const parsedLaborPrice = partsToSend.length
-        ? partsTotals.laborSum
-        : laborManuallyEditedRef.current && String(laborPrice || '').trim()
-          ? parseFloat(laborPrice)
-          : repair?.total_labor_customer != null
-            ? parseFloat(repair.total_labor_customer)
-            : String(laborPrice || '').trim()
-              ? parseFloat(laborPrice)
-              : null;
+      const parsedLaborPrice = String(laborPriceForSave || '').trim()
+        ? parseFloat(laborPriceForSave)
+        : null;
       const parsedPartsPrice = partsToSend.length
         ? partsTotals.partsSum
-        : partsManuallyEditedRef.current && String(partsPrice || '').trim()
-          ? parseFloat(partsPrice)
-          : repair?.total_parts_customer != null
-            ? parseFloat(repair.total_parts_customer)
-            : String(partsPrice || '').trim()
-              ? parseFloat(partsPrice)
-              : null;
-      let parsedTotalPrice = String(totalPrice || '').trim() ? parseFloat(totalPrice) : null;
-      if (partsToSend.length > 0) {
-        parsedTotalPrice = partsTotals.total;
+        : String(partsPriceForSave || '').trim()
+          ? parseFloat(partsPriceForSave)
+          : null;
+      let parsedTotalPrice = String(totalPriceForSave || '').trim()
+        ? parseFloat(totalPriceForSave)
+        : null;
+      const laborNum = Number.isFinite(parsedLaborPrice) ? parsedLaborPrice : 0;
+      const partsNum = Number.isFinite(parsedPartsPrice) ? parsedPartsPrice : 0;
+      if (!totalManuallyEditedRef.current) {
+        if (partsToSend.length > 0 || parsedLaborPrice != null || parsedPartsPrice != null) {
+          parsedTotalPrice = Math.round((laborNum + partsNum) * 100) / 100;
+        }
       } else if (
         (parsedTotalPrice === null || Number.isNaN(parsedTotalPrice)) &&
         (parsedLaborPrice != null || parsedPartsPrice != null)
       ) {
-        const labor = Number.isFinite(parsedLaborPrice) ? parsedLaborPrice : 0;
-        const parts = Number.isFinite(parsedPartsPrice) ? parsedPartsPrice : 0;
-        parsedTotalPrice = labor + parts;
+        parsedTotalPrice = Math.round((laborNum + partsNum) * 100) / 100;
       }
       const parsedFinalKilometers =
         parseOdometerKm(finalKilometers) ?? suggestFinalizeKm(repair);
@@ -844,15 +847,25 @@ export default function RepairDetailScreen({ route, navigation }) {
     (async () => {
       setSelectedParts(added);
       const totals = computePartsTotals(added);
-      setLaborPrice(String(totals.laborSum));
+      const keptLabor = String(laborPrice || '').trim();
+      const nextLabor = keptLabor
+        ? keptLabor
+        : totals.laborSum > 0
+          ? String(totals.laborSum)
+          : '';
+      const laborNum = parseFloat(nextLabor) || 0;
+      const nextTotal = String(Math.round((totals.partsSum + laborNum) * 100) / 100);
       setPartsPrice(String(totals.partsSum));
-      setTotalPrice(String(totals.total));
-      laborManuallyEditedRef.current = false;
+      setLaborPrice(nextLabor);
+      setTotalPrice(nextTotal);
       partsManuallyEditedRef.current = false;
       totalManuallyEditedRef.current = false;
 
       const ok = await handleUpdateRepair({
         partsOverride: added,
+        laborPriceOverride: nextLabor,
+        partsPriceOverride: String(totals.partsSum),
+        totalPriceOverride: nextTotal,
         showSuccessAlert: true,
       });
       if (!cancelled && ok) {
@@ -1056,7 +1069,19 @@ export default function RepairDetailScreen({ route, navigation }) {
     const opParts = repairParts.filter(
       (part) => Number(part.service_order_operation_id) === Number(operationId)
     );
-    return computePartsTotals(opParts);
+    const partsTotals = computePartsTotals(opParts);
+    const op = operations.find((row) => Number(row.id) === Number(operationId));
+    const snapshotMinor = op?.sales_snapshot_minor ?? op?.fixed_price_minor;
+    const opLabor =
+      snapshotMinor != null && Number.isFinite(Number(snapshotMinor))
+        ? Number(snapshotMinor) / 100
+        : 0;
+    const laborSum = Math.round((partsTotals.laborSum + opLabor) * 100) / 100;
+    return {
+      partsSum: partsTotals.partsSum,
+      laborSum,
+      total: Math.round((partsTotals.partsSum + laborSum) * 100) / 100,
+    };
   };
 
   const renderRepairTotalsFooter = () => {
@@ -1376,6 +1401,88 @@ export default function RepairDetailScreen({ route, navigation }) {
     currency: repair?.currency || DEFAULT_CURRENCY,
   };
   const hasPartsLines = displayPartsList.length > 0;
+
+  const laborMatchesMenuLowest = useMemo(() => {
+    const labor = parseFloat(laborPrice);
+    if (!Number.isFinite(labor) || labor <= 0) return false;
+    const typeIds = new Set(
+      (operations || [])
+        .map((op) => Number(op.repair_type_id ?? op.operation_type_id))
+        .filter((id) => Number.isFinite(id))
+    );
+    if (!typeIds.size) return false;
+    return (shopServiceMenu || []).some((item) => {
+      const id = Number(item?.repair_type_id ?? item?.repair_type);
+      if (!typeIds.has(id)) return false;
+      const from = parseFloat(item?.labor_from);
+      return Number.isFinite(from) && Math.abs(from - labor) < 0.005;
+    });
+  }, [laborPrice, operations, shopServiceMenu]);
+
+  const summaryPartsAmount = hasPartsLines
+    ? displayPartsTotals.partsSum
+    : parseFloat(partsPrice) || 0;
+  const summaryLaborAmount = parseFloat(laborPrice) || 0;
+  const summaryTotalAmount = Math.round((summaryPartsAmount + summaryLaborAmount) * 100) / 100;
+
+  const renderShopEditableFinancialSummary = () => (
+    <>
+      <Text style={styles.partsSectionLabel}>Repair financial summary</Text>
+      <View style={styles.summaryRow}>
+        <Text style={styles.summaryLabel}>Parts</Text>
+        <Text style={styles.summaryValue}>
+          {formatMoneyAmount(summaryPartsAmount, DEFAULT_CURRENCY)}
+        </Text>
+      </View>
+      <View style={styles.summaryRow}>
+        <Text style={styles.summaryLabel}>Labor</Text>
+        <Text style={styles.summaryValue}>
+          {formatMoneyAmount(summaryLaborAmount, DEFAULT_CURRENCY)}
+        </Text>
+      </View>
+      <View style={styles.summaryRow}>
+        <Text style={[styles.summaryLabel, { fontWeight: '600' }]}>Total</Text>
+        <Text style={[styles.summaryValue, { fontWeight: '600' }]}>
+          {formatMoneyAmount(summaryTotalAmount, DEFAULT_CURRENCY)}
+        </Text>
+      </View>
+      {hasPartsLines ? (
+        <Text style={styles.mutedText}>
+          Parts come from your parts list. Edit line items via Manage parts.
+        </Text>
+      ) : (
+        <TextInput
+          mode="outlined"
+          label="Parts price"
+          keyboardType="numeric"
+          value={partsPrice}
+          onChangeText={handlePartsChange}
+          style={styles.input}
+        />
+      )}
+      <TextInput
+        mode="outlined"
+        label="Labor price"
+        keyboardType="numeric"
+        value={laborPrice}
+        onChangeText={handleLaborChange}
+        style={styles.input}
+      />
+      {laborMatchesMenuLowest ? (
+        <Text style={styles.mutedText}>{t('repairs.detail.laborFromPriceListHint')}</Text>
+      ) : null}
+      <TextInput
+        mode="outlined"
+        label="Total price"
+        keyboardType="numeric"
+        value={totalPrice}
+        onChangeText={handleTotalChange}
+        style={styles.input}
+      />
+      <Text style={styles.mutedText}>{t('repairs.detail.operationsFinancialHint')}</Text>
+      <Text style={styles.mutedText}>All amounts are in {DEFAULT_CURRENCY}.</Text>
+    </>
+  );
 
   const openVehicleProfile = useCallback(() => {
     if (!canOpenVehicleProfile) return;
@@ -3018,54 +3125,7 @@ export default function RepairDetailScreen({ route, navigation }) {
         {renderPartsSupplierSection()}
         {shopCanFinalizeOngoing ? (
           <>
-            <Text style={styles.partsSectionLabel}>Repair financial summary</Text>
-            {hasPartsLines ? (
-              <>
-                <Text style={styles.detailLine}>
-                  Parts (from list): {formatMoneyAmount(displayPartsTotals.partsSum, DEFAULT_CURRENCY)}
-                </Text>
-                <Text style={styles.detailLine}>
-                  Labor (from list): {formatMoneyAmount(displayPartsTotals.laborSum, DEFAULT_CURRENCY)}
-                </Text>
-                <Text style={[styles.detailLine, { fontWeight: '600' }]}>
-                  Total: {formatMoneyAmount(displayPartsTotals.total, DEFAULT_CURRENCY)}
-                </Text>
-                <Text style={styles.mutedText}>
-                  Amounts come from your parts list. Edit line items via Manage parts.
-                </Text>
-              </>
-            ) : (
-              <>
-                <TextInput
-                  mode="outlined"
-                  label="Labor price"
-                  keyboardType="numeric"
-                  value={laborPrice}
-                  onChangeText={handleLaborChange}
-                  style={styles.input}
-                />
-                <TextInput
-                  mode="outlined"
-                  label="Parts price"
-                  keyboardType="numeric"
-                  value={partsPrice}
-                  onChangeText={handlePartsChange}
-                  style={styles.input}
-                />
-                <TextInput
-                  mode="outlined"
-                  label="Total price"
-                  keyboardType="numeric"
-                  value={totalPrice}
-                  onChangeText={handleTotalChange}
-                  style={styles.input}
-                />
-                <Text style={styles.mutedText}>
-                  Total updates from labor + parts unless you edit it directly.
-                </Text>
-              </>
-            )}
-            <Text style={styles.mutedText}>All amounts are in {DEFAULT_CURRENCY}.</Text>
+            {renderShopEditableFinancialSummary()}
             <Button
               mode="contained"
               onPress={() => handleUpdateRepair()}
@@ -4031,60 +4091,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                               ? ` Previous service record: ${Number(repair.prior_max_odometer_km).toLocaleString()} km.`
                               : ''}
                           </Text>
-                          <Text style={styles.partsSectionLabel}>Repair financial summary</Text>
-                          {hasPartsLines ? (
-                            <>
-                              <Text style={styles.detailLine}>
-                                Parts (from list): {formatMoneyAmount(displayPartsTotals.partsSum, DEFAULT_CURRENCY)}
-                              </Text>
-                              <Text style={styles.detailLine}>
-                                Labor (from list): {formatMoneyAmount(displayPartsTotals.laborSum, DEFAULT_CURRENCY)}
-                              </Text>
-                              <Text style={[styles.detailLine, { fontWeight: '600' }]}>
-                                Total: {formatMoneyAmount(displayPartsTotals.total, DEFAULT_CURRENCY)}
-                              </Text>
-                              <Text style={styles.mutedText}>
-                                Amounts come from your parts list. Edit line items via Manage parts.
-                              </Text>
-                            </>
-                          ) : (
-                            <>
-                              <TextInput
-                                mode="outlined"
-                                label="Labor price"
-                                keyboardType="numeric"
-                                value={laborPrice}
-                                onChangeText={handleLaborChange}
-                                style={styles.input}
-                              />
-                              <TextInput
-                                mode="outlined"
-                                label="Parts price"
-                                keyboardType="numeric"
-                                value={partsPrice}
-                                onChangeText={handlePartsChange}
-                                style={styles.input}
-                              />
-                              <TextInput
-                                mode="outlined"
-                                label="Total price"
-                                keyboardType="numeric"
-                                value={totalPrice}
-                                onChangeText={handleTotalChange}
-                                style={styles.input}
-                              />
-                              <Text style={styles.mutedText}>
-                                Total updates from labor + parts unless you edit it directly.
-                              </Text>
-                              {repairDerivedTotals &&
-                              (repairDerivedTotals.partsSum > 0 || repairDerivedTotals.laborSum > 0) ? (
-                                <Text style={styles.mutedText}>
-                                  {t('repairs.detail.operationsFinancialHint')}
-                                </Text>
-                              ) : null}
-                            </>
-                          )}
-                          <Text style={styles.mutedText}>All amounts are in {DEFAULT_CURRENCY}.</Text>
+                          {renderShopEditableFinancialSummary()}
                           <View style={styles.completionSection}>
                             <Text style={styles.cardSectionTitle}>Payment & completion</Text>
                             <Text style={styles.cardBodyText}>

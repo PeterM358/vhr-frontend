@@ -38,8 +38,9 @@ export function buildOperationTypePickerOptions({
   const filteredCatalog = filterRepairTypesForShop(catalog, shopFilterOpts);
   const catalogById = new Map(catalog.map((rt) => [Number(rt.id), rt]));
 
-  const publishedMenu = menu.filter((item) => item?.is_published);
-  const menuSource = publishedMenu.length ? publishedMenu : menu;
+  // Include all price-list rows (published or not) so "+ Add service" appears in
+  // Choose service type immediately, with labor_from available for prefill hints.
+  const menuSource = menu;
 
   const byId = new Map();
   menuSource.forEach((item) => {
@@ -55,6 +56,8 @@ export function buildOperationTypePickerOptions({
       category_name: item?.category_name || fromCatalog?.category_name,
       icon: item?.icon_key || item?.repair_type_icon || fromCatalog?.icon,
       fromMenu: true,
+      labor_from: item?.labor_from ?? null,
+      labor_to: item?.labor_to ?? null,
     });
   });
 
