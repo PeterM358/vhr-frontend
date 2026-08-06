@@ -341,6 +341,7 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [respondingConfirmation, setRespondingConfirmation] = useState(false);
   const [respondingReschedule, setRespondingReschedule] = useState(false);
   const [partsExportExtra, setPartsExportExtra] = useState('');
+  const [partsSupplierExpanded, setPartsSupplierExpanded] = useState(false);
   const [exportingParts, setExportingParts] = useState(false);
   const [counterModalVisible, setCounterModalVisible] = useState(false);
   const [counterDate, setCounterDate] = useState(() => applyDayOffset(new Date(), 1, new Date()));
@@ -2840,47 +2841,75 @@ export default function RepairDetailScreen({ route, navigation }) {
 
   const renderPartsSupplierSection = () => {
     if (!isShop || !repair?.id || !shopCanManagePartsOnRepair) return null;
+    const exportPartCount = displayPartsForExport.length;
+    const collapsedHint =
+      exportPartCount > 0
+        ? `${exportPartCount} part${exportPartCount === 1 ? '' : 's'} · tap to export`
+        : 'Export VIN & parts to supplier';
     return (
       <View style={styles.partsSupplierSection}>
-        <Text style={styles.partsSectionLabel}>Parts supplier request</Text>
-        <Text style={styles.mutedText}>
-          Export VIN, year, engine, and parts on this repair to your supplier via email or Viber.
-        </Text>
-        {displayPartsForExport.length > 0 ? (
-          <View style={{ marginBottom: 8 }}>
-            {displayPartsForExport.map((p, idx) => (
-              <Text key={idx} style={styles.detailLine}>
-                •{' '}
-                {p.partsMaster?.name ||
-                  p.part_master_detail?.name ||
-                  p.parts_master_detail?.name ||
-                  p.shop_part_detail?.part?.name ||
-                  'Part'}{' '}
-                ×{p.quantity || 1}
-              </Text>
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.mutedText}>
-            No parts yet — add parts above or typical parts will be suggested from the service type.
-          </Text>
-        )}
-        <TextInput
-          mode="outlined"
-          label="Extra parts (comma-separated)"
-          value={partsExportExtra}
-          onChangeText={setPartsExportExtra}
-          style={styles.input}
-        />
-        <Button
-          mode="contained-tonal"
-          icon="share-variant"
-          loading={exportingParts}
-          disabled={exportingParts}
-          onPress={handleExportPartsRequest}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: partsSupplierExpanded }}
+          onPress={() => setPartsSupplierExpanded((prev) => !prev)}
+          style={styles.partsSupplierHeader}
         >
-          Export parts request
-        </Button>
+          <View style={{ flex: 1, paddingRight: 8 }}>
+            <Text style={[styles.partsSectionLabel, { marginTop: 0, marginBottom: 2 }]}>
+              Parts supplier request
+            </Text>
+            {!partsSupplierExpanded ? (
+              <Text style={styles.mutedText}>{collapsedHint}</Text>
+            ) : null}
+          </View>
+          <MaterialCommunityIcons
+            name={partsSupplierExpanded ? 'chevron-up' : 'chevron-down'}
+            size={22}
+            color={COLORS.TEXT_MUTED || '#888'}
+          />
+        </Pressable>
+        {partsSupplierExpanded ? (
+          <View style={{ marginTop: 8 }}>
+            <Text style={styles.mutedText}>
+              Export VIN, year, engine, and parts on this repair to your supplier via email or Viber.
+            </Text>
+            {exportPartCount > 0 ? (
+              <View style={{ marginBottom: 8, marginTop: 4 }}>
+                {displayPartsForExport.map((p, idx) => (
+                  <Text key={idx} style={styles.detailLine}>
+                    •{' '}
+                    {p.partsMaster?.name ||
+                      p.part_master_detail?.name ||
+                      p.parts_master_detail?.name ||
+                      p.shop_part_detail?.part?.name ||
+                      'Part'}{' '}
+                    ×{p.quantity || 1}
+                  </Text>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.mutedText}>
+                No parts yet — add parts above or typical parts will be suggested from the service type.
+              </Text>
+            )}
+            <TextInput
+              mode="outlined"
+              label="Extra parts (comma-separated)"
+              value={partsExportExtra}
+              onChangeText={setPartsExportExtra}
+              style={styles.input}
+            />
+            <Button
+              mode="contained-tonal"
+              icon="share-variant"
+              loading={exportingParts}
+              disabled={exportingParts}
+              onPress={handleExportPartsRequest}
+            >
+              Export parts request
+            </Button>
+          </View>
+        ) : null}
       </View>
     );
   };
@@ -5203,6 +5232,11 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(15,23,42,0.12)',
+  },
+  partsSupplierHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   labelSmall: {
     color: COLORS.TEXT_MUTED,
