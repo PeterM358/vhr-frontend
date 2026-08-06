@@ -30,6 +30,8 @@ import {
   deleteRepairOperation,
   startRepairOperation,
   completeRepairOperation,
+  createRepairAssignment,
+  deleteRepairAssignment,
   operationStatusLabel,
   addRepairPart,
   deleteRepairPart,
@@ -51,6 +53,7 @@ import {
   deleteRepairMedia,
 } from '../api/repairs';
 import { getShopParts, prepareRepairPartsData } from '../api/parts';
+import { listShopEmployees } from '../api/erp';
 import { getOffersForRepair, bookOffer, unbookOffer, deleteOffer } from '../api/offers';
 import { RepairsList } from '../components/shop/RepairsList';
 import RepairOutcomePanel from '../components/client/RepairOutcomePanel';
@@ -277,6 +280,13 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [operations, setOperations] = useState([]);
   const [operationsExpanded, setOperationsExpanded] = useState({});
   const [operationActionId, setOperationActionId] = useState(null);
+  const [opLaborDrafts, setOpLaborDrafts] = useState({});
+  const [opLaborSavingId, setOpLaborSavingId] = useState(null);
+  const [shopEmployees, setShopEmployees] = useState([]);
+  const [shopUsesWorkforce, setShopUsesWorkforce] = useState(false);
+  const [assignPickerOpId, setAssignPickerOpId] = useState(null);
+  const [assignPickerEmployeeId, setAssignPickerEmployeeId] = useState('');
+  const [assignSaving, setAssignSaving] = useState(false);
   const [selectedParts, setSelectedParts] = useState([]);
   const [availableShopParts, setAvailableShopParts] = useState([]);
   const [newPart, setNewPart] = useState({
@@ -716,12 +726,25 @@ export default function RepairDetailScreen({ route, navigation }) {
         setShopProfile(profile);
         const membership = shopMembershipFor(memberships, parsedShopId);
         setShopUsesInventory(shopCapabilityEnabled(profile, 'uses_inventory'));
+        setShopUsesWorkforce(shopCapabilityEnabled(profile, 'uses_employee_time_tracking'));
         setCanIssueStock(shopHasPermission(membership, 'move_stock'));
+        if (shopCapabilityEnabled(profile, 'uses_employee_time_tracking') && token) {
+          try {
+            const empPayload = await listShopEmployees(token, parsedShopId);
+            setShopEmployees(Array.isArray(empPayload) ? empPayload : empPayload?.results || []);
+          } catch {
+            setShopEmployees([]);
+          }
+        } else {
+          setShopEmployees([]);
+        }
       } else {
         setShopProfileId(null);
         setShopProfile(null);
         setShopServiceMenu([]);
         setShopUsesInventory(false);
+        setShopUsesWorkforce(false);
+        setShopEmployees([]);
         setCanIssueStock(false);
       }
 
@@ -1065,6 +1088,122 @@ export default function RepairDetailScreen({ route, navigation }) {
     }
   };
 
+  const moneyMinorToDraft = (minor) => {
+    if (minor == null || !Number.isFinite(Number(minor))) return '';
+    return String(Math.round((Number(minor) / 100) * 100) / 100);
+  };
+
+  useEffect(() => {
+    setOpLaborDrafts((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const op of operations) {
+        const key = String(op.id);
+        if (opLaborSavingId === op.id) continue;
+        const fromServer = moneyMinorToDraft(op.sales_snapshot_minor ?? op.fixed_price_minor);
+        if (next[key] !== fromServer) {
+          next[key] = fromServer;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [operations, opLaborSavingId]);
+
+  const handleSaveOperationLabor = async (operation) => {
+    if (!isMyShopRepair || !operation?.id) return;
+    const raw = String(opLaborDrafts[operation.id] ?? '').trim().replace(',', '.');
+    const amount = raw === '' ? null : parseFloat(raw);
+    if (amount != null && (!Number.isFinite(amount) || amount < 0)) {
+      showMessage(
+        t('repairs.detail.operationsPicker.laborInvalid', null, 'Invalid labor price'),
+        t('repairs.detail.operationsPicker.laborInvalidHint', null, 'Enter a non-negative amount.')
+      );
+      return;
+    }
+    const minor = amount == null ? null : Math.round(amount * 100);
+    const currentMinor = operation.sales_snapshot_minor ?? operation.fixed_price_minor;
+    if (minor === (currentMinor == null ? null : Number(currentMinor))) {
+      return;
+    }
+    try {
+      setOpLaborSavingId(operation.id);
+      const token = await AsyncStorage.getItem('@access_token');
+      await updateRepairOperation(token, repairId, operation.id, {
+        pricing_mode: 'fixed',
+        fixed_price_minor: minor,
+      });
+      await refreshRepair();
+      await refreshParts();
+    } catch (err) {
+      showMessage(
+        t('repairs.detail.operationsPicker.couldNotSaveLabor', null, 'Could not save labor price'),
+        messageFromApiError(err, 'Please try again.')
+      );
+    } finally {
+      setOpLaborSavingId(null);
+    }
+  };
+
+  const operationAssignmentsFor = (operationId) => {
+    const rows = Array.isArray(repair?.workforce_assignments) ? repair.workforce_assignments : [];
+    return rows.filter((row) => Number(row.service_order_operation_id) === Number(operationId));
+  };
+
+  const canExecuteOperationLifecycle = (op) => {
+    const userIds = Array.isArray(op?.assignee_user_ids) ? op.assignee_user_ids : [];
+    if (!userIds.length || currentUserId == null) return false;
+    return userIds.some((id) => Number(id) === Number(currentUserId));
+  };
+
+  const handleAssignWorker = async (operation) => {
+    if (!isMyShopRepair || !operation?.id || !assignPickerEmployeeId) return;
+    const employeeId = parseInt(assignPickerEmployeeId, 10);
+    if (!Number.isFinite(employeeId)) return;
+    const existing = operationAssignmentsFor(operation.id);
+    if (existing.some((row) => Number(row.employee_id) === employeeId)) {
+      setAssignPickerOpId(null);
+      setAssignPickerEmployeeId('');
+      return;
+    }
+    try {
+      setAssignSaving(true);
+      const token = await AsyncStorage.getItem('@access_token');
+      await createRepairAssignment(token, repairId, {
+        employee_id: employeeId,
+        service_order_operation_id: operation.id,
+        role: existing.length ? 'assistant' : 'primary',
+      });
+      setAssignPickerOpId(null);
+      setAssignPickerEmployeeId('');
+      await refreshRepair();
+    } catch (err) {
+      showMessage(
+        t('repairs.detail.operationsPicker.couldNotAssign', null, 'Could not assign worker'),
+        messageFromApiError(err, 'Please try again.')
+      );
+    } finally {
+      setAssignSaving(false);
+    }
+  };
+
+  const handleUnassignWorker = async (assignmentId) => {
+    if (!isMyShopRepair || !assignmentId) return;
+    try {
+      setAssignSaving(true);
+      const token = await AsyncStorage.getItem('@access_token');
+      await deleteRepairAssignment(token, repairId, assignmentId);
+      await refreshRepair();
+    } catch (err) {
+      showMessage(
+        t('repairs.detail.operationsPicker.couldNotUnassign', null, 'Could not remove worker'),
+        messageFromApiError(err, 'Please try again.')
+      );
+    } finally {
+      setAssignSaving(false);
+    }
+  };
+
   const computeOperationSubtotals = (operationId) => {
     const opParts = repairParts.filter(
       (part) => Number(part.service_order_operation_id) === Number(operationId)
@@ -1182,7 +1321,7 @@ export default function RepairDetailScreen({ route, navigation }) {
           ) : null}
         </View>
         <Text style={styles.mutedText}>
-          Split work into job lines. One default operation is enough for simple repairs.
+          Split work into job lines. Set labor price and assign workers here. Start/Complete appear for the assigned technician.
         </Text>
         {visibleOperations.length === 0 ? (
           <Text style={styles.mutedText}>No operations yet — add one to organize parts and labor.</Text>
@@ -1255,7 +1394,135 @@ export default function RepairDetailScreen({ route, navigation }) {
                     ) : (
                       <Text style={styles.mutedText}>No parts on this operation yet.</Text>
                     )}
-                    {op.assigned_mechanics?.length ? (
+                    <TextInput
+                      mode="outlined"
+                      dense
+                      label={t('repairs.detail.operationsPicker.laborPrice', null, 'Labor price')}
+                      keyboardType="decimal-pad"
+                      value={opLaborDrafts[op.id] ?? ''}
+                      onChangeText={(text) =>
+                        setOpLaborDrafts((prev) => ({ ...prev, [op.id]: text }))
+                      }
+                      onBlur={() => handleSaveOperationLabor(op)}
+                      disabled={opLaborSavingId != null || operationActionId != null}
+                      right={
+                        opLaborSavingId === op.id ? (
+                          <TextInput.Icon icon={() => <ActivityIndicator size="small" />} />
+                        ) : (
+                          <TextInput.Affix text={DEFAULT_CURRENCY} />
+                        )
+                      }
+                      style={{ marginTop: 4 }}
+                    />
+                    <Text style={styles.mutedText}>
+                      {t(
+                        'repairs.detail.operationsPicker.laborPriceHint',
+                        null,
+                        'Prefills from your price list. Edit here for this job.'
+                      )}
+                    </Text>
+                    {shopUsesWorkforce ? (
+                      <View style={{ gap: 6, marginTop: 4 }}>
+                        {operationAssignmentsFor(op.id).length ? (
+                          operationAssignmentsFor(op.id).map((row) => (
+                            <View
+                              key={row.id}
+                              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                            >
+                              <Text style={styles.mutedText}>
+                                {t('repairs.detail.operationsPicker.assignedTo', null, 'Assigned')}:{' '}
+                                {row.employee_display_name || `Employee #${row.employee_id}`}
+                              </Text>
+                              <Button
+                                compact
+                                mode="text"
+                                disabled={assignSaving || operationActionId != null}
+                                onPress={() => handleUnassignWorker(row.id)}
+                              >
+                                {t('repairs.detail.operationsPicker.unassign', null, 'Remove')}
+                              </Button>
+                            </View>
+                          ))
+                        ) : op.assigned_mechanics?.length ? (
+                          <Text style={styles.mutedText}>
+                            {t('repairs.detail.operationsPicker.assignedTo', null, 'Assigned')}:{' '}
+                            {op.assigned_mechanics.join(', ')}
+                          </Text>
+                        ) : (
+                          <Text style={styles.mutedText}>
+                            {t(
+                              'repairs.detail.operationsPicker.noWorker',
+                              null,
+                              'No worker assigned yet.'
+                            )}
+                          </Text>
+                        )}
+                        {assignPickerOpId === op.id ? (
+                          <View style={{ gap: 6 }}>
+                            <View
+                              style={{
+                                borderWidth: StyleSheet.hairlineWidth,
+                                borderColor: '#ccc',
+                                borderRadius: 4,
+                              }}
+                            >
+                              <Picker
+                                selectedValue={assignPickerEmployeeId}
+                                onValueChange={(value) => setAssignPickerEmployeeId(String(value))}
+                              >
+                                <Picker.Item
+                                  label={t('repairs.detail.operationsPicker.pickWorker', null, 'Choose worker…')}
+                                  value=""
+                                />
+                                {shopEmployees
+                                  .filter((emp) => emp?.is_active !== false)
+                                  .map((emp) => (
+                                    <Picker.Item
+                                      key={emp.id}
+                                      label={emp.display_name || `Employee #${emp.id}`}
+                                      value={String(emp.id)}
+                                    />
+                                  ))}
+                              </Picker>
+                            </View>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                              <Button
+                                compact
+                                mode="contained"
+                                loading={assignSaving}
+                                disabled={assignSaving || !assignPickerEmployeeId}
+                                onPress={() => handleAssignWorker(op)}
+                              >
+                                {t('repairs.detail.operationsPicker.confirmAssign', null, 'Assign')}
+                              </Button>
+                              <Button
+                                compact
+                                mode="text"
+                                disabled={assignSaving}
+                                onPress={() => {
+                                  setAssignPickerOpId(null);
+                                  setAssignPickerEmployeeId('');
+                                }}
+                              >
+                                {t('common.cancel')}
+                              </Button>
+                            </View>
+                          </View>
+                        ) : (
+                          <Button
+                            compact
+                            mode="outlined"
+                            disabled={operationActionId != null || assignSaving || shopEmployees.length === 0}
+                            onPress={() => {
+                              setAssignPickerOpId(op.id);
+                              setAssignPickerEmployeeId('');
+                            }}
+                          >
+                            {t('repairs.detail.operationsPicker.assignWorker', null, 'Assign worker')}
+                          </Button>
+                        )}
+                      </View>
+                    ) : op.assigned_mechanics?.length ? (
                       <Text style={styles.mutedText}>Mechanics: {op.assigned_mechanics.join(', ')}</Text>
                     ) : null}
                     {op.notes ? <Text style={styles.mutedText}>{op.notes}</Text> : null}
@@ -1271,7 +1538,10 @@ export default function RepairDetailScreen({ route, navigation }) {
                         {t('repairs.detail.operationsPicker.changeType')}
                       </Button>
                     ) : null}
-                    {op.status !== 'completed' && op.status !== 'cancelled' && op.status !== 'declined' ? (
+                    {canExecuteOperationLifecycle(op) &&
+                    op.status !== 'completed' &&
+                    op.status !== 'cancelled' &&
+                    op.status !== 'declined' ? (
                       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                         {op.status !== 'in_progress' ? (
                           <Button
@@ -1281,7 +1551,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                             disabled={operationActionId != null}
                             onPress={() => handleOperationLifecycle(op.id, 'start')}
                           >
-                            Start
+                            {t('repairs.detail.operationsPicker.start', null, 'Start')}
                           </Button>
                         ) : null}
                         <Button
@@ -1291,7 +1561,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                           disabled={operationActionId != null}
                           onPress={() => handleOperationLifecycle(op.id, 'complete')}
                         >
-                          Complete
+                          {t('repairs.detail.operationsPicker.complete', null, 'Complete')}
                         </Button>
                       </View>
                     ) : null}

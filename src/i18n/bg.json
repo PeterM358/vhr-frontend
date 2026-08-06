@@ -3271,7 +3271,22 @@
         "removeOperationConfirm": "Премахване на тази операция от ремонта? Действието е необратимо.",
         "removeOperationBlocked": "Премахнете части, труд и назначения преди изтриване на операцията.",
         "couldNotRemove": "Неуспешно премахване на операция",
-        "laborFromPriceList": "От {amount} труд (ценоразпис)"
+        "laborFromPriceList": "От {amount} труд (ценоразпис)",
+        "laborPrice": "Цена труд",
+        "laborPriceHint": "Попълва се от ценоразписа. Редактирайте тук за този job.",
+        "laborInvalid": "Невалидна цена за труд",
+        "laborInvalidHint": "Въведете неотрицателна сума.",
+        "couldNotSaveLabor": "Неуспешно запазване на цената за труд",
+        "assignWorker": "Назначи работник",
+        "pickWorker": "Избери работник…",
+        "confirmAssign": "Назначи",
+        "unassign": "Премахни",
+        "assignedTo": "Назначен",
+        "noWorker": "Все още няма назначен работник.",
+        "couldNotAssign": "Неуспешно назначаване на работник",
+        "couldNotUnassign": "Неуспешно премахване на работник",
+        "start": "Старт",
+        "complete": "Готово"
       }
     }
   },

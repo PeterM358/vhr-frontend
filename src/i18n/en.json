@@ -3314,7 +3314,22 @@
         "removeOperationConfirm": "Remove this operation from the repair? This cannot be undone.",
         "removeOperationBlocked": "Remove parts, labor, and mechanic assignments from this operation before deleting it.",
         "couldNotRemove": "Could not remove operation",
-        "laborFromPriceList": "From {amount} labor (price list)"
+        "laborFromPriceList": "From {amount} labor (price list)",
+        "laborPrice": "Labor price",
+        "laborPriceHint": "Prefills from your price list. Edit here for this job.",
+        "laborInvalid": "Invalid labor price",
+        "laborInvalidHint": "Enter a non-negative amount.",
+        "couldNotSaveLabor": "Could not save labor price",
+        "assignWorker": "Assign worker",
+        "pickWorker": "Choose worker…",
+        "confirmAssign": "Assign",
+        "unassign": "Remove",
+        "assignedTo": "Assigned",
+        "noWorker": "No worker assigned yet.",
+        "couldNotAssign": "Could not assign worker",
+        "couldNotUnassign": "Could not remove worker",
+        "start": "Start",
+        "complete": "Complete"
       }
     }
   },

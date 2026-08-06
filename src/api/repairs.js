@@ -660,6 +660,44 @@ export const completeRepairOperation = (token, repairId, operationId) =>
 export const cancelRepairOperation = (token, repairId, operationId, reason = '') =>
   postRepairOperationAction(token, repairId, operationId, 'cancel', reason ? { reason } : {});
 
+export async function listRepairAssignments(token, repairId) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/service-order/${repairId}/assignments/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    await throwApiError(response, 'Failed to fetch workforce assignments');
+  }
+  return response.json();
+}
+
+export async function createRepairAssignment(token, repairId, data) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/service-order/${repairId}/assignments/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    await throwApiError(response, 'Failed to assign worker');
+  }
+  return response.json();
+}
+
+export async function deleteRepairAssignment(token, repairId, assignmentId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/repairs/service-order/${repairId}/assignments/${assignmentId}/`,
+    {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  if (!response.ok) {
+    await throwApiError(response, 'Failed to remove worker assignment');
+  }
+}
+
 export function operationStatusLabel(status) {
   switch (status) {
     case 'planned':
