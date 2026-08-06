@@ -111,7 +111,7 @@ import {
 } from '../utils/finalizeMileageValidation';
 import { pickOdometerPhotoAttachment } from '../utils/pickDocumentFile';
 import { uploadRepairDocument } from '../api/documents';
-import { showMessage } from '../utils/crossPlatformAlert';
+import { confirmMessage, showMessage } from '../utils/crossPlatformAlert';
 import { messageFromApiError } from '../utils/apiErrorMessage';
 import { safeError } from '../utils/logger';
 import { getPartsExport, getServiceMenu } from '../api/serviceMenu';
@@ -1098,25 +1098,8 @@ export default function RepairDetailScreen({ route, navigation }) {
     setOperationsExpanded((prev) => ({ ...prev, [operationId]: !prev[operationId] }));
   };
 
-  const handleRemoveOperation = (operation) => {
+  const handleRemoveOperation = async (operation) => {
     if (!isMyShopRepair || !operation?.id) return;
-
-    const runDelete = async () => {
-      try {
-        setOperationActionId(operation.id);
-        const token = await AsyncStorage.getItem('@access_token');
-        await deleteRepairOperation(token, repairId, operation.id);
-        await refreshRepair();
-        await refreshParts();
-      } catch (err) {
-        showMessage(
-          t('repairs.detail.operationsPicker.couldNotRemove'),
-          messageFromApiError(err, 'Please try again.')
-        );
-      } finally {
-        setOperationActionId(null);
-      }
-    };
 
     if (!operationCanHardDelete(operation, repairParts)) {
       showMessage(
@@ -1126,14 +1109,33 @@ export default function RepairDetailScreen({ route, navigation }) {
       return;
     }
 
-    Alert.alert(
+    // Use confirmMessage (not Alert.alert) so the confirm dialog works on web —
+    // shop Repair wizard is used heavily on mobile web where Alert.alert is a no-op.
+    const confirmed = await confirmMessage(
       t('repairs.detail.operationsPicker.removeOperation'),
       t('repairs.detail.operationsPicker.removeOperationConfirm'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('repairs.detail.operationsPicker.removeOperation'), style: 'destructive', onPress: runDelete },
-      ]
+      {
+        confirmLabel: t('repairs.detail.operationsPicker.removeOperation'),
+        cancelLabel: t('common.cancel'),
+        destructive: true,
+      }
     );
+    if (!confirmed) return;
+
+    try {
+      setOperationActionId(operation.id);
+      const token = await AsyncStorage.getItem('@access_token');
+      await deleteRepairOperation(token, repairId, operation.id);
+      await refreshRepair();
+      await refreshParts();
+    } catch (err) {
+      showMessage(
+        t('repairs.detail.operationsPicker.couldNotRemove'),
+        messageFromApiError(err, 'Please try again.')
+      );
+    } finally {
+      setOperationActionId(null);
+    }
   };
 
   const renderOperationsSection = () => {
