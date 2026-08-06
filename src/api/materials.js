@@ -4,6 +4,7 @@
  */
 export {
   getSuggestedPartsForRepairType,
+  getMaterialCategories,
   getPartsCatalog as getMaterialsCatalog,
   getPartsCatalog,
   createPartsMaster as createMaterialMaster,

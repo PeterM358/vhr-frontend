@@ -1,8 +1,11 @@
 /**
- * Return target + parts payload:
+ * Return target + materials payload:
  * - RepairDetail: params.addedParts, repairId
  * - CreateRepair / ClientLogRepair / RepairChat: params.addedParts (+ context)
  * Offer flow uses SelectOfferPartsScreen → CreateOrUpdateOffer.
+ *
+ * Adds MaterialMaster (platform materials catalog) lines; shop OrgMaterial
+ * listings are created/updated when the repair saves via prepareRepairPartsData.
  */
 
 import React, { useState, useEffect, useLayoutEffect } from 'react';
@@ -11,7 +14,6 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,6 +33,13 @@ import ScreenBackground from '../components/ScreenBackground';
 import BASE_STYLES from '../styles/base';
 import { stackContentPaddingTop } from '../navigation/stackContentInset';
 import { partCatalogSubtitle } from '../utils/repairPartsTotals';
+import { showMessage } from '../utils/crossPlatformAlert';
+
+function normalizeMoneyField(value) {
+  if (value === '' || value === null || value === undefined) return '0';
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? String(value) : null;
+}
 
 export default function SelectRepairPartsScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
@@ -38,7 +47,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTitle: 'Choose estimated parts',
+      headerTitle: 'Choose estimated materials',
       headerBackTitleVisible: true,
       headerBackTitle: 'Back',
       headerBackImage: undefined,
@@ -75,8 +84,8 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
           {
             partsMasterId: newCreatedPart.id,
             quantity: 1,
-            price: '',
-            labor: '',
+            price: '0',
+            labor: '0',
             note: '',
             partsMaster: newCreatedPart,
           },
@@ -113,7 +122,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
 
   const handleSearch = async () => {
     if (!query.trim()) {
-      Alert.alert('Validation', 'Please enter search text before searching.');
+      showMessage('Validation', 'Please enter search text before searching.', { variant: 'error' });
       return;
     }
 
@@ -127,10 +136,10 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
       if (shopProfileId) params.shop_profile = shopProfileId;
 
       const data = await getPartsCatalog(token, params);
-      setResults(data);
+      setResults(Array.isArray(data) ? data : (data?.results || []));
     } catch (err) {
       console.error(err);
-      Alert.alert('Error', 'Failed to fetch materials catalog');
+      showMessage('Error', 'Failed to fetch materials catalog', { variant: 'error' });
     } finally {
       setLoading(false);
     }
@@ -160,8 +169,15 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
           partsMasterId: item.id,
           shopPartId: item.shop_part?.id ?? null,
           quantity: 1,
-          price: item.shop_part?.price || '',
-          labor: item.shop_part?.default_labor_cost ?? item.shop_part?.labor_cost ?? '',
+          price: item.shop_part?.price != null && item.shop_part.price !== ''
+            ? String(item.shop_part.price)
+            : '0',
+          labor:
+            item.shop_part?.default_labor_cost != null && item.shop_part.default_labor_cost !== ''
+              ? String(item.shop_part.default_labor_cost)
+              : item.shop_part?.labor_cost != null && item.shop_part.labor_cost !== ''
+                ? String(item.shop_part.labor_cost)
+                : '0',
           note: '',
           partsMaster: item,
         },
@@ -188,27 +204,33 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
 
   const handleConfirmAndReturn = () => {
     if (selected.length === 0) {
-      Alert.alert('No parts selected yet.');
+      showMessage('No materials selected', 'Add at least one material before saving.', {
+        variant: 'error',
+      });
       return;
     }
 
     for (let part of selected) {
-      if (!part.quantity || isNaN(part.quantity) || !part.price || isNaN(part.price) || !part.labor || isNaN(part.labor)) {
-        Alert.alert(
-          'Validation Error',
-          'Please fill in Quantity, Price, and Labor for all selected parts (and ensure they are numbers).'
+      const qty = parseInt(part.quantity, 10);
+      const price = normalizeMoneyField(part.price);
+      const labor = normalizeMoneyField(part.labor);
+      if (!qty || Number.isNaN(qty) || price === null || labor === null) {
+        showMessage(
+          'Validation',
+          'Quantity must be a number. Leave Price/Labor empty to save as 0, or enter valid amounts.',
+          { variant: 'error' },
         );
         return;
       }
     }
 
     const cleanedParts = selected.map(p => ({
-      partsMasterId: parseInt(p.partsMasterId),
+      partsMasterId: parseInt(p.partsMasterId, 10),
       partsMaster: p.partsMaster,
       shopPartId: p.shopPartId ?? null,
-      quantity: parseInt(p.quantity),
-      price: p.price,
-      labor: p.labor,
+      quantity: parseInt(p.quantity, 10),
+      price: normalizeMoneyField(p.price),
+      labor: normalizeMoneyField(p.labor),
       note: p.note,
     }));
 
@@ -218,7 +240,9 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
     if (target === 'RepairDetail') {
       const rid = rp.repairId;
       if (rid == null) {
-        Alert.alert('Error', 'Missing repair reference. Open parts from a repair.');
+        showMessage('Error', 'Missing repair reference. Open materials from a repair.', {
+          variant: 'error',
+        });
         return;
       }
       navigation.navigate({
@@ -278,7 +302,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
       return;
     }
 
-    Alert.alert('Error', `Unknown return target: ${target}`);
+    showMessage('Error', `Unknown return target: ${target}`, { variant: 'error' });
   };
 
   const navigateToAddNewPartScreen = () => {
@@ -287,17 +311,21 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
     });
   };
 
-  // ✅ Determine card color based on value
   const getBorderStyle = (part) => {
-    const fields = [part.quantity, part.price, part.labor];
+    const price = normalizeMoneyField(part.price);
+    const labor = normalizeMoneyField(part.labor);
+    const fields = [part.quantity, price, labor];
     if (fields.some(v => v === '' || v === null)) {
-      return { borderColor: theme.colors.error, borderWidth: 2 };  // RED
+      return { borderColor: theme.colors.error, borderWidth: 2 };
     }
     if (fields.some(v => parseFloat(v) === 0)) {
-      return { borderColor: 'orange', borderWidth: 2 };  // YELLOW
+      return { borderColor: 'orange', borderWidth: 2 };
     }
     return {};
   };
+
+  const saveLabel =
+    returnTo === 'RepairDetail' ? 'Save materials to repair' : 'Confirm selection';
 
   return (
     <ScreenBackground safeArea={false}>
@@ -305,13 +333,23 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
       style={{ flex: 1, backgroundColor: 'transparent' }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={[BASE_STYLES.formScreenScroll, { paddingTop: stackContentPaddingTop(insets, 4) }]}>
+      <ScrollView
+        contentContainerStyle={[
+          BASE_STYLES.formScreenScroll,
+          {
+            paddingTop: stackContentPaddingTop(insets, 4),
+            paddingBottom: 24,
+          },
+        ]}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.helperText}>
-          One global catalog — your shop sets its own sell price. Pick typical parts below or search.
+          Platform materials catalog plus your shop listings. Other organizations&apos; private
+          warehouse stock is never shown. Your shop sets its own sell price.
         </Text>
 
         {loadingSuggested ? (
-          <Text style={styles.helperText}>Loading typical parts for this service…</Text>
+          <Text style={styles.helperText}>Loading typical materials for this service…</Text>
         ) : suggestedParts.length > 0 ? (
           <View style={styles.suggestedBlock}>
             <Text style={styles.suggestedTitle}>Typical for this service</Text>
@@ -341,6 +379,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
           value={query}
           onChangeText={setQuery}
           style={styles.input}
+          onSubmitEditing={handleSearch}
         />
         <Button mode="contained" onPress={handleSearch} loading={loading}>
           Search
@@ -349,7 +388,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
         {results.map((item, idx) => {
           const expanded = expandedCatalogIndexes.includes(idx);
           return (
-            <Card key={idx} style={styles.catalogCard}>
+            <Card key={item.id ?? idx} style={styles.catalogCard}>
               <Card.Title
                 title={item.name}
                 subtitle={partCatalogSubtitle(item)}
@@ -392,21 +431,21 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
         <Divider style={{ marginVertical: 20 }} />
 
         <Text variant="titleMedium" style={{ marginBottom: 8 }}>
-          Selected estimated parts
+          Selected estimated materials
         </Text>
         {selected.length === 0 ? (
-          <Text style={styles.emptyStateText}>No parts selected yet.</Text>
+          <Text style={styles.emptyStateText}>No materials selected yet.</Text>
         ) : null}
         {selected.map((part, index) => {
           const expanded = expandedSelectedIndexes.includes(index);
 
           return (
             <Card
-              key={index}
+              key={`${part.partsMasterId}-${index}`}
               style={[styles.selectedCard, getBorderStyle(part)]}
             >
               <Card.Title
-                title={part.partsMaster?.name || 'Part'}
+                title={part.partsMaster?.name || 'Material'}
                 subtitle={partCatalogSubtitle(part.partsMaster)}
                 left={(props) => (
                   <IconButton
@@ -439,7 +478,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
                   />
                   <TextInput
                     mode="outlined"
-                    label="Price"
+                    label="Price (empty = 0)"
                     keyboardType="numeric"
                     value={part.price}
                     onChangeText={(val) => handleSelectedChange(index, 'price', val)}
@@ -447,7 +486,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
                   />
                   <TextInput
                     mode="outlined"
-                    label="Labor"
+                    label="Labor (empty = 0)"
                     keyboardType="numeric"
                     value={part.labor}
                     onChangeText={(val) => handleSelectedChange(index, 'labor', val)}
@@ -466,25 +505,31 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
           );
         })}
 
-        <Divider style={{ marginVertical: 20 }} />
-
         <Button
-          mode="contained"
+          mode="outlined"
           onPress={navigateToAddNewPartScreen}
-          style={{ marginBottom: 16 }}
+          style={{ marginTop: 8, marginBottom: 8 }}
         >
-          Add custom part
+          Add custom material
         </Button>
-        {/* TODO(estimated-parts): future supplier invoice import, purchase/sell price, discounts, inventory quantity, margins, and supplier integrations. */}
+      </ScrollView>
 
+      <View
+        style={[
+          styles.stickyFooter,
+          { paddingBottom: Math.max(insets.bottom, 12) },
+        ]}
+        pointerEvents="box-none"
+      >
         <Button
           mode="contained"
           onPress={handleConfirmAndReturn}
-          style={{ marginBottom: 30 }}
+          style={styles.saveButton}
+          contentStyle={styles.saveButtonContent}
         >
-          {returnTo === 'RepairDetail' ? 'Save parts to repair' : 'Confirm selection'}
+          {saveLabel}
         </Button>
-      </ScrollView>
+      </View>
     </KeyboardAvoidingView>
     </ScreenBackground>
   );
@@ -517,4 +562,15 @@ const styles = StyleSheet.create({
   suggestedTitle: { fontWeight: '600', marginBottom: 8, color: '#334155' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   suggestChip: { marginBottom: 4 },
+  stickyFooter: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#CBD5E1',
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    zIndex: 20,
+    elevation: 8,
+  },
+  saveButton: { marginBottom: 0 },
+  saveButtonContent: { minHeight: 48 },
 });

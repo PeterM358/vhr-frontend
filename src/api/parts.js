@@ -4,6 +4,14 @@ import { API_BASE_URL } from './config';
 // Materials catalog — paths use /api/materials/ ( /api/parts/ remains a BE alias for one release ).
 // Prefer importing from `./materials` for new code.
 
+export async function getMaterialCategories(token) {
+  const response = await fetch(`${API_BASE_URL}/api/materials/material-categories/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to load material categories');
+  return response.json();
+}
+
 // Get global MaterialMaster catalog with query params object
 export async function getSuggestedPartsForRepairType(token, repairTypeId, shopProfileId) {
   const qs = new URLSearchParams();

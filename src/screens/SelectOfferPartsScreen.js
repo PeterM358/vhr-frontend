@@ -4,10 +4,8 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from 'react-native';import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Text,
@@ -23,6 +21,7 @@ import { getPartsCatalog, getSuggestedPartsForRepairType } from '../api/parts';
 import ScreenBackground from '../components/ScreenBackground';
 import BASE_STYLES from '../styles/base';
 import { stackContentPaddingTop } from '../navigation/stackContentInset';
+import { showMessage } from '../utils/crossPlatformAlert';
 
 export default function SelectOfferPartsScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
@@ -102,7 +101,7 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
 
   const handleSearch = async () => {
     if (!query.trim()) {
-      Alert.alert('Validation', 'Please enter search text before searching.');
+      showMessage('Validation', 'Please enter search text before searching.', { variant: 'error' });
       return;
     }
 
@@ -116,10 +115,10 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
       if (shopProfileId) params.shop_profile = shopProfileId;
 
       const data = await getPartsCatalog(token, params);
-      setResults(data);
+      setResults(Array.isArray(data) ? data : (data?.results || []));
     } catch (err) {
       console.error(err);
-      Alert.alert('Error', 'Failed to fetch materials catalog');
+      showMessage('Error', 'Failed to fetch materials catalog', { variant: 'error' });
     } finally {
       setLoading(false);
     }
@@ -173,27 +172,33 @@ export default function SelectOfferPartsScreen({ route, navigation }) {
 
   const handleConfirmAndReturn = () => {
     if (selected.length === 0) {
-      Alert.alert('No parts selected yet.');
+      showMessage('No materials selected', 'Add at least one material before confirming.', {
+        variant: 'error',
+      });
       return;
     }
 
     for (let part of selected) {
-      if (!part.quantity || isNaN(part.quantity) || !part.price || isNaN(part.price) || !part.labor || isNaN(part.labor)) {
-        Alert.alert(
-          'Validation Error',
-          'Please fill in Quantity, Price, and Labor for all selected parts (and ensure they are numbers).'
+      const qty = parseInt(part.quantity, 10);
+      const priceOk = part.price === '' || part.price == null || !Number.isNaN(parseFloat(part.price));
+      const laborOk = part.labor === '' || part.labor == null || !Number.isNaN(parseFloat(part.labor));
+      if (!qty || Number.isNaN(qty) || !priceOk || !laborOk) {
+        showMessage(
+          'Validation',
+          'Quantity must be a number. Leave Price/Labor empty to save as 0, or enter valid amounts.',
+          { variant: 'error' },
         );
         return;
       }
     }
 
     const cleanedParts = selected.map(p => ({
-      partsMasterId: parseInt(p.partsMasterId),
+      partsMasterId: parseInt(p.partsMasterId, 10),
       partsMaster: p.partsMaster,
       shopPartId: p.shopPartId ?? null,
-      quantity: parseInt(p.quantity),
-      price: p.price,
-      labor: p.labor,
+      quantity: parseInt(p.quantity, 10),
+      price: p.price === '' || p.price == null ? '0' : p.price,
+      labor: p.labor === '' || p.labor == null ? '0' : p.labor,
       note: p.note,
     }));
 
