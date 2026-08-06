@@ -2,14 +2,17 @@ import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 
 import ScreenBackground from '../components/ScreenBackground';
+import PartnerAppHeader from '../components/partner/PartnerAppHeader';
 import ProTabBar from '../components/ui/ProTabBar';
 import ShopWarehouseReceiveScreen from './ShopWarehouseReceiveScreen';
 import ShopWarehouseDocumentsPanel from '../components/warehouse/ShopWarehouseDocumentsPanel';
 import ShopWarehouseStockPanel from '../components/warehouse/ShopWarehouseStockPanel';
+import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import { useTranslation } from '../i18n';
 
 export default function ShopWarehouseHubScreen({ navigation }) {
   const { t } = useTranslation();
+  const handleBack = usePartnerDashboardBack(navigation);
   const hubTabs = [
     { value: 'add', label: t('partnerDashboard.warehouse.addDocument'), icon: 'plus' },
     { value: 'documents', label: t('partnerDashboard.warehouse.documents'), icon: 'file-document-multiple-outline' },
@@ -37,7 +40,13 @@ export default function ShopWarehouseHubScreen({ navigation }) {
   };
 
   return (
-    <ScreenBackground>
+    <ScreenBackground safeArea={false}>
+      <PartnerAppHeader
+        title={t('drawer.partner.warehouse')}
+        backLabel={t('navigation.backToDashboard')}
+        onBack={handleBack}
+        iconOnlyBack
+      />
       <View style={styles.tabsOnly}>
         <ProTabBar tabs={hubTabs} value={tab} onChange={onTabChange} />
       </View>

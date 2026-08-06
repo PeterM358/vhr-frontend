@@ -137,6 +137,8 @@ assert.ok(read('src/screens/ShopHomeScreen.js').includes('PartnerAppHeader'));
 assert.ok(read('src/screens/ShopHomeScreen.js').includes('partnerInAppAlertCopy'));
 assert.ok(read('src/screens/RepairDetailScreen.js').includes('PartnerAppHeader'));
 assert.ok(read('src/screens/ShopCalendarScreen.js').includes('PartnerAppHeader'));
+assert.ok(read('src/screens/ShopInvoicingScreen.js').includes('PartnerAppHeader'));
+assert.ok(read('src/screens/ShopWarehouseHubScreen.js').includes('PartnerAppHeader'));
 assert.ok(read('src/components/shop/RepairsList.js').includes('PartnerAppHeader'));
 
 console.log('partner-nav-chrome checks ok');
