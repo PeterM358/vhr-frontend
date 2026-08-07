@@ -1,0 +1,39 @@
+---
+description: Always ship Bulgarian and English for every user-facing UI string
+alwaysApply: true
+---
+
+# BG + EN for every user-facing string
+
+Veversal ships **English and Bulgarian** for all user-visible copy. Do not merge hardcoded or single-language strings.
+
+## How to translate
+
+- Import **`useTranslation`** from `src/i18n` and use **`t('dotted.key')`** for every new/changed user-facing string in components, screens, and hooks.
+- Add or update the **same key** in both files in the same PR/commit:
+  - `src/i18n/en.json`
+  - `src/i18n/bg.json`
+- Included: buttons, labels, placeholders, helper text, empty states, status labels, alerts/toasts, errors, and navigation chrome.
+
+## API-sourced names
+
+- Catalog values (RepairType, fuel type, etc.): use **`translateRepairTypeLabel`**, **`translateFuelTypeLabel`**, or other localized fields when available.
+- If the API has no localized name, still i18n all **chrome** around it; note follow-up in the PR if catalog data needs backend localization.
+
+## Done checklist
+
+- Keys exist in **en** and **bg** with matching structure.
+- Run the app with locale **BG** on touched screens — no English chrome left on new UI.
+
+## Examples
+
+```jsx
+// Bad
+<Text>Save changes</Text>
+
+// Good
+const { t } = useTranslation();
+<Text>{t('common.saveChanges')}</Text>
+```
+
+Backend API messages that surface to users: coordinate gettext in `vhr` `locale/en/` and `locale/bg/` when changing server copy.
