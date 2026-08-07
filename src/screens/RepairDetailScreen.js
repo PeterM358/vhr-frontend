@@ -1060,6 +1060,15 @@ export default function RepairDetailScreen({ route, navigation }) {
     setOperationTypePickerVisible(true);
   };
 
+  const handleOpenFinalizeServiceTypePicker = () => {
+    if (!shopCanFinalizeOngoing) return;
+    const currentId = resolveEffectiveServiceTypeId(finalRepairTypeId, repair);
+    setOperationTypePickerMode('finalize');
+    setOperationTypePickerTargetId(null);
+    setOperationTypePickerSelectedId(currentId || '');
+    setOperationTypePickerVisible(true);
+  };
+
   const closeOperationTypePicker = () => {
     if (operationActionId != null) return;
     setOperationTypePickerVisible(false);
@@ -1067,7 +1076,23 @@ export default function RepairDetailScreen({ route, navigation }) {
   };
 
   const handleConfirmOperationType = async (selectedTypeId) => {
-    if (!isMyShopRepair || !selectedTypeId) {
+    if (!selectedTypeId) {
+      showMessage(
+        operationTypePickerMode === 'finalize'
+          ? t('repairs.detail.finalServiceTypePickerTitle')
+          : t('repairs.detail.operationsPicker.title'),
+        t('repairs.detail.operationsPicker.serviceTypeRequired')
+      );
+      return;
+    }
+    if (operationTypePickerMode === 'finalize') {
+      setFinalRepairTypeId(String(selectedTypeId));
+      if (finalizeTypeError) setFinalizeTypeError('');
+      setOperationTypePickerVisible(false);
+      setOperationTypePickerTargetId(null);
+      return;
+    }
+    if (!isMyShopRepair) {
       showMessage(
         t('repairs.detail.operationsPicker.title'),
         t('repairs.detail.operationsPicker.serviceTypeRequired')
@@ -1670,8 +1695,14 @@ export default function RepairDetailScreen({ route, navigation }) {
         repairTypes,
         serviceMenuItems: shopServiceMenu,
         shopProfile,
+        jobVehicleTypeId:
+          repair?.vehicle_type_id ??
+          repair?.vehicle_type ??
+          repair?.vehicle?.vehicle_type_id ??
+          repair?.vehicle?.vehicle_type ??
+          null,
       }),
-    [repairTypes, shopServiceMenu, shopProfile]
+    [repairTypes, shopServiceMenu, shopProfile, repair]
   );
 
   const canPickOperationTypes = operationTypePickerOptions.length > 0;
@@ -2874,6 +2905,13 @@ export default function RepairDetailScreen({ route, navigation }) {
 
   const renderShopFinalizeServiceTypeCard = () => {
     if (!shopCanFinalizeOngoing) return null;
+    const selectedId = resolveEffectiveServiceTypeId(finalRepairTypeId, repair);
+    const selectedOption =
+      operationTypePickerOptions.find((row) => String(row.id) === String(selectedId)) ||
+      repairTypes.find((row) => String(row.id) === String(selectedId));
+    const selectedLabel = selectedOption
+      ? translateRepairTypeLabel(selectedOption, t, { locale }) || selectedOption.name
+      : '';
     return (
       <FloatingCard
         style={[
@@ -2881,38 +2919,37 @@ export default function RepairDetailScreen({ route, navigation }) {
           finalizeTypeError ? styles.lightActionCardError : null,
         ]}
       >
-        <Text style={styles.cardSectionTitle}>{t('repairs.detail.finalServiceType', null, 'Final service type *')}</Text>
-        <Text style={styles.cardBodyText}>
-          {t('repairs.detail.finalServiceTypeHelp', null, 'Required before you can finalize. Used for service history, reminders, and statistics.')}
-        </Text>
-        <View
-          style={[styles.pickerContainer, finalizeTypeError ? styles.pickerContainerError : null]}
+        <Text style={styles.cardSectionTitle}>{t('repairs.detail.finalServiceType')}</Text>
+        <Text style={styles.cardBodyText}>{t('repairs.detail.finalServiceTypeHelp')}</Text>
+        <Pressable
+          onPress={handleOpenFinalizeServiceTypePicker}
+          style={[
+            styles.finalizeTypePickerButton,
+            finalizeTypeError ? styles.finalizeTypePickerButtonError : null,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={t('repairs.detail.finalServiceTypePickerTitle')}
         >
-          <Picker
-            selectedValue={finalRepairTypeId}
-            onValueChange={(value) => {
-              setFinalRepairTypeId(value);
-              if (finalizeTypeError) setFinalizeTypeError('');
-            }}
-            style={styles.pickerLight}
-            itemStyle={styles.pickerItemLight}
+          <Text
+            style={[
+              styles.finalizeTypePickerValue,
+              !selectedLabel ? styles.finalizeTypePickerPlaceholder : null,
+            ]}
+            numberOfLines={2}
           >
-            <Picker.Item label={t('repairs.detail.selectServiceType', null, 'Select service type…')} value="" color={COLORS.TEXT_DARK} />
-            {repairTypes.map((type) => (
-              <Picker.Item
-                key={type.id}
-                label={translateRepairTypeLabel(type, t, { locale }) || type.name}
-                value={String(type.id)}
-                color={COLORS.TEXT_DARK}
-              />
-            ))}
-          </Picker>
-        </View>
+            {selectedLabel || t('repairs.detail.selectServiceType')}
+          </Text>
+          <Text style={styles.finalizeTypePickerAction}>
+            {selectedLabel
+              ? t('repairs.detail.changeFinalServiceType')
+              : t('repairs.detail.chooseFinalServiceType')}
+          </Text>
+        </Pressable>
         {finalizeTypeError ? (
           <Text style={styles.errorText}>{finalizeTypeError}</Text>
         ) : showMissingTypeWarning ? (
           <Text style={styles.warningTextOnLight}>
-            {t('repairs.detail.serviceTypeMissingWarning', null, 'Service type missing — choose one above before tapping Finalize repair.')}
+            {t('repairs.detail.serviceTypeMissingWarning')}
           </Text>
         ) : null}
       </FloatingCard>
@@ -4916,19 +4953,25 @@ export default function RepairDetailScreen({ route, navigation }) {
       onConfirm={handleConfirmOperationType}
       loading={operationActionId != null}
       title={
-        operationTypePickerMode === 'edit'
-          ? t('repairs.detail.operationsPicker.editTitle')
-          : t('repairs.detail.operationsPicker.title')
+        operationTypePickerMode === 'finalize'
+          ? t('repairs.detail.finalServiceTypePickerTitle')
+          : operationTypePickerMode === 'edit'
+            ? t('repairs.detail.operationsPicker.editTitle')
+            : t('repairs.detail.operationsPicker.title')
       }
       subtitle={
-        operationTypePickerMode === 'edit'
-          ? t('repairs.detail.operationsPicker.editSubtitle')
-          : t('repairs.detail.operationsPicker.subtitle')
+        operationTypePickerMode === 'finalize'
+          ? t('repairs.detail.finalServiceTypePickerSubtitle')
+          : operationTypePickerMode === 'edit'
+            ? t('repairs.detail.operationsPicker.editSubtitle')
+            : t('repairs.detail.operationsPicker.subtitle')
       }
       confirmLabel={
-        operationTypePickerMode === 'edit'
-          ? t('repairs.detail.operationsPicker.confirmEdit')
-          : t('repairs.detail.operationsPicker.confirm')
+        operationTypePickerMode === 'finalize'
+          ? t('repairs.detail.finalServiceTypeConfirm')
+          : operationTypePickerMode === 'edit'
+            ? t('repairs.detail.operationsPicker.confirmEdit')
+            : t('repairs.detail.operationsPicker.confirm')
       }
     />
     <FinalizeOdometerEvidenceSheet
@@ -5305,6 +5348,38 @@ const styles = StyleSheet.create({
   pickerContainerError: {
     borderColor: '#b91c1c',
     borderWidth: 2,
+  },
+  finalizeTypePickerButton: {
+    marginTop: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  finalizeTypePickerButtonError: {
+    borderColor: '#b91c1c',
+    borderWidth: 2,
+  },
+  finalizeTypePickerValue: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.TEXT_DARK,
+  },
+  finalizeTypePickerPlaceholder: {
+    fontWeight: '500',
+    color: '#64748b',
+  },
+  finalizeTypePickerAction: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.PRIMARY,
   },
   finalizeRequiredCard: {
     marginBottom: 12,

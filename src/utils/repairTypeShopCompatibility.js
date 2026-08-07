@@ -94,6 +94,19 @@ export function repairTypeMatchesVehicleTypes(rt, supportedVehicleTypeIds) {
   return false;
 }
 
+/**
+ * Gate by the vehicle on the repair/job (car RO → drop bike-only types).
+ * Empty RepairType.vehicle_types still means "applies to all".
+ */
+export function repairTypeMatchesJobVehicle(rt, jobVehicleTypeId) {
+  if (jobVehicleTypeId == null || jobVehicleTypeId === '') return true;
+  const jobId = Number(jobVehicleTypeId);
+  if (!Number.isFinite(jobId)) return true;
+  const compat = toIdSet(rt?.vehicle_types);
+  if (!compat.size) return true;
+  return compat.has(jobId);
+}
+
 export function repairTypeMatchesBusinessCategories(rt, shopBusinessCategoryKeys) {
   const shopKeys = toKeySet(shopBusinessCategoryKeys);
   if (!shopKeys.size) return true; // no business type yet — don't gate
@@ -102,16 +115,17 @@ export function repairTypeMatchesBusinessCategories(rt, shopBusinessCategoryKeys
 }
 
 /**
- * True when a RepairType is eligible for the shop's business categories
- * and supported vehicle types.
+ * True when a RepairType is eligible for the shop's business categories,
+ * supported vehicle types, and (when known) the job vehicle type.
  */
 export function isRepairTypeCompatibleWithShop(
   rt,
-  { businessCategoryKeys, supportedVehicleTypeIds } = {}
+  { businessCategoryKeys, supportedVehicleTypeIds, jobVehicleTypeId } = {}
 ) {
   return (
     repairTypeMatchesBusinessCategories(rt, businessCategoryKeys) &&
-    repairTypeMatchesVehicleTypes(rt, supportedVehicleTypeIds)
+    repairTypeMatchesVehicleTypes(rt, supportedVehicleTypeIds) &&
+    repairTypeMatchesJobVehicle(rt, jobVehicleTypeId)
   );
 }
 
