@@ -13,10 +13,11 @@ import BASE_STYLES from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
 import { safeError } from '../utils/logger';
 import { useTranslation } from '../i18n';
+import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 
 export default function ClientRequestRepairScreen({ route, navigation }) {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const vehicleId = route.params?.vehicleId;
   const [description, setDescription] = useState('');
@@ -154,7 +155,11 @@ export default function ClientRequestRepairScreen({ route, navigation }) {
           >
             <Picker.Item label={t('requestService.selectRepairType')} value="" />
             {repairTypes.map((type) => (
-              <Picker.Item key={type.id} label={type.name} value={type.id} />
+              <Picker.Item
+                key={type.id}
+                label={translateRepairTypeLabel(type, t, { locale }) || type.name}
+                value={type.id}
+              />
             ))}
           </Picker>
         </View>

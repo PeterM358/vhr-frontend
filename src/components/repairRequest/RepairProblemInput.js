@@ -3,6 +3,7 @@ import { View, Pressable, StyleSheet } from 'react-native';
 import { Text, TextInput } from 'react-native-paper';
 import { COLORS } from '../../constants/colors';
 import { searchRepairTypes } from '../../utils/repairTypeSearch';
+import { translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
 import { useTranslation } from '../../i18n';
 
 export default function RepairProblemInput({
@@ -12,7 +13,7 @@ export default function RepairProblemInput({
   selectedTypeId,
   onSelectType,
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const suggestions = useMemo(
     () => searchRepairTypes(repairTypes, value, { limit: 6 }),
     [repairTypes, value]
@@ -48,7 +49,7 @@ export default function RepairProblemInput({
                   style={[styles.chip, selected && styles.chipSelected]}
                 >
                   <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                    {type.name}
+                    {translateRepairTypeLabel(type, t, { locale }) || type.name}
                   </Text>
                 </Pressable>
               );

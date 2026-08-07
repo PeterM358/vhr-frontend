@@ -38,6 +38,7 @@ import { stackContentPaddingTop } from '../navigation/stackContentInset';
 import { partCatalogSubtitle } from '../utils/repairPartsTotals';
 import { showMessage } from '../utils/crossPlatformAlert';
 import { useTranslation } from '../i18n';
+import { translateMaterialCategoryLabel } from '../utils/translateShopTypeLabels';
 
 function normalizeMoneyField(value) {
   if (value === '' || value === null || value === undefined) return '0';
@@ -48,7 +49,7 @@ function normalizeMoneyField(value) {
 export default function SelectRepairPartsScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -463,7 +464,11 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
                   <Text>
                     {t(
                       'selectRepairParts.category',
-                      { value: item.category },
+                      {
+                        value: translateMaterialCategoryLabel(item.category, t, {
+                          locale,
+                        }) || item.category,
+                      },
                       `Category: ${item.category}`
                     )}
                   </Text>

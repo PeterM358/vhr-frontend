@@ -290,7 +290,7 @@ function parseApiErrorMessage(error, fallback = 'Request failed.') {
 }
 
 export default function RepairDetailScreen({ route, navigation }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const insets = useSafeAreaInsets();
   const { returnTo } = route.params || {};
   const repairId = useMemo(() => {
@@ -1387,7 +1387,21 @@ export default function RepairDetailScreen({ route, navigation }) {
                         />
                         <Text style={{ fontWeight: '600', flexShrink: 1 }}>
                           {op.sequence != null ? `${op.sequence} · ` : ''}
-                          {op.operation_name || t('repairs.detail.workPerformed', null, 'Work performed')}
+                          {translateRepairTypeLabel(
+                            {
+                              slug: op.repair_type_slug,
+                              name: op.operation_name,
+                              name_bg: op.operation_name_bg,
+                              name_en: op.operation_name_en,
+                              operation_name: op.operation_name,
+                              operation_name_bg: op.operation_name_bg,
+                              operation_name_en: op.operation_name_en,
+                            },
+                            t,
+                            { locale }
+                          ) ||
+                            op.operation_name ||
+                            t('repairs.detail.workPerformed', null, 'Work performed')}
                         </Text>
                       </View>
                       <StatusBadge status={op.status} label={operationStatusLabel(op.status)} />
@@ -1891,7 +1905,10 @@ export default function RepairDetailScreen({ route, navigation }) {
 
   const handleAddPart = async () => {
     if (!newPart.shopPartId) {
-      Alert.alert('Validation', 'Select a part.');
+      Alert.alert(
+        t('common.validation', null, 'Validation'),
+        t('repairs.detail.selectPartRequired', null, 'Select a part.')
+      );
       return;
     }
     try {
@@ -1905,7 +1922,10 @@ export default function RepairDetailScreen({ route, navigation }) {
       setNewPart({ shopPartId: '', quantity: '1', price: '', note: '' });
       await refreshParts();
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to add part.');
+      Alert.alert(
+        t('repairs.detail.errorTitle', null, 'Error'),
+        err.message || t('repairs.detail.failedAddPart', null, 'Failed to add part.')
+      );
     }
   };
 
@@ -1915,7 +1935,10 @@ export default function RepairDetailScreen({ route, navigation }) {
       await deleteRepairPart(token, repairId, partId);
       await refreshParts();
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to delete part.');
+      Alert.alert(
+        t('repairs.detail.errorTitle', null, 'Error'),
+        err.message || t('repairs.detail.failedDeletePart', null, 'Failed to delete part.')
+      );
     }
   };
 
@@ -1925,51 +1948,75 @@ export default function RepairDetailScreen({ route, navigation }) {
       await updateRepairPart(token, repairId, partId, { [field]: value });
       await refreshParts();
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to update part.');
+      Alert.alert(
+        t('repairs.detail.errorTitle', null, 'Error'),
+        err.message || t('repairs.detail.failedUpdatePart', null, 'Failed to update part.')
+      );
     }
   };
 
   const handleBookOffer = async (selectedOfferId) => {
     if (!selectedOfferId || !repair?.vehicle) {
-      Alert.alert('Error', 'Missing offer or vehicle information.');
+      Alert.alert(
+        t('repairs.detail.errorTitle', null, 'Error'),
+        t('repairs.detail.missingOfferOrVehicle', null, 'Missing offer or vehicle information.')
+      );
       return;
     }
 
     try {
       const token = await AsyncStorage.getItem('@access_token');
       await bookOffer(token, selectedOfferId, repair.vehicle);
-      Alert.alert('Success', 'Offer booked!');
+      Alert.alert(
+        t('common.success', null, 'Success'),
+        t('repairs.detail.offerBooked', null, 'Offer booked!')
+      );
       await refreshRepair();
       await refreshOffers();
     } catch (err) {
       safeError('Booking failed', err);
-      Alert.alert('Error', err.message || 'Failed to book offer');
+      Alert.alert(
+        t('repairs.detail.errorTitle', null, 'Error'),
+        err.message || t('repairs.detail.failedBookOffer', null, 'Failed to book offer')
+      );
     }
   };
 
   const handleUnbookOffer = async (selectedOfferId) => {
     if (!selectedOfferId || !repair?.vehicle) {
-      Alert.alert('Error', 'Missing offer or vehicle information.');
+      Alert.alert(
+        t('repairs.detail.errorTitle', null, 'Error'),
+        t('repairs.detail.missingOfferOrVehicle', null, 'Missing offer or vehicle information.')
+      );
       return;
     }
 
     try {
       const token = await AsyncStorage.getItem('@access_token');
       await unbookOffer(token, selectedOfferId, repair.vehicle);
-      Alert.alert('Booking Cancelled', 'You have cancelled your booking.');
+      Alert.alert(
+        t('repairs.detail.bookingCancelledTitle', null, 'Booking Cancelled'),
+        t('repairs.detail.bookingCancelledBody', null, 'You have cancelled your booking.')
+      );
       await refreshRepair();
       await refreshOffers();
     } catch (err) {
       safeError('Cancel booking failed', err);
-      Alert.alert('Error', err.message || 'Failed to cancel booking');
+      Alert.alert(
+        t('repairs.detail.errorTitle', null, 'Error'),
+        err.message || t('repairs.detail.failedCancelBooking', null, 'Failed to cancel booking')
+      );
     }
   };
 
   const handleDeleteOffer = async (selectedOfferId) => {
-    Alert.alert('Delete offer', 'Are you sure you want to delete this offer?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(
+      t('repairs.detail.deleteOfferTitle', null, 'Delete offer'),
+      t('repairs.detail.deleteOfferConfirm', null, 'Are you sure you want to delete this offer?'),
+      [
+      { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.remove', null, 'Delete'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -1977,7 +2024,10 @@ export default function RepairDetailScreen({ route, navigation }) {
             await deleteOffer(token, selectedOfferId);
             await refreshOffers();
           } catch (err) {
-            Alert.alert('Error', err.message || 'Failed to delete offer');
+            Alert.alert(
+              t('repairs.detail.errorTitle', null, 'Error'),
+              err.message || t('repairs.detail.failedDeleteOffer', null, 'Failed to delete offer')
+            );
           }
         },
       },
@@ -1994,7 +2044,10 @@ export default function RepairDetailScreen({ route, navigation }) {
     // TODO: Track call click attribution for offer analytics.
     const supported = await Linking.canOpenURL(phoneUrl);
     if (!supported) {
-      Alert.alert('Call unavailable', 'This device cannot place phone calls.');
+      Alert.alert(
+        t('repairs.detail.callUnavailableTitle', null, 'Call unavailable'),
+        t('repairs.detail.callUnavailableBody', null, 'This device cannot place phone calls.')
+      );
       return;
     }
     await Linking.openURL(phoneUrl);
@@ -2007,7 +2060,12 @@ export default function RepairDetailScreen({ route, navigation }) {
       await issueRepairPartFromStock(token, repairId, partId);
       await refreshParts();
     } catch (err) {
-      Alert.alert('Stock issue failed', err.responseText || err.message || 'Could not issue from stock.');
+      Alert.alert(
+        t('repairs.detail.stockIssueFailedTitle', null, 'Stock issue failed'),
+        err.responseText ||
+          err.message ||
+          t('repairs.detail.stockIssueFailedBody', null, 'Could not issue from stock.')
+      );
     } finally {
       setIssuingPartId(null);
     }
@@ -2233,7 +2291,8 @@ export default function RepairDetailScreen({ route, navigation }) {
           repair.repair_type_name ||
           null,
       },
-      t
+      t,
+      { locale }
     ) || t('vehicles.detail.notSpecified');
   const qualityWarnings = Array.isArray(repair.quality_warnings) ? repair.quality_warnings : [];
   const showMissingTypeWarning =
@@ -2712,7 +2771,13 @@ export default function RepairDetailScreen({ route, navigation }) {
       const payload = await getPartsExport(token, repair.id, shopProfileId, extra || undefined);
       await presentPartsExportShareSheet(payload.share_text, { title: 'Parts request' });
     } catch (err) {
-      Alert.alert('Export failed', parseApiErrorMessage(err, 'Could not build parts export.'));
+      Alert.alert(
+        t('repairs.detail.exportFailedTitle', null, 'Export failed'),
+        parseApiErrorMessage(
+          err,
+          t('repairs.detail.exportFailedBody', null, 'Could not build parts export.')
+        )
+      );
     } finally {
       setExportingParts(false);
     }
@@ -2797,7 +2862,7 @@ export default function RepairDetailScreen({ route, navigation }) {
             {repairTypes.map((type) => (
               <Picker.Item
                 key={type.id}
-                label={translateRepairTypeLabel(type, t) || type.name}
+                label={translateRepairTypeLabel(type, t, { locale }) || type.name}
                 value={String(type.id)}
                 color={COLORS.TEXT_DARK}
               />

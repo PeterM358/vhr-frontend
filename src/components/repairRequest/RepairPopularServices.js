@@ -3,6 +3,7 @@ import { View, Pressable, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import { COLORS } from '../../constants/colors';
 import { resolvePopularRepairTypes } from '../../utils/repairTypeSearch';
+import { translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
 import { useTranslation } from '../../i18n';
 
 export default function RepairPopularServices({
@@ -10,7 +11,7 @@ export default function RepairPopularServices({
   selectedTypeId,
   onSelectType,
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const popularTypes = useMemo(
     () => resolvePopularRepairTypes(repairTypes),
     [repairTypes]
@@ -31,7 +32,7 @@ export default function RepairPopularServices({
               style={[styles.chip, selected && styles.chipSelected]}
             >
               <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                {type.name}
+                {translateRepairTypeLabel(type, t, { locale }) || type.name}
               </Text>
             </Pressable>
           );

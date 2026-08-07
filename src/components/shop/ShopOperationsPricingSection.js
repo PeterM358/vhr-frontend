@@ -82,7 +82,7 @@ export default function ShopOperationsPricingSection({
   onUpsertOperationPricing,
   savingPricing = false,
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const navigation = useNavigation();
   const [pricingTarget, setPricingTarget] = useState(null);
   const [pricingValue, setPricingValue] = useState(null);
@@ -225,7 +225,7 @@ export default function ShopOperationsPricingSection({
                           statusStyle && styles[statusStyle.text],
                         ]}
                       >
-                        {translateRepairTypeLabel(row, t)}
+                        {translateRepairTypeLabel(row, t, { locale })}
                       </Text>
                       {selected ? (
                         <Text style={[styles.priceLine, statusStyle && styles[statusStyle.price]]}>
@@ -283,7 +283,7 @@ export default function ShopOperationsPricingSection({
         <Dialog visible={!!pricingTarget} onDismiss={closePricing}>
           <Dialog.Title>
             {pricingTarget
-              ? translateRepairTypeLabel(pricingTarget.row, t)
+              ? translateRepairTypeLabel(pricingTarget.row, t, { locale })
               : t('partnerProfile.operationsPricingTitle')}
           </Dialog.Title>
           <Dialog.ScrollArea style={styles.dialogScroll}>

@@ -4,6 +4,10 @@ import { Text, Button } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { COLORS } from '../../constants/colors';
 import { groupRepairTypesByCategory } from '../../utils/repairTypeSearch';
+import {
+  translateRepairTypeLabel,
+  translateServiceCategoryLabel,
+} from '../../utils/translateShopTypeLabels';
 import { useTranslation } from '../../i18n';
 
 const ACCORDION_MAX_HEIGHT = 320;
@@ -15,7 +19,7 @@ export default function RepairServicePicker({
   expanded,
   onToggleExpanded,
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const categories = groupRepairTypesByCategory(repairTypes);
   const [openSlug, setOpenSlug] = useState(null);
 
@@ -62,7 +66,9 @@ export default function RepairServicePicker({
                     onPress={() => toggleCategory(group.slug)}
                     style={styles.categoryHeader}
                   >
-                    <Text style={styles.categoryTitle}>{group.name}</Text>
+                    <Text style={styles.categoryTitle}>
+                      {translateServiceCategoryLabel(group, t, { locale }) || group.name}
+                    </Text>
                     <View style={styles.categoryMeta}>
                       <Text style={styles.categoryCount}>{group.types.length}</Text>
                       <MaterialCommunityIcons
@@ -83,7 +89,7 @@ export default function RepairServicePicker({
                             style={[styles.typeRow, selected && styles.typeRowSelected]}
                           >
                             <Text style={[styles.typeName, selected && styles.typeNameSelected]}>
-                              {type.name}
+                              {translateRepairTypeLabel(type, t, { locale }) || type.name}
                             </Text>
                           </Pressable>
                         );

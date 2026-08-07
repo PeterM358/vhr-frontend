@@ -172,12 +172,33 @@ function resolveCategorySlug(value) {
   return normalizeKey(v.slug || v.category_slug || v.code || v.name || v.category_name);
 }
 
-export function translateRepairTypeLabel(value, t) {
+function pickLocalizedName(v, locale) {
+  if (!v || typeof v !== 'object') return '';
+  const loc = String(locale || '').toLowerCase().slice(0, 2);
+  if (loc === 'bg') {
+    return String(v.name_bg || v.operation_name_bg || '').trim();
+  }
+  if (loc === 'en') {
+    return String(v.name_en || v.operation_name_en || v.name || v.operation_name || '').trim();
+  }
+  if (loc) {
+    return String(v[`name_${loc}`] || v.name_en || v.name || '').trim();
+  }
+  return '';
+}
+
+export function translateRepairTypeLabel(value, t, { locale } = {}) {
   if (!value) return '';
 
   const slug = resolveRepairSlug(value);
   const v = typeof value === 'string' ? { name: value } : value;
-  const rawName = v.repair_type_name || v.name || v.display_name || v.name_en || v.name_bg;
+  const rawName =
+    v.repair_type_name ||
+    v.operation_name ||
+    v.name ||
+    v.display_name ||
+    v.name_en ||
+    v.name_bg;
   const rawSlug = v.slug || v.repair_type_slug || v.code || v.repair_type_code;
 
   const explicitKey = REPAIR_I18N_KEY_BY_SLUG[slug];
@@ -197,6 +218,9 @@ export function translateRepairTypeLabel(value, t) {
     }
   }
 
+  const localized = pickLocalizedName(v, locale);
+  if (localized) return localized;
+
   const fallback = String(rawName || '').trim() || humanizeSlugLabel(rawSlug || slug);
   return fallback || String(value).trim();
 }
@@ -205,7 +229,7 @@ export function translateRepairTypeLabel(value, t) {
  * Service category = grouping (Maintenance, Mechanical, …).
  * Repair type / operation = leaf service under a category.
  */
-export function translateServiceCategoryLabel(value, t) {
+export function translateServiceCategoryLabel(value, t, { locale } = {}) {
   if (!value) return '';
 
   const slug = resolveCategorySlug(value);
@@ -224,6 +248,62 @@ export function translateServiceCategoryLabel(value, t) {
     const translated = t(key, null, fallbackSentinel);
     if (translated !== fallbackSentinel) return translated;
   }
+
+  const localized = pickLocalizedName(v, locale);
+  if (localized) return localized;
+
+  return String(rawName || '').trim() || humanizeSlugLabel(slug) || String(value).trim();
+}
+
+/** Slug → materialCategories.* i18n key (seed_part_taxonomy PartCategory). */
+const MATERIAL_CATEGORY_I18N_KEY_BY_SLUG = {
+  brakes: 'materialCategories.brakes',
+  clutch: 'materialCategories.clutch',
+  fluids: 'materialCategories.fluids',
+  filters: 'materialCategories.filters',
+  ignition: 'materialCategories.ignition',
+  electrical: 'materialCategories.electrical',
+  sensors: 'materialCategories.sensors',
+  engine: 'materialCategories.engine',
+  suspension: 'materialCategories.suspension',
+  tires: 'materialCategories.tires',
+  accessories: 'materialCategories.accessories',
+  lighting: 'materialCategories.lighting',
+  'air-conditioning': 'materialCategories.airConditioning',
+  drive: 'materialCategories.drive',
+};
+
+function resolveMaterialCategorySlug(value) {
+  const v = typeof value === 'string' ? { name: value } : value || {};
+  return normalizeKey(v.slug || v.code || v.name || v.category || v.category_name);
+}
+
+/**
+ * Material / part category label (Brakes, Filters, …).
+ * Prefer i18n slug map, then API name_bg/name_en for locale, then English name.
+ */
+export function translateMaterialCategoryLabel(value, t, { locale } = {}) {
+  if (!value) return '';
+
+  const slug = resolveMaterialCategorySlug(value);
+  const v = typeof value === 'string' ? { name: value } : value || {};
+  const rawName = v.name || v.category || v.category_name || v.name_en || v.display_name;
+
+  const explicitKey = MATERIAL_CATEGORY_I18N_KEY_BY_SLUG[slug];
+  if (explicitKey) {
+    return t(explicitKey, null, String(rawName || slug || value));
+  }
+
+  const camel = camelCaseFromSlug(slug);
+  if (camel) {
+    const key = `materialCategories.${camel}`;
+    const fallbackSentinel = '__MISSING_MATERIAL_CATEGORY__';
+    const translated = t(key, null, fallbackSentinel);
+    if (translated !== fallbackSentinel) return translated;
+  }
+
+  const localized = pickLocalizedName(v, locale);
+  if (localized) return localized;
 
   return String(rawName || '').trim() || humanizeSlugLabel(slug) || String(value).trim();
 }
@@ -275,8 +355,8 @@ export function translateVehicleTypePublicLabels(values, t) {
   return translateVehicleTypeLabels(values, t, { public: true });
 }
 
-export function translateRepairTypeLabels(values, t) {
-  return (values || []).map((v) => translateRepairTypeLabel(v, t)).filter(Boolean);
+export function translateRepairTypeLabels(values, t, options) {
+  return (values || []).map((v) => translateRepairTypeLabel(v, t, options)).filter(Boolean);
 }
 
 const FUEL_TYPE_ALIASES = {

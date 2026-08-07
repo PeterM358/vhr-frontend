@@ -39,11 +39,12 @@ import { WebSocketContext } from '../context/WebSocketManager';
 import { API_BASE_URL } from '../api/config';
 import { formatMoneyAmount } from '../constants/currency';
 import { useTranslation } from '../i18n';
+import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 
 export default function RepairChatScreen({ route, navigation }) {
   const { repairId } = route.params;
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { chatMessages } = useContext(WebSocketContext);
 
   const [repair, setRepair] = useState(null);
@@ -497,7 +498,9 @@ export default function RepairChatScreen({ route, navigation }) {
                       <>
                         {isShop && repair.status !== 'done' && (
                           <>
-                            <Text variant="labelLarge" style={{ marginBottom: 4 }}>Repair Type *</Text>
+                            <Text variant="labelLarge" style={{ marginBottom: 4 }}>
+                              {t('repairs.detail.serviceType', null, 'Service type')} *
+                            </Text>
                             <Menu
                               visible={repairTypeMenuVisible}
                               onDismiss={() => setRepairTypeMenuVisible(false)}
@@ -507,18 +510,22 @@ export default function RepairChatScreen({ route, navigation }) {
                                   onPress={() => setRepairTypeMenuVisible(true)}
                                   style={{ marginVertical: 6 }}
                                 >
-                                  {repairTypes.find(t => t.id === repair.repair_type)?.name || "Select Repair Type"}
+                                  {translateRepairTypeLabel(
+                                    repairTypes.find((rt) => rt.id === repair.repair_type),
+                                    t,
+                                    { locale }
+                                  ) || t('repairs.detail.selectServiceType', null, 'Select service type…')}
                                 </Button>
                               }
                             >
-                              {repairTypes.map((t) => (
+                              {repairTypes.map((type) => (
                                 <Menu.Item
-                                  key={t.id}
+                                  key={type.id}
                                   onPress={() => {
-                                    setRepair((prev) => ({ ...prev, repair_type: t.id }));
+                                    setRepair((prev) => ({ ...prev, repair_type: type.id }));
                                     setRepairTypeMenuVisible(false);
                                   }}
-                                  title={t.name}
+                                  title={translateRepairTypeLabel(type, t, { locale }) || type.name}
                                 />
                               ))}
                             </Menu>

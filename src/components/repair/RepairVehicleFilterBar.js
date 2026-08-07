@@ -7,6 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../../api/config';
 import { getMakes, getModelsForMake } from '../../api/vehicles';
 import { COLORS } from '../../constants/colors';
+import { useTranslation } from '../../i18n';
+import { translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
 
 const ANY = '';
 
@@ -35,6 +37,7 @@ function modelPickerLabel(model) {
 }
 
 export default function RepairVehicleFilterBar({ value, onChange, statusTab = 'open' }) {
+  const { t, locale } = useTranslation();
   const {
     makeId = ANY,
     modelId = ANY,
@@ -220,7 +223,9 @@ export default function RepairVehicleFilterBar({ value, onChange, statusTab = 'o
       </View>
 
       <View style={styles.pickerBox}>
-        <Text style={styles.pickerLabel}>Service type</Text>
+        <Text style={styles.pickerLabel}>
+          {t('repairs.detail.serviceType', null, 'Service type')}
+        </Text>
         <View style={styles.pickerShell}>
           <Picker
             selectedValue={repairTypeId || ANY}
@@ -228,9 +233,13 @@ export default function RepairVehicleFilterBar({ value, onChange, statusTab = 'o
             style={styles.picker}
             dropdownIconColor={COLORS.TEXT_MUTED}
           >
-            <Picker.Item label="Any service" value={ANY} />
+            <Picker.Item label={t('repairs.filters.anyService', null, 'Any service')} value={ANY} />
             {repairTypes.map((type) => (
-              <Picker.Item key={String(type.id)} label={type.name} value={String(type.id)} />
+              <Picker.Item
+                key={String(type.id)}
+                label={translateRepairTypeLabel(type, t, { locale }) || type.name}
+                value={String(type.id)}
+              />
             ))}
           </Picker>
         </View>

@@ -21,7 +21,7 @@ import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 
 export default function ClientLogRepairScreen({ navigation, route }) {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const [description, setDescription] = useState('');
   const [kilometers, setKilometers] = useState('');
@@ -174,7 +174,7 @@ export default function ClientLogRepairScreen({ navigation, route }) {
           {repairTypes.map(type => (
             <Picker.Item
               key={type.id}
-              label={translateRepairTypeLabel(type, t) || type.name}
+              label={translateRepairTypeLabel(type, t, { locale }) || type.name}
               value={type.id}
             />
           ))}

@@ -19,7 +19,9 @@ Locale files: `src/i18n/en.json`, `src/i18n/bg.json`.
 | `erp.review.*` | Client post-service review form |
 | `erp.clientComplaint.*` | Client post-service complaint form |
 
-Related repair/materials UI also uses `repairs.detail.*`, `repairWizard.*`, `operationStatuses.*`, `selectRepairParts.*`, `createMasterPart.*`, `relatedServiceHistory.*`, and `shopDataAccess.*`.
+Related repair/materials UI also uses `repairs.detail.*`, `repairWizard.*`, `operationStatuses.*`, `selectRepairParts.*`, `createMasterPart.*`, `relatedServiceHistory.*`, `shopDataAccess.*`, `serviceCategories.*`, `materialCategories.*`, and `repairs.*` slug labels via `translateRepairTypeLabel` / `translateMaterialCategoryLabel`.
+
+Backend: `RepairType.name_bg` / `name_en` (seeded by `seed_service_types`) and `MaterialCategory.name_bg` / `name_en` (seeded by `seed_part_taxonomy`, exposed on `/api/materials/material-categories/`). After deploy, re-run those seeds (or migrate) so existing rows get BG names.
 
 Drawer labels live under `drawer.partner.*` (`analytics`, `workforce`, `documentImports`, `complaints`).
 

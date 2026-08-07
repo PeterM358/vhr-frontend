@@ -51,6 +51,8 @@ export function buildOperationTypePickerOptions({
       ...(fromCatalog || {}),
       id,
       name: String(item?.repair_type_name || fromCatalog?.name || '').trim(),
+      name_bg: fromCatalog?.name_bg || '',
+      name_en: fromCatalog?.name_en || item?.repair_type_name || fromCatalog?.name || '',
       slug: item?.repair_type_slug || fromCatalog?.slug,
       category_slug: fromCatalog?.category_slug,
       category_name: item?.category_name || fromCatalog?.category_name,

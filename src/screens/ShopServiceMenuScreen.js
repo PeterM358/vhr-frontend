@@ -102,7 +102,7 @@ function toIdArray(value) {
 }
 
 export default function ShopServiceMenuScreen() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const navigation = useNavigation();
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = usePartnerDashboardBack(navigation);
@@ -222,9 +222,9 @@ export default function ShopServiceMenuScreen() {
       .filter((rt) => !existingTypeIds.has(Number(rt.id)))
       .filter((rt) => {
         if (!q) return true;
-        const label = (translateRepairTypeLabel(rt, t) || rt.name || '').toLowerCase();
+        const label = (translateRepairTypeLabel(rt, t, { locale }) || rt.name || '').toLowerCase();
         const category = (
-          translateServiceCategoryLabel(rt.category_name || rt.category_slug, t) ||
+          translateServiceCategoryLabel(rt.category_name || rt.category_slug, t, { locale }) ||
           rt.category_name ||
           ''
         ).toLowerCase();
@@ -431,13 +431,14 @@ export default function ShopServiceMenuScreen() {
           </View>
           <View style={styles.menuRowBody}>
             <Text style={styles.menuRowTitle}>
-              {translateRepairTypeLabel(meta || group.sample, t) || t('common.service')}
+              {translateRepairTypeLabel(meta || group.sample, t, { locale }) || t('common.service')}
             </Text>
             {meta?.category_name ? (
               <Text style={styles.menuRowCategory}>
                 {translateServiceCategoryLabel(
                   meta.category_slug || meta.category_name,
-                  t
+                  t,
+                  { locale }
                 ) || meta.category_name}
               </Text>
             ) : null}
@@ -593,7 +594,7 @@ export default function ShopServiceMenuScreen() {
                       color={COLORS.PRIMARY}
                     />
                     <Text style={styles.typeTileLabel} numberOfLines={2}>
-                      {translateRepairTypeLabel(type, t) || type.name}
+                      {translateRepairTypeLabel(type, t, { locale }) || type.name}
                     </Text>
                   </Pressable>
                 ))

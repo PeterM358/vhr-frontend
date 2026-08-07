@@ -14,7 +14,7 @@ import { COLORS } from '../../constants/colors';
 import { useTranslation } from '../../i18n';
 import { getOperationIcon } from '../../icons/operationIconRegistry';
 import { groupRepairTypesByCategory, searchRepairTypes } from '../../utils/repairTypeSearch';
-import { translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
+import { translateRepairTypeLabel, translateServiceCategoryLabel } from '../../utils/translateShopTypeLabels';
 
 export default function OperationTypePickerSheet({
   visible,
@@ -31,7 +31,7 @@ export default function OperationTypePickerSheet({
   emptyText,
   errorText,
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [query, setQuery] = useState('');
   const [pendingTypeId, setPendingTypeId] = useState('');
 
@@ -93,10 +93,12 @@ export default function OperationTypePickerSheet({
             ) : (
               grouped.map((group) => (
                 <View key={group.slug} style={styles.groupBlock}>
-                  <Text style={styles.groupTitle}>{group.name}</Text>
+                  <Text style={styles.groupTitle}>
+                    {translateServiceCategoryLabel(group, t, { locale }) || group.name}
+                  </Text>
                   {group.types.map((type) => {
                     const selected = String(type.id) === String(pendingTypeId);
-                    const label = translateRepairTypeLabel(type, t);
+                    const label = translateRepairTypeLabel(type, t, { locale });
                     const laborFrom =
                       type.labor_from != null && String(type.labor_from).trim() !== ''
                         ? String(type.labor_from)

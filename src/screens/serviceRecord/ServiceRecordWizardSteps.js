@@ -52,7 +52,7 @@ export function ServiceRecordIntroStep() {
 }
 
 export function ServiceRecordTypeStep() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const form = useForm();
 
   return (
@@ -76,7 +76,7 @@ export function ServiceRecordTypeStep() {
               <Picker.Item
                 key={repairType.id}
                 label={
-                  translateRepairTypeLabel(repairType, t) ||
+                  translateRepairTypeLabel(repairType, t, { locale }) ||
                   repairType.name ||
                   `Type ${repairType.id}`
                 }

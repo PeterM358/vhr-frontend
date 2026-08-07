@@ -20,28 +20,29 @@ import ScreenBackground from '../components/ScreenBackground';
 import BASE_STYLES from '../styles/base';
 import { showMessage } from '../utils/crossPlatformAlert';
 import { useTranslation } from '../i18n';
+import { translateMaterialCategoryLabel } from '../utils/translateShopTypeLabels';
 
 const FALLBACK_CATEGORIES = [
-  'Brakes',
-  'Clutch',
-  'Fluids',
-  'Filters',
-  'Ignition',
-  'Electrical',
-  'Sensors',
-  'Engine',
-  'Suspension',
-  'Tires',
-  'Accessories',
-  'Lighting',
-  'Air Conditioning',
-  'Drive',
+  { name: 'Brakes', slug: 'brakes' },
+  { name: 'Clutch', slug: 'clutch' },
+  { name: 'Fluids', slug: 'fluids' },
+  { name: 'Filters', slug: 'filters' },
+  { name: 'Ignition', slug: 'ignition' },
+  { name: 'Electrical', slug: 'electrical' },
+  { name: 'Sensors', slug: 'sensors' },
+  { name: 'Engine', slug: 'engine' },
+  { name: 'Suspension', slug: 'suspension' },
+  { name: 'Tires', slug: 'tires' },
+  { name: 'Accessories', slug: 'accessories' },
+  { name: 'Lighting', slug: 'lighting' },
+  { name: 'Air Conditioning', slug: 'air-conditioning' },
+  { name: 'Drive', slug: 'drive' },
 ];
 
 const OTHER = '__other__';
 
 export default function CreateMasterPartScreen({ navigation, route }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [newPartData, setNewPartData] = useState({
     name: '',
     brand: '',
@@ -60,11 +61,16 @@ export default function CreateMasterPartScreen({ navigation, route }) {
       try {
         const token = await AsyncStorage.getItem('@access_token');
         const rows = await getMaterialCategories(token);
-        const names = (Array.isArray(rows) ? rows : [])
-          .map((r) => r.name)
-          .filter(Boolean);
-        if (active && names.length) {
-          setCategories(names);
+        const normalized = (Array.isArray(rows) ? rows : [])
+          .map((r) => ({
+            name: r.name,
+            slug: r.slug,
+            name_bg: r.name_bg,
+            name_en: r.name_en || r.name,
+          }))
+          .filter((r) => r.name);
+        if (active && normalized.length) {
+          setCategories(normalized);
         }
       } catch (err) {
         console.warn('Material categories load failed; using fallback list', err);
@@ -186,8 +192,12 @@ export default function CreateMasterPartScreen({ navigation, route }) {
               label={t('createMasterPart.selectCategory', null, 'Select category…')}
               value=""
             />
-            {categories.map((name) => (
-              <Picker.Item key={name} label={name} value={name} />
+            {categories.map((cat) => (
+              <Picker.Item
+                key={cat.slug || cat.name}
+                label={translateMaterialCategoryLabel(cat, t, { locale }) || cat.name}
+                value={cat.name}
+              />
             ))}
             <Picker.Item
               label={t('createMasterPart.other', null, 'Other…')}

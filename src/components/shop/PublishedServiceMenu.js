@@ -42,7 +42,7 @@ function isDefaultVehicleScope(item) {
  * and All | Cars | Trucks filter chips (from menu vehicle_type).
  */
 export default function PublishedServiceMenu({ items = [], dark = false }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [filter, setFilter] = useState(FILTER_ALL);
 
   const menuItems = Array.isArray(items) ? items : [];
@@ -159,7 +159,7 @@ export default function PublishedServiceMenu({ items = [], dark = false }) {
         </Text>
       ) : (
         filteredItems.map((item, index) => {
-          const label = translateRepairTypeLabel(item, t) || t('common.service');
+          const label = translateRepairTypeLabel(item, t, { locale }) || t('common.service');
           const { parts, labor, total, time, hasParts } = describeServicePricing(item, t);
           const priceLine =
             (hasParts && total) || labor || t('serviceCenters.profile.priceOnRequest');
