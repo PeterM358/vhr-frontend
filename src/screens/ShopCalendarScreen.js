@@ -77,6 +77,10 @@ import {
 import { WebSocketContext } from '../context/WebSocketManager';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useTranslation } from '../i18n';
+import {
+  translateRepairTypeLabel,
+  translateVehicleTypeLabel,
+} from '../utils/translateShopTypeLabels';
 import { isCalendarNotification } from '../utils/shopNotificationRouting';
 import { normalizeNotification } from '../utils/normalizeNotification';
 import {
@@ -294,10 +298,28 @@ function CompactJobCard({
   const showBay = Boolean(bayNumber) && isMultiDay;
   const bayAccent = showBay ? getBayAccent(bayNumber) : null;
 
+  const repairTypeLabel =
+    translateRepairTypeLabel(
+      {
+        repair_type_name: item.repair_type_name,
+        slug: item.repair_type_slug,
+        name_bg: item.repair_type_name_bg,
+        name_en: item.repair_type_name_en,
+      },
+      t,
+      { locale }
+    ) || item.repair_type_name;
+  const vehicleTypeLabel = item.vehicle_type_name
+    ? translateVehicleTypeLabel(
+        { name: item.vehicle_type_name, vehicle_type_name: item.vehicle_type_name },
+        t
+      ) || item.vehicle_type_name
+    : '';
+
   // Middle days: compact identity row (bay + plate), not a full duplicate card.
   if (isStay) {
     const plateLabel = plate || vehicle;
-    const serviceShort = item.repair_type_name;
+    const serviceShort = repairTypeLabel;
     return (
       <Pressable
         onPress={() => onOpen?.(item)}
@@ -393,8 +415,10 @@ function CompactJobCard({
       </Text>
       {!isReadyDay ? (
         <Text style={styles.compactService} numberOfLines={2}>
-          {item.repair_type_name || t('partnerDashboard.calendar.repairTypeMissing')}
-          {item.vehicle_type_name ? ` · ${item.vehicle_type_name}` : ` · ${t('partnerDashboard.calendar.vehicleTypeMissing')}`}
+          {repairTypeLabel || t('partnerDashboard.calendar.repairTypeMissing')}
+          {vehicleTypeLabel
+            ? ` · ${vehicleTypeLabel}`
+            : ` · ${t('partnerDashboard.calendar.vehicleTypeMissing')}`}
         </Text>
       ) : null}
       {occupancyHint ? <Text style={styles.compactHint}>{occupancyHint}</Text> : null}
@@ -1452,7 +1476,18 @@ export default function ShopCalendarScreen() {
               <Text style={styles.modalSub}>
                 {(selectedJob.vehicle_license_plate || t('partnerDashboard.calendar.vehicleFallback')) +
                   ' · ' +
-                  (selectedJob.repair_type_name || t('partnerDashboard.calendar.serviceFallback'))}
+                  (translateRepairTypeLabel(
+                    {
+                      repair_type_name: selectedJob.repair_type_name,
+                      slug: selectedJob.repair_type_slug,
+                      name_bg: selectedJob.repair_type_name_bg,
+                      name_en: selectedJob.repair_type_name_en,
+                    },
+                    t,
+                    { locale }
+                  ) ||
+                    selectedJob.repair_type_name ||
+                    t('partnerDashboard.calendar.serviceFallback'))}
               </Text>
             ) : null}
 

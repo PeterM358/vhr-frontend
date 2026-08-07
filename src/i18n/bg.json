@@ -30,7 +30,8 @@
     "continue": "Напред",
     "done": "Готово",
     "user": "Потребител",
-    "delete": "Изтрий"
+    "delete": "Изтрий",
+    "success": "Успех"
   },
   "fleet": {
     "dashboard": {
@@ -2098,7 +2099,13 @@
       "createButton": "Създай промоция",
       "deleteButton": "Изтрий",
       "emptyTitle": "Все още няма промоции",
-      "emptySubtitle": "Създайте първата си промоция, за да привлечете клиенти."
+      "emptySubtitle": "Създайте първата си промоция, за да привлечете клиенти.",
+      "loadError": "Неуспешно зареждане на промоции",
+      "deleteTitle": "Изтриване на промоция",
+      "deleteConfirm": "Сигурни ли сте, че искате да изтриете тази промоция?",
+      "deleteFailed": "Неуспешно изтриване на промоция",
+      "maxBookings": "Макс.: {count}",
+      "maxUnlimited": "Макс.: Без лимит"
     },
     "invoicing": {
       "tabs": {
@@ -3104,7 +3111,27 @@
     "emptyTitle": "Няма намерени ремонти",
     "emptySubtitle": "Няма нищо в \"{status}\" в момента.",
     "filters": {
-      "anyService": "Всяка услуга"
+      "anyService": "Всяка услуга",
+      "heading": "Филтри",
+      "intro": "Марката и моделът идентифицират автомобила. Годините са отделни: регистрация в профила на автомобила спрямо кога е извършена услугата.",
+      "make": "Марка",
+      "model": "Модел",
+      "anyMake": "Всяка марка",
+      "anyModel": "Всеки модел",
+      "selectMakeFirst": "Първо изберете марка",
+      "catalogFrom": "от {year}",
+      "catalogUntil": "до {year}",
+      "catalogRangeLabel": "каталог {range}",
+      "catalogYearsHint": "Каталожни години на производство: {range}. Това не е годината на регистрация на автомобила.",
+      "registrationYear": "Година на регистрация",
+      "registrationYearSublabel": "Година в профила на автомобила",
+      "anyRegistrationYear": "Всяка година на регистрация",
+      "serviceCompletedYear": "Година на завършена услуга",
+      "requestJobYear": "Година на заявка / работа",
+      "serviceCompletedSublabel": "Кога е завършена работата",
+      "requestCreatedSublabel": "Кога е създадена заявката",
+      "anyServiceYear": "Всяка година на услуга",
+      "clearAll": "Изчисти всички филтри"
     },
     "repairRequests": "Ремонти",
     "openRequests": "Активни заявки",
@@ -3428,7 +3455,48 @@
       "warrantyMonthsValue": "Гаранция: {months} месеца",
       "warrantyDash": "Гаранция: —",
       "requestTargeting": "Насочване на заявката",
-      "months": "месеца"
+      "months": "месеца",
+      "mediaPermissionTitle": "Нужно е разрешение",
+      "mediaPermissionBody": "Разрешете достъп до снимки/видеа, за да прикачите медия.",
+      "mediaUploadFailedTitle": "Качването не успя",
+      "mediaUploadPhotoFailed": "Неуспешно добавяне на тази снимка. Моля, опитайте отново.",
+      "mediaUploadVideoFailed": "Неуспешно добавяне на това видео. Моля, опитайте отново.",
+      "addPhotoOrVideo": "Добави снимка или видео",
+      "mediaPhoto": "Снимка",
+      "mediaVideoOption": "Видео",
+      "uploadingMedia": "Качване…",
+      "removeMediaTitle": "Премахване на тази медия от заявката?",
+      "removeMediaFailedTitle": "Неуспешно премахване на медия",
+      "removeMediaFailedBody": "Нещо се обърка. Можете да опитате отново след малко.",
+      "removeMediaA11y": "Премахни медия",
+      "mediaEditOpenHint": "Добавяйте или премахвайте снимки и видеа, докато заявката е отворена. След резервация в сервиз медията тук става само за четене.",
+      "videoAttachmentFallback": "Видео прикачен файл",
+      "confirmationRequestedTitle": "Искане за потвърждение изпратено",
+      "confirmationRequestedBody": "Избраният сервиз е уведомен.",
+      "confirmationRequestFailedTitle": "Неуспешно искане за потвърждение",
+      "vehicleArrivedBody": "Ремонтът вече е в процес.",
+      "couldNotConfirmArrival": "Неуспешно потвърждение",
+      "newTimeConfirmedTitle": "Новият час е потвърден",
+      "newTimeConfirmedBody": "Часът ви беше актуализиран.",
+      "rescheduleDeclinedTitle": "Презаписът е отказан",
+      "rescheduleDeclinedBody": "Сервизът ще запази предишния час, освен ако не се свържат с вас.",
+      "couldNotRespond": "Неуспешен отговор",
+      "timeConfirmedTitle": "Часът е потвърден",
+      "timeConfirmedBody": "Часът беше актуализиран.",
+      "suggestionDeclinedTitle": "Предложението е отказано",
+      "suggestionDeclinedBody": "Предишният час остава в календара.",
+      "suggestionSentTitle": "Предложението е изпратено",
+      "suggestionSentBody": "Сервизът ще приеме или откаже предпочитания от вас час.",
+      "couldNotSend": "Неуспешно изпращане",
+      "recordConfirmedTitle": "Записът е потвърден",
+      "recordRejectedTitle": "Записът е отхвърлен",
+      "recordConfirmedBody": "Този сервизен запис вече е потвърден от вашия сервиз.",
+      "recordRejectedBody": "Собственикът ще види бележката ви за отхвърляне.",
+      "couldNotSubmitResponse": "Неуспешно изпращане на отговор",
+      "rejectConfirmationTitle": "Отхвърляне на потвърждение",
+      "rejectConfirmationBody": "Собственикът ще види, че този запис не е потвърден.",
+      "reject": "Отхвърли",
+      "rejectConfirmationNote": "Сервизът не можа да потвърди този запис."
     }
   },
   "requestService": {
@@ -4793,6 +4861,18 @@
       "noRepairTypes": "Няма налични типове ремонти.",
       "saveFailed": "Промоцията не можа да се запише.",
       "success": "Промоцията е създадена."
+    },
+    "detail": {
+      "price": "Цена: {amount}",
+      "selectVehicle": "Изберете автомобил",
+      "book": "Резервирай промоция",
+      "unbook": "Отмени резервацията",
+      "bookedSuccess": "Промоцията е резервирана!",
+      "bookingFailed": "Резервацията не успя",
+      "cancelledTitle": "Отменено",
+      "unbookedSuccess": "Резервацията е премахната.",
+      "unbookFailed": "Отмяната не успя",
+      "loadFailed": "Неуспешно зареждане на резервация или автомобили"
     }
   },
   "policies": {

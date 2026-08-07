@@ -19,9 +19,9 @@ Locale files: `src/i18n/en.json`, `src/i18n/bg.json`.
 | `erp.review.*` | Client post-service review form |
 | `erp.clientComplaint.*` | Client post-service complaint form |
 
-Related repair/materials UI also uses `repairs.detail.*`, `repairWizard.*`, `operationStatuses.*`, `selectRepairParts.*`, `createMasterPart.*`, `relatedServiceHistory.*`, `shopDataAccess.*`, `serviceCategories.*`, `materialCategories.*`, and `repairs.*` slug labels via `translateRepairTypeLabel` / `translateMaterialCategoryLabel`.
+Related repair/materials UI also uses `repairs.detail.*`, `repairs.filters.*`, `repairWizard.*`, `operationStatuses.*`, `selectRepairParts.*`, `createMasterPart.*`, `relatedServiceHistory.*`, `shopDataAccess.*`, `serviceCategories.*`, `materialCategories.*`, `partnerDashboard.promotions.*`, `promotions.detail.*`, and `repairs.*` slug labels via `translateRepairTypeLabel` / `translateMaterialCategoryLabel` (including shop calendar and promotion surfaces).
 
-Backend: `RepairType.name_bg` / `name_en` (seeded by `seed_service_types`) and `MaterialCategory.name_bg` / `name_en` (seeded by `seed_part_taxonomy`, exposed on `/api/materials/material-categories/`). After deploy, re-run those seeds (or migrate) so existing rows get BG names.
+Backend: `RepairType.name_bg` / `name_en` (seeded by `seed_service_types`) and `MaterialCategory.name_bg` / `name_en` (seeded by `seed_part_taxonomy`, exposed on `/api/materials/material-categories/`). After deploy, run migrations `materials.0014` and `repairs.0045`, then re-run those seeds so existing rows get BG names.
 
 Drawer labels live under `drawer.partner.*` (`analytics`, `workforce`, `documentImports`, `complaints`).
 

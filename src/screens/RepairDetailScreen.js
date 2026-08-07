@@ -2334,7 +2334,10 @@ export default function RepairDetailScreen({ route, navigation }) {
   const requestMediaLibraryPermission = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission required', 'Allow access to photos/videos to attach media.');
+      Alert.alert(
+        t('repairs.detail.mediaPermissionTitle'),
+        t('repairs.detail.mediaPermissionBody')
+      );
       return false;
     }
     return true;
@@ -2366,7 +2369,10 @@ export default function RepairDetailScreen({ route, navigation }) {
       await refreshRepair();
     } catch (err) {
       console.error(err);
-      Alert.alert('Upload failed', 'Could not add this photo. Please try again.');
+      Alert.alert(
+        t('repairs.detail.mediaUploadFailedTitle'),
+        t('repairs.detail.mediaUploadPhotoFailed')
+      );
     } finally {
       setUploadingMedia(false);
     }
@@ -2398,7 +2404,10 @@ export default function RepairDetailScreen({ route, navigation }) {
       await refreshRepair();
     } catch (err) {
       console.error(err);
-      Alert.alert('Upload failed', 'Could not add this video. Please try again.');
+      Alert.alert(
+        t('repairs.detail.mediaUploadFailedTitle'),
+        t('repairs.detail.mediaUploadVideoFailed')
+      );
     } finally {
       setUploadingMedia(false);
     }
@@ -2406,19 +2415,19 @@ export default function RepairDetailScreen({ route, navigation }) {
 
   const handleAddPhotoOrVideo = () => {
     if (!canEditClientRequest || uploadingMedia) return;
-    Alert.alert('Add photo or video', undefined, [
-      { text: 'Photo', onPress: () => { handlePickAndUploadPhoto(); } },
-      { text: 'Video', onPress: () => { handlePickAndUploadVideo(); } },
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('repairs.detail.addPhotoOrVideo'), undefined, [
+      { text: t('repairs.detail.mediaPhoto'), onPress: () => { handlePickAndUploadPhoto(); } },
+      { text: t('repairs.detail.mediaVideoOption'), onPress: () => { handlePickAndUploadVideo(); } },
+      { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
     ]);
   };
 
   const handleConfirmDeleteMedia = (mediaItem) => {
     if (!canEditClientRequest || mediaItem.id == null) return;
-    Alert.alert('Remove this media from the request?', '', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('repairs.detail.removeMediaTitle'), '', [
+      { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('common.remove', null, 'Remove'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -2428,8 +2437,8 @@ export default function RepairDetailScreen({ route, navigation }) {
           } catch (err) {
             console.error(err);
             Alert.alert(
-              "Couldn't remove media",
-              err.message || 'Something went wrong. You can try again in a moment.'
+              t('repairs.detail.removeMediaFailedTitle'),
+              err.message || t('repairs.detail.removeMediaFailedBody')
             );
           }
         },
@@ -2444,11 +2453,14 @@ export default function RepairDetailScreen({ route, navigation }) {
       const token = await AsyncStorage.getItem('@access_token');
       await requestOwnerLoggedRepairConfirmation(token, repairId);
       await refreshRepair();
-      Alert.alert('Confirmation requested', 'The selected service center was notified.');
+      Alert.alert(
+        t('repairs.detail.confirmationRequestedTitle'),
+        t('repairs.detail.confirmationRequestedBody')
+      );
     } catch (err) {
       Alert.alert(
-        'Could not request confirmation',
-        parseApiErrorMessage(err, 'Please try again.')
+        t('repairs.detail.confirmationRequestFailedTitle'),
+        parseApiErrorMessage(err, t('repairs.detail.pleaseTryAgain'))
       );
     } finally {
       setRequestingConfirmation(false);
@@ -2466,9 +2478,15 @@ export default function RepairDetailScreen({ route, navigation }) {
       const token = await AsyncStorage.getItem('@access_token');
       await shopConfirmVehicleArrival(token, repairId);
       await refreshRepair();
-      Alert.alert('Vehicle arrived', 'The repair is now in service.');
+      Alert.alert(
+        t('partnerDashboard.calendar.vehicleArrivedTitle'),
+        t('repairs.detail.vehicleArrivedBody')
+      );
     } catch (err) {
-      Alert.alert('Could not confirm', parseApiErrorMessage(err, 'Please try again.'));
+      Alert.alert(
+        t('repairs.detail.couldNotConfirmArrival'),
+        parseApiErrorMessage(err, t('repairs.detail.pleaseTryAgain'))
+      );
     } finally {
       setRespondingArrival(false);
     }
@@ -2573,7 +2591,10 @@ export default function RepairDetailScreen({ route, navigation }) {
         t('repairs.detail.checkedInBody')
       );
     } catch (err) {
-      Alert.alert(t('repairs.detail.couldNotCheckIn'), parseApiErrorMessage(err, 'Please try again.'));
+      Alert.alert(
+        t('repairs.detail.couldNotCheckIn'),
+        parseApiErrorMessage(err, t('repairs.detail.pleaseTryAgain'))
+      );
     } finally {
       setRespondingArrival(false);
     }
@@ -2605,7 +2626,10 @@ export default function RepairDetailScreen({ route, navigation }) {
                 t('repairs.detail.appointmentCanceledBody')
               );
             } catch (err) {
-              Alert.alert(t('repairs.detail.couldNotCancel'), parseApiErrorMessage(err, 'Please try again.'));
+              Alert.alert(
+                t('repairs.detail.couldNotCancel'),
+                parseApiErrorMessage(err, t('repairs.detail.pleaseTryAgain'))
+              );
             } finally {
               setCancelingAppointment(false);
             }
@@ -2626,10 +2650,12 @@ export default function RepairDetailScreen({ route, navigation }) {
       return;
     }
     Alert.alert(
-      action === 'accept' ? 'New time confirmed' : 'Reschedule declined',
       action === 'accept'
-        ? 'Your appointment was updated.'
-        : 'The shop will keep the previous time unless they contact you.'
+        ? t('repairs.detail.newTimeConfirmedTitle')
+        : t('repairs.detail.rescheduleDeclinedTitle'),
+      action === 'accept'
+        ? t('repairs.detail.newTimeConfirmedBody')
+        : t('repairs.detail.rescheduleDeclinedBody')
     );
   };
 
@@ -2644,7 +2670,10 @@ export default function RepairDetailScreen({ route, navigation }) {
       });
       await afterRescheduleAction(action);
     } catch (err) {
-      Alert.alert('Could not respond', parseApiErrorMessage(err, 'Please try again.'));
+      Alert.alert(
+        t('repairs.detail.couldNotRespond'),
+        parseApiErrorMessage(err, t('repairs.detail.pleaseTryAgain'))
+      );
     } finally {
       setRespondingReschedule(false);
     }
@@ -2661,13 +2690,18 @@ export default function RepairDetailScreen({ route, navigation }) {
       });
       await refreshRepair();
       Alert.alert(
-        action === 'accept' ? 'Time confirmed' : 'Suggestion declined',
         action === 'accept'
-          ? 'The appointment was updated.'
-          : 'The previous time stays on the calendar.'
+          ? t('repairs.detail.timeConfirmedTitle')
+          : t('repairs.detail.suggestionDeclinedTitle'),
+        action === 'accept'
+          ? t('repairs.detail.timeConfirmedBody')
+          : t('repairs.detail.suggestionDeclinedBody')
       );
     } catch (err) {
-      Alert.alert('Could not respond', parseApiErrorMessage(err, 'Please try again.'));
+      Alert.alert(
+        t('repairs.detail.couldNotRespond'),
+        parseApiErrorMessage(err, t('repairs.detail.pleaseTryAgain'))
+      );
     } finally {
       setRespondingReschedule(false);
     }
@@ -2704,14 +2738,17 @@ export default function RepairDetailScreen({ route, navigation }) {
       });
       await refreshRepair();
       Alert.alert(
-        'Suggestion sent',
-        'The service center will accept or decline your preferred time.'
+        t('repairs.detail.suggestionSentTitle'),
+        t('repairs.detail.suggestionSentBody')
       );
       if (returnTo === 'ClientActivity' || returnTo === 'ClientNotifications') {
         navigation.goBack();
       }
     } catch (err) {
-      Alert.alert('Could not send', parseApiErrorMessage(err, 'Please try again.'));
+      Alert.alert(
+        t('repairs.detail.couldNotSend'),
+        parseApiErrorMessage(err, t('repairs.detail.pleaseTryAgain'))
+      );
     } finally {
       setSubmittingCounter(false);
     }
@@ -2729,15 +2766,17 @@ export default function RepairDetailScreen({ route, navigation }) {
         });
         await refreshRepair();
         Alert.alert(
-          action === 'confirm' ? 'Record confirmed' : 'Record rejected',
           action === 'confirm'
-            ? 'This service record is now confirmed by your service center.'
-            : 'The owner will see your rejection note.'
+            ? t('repairs.detail.recordConfirmedTitle')
+            : t('repairs.detail.recordRejectedTitle'),
+          action === 'confirm'
+            ? t('repairs.detail.recordConfirmedBody')
+            : t('repairs.detail.recordRejectedBody')
         );
       } catch (err) {
         Alert.alert(
-          'Could not submit response',
-          parseApiErrorMessage(err, 'Please try again.')
+          t('repairs.detail.couldNotSubmitResponse'),
+          parseApiErrorMessage(err, t('repairs.detail.pleaseTryAgain'))
         );
       } finally {
         setRespondingConfirmation(false);
@@ -2749,14 +2788,14 @@ export default function RepairDetailScreen({ route, navigation }) {
       return;
     }
     Alert.alert(
-      'Reject confirmation',
-      'The owner will see that this record was not confirmed.',
+      t('repairs.detail.rejectConfirmationTitle'),
+      t('repairs.detail.rejectConfirmationBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
         {
-          text: 'Reject',
+          text: t('repairs.detail.reject'),
           style: 'destructive',
-          onPress: () => run('Service center could not verify this record.'),
+          onPress: () => run(t('repairs.detail.rejectConfirmationNote')),
         },
       ]
     );
@@ -4667,9 +4706,9 @@ export default function RepairDetailScreen({ route, navigation }) {
                     : t('repairs.detail.photosPermanentRecord')
                   : isOpenStatus
                     ? canEditClientRequest
-                      ? 'Add or remove photos and videos while this request is open. After a shop is booked, media here becomes read-only.'
-                      : 'Photos and videos attached to this request.'
-                    : 'Documentation shared during this repair.'}
+                      ? t('repairs.detail.mediaEditOpenHint')
+                      : t('repairs.detail.mediaAttachedToRequest')
+                    : t('repairs.detail.mediaDuringRepair')}
               </Text>
               {canEditClientRequest ? (
                 <Button
@@ -4678,7 +4717,9 @@ export default function RepairDetailScreen({ route, navigation }) {
                   disabled={uploadingMedia}
                   style={styles.mediaAddButton}
                 >
-                  {uploadingMedia ? 'Uploading…' : 'Add photo or video'}
+                  {uploadingMedia
+                    ? t('repairs.detail.uploadingMedia')
+                    : t('repairs.detail.addPhotoOrVideo')}
                 </Button>
               ) : null}
               {mediaItems.length > 0 ? (
@@ -4700,7 +4741,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                               <Pressable
                                 style={styles.mediaRemoveBtn}
                                 onPress={() => handleConfirmDeleteMedia(m)}
-                                accessibilityLabel="Remove media"
+                                accessibilityLabel={t('repairs.detail.removeMediaA11y')}
                                 hitSlop={10}
                               >
                                 <MaterialCommunityIcons name="trash-can-outline" size={18} color="#fff" />
@@ -4742,7 +4783,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                               <Pressable
                                 style={styles.mediaRemoveBtnInline}
                                 onPress={() => handleConfirmDeleteMedia(m)}
-                                accessibilityLabel="Remove media"
+                                accessibilityLabel={t('repairs.detail.removeMediaA11y')}
                                 hitSlop={10}
                               >
                                 <MaterialCommunityIcons name="trash-can-outline" size={22} color={COLORS.TEXT_MUTED} />
@@ -4750,7 +4791,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                             ) : null}
                           </View>
                           <Text style={styles.mediaCaption} numberOfLines={2}>
-                            {m.description || m.caption || mediaUrl(m)?.split('/').pop() || 'Video attachment'}
+                            {m.description || m.caption || mediaUrl(m)?.split('/').pop() || t('repairs.detail.videoAttachmentFallback')}
                           </Text>
                           <Button mode="outlined" compact style={styles.videoPlayBtn}>
                             Play (coming soon)

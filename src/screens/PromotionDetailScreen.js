@@ -17,8 +17,11 @@ import { Card, Text, Button, useTheme, Divider } from 'react-native-paper';
 import { formatMoneyAmount } from '../constants/currency';
 import ScreenBackground from '../components/ScreenBackground';
 import { stackContentPaddingTop } from '../navigation/stackContentInset';
+import { useTranslation } from '../i18n';
+import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 
 export default function PromotionDetailScreen({ route, navigation }) {
+  const { t, locale } = useTranslation();
   const insets = useSafeAreaInsets();
   const topPad = stackContentPaddingTop(insets);
   const { promotion } = route.params;
@@ -28,6 +31,21 @@ export default function PromotionDetailScreen({ route, navigation }) {
   const [selectedVehicleId, setSelectedVehicleId] = useState(null);
   const [alreadyBooked, setAlreadyBooked] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const repairTypeTitle =
+    translateRepairTypeLabel(
+      {
+        repair_type_name: promotion?.repair_type_name,
+        slug: promotion?.repair_type_slug,
+        name_bg: promotion?.repair_type_name_bg,
+        name_en: promotion?.repair_type_name_en,
+      },
+      t,
+      { locale }
+    ) ||
+    promotion?.repair_type_name ||
+    promotion?.title ||
+    '';
 
   useEffect(() => {
     const fetchBookingStatus = async () => {
@@ -50,7 +68,10 @@ export default function PromotionDetailScreen({ route, navigation }) {
         setAlreadyBooked(vehicleIds.includes(selectedIdStr));
       } catch (err) {
         safeError('Failed to load booking or vehicle data', err);
-        Alert.alert('Error', 'Failed to load booking or vehicle data');
+        Alert.alert(
+          t('repairs.detail.errorTitle', null, 'Error'),
+          t('promotions.detail.loadFailed')
+        );
       } finally {
         setLoading(false);
       }
@@ -59,7 +80,7 @@ export default function PromotionDetailScreen({ route, navigation }) {
     if (promotion?.id) {
       fetchBookingStatus();
     }
-  }, [promotion?.id]);
+  }, [promotion?.id, t]);
 
   useEffect(() => {
     const updateBookingStatus = async () => {
@@ -98,10 +119,13 @@ export default function PromotionDetailScreen({ route, navigation }) {
     try {
       const token = await AsyncStorage.getItem('@access_token');
       await bookPromotion(token, promotion.id, parseInt(selectedVehicleId));
-      Alert.alert('Success', 'Promotion booked!');
+      Alert.alert(t('common.success', null, 'Success'), t('promotions.detail.bookedSuccess'));
       await refreshBookingStatus();
     } catch (err) {
-      Alert.alert('Error', err.message || 'Booking failed');
+      Alert.alert(
+        t('repairs.detail.errorTitle', null, 'Error'),
+        err.message || t('promotions.detail.bookingFailed')
+      );
     }
   };
 
@@ -110,10 +134,13 @@ export default function PromotionDetailScreen({ route, navigation }) {
       const token = await AsyncStorage.getItem('@access_token');
       // Send vehicle_id in the request body as required by backend
       await unbookPromotion(token, promotion.id, parseInt(selectedVehicleId));
-      Alert.alert('Cancelled', 'Booking has been removed.');
+      Alert.alert(t('promotions.detail.cancelledTitle'), t('promotions.detail.unbookedSuccess'));
       await refreshBookingStatus();
     } catch (err) {
-      Alert.alert('Error', err.message || 'Unbooking failed');
+      Alert.alert(
+        t('repairs.detail.errorTitle', null, 'Error'),
+        err.message || t('promotions.detail.unbookFailed')
+      );
     }
   };
 
@@ -140,17 +167,19 @@ export default function PromotionDetailScreen({ route, navigation }) {
         ]}
       >
         <Card style={styles.card} mode="elevated" elevation={2}>
-          <Card.Title title={promotion.repair_type_name} subtitle={promotion.shop_name} />
+          <Card.Title title={repairTypeTitle} subtitle={promotion.shop_name} />
           <Card.Content>
             <Divider style={{ marginVertical: 8 }} />
             <Text variant="bodyMedium">{promotion.description}</Text>
-            <Text variant="titleMedium" style={{ marginTop: 8 }}>Price: {formatMoneyAmount(promotion.price)}</Text>
+            <Text variant="titleMedium" style={{ marginTop: 8 }}>
+              {t('promotions.detail.price', { amount: formatMoneyAmount(promotion.price) })}
+            </Text>
           </Card.Content>
         </Card>
 
         <Card style={styles.card} mode="elevated" elevation={2}>
           <Card.Content>
-            <Text variant="labelLarge">Select Vehicle</Text>
+            <Text variant="labelLarge">{t('promotions.detail.selectVehicle')}</Text>
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={selectedVehicleId}
@@ -173,7 +202,7 @@ export default function PromotionDetailScreen({ route, navigation }) {
                 style={styles.button}
                 buttonColor={theme.colors.error}
               >
-                Unbook Promotion
+                {t('promotions.detail.unbook')}
               </Button>
             ) : (
               <Button
@@ -181,7 +210,7 @@ export default function PromotionDetailScreen({ route, navigation }) {
                 onPress={handleBook}
                 style={styles.button}
               >
-                Book Promotion
+                {t('promotions.detail.book')}
               </Button>
             )}
           </Card.Content>

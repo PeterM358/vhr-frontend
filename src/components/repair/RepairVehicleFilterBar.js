@@ -22,18 +22,20 @@ function buildDescendingYears(startYear, endYear) {
   return years;
 }
 
-function formatModelCatalogYears(model) {
+function formatModelCatalogYears(model, t) {
   const from = model?.production_year_from;
   const to = model?.production_year_to;
   if (from && to) return `${from}–${to}`;
-  if (from) return `from ${from}`;
-  if (to) return `until ${to}`;
+  if (from) return t('repairs.filters.catalogFrom', { year: from });
+  if (to) return t('repairs.filters.catalogUntil', { year: to });
   return null;
 }
 
-function modelPickerLabel(model) {
-  const range = formatModelCatalogYears(model);
-  return range ? `${model.name} (catalog ${range})` : model.name;
+function modelPickerLabel(model, t) {
+  const range = formatModelCatalogYears(model, t);
+  return range
+    ? `${model.name} (${t('repairs.filters.catalogRangeLabel', { range })})`
+    : model.name;
 }
 
 export default function RepairVehicleFilterBar({ value, onChange, statusTab = 'open' }) {
@@ -116,7 +118,7 @@ export default function RepairVehicleFilterBar({ value, onChange, statusTab = 'o
     [models, modelId]
   );
 
-  const catalogYearsHint = formatModelCatalogYears(selectedModel);
+  const catalogYearsHint = formatModelCatalogYears(selectedModel, t);
 
   const hasActiveFilters = Boolean(
     makeId || modelId || vehicleYear || serviceYear || repairTypeId
@@ -126,19 +128,18 @@ export default function RepairVehicleFilterBar({ value, onChange, statusTab = 'o
     onChange?.({ makeId, modelId, vehicleYear, serviceYear, repairTypeId, ...next });
 
   const serviceYearLabel =
-    statusTab === 'done' ? 'Service completed year' : 'Request / job year';
+    statusTab === 'done'
+      ? t('repairs.filters.serviceCompletedYear')
+      : t('repairs.filters.requestJobYear');
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.heading}>Filters</Text>
-      <Text style={styles.intro}>
-        Make and model identify the car. Years are separate: registration on the vehicle profile vs when
-        the service happened.
-      </Text>
+      <Text style={styles.heading}>{t('repairs.filters.heading')}</Text>
+      <Text style={styles.intro}>{t('repairs.filters.intro')}</Text>
 
       <View style={styles.pickerRow}>
         <View style={styles.pickerBox}>
-          <Text style={styles.pickerLabel}>Make</Text>
+          <Text style={styles.pickerLabel}>{t('repairs.filters.make')}</Text>
           <View style={styles.pickerShell}>
             <Picker
               selectedValue={makeId || ANY}
@@ -146,7 +147,7 @@ export default function RepairVehicleFilterBar({ value, onChange, statusTab = 'o
               style={styles.picker}
               dropdownIconColor={COLORS.TEXT_MUTED}
             >
-              <Picker.Item label="Any make" value={ANY} />
+              <Picker.Item label={t('repairs.filters.anyMake')} value={ANY} />
               {makes.map((make) => (
                 <Picker.Item key={String(make.id)} label={make.name} value={String(make.id)} />
               ))}
@@ -155,7 +156,7 @@ export default function RepairVehicleFilterBar({ value, onChange, statusTab = 'o
         </View>
 
         <View style={styles.pickerBox}>
-          <Text style={styles.pickerLabel}>Model</Text>
+          <Text style={styles.pickerLabel}>{t('repairs.filters.model')}</Text>
           <View style={[styles.pickerShell, !makeId && styles.pickerDisabled]}>
             <Picker
               enabled={Boolean(makeId) && !modelsLoading}
@@ -164,11 +165,16 @@ export default function RepairVehicleFilterBar({ value, onChange, statusTab = 'o
               style={styles.picker}
               dropdownIconColor={COLORS.TEXT_MUTED}
             >
-              <Picker.Item label={makeId ? 'Any model' : 'Select make first'} value={ANY} />
+              <Picker.Item
+                label={
+                  makeId ? t('repairs.filters.anyModel') : t('repairs.filters.selectMakeFirst')
+                }
+                value={ANY}
+              />
               {models.map((model) => (
                 <Picker.Item
                   key={String(model.id)}
-                  label={modelPickerLabel(model)}
+                  label={modelPickerLabel(model, t)}
                   value={String(model.id)}
                 />
               ))}
@@ -176,7 +182,7 @@ export default function RepairVehicleFilterBar({ value, onChange, statusTab = 'o
           </View>
           {catalogYearsHint ? (
             <Text style={styles.pickerHint}>
-              Catalog production years: {catalogYearsHint}. This is not the car registration year.
+              {t('repairs.filters.catalogYearsHint', { range: catalogYearsHint })}
             </Text>
           ) : null}
         </View>
@@ -184,8 +190,8 @@ export default function RepairVehicleFilterBar({ value, onChange, statusTab = 'o
 
       <View style={styles.pickerRow}>
         <View style={styles.pickerBox}>
-          <Text style={styles.pickerLabel}>Car registration year</Text>
-          <Text style={styles.pickerSublabel}>Year on the vehicle profile</Text>
+          <Text style={styles.pickerLabel}>{t('repairs.filters.registrationYear')}</Text>
+          <Text style={styles.pickerSublabel}>{t('repairs.filters.registrationYearSublabel')}</Text>
           <View style={styles.pickerShell}>
             <Picker
               selectedValue={vehicleYear || ANY}
@@ -193,7 +199,7 @@ export default function RepairVehicleFilterBar({ value, onChange, statusTab = 'o
               style={styles.picker}
               dropdownIconColor={COLORS.TEXT_MUTED}
             >
-              <Picker.Item label="Any registration year" value={ANY} />
+              <Picker.Item label={t('repairs.filters.anyRegistrationYear')} value={ANY} />
               {registrationYearOptions.map((year) => (
                 <Picker.Item key={`reg-${year}`} label={String(year)} value={String(year)} />
               ))}
@@ -204,7 +210,9 @@ export default function RepairVehicleFilterBar({ value, onChange, statusTab = 'o
         <View style={styles.pickerBox}>
           <Text style={styles.pickerLabel}>{serviceYearLabel}</Text>
           <Text style={styles.pickerSublabel}>
-            {statusTab === 'done' ? 'When the job was completed' : 'When the request was created'}
+            {statusTab === 'done'
+              ? t('repairs.filters.serviceCompletedSublabel')
+              : t('repairs.filters.requestCreatedSublabel')}
           </Text>
           <View style={styles.pickerShell}>
             <Picker
@@ -213,7 +221,7 @@ export default function RepairVehicleFilterBar({ value, onChange, statusTab = 'o
               style={styles.picker}
               dropdownIconColor={COLORS.TEXT_MUTED}
             >
-              <Picker.Item label="Any service year" value={ANY} />
+              <Picker.Item label={t('repairs.filters.anyServiceYear')} value={ANY} />
               {serviceYearOptions.map((year) => (
                 <Picker.Item key={`svc-${year}`} label={String(year)} value={String(year)} />
               ))}
@@ -260,7 +268,7 @@ export default function RepairVehicleFilterBar({ value, onChange, statusTab = 'o
           }
           style={styles.clearBtn}
         >
-          Clear all filters
+          {t('repairs.filters.clearAll')}
         </Button>
       ) : null}
     </View>

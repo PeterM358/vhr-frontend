@@ -30,9 +30,10 @@ import {
   TEXT_MUTED,
 } from '../../constants/colors';
 import { formatMoneyAmount } from '../../constants/currency';
+import { translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
 
 export default function ShopPromotions() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const handleBack = usePartnerDashboardBack(navigation);
@@ -55,7 +56,10 @@ export default function ShopPromotions() {
       setOffers(data);
     } catch (err) {
       console.error('Failed to fetch promotions', err);
-      Alert.alert('Error', 'Failed to load promotions');
+      Alert.alert(
+        t('repairs.detail.errorTitle', null, 'Error'),
+        t('partnerDashboard.promotions.loadError')
+      );
     } finally {
       setLoading(false);
     }
@@ -63,12 +67,12 @@ export default function ShopPromotions() {
 
   const handleDelete = (offerId) => {
     Alert.alert(
-      'Delete promotion',
-      'Are you sure you want to delete this promotion?',
+      t('partnerDashboard.promotions.deleteTitle'),
+      t('partnerDashboard.promotions.deleteConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('partnerDashboard.promotions.deleteButton'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -77,7 +81,10 @@ export default function ShopPromotions() {
               setOffers((prev) => prev.filter((o) => o.id !== offerId));
             } catch (err) {
               console.error('Failed to delete promotion', err);
-              Alert.alert('Error', err.message || 'Failed to delete promotion');
+              Alert.alert(
+                t('repairs.detail.errorTitle', null, 'Error'),
+                err.message || t('partnerDashboard.promotions.deleteFailed')
+              );
             }
           },
         },
@@ -110,7 +117,18 @@ export default function ShopPromotions() {
               size={14}
               color={TEXT_MUTED}
             />
-            <Text style={styles.metaText}>{item.repair_type_name}</Text>
+            <Text style={styles.metaText}>
+              {translateRepairTypeLabel(
+                {
+                  repair_type_name: item.repair_type_name,
+                  slug: item.repair_type_slug,
+                  name_bg: item.repair_type_name_bg,
+                  name_en: item.repair_type_name_en,
+                },
+                t,
+                { locale }
+              ) || item.repair_type_name}
+            </Text>
           </View>
         )}
         {(!!item.valid_from || !!item.valid_until) && (
@@ -132,7 +150,9 @@ export default function ShopPromotions() {
             color={TEXT_MUTED}
           />
           <Text style={styles.metaText}>
-            Max: {item.max_bookings || 'Unlimited'}
+            {item.max_bookings
+              ? t('partnerDashboard.promotions.maxBookings', { count: item.max_bookings })
+              : t('partnerDashboard.promotions.maxUnlimited')}
           </Text>
         </View>
       </View>
