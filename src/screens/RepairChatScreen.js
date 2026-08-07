@@ -38,10 +38,12 @@ import { WebSocketContext } from '../context/WebSocketManager';
 
 import { API_BASE_URL } from '../api/config';
 import { formatMoneyAmount } from '../constants/currency';
+import { useTranslation } from '../i18n';
 
 export default function RepairChatScreen({ route, navigation }) {
   const { repairId } = route.params;
   const theme = useTheme();
+  const { t } = useTranslation();
   const { chatMessages } = useContext(WebSocketContext);
 
   const [repair, setRepair] = useState(null);
@@ -573,7 +575,7 @@ export default function RepairChatScreen({ route, navigation }) {
                           });
                         }}
                       >
-                        Manage Parts
+                        {t('repairChat.manageParts', null, 'Manage parts')}
                       </Button>
                     )}
 
@@ -585,8 +587,8 @@ export default function RepairChatScreen({ route, navigation }) {
                               {part.partsMaster?.name} ({part.partsMaster?.brand})
                             </Text>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 4 }}>
-                              <Text>Qty: {part.quantity}</Text>
-                              <Text>Price: {part.price}</Text>
+                              <Text>{t('repairChat.qty', { value: part.quantity }, `Qty: ${part.quantity}`)}</Text>
+                              <Text>{t('repairChat.price', { value: part.price }, `Price: ${part.price}`)}</Text>
                               <Text>Labor: {part.labor}</Text>
                             </View>
                             {part.note ? <Text style={{ fontStyle: 'italic' }}>Note: {part.note}</Text> : null}

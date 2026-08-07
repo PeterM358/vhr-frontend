@@ -90,7 +90,7 @@ import {
 } from '../api/vehicleAccess';
 import StatusBadge from '../components/ui/StatusBadge';
 import { COLORS } from '../constants/colors';
-import { useTranslation, translateRepairStatus } from '../i18n';
+import { useTranslation, translateRepairStatus, t as translate } from '../i18n';
 import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 import { formatDurationMinutes } from '../utils/laborDuration';
 import { getOperationIcon } from '../icons/operationIconRegistry';
@@ -195,27 +195,62 @@ function hasOdometerEvidenceAvailable(repair, pendingPhoto) {
   );
 }
 
-function formatPaymentStatus(status) {
+function formatPaymentStatus(status, translateFn = translate) {
   if (!status) return '—';
+  const key = String(status);
   const map = {
-    unpaid: 'Unpaid',
-    partially_paid: 'Partially paid',
-    paid: 'Paid',
-    included_in_invoice: 'Included in invoice',
+    unpaid: translateFn('repairs.detail.paymentUnpaid', null, 'Unpaid'),
+    partially_paid: translateFn('repairs.detail.paymentPartiallyPaid', null, 'Partially paid'),
+    paid: translateFn('repairs.detail.paymentPaid', null, 'Paid'),
+    included_in_invoice: translateFn(
+      'repairs.detail.paymentIncludedInInvoice',
+      null,
+      'Included in invoice'
+    ),
   };
-  return map[String(status)] || String(status).replace(/_/g, ' ');
+  return map[key] || key.replace(/_/g, ' ');
 }
 
-const PAYMENT_STATUS_OPTIONS = [
-  { value: 'paid', label: 'Paid on pickup', hint: 'Customer paid when collecting the vehicle' },
-  { value: 'unpaid', label: 'Unpaid', hint: 'Bill later — common for fleet accounts' },
-  {
-    value: 'included_in_invoice',
-    label: 'Monthly invoice',
-    hint: 'Company / fleet — settle on periodic invoice',
-  },
-  { value: 'partially_paid', label: 'Partial deposit', hint: 'Deposit received, balance outstanding' },
-];
+function getPaymentStatusOptions(translateFn = translate) {
+  return [
+    {
+      value: 'paid',
+      label: translateFn('repairs.detail.paymentPaidOnPickup', null, 'Paid on pickup'),
+      hint: translateFn(
+        'repairs.detail.paymentPaidOnPickupHint',
+        null,
+        'Customer paid when collecting the vehicle'
+      ),
+    },
+    {
+      value: 'unpaid',
+      label: translateFn('repairs.detail.paymentUnpaid', null, 'Unpaid'),
+      hint: translateFn(
+        'repairs.detail.paymentUnpaidHint',
+        null,
+        'Bill later — common for fleet accounts'
+      ),
+    },
+    {
+      value: 'included_in_invoice',
+      label: translateFn('repairs.detail.paymentMonthlyInvoice', null, 'Monthly invoice'),
+      hint: translateFn(
+        'repairs.detail.paymentMonthlyInvoiceHint',
+        null,
+        'Company / fleet — settle on periodic invoice'
+      ),
+    },
+    {
+      value: 'partially_paid',
+      label: translateFn('repairs.detail.paymentPartialDeposit', null, 'Partial deposit'),
+      hint: translateFn(
+        'repairs.detail.paymentPartialDepositHint',
+        null,
+        'Deposit received, balance outstanding'
+      ),
+    },
+  ];
+}
 
 function formatHistoryDate(raw) {
   if (raw == null || raw === '') return null;
@@ -503,7 +538,7 @@ export default function RepairDetailScreen({ route, navigation }) {
     totalPriceOverride = undefined,
   } = {}) => {
     if (repair.status === 'done') {
-      Alert.alert("This repair is completed and can no longer be edited.");
+      Alert.alert(t('repairs.detail.completedCannotEdit', null, 'This repair is completed and can no longer be edited.'));
       return false;
     }
     const partsToSend = partsOverride ?? (selectedParts.length > 0 ? selectedParts : repairParts);
@@ -518,9 +553,9 @@ export default function RepairDetailScreen({ route, navigation }) {
       if (finalize) {
         const effectiveTypeId = resolveEffectiveServiceTypeId(finalRepairTypeId, repair);
         if (!effectiveTypeId) {
-          const msg = 'Select the final service type before completing this repair.';
+          const msg = t('repairs.detail.selectFinalServiceType', null, 'Select the final service type before completing this repair.');
           setFinalizeTypeError(msg);
-          showMessage('Service type required', msg);
+          showMessage(t('repairs.detail.serviceTypeRequiredTitle', null, 'Service type required'), msg);
           return false;
         }
         setFinalizeTypeError('');
@@ -529,7 +564,7 @@ export default function RepairDetailScreen({ route, navigation }) {
       if (finalize && !skipMileageGate) {
         const effectiveKm = resolveEffectiveFinalizeKm(finalKilometers, repair);
         if (effectiveKm == null) {
-          const msg = 'Enter the final vehicle kilometers before completing this repair.';
+          const msg = t('repairs.detail.enterFinalKilometers', null, 'Enter the final vehicle kilometers before completing this repair.');
           setFinalizeKmError(msg);
           setOdometerEvidenceSheet({
             visible: true,
@@ -643,7 +678,7 @@ export default function RepairDetailScreen({ route, navigation }) {
       if (pendingOdometerPhoto && repair?.vehicle) {
         await uploadRepairDocument(token, repair.vehicle, repairId, pendingOdometerPhoto, {
           document_type: pendingOdometerPhoto.documentType,
-          title: pendingOdometerPhoto.title || 'Odometer photo',
+          title: pendingOdometerPhoto.title || t('repairs.detail.odometerPhoto', null, 'Odometer photo'),
           notes: noteText || undefined,
           currency: DEFAULT_CURRENCY,
         });
@@ -656,12 +691,12 @@ export default function RepairDetailScreen({ route, navigation }) {
       if (showSuccessAlert) {
         if (finalize) {
           showMessage(
-            'Repair completed',
-            'The client was notified that the vehicle is ready for pickup.',
+            t('repairs.detail.repairCompletedNotifyTitle', null, 'Repair completed'),
+            t('repairs.detail.repairCompletedNotifyBody', null, 'The client was notified that the vehicle is ready for pickup.'),
             { variant: 'success' }
           );
         } else {
-          showMessage('Saved', 'Repair progress saved successfully.');
+          showMessage(t('repairs.detail.savedTitle', null, 'Saved'), t('repairs.detail.repairProgressSaved', null, 'Repair progress saved successfully.'));
         }
       }
       setFinalizeKmError('');
@@ -671,7 +706,7 @@ export default function RepairDetailScreen({ route, navigation }) {
       return true;
     } catch (err) {
       console.error('❌ Update Error:', err);
-      const message = parseApiErrorMessage(err, 'Failed to update repair');
+      const message = parseApiErrorMessage(err, t('repairs.detail.failedUpdateRepair', null, 'Failed to update repair'));
       if (/odometer|kilometer|\bkm\b/i.test(message)) {
         setFinalizeKmError(message);
         const effectiveKm = resolveEffectiveFinalizeKm(finalKilometers, repair);
@@ -821,7 +856,7 @@ export default function RepairDetailScreen({ route, navigation }) {
 
       } catch (error) {
         console.error(error);
-        Alert.alert('Error', 'Failed to load repair data.');
+        Alert.alert(t('repairs.detail.errorTitle', null, 'Error'), t('repairs.detail.failedLoadRepair', null, 'Failed to load repair data.'));
       } finally {
         setLoading(false);
       }
@@ -962,7 +997,7 @@ export default function RepairDetailScreen({ route, navigation }) {
 
   const handleFinalizeRepair = async () => {
     if (String(repair?.status || '').toLowerCase() !== 'ongoing') {
-      showMessage('Cannot finalize', 'Only ongoing repairs can be finalized.');
+      showMessage(t('repairs.detail.cannotFinalizeTitle', null, 'Cannot finalize'), t('repairs.detail.cannotFinalizeBody', null, 'Only ongoing repairs can be finalized.'));
       return;
     }
     await handleUpdateRepair({ finalize: true, showSuccessAlert: true });
@@ -1066,7 +1101,7 @@ export default function RepairDetailScreen({ route, navigation }) {
         operationTypePickerMode === 'edit'
           ? t('repairs.detail.operationsPicker.couldNotUpdate')
           : t('repairs.detail.operationsPicker.couldNotAdd'),
-        messageFromApiError(err, 'Please try again.')
+        messageFromApiError(err, t('repairs.detail.pleaseTryAgain', null, 'Please try again.'))
       );
     } finally {
       setOperationActionId(null);
@@ -1086,7 +1121,7 @@ export default function RepairDetailScreen({ route, navigation }) {
       await refreshRepair();
       await refreshParts();
     } catch (err) {
-      showMessage('Operation update failed', messageFromApiError(err, 'Please try again.'));
+      showMessage('Operation update failed', messageFromApiError(err, t('repairs.detail.pleaseTryAgain', null, 'Please try again.')));
     } finally {
       setOperationActionId(null);
     }
@@ -1143,7 +1178,7 @@ export default function RepairDetailScreen({ route, navigation }) {
     } catch (err) {
       showMessage(
         t('repairs.detail.operationsPicker.couldNotSaveLabor', null, 'Could not save labor price'),
-        messageFromApiError(err, 'Please try again.')
+        messageFromApiError(err, t('repairs.detail.pleaseTryAgain', null, 'Please try again.'))
       );
     } finally {
       setOpLaborSavingId(null);
@@ -1185,7 +1220,7 @@ export default function RepairDetailScreen({ route, navigation }) {
     } catch (err) {
       showMessage(
         t('repairs.detail.operationsPicker.couldNotAssign', null, 'Could not assign worker'),
-        messageFromApiError(err, 'Please try again.')
+        messageFromApiError(err, t('repairs.detail.pleaseTryAgain', null, 'Please try again.'))
       );
     } finally {
       setAssignSaving(false);
@@ -1202,7 +1237,7 @@ export default function RepairDetailScreen({ route, navigation }) {
     } catch (err) {
       showMessage(
         t('repairs.detail.operationsPicker.couldNotUnassign', null, 'Could not remove worker'),
-        messageFromApiError(err, 'Please try again.')
+        messageFromApiError(err, t('repairs.detail.pleaseTryAgain', null, 'Please try again.'))
       );
     } finally {
       setAssignSaving(false);
@@ -1235,28 +1270,28 @@ export default function RepairDetailScreen({ route, navigation }) {
     }
     return (
       <FloatingCard style={styles.lightActionCard}>
-        <Text style={styles.cardTitle}>Repair totals</Text>
+        <Text style={styles.cardTitle}>{t('repairs.detail.repairTotals', null, 'Repair totals')}</Text>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Parts total</Text>
+          <Text style={styles.summaryLabel}>{t('repairs.detail.partsTotal', null, 'Parts total')}</Text>
           <Text style={styles.summaryValue}>
             {formatMoneyAmount(footerTotals.partsSum, footerTotals.currency)}
           </Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Labor total</Text>
+          <Text style={styles.summaryLabel}>{t('repairs.detail.laborTotal', null, 'Labor total')}</Text>
           <Text style={styles.summaryValue}>
             {formatMoneyAmount(footerTotals.laborSum, footerTotals.currency)}
           </Text>
         </View>
         <View style={[styles.summaryRow, { borderBottomWidth: 0 }]}>
-          <Text style={[styles.summaryLabel, { fontWeight: '700', color: COLORS.TEXT_DARK }]}>Grand total</Text>
+          <Text style={[styles.summaryLabel, { fontWeight: '700', color: COLORS.TEXT_DARK }]}>{t('repairs.detail.grandTotal', null, 'Grand total')}</Text>
           <Text style={[styles.summaryValue, styles.summaryValueEmphasis]}>
             {formatMoneyAmount(footerTotals.total, footerTotals.currency)}
           </Text>
         </View>
         {repair.total_margin != null && repair.total_parts_cost != null ? (
           <Text style={[styles.mutedText, { marginTop: 8 }]}>
-            Internal margin: {formatMoneyAmount(parseFloat(repair.total_margin), footerTotals.currency)}
+            {t('repairs.detail.internalMargin', { amount: formatMoneyAmount(parseFloat(repair.total_margin), footerTotals.currency) }, `Internal margin: ${formatMoneyAmount(parseFloat(repair.total_margin), footerTotals.currency)}`)}
           </Text>
         ) : null}
       </FloatingCard>
@@ -1300,7 +1335,7 @@ export default function RepairDetailScreen({ route, navigation }) {
     } catch (err) {
       showMessage(
         t('repairs.detail.operationsPicker.couldNotRemove'),
-        messageFromApiError(err, 'Please try again.')
+        messageFromApiError(err, t('repairs.detail.pleaseTryAgain', null, 'Please try again.'))
       );
     } finally {
       setOperationActionId(null);
@@ -1318,18 +1353,18 @@ export default function RepairDetailScreen({ route, navigation }) {
     return (
       <FloatingCard style={styles.lightActionCard}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={styles.cardTitle}>Operations</Text>
+          <Text style={styles.cardTitle}>{t('repairs.detail.operationsTitle', null, 'Operations')}</Text>
           {visibleOperations.length ? (
             <Text style={styles.mutedText}>
-              {visibleCompletedCount}/{visibleOperations.length} completed
+              {t('repairs.detail.operationsCompletedCount', { done: visibleCompletedCount, total: visibleOperations.length }, `${visibleCompletedCount}/${visibleOperations.length} completed`)}
             </Text>
           ) : null}
         </View>
         <Text style={styles.mutedText}>
-          Split work into job lines. Set labor price and assign workers here. Start/Complete appear for the assigned technician.
+          {t('repairs.detail.operationsHelp', null, 'Split work into job lines. Set labor price and assign workers here. Start/Complete appear for the assigned technician.')}
         </Text>
         {visibleOperations.length === 0 ? (
-          <Text style={styles.mutedText}>No operations yet — add one to organize parts and labor.</Text>
+          <Text style={styles.mutedText}>{t('repairs.detail.noOperationsYet', null, 'No operations yet — add one to organize parts and labor.')}</Text>
         ) : (
           visibleOperations.map((op) => {
             const expanded = operationsExpanded[op.id];
@@ -1352,15 +1387,13 @@ export default function RepairDetailScreen({ route, navigation }) {
                         />
                         <Text style={{ fontWeight: '600', flexShrink: 1 }}>
                           {op.sequence != null ? `${op.sequence} · ` : ''}
-                          {op.operation_name || 'Work performed'}
+                          {op.operation_name || t('repairs.detail.workPerformed', null, 'Work performed')}
                         </Text>
                       </View>
                       <StatusBadge status={op.status} label={operationStatusLabel(op.status)} />
                     </View>
                     <Text style={styles.mutedText}>
-                      Parts {formatMoneyAmount(opTotals.partsSum, DEFAULT_CURRENCY)} · Labor{' '}
-                      {formatMoneyAmount(opTotals.laborSum, DEFAULT_CURRENCY)} · Total{' '}
-                      {formatMoneyAmount(opTotals.total, DEFAULT_CURRENCY)}
+                      {t('repairs.detail.opLinePartsLaborTotal', { parts: formatMoneyAmount(opTotals.partsSum, DEFAULT_CURRENCY), labor: formatMoneyAmount(opTotals.laborSum, DEFAULT_CURRENCY), total: formatMoneyAmount(opTotals.total, DEFAULT_CURRENCY) }, `Parts ${formatMoneyAmount(opTotals.partsSum, DEFAULT_CURRENCY)} · Labor ${formatMoneyAmount(opTotals.laborSum, DEFAULT_CURRENCY)} · Total ${formatMoneyAmount(opTotals.total, DEFAULT_CURRENCY)}`)}
                     </Text>
                   </Pressable>
                   <Pressable
@@ -1388,16 +1421,16 @@ export default function RepairDetailScreen({ route, navigation }) {
                   <View style={{ marginTop: 8, gap: 6 }}>
                     {opParts.length ? (
                       <View>
-                        <Text style={styles.mutedText}>Parts</Text>
+                        <Text style={styles.mutedText}>{t('repairs.detail.parts', null, 'Parts')}</Text>
                         {opParts.map((part) => (
                           <Text key={part.id} style={styles.detailLine}>
-                            {(part.description || part.part_master_detail?.name || 'Part').trim()} ×{' '}
+                            {(part.description || part.part_master_detail?.name || t('repairs.detail.partFallback', null, 'Part')).trim()} ×{' '}
                             {part.quantity || 1}
                           </Text>
                         ))}
                       </View>
                     ) : (
-                      <Text style={styles.mutedText}>No parts on this operation yet.</Text>
+                      <Text style={styles.mutedText}>{t('repairs.detail.noPartsOnOperation', null, 'No parts on this operation yet.')}</Text>
                     )}
                     <TextInput
                       mode="outlined"
@@ -1458,7 +1491,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                             >
                               <Text style={styles.mutedText}>
                                 {t('repairs.detail.operationsPicker.assignedTo', null, 'Assigned')}:{' '}
-                                {row.employee_display_name || `Employee #${row.employee_id}`}
+                                {row.employee_display_name || t('repairs.detail.employeeFallback', { id: row.employee_id }, `Employee #${row.employee_id}`)}
                               </Text>
                               <Button
                                 compact
@@ -1506,7 +1539,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                                   .map((emp) => (
                                     <Picker.Item
                                       key={emp.id}
-                                      label={emp.display_name || `Employee #${emp.id}`}
+                                      label={emp.display_name || t('repairs.detail.employeeFallback', { id: emp.id }, `Employee #${emp.id}`)}
                                       value={String(emp.id)}
                                     />
                                   ))}
@@ -1550,7 +1583,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                         )}
                       </View>
                     ) : op.assigned_mechanics?.length ? (
-                      <Text style={styles.mutedText}>Mechanics: {op.assigned_mechanics.join(', ')}</Text>
+                      <Text style={styles.mutedText}>{t('repairs.detail.mechanicsLabel', { names: op.assigned_mechanics.join(', ') }, `Mechanics: ${op.assigned_mechanics.join(', ')}`)}</Text>
                     ) : null}
                     {op.notes ? <Text style={styles.mutedText}>{op.notes}</Text> : null}
                     {['planned', 'approved', 'in_progress', 'waiting_parts'].includes(
@@ -1638,10 +1671,10 @@ export default function RepairDetailScreen({ route, navigation }) {
       await updateRepair(token, repairId, { payment_status: statusToSave || 'unpaid' });
       setPaymentStatus(statusToSave);
       await refreshRepair();
-      showMessage('Payment status updated', '', { variant: 'success' });
+      showMessage(t('repairs.detail.paymentStatusUpdated', null, 'Payment status updated'), '', { variant: 'success' });
       return true;
     } catch (err) {
-      showMessage('Error', parseApiErrorMessage(err, 'Could not update payment status.'));
+      showMessage(t('repairs.detail.errorTitle', null, 'Error'), parseApiErrorMessage(err, t('repairs.detail.couldNotUpdatePayment', null, 'Could not update payment status.')));
       return false;
     } finally {
       setPaymentStatusSaving(false);
@@ -1724,33 +1757,33 @@ export default function RepairDetailScreen({ route, navigation }) {
 
   const renderShopEditableFinancialSummary = () => (
     <>
-      <Text style={styles.partsSectionLabel}>Repair financial summary</Text>
+      <Text style={styles.partsSectionLabel}>{t('repairs.detail.repairFinancialSummary', null, 'Repair financial summary')}</Text>
       <View style={styles.summaryRow}>
-        <Text style={styles.summaryLabel}>Parts</Text>
+        <Text style={styles.summaryLabel}>{t('repairs.detail.parts', null, 'Parts')}</Text>
         <Text style={styles.summaryValue}>
           {formatMoneyAmount(summaryPartsAmount, DEFAULT_CURRENCY)}
         </Text>
       </View>
       <View style={styles.summaryRow}>
-        <Text style={styles.summaryLabel}>Labor</Text>
+        <Text style={styles.summaryLabel}>{t('repairs.detail.labor')}</Text>
         <Text style={styles.summaryValue}>
           {formatMoneyAmount(summaryLaborAmount, DEFAULT_CURRENCY)}
         </Text>
       </View>
       <View style={styles.summaryRow}>
-        <Text style={[styles.summaryLabel, { fontWeight: '600' }]}>Total</Text>
+        <Text style={[styles.summaryLabel, { fontWeight: '600' }]}>{t('repairs.detail.total')}</Text>
         <Text style={[styles.summaryValue, { fontWeight: '600' }]}>
           {formatMoneyAmount(summaryTotalAmount, DEFAULT_CURRENCY)}
         </Text>
       </View>
       {hasPartsLines ? (
         <Text style={styles.mutedText}>
-          Parts come from your parts list. Edit line items via Manage parts.
+          {t('repairs.detail.partsFromListHint', null, 'Parts come from your parts list. Edit line items via Manage parts.')}
         </Text>
       ) : (
         <TextInput
           mode="outlined"
-          label="Parts price"
+          label={t('repairs.detail.partsPrice', null, 'Parts price')}
           keyboardType="numeric"
           value={partsPrice}
           onChangeText={handlePartsChange}
@@ -1759,7 +1792,7 @@ export default function RepairDetailScreen({ route, navigation }) {
       )}
       <TextInput
         mode="outlined"
-        label="Labor price"
+        label={t('repairs.detail.operationsPicker.laborPrice', null, 'Labor price')}
         keyboardType="numeric"
         value={laborPrice}
         onChangeText={handleLaborChange}
@@ -1770,14 +1803,14 @@ export default function RepairDetailScreen({ route, navigation }) {
       ) : null}
       <TextInput
         mode="outlined"
-        label="Total price"
+        label={t('repairs.detail.totalPrice', null, 'Total price')}
         keyboardType="numeric"
         value={totalPrice}
         onChangeText={handleTotalChange}
         style={styles.input}
       />
       <Text style={styles.mutedText}>{t('repairs.detail.operationsFinancialHint')}</Text>
-      <Text style={styles.mutedText}>All amounts are in {DEFAULT_CURRENCY}.</Text>
+      <Text style={styles.mutedText}>{t('repairs.detail.allAmountsInCurrency', { currency: DEFAULT_CURRENCY }, `All amounts are in ${DEFAULT_CURRENCY}.`)}</Text>
     </>
   );
 
@@ -2016,7 +2049,7 @@ export default function RepairDetailScreen({ route, navigation }) {
       item.part_master_detail?.name ||
       item.shop_part_detail?.part?.name ||
       item.description ||
-      'Unnamed Part';
+      t('repairs.detail.partFallback', null, 'Part');
     const canIssueThisPart =
       shopUsesInventory &&
       canIssueStock &&
@@ -2034,7 +2067,7 @@ export default function RepairDetailScreen({ route, navigation }) {
     <View style={{ borderBottomWidth: 1, borderBottomColor: '#ddd', paddingVertical: 6 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <Text style={{ flex: 2 }}>
-          {item.partsMaster?.name || item.part_master_detail?.name || item.shop_part_detail?.part?.name || item.description || 'Unnamed Part'}
+          {item.partsMaster?.name || item.part_master_detail?.name || item.shop_part_detail?.part?.name || item.description || t('repairs.detail.partFallback', null, 'Part')}
         </Text>
         <Text style={{ flex: 1, textAlign: 'center' }}>{item.quantity}</Text>
         <Text style={{ flex: 1, textAlign: 'center' }}>
@@ -2106,12 +2139,12 @@ export default function RepairDetailScreen({ route, navigation }) {
   }
 
   const targetingModeLabelMap = {
-    all_qualified: 'All qualified nearby service centers',
-    selected_centers: 'Selected service centers',
-    verified_only: 'Verified/guaranteed centers only',
-    operator_assisted: 'Platform assisted matching',
+    all_qualified: t('repairs.detail.targetingAllQualified', null, 'All qualified nearby service centers'),
+    selected_centers: t('repairs.detail.targetingSelected', null, 'Selected service centers'),
+    verified_only: t('repairs.detail.targetingVerified', null, 'Verified/guaranteed centers only'),
+    operator_assisted: t('repairs.detail.targetingOperator', null, 'Platform assisted matching'),
   };
-  const targetingLabel = targetingModeLabelMap[repair.request_targeting_mode] || 'All qualified nearby service centers';
+  const targetingLabel = targetingModeLabelMap[repair.request_targeting_mode] || t('repairs.detail.targetingAllQualified', null, 'All qualified nearby service centers');
   const preferredCenterNames = Array.isArray(repair.preferred_service_center_names)
     ? repair.preferred_service_center_names
     : [];
@@ -2703,7 +2736,7 @@ export default function RepairDetailScreen({ route, navigation }) {
 
   const navigateToManageParts = () => {
     if (repair.status === 'done') {
-      Alert.alert('This repair is completed and can no longer be edited.');
+      Alert.alert(t('repairs.detail.completedCannotEdit', null, 'This repair is completed and can no longer be edited.'));
       return;
     }
     navigation.navigate('SelectRepairParts', {
@@ -2744,9 +2777,9 @@ export default function RepairDetailScreen({ route, navigation }) {
           finalizeTypeError ? styles.lightActionCardError : null,
         ]}
       >
-        <Text style={styles.cardSectionTitle}>Final service type *</Text>
+        <Text style={styles.cardSectionTitle}>{t('repairs.detail.finalServiceType', null, 'Final service type *')}</Text>
         <Text style={styles.cardBodyText}>
-          Required before you can finalize. Used for service history, reminders, and statistics.
+          {t('repairs.detail.finalServiceTypeHelp', null, 'Required before you can finalize. Used for service history, reminders, and statistics.')}
         </Text>
         <View
           style={[styles.pickerContainer, finalizeTypeError ? styles.pickerContainerError : null]}
@@ -2760,11 +2793,11 @@ export default function RepairDetailScreen({ route, navigation }) {
             style={styles.pickerLight}
             itemStyle={styles.pickerItemLight}
           >
-            <Picker.Item label="Select service type…" value="" color={COLORS.TEXT_DARK} />
+            <Picker.Item label={t('repairs.detail.selectServiceType', null, 'Select service type…')} value="" color={COLORS.TEXT_DARK} />
             {repairTypes.map((type) => (
               <Picker.Item
                 key={type.id}
-                label={type.name}
+                label={translateRepairTypeLabel(type, t) || type.name}
                 value={String(type.id)}
                 color={COLORS.TEXT_DARK}
               />
@@ -2775,7 +2808,7 @@ export default function RepairDetailScreen({ route, navigation }) {
           <Text style={styles.errorText}>{finalizeTypeError}</Text>
         ) : showMissingTypeWarning ? (
           <Text style={styles.warningTextOnLight}>
-            Service type missing — choose one above before tapping Finalize repair.
+            {t('repairs.detail.serviceTypeMissingWarning', null, 'Service type missing — choose one above before tapping Finalize repair.')}
           </Text>
         ) : null}
       </FloatingCard>
@@ -2784,17 +2817,17 @@ export default function RepairDetailScreen({ route, navigation }) {
 
   const renderPaymentStatusSelector = ({ saveOnSelect = false } = {}) => {
     const selectedHint =
-      PAYMENT_STATUS_OPTIONS.find((opt) => opt.value === paymentStatus)?.hint || '';
+      getPaymentStatusOptions(t).find((opt) => opt.value === paymentStatus)?.hint || '';
     return (
       <View style={styles.completionSection}>
-        <Text style={styles.cardSectionTitle}>Payment status</Text>
+        <Text style={styles.cardSectionTitle}>{t('repairs.detail.paymentStatusTitle', null, 'Payment status')}</Text>
         <Text style={styles.cardBodyText}>
           {saveOnSelect
-            ? 'Update when the customer pays — e.g. mark Paid on pickup, or Monthly invoice for fleet accounts.'
-            : 'Finalize when the work is finished — payment does not block completion. Mark how money was handled: paid on pickup for retail, or unpaid / monthly invoice for fleet and company accounts.'}
+            ? t('repairs.detail.paymentStatusHelpSave', null, 'Update when the customer pays — e.g. mark Paid on pickup, or Monthly invoice for fleet accounts.')
+            : t('repairs.detail.paymentStatusHelpFinalize', null, 'Finalize when the work is finished — payment does not block completion. Mark how money was handled: paid on pickup for retail, or unpaid / monthly invoice for fleet and company accounts.')}
         </Text>
         <View style={styles.paymentChipRow}>
-          {PAYMENT_STATUS_OPTIONS.map((opt) => {
+          {getPaymentStatusOptions(t).map((opt) => {
             const selected = paymentStatus === opt.value;
             return (
               <Pressable
@@ -2832,7 +2865,7 @@ export default function RepairDetailScreen({ route, navigation }) {
             onPress={() => handleSavePaymentStatus()}
             style={styles.progressButton}
           >
-            Save payment status
+            {t('repairs.detail.savePaymentStatus', null, 'Save payment status')}
           </Button>
         ) : null}
       </View>
@@ -2844,8 +2877,14 @@ export default function RepairDetailScreen({ route, navigation }) {
     const exportPartCount = displayPartsForExport.length;
     const collapsedHint =
       exportPartCount > 0
-        ? `${exportPartCount} part${exportPartCount === 1 ? '' : 's'} · tap to export`
-        : 'Export VIN & parts to supplier';
+        ? t(
+            exportPartCount === 1
+              ? 'repairs.detail.partsSupplierCollapsedWithCount'
+              : 'repairs.detail.partsSupplierCollapsedWithCountPlural',
+            { count: exportPartCount },
+            `${exportPartCount} part${exportPartCount === 1 ? '' : 's'} · tap to export`
+          )
+        : t('repairs.detail.partsSupplierCollapsedEmpty', null, 'Export VIN & parts to supplier');
     return (
       <View style={styles.partsSupplierSection}>
         <Pressable
@@ -2856,7 +2895,7 @@ export default function RepairDetailScreen({ route, navigation }) {
         >
           <View style={{ flex: 1, paddingRight: 8 }}>
             <Text style={[styles.partsSectionLabel, { marginTop: 0, marginBottom: 2 }]}>
-              Parts supplier request
+              {t('repairs.detail.partsSupplierTitle', null, 'Parts supplier request')}
             </Text>
             {!partsSupplierExpanded ? (
               <Text style={styles.mutedText}>{collapsedHint}</Text>
@@ -2871,7 +2910,7 @@ export default function RepairDetailScreen({ route, navigation }) {
         {partsSupplierExpanded ? (
           <View style={{ marginTop: 8 }}>
             <Text style={styles.mutedText}>
-              Export VIN, year, engine, and parts on this repair to your supplier via email or Viber.
+              {t('repairs.detail.partsSupplierHelp', null, 'Export VIN, year, engine, and parts on this repair to your supplier via email or Viber.')}
             </Text>
             {exportPartCount > 0 ? (
               <View style={{ marginBottom: 8, marginTop: 4 }}>
@@ -2882,19 +2921,19 @@ export default function RepairDetailScreen({ route, navigation }) {
                       p.part_master_detail?.name ||
                       p.parts_master_detail?.name ||
                       p.shop_part_detail?.part?.name ||
-                      'Part'}{' '}
+                      t('repairs.detail.partFallback', null, 'Part')}{' '}
                     ×{p.quantity || 1}
                   </Text>
                 ))}
               </View>
             ) : (
               <Text style={styles.mutedText}>
-                No parts yet — add parts above or typical parts will be suggested from the service type.
+                {t('repairs.detail.partsSupplierEmpty', null, 'No parts yet — add parts above or typical parts will be suggested from the service type.')}
               </Text>
             )}
             <TextInput
               mode="outlined"
-              label="Extra parts (comma-separated)"
+              label={t('repairs.detail.extraPartsLabel', null, 'Extra parts (comma-separated)')}
               value={partsExportExtra}
               onChangeText={setPartsExportExtra}
               style={styles.input}
@@ -2906,7 +2945,7 @@ export default function RepairDetailScreen({ route, navigation }) {
               disabled={exportingParts}
               onPress={handleExportPartsRequest}
             >
-              Export parts request
+              {t('repairs.detail.exportPartsRequest', null, 'Export parts request')}
             </Button>
           </View>
         ) : null}
@@ -3299,19 +3338,19 @@ export default function RepairDetailScreen({ route, navigation }) {
         </FloatingCard>
       ) : null}
       <FloatingCard>
-        <Text style={styles.cardTitle}>Request details</Text>
-        {repair.symptoms ? <Text style={styles.detailLine}>Symptoms: {repair.symptoms}</Text> : null}
+        <Text style={styles.cardTitle}>{t('repairs.detail.requestDetails', null, 'Request details')}</Text>
+        {repair.symptoms ? <Text style={styles.detailLine}>{t('repairs.detail.symptoms', { value: repair.symptoms }, `Symptoms: ${repair.symptoms}`)}</Text> : null}
         {repair.description ? (
-          <Text style={styles.detailLine}>Description: {repair.description}</Text>
+          <Text style={styles.detailLine}>{t('repairs.detail.descriptionLabel', { value: repair.description }, `Description: ${repair.description}`)}</Text>
         ) : null}
         {visitDisplayText ? <Text style={styles.detailLine}>{visitDisplayText}</Text> : null}
         <Text style={styles.detailLine}>
-          Guarantee requested: {repair.requires_guarantee ? 'Yes' : 'No'}
+          {t('repairs.detail.guaranteeRequested', { value: repair.requires_guarantee ? t('repairs.detail.yes', null, 'Yes') : t('repairs.detail.no', null, 'No') }, `Guarantee requested: ${repair.requires_guarantee ? 'Yes' : 'No'}`)}
         </Text>
         {repair.preferred_radius_km ? (
-          <Text style={styles.detailLine}>Preferred radius: {repair.preferred_radius_km} km</Text>
+          <Text style={styles.detailLine}>{t('repairs.detail.preferredRadius', { value: repair.preferred_radius_km }, `Preferred radius: ${repair.preferred_radius_km} km`)}</Text>
         ) : null}
-        <Text style={styles.detailLine}>Targeting mode: {targetingLabel}</Text>
+        <Text style={styles.detailLine}>{t('repairs.detail.targetingMode', { value: targetingLabel }, `Targeting mode: ${targetingLabel}`)}</Text>
       </FloatingCard>
       {isOpenStatus && isShop
         ? (() => {
@@ -3341,8 +3380,8 @@ export default function RepairDetailScreen({ route, navigation }) {
         <Text style={styles.cardTitle}>{t('repairs.detail.photosAndVideos')}</Text>
         <Text style={styles.mutedText}>
           {isOpenStatus
-            ? 'Photos and videos attached to this request.'
-            : 'Documentation shared during this repair.'}
+            ? t('repairs.detail.mediaAttachedToRequest', null, 'Photos and videos attached to this request.')
+            : t('repairs.detail.mediaDuringRepair', null, 'Documentation shared during this repair.')}
         </Text>
         {mediaItems.length > 0 ? (
           <>
@@ -3361,7 +3400,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                       />
                     </View>
                     <View style={styles.mediaMetaRow}>
-                      <Text style={styles.mediaType}>Image</Text>
+                      <Text style={styles.mediaType}>{t('repairs.detail.mediaImage', null, 'Image')}</Text>
                       <Text style={styles.mediaDateText}>
                         {m.created_at ? new Date(m.created_at).toLocaleDateString() : '—'}
                       </Text>
@@ -3384,7 +3423,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                           size={20}
                           color={COLORS.PRIMARY}
                         />
-                        <Text style={styles.mediaType}>Video</Text>
+                        <Text style={styles.mediaType}>{t('repairs.detail.mediaVideo', null, 'Video')}</Text>
                       </View>
                     </View>
                     <Text style={styles.mediaCaption} numberOfLines={2}>
@@ -3414,35 +3453,35 @@ export default function RepairDetailScreen({ route, navigation }) {
     <Card mode="outlined" style={styles.headerCard}>
       <Card.Title title={t('repairWizard.partsTitle', null, 'Parts & labor')} />
       <Card.Content>
-        <Text style={styles.mutedText}>Track parts, notes, and labor for this repair.</Text>
+        <Text style={styles.mutedText}>{t('repairs.detail.trackPartsLabor', null, 'Track parts, notes, and labor for this repair.')}</Text>
         {vehicleAtShop ? (
           <View style={styles.serviceStateChip}>
-            <Text style={styles.serviceStateChipText}>Vehicle at service center</Text>
+            <Text style={styles.serviceStateChipText}>{t('repairs.detail.vehicleAtServiceCenter', null, 'Vehicle at service center')}</Text>
           </View>
         ) : null}
         {shopCanManagePartsOnRepair ? (
           <View style={{ alignItems: 'flex-start', marginBottom: 8 }}>
             <Button mode="outlined" onPress={navigateToManageParts}>
-              Manage Parts
+              {t('repairs.detail.manageParts', null, 'Manage parts')}
             </Button>
           </View>
         ) : null}
-        <Text style={styles.partsSectionLabel}>Parts used</Text>
+        <Text style={styles.partsSectionLabel}>{t('repairs.detail.sectionPartsUsed')}</Text>
         {(selectedParts.length > 0 ? selectedParts : repairParts).length === 0 ? (
-          <Text style={{ fontStyle: 'italic', color: 'gray' }}>No parts recorded yet.</Text>
+          <Text style={{ fontStyle: 'italic', color: 'gray' }}>{t('repairs.detail.noPartsRecordedYet', null, 'No parts recorded yet.')}</Text>
         ) : (
           <>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-              <Text style={{ flex: 2, fontWeight: 'bold' }}>Part</Text>
-              <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>Qty</Text>
-              <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>Price</Text>
-              <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>Labor</Text>
+              <Text style={{ flex: 2, fontWeight: 'bold' }}>{t('repairs.detail.partColumnShort', null, 'Part')}</Text>
+              <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>{t('repairs.detail.qtyColumnShort', null, 'Qty')}</Text>
+              <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>{t('repairs.detail.priceColumnShort', null, 'Price')}</Text>
+              <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>{t('repairs.detail.laborColumnShort', null, 'Labor')}</Text>
             </View>
             {displayPartsList.map((item, index) => (
               <View key={item.id || index}>{renderRepairPartItem({ item })}</View>
             ))}
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10 }}>
-              <Text style={{ fontWeight: 'bold', marginRight: 10 }}>Total:</Text>
+              <Text style={{ fontWeight: 'bold', marginRight: 10 }}>{t('repairs.detail.totalWithColon', null, 'Total:')}</Text>
               <Text>{formatMoneyAmount(displayPartsTotals.total, DEFAULT_CURRENCY)}</Text>
             </View>
           </>
@@ -3456,12 +3495,12 @@ export default function RepairDetailScreen({ route, navigation }) {
               onPress={() => handleUpdateRepair()}
               style={styles.progressButton}
             >
-              Save repair progress
+              {t('repairs.detail.saveRepairProgress', null, 'Save repair progress')}
             </Button>
           </>
         ) : isOpenStatus ? (
           <Text style={styles.mutedText}>
-            Parts and labor editing unlocks once this repair is ongoing at your center.
+            {t('repairs.detail.partsLaborUnlockHint', null, 'Parts and labor editing unlocks once this repair is ongoing at your center.')}
           </Text>
         ) : null}
       </Card.Content>
@@ -3478,7 +3517,7 @@ export default function RepairDetailScreen({ route, navigation }) {
           </Text>
           <TextInput
             mode="outlined"
-            placeholder="Shop notes"
+            placeholder={t('repairs.detail.shopNotes', null, 'Shop notes')}
             value={shopDescription}
             onChangeText={setShopDescription}
             style={styles.input}
@@ -3486,7 +3525,7 @@ export default function RepairDetailScreen({ route, navigation }) {
           />
           <TextInput
             mode="outlined"
-            label="Final vehicle kilometers"
+            label={t('repairs.detail.finalVehicleKilometers', null, 'Final vehicle kilometers')}
             keyboardType="numeric"
             value={finalKilometers}
             onChangeText={(text) => {
@@ -3503,28 +3542,40 @@ export default function RepairDetailScreen({ route, navigation }) {
             onPress={handlePickDashboardPhoto}
             style={styles.dashboardPhotoBtn}
           >
-            {pendingOdometerPhoto ? 'Change dashboard photo' : 'Upload dashboard photo'}
+            {pendingOdometerPhoto ? t('repairs.detail.changeDashboardPhoto', null, 'Change dashboard photo') : t('repairs.detail.uploadDashboardPhoto', null, 'Upload dashboard photo')}
           </Button>
           {pendingOdometerPhoto ? (
             <Text style={styles.mutedText}>
-              Dashboard photo ready — will upload when you save or finalize.
+              {t('repairs.detail.dashboardPhotoReady', null, 'Dashboard photo ready — will upload when you save or finalize.')}
             </Text>
           ) : null}
           <Text style={styles.mutedText}>
-            Used for vehicle history and future service reminders. Defaults to the vehicle odometer
-            (
-            {repair?.vehicle_kilometers != null
-              ? `${Number(repair.vehicle_kilometers).toLocaleString()} km`
-              : 'from profile'}
-            ).
+            {t(
+              'repairs.detail.odometerHelpPrefix',
+              {
+                odometer:
+                  repair?.vehicle_kilometers != null
+                    ? `${Number(repair.vehicle_kilometers).toLocaleString()} km`
+                    : t('repairs.detail.odometerFromProfile', null, 'from profile'),
+              },
+              `Used for vehicle history and future service reminders. Defaults to the vehicle odometer (${
+                repair?.vehicle_kilometers != null
+                  ? `${Number(repair.vehicle_kilometers).toLocaleString()} km`
+                  : 'from profile'
+              }).`
+            )}
             {repair?.prior_max_odometer_km != null
-              ? ` Previous service record: ${Number(repair.prior_max_odometer_km).toLocaleString()} km.`
+              ? t(
+                  'repairs.detail.previousServiceRecord',
+                  { km: Number(repair.prior_max_odometer_km).toLocaleString() },
+                  ` Previous service record: ${Number(repair.prior_max_odometer_km).toLocaleString()} km.`
+                )
               : ''}
           </Text>
           {renderPaymentStatusSelector()}
           <TextInput
             mode="outlined"
-            label="Warranty months"
+            label={t('repairs.detail.warrantyMonthsLabel', null, 'Warranty months')}
             keyboardType="numeric"
             value={warrantyMonths}
             onChangeText={setWarrantyMonths}
@@ -3535,7 +3586,7 @@ export default function RepairDetailScreen({ route, navigation }) {
             onPress={() => handleUpdateRepair()}
             style={styles.progressButton}
           >
-            Save repair progress
+            {t('repairs.detail.saveRepairProgress', null, 'Save repair progress')}
           </Button>
           <Button
             mode="contained"
@@ -3545,8 +3596,7 @@ export default function RepairDetailScreen({ route, navigation }) {
             {t('repairWizard.finalize', null, 'Finalize repair')}
           </Button>
           <Text style={styles.mutedText}>
-            You can finalize before payment is collected — update payment status later from the
-            completed record when needed.
+            {t('repairs.detail.finalizeBeforePaymentHint', null, 'You can finalize before payment is collected — update payment status later from the completed record when needed.')}
           </Text>
         </FloatingCard>
       ) : (
@@ -3555,8 +3605,7 @@ export default function RepairDetailScreen({ route, navigation }) {
             {t('repairWizard.finalizeTitle', null, 'Finalize')}
           </Text>
           <Text style={styles.mutedText}>
-            Finalize unlocks when the repair is ongoing at your center. Use Overview for arrival
-            and booking steps first.
+            {t('repairs.detail.finalizeUnlockHint', null, 'Finalize unlocks when the repair is ongoing at your center. Use Overview for arrival and booking steps first.')}
           </Text>
         </FloatingCard>
       )}
@@ -3650,7 +3699,7 @@ export default function RepairDetailScreen({ route, navigation }) {
 
             {isDone && isMyShopRepair ? (
               <FloatingCard style={styles.lightActionCard}>
-                <Text style={styles.cardTitle}>Repair completed</Text>
+                <Text style={styles.cardTitle}>{t('repairs.detail.repairCompletedTitle', null, 'Repair completed')}</Text>
                 <Text style={styles.mutedText}>
                   The client is notified in the app when you finalize. If they have no app but an email on
                   file, a pickup email can be sent once mail is enabled. Update payment status below when
@@ -3969,22 +4018,22 @@ export default function RepairDetailScreen({ route, navigation }) {
 
             {!isDone ? (
             <FloatingCard>
-              <Text style={styles.cardTitle}>Request details</Text>
+              <Text style={styles.cardTitle}>{t('repairs.detail.requestDetails', null, 'Request details')}</Text>
               {canEditClientRequest ? (
                 <Button mode="outlined" onPress={handleEditRequest} style={styles.editRequestButton}>
                   Edit request
                 </Button>
               ) : null}
-              {repair.symptoms ? <Text style={styles.detailLine}>Symptoms: {repair.symptoms}</Text> : null}
-              {repair.description ? <Text style={styles.detailLine}>Description: {repair.description}</Text> : null}
+              {repair.symptoms ? <Text style={styles.detailLine}>{t('repairs.detail.symptoms', { value: repair.symptoms }, `Symptoms: ${repair.symptoms}`)}</Text> : null}
+              {repair.description ? <Text style={styles.detailLine}>{t('repairs.detail.descriptionLabel', { value: repair.description }, `Description: ${repair.description}`)}</Text> : null}
               {visitDisplayText ? (
                 <Text style={styles.detailLine}>{visitDisplayText}</Text>
               ) : null}
-              <Text style={styles.detailLine}>Guarantee requested: {repair.requires_guarantee ? 'Yes' : 'No'}</Text>
+              <Text style={styles.detailLine}>{t('repairs.detail.guaranteeRequested', { value: repair.requires_guarantee ? t('repairs.detail.yes', null, 'Yes') : t('repairs.detail.no', null, 'No') }, `Guarantee requested: ${repair.requires_guarantee ? 'Yes' : 'No'}`)}</Text>
               {repair.preferred_radius_km ? (
-                <Text style={styles.detailLine}>Preferred radius: {repair.preferred_radius_km} km</Text>
+                <Text style={styles.detailLine}>{t('repairs.detail.preferredRadius', { value: repair.preferred_radius_km }, `Preferred radius: ${repair.preferred_radius_km} km`)}</Text>
               ) : null}
-              <Text style={styles.detailLine}>Targeting mode: {targetingLabel}</Text>
+              <Text style={styles.detailLine}>{t('repairs.detail.targetingMode', { value: targetingLabel }, `Targeting mode: ${targetingLabel}`)}</Text>
               {isShop && repair.request_targeting_mode !== 'all_qualified' ? (
                 <Text style={styles.mutedText}>Matching details are available for non-default targeting modes.</Text>
               ) : null}
@@ -4304,7 +4353,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                 {isMyShopRepair && isDone
                   ? 'Payment can be updated in the card above when the customer pays.'
                   : isMyShopRepair
-                    ? 'After finalize, create a platform invoice or attach an external PDF.'
+                    ? t('repairs.detail.afterFinalizeInvoiceHint', null, 'After finalize, create a platform invoice or attach an external PDF.')
                     : null}
               </Text>
             </FloatingCard>
@@ -4333,27 +4382,27 @@ export default function RepairDetailScreen({ route, navigation }) {
                   <Text style={styles.mutedText}>Track parts, notes, and final repair details.</Text>
                   {vehicleAtShop ? (
                     <View style={styles.serviceStateChip}>
-                      <Text style={styles.serviceStateChipText}>Vehicle at service center</Text>
+                      <Text style={styles.serviceStateChipText}>{t('repairs.detail.vehicleAtServiceCenter', null, 'Vehicle at service center')}</Text>
                     </View>
                   ) : null}
                   {shopCanManagePartsOnRepair ? (
                     <View style={{ alignItems: 'flex-start', marginBottom: 8 }}>
                       <Button mode="outlined" onPress={navigateToManageParts}>
-                        Manage Parts
+                        {t('repairs.detail.manageParts', null, 'Manage parts')}
                       </Button>
                     </View>
                   ) : null}
-                  <Text style={styles.partsSectionLabel}>Parts used</Text>
+                  <Text style={styles.partsSectionLabel}>{t('repairs.detail.sectionPartsUsed')}</Text>
                   {(selectedParts.length > 0 ? selectedParts : repairParts).length === 0 ? (
-                    <Text style={{ fontStyle: 'italic', color: 'gray' }}>No parts recorded yet.</Text>
+                    <Text style={{ fontStyle: 'italic', color: 'gray' }}>{t('repairs.detail.noPartsRecordedYet', null, 'No parts recorded yet.')}</Text>
                   ) : (
                     <>
                       {/* Table header row */}
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <Text style={{ flex: 2, fontWeight: 'bold' }}>Part</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>Qty</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>Price</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>Labor</Text>
+                        <Text style={{ flex: 2, fontWeight: 'bold' }}>{t('repairs.detail.partColumnShort', null, 'Part')}</Text>
+                        <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>{t('repairs.detail.qtyColumnShort', null, 'Qty')}</Text>
+                        <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>{t('repairs.detail.priceColumnShort', null, 'Price')}</Text>
+                        <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>{t('repairs.detail.laborColumnShort', null, 'Labor')}</Text>
                       </View>
                       {displayPartsList.map((item, index) => (
                         <View key={item.id || index}>
@@ -4361,7 +4410,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                         </View>
                       ))}
                       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10 }}>
-                        <Text style={{ fontWeight: 'bold', marginRight: 10 }}>Total:</Text>
+                        <Text style={{ fontWeight: 'bold', marginRight: 10 }}>{t('repairs.detail.totalWithColon', null, 'Total:')}</Text>
                         <Text>
                           {formatMoneyAmount(displayPartsTotals.total, DEFAULT_CURRENCY)}
                         </Text>
@@ -4375,7 +4424,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                         <>
                           <TextInput
                             mode="outlined"
-                            placeholder="Shop notes"
+                            placeholder={t('repairs.detail.shopNotes', null, 'Shop notes')}
                             value={shopDescription}
                             onChangeText={setShopDescription}
                             style={styles.input}
@@ -4383,7 +4432,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                           />
                           <TextInput
                             mode="outlined"
-                            label="Final vehicle kilometers"
+                            label={t('repairs.detail.finalVehicleKilometers', null, 'Final vehicle kilometers')}
                             keyboardType="numeric"
                             value={finalKilometers}
                             onChangeText={(text) => {
@@ -4402,31 +4451,51 @@ export default function RepairDetailScreen({ route, navigation }) {
                             onPress={handlePickDashboardPhoto}
                             style={styles.dashboardPhotoBtn}
                           >
-                            {pendingOdometerPhoto ? 'Change dashboard photo' : 'Upload dashboard photo'}
+                            {pendingOdometerPhoto ? t('repairs.detail.changeDashboardPhoto', null, 'Change dashboard photo') : t('repairs.detail.uploadDashboardPhoto', null, 'Upload dashboard photo')}
                           </Button>
                           {pendingOdometerPhoto ? (
-                            <Text style={styles.mutedText}>Dashboard photo ready — will upload when you save or finalize.</Text>
+                            <Text style={styles.mutedText}>{t('repairs.detail.dashboardPhotoReady', null, 'Dashboard photo ready — will upload when you save or finalize.')}</Text>
                           ) : null}
                           <Text style={styles.mutedText}>
-                            Used for vehicle history and future service reminders. Defaults to the vehicle
-                            odometer ({repair?.vehicle_kilometers != null
-                              ? `${Number(repair.vehicle_kilometers).toLocaleString()} km`
-                              : 'from profile'}).
+                            {t(
+                              'repairs.detail.odometerHelpPrefix',
+                              {
+                                odometer:
+                                  repair?.vehicle_kilometers != null
+                                    ? `${Number(repair.vehicle_kilometers).toLocaleString()} km`
+                                    : t('repairs.detail.odometerFromProfile', null, 'from profile'),
+                              },
+                              `Used for vehicle history and future service reminders. Defaults to the vehicle odometer (${
+                                repair?.vehicle_kilometers != null
+                                  ? `${Number(repair.vehicle_kilometers).toLocaleString()} km`
+                                  : 'from profile'
+                              }).`
+                            )}
                             {repair?.prior_max_odometer_km != null
-                              ? ` Previous service record: ${Number(repair.prior_max_odometer_km).toLocaleString()} km.`
+                              ? t(
+                                  'repairs.detail.previousServiceRecord',
+                                  { km: Number(repair.prior_max_odometer_km).toLocaleString() },
+                                  ` Previous service record: ${Number(repair.prior_max_odometer_km).toLocaleString()} km.`
+                                )
                               : ''}
                           </Text>
                           {renderShopEditableFinancialSummary()}
                           <View style={styles.completionSection}>
-                            <Text style={styles.cardSectionTitle}>Payment & completion</Text>
+                            <Text style={styles.cardSectionTitle}>
+                              {t('repairs.detail.paymentAndCompletion', null, 'Payment & completion')}
+                            </Text>
                             <Text style={styles.cardBodyText}>
-                              Finalize when the work is finished — payment does not block completion.
+                              {t(
+                                'repairs.detail.paymentDoesNotBlock',
+                                null,
+                                'Finalize when the work is finished — payment does not block completion.'
+                              )}
                             </Text>
                           </View>
                           {renderPaymentStatusSelector()}
                           <TextInput
                             mode="outlined"
-                            label="Warranty months"
+                            label={t('repairs.detail.warrantyMonthsLabel', null, 'Warranty months')}
                             keyboardType="numeric"
                             value={warrantyMonths}
                             onChangeText={setWarrantyMonths}
@@ -4437,7 +4506,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                             onPress={() => handleUpdateRepair()}
                             style={styles.progressButton}
                           >
-                            Save repair progress
+                            {t('repairs.detail.saveRepairProgress', null, 'Save repair progress')}
                           </Button>
                           {String(repair.status || '').toLowerCase() === 'ongoing' ? (
                             <Button
@@ -4445,12 +4514,15 @@ export default function RepairDetailScreen({ route, navigation }) {
                               onPress={() => handleFinalizeRepair()}
                               style={styles.progressButton}
                             >
-                              Finalize repair
+                              {t('repairWizard.finalize', null, 'Finalize repair')}
                             </Button>
                           ) : null}
                           <Text style={styles.mutedText}>
-                            You can finalize before payment is collected — update payment status later
-                            from the completed record when needed.
+                            {t(
+                              'repairs.detail.finalizeBeforePaymentHint',
+                              null,
+                              'You can finalize before payment is collected — update payment status later from the completed record when needed.'
+                            )}
                           </Text>
                         </>
                       )}
@@ -4458,25 +4530,27 @@ export default function RepairDetailScreen({ route, navigation }) {
                   )}
                   {(!isShop || repair.shop_profile !== shopProfileId) && (
                     <>
-                      <Text style={styles.partsSectionLabel}>Repair financial summary</Text>
+                      <Text style={styles.partsSectionLabel}>{t('repairs.detail.repairFinancialSummary', null, 'Repair financial summary')}</Text>
                       {hasFinancialSummary ? (
                         <>
-                          <Text style={styles.detailLine}>Labor: {formatMoneyAmount(repair.labor_price, repair.currency)}</Text>
-                          <Text style={styles.detailLine}>Parts: {formatMoneyAmount(repair.parts_price, repair.currency)}</Text>
+                          <Text style={styles.detailLine}>{t('repairs.detail.laborColon', { amount: formatMoneyAmount(repair.labor_price, repair.currency) }, `Labor: ${formatMoneyAmount(repair.labor_price, repair.currency)}`)}</Text>
+                          <Text style={styles.detailLine}>{t('repairs.detail.partsColon', { amount: formatMoneyAmount(repair.parts_price, repair.currency) }, `Parts: ${formatMoneyAmount(repair.parts_price, repair.currency)}`)}</Text>
                           <Text style={styles.detailLine}>
-                            Total: {formatMoneyAmount(repair.total_price ?? repair.calculated_total_price, repair.currency)}
+                            {t('repairs.detail.totalWithColon', null, 'Total:')} {formatMoneyAmount(repair.total_price ?? repair.calculated_total_price, repair.currency)}
                           </Text>
-                          <Text style={styles.detailLine}>Payment status: {formatPaymentStatus(repair.payment_status)}</Text>
+                          <Text style={styles.detailLine}>{t('repairs.detail.paymentStatusTitle', null, 'Payment status')}: {formatPaymentStatus(repair.payment_status)}</Text>
                           <Text style={styles.detailLine}>
-                            Warranty: {repair.warranty_months != null ? `${repair.warranty_months} months` : '—'}
+                            {repair.warranty_months != null
+                              ? t('repairs.detail.warrantyMonthsValue', { months: repair.warranty_months }, `Warranty: ${repair.warranty_months} months`)
+                              : t('repairs.detail.warrantyDash', null, 'Warranty: —')}
                           </Text>
                         </>
                       ) : (
-                        <Text style={styles.mutedText}>Financial summary not added yet.</Text>
+                        <Text style={styles.mutedText}>{t('repairs.detail.financialSummaryNotAdded', null, 'Financial summary not added yet.')}</Text>
                       )}
                       <Text style={styles.mutedText}>
                         {isMyShopRepair
-                          ? 'After finalize, create a platform invoice or attach an external PDF.'
+                          ? t('repairs.detail.afterFinalizeInvoiceHint', null, 'After finalize, create a platform invoice or attach an external PDF.')
                           : null}
                       </Text>
                     </>
@@ -4495,7 +4569,7 @@ export default function RepairDetailScreen({ route, navigation }) {
 
             {shouldShowTargetingCardForClient ? (
             <FloatingCard>
-              <Text style={styles.cardTitle}>Request targeting</Text>
+              <Text style={styles.cardTitle}>{t('repairs.detail.requestTargeting', null, 'Request targeting')}</Text>
               {preferredCenterNames.length > 0 ? (
                 <View style={styles.chipsWrap}>
                   {preferredCenterNames.map((name, idx) => (
@@ -4569,7 +4643,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                             ) : null}
                           </View>
                           <View style={styles.mediaMetaRow}>
-                            <Text style={styles.mediaType}>Image</Text>
+                            <Text style={styles.mediaType}>{t('repairs.detail.mediaImage', null, 'Image')}</Text>
                             <Text style={styles.mediaDateText}>
                               {m.created_at ? new Date(m.created_at).toLocaleDateString() : '—'}
                             </Text>
@@ -4594,7 +4668,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                           <View style={styles.videoMediaHeaderRow}>
                             <View style={[styles.videoMediaTop, styles.videoMediaTopGrow]}>
                               <MaterialCommunityIcons name="video-outline" size={20} color={COLORS.PRIMARY} />
-                              <Text style={styles.mediaType}>Video</Text>
+                              <Text style={styles.mediaType}>{t('repairs.detail.mediaVideo', null, 'Video')}</Text>
                               <Text style={styles.mediaDateText}>
                                 {m.created_at ? new Date(m.created_at).toLocaleDateString() : '—'}
                               </Text>

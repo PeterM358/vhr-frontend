@@ -419,6 +419,12 @@ export function translateRepairStatus(status, translateFn = t) {
   return translateFn(`repairStatuses.${key}`, null, String(status));
 }
 
+export function translateOperationStatus(status, translateFn = t) {
+  const key = String(status ?? '').toLowerCase().trim();
+  if (!key) return translateFn('operationStatuses.unknown', null, 'Unknown');
+  return translateFn(`operationStatuses.${key}`, null, String(status));
+}
+
 export function translateMileageConfidenceCategory(category, translateFn = t) {
   const key = String(category ?? '').toLowerCase().trim();
   if (!key) return translateFn('mileageConfidence.category.low', null, 'Low confidence');

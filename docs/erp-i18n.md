@@ -2,6 +2,8 @@
 
 Locale files: `src/i18n/en.json`, `src/i18n/bg.json`.
 
+**Rule:** every user-facing string shipped for shop/partner/client app screens must land in both `en.json` and `bg.json` in the same change (use `t('key')` / `useTranslation`). Do not ship English-only UI chrome when BG is a supported locale. See also Cursor rule for BG+EN i18n discipline.
+
 ## `erp.*` structure
 
 | Section | Purpose |
@@ -16,6 +18,8 @@ Locale files: `src/i18n/en.json`, `src/i18n/bg.json`.
 | `erp.payments.*` | Payment and document lifecycle statuses |
 | `erp.review.*` | Client post-service review form |
 | `erp.clientComplaint.*` | Client post-service complaint form |
+
+Related repair/materials UI also uses `repairs.detail.*`, `repairWizard.*`, `operationStatuses.*`, `selectRepairParts.*`, `createMasterPart.*`, `relatedServiceHistory.*`, and `shopDataAccess.*`.
 
 Drawer labels live under `drawer.partner.*` (`analytics`, `workforce`, `documentImports`, `complaints`).
 

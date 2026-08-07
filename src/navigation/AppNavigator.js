@@ -707,8 +707,8 @@ export default function AppNavigator() {
         />
         
         <Stack.Screen name="AddShopPartScreen" component={AddShopPartScreen} options={{ title: 'Add Parts to Inventory' }}/>
-        <Stack.Screen name="SelectRepairParts" component={SelectRepairPartsScreen} options={{ title: 'Choose estimated materials' }}/>
-        <Stack.Screen name="CreateMasterPart" component={CreateMasterPartScreen} options={{ title: 'Add New Material to Catalog' }}/>
+        <Stack.Screen name="SelectRepairParts" component={SelectRepairPartsScreen} options={{ title: t('selectRepairParts.title', null, 'Choose estimated materials') }}/>
+        <Stack.Screen name="CreateMasterPart" component={CreateMasterPartScreen} options={{ title: t('createMasterPart.title', null, 'Add new material to catalog') }}/>
         <Stack.Screen
           name="ClientProfile"
           component={ClientProfileScreen}

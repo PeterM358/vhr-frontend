@@ -19,6 +19,7 @@ import { createPartsMaster, getMaterialCategories } from '../api/parts';
 import ScreenBackground from '../components/ScreenBackground';
 import BASE_STYLES from '../styles/base';
 import { showMessage } from '../utils/crossPlatformAlert';
+import { useTranslation } from '../i18n';
 
 const FALLBACK_CATEGORIES = [
   'Brakes',
@@ -40,6 +41,7 @@ const FALLBACK_CATEGORIES = [
 const OTHER = '__other__';
 
 export default function CreateMasterPartScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const [newPartData, setNewPartData] = useState({
     name: '',
     brand: '',
@@ -78,9 +80,17 @@ export default function CreateMasterPartScreen({ navigation, route }) {
 
   const handleCreateNewPart = async () => {
     if (!newPartData.name.trim() || !newPartData.brand.trim() || !resolvedCategory) {
-      showMessage('Validation', 'Name, Brand, and Category are required.', {
-        variant: 'error',
-      });
+      showMessage(
+        t('createMasterPart.validationTitle', null, 'Validation'),
+        t(
+          'createMasterPart.validationRequired',
+          null,
+          'Name, brand, and category are required.'
+        ),
+        {
+          variant: 'error',
+        }
+      );
       return;
     }
 
@@ -95,7 +105,11 @@ export default function CreateMasterPartScreen({ navigation, route }) {
         description: newPartData.description || '',
         ...(partNumber ? { part_number: partNumber } : {}),
       });
-      showMessage('Success', 'New material added to catalog.', { variant: 'success' });
+      showMessage(
+        t('createMasterPart.successTitle', null, 'Success'),
+        t('createMasterPart.successBody', null, 'New material added to catalog.'),
+        { variant: 'success' }
+      );
       navigation.navigate({
         name: route.params?.returnTo || 'SelectRepairParts',
         params: { newCreatedPart: created },
@@ -103,7 +117,11 @@ export default function CreateMasterPartScreen({ navigation, route }) {
       });
     } catch (err) {
       console.error(err);
-      showMessage('Error', 'Failed to create new material', { variant: 'error' });
+      showMessage(
+        t('createMasterPart.errorTitle', null, 'Error'),
+        t('createMasterPart.errorBody', null, 'Failed to create new material'),
+        { variant: 'error' }
+      );
     } finally {
       setCreating(false);
     }
@@ -120,16 +138,19 @@ export default function CreateMasterPartScreen({ navigation, route }) {
         keyboardShouldPersistTaps="handled"
       >
         <Text variant="headlineSmall" style={styles.title}>
-          Add New Material to Catalog
+          {t('createMasterPart.title', null, 'Add new material to catalog')}
         </Text>
         <Text style={styles.helper}>
-          Creates a platform materials catalog entry. Your shop sell price is set when you
-          save materials on the repair.
+          {t(
+            'createMasterPart.helper',
+            null,
+            'Creates a platform materials catalog entry. Your shop sell price is set when you save materials on the repair.'
+          )}
         </Text>
 
         <TextInput
           mode="outlined"
-          label="Name *"
+          label={t('createMasterPart.name', null, 'Name *')}
           value={newPartData.name}
           onChangeText={(val) => setNewPartData({ ...newPartData, name: val })}
           style={styles.input}
@@ -137,7 +158,7 @@ export default function CreateMasterPartScreen({ navigation, route }) {
 
         <TextInput
           mode="outlined"
-          label="Brand *"
+          label={t('createMasterPart.brand', null, 'Brand *')}
           value={newPartData.brand}
           onChangeText={(val) => setNewPartData({ ...newPartData, brand: val })}
           style={styles.input}
@@ -145,32 +166,40 @@ export default function CreateMasterPartScreen({ navigation, route }) {
 
         <TextInput
           mode="outlined"
-          label="Part number (optional)"
+          label={t('createMasterPart.partNumber', null, 'Part number (optional)')}
           value={newPartData.part_number}
           onChangeText={(val) => setNewPartData({ ...newPartData, part_number: val })}
           style={styles.input}
           autoCapitalize="characters"
         />
 
-        <Text style={styles.fieldLabel}>Category *</Text>
+        <Text style={styles.fieldLabel}>
+          {t('createMasterPart.category', null, 'Category *')}
+        </Text>
         <View style={styles.pickerWrap}>
           <Picker
             selectedValue={categoryChoice}
             onValueChange={(val) => setCategoryChoice(val)}
             style={styles.picker}
           >
-            <Picker.Item label="Select category…" value="" />
+            <Picker.Item
+              label={t('createMasterPart.selectCategory', null, 'Select category…')}
+              value=""
+            />
             {categories.map((name) => (
               <Picker.Item key={name} label={name} value={name} />
             ))}
-            <Picker.Item label="Other…" value={OTHER} />
+            <Picker.Item
+              label={t('createMasterPart.other', null, 'Other…')}
+              value={OTHER}
+            />
           </Picker>
         </View>
 
         {categoryChoice === OTHER ? (
           <TextInput
             mode="outlined"
-            label="Custom category *"
+            label={t('createMasterPart.customCategory', null, 'Custom category *')}
             value={customCategory}
             onChangeText={setCustomCategory}
             style={styles.input}
@@ -179,7 +208,7 @@ export default function CreateMasterPartScreen({ navigation, route }) {
 
         <TextInput
           mode="outlined"
-          label="Description"
+          label={t('createMasterPart.description', null, 'Description')}
           value={newPartData.description}
           onChangeText={(val) => setNewPartData({ ...newPartData, description: val })}
           style={styles.input}
@@ -192,7 +221,7 @@ export default function CreateMasterPartScreen({ navigation, route }) {
           loading={creating}
           style={{ marginVertical: 20 }}
         >
-          Add to Catalog
+          {t('createMasterPart.submit', null, 'Add to catalog')}
         </Button>
       </ScrollView>
     </KeyboardAvoidingView>

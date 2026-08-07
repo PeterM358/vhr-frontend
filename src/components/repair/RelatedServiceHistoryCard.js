@@ -1,3 +1,7 @@
+/**
+ * Related service history card on shop repair detail.
+ */
+
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
@@ -5,6 +9,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 
 import FloatingCard from '../ui/FloatingCard';
 import { COLORS } from '../../constants/colors';
+import { useTranslation } from '../../i18n';
 import {
   ACCESS_AUTHORIZED_MECHANICAL,
   ACCESS_JOB_SCOPED,
@@ -19,8 +24,8 @@ function formatDate(iso) {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function AccessScopeBadge({ scope }) {
-  const level = getAccessLevel(scope);
+function AccessScopeBadge({ scope, t }) {
+  const level = getAccessLevel(scope, t);
   const isAuthorized = scope === ACCESS_AUTHORIZED_MECHANICAL;
   return (
     <View style={[styles.badge, isAuthorized ? styles.badgeAuthorized : styles.badgeJob]}>
@@ -30,13 +35,14 @@ function AccessScopeBadge({ scope }) {
         color={isAuthorized ? '#166534' : '#0F4C81'}
       />
       <Text style={[styles.badgeText, isAuthorized ? styles.badgeTextAuthorized : styles.badgeTextJob]}>
-        {level?.badgeLabel || formatAccessScopeLabel(scope)}
+        {level?.badgeLabel || formatAccessScopeLabel(scope, t)}
       </Text>
     </View>
   );
 }
 
 export default function RelatedServiceHistoryCard({ payload, loading, onOpenFullRecord }) {
+  const { t } = useTranslation();
   const [expandedId, setExpandedId] = useState(null);
 
   if (loading) {
@@ -44,7 +50,9 @@ export default function RelatedServiceHistoryCard({ payload, loading, onOpenFull
       <FloatingCard>
         <View style={styles.loadingRow}>
           <ActivityIndicator size="small" color={COLORS.PRIMARY} />
-          <Text style={styles.muted}>Loading vehicle service context…</Text>
+          <Text style={styles.muted}>
+            {t('relatedServiceHistory.loading', null, 'Loading vehicle service context…')}
+          </Text>
         </View>
       </FloatingCard>
     );
@@ -54,16 +62,16 @@ export default function RelatedServiceHistoryCard({ payload, loading, onOpenFull
     return null;
   }
 
-  const level = getAccessLevel(payload.access_scope);
+  const level = getAccessLevel(payload.access_scope, t);
   const records = Array.isArray(payload.records) ? payload.records : [];
   const anchorName = payload.anchor_service_type_name;
   const isJobScoped = payload.access_scope === ACCESS_JOB_SCOPED;
 
   const title = isJobScoped
     ? anchorName
-      ? `Related ${anchorName.toLowerCase()} history`
-      : 'Related service history'
-    : 'Vehicle mechanical history';
+      ? t('relatedServiceHistory.titleRelatedNamed', { name: String(anchorName).toLowerCase() }, `Related ${String(anchorName).toLowerCase()} history`)
+      : t('relatedServiceHistory.titleRelated', null, 'Related service history')
+    : t('relatedServiceHistory.titleMechanical', null, 'Vehicle mechanical history');
 
   const toggleRow = (rowId) => {
     setExpandedId((prev) => (prev === rowId ? null : rowId));
@@ -73,16 +81,30 @@ export default function RelatedServiceHistoryCard({ payload, loading, onOpenFull
     <FloatingCard>
       <View style={styles.headerRow}>
         <Text style={styles.title}>{title}</Text>
-        <AccessScopeBadge scope={payload.access_scope} />
+        <AccessScopeBadge scope={payload.access_scope} t={t} />
       </View>
       <Text style={styles.summary}>{level?.summary}</Text>
-      <Text style={styles.tapHint}>Tap a row to expand. Open full record only if you need invoices, photos, or edits.</Text>
+      <Text style={styles.tapHint}>
+        {t(
+          'relatedServiceHistory.tapHint',
+          null,
+          'Tap a row to expand. Open full record only if you need invoices, photos, or edits.'
+        )}
+      </Text>
 
       {records.length === 0 ? (
         <Text style={styles.empty}>
           {isJobScoped
-            ? 'No prior completed services in this category on this vehicle.'
-            : 'No completed mechanical services on file yet.'}
+            ? t(
+                'relatedServiceHistory.emptyJobScoped',
+                null,
+                'No prior completed services in this category on this vehicle.'
+              )
+            : t(
+                'relatedServiceHistory.emptyMechanical',
+                null,
+                'No completed mechanical services on file yet.'
+              )}
         </Text>
       ) : (
         <View style={styles.list}>
@@ -102,7 +124,10 @@ export default function RelatedServiceHistoryCard({ payload, loading, onOpenFull
                 ]}
               >
                 <View style={styles.recordHeader}>
-                  <Text style={styles.recordTitle}>{row.service_type_name || 'Service'}</Text>
+                  <Text style={styles.recordTitle}>
+                    {row.service_type_name ||
+                      t('relatedServiceHistory.serviceFallback', null, 'Service')}
+                  </Text>
                   <View style={styles.recordHeaderRight}>
                     <Text style={styles.recordDate}>{formatDate(row.completed_at)}</Text>
                     <MaterialCommunityIcons
@@ -114,24 +139,36 @@ export default function RelatedServiceHistoryCard({ payload, loading, onOpenFull
                 </View>
 
                 <Text style={styles.recordMeta}>
-                  {row.final_kilometers != null ? `${row.final_kilometers.toLocaleString()} km` : 'Km not recorded'}
+                  {row.final_kilometers != null
+                    ? `${row.final_kilometers.toLocaleString()} km`
+                    : t('relatedServiceHistory.kmNotRecorded', null, 'Km not recorded')}
                   {(row.performed_by || row.shop_name) ? ` · ${row.performed_by || row.shop_name}` : ''}
                 </Text>
 
                 {isExpanded ? (
                   <View style={styles.expandedBody}>
                     {row.category_name ? (
-                      <Text style={styles.expandedLine}>Category: {row.category_name}</Text>
+                      <Text style={styles.expandedLine}>
+                        {t(
+                          'relatedServiceHistory.category',
+                          { value: row.category_name },
+                          `Category: ${row.category_name}`
+                        )}
+                      </Text>
                     ) : null}
                     {row.performed_by ? (
                       <Text style={styles.expandedLine}>
-                        <Text style={styles.expandedLabel}>Performed by: </Text>
+                        <Text style={styles.expandedLabel}>
+                          {t('relatedServiceHistory.performedBy', null, 'Performed by: ')}
+                        </Text>
                         {row.performed_by}
                       </Text>
                     ) : null}
                     {row.record_origin ? (
                       <Text style={styles.expandedLine}>
-                        <Text style={styles.expandedLabel}>How recorded: </Text>
+                        <Text style={styles.expandedLabel}>
+                          {t('relatedServiceHistory.howRecorded', null, 'How recorded: ')}
+                        </Text>
                         {row.record_origin}
                       </Text>
                     ) : null}
@@ -141,7 +178,9 @@ export default function RelatedServiceHistoryCard({ payload, loading, onOpenFull
 
                     {hasParts ? (
                       <View style={styles.partsBlock}>
-                        <Text style={styles.partsLabel}>Parts</Text>
+                        <Text style={styles.partsLabel}>
+                          {t('relatedServiceHistory.parts', null, 'Parts')}
+                        </Text>
                         {row.parts.map((part, idx) => (
                           <Text key={`${row.id}-part-${idx}`} style={styles.partLine}>
                             {part.quantity > 1 ? `${part.quantity}× ` : ''}
@@ -151,7 +190,13 @@ export default function RelatedServiceHistoryCard({ payload, loading, onOpenFull
                         ))}
                       </View>
                     ) : (
-                      <Text style={styles.expandedMuted}>No parts listed on this record.</Text>
+                      <Text style={styles.expandedMuted}>
+                        {t(
+                          'relatedServiceHistory.noParts',
+                          null,
+                          'No parts listed on this record.'
+                        )}
+                      </Text>
                     )}
 
                     {canOpen && onOpenFullRecord ? (
@@ -162,7 +207,11 @@ export default function RelatedServiceHistoryCard({ payload, loading, onOpenFull
                         onPress={() => onOpenFullRecord(row.id)}
                         style={styles.openFullBtn}
                       >
-                        Open full service record
+                        {t(
+                          'relatedServiceHistory.openFull',
+                          null,
+                          'Open full service record'
+                        )}
                       </Button>
                     ) : null}
                   </View>
@@ -247,66 +296,60 @@ const styles = StyleSheet.create({
   record: {
     borderWidth: 1,
     borderRadius: 10,
-    padding: 10,
+    borderColor: '#E2E8F0',
+    padding: 12,
     backgroundColor: '#fff',
   },
-  recordCollapsed: {
-    borderColor: 'rgba(15,23,42,0.08)',
-  },
+  recordCollapsed: {},
   recordExpanded: {
-    borderColor: 'rgba(59,130,246,0.35)',
-    backgroundColor: 'rgba(59,130,246,0.04)',
+    borderColor: COLORS.PRIMARY,
+    backgroundColor: 'rgba(15,76,129,0.03)',
   },
   recordPressed: {
     opacity: 0.92,
   },
   recordHeader: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 8,
-    alignItems: 'center',
   },
   recordHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 4,
   },
   recordTitle: {
     flex: 1,
     fontWeight: '600',
-    color: COLORS.TEXT_DARK,
     fontSize: 14,
+    color: COLORS.TEXT_DARK,
   },
   recordDate: {
-    color: COLORS.TEXT_MUTED,
     fontSize: 12,
+    color: COLORS.TEXT_MUTED,
   },
   recordMeta: {
     marginTop: 4,
-    color: COLORS.TEXT_MUTED,
     fontSize: 12,
+    color: COLORS.TEXT_MUTED,
   },
   expandedBody: {
     marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(15,23,42,0.1)',
-    gap: 6,
+    gap: 4,
   },
   expandedLine: {
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.TEXT_DARK,
-    lineHeight: 17,
   },
   expandedLabel: {
-    fontWeight: '700',
-    color: COLORS.TEXT_MUTED,
+    fontWeight: '600',
   },
   expandedTrust: {
+    marginTop: 4,
     fontSize: 12,
     color: COLORS.TEXT_MUTED,
     fontStyle: 'italic',
-    lineHeight: 17,
   },
   expandedMuted: {
     fontSize: 12,
@@ -314,22 +357,21 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   partsBlock: {
-    marginTop: 4,
+    marginTop: 6,
+    gap: 2,
   },
   partsLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.TEXT_MUTED,
-    textTransform: 'uppercase',
-    marginBottom: 4,
+    fontWeight: '600',
+    fontSize: 13,
+    color: COLORS.TEXT_DARK,
+    marginBottom: 2,
   },
   partLine: {
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.TEXT_DARK,
-    lineHeight: 17,
   },
   openFullBtn: {
+    marginTop: 8,
     alignSelf: 'flex-start',
-    marginTop: 4,
   },
 });

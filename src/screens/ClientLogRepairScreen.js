@@ -16,9 +16,12 @@ import BASE_STYLES from '../styles/base';
 import { safeError } from '../utils/logger';
 import { COLORS } from '../styles/colors';
 import ScreenBackground from '../components/ScreenBackground';
+import { useTranslation } from '../i18n';
+import { translateRepairTypeLabel } from '../utils/translateShopTypeLabels';
 
 export default function ClientLogRepairScreen({ navigation, route }) {
   const theme = useTheme();
+  const { t } = useTranslation();
 
   const [description, setDescription] = useState('');
   const [kilometers, setKilometers] = useState('');
@@ -162,14 +165,18 @@ export default function ClientLogRepairScreen({ navigation, route }) {
       />
 
       <View style={styles.pickerContainer}>
-        <Text style={styles.pickerLabel}>Repair Type *</Text>
+        <Text style={styles.pickerLabel}>{t('clientLogRepair.repairType', null, 'Repair type *')}</Text>
         <Picker
           selectedValue={repairTypeId}
           onValueChange={(val) => setRepairTypeId(val)}
         >
-          <Picker.Item label="Select Repair Type" value={null} />
+          <Picker.Item label={t('clientLogRepair.selectRepairType', null, 'Select repair type')} value={null} />
           {repairTypes.map(type => (
-            <Picker.Item key={type.id} label={type.name} value={type.id} />
+            <Picker.Item
+              key={type.id}
+              label={translateRepairTypeLabel(type, t) || type.name}
+              value={type.id}
+            />
           ))}
         </Picker>
       </View>
@@ -181,13 +188,17 @@ export default function ClientLogRepairScreen({ navigation, route }) {
         onPress={handleSelectParts}
         style={styles.input}
       >
-        Manage Parts ({selectedParts.length} selected)
+        {t(
+          'clientLogRepair.managePartsSelected',
+          { count: selectedParts.length },
+          `Manage parts (${selectedParts.length} selected)`
+        )}
       </Button>
 
       {selectedParts.length > 0 && (
         <>
           <Text variant="titleMedium" style={styles.label}>
-            Selected Parts
+            {t('clientLogRepair.selectedParts', null, 'Selected parts')}
           </Text>
           {selectedParts.map((part, index) => (
             <Card key={index} style={styles.partCard}>

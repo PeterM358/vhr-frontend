@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './config';
+import { translateOperationStatus } from '../i18n';
 import { formatDrfErrorMessage, messageFromApiResponseText } from '../utils/apiErrorMessage';
 import { safeWarn } from '../utils/logger';
 
@@ -699,22 +700,5 @@ export async function deleteRepairAssignment(token, repairId, assignmentId) {
 }
 
 export function operationStatusLabel(status) {
-  switch (status) {
-    case 'planned':
-      return 'Planned';
-    case 'approved':
-      return 'Approved';
-    case 'in_progress':
-      return 'In progress';
-    case 'waiting_parts':
-      return 'Waiting parts';
-    case 'completed':
-      return 'Completed';
-    case 'cancelled':
-      return 'Cancelled';
-    case 'declined':
-      return 'Declined';
-    default:
-      return status || 'Unknown';
-  }
+  return translateOperationStatus(status);
 }

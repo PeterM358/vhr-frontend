@@ -256,7 +256,13 @@ export default function ManageVehicleServiceCentersScreen({ navigation, route })
                         {center.location || 'Location not specified'}
                       </Text>
                       <Text style={styles.rowTap}>Tap for shop profile</Text>
-                      <Text style={styles.authorizedBadge}>Full mechanical history</Text>
+                      <Text style={styles.authorizedBadge}>
+                        {t(
+                          'shopDataAccess.fullMechanicalHistoryBadge',
+                          null,
+                          'Full mechanical history'
+                        )}
+                      </Text>
                     </View>
                     <View style={styles.rowActions}>
                       <Text style={styles.accessLabel}>Authorized</Text>
