@@ -3462,6 +3462,7 @@
       "savedTitle": "Saved",
       "repairProgressSaved": "Repair progress saved successfully.",
       "failedUpdateRepair": "Failed to update repair",
+      "couldNotPickDashboardPhoto": "Could not pick dashboard photo.",
       "cannotFinalizeTitle": "Cannot finalize",
       "cannotFinalizeBody": "Only ongoing repairs can be finalized.",
       "paymentStatusUpdated": "Payment status updated",

@@ -3420,6 +3420,7 @@
       "savedTitle": "Запазено",
       "repairProgressSaved": "Напредъкът на ремонта е запазен успешно.",
       "failedUpdateRepair": "Неуспешна актуализация на ремонта",
+      "couldNotPickDashboardPhoto": "Неуспешен избор на снимка на таблото.",
       "cannotFinalizeTitle": "Не може да се финализира",
       "cannotFinalizeBody": "Само активни ремонти могат да се финализират.",
       "paymentStatusUpdated": "Статусът на плащане е актуализиран",

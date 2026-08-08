@@ -522,9 +522,12 @@ export default function RepairDetailScreen({ route, navigation }) {
         setFinalizeKmError('');
       }
     } catch (err) {
-      showMessage('Error', err.message || 'Could not pick dashboard photo.');
+      showMessage(
+        t('common.error', null, 'Something went wrong'),
+        err.message || t('repairs.detail.couldNotPickDashboardPhoto', null, 'Could not pick dashboard photo.')
+      );
     }
-  }, []);
+  }, [t]);
 
   const handleUpdateRepair = async ({
     finalize = false,
@@ -724,7 +727,7 @@ export default function RepairDetailScreen({ route, navigation }) {
       if (/service type|final_repair_type|repair_type/i.test(message)) {
         setFinalizeTypeError(message);
       }
-      showMessage('Error', message);
+      showMessage(t('common.error', null, 'Something went wrong'), message);
       setOdometerSheetFinalizing(false);
       return false;
     }
