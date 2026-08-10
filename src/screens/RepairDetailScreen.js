@@ -378,6 +378,11 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [respondingReschedule, setRespondingReschedule] = useState(false);
   const [partsExportExtra, setPartsExportExtra] = useState('');
   const [partsSupplierExpanded, setPartsSupplierExpanded] = useState(false);
+  /** Done shop record: bulky sections start collapsed to reduce scroll. */
+  const [doneOperationsSectionExpanded, setDoneOperationsSectionExpanded] = useState(false);
+  const [doneCompletionInfoExpanded, setDoneCompletionInfoExpanded] = useState(false);
+  const [doneInvoicingExpanded, setDoneInvoicingExpanded] = useState(false);
+  const [doneServiceRecordExpanded, setDoneServiceRecordExpanded] = useState(false);
   const [exportingParts, setExportingParts] = useState(false);
   const [counterModalVisible, setCounterModalVisible] = useState(false);
   const [counterDate, setCounterDate] = useState(() => applyDayOffset(new Date(), 1, new Date()));
@@ -1331,6 +1336,25 @@ export default function RepairDetailScreen({ route, navigation }) {
     setOperationsExpanded((prev) => ({ ...prev, [operationId]: !prev[operationId] }));
   };
 
+  const renderDoneCollapsibleHeader = ({ title, hint, expanded, onToggle }) => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ expanded }}
+      onPress={onToggle}
+      style={styles.doneCollapsibleHeader}
+    >
+      <View style={{ flex: 1, paddingRight: 8 }}>
+        <Text style={[styles.cardTitle, { marginBottom: expanded ? 0 : 2 }]}>{title}</Text>
+        {!expanded && hint ? <Text style={styles.mutedText}>{hint}</Text> : null}
+      </View>
+      <MaterialCommunityIcons
+        name={expanded ? 'chevron-up' : 'chevron-down'}
+        size={22}
+        color={COLORS.TEXT_MUTED || '#888'}
+      />
+    </Pressable>
+  );
+
   const handleRemoveOperation = async (operation) => {
     if (!isMyShopRepair || !operation?.id) return;
 
@@ -1384,30 +1408,62 @@ export default function RepairDetailScreen({ route, navigation }) {
       (op) => String(op.status || '').toLowerCase() === 'completed'
     ).length;
     const readOnly = isDoneStatus;
+    const sectionExpanded = !readOnly || doneOperationsSectionExpanded;
+    const laborForHint =
+      footerTotals?.laborSum != null
+        ? footerTotals.laborSum
+        : visibleOperations.reduce((acc, op) => acc + computeOperationSubtotals(op.id).laborSum, 0);
+    const currencyForHint = footerTotals?.currency || DEFAULT_CURRENCY;
+    const operationsCollapsedHint = t(
+      'repairs.detail.operationsCollapsedHint',
+      {
+        done: visibleCompletedCount,
+        total: visibleOperations.length,
+        labor: formatMoneyAmount(laborForHint, currencyForHint),
+      },
+      `${visibleCompletedCount}/${visibleOperations.length} completed · Labor ${formatMoneyAmount(laborForHint, currencyForHint)} · tap to expand`
+    );
     return (
       <FloatingCard style={styles.lightActionCard}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={styles.cardTitle}>{t('repairs.detail.operationsTitle', null, 'Operations')}</Text>
-          {visibleOperations.length ? (
+        {readOnly ? (
+          renderDoneCollapsibleHeader({
+            title: t('repairs.detail.operationsTitle', null, 'Operations'),
+            hint: operationsCollapsedHint,
+            expanded: sectionExpanded,
+            onToggle: () => setDoneOperationsSectionExpanded((prev) => !prev),
+          })
+        ) : (
+          <>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={styles.cardTitle}>{t('repairs.detail.operationsTitle', null, 'Operations')}</Text>
+              {visibleOperations.length ? (
+                <Text style={styles.mutedText}>
+                  {t('repairs.detail.operationsCompletedCount', { done: visibleCompletedCount, total: visibleOperations.length }, `${visibleCompletedCount}/${visibleOperations.length} completed`)}
+                </Text>
+              ) : null}
+            </View>
             <Text style={styles.mutedText}>
-              {t('repairs.detail.operationsCompletedCount', { done: visibleCompletedCount, total: visibleOperations.length }, `${visibleCompletedCount}/${visibleOperations.length} completed`)}
+              {t('repairs.detail.operationsHelp', null, 'Split work into job lines. Set labor price and assign workers here. Start/Complete appear for the assigned technician.')}
             </Text>
-          ) : null}
-        </View>
-        <Text style={styles.mutedText}>
-          {readOnly
-            ? t(
-                'repairs.detail.operationsCompletedHelp',
-                null,
-                'Work lines completed on this visit — labor and materials below.'
-              )
-            : t('repairs.detail.operationsHelp', null, 'Split work into job lines. Set labor price and assign workers here. Start/Complete appear for the assigned technician.')}
-        </Text>
+          </>
+        )}
+        {sectionExpanded ? (
+        <>
+        {readOnly ? (
+          <Text style={[styles.mutedText, { marginTop: 8 }]}>
+            {t(
+              'repairs.detail.operationsCompletedHelp',
+              null,
+              'Work lines completed on this visit — labor and materials below.'
+            )}
+          </Text>
+        ) : null}
         {visibleOperations.length === 0 ? (
           <Text style={styles.mutedText}>{t('repairs.detail.noOperationsYet', null, 'No operations yet — add one to organize parts and labor.')}</Text>
         ) : (
           visibleOperations.map((op) => {
-            const expanded = operationsExpanded[op.id] || readOnly;
+            // Done: compact one-line rows; expand only when tapped (never force-open all).
+            const expanded = Boolean(operationsExpanded[op.id]);
             const opParts = repairParts.filter(
               (part) => Number(part.service_order_operation_id) === Number(op.id)
             );
@@ -1415,8 +1471,16 @@ export default function RepairDetailScreen({ route, navigation }) {
             const canRemove = !readOnly && operationCanHardDelete(op, repairParts);
             const removeDisabled = readOnly || operationActionId != null || !canRemove;
             return (
-              <View key={op.id} style={{ marginTop: 12, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#ddd' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}>
+              <View
+                key={op.id}
+                style={{
+                  marginTop: readOnly ? 8 : 12,
+                  paddingTop: readOnly ? 0 : 8,
+                  borderTopWidth: readOnly ? 0 : StyleSheet.hairlineWidth,
+                  borderTopColor: '#ddd',
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Pressable style={{ flex: 1 }} onPress={() => toggleOperationExpanded(op.id)}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8, paddingRight: 8 }}>
@@ -1425,7 +1489,10 @@ export default function RepairDetailScreen({ route, navigation }) {
                           size={20}
                           color={COLORS.PRIMARY}
                         />
-                        <Text style={{ fontWeight: '600', flexShrink: 1 }}>
+                        <Text
+                          style={{ fontWeight: '600', flexShrink: 1 }}
+                          numberOfLines={readOnly && !expanded ? 1 : undefined}
+                        >
                           {op.sequence != null ? `${op.sequence} · ` : ''}
                           {translateRepairTypeLabel(
                             {
@@ -1444,11 +1511,26 @@ export default function RepairDetailScreen({ route, navigation }) {
                             t('repairs.detail.workPerformed', null, 'Work performed')}
                         </Text>
                       </View>
+                      {readOnly && !expanded ? (
+                        <Text style={[styles.mutedText, { marginRight: 6 }]}>
+                          {formatMoneyAmount(opTotals.total, DEFAULT_CURRENCY)}
+                        </Text>
+                      ) : null}
                       <StatusBadge status={op.status} label={operationStatusLabel(op.status)} />
+                      {readOnly ? (
+                        <MaterialCommunityIcons
+                          name={expanded ? 'chevron-up' : 'chevron-down'}
+                          size={18}
+                          color={COLORS.TEXT_MUTED || '#888'}
+                          style={{ marginLeft: 4 }}
+                        />
+                      ) : null}
                     </View>
-                    <Text style={styles.mutedText}>
-                      {t('repairs.detail.opLinePartsLaborTotal', { parts: formatMoneyAmount(opTotals.partsSum, DEFAULT_CURRENCY), labor: formatMoneyAmount(opTotals.laborSum, DEFAULT_CURRENCY), total: formatMoneyAmount(opTotals.total, DEFAULT_CURRENCY) }, `Parts ${formatMoneyAmount(opTotals.partsSum, DEFAULT_CURRENCY)} · Labor ${formatMoneyAmount(opTotals.laborSum, DEFAULT_CURRENCY)} · Total ${formatMoneyAmount(opTotals.total, DEFAULT_CURRENCY)}`)}
-                    </Text>
+                    {!readOnly || expanded ? (
+                      <Text style={styles.mutedText}>
+                        {t('repairs.detail.opLinePartsLaborTotal', { parts: formatMoneyAmount(opTotals.partsSum, DEFAULT_CURRENCY), labor: formatMoneyAmount(opTotals.laborSum, DEFAULT_CURRENCY), total: formatMoneyAmount(opTotals.total, DEFAULT_CURRENCY) }, `Parts ${formatMoneyAmount(opTotals.partsSum, DEFAULT_CURRENCY)} · Labor ${formatMoneyAmount(opTotals.laborSum, DEFAULT_CURRENCY)} · Total ${formatMoneyAmount(opTotals.total, DEFAULT_CURRENCY)}`)}
+                      </Text>
+                    ) : null}
                   </Pressable>
                   {!readOnly ? (
                   <Pressable
@@ -1710,6 +1792,8 @@ export default function RepairDetailScreen({ route, navigation }) {
         >
           {t('repairs.detail.operationsPicker.addOperation')}
         </Button>
+        ) : null}
+        </>
         ) : null}
       </FloatingCard>
     );
@@ -3865,20 +3949,34 @@ export default function RepairDetailScreen({ route, navigation }) {
 
             {renderShopFinalizeServiceTypeCard()}
 
+            {/* Done shop: totals stay visible near top; bulky sections collapse below. */}
+            {isDone && isMyShopRepair ? renderRepairTotalsFooter() : null}
+
             {renderOperationsSection()}
 
-            {renderRepairTotalsFooter()}
+            {!isDone || !isMyShopRepair ? renderRepairTotalsFooter() : null}
 
             {isDone && isMyShopRepair ? (
               <FloatingCard style={styles.lightActionCard}>
-                <Text style={styles.cardTitle}>{t('repairs.detail.repairCompletedTitle', null, 'Repair completed')}</Text>
-                <Text style={styles.mutedText}>
-                  {t(
-                    'repairs.detail.clientNotifiedOnFinalize',
+                {renderDoneCollapsibleHeader({
+                  title: t('repairs.detail.repairCompletedTitle', null, 'Repair completed'),
+                  hint: t(
+                    'repairs.detail.repairCompletedCollapsedHint',
                     null,
-                    'The client is notified in the app when you finalize. If they have no app but an email on file, a pickup email can be sent once mail is enabled. Update payment status below when they pay.'
-                  )}
-                </Text>
+                    'Client notified · tap for details'
+                  ),
+                  expanded: doneCompletionInfoExpanded,
+                  onToggle: () => setDoneCompletionInfoExpanded((prev) => !prev),
+                })}
+                {doneCompletionInfoExpanded ? (
+                  <Text style={[styles.mutedText, { marginTop: 8 }]}>
+                    {t(
+                      'repairs.detail.clientNotifiedOnFinalize',
+                      null,
+                      'The client is notified in the app when you finalize. If they have no app but an email on file, a pickup email can be sent once mail is enabled. Update payment status below when they pay.'
+                    )}
+                  </Text>
+                ) : null}
               </FloatingCard>
             ) : null}
 
@@ -3889,14 +3987,37 @@ export default function RepairDetailScreen({ route, navigation }) {
             ) : null}
 
             {isDone && isMyShopRepair ? (
-              <RepairInvoicingCard
-                repair={repair}
-                onRepairUpdated={setRepair}
-                onOpenInvoice={(invoiceId) =>
-                  navigation.navigate('ShopInvoiceDetail', { invoiceId })
-                }
-                onOpenInvoicingHome={() => navigation.navigate('ShopInvoicing')}
-              />
+              <FloatingCard style={styles.lightActionCard}>
+                {renderDoneCollapsibleHeader({
+                  title: t('repairs.invoicing.title', null, 'Invoicing'),
+                  hint: repair?.has_issued_invoice
+                    ? t(
+                        'repairs.detail.invoicingCollapsedIssued',
+                        null,
+                        'Platform invoice issued · tap to expand'
+                      )
+                    : t(
+                        'repairs.detail.invoicingCollapsedHint',
+                        null,
+                        'Platform or external PDF · tap to expand'
+                      ),
+                  expanded: doneInvoicingExpanded,
+                  onToggle: () => setDoneInvoicingExpanded((prev) => !prev),
+                })}
+                {doneInvoicingExpanded ? (
+                  <View style={{ marginTop: 8 }}>
+                    <RepairInvoicingCard
+                      repair={repair}
+                      embedded
+                      onRepairUpdated={setRepair}
+                      onOpenInvoice={(invoiceId) =>
+                        navigation.navigate('ShopInvoiceDetail', { invoiceId })
+                      }
+                      onOpenInvoicingHome={() => navigation.navigate('ShopInvoicing')}
+                    />
+                  </View>
+                ) : null}
+              </FloatingCard>
             ) : null}
 
             {!isShop && isDone && repair.shop_profile_name ? (
@@ -4216,16 +4337,42 @@ export default function RepairDetailScreen({ route, navigation }) {
 
             {isDone ? (
             <FloatingCard style={styles.historyRecordCard}>
-              <Text style={styles.cardTitle}>
-                {isOwnerLoggedServiceRecord
-                  ? t('repairs.detail.serviceRecordTitle')
-                  : t('repairs.detail.completedServiceRecord')}
-              </Text>
-              <Text style={styles.historyHelperText}>
-                {isOwnerLoggedServiceRecord
-                  ? t('repairs.detail.ownerLoggedRecordHelper')
-                  : t('repairs.detail.completedRecordHelper')}
-              </Text>
+              {isMyShopRepair ? (
+                renderDoneCollapsibleHeader({
+                  title: isOwnerLoggedServiceRecord
+                    ? t('repairs.detail.serviceRecordTitle')
+                    : t('repairs.detail.completedServiceRecord'),
+                  hint: t(
+                    'repairs.detail.completedRecordCollapsedHint',
+                    null,
+                    'Service type, notes, parts · tap to expand'
+                  ),
+                  expanded: doneServiceRecordExpanded,
+                  onToggle: () => setDoneServiceRecordExpanded((prev) => !prev),
+                })
+              ) : (
+                <>
+                  <Text style={styles.cardTitle}>
+                    {isOwnerLoggedServiceRecord
+                      ? t('repairs.detail.serviceRecordTitle')
+                      : t('repairs.detail.completedServiceRecord')}
+                  </Text>
+                  <Text style={styles.historyHelperText}>
+                    {isOwnerLoggedServiceRecord
+                      ? t('repairs.detail.ownerLoggedRecordHelper')
+                      : t('repairs.detail.completedRecordHelper')}
+                  </Text>
+                </>
+              )}
+              {(!isMyShopRepair || doneServiceRecordExpanded) ? (
+              <>
+              {isMyShopRepair ? (
+                <Text style={[styles.historyHelperText, { marginTop: 8 }]}>
+                  {isOwnerLoggedServiceRecord
+                    ? t('repairs.detail.ownerLoggedRecordHelper')
+                    : t('repairs.detail.completedRecordHelper')}
+                </Text>
+              ) : null}
               <View style={styles.completedPillRow}>
                 <View style={styles.completedPill}>
                   <Text style={styles.completedPillText}>{t('repairs.detail.completedBadge')}</Text>
@@ -4558,6 +4705,8 @@ export default function RepairDetailScreen({ route, navigation }) {
                     ? t('repairs.detail.afterFinalizeInvoiceHint', null, 'After finalize, create a platform invoice or attach an external PDF.')
                     : null}
               </Text>
+              </>
+              ) : null}
             </FloatingCard>
             ) : isOpenStatus && isShop ? (
             (() => {
@@ -5554,6 +5703,11 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(15,23,42,0.12)',
   },
   partsSupplierHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  doneCollapsibleHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

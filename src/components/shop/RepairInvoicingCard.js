@@ -16,6 +16,7 @@ export default function RepairInvoicingCard({
   onRepairUpdated,
   onOpenInvoice,
   onOpenInvoicingHome,
+  embedded = false,
 }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
@@ -96,9 +97,11 @@ export default function RepairInvoicingCard({
     }
   };
 
-  return (
-    <FloatingCard style={styles.card}>
-      <Text style={styles.title}>{t('repairs.invoicing.title', null, 'Invoicing')}</Text>
+  const body = (
+    <>
+      {!embedded ? (
+        <Text style={styles.title}>{t('repairs.invoicing.title', null, 'Invoicing')}</Text>
+      ) : null}
       <Text style={styles.hint}>
         {t(
           'repairs.invoicing.hint',
@@ -145,12 +148,25 @@ export default function RepairInvoicingCard({
       >
         {t('repairs.invoicing.uploadExternalPdf', null, 'Upload external PDF')}
       </Button>
+    </>
+  );
+
+  if (embedded) {
+    return <View style={styles.embedded}>{body}</View>;
+  }
+
+  return (
+    <FloatingCard style={styles.card}>
+      {body}
     </FloatingCard>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
+    gap: 8,
+  },
+  embedded: {
     gap: 8,
   },
   title: {
