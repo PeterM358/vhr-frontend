@@ -16,12 +16,26 @@ import {
   formatAccessScopeLabel,
   getAccessLevel,
 } from '../../utils/shopDataAccess';
+import { formatServiceRecordLabels } from '../../utils/serviceRecordProvider';
+import {
+  translateRepairTypeLabel,
+  translateServiceCategoryLabel,
+} from '../../utils/translateShopTypeLabels';
+import { resolveRepairDisplayTotal } from '../../utils/repairDisplayTotal';
 
 function formatDate(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function formatMoney(amount, currency) {
+  if (amount == null || amount === '') return null;
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return String(amount);
+  const cur = currency || '';
+  return cur ? `${n} ${cur}` : String(n);
 }
 
 function AccessScopeBadge({ scope, t }) {
@@ -41,8 +55,24 @@ function AccessScopeBadge({ scope, t }) {
   );
 }
 
+function localizeOperationTitle(op, t, locale) {
+  return (
+    translateRepairTypeLabel(
+      {
+        slug: op.repair_type_slug,
+        name: op.repair_type_name || op.title,
+        operation_name: op.title,
+      },
+      t,
+      { locale }
+    ) ||
+    op.title ||
+    t('relatedServiceHistory.serviceFallback', null, 'Service')
+  );
+}
+
 export default function RelatedServiceHistoryCard({ payload, loading, onOpenFullRecord }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [expandedId, setExpandedId] = useState(null);
 
   if (loading) {
@@ -69,7 +99,15 @@ export default function RelatedServiceHistoryCard({ payload, loading, onOpenFull
 
   const title = isJobScoped
     ? anchorName
-      ? t('relatedServiceHistory.titleRelatedNamed', { name: String(anchorName).toLowerCase() }, `Related ${String(anchorName).toLowerCase()} history`)
+      ? t(
+          'relatedServiceHistory.titleRelatedNamed',
+          {
+            name: String(
+              translateRepairTypeLabel(anchorName, t, { locale }) || anchorName
+            ).toLowerCase(),
+          },
+          `Related ${String(anchorName).toLowerCase()} history`
+        )
       : t('relatedServiceHistory.titleRelated', null, 'Related service history')
     : t('relatedServiceHistory.titleMechanical', null, 'Vehicle mechanical history');
 
@@ -109,9 +147,34 @@ export default function RelatedServiceHistoryCard({ payload, loading, onOpenFull
       ) : (
         <View style={styles.list}>
           {records.map((row) => {
-            const canOpen = row.can_open !== false;
+            const canOpen = row.can_open !== false && !row.is_current;
             const isExpanded = expandedId === row.id;
+            const operations = Array.isArray(row.operations) ? row.operations : [];
             const hasParts = Array.isArray(row.parts) && row.parts.length > 0;
+            const partsPriceNum =
+              row.parts_price != null && row.parts_price !== '' ? Number(row.parts_price) : null;
+            const hasPartsAmount = partsPriceNum != null && Number.isFinite(partsPriceNum) && partsPriceNum > 0;
+            const labels = formatServiceRecordLabels(row, t);
+            const serviceLabel =
+              translateRepairTypeLabel(
+                {
+                  slug: row.service_type_slug,
+                  name: row.service_type_name,
+                },
+                t,
+                { locale }
+              ) ||
+              row.service_type_name ||
+              t('relatedServiceHistory.serviceFallback', null, 'Service');
+            const categoryLabel = row.category_name
+              ? translateServiceCategoryLabel(
+                  { slug: row.category_slug, name: row.category_name },
+                  t,
+                  { locale }
+                ) || row.category_name
+              : null;
+            const displayTotal = resolveRepairDisplayTotal(row);
+            const currency = row.currency || '';
 
             return (
               <Pressable
@@ -125,8 +188,10 @@ export default function RelatedServiceHistoryCard({ payload, loading, onOpenFull
               >
                 <View style={styles.recordHeader}>
                   <Text style={styles.recordTitle}>
-                    {row.service_type_name ||
-                      t('relatedServiceHistory.serviceFallback', null, 'Service')}
+                    {serviceLabel}
+                    {row.is_current
+                      ? ` · ${t('relatedServiceHistory.thisVisit', null, 'This visit')}`
+                      : ''}
                   </Text>
                   <View style={styles.recordHeaderRight}>
                     <Text style={styles.recordDate}>{formatDate(row.completed_at)}</Text>
@@ -142,41 +207,78 @@ export default function RelatedServiceHistoryCard({ payload, loading, onOpenFull
                   {row.final_kilometers != null
                     ? `${row.final_kilometers.toLocaleString()} km`
                     : t('relatedServiceHistory.kmNotRecorded', null, 'Km not recorded')}
-                  {(row.performed_by || row.shop_name) ? ` · ${row.performed_by || row.shop_name}` : ''}
+                  {labels.performedBy ? ` · ${labels.performedBy}` : ''}
                 </Text>
 
                 {isExpanded ? (
                   <View style={styles.expandedBody}>
-                    {row.category_name ? (
+                    {categoryLabel ? (
                       <Text style={styles.expandedLine}>
                         {t(
                           'relatedServiceHistory.category',
-                          { value: row.category_name },
-                          `Category: ${row.category_name}`
+                          { value: categoryLabel },
+                          `Category: ${categoryLabel}`
                         )}
                       </Text>
                     ) : null}
-                    {row.performed_by ? (
+                    {labels.performedBy ? (
                       <Text style={styles.expandedLine}>
                         <Text style={styles.expandedLabel}>
                           {t('relatedServiceHistory.performedBy', null, 'Performed by: ')}
                         </Text>
-                        {row.performed_by}
+                        {labels.performedBy}
                       </Text>
                     ) : null}
-                    {row.record_origin ? (
+                    {labels.recordOrigin ? (
                       <Text style={styles.expandedLine}>
                         <Text style={styles.expandedLabel}>
                           {t('relatedServiceHistory.howRecorded', null, 'How recorded: ')}
                         </Text>
-                        {row.record_origin}
+                        {labels.recordOrigin}
                       </Text>
                     ) : null}
-                    {row.record_trust ? (
-                      <Text style={styles.expandedTrust}>{row.record_trust}</Text>
+                    {labels.recordTrust ? (
+                      <Text style={styles.expandedTrust}>{labels.recordTrust}</Text>
                     ) : null}
 
-                    {hasParts ? (
+                    {operations.length > 0 ? (
+                      <View style={styles.opsBlock}>
+                        <Text style={styles.partsLabel}>
+                          {t('relatedServiceHistory.operations', null, 'Operations')}
+                        </Text>
+                        {operations.map((op, idx) => {
+                          const opParts = Array.isArray(op.parts) ? op.parts : [];
+                          const laborAmt = formatMoney(op.labor_amount, currency);
+                          return (
+                            <View key={op.id != null ? String(op.id) : `op-${idx}`} style={styles.opRow}>
+                              <Text style={styles.partLine}>
+                                {op.sequence != null ? `${op.sequence}. ` : ''}
+                                {localizeOperationTitle(op, t, locale)}
+                                {laborAmt
+                                  ? ` — ${t(
+                                      'relatedServiceHistory.laborAmount',
+                                      { amount: laborAmt },
+                                      `Labor ${laborAmt}`
+                                    )}`
+                                  : ''}
+                              </Text>
+                              {opParts.map((part, pIdx) => (
+                                <Text
+                                  key={`${op.id || idx}-part-${pIdx}`}
+                                  style={styles.opPartLine}
+                                >
+                                  {part.quantity > 1 ? `${part.quantity}× ` : ''}
+                                  {part.name}
+                                  {part.note ? ` — ${part.note}` : ''}
+                                </Text>
+                              ))}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ) : null}
+
+                    {hasParts && operations.length === 0 ? (
                       <View style={styles.partsBlock}>
                         <Text style={styles.partsLabel}>
                           {t('relatedServiceHistory.parts', null, 'Parts')}
@@ -189,7 +291,19 @@ export default function RelatedServiceHistoryCard({ payload, loading, onOpenFull
                           </Text>
                         ))}
                       </View>
-                    ) : (
+                    ) : null}
+
+                    {!hasParts && hasPartsAmount ? (
+                      <Text style={styles.expandedLine}>
+                        {t(
+                          'relatedServiceHistory.partsAmountSummary',
+                          { amount: formatMoney(partsPriceNum, currency) },
+                          `Parts (summary): ${formatMoney(partsPriceNum, currency)}`
+                        )}
+                      </Text>
+                    ) : null}
+
+                    {!hasParts && !hasPartsAmount && operations.length === 0 ? (
                       <Text style={styles.expandedMuted}>
                         {t(
                           'relatedServiceHistory.noParts',
@@ -197,7 +311,39 @@ export default function RelatedServiceHistoryCard({ payload, loading, onOpenFull
                           'No parts listed on this record.'
                         )}
                       </Text>
-                    )}
+                    ) : null}
+
+                    {displayTotal != null || row.labor_price != null || row.parts_price != null ? (
+                      <View style={styles.amountsBlock}>
+                        {row.labor_price != null ? (
+                          <Text style={styles.expandedLine}>
+                            {t(
+                              'relatedServiceHistory.laborSummary',
+                              { amount: formatMoney(row.labor_price, currency) },
+                              `Labor: ${formatMoney(row.labor_price, currency)}`
+                            )}
+                          </Text>
+                        ) : null}
+                        {row.parts_price != null ? (
+                          <Text style={styles.expandedLine}>
+                            {t(
+                              'relatedServiceHistory.partsSummary',
+                              { amount: formatMoney(row.parts_price, currency) },
+                              `Parts: ${formatMoney(row.parts_price, currency)}`
+                            )}
+                          </Text>
+                        ) : null}
+                        {displayTotal != null ? (
+                          <Text style={[styles.expandedLine, styles.expandedLabel]}>
+                            {t(
+                              'relatedServiceHistory.totalSummary',
+                              { amount: formatMoney(displayTotal, currency) },
+                              `Total: ${formatMoney(displayTotal, currency)}`
+                            )}
+                          </Text>
+                        ) : null}
+                      </View>
+                    ) : null}
 
                     {canOpen && onOpenFullRecord ? (
                       <Button
@@ -357,6 +503,22 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   partsBlock: {
+    marginTop: 6,
+    gap: 2,
+  },
+  opsBlock: {
+    marginTop: 6,
+    gap: 6,
+  },
+  opRow: {
+    gap: 2,
+  },
+  opPartLine: {
+    fontSize: 12,
+    color: COLORS.TEXT_MUTED,
+    paddingLeft: 12,
+  },
+  amountsBlock: {
     marginTop: 6,
     gap: 2,
   },

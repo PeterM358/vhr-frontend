@@ -123,6 +123,7 @@ import OperationTypePickerSheet from '../components/repair/OperationTypePickerSh
 import { buildOperationTypePickerOptions } from '../utils/operationTypePickerOptions';
 import { presentPartsExportShareSheet } from '../utils/partsExportShare';
 import { computePartsTotals } from '../utils/repairPartsTotals';
+import { resolveRepairDisplayTotal } from '../utils/repairDisplayTotal';
 import {
   readShopMemberships,
   shopCapabilityEnabled,
@@ -1371,13 +1372,18 @@ export default function RepairDetailScreen({ route, navigation }) {
   };
 
   const renderOperationsSection = () => {
-    if (!isShop || !isMyShopRepair || String(repair?.status || '').toLowerCase() === 'done') {
+    if (!isShop || !isMyShopRepair) {
       return null;
     }
+    const isDoneStatus = String(repair?.status || '').toLowerCase() === 'done';
     const visibleOperations = operations.filter((op) => !isClosedOperationStatus(op.status));
+    if (isDoneStatus && visibleOperations.length === 0) {
+      return null;
+    }
     const visibleCompletedCount = visibleOperations.filter(
       (op) => String(op.status || '').toLowerCase() === 'completed'
     ).length;
+    const readOnly = isDoneStatus;
     return (
       <FloatingCard style={styles.lightActionCard}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1389,19 +1395,25 @@ export default function RepairDetailScreen({ route, navigation }) {
           ) : null}
         </View>
         <Text style={styles.mutedText}>
-          {t('repairs.detail.operationsHelp', null, 'Split work into job lines. Set labor price and assign workers here. Start/Complete appear for the assigned technician.')}
+          {readOnly
+            ? t(
+                'repairs.detail.operationsCompletedHelp',
+                null,
+                'Work lines completed on this visit — labor and materials below.'
+              )
+            : t('repairs.detail.operationsHelp', null, 'Split work into job lines. Set labor price and assign workers here. Start/Complete appear for the assigned technician.')}
         </Text>
         {visibleOperations.length === 0 ? (
           <Text style={styles.mutedText}>{t('repairs.detail.noOperationsYet', null, 'No operations yet — add one to organize parts and labor.')}</Text>
         ) : (
           visibleOperations.map((op) => {
-            const expanded = operationsExpanded[op.id];
+            const expanded = operationsExpanded[op.id] || readOnly;
             const opParts = repairParts.filter(
               (part) => Number(part.service_order_operation_id) === Number(op.id)
             );
             const opTotals = computeOperationSubtotals(op.id);
-            const canRemove = operationCanHardDelete(op, repairParts);
-            const removeDisabled = operationActionId != null || !canRemove;
+            const canRemove = !readOnly && operationCanHardDelete(op, repairParts);
+            const removeDisabled = readOnly || operationActionId != null || !canRemove;
             return (
               <View key={op.id} style={{ marginTop: 12, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#ddd' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}>
@@ -1438,6 +1450,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                       {t('repairs.detail.opLinePartsLaborTotal', { parts: formatMoneyAmount(opTotals.partsSum, DEFAULT_CURRENCY), labor: formatMoneyAmount(opTotals.laborSum, DEFAULT_CURRENCY), total: formatMoneyAmount(opTotals.total, DEFAULT_CURRENCY) }, `Parts ${formatMoneyAmount(opTotals.partsSum, DEFAULT_CURRENCY)} · Labor ${formatMoneyAmount(opTotals.laborSum, DEFAULT_CURRENCY)} · Total ${formatMoneyAmount(opTotals.total, DEFAULT_CURRENCY)}`)}
                     </Text>
                   </Pressable>
+                  {!readOnly ? (
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={t('repairs.detail.operationsPicker.removeOperation')}
@@ -1458,6 +1471,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                       />
                     )}
                   </Pressable>
+                  ) : null}
                 </View>
                 {expanded ? (
                   <View style={{ marginTop: 8, gap: 6 }}>
@@ -1474,6 +1488,16 @@ export default function RepairDetailScreen({ route, navigation }) {
                     ) : (
                       <Text style={styles.mutedText}>{t('repairs.detail.noPartsOnOperation', null, 'No parts on this operation yet.')}</Text>
                     )}
+                    {readOnly ? (
+                      <Text style={styles.detailLine}>
+                        {t(
+                          'repairs.detail.laborColon',
+                          { amount: formatMoneyAmount(opTotals.laborSum, DEFAULT_CURRENCY) },
+                          `Labor: ${formatMoneyAmount(opTotals.laborSum, DEFAULT_CURRENCY)}`
+                        )}
+                      </Text>
+                    ) : (
+                    <>
                     <TextInput
                       mode="outlined"
                       dense
@@ -1627,7 +1651,6 @@ export default function RepairDetailScreen({ route, navigation }) {
                     ) : op.assigned_mechanics?.length ? (
                       <Text style={styles.mutedText}>{t('repairs.detail.mechanicsLabel', { names: op.assigned_mechanics.join(', ') }, `Mechanics: ${op.assigned_mechanics.join(', ')}`)}</Text>
                     ) : null}
-                    {op.notes ? <Text style={styles.mutedText}>{op.notes}</Text> : null}
                     {['planned', 'approved', 'in_progress', 'waiting_parts'].includes(
                       String(op.status || '').toLowerCase()
                     ) ? (
@@ -1667,12 +1690,16 @@ export default function RepairDetailScreen({ route, navigation }) {
                         </Button>
                       </View>
                     ) : null}
+                    </>
+                    )}
+                    {op.notes ? <Text style={styles.mutedText}>{op.notes}</Text> : null}
                   </View>
                 ) : null}
               </View>
             );
           })
         )}
+        {!readOnly ? (
         <Button
           mode="outlined"
           icon="plus"
@@ -1683,6 +1710,7 @@ export default function RepairDetailScreen({ route, navigation }) {
         >
           {t('repairs.detail.operationsPicker.addOperation')}
         </Button>
+        ) : null}
       </FloatingCard>
     );
   };
@@ -3845,9 +3873,11 @@ export default function RepairDetailScreen({ route, navigation }) {
               <FloatingCard style={styles.lightActionCard}>
                 <Text style={styles.cardTitle}>{t('repairs.detail.repairCompletedTitle', null, 'Repair completed')}</Text>
                 <Text style={styles.mutedText}>
-                  The client is notified in the app when you finalize. If they have no app but an email on
-                  file, a pickup email can be sent once mail is enabled. Update payment status below when
-                  they pay.
+                  {t(
+                    'repairs.detail.clientNotifiedOnFinalize',
+                    null,
+                    'The client is notified in the app when you finalize. If they have no app but an email on file, a pickup email can be sent once mail is enabled. Update payment status below when they pay.'
+                  )}
                 </Text>
               </FloatingCard>
             ) : null}
@@ -4213,8 +4243,8 @@ export default function RepairDetailScreen({ route, navigation }) {
                     <Text style={styles.summaryLabel}>Service provider</Text>
                     <Text style={styles.summaryValue}>{formatServiceRecordProvider(repair)}</Text>
                   </View>
-                  {formatOwnerLoggedTrustLabel(repair) ? (
-                    <Text style={styles.trustHint}>{formatOwnerLoggedTrustLabel(repair)}</Text>
+                  {formatOwnerLoggedTrustLabel(repair, t) ? (
+                    <Text style={styles.trustHint}>{formatOwnerLoggedTrustLabel(repair, t)}</Text>
                   ) : null}
                   {hasSelectedShopProvider ? (
                     <View style={styles.confirmationCard}>
@@ -4395,27 +4425,48 @@ export default function RepairDetailScreen({ route, navigation }) {
 
               <Text style={styles.summarySectionTitle}>{t('repairs.detail.sectionNotes')}</Text>
               {repair.shop_description ? (
-                <Text style={styles.detailLine}>Workshop notes: {repair.shop_description}</Text>
+                <Text style={styles.detailLine}>
+                  {t('repairs.detail.workshopNotesPrefix', null, 'Workshop notes: ')}
+                  {repair.shop_description}
+                </Text>
               ) : null}
               {repair.description ? (
                 <Text style={styles.detailLine}>
-                  {isOwnerLoggedServiceRecord ? 'Notes: ' : 'Original request: '}
+                  {isOwnerLoggedServiceRecord
+                    ? t('repairs.detail.notesPrefix', null, 'Notes: ')
+                    : t('repairs.detail.originalRequestPrefix', null, 'Original request: ')}
                   {repair.description}
                 </Text>
               ) : null}
               {repair.symptoms ? (
                 <Text style={styles.mutedText}>
-                  {isOwnerLoggedServiceRecord ? 'Details: ' : 'Symptoms: '}
+                  {isOwnerLoggedServiceRecord
+                    ? t('repairs.detail.detailsPrefix', null, 'Details: ')
+                    : t('repairs.detail.symptomsPrefix', null, 'Symptoms: ')}
                   {repair.symptoms}
                 </Text>
               ) : null}
               {!repair.shop_description && !repair.description && !repair.symptoms ? (
-                <Text style={styles.mutedText}>No notes captured for this record.</Text>
+                <Text style={styles.mutedText}>
+                  {t('repairs.detail.noNotesCaptured', null, 'No notes captured for this record.')}
+                </Text>
               ) : null}
 
               <Text style={styles.summarySectionTitle}>{t('repairs.detail.sectionPartsUsed')}</Text>
               {displayPartsList.length === 0 ? (
-                <Text style={styles.mutedText}>{t('repairs.detail.noPartsRecorded')}</Text>
+                repair.parts_price != null && Number(repair.parts_price) > 0 ? (
+                  <Text style={styles.detailLine}>
+                    {t(
+                      'repairs.detail.partsAmountSummaryOnly',
+                      {
+                        amount: formatMoneyAmount(repair.parts_price, summaryCurrency),
+                      },
+                      `Parts (summary): ${formatMoneyAmount(repair.parts_price, summaryCurrency)} — no line items recorded.`
+                    )}
+                  </Text>
+                ) : (
+                  <Text style={styles.mutedText}>{t('repairs.detail.noPartsRecorded')}</Text>
+                )
               ) : (
                 <>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -4464,9 +4515,12 @@ export default function RepairDetailScreen({ route, navigation }) {
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>{t('repairs.detail.total')}</Text>
                     <Text style={[styles.summaryValue, styles.summaryValueEmphasis]}>
-                      {repair.total_price != null || repair.calculated_total_price != null
-                        ? `${repair.total_price ?? repair.calculated_total_price} ${summaryCurrency}`
-                        : '—'}
+                      {(() => {
+                        const displayTotal = resolveRepairDisplayTotal(repair);
+                        return displayTotal != null
+                          ? `${displayTotal} ${summaryCurrency}`
+                          : '—';
+                      })()}
                     </Text>
                   </View>
                 </>
@@ -4495,7 +4549,11 @@ export default function RepairDetailScreen({ route, navigation }) {
               ) : null}
               <Text style={[styles.mutedText, { marginTop: 8 }]}>
                 {isMyShopRepair && isDone
-                  ? 'Payment can be updated in the card above when the customer pays.'
+                  ? t(
+                      'repairs.detail.paymentUpdateHint',
+                      null,
+                      'Payment can be updated in the card above when the customer pays.'
+                    )
                   : isMyShopRepair
                     ? t('repairs.detail.afterFinalizeInvoiceHint', null, 'After finalize, create a platform invoice or attach an external PDF.')
                     : null}
@@ -4680,7 +4738,11 @@ export default function RepairDetailScreen({ route, navigation }) {
                           <Text style={styles.detailLine}>{t('repairs.detail.laborColon', { amount: formatMoneyAmount(repair.labor_price, repair.currency) }, `Labor: ${formatMoneyAmount(repair.labor_price, repair.currency)}`)}</Text>
                           <Text style={styles.detailLine}>{t('repairs.detail.partsColon', { amount: formatMoneyAmount(repair.parts_price, repair.currency) }, `Parts: ${formatMoneyAmount(repair.parts_price, repair.currency)}`)}</Text>
                           <Text style={styles.detailLine}>
-                            {t('repairs.detail.totalWithColon', null, 'Total:')} {formatMoneyAmount(repair.total_price ?? repair.calculated_total_price, repair.currency)}
+                            {t('repairs.detail.totalWithColon', null, 'Total:')}{' '}
+                            {formatMoneyAmount(
+                              resolveRepairDisplayTotal(repair),
+                              repair.currency
+                            )}
                           </Text>
                           <Text style={styles.detailLine}>{t('repairs.detail.paymentStatusTitle', null, 'Payment status')}: {formatPaymentStatus(repair.payment_status)}</Text>
                           <Text style={styles.detailLine}>

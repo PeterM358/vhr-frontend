@@ -3544,7 +3544,34 @@
       "rejectConfirmationTitle": "Reject confirmation",
       "rejectConfirmationBody": "The owner will see that this record was not confirmed.",
       "reject": "Reject",
-      "rejectConfirmationNote": "Service center could not verify this record."
+      "rejectConfirmationNote": "Service center could not verify this record.",
+      "clientNotifiedOnFinalize": "The client is notified in the app when you finalize. If they have no app but an email on file, a pickup email can be sent once mail is enabled. Update payment status below when they pay.",
+      "workshopNotesPrefix": "Workshop notes: ",
+      "notesPrefix": "Notes: ",
+      "originalRequestPrefix": "Original request: ",
+      "detailsPrefix": "Details: ",
+      "symptomsPrefix": "Symptoms: ",
+      "noNotesCaptured": "No notes captured for this record.",
+      "partsAmountSummaryOnly": "Parts (summary): {amount} — no line items recorded.",
+      "paymentUpdateHint": "Payment can be updated in the card above when the customer pays.",
+      "operationsCompletedHelp": "Work lines completed on this visit — labor and materials below."
+    },
+    "invoicing": {
+      "title": "Invoicing",
+      "hint": "Use a platform invoice for numbering and bill-to snapshot, or attach a PDF from your external accounting app — both paths are supported.",
+      "createPlatform": "Create platform invoice",
+      "uploadExternalPdf": "Upload external PDF",
+      "platformIssued": "Platform invoice issued for this repair.",
+      "openList": "Open invoicing list",
+      "draftCreatedTitle": "Draft created",
+      "draftCreatedBody": "Open Invoicing from the menu to review and issue.",
+      "createDraftFailed": "Could not create invoice draft",
+      "missingDataTitle": "Missing data",
+      "vehicleRequiredForPdf": "Vehicle is required to attach an external invoice PDF.",
+      "externalInvoiceTitle": "External invoice",
+      "uploadedTitle": "Uploaded",
+      "uploadedBody": "External invoice PDF attached to this repair. No platform invoice was created.",
+      "uploadFailed": "Could not upload invoice PDF"
     }
   },
   "requestService": {
@@ -5026,7 +5053,14 @@
     "authorizedBadge": "Authorized",
     "limitedAccess": "Limited access",
     "jobScopedSummary": "Automatic when you book a repair. The center sees this job plus prior work in the same service area (e.g. brakes, oil).",
-    "authorizedSummary": "You explicitly shared this vehicle. The center can help with ongoing maintenance and see mechanical service history."
+    "authorizedSummary": "You explicitly shared this vehicle. The center can help with ongoing maintenance and see mechanical service history.",
+    "thisVisit": "This visit",
+    "operations": "Operations",
+    "laborAmount": "Labor {amount}",
+    "partsAmountSummary": "Parts (summary): {amount}",
+    "laborSummary": "Labor: {amount}",
+    "partsSummary": "Parts: {amount}",
+    "totalSummary": "Total: {amount}"
   },
   "shopDataAccess": {
     "jobScopedShort": "This job only",
@@ -5051,5 +5085,37 @@
     "manageParts": "Manage parts",
     "qty": "Qty: {value}",
     "price": "Price: {value}"
+  },
+  "serviceRecord": {
+    "performedByOwnerSelf": "Owner (self-repair)",
+    "performedByNotSpecified": "Not specified",
+    "performedByServiceCenter": "Service center",
+    "origin": {
+      "clientRequestCompleted": "Client request completed by a service center",
+      "openClientRequest": "Open client request (not completed yet)",
+      "startedFromClientRequest": "Started from a client request",
+      "ownerAdded": "Owner added this to vehicle history",
+      "shopLogged": "Service center logged this job on the platform",
+      "imported": "Imported or external record"
+    },
+    "trust": {
+      "ownerSelfRepair": "Owner logged · Self repair (low trust until evidence)",
+      "serviceCenterConfirmed": "Service center confirmed (high trust)",
+      "confirmationRequested": "Confirmation requested from selected service center",
+      "serviceCenterRejected": "Service center did not confirm this owner-logged record",
+      "workshopAttributed": "Workshop attributed (owner logged with selected service center)",
+      "ownerWorkshopWithProof": "Owner logged · Workshop (medium with photos/receipt)",
+      "ownerWorkshopLow": "Owner logged · Workshop (low–medium until evidence)",
+      "ownerLoggedLow": "Owner logged (low trust until evidence)",
+      "finalizedByShop": "High — finalized by shop on platform",
+      "reviewPhotos": "Review photos or invoice if needed",
+      "noServiceYet": "No service performed yet",
+      "inProgress": "In progress on platform",
+      "serviceCenterConfirmedRecord": "High — service center confirmed the record",
+      "ownerAttachedProof": "Medium — owner attached proof",
+      "ownerTypedNotLiveJob": "Owner typed this — not the same as a live shop job on the platform",
+      "shopEntered": "High — shop-entered service record",
+      "highShopConfirmed": "High — shop confirmed on platform"
+    }
   }
 }

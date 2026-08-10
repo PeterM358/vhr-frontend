@@ -9,6 +9,7 @@ import { draftInvoiceFromRepairs } from '../../api/billing';
 import { uploadRepairDocument } from '../../api/documents';
 import { pickReceiptOrInvoiceAttachment } from '../../utils/pickDocumentFile';
 import { DOCUMENT_TYPE_REPAIR_INVOICE } from '../../utils/vehicleDocumentTypes';
+import { useTranslation } from '../../i18n';
 
 export default function RepairInvoicingCard({
   repair,
@@ -16,6 +17,7 @@ export default function RepairInvoicingCard({
   onOpenInvoice,
   onOpenInvoicingHome,
 }) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
 
   const hasIssued = Boolean(repair?.has_issued_invoice);
@@ -33,10 +35,20 @@ export default function RepairInvoicingCard({
       if (onOpenInvoice && invoice?.id) {
         onOpenInvoice(invoice.id);
       } else {
-        Alert.alert('Draft created', 'Open Invoicing from the menu to review and issue.');
+        Alert.alert(
+          t('repairs.invoicing.draftCreatedTitle', null, 'Draft created'),
+          t(
+            'repairs.invoicing.draftCreatedBody',
+            null,
+            'Open Invoicing from the menu to review and issue.'
+          )
+        );
       }
     } catch (err) {
-      Alert.alert('Error', err.message || 'Could not create invoice draft');
+      Alert.alert(
+        t('common.error', null, 'Error'),
+        err.message || t('repairs.invoicing.createDraftFailed', null, 'Could not create invoice draft')
+      );
     } finally {
       setBusy(false);
     }
@@ -44,7 +56,14 @@ export default function RepairInvoicingCard({
 
   const handleUploadExternalPdf = async () => {
     if (!repair?.id || !vehicleId) {
-      Alert.alert('Missing data', 'Vehicle is required to attach an external invoice PDF.');
+      Alert.alert(
+        t('repairs.invoicing.missingDataTitle', null, 'Missing data'),
+        t(
+          'repairs.invoicing.vehicleRequiredForPdf',
+          null,
+          'Vehicle is required to attach an external invoice PDF.'
+        )
+      );
       return;
     }
     setBusy(true);
@@ -57,14 +76,21 @@ export default function RepairInvoicingCard({
       const token = await AsyncStorage.getItem('@access_token');
       await uploadRepairDocument(token, vehicleId, repair.id, attachment, {
         document_type: DOCUMENT_TYPE_REPAIR_INVOICE,
-        title: attachment.fileName || 'External invoice',
+        title: attachment.fileName || t('repairs.invoicing.externalInvoiceTitle', null, 'External invoice'),
       });
       Alert.alert(
-        'Uploaded',
-        'External invoice PDF attached to this repair. No platform invoice was created.'
+        t('repairs.invoicing.uploadedTitle', null, 'Uploaded'),
+        t(
+          'repairs.invoicing.uploadedBody',
+          null,
+          'External invoice PDF attached to this repair. No platform invoice was created.'
+        )
       );
     } catch (err) {
-      Alert.alert('Error', err.message || 'Could not upload invoice PDF');
+      Alert.alert(
+        t('common.error', null, 'Error'),
+        err.message || t('repairs.invoicing.uploadFailed', null, 'Could not upload invoice PDF')
+      );
     } finally {
       setBusy(false);
     }
@@ -72,18 +98,27 @@ export default function RepairInvoicingCard({
 
   return (
     <FloatingCard style={styles.card}>
-      <Text style={styles.title}>Invoicing</Text>
+      <Text style={styles.title}>{t('repairs.invoicing.title', null, 'Invoicing')}</Text>
       <Text style={styles.hint}>
-        Use a platform invoice for numbering and bill-to snapshot, or attach a PDF from your
-        external accounting app — both paths are supported.
+        {t(
+          'repairs.invoicing.hint',
+          null,
+          'Use a platform invoice for numbering and bill-to snapshot, or attach a PDF from your external accounting app — both paths are supported.'
+        )}
       </Text>
 
       {hasIssued ? (
         <View style={styles.issuedBanner}>
-          <Text style={styles.issuedText}>Platform invoice issued for this repair.</Text>
+          <Text style={styles.issuedText}>
+            {t(
+              'repairs.invoicing.platformIssued',
+              null,
+              'Platform invoice issued for this repair.'
+            )}
+          </Text>
           {onOpenInvoicingHome ? (
             <Button mode="text" compact onPress={onOpenInvoicingHome}>
-              Open invoicing list
+              {t('repairs.invoicing.openList', null, 'Open invoicing list')}
             </Button>
           ) : null}
         </View>
@@ -96,7 +131,7 @@ export default function RepairInvoicingCard({
           disabled={busy}
           style={styles.btn}
         >
-          Create platform invoice
+          {t('repairs.invoicing.createPlatform', null, 'Create platform invoice')}
         </Button>
       )}
 
@@ -108,7 +143,7 @@ export default function RepairInvoicingCard({
         disabled={busy}
         style={styles.btn}
       >
-        Upload external PDF
+        {t('repairs.invoicing.uploadExternalPdf', null, 'Upload external PDF')}
       </Button>
     </FloatingCard>
   );
