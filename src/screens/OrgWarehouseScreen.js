@@ -17,6 +17,7 @@ import {
   updateWarehouseSettings,
 } from '../api/orgWarehouse';
 import OrgMaterialsIntakePanel from '../components/org/OrgMaterialsIntakePanel';
+import OrgToolAssetsPanel from '../components/org/OrgToolAssetsPanel';
 import {
   readOrganizationMemberships,
   refreshOrganizationMemberships,
@@ -35,6 +36,7 @@ const CARD_SURFACE = { color: ON_CARD };
 const PRIMARY_MODES = [
   { id: 'documents', labelKey: 'org.warehouse.tabDocuments', fallback: 'Documents' },
   { id: 'materials', labelKey: 'org.warehouse.tabMaterials', fallback: 'Materials' },
+  { id: 'tools', labelKey: 'org.warehouse.tabTools', fallback: 'Tools' },
 ];
 
 const SECONDARY_MODES = [
@@ -108,7 +110,12 @@ export default function OrgWarehouseScreen({ navigation, route }) {
   const [intakePostingMode, setIntakePostingMode] = useState('both');
   const [rows, setRows] = useState([]);
   const [mode, setMode] = useState(() => {
-    if (routeInitialTab === 'materials' || routeInitialTab === 'list' || routeInitialTab === 'add') {
+    if (
+      routeInitialTab === 'materials'
+      || routeInitialTab === 'list'
+      || routeInitialTab === 'add'
+      || routeInitialTab === 'tools'
+    ) {
       return routeInitialTab;
     }
     return 'documents';
@@ -127,7 +134,13 @@ export default function OrgWarehouseScreen({ navigation, route }) {
 
   useEffect(() => {
     const tab = route?.params?.initialTab || route?.params?.tab || route?.params?.section;
-    if (tab === 'documents' || tab === 'materials' || tab === 'list' || tab === 'add') {
+    if (
+      tab === 'documents'
+      || tab === 'materials'
+      || tab === 'list'
+      || tab === 'add'
+      || tab === 'tools'
+    ) {
       setMode(tab);
       if (tab === 'documents') {
         setDocumentsListKey((k) => k + 1);
@@ -292,7 +305,7 @@ export default function OrgWarehouseScreen({ navigation, route }) {
           {t(
             'org.warehouse.lead',
             null,
-            'Documents: import invoices. Materials: on-stock quantities. Locations: bins for issue.',
+            'Documents: import invoices. Materials: stock. Tools: numbered QR / kits. Locations: bins.',
           )}
         </Text>
 
@@ -358,6 +371,18 @@ export default function OrgWarehouseScreen({ navigation, route }) {
               navigation={navigation}
               documentsListKey={documentsListKey}
             />
+          ) : loading ? (
+            <ActivityIndicator color="#fff" style={styles.loader} />
+          ) : (
+            <AppCard style={styles.card} contentStyle={CARD_SURFACE}>
+              <Text style={styles.error}>
+                {error || t('org.warehouse.loadError', null, 'Could not load warehouse.')}
+              </Text>
+            </AppCard>
+          )
+        ) : mode === 'tools' ? (
+          orgId ? (
+            <OrgToolAssetsPanel organizationId={orgId} canManage={canManage} />
           ) : loading ? (
             <ActivityIndicator color="#fff" style={styles.loader} />
           ) : (
