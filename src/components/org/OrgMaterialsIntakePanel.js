@@ -71,6 +71,7 @@ function emptyManual() {
     unit_code: 'piece',
     unit_price: '',
     is_durable_tool: false,
+    invoice_number: '',
   };
 }
 
@@ -99,7 +100,7 @@ function unitDisplay(code, t) {
   return t(opt.labelKey, null, opt.fallback);
 }
 
-function UnitPicker({ value, onChange, t, disabled, units }) {
+function UnitPicker({ value, onChange, t, disabled, units, locale }) {
   const list = Array.isArray(units) && units.length
     ? units
     : MATERIAL_UNIT_OPTIONS.map((opt) => ({
@@ -107,6 +108,8 @@ function UnitPicker({ value, onChange, t, disabled, units }) {
         code: opt.code,
         symbol: t(opt.labelKey, null, opt.fallback),
         name: t(opt.labelKey, null, opt.fallback),
+        name_bg: t(opt.labelKey, null, opt.fallback),
+        name_en: t(opt.labelKey, null, opt.fallback),
         is_active: true,
       }));
   return (
@@ -115,6 +118,7 @@ function UnitPicker({ value, onChange, t, disabled, units }) {
       valueCode={value}
       disabled={disabled}
       emptyLabel={t('org.warehouse.intake.unit', null, 'Unit')}
+      locale={locale}
       onChange={({ code }) => onChange(code)}
     />
   );
@@ -125,6 +129,7 @@ function EditableLineCard({
   canEdit,
   busy,
   t,
+  locale,
   onSave,
   onConfirmRow,
   onDeleteLine,
@@ -138,6 +143,7 @@ function EditableLineCard({
     quantity: String(line.quantity ?? ''),
     unit_code: line.unit_code || 'piece',
     unit_price: line.unit_price || moneyFromMinor(line.unit_price_ex_vat_minor),
+    is_durable_tool: Boolean(line.is_durable_tool),
   });
 
   useEffect(() => {
@@ -148,6 +154,7 @@ function EditableLineCard({
       quantity: String(line.quantity ?? ''),
       unit_code: line.unit_code || 'piece',
       unit_price: line.unit_price || moneyFromMinor(line.unit_price_ex_vat_minor),
+      is_durable_tool: Boolean(line.is_durable_tool),
     });
   }, [line]);
 
@@ -241,9 +248,29 @@ function EditableLineCard({
         value={draft.unit_code}
         onChange={(code) => setDraft((p) => ({ ...p, unit_code: code }))}
         t={t}
+        locale={locale}
         disabled={!editable}
         units={units}
       />
+      <View style={styles.switchRow}>
+        <View style={styles.switchLabelWrap}>
+          <Text style={styles.sectionLabel}>
+            {t('org.warehouse.intake.durableTool', null, 'Durable tool (hand machine)')}
+          </Text>
+          <Text style={styles.helper}>
+            {t(
+              'org.warehouse.intake.durableToolHint',
+              null,
+              'Drill, grinder, etc. — not consumed on tasks; write off via scrap when broken.',
+            )}
+          </Text>
+        </View>
+        <Switch
+          value={Boolean(draft.is_durable_tool)}
+          disabled={!editable}
+          onValueChange={(v) => setDraft((p) => ({ ...p, is_durable_tool: v }))}
+        />
+      </View>
       {confirmed ? (
         <Text style={styles.confirmedBadge}>
           {t('org.warehouse.intake.lineConfirmed', null, 'Confirmed → stock')}
@@ -291,7 +318,7 @@ export default function OrgMaterialsIntakePanel({
   navigation = null,
   documentsListKey = 0,
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const canPost = canPostIntake == null ? Boolean(canManage) : Boolean(canPostIntake);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -340,6 +367,8 @@ export default function OrgMaterialsIntakePanel({
           id: u.id,
           code: u.code,
           name: u.name || u.symbol || u.code,
+          name_bg: u.name_bg || '',
+          name_en: u.name_en || u.name || '',
           symbol: u.symbol || u.name || u.code,
           is_active: u.is_active !== false,
         })),
@@ -514,6 +543,7 @@ export default function OrgMaterialsIntakePanel({
         quantity: draft.quantity || '1',
         unit_code: draft.unit_code || 'piece',
         unit_price: draft.unit_price || '0',
+        is_durable_tool: Boolean(draft.is_durable_tool),
       });
       await refreshActive(token, activeIntake.id);
       setMessage(t('org.warehouse.intake.lineSaved', null, 'Row saved.'));
@@ -566,6 +596,7 @@ export default function OrgMaterialsIntakePanel({
         quantity: manual.quantity || '1',
         unit_code: manual.unit_code || 'piece',
         unit_price: manual.unit_price || '0',
+        is_durable_tool: Boolean(manual.is_durable_tool),
       });
       await refreshActive(token, activeIntake.id);
       setManual(emptyManual());
@@ -608,6 +639,9 @@ export default function OrgMaterialsIntakePanel({
       };
       if (confirmLocationId) payload.location_id = confirmLocationId;
       payload.is_durable_tool = Boolean(standalone.is_durable_tool);
+      if (standalone.invoice_number?.trim()) {
+        payload.invoice_number = standalone.invoice_number.trim();
+      }
       const created = await createOrgMaterial(token, organizationId, payload);
       setConfirmSummary({
         invoice_number: '',
@@ -1015,6 +1049,21 @@ export default function OrgMaterialsIntakePanel({
             style={styles.input}
             textColor={ON_CARD}
           />
+          <TextInput
+            label={t('org.warehouse.intake.documentNumber', null, 'Document # (optional)')}
+            value={standalone.invoice_number}
+            onChangeText={(v) => setStandalone((p) => ({ ...p, invoice_number: v }))}
+            mode="outlined"
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+          <Text style={styles.helper}>
+            {t(
+              'org.warehouse.intake.documentNumberHint',
+              null,
+              'If you are not scanning an invoice, you can still record a paper/doc number for the audit trail.',
+            )}
+          </Text>
           <View style={styles.row2}>
             <TextInput
               label={t('org.warehouse.intake.qty', null, 'Qty')}
@@ -1026,7 +1075,7 @@ export default function OrgMaterialsIntakePanel({
               textColor={ON_CARD}
             />
             <TextInput
-              label={t('org.warehouse.intake.price', null, 'Price')}
+              label={t('org.warehouse.intake.priceEur', null, 'Price (EUR)')}
               value={standalone.unit_price}
               onChangeText={(v) => setStandalone((p) => ({ ...p, unit_price: v }))}
               mode="outlined"
@@ -1040,6 +1089,7 @@ export default function OrgMaterialsIntakePanel({
             value={standalone.unit_code}
             onChange={(code) => setStandalone((p) => ({ ...p, unit_code: code }))}
             t={t}
+            locale={locale}
             units={catalogUnits}
           />
           <View style={styles.switchRow}>
@@ -1215,6 +1265,7 @@ export default function OrgMaterialsIntakePanel({
                     canEdit={activeIntake.status === 'draft' && canPost}
                     busy={busy}
                     t={t}
+                    locale={locale}
                     onSave={onSaveLine}
                     onConfirmRow={onConfirmRow}
                     onDeleteLine={onDeleteLine}
@@ -1257,7 +1308,7 @@ export default function OrgMaterialsIntakePanel({
                   textColor={ON_CARD}
                 />
                 <TextInput
-                  label={t('org.warehouse.intake.colPriceEx', null, 'Unit ex-VAT')}
+                  label={t('org.warehouse.intake.priceEur', null, 'Price (EUR)')}
                   value={manual.unit_price}
                   onChangeText={(v) => setManual((p) => ({ ...p, unit_price: v }))}
                   mode="outlined"
@@ -1271,8 +1322,27 @@ export default function OrgMaterialsIntakePanel({
                 value={manual.unit_code}
                 onChange={(code) => setManual((p) => ({ ...p, unit_code: code }))}
                 t={t}
-            units={catalogUnits}
+                locale={locale}
+                units={catalogUnits}
               />
+              <View style={styles.switchRow}>
+                <View style={styles.switchLabelWrap}>
+                  <Text style={styles.sectionLabel}>
+                    {t('org.warehouse.intake.durableTool', null, 'Durable tool (hand machine)')}
+                  </Text>
+                  <Text style={styles.helper}>
+                    {t(
+                      'org.warehouse.intake.durableToolHint',
+                      null,
+                      'Drill, grinder, etc. — not consumed on tasks; write off via scrap when broken.',
+                    )}
+                  </Text>
+                </View>
+                <Switch
+                  value={Boolean(manual.is_durable_tool)}
+                  onValueChange={(v) => setManual((p) => ({ ...p, is_durable_tool: v }))}
+                />
+              </View>
               <Button mode="outlined" onPress={onAddManual} disabled={busy} style={styles.secondaryBtn}>
                 {t('org.warehouse.intake.addLine', null, 'Add line')}
               </Button>
@@ -1582,6 +1652,11 @@ export default function OrgMaterialsIntakePanel({
                     <Text style={styles.lineName}>
                       {formatMaterialListLabel(row, { includeSku: false })}
                     </Text>
+                    {row.is_durable_tool ? (
+                      <Text style={styles.durableBadge}>
+                        {t('org.warehouse.intake.durableTool', null, 'Durable tool (hand machine)')}
+                      </Text>
+                    ) : null}
                     <Text style={styles.lineMeta}>
                       {row.part_number ? `${row.part_number} · ` : ''}
                       {t('org.warehouse.intake.onStock', null, 'On stock')}: {row.quantity_on_hand}

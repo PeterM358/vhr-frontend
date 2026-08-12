@@ -5,9 +5,14 @@ import { Text } from 'react-native-paper';
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
 
-export function unitDisplayLabel(unit) {
+/** Prefer localized name (BG/EN) over English catalog symbol like "pc". */
+export function unitDisplayLabel(unit, locale = 'en') {
   if (!unit) return '';
-  return unit.symbol || unit.name || unit.code || '';
+  const loc = String(locale || 'en').toLowerCase();
+  if (loc.startsWith('bg')) {
+    return unit.name_bg || unit.symbol || unit.name || unit.name_en || unit.code || '';
+  }
+  return unit.name_en || unit.name || unit.symbol || unit.code || '';
 }
 
 /**
@@ -21,6 +26,7 @@ export default function UnitOfMeasurePicker({
   onChange,
   disabled = false,
   emptyLabel = 'No units',
+  locale = 'en',
 }) {
   const list = Array.isArray(units) ? units.filter((u) => u && u.is_active !== false) : [];
 
@@ -58,7 +64,7 @@ export default function UnitOfMeasurePicker({
             ]}
           >
             <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-              {unitDisplayLabel(unit)}
+              {unitDisplayLabel(unit, locale)}
             </Text>
           </Pressable>
         );
