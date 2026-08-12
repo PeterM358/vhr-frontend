@@ -1714,6 +1714,12 @@ const styles = StyleSheet.create({
   helper: { color: ON_CARD_MUTED, fontSize: 13, marginTop: 6, marginBottom: 6 },
   lineRow: { paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E2E8F0' },
   lineName: { color: ON_CARD, fontSize: 14, fontWeight: '500' },
+  durableBadge: {
+    color: '#0F766E',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+  },
   lineMeta: { color: ON_CARD_MUTED, fontSize: 12, marginTop: 2 },
   manualBox: { marginTop: 12, gap: 4 },
   sectionLabel: { color: ON_CARD, fontWeight: '600', marginBottom: 4, marginTop: 4 },
