@@ -78,6 +78,13 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
   const [kitAssetIds, setKitAssetIds] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
 
+  const [showScrapped, setShowScrapped] = useState(false);
+
+  const visibleAssets = useMemo(() => {
+    if (showScrapped) return assets;
+    return (assets || []).filter((a) => a.status !== 'scrapped');
+  }, [assets, showScrapped]);
+
   const employeeOptions = useMemo(
     () =>
       (workforce || [])
@@ -236,9 +243,9 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
     Alert.alert(
       t('org.warehouse.tools.scrapTitle', null, 'Write off this numbered tool?'),
       t(
-        'org.warehouse.tools.scrapBody',
+        'org.warehouse.tools.scrapBodyReuse',
         { tag: asset.asset_tag },
-        `Scrap ${asset.asset_tag} — removes 1 from stock and marks it scrapped.`,
+        `Scrap ${asset.asset_tag}: −1 from stock. The number is freed — after you buy a replacement and add stock, number again to reuse ${asset.asset_tag} and reprint/stick the label.`,
       ),
       [
         { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
@@ -253,6 +260,13 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
                   reason: 'broken',
                   lines: [{ tool_asset_id: asset.id }],
                 }),
+              );
+              setMessage(
+                t(
+                  'org.warehouse.tools.scrapDoneReuse',
+                  { tag: asset.asset_tag },
+                  `Scrapped. Add the new unit to stock, then number 1× with the same prefix to get ${asset.asset_tag} again.`,
+                ),
               );
               await load();
             } catch (e) {
@@ -553,7 +567,7 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
       <AppCard style={styles.card} contentStyle={CARD_SURFACE}>
         <View style={styles.rowBetween}>
           <Text style={styles.section}>
-            {t('org.warehouse.tools.assets', null, 'Assets')} ({assets.length})
+            {t('org.warehouse.tools.assets', null, 'Assets')} ({visibleAssets.length})
           </Text>
           {canManage && selectedIds.length ? (
             <Button compact mode="outlined" onPress={onPrintSelected} disabled={busy} textColor={ON_CARD}>
@@ -561,12 +575,19 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
             </Button>
           ) : null}
         </View>
-        {!assets.length ? (
+        <Pressable onPress={() => setShowScrapped((v) => !v)} style={{ marginBottom: 8 }}>
+          <Text style={styles.hint}>
+            {showScrapped
+              ? t('org.warehouse.tools.hideScrapped', null, 'Hide scrapped')
+              : t('org.warehouse.tools.showScrapped', null, 'Show scrapped')}
+          </Text>
+        </Pressable>
+        {!visibleAssets.length ? (
           <Text style={styles.hint}>
             {t('org.warehouse.tools.noAssets', null, 'No numbered tools yet.')}
           </Text>
         ) : (
-          assets.map((asset) => {
+          visibleAssets.map((asset) => {
             const selected = selectedIds.includes(asset.id);
             return (
               <View key={asset.id} style={styles.assetRow}>
