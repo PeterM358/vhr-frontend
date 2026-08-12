@@ -301,9 +301,16 @@ function hydrateFromRow(row) {
   });
   // Prefill unit from material master briefs when line had no unit_id.
   const briefs = Array.isArray(row.default_materials) ? row.default_materials : [];
+  const durableFromMaterials = [];
   briefs.forEach((brief) => {
     const mid = Number(brief.id);
-    if (!mid || !materialNorms[mid]) return;
+    if (!mid) return;
+    if (brief.is_durable_tool) {
+      durableFromMaterials.push(mid);
+      delete materialNorms[mid];
+      return;
+    }
+    if (!materialNorms[mid]) return;
     if (materialNorms[mid].unitId) return;
     const opsId = brief.ops_unit_id || brief.norm_unit_id;
     if (opsId) {
@@ -314,11 +321,15 @@ function hydrateFromRow(row) {
       };
     }
   });
-  const toolIds = Array.isArray(materials.required_tool_lines)
+  const consumableIds = materialIds
+    .map((id) => Number(id))
+    .filter((id) => id && !durableFromMaterials.includes(id));
+  const toolIdsRaw = Array.isArray(materials.required_tool_lines)
     ? materials.required_tool_lines.map((line) => Number(line.material_id)).filter(Boolean)
     : Array.isArray(row.required_tool_ids)
       ? row.required_tool_ids.map((id) => Number(id)).filter(Boolean)
       : [];
+  const toolIds = [...new Set([...toolIdsRaw, ...durableFromMaterials])];
   return {
     name: row.name || '',
     code: row.code || '',
@@ -343,7 +354,7 @@ function hydrateFromRow(row) {
       row.norm_input_unit_id ||
       row.norm_input_unit?.id ||
       null,
-    defaultMaterialIds: materialIds.map((id) => Number(id)).filter(Boolean),
+    defaultMaterialIds: consumableIds,
     materialNorms,
     materialSearch: '',
     requiredToolIds: toolIds,
@@ -393,7 +404,15 @@ function buildNormsPayload(form) {
   }
 
   if (form.kind !== 'labor_only') {
-    const ids = form.consumesMaterials ? (form.defaultMaterialIds || []).slice(0, 40) : [];
+    const durableKnown = new Set(
+      [...(form.requiredToolIds || [])].map((id) => Number(id)).filter(Boolean),
+    );
+    const ids = form.consumesMaterials
+      ? (form.defaultMaterialIds || [])
+          .map((id) => Number(id))
+          .filter((id) => id && !durableKnown.has(id))
+          .slice(0, 40)
+      : [];
     const materialLines = ids.map((mid) => {
       const meta = (form.materialNorms && form.materialNorms[mid]) || {};
       const rate = String(meta.rate || '').trim() || null;
@@ -636,17 +655,21 @@ export default function OrgOperationsScreen({ navigation, route }) {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const resolved = orgId || (await resolveActiveOrganizationId(routeOrgId));
       if (resolved) {
-        const params = {};
+        const params = { durable_tool: '0' };
         if (query && String(query).trim()) params.search = String(query).trim();
         const data = await listOrgMaterials(token, resolved, params);
-        const list = Array.isArray(data?.results) ? data.results : [];
+        const list = (Array.isArray(data?.results) ? data.results : []).filter(
+          (m) => !m.is_durable_tool,
+        );
         setMaterialCatalog(list.slice(0, 40));
         return;
       }
       const params = {};
       if (query && String(query).trim()) params.search = String(query).trim();
       const data = await getMaterialsCatalog(token, params);
-      const list = Array.isArray(data) ? data : data?.results || [];
+      const list = (Array.isArray(data) ? data : data?.results || []).filter(
+        (m) => !m.is_durable_tool,
+      );
       setMaterialCatalog(list.slice(0, 40));
     } catch {
       setMaterialCatalog([]);
@@ -781,6 +804,29 @@ export default function OrgOperationsScreen({ navigation, route }) {
 
   const toggleMaterial = (mat) => {
     const id = Number(mat.id);
+    if (mat?.is_durable_tool) {
+      setForm((prev) => {
+        const exists = (prev.requiredToolIds || []).includes(id);
+        const nextIds = exists
+          ? prev.requiredToolIds.filter((x) => x !== id)
+          : [...(prev.requiredToolIds || []), id].slice(0, 40);
+        const nextNorms = { ...(prev.materialNorms || {}) };
+        delete nextNorms[id];
+        return {
+          ...prev,
+          requiredToolIds: nextIds,
+          defaultMaterialIds: (prev.defaultMaterialIds || []).filter((x) => x !== id),
+          materialNorms: nextNorms,
+        };
+      });
+      setSelectedTools((prev) => {
+        const exists = prev.some((m) => Number(m.id) === id);
+        if (exists) return prev.filter((m) => Number(m.id) !== id);
+        return [...prev, mat].slice(0, 40);
+      });
+      setSelectedMaterials((prev) => prev.filter((m) => Number(m.id) !== id));
+      return;
+    }
     const masterUnitId = resolveMaterialOpsUnitId(mat, units);
     setForm((prev) => {
       const exists = (prev.defaultMaterialIds || []).includes(id);

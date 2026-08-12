@@ -1655,6 +1655,16 @@ export default function OrgMaterialsIntakePanel({
                     {row.is_durable_tool ? (
                       <Text style={styles.durableBadge}>
                         {t('org.warehouse.intake.durableTool', null, 'Durable tool (hand machine)')}
+                        {row.tool_assets_numbered != null
+                          ? ` · ${t(
+                              'org.warehouse.tools.numberedShort',
+                              {
+                                numbered: row.tool_assets_numbered,
+                                avail: row.tool_assets_available_to_number,
+                              },
+                              `${row.tool_assets_numbered} numbered / ${row.tool_assets_available_to_number} left`,
+                            )}`
+                          : ''}
                       </Text>
                     ) : null}
                     <Text style={styles.lineMeta}>

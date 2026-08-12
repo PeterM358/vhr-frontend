@@ -52,8 +52,24 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
   const [blame, setBlame] = useState([]);
 
   const [genMaterialId, setGenMaterialId] = useState(null);
-  const [genCount, setGenCount] = useState('5');
+  const [genCount, setGenCount] = useState('1');
   const [genPrefix, setGenPrefix] = useState('');
+
+  const selectedDurable = useMemo(
+    () => durableMaterials.find((row) => Number(row.id || row.material_id) === Number(genMaterialId)),
+    [durableMaterials, genMaterialId],
+  );
+  const availableToNumber = selectedDurable
+    ? Number(selectedDurable.tool_assets_available_to_number ?? 0)
+    : 0;
+
+  const pickDurableMaterial = (row) => {
+    const mid = row.id || row.material_id || row.material?.id;
+    setGenMaterialId(mid);
+    const avail = Number(row.tool_assets_available_to_number ?? 0);
+    setGenCount(String(Math.max(0, avail)));
+    setGenPrefix(row.suggested_tag_prefix || '');
+  };
   const [employeeId, setEmployeeId] = useState(null);
   const [scanPayload, setScanPayload] = useState('');
   const [scanResult, setScanResult] = useState(null);
@@ -118,17 +134,44 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
       setMessage(t('org.warehouse.tools.pickMaterial', null, 'Pick a durable tool material.'));
       return;
     }
+    const n = Number(genCount) || 0;
+    if (n < 1) {
+      setMessage(
+        t(
+          'org.warehouse.tools.noneAvailable',
+          null,
+          'No stock left to number. Add quantity on Materials first, or you already numbered all on-hand units.',
+        ),
+      );
+      return;
+    }
+    if (availableToNumber > 0 && n > availableToNumber) {
+      setMessage(
+        t(
+          'org.warehouse.tools.tooMany',
+          { available: availableToNumber },
+          `Only ${availableToNumber} available to number from current stock.`,
+        ),
+      );
+      return;
+    }
     setBusy(true);
     setMessage('');
     try {
       await withToken((token) =>
         generateToolAssets(token, organizationId, {
           material_id: genMaterialId,
-          count: Number(genCount) || 1,
+          count: n,
           tag_prefix: genPrefix.trim(),
         }),
       );
-      setMessage(t('org.warehouse.tools.generated', null, 'Numbered tools created. Print labels and stick them on.'));
+      setMessage(
+        t(
+          'org.warehouse.tools.generated',
+          null,
+          'Numbered tools created. Print labels and stick them on.',
+        ),
+      );
       setSelectedIds([]);
       await load();
     } catch (e) {
@@ -423,18 +466,38 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
           <Text style={styles.section}>
             {t('org.warehouse.tools.numberSection', null, 'Number new tools')}
           </Text>
+          <Text style={styles.hint}>
+            {t(
+              'org.warehouse.tools.prefixHint',
+              null,
+              'Each SKU gets its own prefix: drills → BO-001…, grinders → FLE-001…. You can only number units that are on stock and not numbered yet.',
+            )}
+          </Text>
           <View style={styles.chipWrap}>
             {durableMaterials.map((row) => {
               const mid = row.id || row.material_id || row.material?.id;
               const name = row.label || row.name || row.material?.name || `#${mid}`;
+              const avail = Number(row.tool_assets_available_to_number ?? 0);
+              const numbered = Number(row.tool_assets_numbered ?? 0);
+              const stock = row.quantity_on_hand != null ? String(row.quantity_on_hand) : '?';
               const active = genMaterialId === mid;
               return (
                 <Pressable
                   key={mid}
-                  onPress={() => setGenMaterialId(mid)}
+                  onPress={() => pickDurableMaterial(row)}
                   style={[styles.chip, active && styles.chipActive]}
                 >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{name}</Text>
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {name}
+                    {row.suggested_tag_prefix ? ` · ${row.suggested_tag_prefix}` : ''}
+                  </Text>
+                  <Text style={[styles.chipMeta, active && styles.chipTextActive]}>
+                    {t(
+                      'org.warehouse.tools.stockNumberedMeta',
+                      { stock, numbered, avail },
+                      `stock ${stock} · numbered ${numbered} · left ${avail}`,
+                    )}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -457,6 +520,15 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
             style={styles.input}
             textColor={ON_CARD}
           />
+          {selectedDurable ? (
+            <Text style={styles.hint}>
+              {t(
+                'org.warehouse.tools.availableHint',
+                { n: availableToNumber },
+                `${availableToNumber} can still be numbered from current stock.`,
+              )}
+            </Text>
+          ) : null}
           <TextInput
             label={t('org.warehouse.tools.prefix', null, 'Tag prefix (optional)')}
             value={genPrefix}
@@ -465,9 +537,14 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
             autoCapitalize="characters"
             style={styles.input}
             textColor={ON_CARD}
-            placeholder="DRILL"
+            placeholder="BO"
           />
-          <Button mode="contained" loading={busy} disabled={busy} onPress={onGenerate}>
+          <Button
+            mode="contained"
+            loading={busy}
+            disabled={busy || availableToNumber < 1}
+            onPress={onGenerate}
+          >
             {t('org.warehouse.tools.generate', null, 'Create numbered instances')}
           </Button>
         </AppCard>
@@ -666,6 +743,7 @@ const styles = StyleSheet.create({
   chipActive: { borderColor: '#0F172A', backgroundColor: '#0F172A' },
   chipText: { color: ON_CARD, fontSize: 12 },
   chipTextActive: { color: '#fff' },
+  chipMeta: { color: ON_CARD_MUTED, fontSize: 10, marginTop: 2 },
   assetRow: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E2E8F0',
