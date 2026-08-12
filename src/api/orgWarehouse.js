@@ -155,6 +155,22 @@ export async function updateOrgMaterial(token, organizationId, stockId, payload)
   return response.json();
 }
 
+export async function createMaterialScrap(token, organizationId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/material-scrap/`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to write off material'));
+  return response.json();
+}
+
 export async function listMaterialsIntakes(token, organizationId, params = {}) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/materials-intake/${buildQuery(params)}`,

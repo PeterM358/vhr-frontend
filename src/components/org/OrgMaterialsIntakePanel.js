@@ -4,7 +4,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Button, TextInput } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
@@ -15,6 +15,7 @@ import {
   addMaterialsIntakeLine,
   confirmMaterialsIntake,
   createOrgMaterial,
+  createMaterialScrap,
   deleteMaterialsIntake,
   deleteMaterialsIntakeLine,
   getMaterialsIntake,
@@ -69,6 +70,7 @@ function emptyManual() {
     quantity: '1',
     unit_code: 'piece',
     unit_price: '',
+    is_durable_tool: false,
   };
 }
 
@@ -605,6 +607,7 @@ export default function OrgMaterialsIntakePanel({
         unit_price: standalone.unit_price || '0',
       };
       if (confirmLocationId) payload.location_id = confirmLocationId;
+      payload.is_durable_tool = Boolean(standalone.is_durable_tool);
       const created = await createOrgMaterial(token, organizationId, payload);
       setConfirmSummary({
         invoice_number: '',
@@ -820,12 +823,52 @@ export default function OrgMaterialsIntakePanel({
         name: editingMaterial.name,
         part_number: editingMaterial.part_number,
         description: editingMaterial.description,
+        is_durable_tool: Boolean(editingMaterial.is_durable_tool),
       });
       setEditingMaterial(null);
       setMessage(t('org.warehouse.intake.materialUpdated', null, 'Material updated.'));
       await load();
     } catch (e) {
       setError(e.message || t('org.warehouse.intake.saveError', null, 'Could not save.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onScrapMaterial = async () => {
+    if (!editingMaterial?.stock_id || !canManage) return;
+    const qty = String(editingMaterial.scrap_qty || '1').trim() || '1';
+    const ok = await confirmMessage(
+      t('org.warehouse.intake.scrapMaterialTitle', null, 'Write off from stock?'),
+      t(
+        'org.warehouse.intake.scrapMaterialBody',
+        { qty },
+        `Removes ${qty} from on-hand quantity (брак). Use when the tool is broken or worn out.`,
+      ),
+    );
+    if (!ok) return;
+    setBusy(true);
+    setError('');
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      await createMaterialScrap(token, organizationId, {
+        reason: editingMaterial.scrap_reason || 'broken',
+        lines: [
+          {
+            material_id: editingMaterial.material_id || editingMaterial.id,
+            quantity: qty,
+          },
+        ],
+      });
+      setMessage(
+        t('org.warehouse.intake.scrapMaterialDone', null, 'Written off from warehouse stock.'),
+      );
+      setEditingMaterial(null);
+      await load();
+    } catch (e) {
+      setError(
+        e.message || t('org.warehouse.intake.scrapMaterialError', null, 'Could not write off material.'),
+      );
     } finally {
       setBusy(false);
     }
@@ -999,6 +1042,24 @@ export default function OrgMaterialsIntakePanel({
             t={t}
             units={catalogUnits}
           />
+          <View style={styles.switchRow}>
+            <View style={styles.switchLabelWrap}>
+              <Text style={styles.sectionLabel}>
+                {t('org.warehouse.intake.durableTool', null, 'Durable tool (hand machine)')}
+              </Text>
+              <Text style={styles.helper}>
+                {t(
+                  'org.warehouse.intake.durableToolHint',
+                  null,
+                  'Drill, grinder, etc. — not consumed on tasks; write off via scrap when broken.',
+                )}
+              </Text>
+            </View>
+            <Switch
+              value={Boolean(standalone.is_durable_tool)}
+              onValueChange={(v) => setStandalone((p) => ({ ...p, is_durable_tool: v }))}
+            />
+          </View>
           <Text style={styles.sectionLabel}>
             {t('org.warehouse.intake.storeLocation', null, 'Store into location')}
           </Text>
@@ -1421,10 +1482,32 @@ export default function OrgMaterialsIntakePanel({
                   ? ` ${unitDisplay(editingMaterial.unit_code, t)}`
                   : ''}
               </Text>
+              <View style={styles.switchRow}>
+                <Text style={styles.sectionLabel}>
+                  {t('org.warehouse.intake.durableTool', null, 'Durable tool (hand machine)')}
+                </Text>
+                <Switch
+                  value={Boolean(editingMaterial.is_durable_tool)}
+                  onValueChange={(v) =>
+                    setEditingMaterial((p) => ({ ...p, is_durable_tool: v }))
+                  }
+                />
+              </View>
               <View style={styles.lineActions}>
                 <Button mode="contained" onPress={onSaveMaterial} loading={busy} disabled={busy}>
                   {t('common.save', null, 'Save')}
                 </Button>
+                {editingMaterial.is_durable_tool ? (
+                  <Button
+                    mode="outlined"
+                    onPress={onScrapMaterial}
+                    loading={busy}
+                    disabled={busy}
+                    textColor={ON_CARD}
+                  >
+                    {t('org.warehouse.intake.scrapMaterial', null, 'Write off (scrap)')}
+                  </Button>
+                ) : null}
                 <Button mode="text" onPress={() => setEditingMaterial(null)} textColor={ON_CARD}>
                   {t('common.cancel', null, 'Cancel')}
                 </Button>
@@ -1479,9 +1562,12 @@ export default function OrgMaterialsIntakePanel({
                     const rawDesc = row.description || row.name || '';
                     setEditingMaterial({
                       stock_id: row.stock_id,
+                      material_id: row.id,
                       name: stripOldMaterialSuffix(rawName) || rawName,
                       part_number: row.part_number || '',
                       description: stripOldMaterialSuffix(rawDesc) || rawDesc,
+                      is_durable_tool: Boolean(row.is_durable_tool),
+                      scrap_qty: '1',
                       part_number_alias:
                         row.part_number_alias ||
                         extractOldMaterialNumber(rawName) ||
@@ -1604,4 +1690,12 @@ const styles = StyleSheet.create({
   supplierRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' },
   supplierSave: { marginTop: 6 },
   keptNote: { color: ON_CARD_MUTED, fontSize: 11, fontStyle: 'italic', marginTop: 4 },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 8,
+  },
+  switchLabelWrap: { flex: 1 },
 });

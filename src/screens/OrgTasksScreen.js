@@ -1751,6 +1751,21 @@ export default function OrgTasksScreen({ navigation, route }) {
     return rows.filter(isFuelMaterial);
   }, [selected]);
 
+  const requiredToolsFromOps = useMemo(() => {
+    const out = [];
+    const seen = new Set();
+    (selected?.operations || []).forEach((op) => {
+      const tools = op.activity?.required_tools || [];
+      tools.forEach((tool) => {
+        const id = Number(tool.id);
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        out.push(tool);
+      });
+    });
+    return out;
+  }, [selected]);
+
   const primaryOutputUnit = useMemo(() => {
     const ops = selected?.operations || [];
     for (const op of ops) {
@@ -2946,6 +2961,26 @@ export default function OrgTasksScreen({ navigation, route }) {
                       'Warehouse issues materials onto this task. Enter leftover after work — consumed = issued − leftover.',
                     )}
               </Text>
+              {requiredToolsFromOps.length ? (
+                <View style={styles.ackBanner}>
+                  <Text style={styles.materialsGateTitle}>
+                    {t('org.tasks.requiredToolsTitle', null, 'Required tools')}
+                  </Text>
+                  <Text style={styles.opMeta}>
+                    {t(
+                      'org.tasks.requiredToolsHint',
+                      null,
+                      'Checklist only — warehouse stock is not reduced. Report broken tools via scrap in Warehouse.',
+                    )}
+                  </Text>
+                  {requiredToolsFromOps.map((tool) => (
+                    <Text key={`tool-${tool.id}`} style={styles.opMeta}>
+                      · {tool.label || tool.name}
+                      {tool.part_number ? ` (${tool.part_number})` : ''}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
               {taskHasPendingMaterialConfirm(selected) ? (
                 <View style={styles.ackBanner}>
                   <Text style={styles.materialsGateTitle}>

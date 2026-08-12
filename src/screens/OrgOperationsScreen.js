@@ -217,6 +217,8 @@ function emptyFormState() {
     defaultMaterialIds: [],
     materialNorms: {},
     materialSearch: '',
+    requiredToolIds: [],
+    toolSearch: '',
     transportBaseRate: '',
     transportPerTonRate: '',
     transportRateUnitId: null,
@@ -312,6 +314,11 @@ function hydrateFromRow(row) {
       };
     }
   });
+  const toolIds = Array.isArray(materials.required_tool_lines)
+    ? materials.required_tool_lines.map((line) => Number(line.material_id)).filter(Boolean)
+    : Array.isArray(row.required_tool_ids)
+      ? row.required_tool_ids.map((id) => Number(id)).filter(Boolean)
+      : [];
   return {
     name: row.name || '',
     code: row.code || '',
@@ -339,6 +346,8 @@ function hydrateFromRow(row) {
     defaultMaterialIds: materialIds.map((id) => Number(id)).filter(Boolean),
     materialNorms,
     materialSearch: '',
+    requiredToolIds: toolIds,
+    toolSearch: '',
     transportBaseRate:
       transport.base_rate != null
         ? String(transport.base_rate)
@@ -428,6 +437,11 @@ function buildNormsPayload(form) {
         : null,
       default_material_ids: ids,
       material_lines: materialLines,
+      required_tool_lines: (form.requiredToolIds || []).slice(0, 40).map((mid) => ({
+        material_id: mid,
+        qty: '1',
+        notes: '',
+      })),
     };
   }
 
@@ -512,7 +526,9 @@ export default function OrgOperationsScreen({ navigation, route }) {
   const [rows, setRows] = useState([]);
   const [units, setUnits] = useState([]);
   const [materialCatalog, setMaterialCatalog] = useState([]);
+  const [toolCatalog, setToolCatalog] = useState([]);
   const [selectedMaterials, setSelectedMaterials] = useState([]);
+  const [selectedTools, setSelectedTools] = useState([]);
   const [mode, setMode] = useState('list');
   const [wizardStep, setWizardStep] = useState(0);
   const [maxReachedWizardStep, setMaxReachedWizardStep] = useState(0);
@@ -637,6 +653,24 @@ export default function OrgOperationsScreen({ navigation, route }) {
     }
   }, [orgId, routeOrgId]);
 
+  const searchTools = useCallback(async (query) => {
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const resolved = orgId || (await resolveActiveOrganizationId(routeOrgId));
+      if (!resolved) {
+        setToolCatalog([]);
+        return;
+      }
+      const params = { durable_tool: '1' };
+      if (query && String(query).trim()) params.search = String(query).trim();
+      const data = await listOrgMaterials(token, resolved, params);
+      const list = Array.isArray(data?.results) ? data.results : [];
+      setToolCatalog(list.slice(0, 40));
+    } catch {
+      setToolCatalog([]);
+    }
+  }, [orgId, routeOrgId]);
+
   useFocusEffect(
     useCallback(() => {
       load();
@@ -678,7 +712,9 @@ export default function OrgOperationsScreen({ navigation, route }) {
     setEditingId(null);
     setForm(emptyFormState());
     setSelectedMaterials([]);
+    setSelectedTools([]);
     setMaterialCatalog([]);
+    setToolCatalog([]);
     setFormMessage('');
     setWizardStep(0);
     setMaxReachedWizardStep(0);
@@ -688,6 +724,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
     resetForm();
     setMode('add');
     searchMaterials('');
+    searchTools('');
   };
 
   const startEdit = (row) => {
@@ -697,11 +734,13 @@ export default function OrgOperationsScreen({ navigation, route }) {
     setSelectedMaterials(
       Array.isArray(row.default_materials) ? row.default_materials : [],
     );
+    setSelectedTools(Array.isArray(row.required_tools) ? row.required_tools : []);
     setFormMessage('');
     setWizardStep(0);
     setMaxReachedWizardStep(0);
     setMode('add');
     searchMaterials('');
+    searchTools('');
   };
 
   const closeWizard = () => {
@@ -775,6 +814,22 @@ export default function OrgOperationsScreen({ navigation, route }) {
       };
     });
     setSelectedMaterials((prev) => {
+      const exists = prev.some((m) => Number(m.id) === id);
+      if (exists) return prev.filter((m) => Number(m.id) !== id);
+      return [...prev, mat].slice(0, 40);
+    });
+  };
+
+  const toggleTool = (mat) => {
+    const id = Number(mat.id);
+    setForm((prev) => {
+      const exists = (prev.requiredToolIds || []).includes(id);
+      const nextIds = exists
+        ? prev.requiredToolIds.filter((x) => x !== id)
+        : [...(prev.requiredToolIds || []), id].slice(0, 40);
+      return { ...prev, requiredToolIds: nextIds };
+    });
+    setSelectedTools((prev) => {
       const exists = prev.some((m) => Number(m.id) === id);
       if (exists) return prev.filter((m) => Number(m.id) !== id);
       return [...prev, mat].slice(0, 40);
@@ -1694,6 +1749,60 @@ export default function OrgOperationsScreen({ navigation, route }) {
                 </Text>
               ) : null}
             </>
+          ) : null}
+          <Text style={[styles.fieldLabel, styles.opTitleInline]}>
+            {t('org.operations.requiredTools', null, 'Required tools (no consumption)')}
+          </Text>
+          <Text style={styles.helper}>
+            {t(
+              'org.operations.requiredToolsHint',
+              null,
+              'Hand tools from warehouse (drill, grinder…). Listed on the task as a checklist — stock is not reduced until you write off a broken item (scrap).',
+            )}
+          </Text>
+          <TextInput
+            label={t('org.operations.searchTools', null, 'Search tools')}
+            value={form.toolSearch}
+            onChangeText={(value) => {
+              setField('toolSearch', value);
+              searchTools(value);
+            }}
+            mode="outlined"
+            style={styles.input}
+            textColor={ON_CARD}
+          />
+          <View style={styles.kindWrap}>
+            {[
+              ...selectedTools,
+              ...toolCatalog.filter(
+                (m) => !selectedTools.some((s) => Number(s.id) === Number(m.id)),
+              ),
+            ].map((mat) => {
+              const active = (form.requiredToolIds || []).includes(Number(mat.id));
+              return (
+                <Pressable
+                  key={`tool-${mat.id}`}
+                  onPress={() => toggleTool(mat)}
+                  style={[styles.kindChip, active && styles.kindChipActive]}
+                >
+                  <Text
+                    style={[styles.kindChipText, active && styles.kindChipTextActive]}
+                    numberOfLines={1}
+                  >
+                    {materialLabel(mat)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {(form.requiredToolIds || []).length === 0 ? (
+            <Text style={styles.helper}>
+              {t(
+                'org.operations.noToolsSelected',
+                null,
+                'No tools selected. Mark warehouse SKUs as “durable tool” when adding them.',
+              )}
+            </Text>
           ) : null}
         </>
       );
