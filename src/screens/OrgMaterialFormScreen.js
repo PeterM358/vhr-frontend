@@ -251,7 +251,7 @@ export default function OrgMaterialFormScreen({ navigation, route }) {
 
   return (
     <ScreenBackground>
-      <OrgAppHeader title={title} onBack={onBack} />
+      <OrgAppHeader mode="detail" title={title} onBack={onBack} />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: scrollBottomPadding }]}>
         {loading ? (
           <ActivityIndicator style={{ marginTop: 40 }} color={COLORS.primary} />

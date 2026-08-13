@@ -136,6 +136,7 @@ export default function OrgToolNumberScreen({ navigation, route }) {
   return (
     <ScreenBackground>
       <OrgAppHeader
+        mode="detail"
         title={t('org.warehouse.tools.numberSection', null, 'Number new tools')}
         onBack={onBack}
       />

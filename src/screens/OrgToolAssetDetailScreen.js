@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
@@ -12,6 +12,7 @@ import {
   deleteToolAsset,
   getToolAsset,
   issueToolAsset,
+  listWarehouseLocations,
   openToolAssetLabel,
   returnToolAsset,
   updateToolAsset,
@@ -38,6 +39,14 @@ function statusLabel(t, status) {
   return map[status] || status;
 }
 
+function binLabel(row) {
+  if (!row) return '';
+  if (row.parent_id) {
+    return `${row.parent_name || 'Site'} / ${row.name}${row.address ? ` (${row.address})` : ''}`;
+  }
+  return row.name || row.code || `#${row.id}`;
+}
+
 export default function OrgToolAssetDetailScreen({ navigation, route }) {
   const { t } = useTranslation();
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
@@ -52,6 +61,8 @@ export default function OrgToolAssetDetailScreen({ navigation, route }) {
   const [asset, setAsset] = useState(null);
   const [notes, setNotes] = useState('');
   const [serial, setSerial] = useState('');
+  const [locationId, setLocationId] = useState(null);
+  const [bins, setBins] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [employeeId, setEmployeeId] = useState(null);
 
@@ -73,13 +84,15 @@ export default function OrgToolAssetDetailScreen({ navigation, route }) {
         setError(t('org.warehouse.tools.notFound', null, 'Tool not found.'));
         return;
       }
-      const [row, workforce] = await Promise.all([
+      const [row, workforce, locData] = await Promise.all([
         getToolAsset(token, resolved, assetId),
         listOrgWorkforce(token, resolved, { status: 'active' }).catch(() => ({ results: [] })),
+        listWarehouseLocations(token, resolved, { active: '1' }).catch(() => ({ results: [] })),
       ]);
       setAsset(row);
       setNotes(row.notes || '');
       setSerial(row.serial_number || '');
+      setLocationId(row.location_id || null);
       const members = Array.isArray(workforce?.results)
         ? workforce.results
         : Array.isArray(workforce)
@@ -92,6 +105,16 @@ export default function OrgToolAssetDetailScreen({ navigation, route }) {
             id: m.employee_id,
             label: m.display_name || m.employee_display_name || `#${m.employee_id}`,
           })),
+      );
+      const locs = Array.isArray(locData?.results) ? locData.results : [];
+      const active = locs.filter((r) => r && r.is_active !== false);
+      const parentsWithChildren = new Set(
+        active.filter((r) => r.parent_id).map((r) => Number(r.parent_id)),
+      );
+      setBins(
+        active
+          .filter((r) => r.parent_id || !parentsWithChildren.has(Number(r.id)))
+          .map((r) => ({ ...r, label: binLabel(r) })),
       );
     } catch (e) {
       setError(e.message || t('org.warehouse.tools.loadError', null, 'Could not load tools.'));
@@ -121,8 +144,10 @@ export default function OrgToolAssetDetailScreen({ navigation, route }) {
       const row = await updateToolAsset(token, orgId, assetId, {
         notes,
         serial_number: serial,
+        location_id: locationId || null,
       });
       setAsset(row);
+      setLocationId(row.location_id || null);
       setMessage(t('org.warehouse.tools.saved', null, 'Tool saved.'));
     } catch (e) {
       setError(e.message || t('org.warehouse.intake.saveError', null, 'Could not save.'));
@@ -239,6 +264,7 @@ export default function OrgToolAssetDetailScreen({ navigation, route }) {
   return (
     <ScreenBackground>
       <OrgAppHeader
+        mode="detail"
         title={asset?.asset_tag || t('org.warehouse.tools.tool', null, 'Tool')}
         onBack={onBack}
       />
@@ -253,6 +279,7 @@ export default function OrgToolAssetDetailScreen({ navigation, route }) {
             <Text style={styles.meta}>
               {materialName}
               {asset?.status ? ` · ${statusLabel(t, asset.status)}` : ''}
+              {asset?.location?.label ? ` · ${asset.location.label}` : ''}
             </Text>
             <Text style={styles.hint}>
               {t(
@@ -261,6 +288,51 @@ export default function OrgToolAssetDetailScreen({ navigation, route }) {
                 'Delete = mistaken number (stock unchanged). Scrap = broken machine (stock −1).',
               )}
             </Text>
+
+            <Text style={styles.label}>
+              {t('org.warehouse.tools.storageAddress', null, 'Warehouse address (cupboard)')}
+            </Text>
+            <Text style={styles.hint}>
+              {t(
+                'org.warehouse.tools.storageAddressHint',
+                null,
+                'Put this machine in a cupboard/rack under Baza (e.g. shkaf1). Create addresses under Locations → Open site.',
+              )}
+            </Text>
+            {!bins.length ? (
+              <Text style={styles.meta}>
+                {t(
+                  'org.warehouse.tools.noBins',
+                  null,
+                  'No warehouse addresses yet. Open Baza and add shkaf1 first.',
+                )}
+              </Text>
+            ) : (
+              <View style={styles.chipRow}>
+                <Pressable
+                  onPress={() => setLocationId(null)}
+                  style={[styles.chip, !locationId && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, !locationId && styles.chipTextActive]}>
+                    {t('org.warehouse.tools.noBin', null, 'Not placed')}
+                  </Text>
+                </Pressable>
+                {bins.map((bin) => {
+                  const active = Number(locationId) === Number(bin.id);
+                  return (
+                    <Pressable
+                      key={bin.id}
+                      onPress={() => setLocationId(bin.id)}
+                      style={[styles.chip, active && styles.chipActive]}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {bin.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
 
             <TextInput
               label={t('org.warehouse.tools.serial', null, 'Serial number')}
@@ -354,5 +426,16 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#fff' },
   block: { gap: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#fff',
+  },
+  chipActive: { backgroundColor: '#1D4ED8', borderColor: '#1D4ED8' },
+  chipText: { color: ON_CARD, fontSize: 13 },
+  chipTextActive: { color: '#fff' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8, alignItems: 'center' },
 });
