@@ -43,6 +43,10 @@ import {
   FleetDashboardScreen,
   OrgFleetVehicleDetailScreen,
   OrgWorkforceMemberDetailScreen,
+  OrgMaterialFormScreen,
+  OrgToolAssetDetailScreen,
+  OrgToolNumberScreen,
+  OrgWarehouseLocationDetailScreen,
   PartnerOnboardingScreen,
   CreatePromotionScreen,
   ShopRegisterClientScreen,
@@ -478,6 +482,26 @@ export default function AppNavigator() {
           name="OrgWorkforceMemberDetail"
           component={OrgWorkforceMemberDetailScreen}
           options={{ ...appNavBarScreenOptions, title: 'Team member' }}
+        />
+        <Stack.Screen
+          name="OrgMaterialForm"
+          component={OrgMaterialFormScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Material' }}
+        />
+        <Stack.Screen
+          name="OrgToolNumber"
+          component={OrgToolNumberScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Number tools' }}
+        />
+        <Stack.Screen
+          name="OrgToolAssetDetail"
+          component={OrgToolAssetDetailScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Tool' }}
+        />
+        <Stack.Screen
+          name="OrgWarehouseLocationDetail"
+          component={OrgWarehouseLocationDetailScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Location' }}
         />
         <Stack.Screen
           name="PartnerOnboarding"

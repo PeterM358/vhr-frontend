@@ -45,6 +45,15 @@ export async function listWarehouseLocations(token, organizationId, params = {})
   return response.json();
 }
 
+export async function getWarehouseLocation(token, organizationId, locationId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/locations/${locationId}/`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load warehouse location'));
+  return response.json();
+}
+
 export async function getWarehouseSettings(token, organizationId) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/settings/`,
@@ -139,6 +148,15 @@ export async function createOrgMaterial(token, organizationId, payload) {
   return response.json();
 }
 
+export async function getOrgMaterial(token, organizationId, stockId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/materials/${stockId}/`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load material'));
+  return response.json();
+}
+
 export async function updateOrgMaterial(token, organizationId, stockId, payload) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/materials/${stockId}/`,
@@ -177,6 +195,43 @@ export async function listToolAssets(token, organizationId, params = {}) {
     { headers: authHeaders(token) },
   );
   if (!response.ok) throw new Error(await parseError(response, 'Failed to load tool assets'));
+  return response.json();
+}
+
+export async function getToolAsset(token, organizationId, assetId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/tool-assets/${assetId}/`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load tool asset'));
+  return response.json();
+}
+
+export async function updateToolAsset(token, organizationId, assetId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/tool-assets/${assetId}/`,
+    {
+      method: 'PATCH',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to update tool asset'));
+  return response.json();
+}
+
+export async function deleteToolAsset(token, organizationId, assetId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/tool-assets/${assetId}/`,
+    {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to delete tool asset'));
   return response.json();
 }
 

@@ -51,6 +51,12 @@ import {
   partnerComplaints,
   partnerOrganizationWorkforce,
   partnerOrganizationWorkforceMember,
+  partnerOrganizationWarehouse,
+  partnerOrganizationMaterialNew,
+  partnerOrganizationMaterialEdit,
+  partnerOrganizationToolAsset,
+  partnerOrganizationToolNumber,
+  partnerOrganizationWarehouseLocation,
   partnerOrganizationTasks,
   partnerOrganizationCreateTask,
   partnerOrganizationOperations,
@@ -243,6 +249,47 @@ export function getCanonicalWebPath(state) {
         });
       }
       return partnerOrganizationWorkforceMember(membershipId, {
+        organizationId: params.organizationId || params.orgId,
+      });
+    }
+    case 'OrgMaterialForm': {
+      const stockId = params.stockId;
+      const pathParams = {};
+      if (params.organizationId != null) pathParams.organizationId = params.organizationId;
+      else if (params.orgId != null) pathParams.organizationId = params.orgId;
+      if (stockId == null || stockId === '' || stockId === 'new') {
+        return partnerOrganizationMaterialNew(pathParams);
+      }
+      return partnerOrganizationMaterialEdit(stockId, pathParams);
+    }
+    case 'OrgToolNumber': {
+      const pathParams = {};
+      if (params.organizationId != null) pathParams.organizationId = params.organizationId;
+      else if (params.orgId != null) pathParams.organizationId = params.orgId;
+      if (params.materialId != null) pathParams.materialId = params.materialId;
+      return partnerOrganizationToolNumber(pathParams);
+    }
+    case 'OrgToolAssetDetail': {
+      const assetId = params.assetId;
+      if (assetId == null) {
+        return partnerOrganizationWarehouse({
+          organizationId: params.organizationId || params.orgId,
+          tab: 'tools',
+        });
+      }
+      return partnerOrganizationToolAsset(assetId, {
+        organizationId: params.organizationId || params.orgId,
+      });
+    }
+    case 'OrgWarehouseLocationDetail': {
+      const locationId = params.locationId;
+      if (locationId == null) {
+        return partnerOrganizationWarehouse({
+          organizationId: params.organizationId || params.orgId,
+          tab: 'list',
+        });
+      }
+      return partnerOrganizationWarehouseLocation(locationId, {
         organizationId: params.organizationId || params.orgId,
       });
     }
@@ -1135,6 +1182,155 @@ export function getPartnerNavigationStateFromPath(path) {
           },
         },
         { name: 'OrgWorkforceMemberDetail', params },
+      ],
+      index: 1,
+    };
+  }
+  if (pathPart === 'partner/organization/warehouse/materials/new') {
+    const params = { stockId: 'new' };
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) params.organizationId = organizationId;
+    return {
+      routes: [
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [
+              { name: 'OrgOverview' },
+              {
+                name: 'OrgWarehouse',
+                params: organizationId
+                  ? { organizationId, tab: 'materials' }
+                  : { tab: 'materials' },
+              },
+            ],
+          },
+        },
+        { name: 'OrgMaterialForm', params },
+      ],
+      index: 1,
+    };
+  }
+  const orgMaterialEditMatch = pathPart.match(
+    /^partner\/organization\/warehouse\/materials\/([^/]+)$/,
+  );
+  if (orgMaterialEditMatch) {
+    const stockIdRaw = orgMaterialEditMatch[1];
+    const stockIdNum = parseInt(stockIdRaw, 10);
+    const stockId = Number.isFinite(stockIdNum) ? stockIdNum : stockIdRaw;
+    const params = { stockId };
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) params.organizationId = organizationId;
+    return {
+      routes: [
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [
+              { name: 'OrgOverview' },
+              {
+                name: 'OrgWarehouse',
+                params: organizationId
+                  ? { organizationId, tab: 'materials' }
+                  : { tab: 'materials' },
+              },
+            ],
+          },
+        },
+        { name: 'OrgMaterialForm', params },
+      ],
+      index: 1,
+    };
+  }
+  if (pathPart === 'partner/organization/warehouse/tools/number') {
+    const params = {};
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) params.organizationId = organizationId;
+    if (query.materialId) params.materialId = query.materialId;
+    return {
+      routes: [
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [
+              { name: 'OrgOverview' },
+              {
+                name: 'OrgWarehouse',
+                params: organizationId
+                  ? { organizationId, tab: 'tools' }
+                  : { tab: 'tools' },
+              },
+            ],
+          },
+        },
+        { name: 'OrgToolNumber', params },
+      ],
+      index: 1,
+    };
+  }
+  const orgToolAssetMatch = pathPart.match(
+    /^partner\/organization\/warehouse\/tools\/([^/]+)$/,
+  );
+  if (orgToolAssetMatch && orgToolAssetMatch[1] !== 'number') {
+    const assetIdRaw = orgToolAssetMatch[1];
+    const assetIdNum = parseInt(assetIdRaw, 10);
+    const assetId = Number.isFinite(assetIdNum) ? assetIdNum : assetIdRaw;
+    const params = { assetId };
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) params.organizationId = organizationId;
+    return {
+      routes: [
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [
+              { name: 'OrgOverview' },
+              {
+                name: 'OrgWarehouse',
+                params: organizationId
+                  ? { organizationId, tab: 'tools' }
+                  : { tab: 'tools' },
+              },
+            ],
+          },
+        },
+        { name: 'OrgToolAssetDetail', params },
+      ],
+      index: 1,
+    };
+  }
+  const orgLocationDetailMatch = pathPart.match(
+    /^partner\/organization\/warehouse\/locations\/([^/]+)$/,
+  );
+  if (orgLocationDetailMatch) {
+    const locationIdRaw = orgLocationDetailMatch[1];
+    const locationIdNum = parseInt(locationIdRaw, 10);
+    const locationId = Number.isFinite(locationIdNum) ? locationIdNum : locationIdRaw;
+    const params = { locationId };
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) params.organizationId = organizationId;
+    return {
+      routes: [
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [
+              { name: 'OrgOverview' },
+              {
+                name: 'OrgWarehouse',
+                params: organizationId
+                  ? { organizationId, tab: 'list' }
+                  : { tab: 'list' },
+              },
+            ],
+          },
+        },
+        { name: 'OrgWarehouseLocationDetail', params },
       ],
       index: 1,
     };

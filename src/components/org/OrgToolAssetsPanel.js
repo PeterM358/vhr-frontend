@@ -5,12 +5,10 @@ import { ActivityIndicator, Button, TextInput } from 'react-native-paper';
 
 import AppCard from '../ui/AppCard';
 import {
-  createMaterialScrap,
   createToolKit,
-  generateToolAssets,
+  deleteToolAsset,
   issueToolAsset,
   issueToolKit,
-  listOrgMaterials,
   listToolAssets,
   listToolKits,
   listToolScrapBlame,
@@ -24,6 +22,11 @@ import {
 import { listOrgWorkforce } from '../../api/orgWorkforce';
 import { STORAGE_KEYS } from '../../constants/storageKeys';
 import { useTranslation } from '../../i18n';
+import { confirmMessage } from '../../utils/crossPlatformAlert';
+import {
+  navigateToOrgToolAssetDetail,
+  navigateToOrgToolNumber,
+} from '../../navigation/webNavigation';
 
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
@@ -39,7 +42,7 @@ function statusLabel(t, status) {
   return map[status] || status;
 }
 
-export default function OrgToolAssetsPanel({ organizationId, canManage }) {
+export default function OrgToolAssetsPanel({ organizationId, canManage, navigation = null }) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -47,29 +50,9 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
   const [message, setMessage] = useState('');
   const [assets, setAssets] = useState([]);
   const [kits, setKits] = useState([]);
-  const [durableMaterials, setDurableMaterials] = useState([]);
   const [workforce, setWorkforce] = useState([]);
   const [blame, setBlame] = useState([]);
 
-  const [genMaterialId, setGenMaterialId] = useState(null);
-  const [genCount, setGenCount] = useState('1');
-  const [genPrefix, setGenPrefix] = useState('');
-
-  const selectedDurable = useMemo(
-    () => durableMaterials.find((row) => Number(row.id || row.material_id) === Number(genMaterialId)),
-    [durableMaterials, genMaterialId],
-  );
-  const availableToNumber = selectedDurable
-    ? Number(selectedDurable.tool_assets_available_to_number ?? 0)
-    : 0;
-
-  const pickDurableMaterial = (row) => {
-    const mid = row.id || row.material_id || row.material?.id;
-    setGenMaterialId(mid);
-    const avail = Number(row.tool_assets_available_to_number ?? 0);
-    setGenCount(String(Math.max(0, avail)));
-    setGenPrefix(row.suggested_tag_prefix || '');
-  };
   const [employeeId, setEmployeeId] = useState(null);
   const [scanPayload, setScanPayload] = useState('');
   const [scanResult, setScanResult] = useState(null);
@@ -102,15 +85,13 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
     setError('');
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const [assetsRes, kitsRes, matsRes, wfRes] = await Promise.all([
+      const [assetsRes, kitsRes, wfRes] = await Promise.all([
         listToolAssets(token, organizationId, { limit: 200 }),
         listToolKits(token, organizationId, { active: '1' }),
-        listOrgMaterials(token, organizationId, { durable_tool: '1', limit: 80 }),
         listOrgWorkforce(token, organizationId, { active: '1' }),
       ]);
       setAssets(assetsRes.results || []);
       setKits(kitsRes.results || []);
-      setDurableMaterials(matsRes.results || matsRes.materials || []);
       setWorkforce(wfRes.results || wfRes.members || []);
       if (canManage) {
         try {
@@ -136,57 +117,6 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
     return fn(token);
   };
 
-  const onGenerate = async () => {
-    if (!genMaterialId) {
-      setMessage(t('org.warehouse.tools.pickMaterial', null, 'Pick a durable tool material.'));
-      return;
-    }
-    const n = Number(genCount) || 0;
-    if (n < 1) {
-      setMessage(
-        t(
-          'org.warehouse.tools.noneAvailable',
-          null,
-          'No stock left to number. Add quantity on Materials first, or you already numbered all on-hand units.',
-        ),
-      );
-      return;
-    }
-    if (availableToNumber > 0 && n > availableToNumber) {
-      setMessage(
-        t(
-          'org.warehouse.tools.tooMany',
-          { available: availableToNumber },
-          `Only ${availableToNumber} available to number from current stock.`,
-        ),
-      );
-      return;
-    }
-    setBusy(true);
-    setMessage('');
-    try {
-      await withToken((token) =>
-        generateToolAssets(token, organizationId, {
-          material_id: genMaterialId,
-          count: n,
-          tag_prefix: genPrefix.trim(),
-        }),
-      );
-      setMessage(
-        t(
-          'org.warehouse.tools.generated',
-          null,
-          'Numbered tools created. Print labels and stick them on.',
-        ),
-      );
-      setSelectedIds([]);
-      await load();
-    } catch (e) {
-      setMessage(e.message || t('org.warehouse.tools.generateError', null, 'Could not number tools.'));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
@@ -209,76 +139,8 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
     }
   };
 
-  const onIssueAsset = async (assetId) => {
-    if (!employeeId) {
-      setMessage(t('org.warehouse.tools.pickEmployee', null, 'Pick who receives the tool.'));
-      return;
-    }
-    setBusy(true);
-    try {
-      await withToken((token) =>
-        issueToolAsset(token, organizationId, assetId, { employee_id: employeeId }),
-      );
-      await load();
-    } catch (e) {
-      setMessage(e.message || t('org.warehouse.tools.issueError', null, 'Could not issue tool.'));
-    } finally {
-      setBusy(false);
-    }
-  };
 
-  const onReturnAsset = async (assetId) => {
-    setBusy(true);
-    try {
-      await withToken((token) => returnToolAsset(token, organizationId, assetId));
-      await load();
-    } catch (e) {
-      setMessage(e.message || t('org.warehouse.tools.returnError', null, 'Could not return tool.'));
-    } finally {
-      setBusy(false);
-    }
-  };
 
-  const onScrapAsset = (asset) => {
-    Alert.alert(
-      t('org.warehouse.tools.scrapTitle', null, 'Write off this numbered tool?'),
-      t(
-        'org.warehouse.tools.scrapBodyReuse',
-        { tag: asset.asset_tag },
-        `Scrap ${asset.asset_tag}: −1 from stock. The number is freed — after you buy a replacement and add stock, number again to reuse ${asset.asset_tag} and reprint/stick the label.`,
-      ),
-      [
-        { text: t('common.cancel', null, 'Cancel'), style: 'cancel' },
-        {
-          text: t('org.warehouse.intake.scrapMaterial', null, 'Write off (scrap)'),
-          style: 'destructive',
-          onPress: async () => {
-            setBusy(true);
-            try {
-              await withToken((token) =>
-                createMaterialScrap(token, organizationId, {
-                  reason: 'broken',
-                  lines: [{ tool_asset_id: asset.id }],
-                }),
-              );
-              setMessage(
-                t(
-                  'org.warehouse.tools.scrapDoneReuse',
-                  { tag: asset.asset_tag },
-                  `Scrapped. Add the new unit to stock, then number 1× with the same prefix to get ${asset.asset_tag} again.`,
-                ),
-              );
-              await load();
-            } catch (e) {
-              setMessage(e.message || t('org.warehouse.intake.scrapMaterialError', null, 'Could not write off material.'));
-            } finally {
-              setBusy(false);
-            }
-          },
-        },
-      ],
-    );
-  };
 
   const onScan = async () => {
     if (!scanPayload.trim()) return;
@@ -476,92 +338,16 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
       ) : null}
 
       {canManage ? (
-        <AppCard style={styles.card} contentStyle={CARD_SURFACE}>
-          <Text style={styles.section}>
-            {t('org.warehouse.tools.numberSection', null, 'Number new tools')}
-          </Text>
-          <Text style={styles.hint}>
-            {t(
-              'org.warehouse.tools.prefixHint',
-              null,
-              'Each SKU gets its own prefix: drills → BO-001…, grinders → FLE-001…. You can only number units that are on stock and not numbered yet.',
-            )}
-          </Text>
-          <View style={styles.chipWrap}>
-            {durableMaterials.map((row) => {
-              const mid = row.id || row.material_id || row.material?.id;
-              const name = row.label || row.name || row.material?.name || `#${mid}`;
-              const avail = Number(row.tool_assets_available_to_number ?? 0);
-              const numbered = Number(row.tool_assets_numbered ?? 0);
-              const stock = row.quantity_on_hand != null ? String(row.quantity_on_hand) : '?';
-              const active = genMaterialId === mid;
-              return (
-                <Pressable
-                  key={mid}
-                  onPress={() => pickDurableMaterial(row)}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {name}
-                    {row.suggested_tag_prefix ? ` · ${row.suggested_tag_prefix}` : ''}
-                  </Text>
-                  <Text style={[styles.chipMeta, active && styles.chipTextActive]}>
-                    {t(
-                      'org.warehouse.tools.stockNumberedMeta',
-                      { stock, numbered, avail },
-                      `stock ${stock} · numbered ${numbered} · left ${avail}`,
-                    )}
-                  </Text>
-                </Pressable>
-              );
-            })}
-            {!durableMaterials.length ? (
-              <Text style={styles.hint}>
-                {t(
-                  'org.warehouse.tools.noDurable',
-                  null,
-                  'Mark materials as durable tools first (Materials tab).',
-                )}
-              </Text>
-            ) : null}
-          </View>
-          <TextInput
-            label={t('org.warehouse.tools.count', null, 'How many')}
-            value={genCount}
-            onChangeText={setGenCount}
-            mode="outlined"
-            keyboardType="number-pad"
-            style={styles.input}
-            textColor={ON_CARD}
-          />
-          {selectedDurable ? (
-            <Text style={styles.hint}>
-              {t(
-                'org.warehouse.tools.availableHint',
-                { n: availableToNumber },
-                `${availableToNumber} can still be numbered from current stock.`,
-              )}
-            </Text>
-          ) : null}
-          <TextInput
-            label={t('org.warehouse.tools.prefix', null, 'Tag prefix (optional)')}
-            value={genPrefix}
-            onChangeText={setGenPrefix}
-            mode="outlined"
-            autoCapitalize="characters"
-            style={styles.input}
-            textColor={ON_CARD}
-            placeholder="BO"
-          />
-          <Button
-            mode="contained"
-            loading={busy}
-            disabled={busy || availableToNumber < 1}
-            onPress={onGenerate}
-          >
-            {t('org.warehouse.tools.generate', null, 'Create numbered instances')}
-          </Button>
-        </AppCard>
+        <Button
+          mode="contained"
+          onPress={() =>
+            navigateToOrgToolNumber(navigation, { orgId: organizationId })
+          }
+          disabled={!navigation}
+          style={{ marginBottom: 4 }}
+        >
+          {t('org.warehouse.tools.numberSection', null, 'Number new tools')}
+        </Button>
       ) : null}
 
       <AppCard style={styles.card} contentStyle={CARD_SURFACE}>
@@ -591,12 +377,28 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
             const selected = selectedIds.includes(asset.id);
             return (
               <View key={asset.id} style={styles.assetRow}>
-                <Pressable onPress={() => canManage && toggleSelect(asset.id)} style={{ flex: 1 }}>
+                <Pressable
+                  onPress={() => {
+                    if (navigation) {
+                      navigateToOrgToolAssetDetail(navigation, {
+                        orgId: organizationId,
+                        assetId: asset.id,
+                      });
+                      return;
+                    }
+                    if (canManage) toggleSelect(asset.id);
+                  }}
+                  onLongPress={() => canManage && toggleSelect(asset.id)}
+                  style={{ flex: 1 }}
+                >
                   <Text style={styles.assetTag}>{asset.asset_tag}</Text>
                   <Text style={styles.meta}>
                     {asset.material?.name || ''} · {statusLabel(t, asset.status)}
                     {asset.current_employee?.display_name
                       ? ` · ${asset.current_employee.display_name}`
+                      : ''}
+                    {canManage
+                      ? ` · ${t('org.warehouse.intake.tapToEdit', null, 'Tap to edit')}`
                       : ''}
                   </Text>
                   {selected ? (
@@ -616,19 +418,50 @@ export default function OrgToolAssetsPanel({ organizationId, canManage }) {
                     >
                       {t('org.warehouse.printLabel', null, 'Print stamp')}
                     </Button>
-                    {asset.status === 'in_stock' ? (
-                      <Button compact onPress={() => onIssueAsset(asset.id)} disabled={busy}>
-                        {t('org.warehouse.tools.issue', null, 'Issue')}
-                      </Button>
-                    ) : null}
-                    {asset.status === 'issued' ? (
-                      <Button compact onPress={() => onReturnAsset(asset.id)} disabled={busy}>
-                        {t('org.warehouse.tools.return', null, 'Return')}
-                      </Button>
-                    ) : null}
-                    {asset.status !== 'scrapped' ? (
-                      <Button compact textColor="#B91C1C" onPress={() => onScrapAsset(asset)} disabled={busy}>
-                        {t('org.warehouse.intake.scrapMaterial', null, 'Write off (scrap)')}
+                    <Button
+                      compact
+                      onPress={() => toggleSelect(asset.id)}
+                      textColor={ON_CARD}
+                    >
+                      {selected
+                        ? t('org.warehouse.tools.selected', null, 'Selected for print')
+                        : t('org.warehouse.tools.select', null, 'Select')}
+                    </Button>
+                    {asset.status !== 'issued' ? (
+                      <Button
+                        compact
+                        textColor="#B91C1C"
+                        disabled={busy}
+                        onPress={async () => {
+                          const ok = await confirmMessage(
+                            t('org.warehouse.tools.deleteTitle', null, 'Delete this number?'),
+                            t(
+                              'org.warehouse.tools.deleteBody',
+                              null,
+                              'Removes a mistaken numbered tool. Does NOT change stock quantity (unlike scrap).',
+                            ),
+                          );
+                          if (!ok) return;
+                          setBusy(true);
+                          try {
+                            await withToken((token) =>
+                              deleteToolAsset(token, organizationId, asset.id),
+                            );
+                            setMessage(
+                              t('org.warehouse.tools.deletedOk', null, 'Number deleted (stock unchanged).'),
+                            );
+                            await load();
+                          } catch (e) {
+                            setMessage(
+                              e.message
+                                || t('org.warehouse.tools.deleteError', null, 'Could not delete.'),
+                            );
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        {t('org.warehouse.tools.deleteNumber', null, 'Delete number')}
                       </Button>
                     ) : null}
                   </View>

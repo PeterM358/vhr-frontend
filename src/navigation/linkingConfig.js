@@ -50,6 +50,37 @@ export const linkingScreens = {
       },
     },
   },
+  OrgMaterialForm: {
+    path: 'partner/organization/warehouse/materials/:stockId',
+    parse: {
+      stockId: (value) => {
+        if (value === 'new') return 'new';
+        const id = parseInt(String(value), 10);
+        return Number.isFinite(id) ? id : String(value || '').trim();
+      },
+    },
+  },
+  OrgToolNumber: {
+    path: 'partner/organization/warehouse/tools/number',
+  },
+  OrgToolAssetDetail: {
+    path: 'partner/organization/warehouse/tools/:assetId',
+    parse: {
+      assetId: (value) => {
+        const id = parseInt(String(value), 10);
+        return Number.isFinite(id) ? id : String(value || '').trim();
+      },
+    },
+  },
+  OrgWarehouseLocationDetail: {
+    path: 'partner/organization/warehouse/locations/:locationId',
+    parse: {
+      locationId: (value) => {
+        const id = parseInt(String(value), 10);
+        return Number.isFinite(id) ? id : String(value || '').trim();
+      },
+    },
+  },
   ShopHome: {
     path: 'partner',
     screens: {

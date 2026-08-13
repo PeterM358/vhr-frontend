@@ -28,6 +28,10 @@ export { default as FleetRegisterImportScreen } from '../screens/FleetRegisterIm
 export { default as FleetDashboardScreen } from '../screens/FleetDashboardScreen';
 export { default as OrgFleetVehicleDetailScreen } from '../screens/OrgFleetVehicleDetailScreen';
 export { default as OrgWorkforceMemberDetailScreen } from '../screens/OrgWorkforceMemberDetailScreen';
+export { default as OrgMaterialFormScreen } from '../screens/OrgMaterialFormScreen';
+export { default as OrgToolAssetDetailScreen } from '../screens/OrgToolAssetDetailScreen';
+export { default as OrgToolNumberScreen } from '../screens/OrgToolNumberScreen';
+export { default as OrgWarehouseLocationDetailScreen } from '../screens/OrgWarehouseLocationDetailScreen';
 export { default as PartnerOnboardingScreen } from '../screens/PartnerOnboardingScreen';
 export { default as CreatePromotionScreen } from '../screens/CreatePromotionScreen';
 export { default as ShopRegisterClientScreen } from '../screens/ShopRegisterClientScreen';

@@ -23,7 +23,7 @@ import {
   refreshOrganizationMemberships,
   resolveActiveOrganizationId,
 } from '../utils/orgWorkspace';
-import { navigateToOrgHome } from '../navigation/webNavigation';
+import { navigateToOrgHome, navigateToOrgWarehouseLocation } from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
@@ -32,6 +32,21 @@ import { useScrollContentBottomPadding } from '../utils/mobileWebInsets';
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
 const CARD_SURFACE = { color: ON_CARD };
+
+function storageLocationOptions(rows) {
+  const active = (Array.isArray(rows) ? rows : []).filter((r) => r && r.is_active !== false);
+  const parentsWithChildren = new Set(
+    active.filter((r) => r.parent_id).map((r) => Number(r.parent_id)),
+  );
+  return active
+    .filter((r) => r.parent_id || !parentsWithChildren.has(Number(r.id)))
+    .map((r) => ({
+      ...r,
+      display_name: r.parent_id
+        ? `${r.parent_name || 'Site'} / ${r.name}`
+        : r.name,
+    }));
+}
 
 const PRIMARY_MODES = [
   { id: 'documents', labelKey: 'org.warehouse.tabDocuments', fallback: 'Documents' },
@@ -184,6 +199,16 @@ export default function OrgWarehouseScreen({ navigation, route }) {
     }
   }, [routeOrgId, t]);
 
+  const siteRows = useMemo(
+    () => (rows || []).filter((r) => r && !r.parent_id),
+    [rows],
+  );
+  const storageLocations = useMemo(() => storageLocationOptions(rows), [rows]);
+  const activeCount = useMemo(
+    () => siteRows.filter((r) => r.is_active !== false).length,
+    [siteRows],
+  );
+
   const saveIntakePostingMode = async (nextMode) => {
     if (!orgId || !canManageSettings || nextMode === intakePostingMode) return;
     setSettingsBusy(true);
@@ -288,8 +313,6 @@ export default function OrgWarehouseScreen({ navigation, route }) {
     }
   };
 
-  const activeCount = useMemo(() => rows.filter((row) => row.is_active).length, [rows]);
-
   return (
     <ScreenBackground safeArea={false}>
       <OrgAppHeader
@@ -367,7 +390,7 @@ export default function OrgWarehouseScreen({ navigation, route }) {
               canManage={canManage}
               canPostIntake={canPostIntake}
               section={mode}
-              locations={rows.filter((r) => r.is_active !== false)}
+              locations={storageLocations}
               navigation={navigation}
               documentsListKey={documentsListKey}
             />
@@ -382,7 +405,11 @@ export default function OrgWarehouseScreen({ navigation, route }) {
           )
         ) : mode === 'tools' ? (
           orgId ? (
-            <OrgToolAssetsPanel organizationId={orgId} canManage={canManage} />
+            <OrgToolAssetsPanel
+              organizationId={orgId}
+              canManage={canManage}
+              navigation={navigation}
+            />
           ) : loading ? (
             <ActivityIndicator color="#fff" style={styles.loader} />
           ) : (
@@ -409,37 +436,53 @@ export default function OrgWarehouseScreen({ navigation, route }) {
             <Text style={styles.meta}>
               {t(
                 'org.warehouse.count',
-                { active: activeCount, total: rows.length },
-                `${activeCount} active of ${rows.length}`,
+                { active: activeCount, total: siteRows.length },
+                `${activeCount} active of ${siteRows.length}`,
               )}
             </Text>
             <Text style={styles.nextNote}>
               {t(
-                'org.warehouse.nextSliceNote',
+                'org.warehouse.sitesLead',
                 null,
-                'Next: warehouse users issue materials from a location; receivers confirm; workers fill only km / hours / m².',
+                'Sites like Baza. Open a site to add warehouse addresses (bins/racks) for materials and tools.',
               )}
             </Text>
-            {rows.length === 0 ? (
+            {siteRows.length === 0 ? (
               <Text style={styles.empty}>
                 {t(
                   'org.warehouse.empty',
                   null,
-                  'No locations yet. Add paint rooms, fuel tanks, or yard bins.',
+                  'No locations yet. Add a site (e.g. Baza), then open it to add warehouse addresses.',
                 )}
               </Text>
             ) : (
-              rows.map((row) => (
-                <View key={row.id} style={styles.row}>
+              siteRows.map((row) => (
+                <Pressable
+                  key={row.id}
+                  onPress={() =>
+                    navigateToOrgWarehouseLocation(navigation, {
+                      orgId,
+                      locationId: row.id,
+                    })
+                  }
+                  style={styles.row}
+                >
                   <View style={styles.rowBody}>
                     <Text style={styles.rowTitle}>{row.name}</Text>
                     <Text style={styles.rowMeta}>
                       {row.code}
                       {row.address ? ` · ${row.address}` : ''}
-                      {row.qr_code ? ` · QR ${row.qr_code}` : ''}
+                      {row.child_count
+                        ? ` · ${t(
+                            'org.warehouse.addressCount',
+                            { count: row.child_count },
+                            `${row.child_count} address(es)`,
+                          )}`
+                        : ` · ${t('org.warehouse.noAddressesYet', null, 'No addresses yet')}`}
                       {row.is_active
                         ? ''
                         : ` · ${t('org.warehouse.inactive', null, 'Inactive')}`}
+                      {` · ${t('org.warehouse.tapToOpen', null, 'Tap to open')}`}
                     </Text>
                     {row.description ? (
                       <Text style={styles.rowNotes} numberOfLines={2}>
@@ -449,17 +492,40 @@ export default function OrgWarehouseScreen({ navigation, route }) {
                   </View>
                   {canManage ? (
                     <View style={styles.rowActions}>
-                      <Pressable onPress={() => startEdit(row)} style={styles.rowAction}>
-                        <Text style={styles.rowActionText}>{t('common.edit', null, 'Edit')}</Text>
+                      <Pressable
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          navigateToOrgWarehouseLocation(navigation, {
+                            orgId,
+                            locationId: row.id,
+                          });
+                        }}
+                        style={styles.rowAction}
+                      >
+                        <Text style={styles.rowActionText}>
+                          {t('org.warehouse.openSite', null, 'Open / addresses')}
+                        </Text>
                       </Pressable>
                       <Pressable
-                        onPress={async () => {
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          startEdit(row);
+                        }}
+                        style={styles.rowAction}
+                      >
+                        <Text style={styles.rowActionText}>
+                          {t('org.warehouse.editSite', null, 'Rename site')}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={async (e) => {
+                          e?.stopPropagation?.();
                           try {
                             const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
                             await openWarehouseLocationLabel(token, orgId, row.id);
-                          } catch (e) {
+                          } catch (err) {
                             setError(
-                              e.message
+                              err.message
                                 || t('org.warehouse.labelError', null, 'Could not open label.'),
                             );
                           }
@@ -470,7 +536,13 @@ export default function OrgWarehouseScreen({ navigation, route }) {
                           {t('org.warehouse.printLabel', null, 'Print stamp')}
                         </Text>
                       </Pressable>
-                      <Pressable onPress={() => toggleActive(row)} style={styles.rowAction}>
+                      <Pressable
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          toggleActive(row);
+                        }}
+                        style={styles.rowAction}
+                      >
                         <Text style={styles.rowActionText}>
                           {row.is_active
                             ? t('org.warehouse.deactivate', null, 'Deactivate')
@@ -479,7 +551,7 @@ export default function OrgWarehouseScreen({ navigation, route }) {
                       </Pressable>
                     </View>
                   ) : null}
-                </View>
+                </Pressable>
               ))
             )}
             {canManage ? (

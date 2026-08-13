@@ -66,6 +66,11 @@ import {
   partnerOrganizationTasks,
   partnerOrganizationProjects,
   partnerOrganizationWarehouse,
+  partnerOrganizationMaterialNew,
+  partnerOrganizationMaterialEdit,
+  partnerOrganizationToolAsset,
+  partnerOrganizationToolNumber,
+  partnerOrganizationWarehouseLocation,
   partnerOrganizationAccounting,
   partnerOrganizationFleetPlanning,
   partnerOrganizationInvoicing,
@@ -1233,6 +1238,7 @@ export function navigateToOrgWarehouse(navigation, params = {}) {
     const pathParams = {};
     if (params.orgId != null) pathParams.organizationId = params.orgId;
     else if (params.organizationId != null) pathParams.organizationId = params.organizationId;
+    if (params.tab) pathParams.tab = params.tab;
     resetPartnerStackWebRoutes(
       navigation,
       [orgWarehouseRoute],
@@ -1241,6 +1247,111 @@ export function navigateToOrgWarehouse(navigation, params = {}) {
     return;
   }
   navigation.navigate('OrgHome', { screen: 'OrgWarehouse', params: routeParams });
+}
+
+function orgWarehouseStackRoute(organizationId, tab) {
+  const params = {};
+  if (organizationId != null) params.organizationId = organizationId;
+  if (tab) params.tab = tab;
+  return {
+    name: 'OrgHome',
+    state: {
+      index: 1,
+      routes: [
+        { name: 'OrgOverview' },
+        { name: 'OrgWarehouse', params: Object.keys(params).length ? params : undefined },
+      ],
+    },
+  };
+}
+
+export function navigateToOrgMaterialForm(navigation, params = {}) {
+  const organizationId = params.orgId ?? params.organizationId;
+  const stockId = params.stockId;
+  const isCreate = stockId == null || stockId === '' || stockId === 'new';
+  const detailParams = {
+    ...(organizationId != null ? { organizationId } : {}),
+    stockId: isCreate ? 'new' : stockId,
+  };
+  const warehouseRoute = orgWarehouseStackRoute(organizationId, 'materials');
+  if (Platform.OS === 'web') {
+    const pathParams = {};
+    if (organizationId != null) pathParams.organizationId = organizationId;
+    resetPartnerStackWebRoutes(
+      navigation,
+      [warehouseRoute, { name: 'OrgMaterialForm', params: detailParams }],
+      isCreate
+        ? partnerOrganizationMaterialNew(pathParams)
+        : partnerOrganizationMaterialEdit(stockId, pathParams),
+    );
+    return;
+  }
+  navigation.navigate('OrgMaterialForm', detailParams);
+}
+
+export function navigateToOrgToolAssetDetail(navigation, params = {}) {
+  const organizationId = params.orgId ?? params.organizationId;
+  const assetId = params.assetId;
+  if (assetId == null) return;
+  const detailParams = {
+    assetId,
+    ...(organizationId != null ? { organizationId } : {}),
+  };
+  const warehouseRoute = orgWarehouseStackRoute(organizationId, 'tools');
+  if (Platform.OS === 'web') {
+    const pathParams = {};
+    if (organizationId != null) pathParams.organizationId = organizationId;
+    resetPartnerStackWebRoutes(
+      navigation,
+      [warehouseRoute, { name: 'OrgToolAssetDetail', params: detailParams }],
+      partnerOrganizationToolAsset(assetId, pathParams),
+    );
+    return;
+  }
+  navigation.navigate('OrgToolAssetDetail', detailParams);
+}
+
+export function navigateToOrgToolNumber(navigation, params = {}) {
+  const organizationId = params.orgId ?? params.organizationId;
+  const detailParams = {
+    ...(organizationId != null ? { organizationId } : {}),
+    ...(params.materialId != null ? { materialId: params.materialId } : {}),
+  };
+  const warehouseRoute = orgWarehouseStackRoute(organizationId, 'tools');
+  if (Platform.OS === 'web') {
+    const pathParams = {};
+    if (organizationId != null) pathParams.organizationId = organizationId;
+    if (params.materialId != null) pathParams.materialId = params.materialId;
+    resetPartnerStackWebRoutes(
+      navigation,
+      [warehouseRoute, { name: 'OrgToolNumber', params: detailParams }],
+      partnerOrganizationToolNumber(pathParams),
+    );
+    return;
+  }
+  navigation.navigate('OrgToolNumber', detailParams);
+}
+
+export function navigateToOrgWarehouseLocation(navigation, params = {}) {
+  const organizationId = params.orgId ?? params.organizationId;
+  const locationId = params.locationId;
+  if (locationId == null) return;
+  const detailParams = {
+    locationId,
+    ...(organizationId != null ? { organizationId } : {}),
+  };
+  const warehouseRoute = orgWarehouseStackRoute(organizationId, 'list');
+  if (Platform.OS === 'web') {
+    const pathParams = {};
+    if (organizationId != null) pathParams.organizationId = organizationId;
+    resetPartnerStackWebRoutes(
+      navigation,
+      [warehouseRoute, { name: 'OrgWarehouseLocationDetail', params: detailParams }],
+      partnerOrganizationWarehouseLocation(locationId, pathParams),
+    );
+    return;
+  }
+  navigation.navigate('OrgWarehouseLocationDetail', detailParams);
 }
 
 export function navigateToOrgAccounting(navigation, params = {}) {

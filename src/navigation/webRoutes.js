@@ -712,6 +712,35 @@ export function partnerOrganizationWarehouse(params = {}) {
   return buildPathWithQuery(`${PARTNER}/organization/warehouse`, params);
 }
 
+export function partnerOrganizationMaterialNew(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/organization/warehouse/materials/new`, params);
+}
+
+export function partnerOrganizationMaterialEdit(stockId, params = {}) {
+  return buildPathWithQuery(
+    `${PARTNER}/organization/warehouse/materials/${normalizeId(stockId)}`,
+    params,
+  );
+}
+
+export function partnerOrganizationToolAsset(assetId, params = {}) {
+  return buildPathWithQuery(
+    `${PARTNER}/organization/warehouse/tools/${normalizeId(assetId)}`,
+    params,
+  );
+}
+
+export function partnerOrganizationToolNumber(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/organization/warehouse/tools/number`, params);
+}
+
+export function partnerOrganizationWarehouseLocation(locationId, params = {}) {
+  return buildPathWithQuery(
+    `${PARTNER}/organization/warehouse/locations/${normalizeId(locationId)}`,
+    params,
+  );
+}
+
 export function partnerOrganizationAccounting(params = {}) {
   return buildPathWithQuery(`${PARTNER}/organization/accounting`, params);
 }

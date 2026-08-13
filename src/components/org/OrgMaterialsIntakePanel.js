@@ -14,8 +14,6 @@ import EmptyStateCard from '../ui/EmptyStateCard';
 import {
   addMaterialsIntakeLine,
   confirmMaterialsIntake,
-  createOrgMaterial,
-  createMaterialScrap,
   deleteMaterialsIntake,
   deleteMaterialsIntakeLine,
   getMaterialsIntake,
@@ -24,7 +22,6 @@ import {
   openMaterialsIntakeFile,
   updateMaterialsIntake,
   updateMaterialsIntakeLine,
-  updateOrgMaterial,
   uploadMaterialsIntake,
 } from '../../api/orgWarehouse';
 import { pickReceiptOrInvoiceAttachment } from '../../utils/pickDocumentFile';
@@ -38,6 +35,9 @@ import { STORAGE_KEYS } from '../../constants/storageKeys';
 import { useTranslation } from '../../i18n';
 import { fetchUnits } from '../../api/partCatalog';
 import UnitOfMeasurePicker from './UnitOfMeasurePicker';
+import {
+  navigateToOrgMaterialForm,
+} from '../../navigation/webNavigation';
 import { navigateToOrgCompanyAccount } from '../../navigation/webNavigation';
 
 /** Text on light AppCard / FloatingCard surfaces. */
@@ -329,10 +329,7 @@ export default function OrgMaterialsIntakePanel({
   const [activeIntake, setActiveIntake] = useState(null);
   const [confirmSummary, setConfirmSummary] = useState(null);
   const [manual, setManual] = useState(emptyManual);
-  const [standalone, setStandalone] = useState(emptyManual);
-  const [showStandalone, setShowStandalone] = useState(false);
   const [supplierDraft, setSupplierDraft] = useState('');
-  const [editingMaterial, setEditingMaterial] = useState(null);
   const [materialQuery, setMaterialQuery] = useState('');
   const [docQuery, setDocQuery] = useState('');
   const [confirmLocationId, setConfirmLocationId] = useState(null);
@@ -396,8 +393,6 @@ export default function OrgMaterialsIntakePanel({
   useEffect(() => {
     if (section !== 'materials') {
       setMaterialQuery('');
-      setShowStandalone(false);
-      setEditingMaterial(null);
     }
     if (section !== 'documents') {
       setDocQuery('');
@@ -607,72 +602,6 @@ export default function OrgMaterialsIntakePanel({
     }
   };
 
-  const onAddStandalone = async () => {
-    if (!canManage || !organizationId) return;
-    if (!standalone.description.trim() && !standalone.part_number.trim()) {
-      setError(t('org.warehouse.intake.lineRequired', null, 'Enter a material name or part number.'));
-      return;
-    }
-    const qty = Number(standalone.quantity || 0);
-    if (qty > 0 && !confirmLocationId) {
-      setError(
-        t(
-          'org.warehouse.intake.locationRequired',
-          null,
-          'Select a warehouse location before storing quantity.',
-        ),
-      );
-      return;
-    }
-    setBusy(true);
-    setError('');
-    setMessage('');
-    try {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const payload = {
-        description: standalone.description.trim(),
-        part_number: standalone.part_number.trim(),
-        part_number_alias: standalone.part_number_alias.trim(),
-        quantity: standalone.quantity || '0',
-        unit_code: standalone.unit_code || 'piece',
-        unit_price: standalone.unit_price || '0',
-      };
-      if (confirmLocationId) payload.location_id = confirmLocationId;
-      payload.is_durable_tool = Boolean(standalone.is_durable_tool);
-      if (standalone.invoice_number?.trim()) {
-        payload.invoice_number = standalone.invoice_number.trim();
-      }
-      const created = await createOrgMaterial(token, organizationId, payload);
-      setConfirmSummary({
-        invoice_number: '',
-        supplier_name: '',
-        source_file_name: '',
-        document_kind: 'manual',
-        materials_count: 1,
-        materials: [
-          {
-            name: created.name,
-            part_number: created.part_number,
-            part_number_alias: created.part_number_alias || standalone.part_number_alias,
-            quantity_added: created.quantity_added || standalone.quantity,
-            quantity_on_hand: created.quantity_on_hand,
-            unit_code: created.unit_code || standalone.unit_code,
-            created: true,
-            location_name: created.location_name,
-          },
-        ],
-      });
-      setMessage(t('org.warehouse.intake.manualCreated', null, 'Material added to warehouse stock.'));
-      setStandalone(emptyManual());
-      setShowStandalone(false);
-      await load();
-    } catch (e) {
-      setError(e.message || t('org.warehouse.intake.lineError', null, 'Could not add material.'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const applyConfirmResult = async (data) => {
     setActiveIntake(data);
     setConfirmSummary(data.confirm_summary || null);
@@ -847,67 +776,6 @@ export default function OrgMaterialsIntakePanel({
     }
   };
 
-  const onSaveMaterial = async () => {
-    if (!editingMaterial?.stock_id) return;
-    setBusy(true);
-    setError('');
-    try {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      await updateOrgMaterial(token, organizationId, editingMaterial.stock_id, {
-        name: editingMaterial.name,
-        part_number: editingMaterial.part_number,
-        description: editingMaterial.description,
-        is_durable_tool: Boolean(editingMaterial.is_durable_tool),
-      });
-      setEditingMaterial(null);
-      setMessage(t('org.warehouse.intake.materialUpdated', null, 'Material updated.'));
-      await load();
-    } catch (e) {
-      setError(e.message || t('org.warehouse.intake.saveError', null, 'Could not save.'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onScrapMaterial = async () => {
-    if (!editingMaterial?.stock_id || !canManage) return;
-    const qty = String(editingMaterial.scrap_qty || '1').trim() || '1';
-    const ok = await confirmMessage(
-      t('org.warehouse.intake.scrapMaterialTitle', null, 'Write off from stock?'),
-      t(
-        'org.warehouse.intake.scrapMaterialBody',
-        { qty },
-        `Removes ${qty} from on-hand quantity (брак). Use when the tool is broken or worn out.`,
-      ),
-    );
-    if (!ok) return;
-    setBusy(true);
-    setError('');
-    try {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      await createMaterialScrap(token, organizationId, {
-        reason: editingMaterial.scrap_reason || 'broken',
-        lines: [
-          {
-            material_id: editingMaterial.material_id || editingMaterial.id,
-            quantity: qty,
-          },
-        ],
-      });
-      setMessage(
-        t('org.warehouse.intake.scrapMaterialDone', null, 'Written off from warehouse stock.'),
-      );
-      setEditingMaterial(null);
-      await load();
-    } catch (e) {
-      setError(
-        e.message || t('org.warehouse.intake.scrapMaterialError', null, 'Could not write off material.'),
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
   if (loading) {
     return (
       <View style={styles.center}>
@@ -1018,131 +886,13 @@ export default function OrgMaterialsIntakePanel({
       {isMaterials && canManage ? (
         <Button
           mode="contained"
-          onPress={() => {
-            setShowStandalone((v) => !v);
-            setConfirmSummary(null);
-          }}
-          disabled={busy}
+          onPress={() =>
+            navigateToOrgMaterialForm(navigation, { orgId: organizationId })
+          }
+          disabled={busy || !navigation}
         >
           {t('org.warehouse.intake.addMaterial', null, 'Add material')}
         </Button>
-      ) : null}
-
-      {isMaterials && showStandalone && canManage ? (
-        <AppCard style={styles.card}>
-          <Text style={styles.cardTitle}>
-            {t('org.warehouse.intake.addMaterialTitle', null, 'Add material (no invoice)')}
-          </Text>
-          <TextInput
-            label={t('org.warehouse.intake.lineName', null, 'Name / description')}
-            value={standalone.description}
-            onChangeText={(v) => setStandalone((p) => ({ ...p, description: v }))}
-            mode="outlined"
-            style={styles.input}
-            textColor={ON_CARD}
-          />
-          <TextInput
-            label={t('org.warehouse.intake.partNumber', null, 'Part number / SKU')}
-            value={standalone.part_number}
-            onChangeText={(v) => setStandalone((p) => ({ ...p, part_number: v }))}
-            mode="outlined"
-            style={styles.input}
-            textColor={ON_CARD}
-          />
-          <TextInput
-            label={t('org.warehouse.intake.documentNumber', null, 'Document # (optional)')}
-            value={standalone.invoice_number}
-            onChangeText={(v) => setStandalone((p) => ({ ...p, invoice_number: v }))}
-            mode="outlined"
-            style={styles.input}
-            textColor={ON_CARD}
-          />
-          <Text style={styles.helper}>
-            {t(
-              'org.warehouse.intake.documentNumberHint',
-              null,
-              'If you are not scanning an invoice, you can still record a paper/doc number for the audit trail.',
-            )}
-          </Text>
-          <View style={styles.row2}>
-            <TextInput
-              label={t('org.warehouse.intake.qty', null, 'Qty')}
-              value={standalone.quantity}
-              onChangeText={(v) => setStandalone((p) => ({ ...p, quantity: v }))}
-              mode="outlined"
-              style={[styles.input, styles.flex1]}
-              keyboardType="decimal-pad"
-              textColor={ON_CARD}
-            />
-            <TextInput
-              label={t('org.warehouse.intake.priceEur', null, 'Price (EUR)')}
-              value={standalone.unit_price}
-              onChangeText={(v) => setStandalone((p) => ({ ...p, unit_price: v }))}
-              mode="outlined"
-              style={[styles.input, styles.flex1]}
-              keyboardType="decimal-pad"
-              textColor={ON_CARD}
-            />
-          </View>
-          <Text style={styles.sectionLabel}>{t('org.warehouse.intake.unit', null, 'Unit')}</Text>
-          <UnitPicker
-            value={standalone.unit_code}
-            onChange={(code) => setStandalone((p) => ({ ...p, unit_code: code }))}
-            t={t}
-            locale={locale}
-            units={catalogUnits}
-          />
-          <View style={styles.switchRow}>
-            <View style={styles.switchLabelWrap}>
-              <Text style={styles.sectionLabel}>
-                {t('org.warehouse.intake.durableTool', null, 'Durable tool (hand machine)')}
-              </Text>
-              <Text style={styles.helper}>
-                {t(
-                  'org.warehouse.intake.durableToolHint',
-                  null,
-                  'Drill, grinder, etc. — not consumed on tasks; write off via scrap when broken.',
-                )}
-              </Text>
-            </View>
-            <Switch
-              value={Boolean(standalone.is_durable_tool)}
-              onValueChange={(v) => setStandalone((p) => ({ ...p, is_durable_tool: v }))}
-            />
-          </View>
-          <Text style={styles.sectionLabel}>
-            {t('org.warehouse.intake.storeLocation', null, 'Store into location')}
-          </Text>
-          {activeLocations.length === 0 ? (
-            <Text style={styles.helper}>
-              {t(
-                'org.warehouse.intake.noLocations',
-                null,
-                'Add a location under Locations (e.g. Baza / Port 1) before confirming.',
-              )}
-            </Text>
-          ) : (
-            <View style={styles.unitRow}>
-              {activeLocations.map((loc) => {
-                const selected = Number(confirmLocationId) === Number(loc.id);
-                return (
-                  <Pressable
-                    key={loc.id}
-                    onPress={() => setConfirmLocationId(loc.id)}
-                    style={[styles.unitChip, selected && styles.unitChipSelected]}
-                  >
-                    <Text style={[styles.unitChipText, selected && styles.unitChipTextSelected]}>
-                      {loc.name || loc.code}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-          <Button mode="contained" onPress={onAddStandalone} loading={busy} disabled={busy}>
-            {t('org.warehouse.intake.saveMaterial', null, 'Save to warehouse')}
-          </Button>
-        </AppCard>
       ) : null}
 
       {detailOpen ? (
@@ -1228,8 +978,10 @@ export default function OrgMaterialsIntakePanel({
                         style={[styles.unitChip, selected && styles.unitChipSelected]}
                       >
                         <Text style={[styles.unitChipText, selected && styles.unitChipTextSelected]}>
-                          {loc.name || loc.code}
-                          {loc.code && loc.name !== loc.code ? ` (${loc.code})` : ''}
+                          {loc.display_name || loc.name || loc.code}
+                          {!loc.display_name && loc.code && loc.name !== loc.code
+                            ? ` (${loc.code})`
+                            : ''}
                         </Text>
                       </Pressable>
                     );
@@ -1518,72 +1270,6 @@ export default function OrgMaterialsIntakePanel({
               }
             />
           ) : null}
-          {editingMaterial ? (
-            <AppCard style={styles.card}>
-              <Text style={styles.cardTitle}>
-                {t('org.warehouse.intake.editMaterial', null, 'Edit material')}
-              </Text>
-              <TextInput
-                label={t('org.warehouse.intake.lineName', null, 'Name / description')}
-                value={editingMaterial.name}
-                onChangeText={(v) => setEditingMaterial((p) => ({ ...p, name: v }))}
-                mode="outlined"
-                style={styles.input}
-                textColor={ON_CARD}
-              />
-              <TextInput
-                label={t('org.warehouse.intake.partNumber', null, 'Part number / SKU')}
-                value={editingMaterial.part_number}
-                onChangeText={(v) => setEditingMaterial((p) => ({ ...p, part_number: v }))}
-                mode="outlined"
-                style={styles.input}
-                textColor={ON_CARD}
-              />
-              {editingMaterial.part_number_alias ? (
-                <Text style={styles.meta}>
-                  {t('org.warehouse.intake.oldPartNumber', null, 'Old material number (optional)')}
-                  {': '}
-                  {editingMaterial.part_number_alias}
-                </Text>
-              ) : null}
-              <Text style={styles.meta}>
-                {t('org.warehouse.intake.onStock', null, 'On stock')}: {editingMaterial.quantity_on_hand}
-                {editingMaterial.unit_code
-                  ? ` ${unitDisplay(editingMaterial.unit_code, t)}`
-                  : ''}
-              </Text>
-              <View style={styles.switchRow}>
-                <Text style={styles.sectionLabel}>
-                  {t('org.warehouse.intake.durableTool', null, 'Durable tool (hand machine)')}
-                </Text>
-                <Switch
-                  value={Boolean(editingMaterial.is_durable_tool)}
-                  onValueChange={(v) =>
-                    setEditingMaterial((p) => ({ ...p, is_durable_tool: v }))
-                  }
-                />
-              </View>
-              <View style={styles.lineActions}>
-                <Button mode="contained" onPress={onSaveMaterial} loading={busy} disabled={busy}>
-                  {t('common.save', null, 'Save')}
-                </Button>
-                {editingMaterial.is_durable_tool ? (
-                  <Button
-                    mode="outlined"
-                    onPress={onScrapMaterial}
-                    loading={busy}
-                    disabled={busy}
-                    textColor={ON_CARD}
-                  >
-                    {t('org.warehouse.intake.scrapMaterial', null, 'Write off (scrap)')}
-                  </Button>
-                ) : null}
-                <Button mode="text" onPress={() => setEditingMaterial(null)} textColor={ON_CARD}>
-                  {t('common.cancel', null, 'Cancel')}
-                </Button>
-              </View>
-            </AppCard>
-          ) : null}
           {materials.length === 0 ? (
             <EmptyStateCard
               title={t('org.warehouse.intake.emptyTitle', null, 'No materials yet')}
@@ -1627,24 +1313,10 @@ export default function OrgMaterialsIntakePanel({
                 <Pressable
                   key={row.stock_id || row.id}
                   onPress={() => {
-                    if (!canManage) return;
-                    const rawName = row.name || '';
-                    const rawDesc = row.description || row.name || '';
-                    setEditingMaterial({
-                      stock_id: row.stock_id,
-                      material_id: row.id,
-                      name: stripOldMaterialSuffix(rawName) || rawName,
-                      part_number: row.part_number || '',
-                      description: stripOldMaterialSuffix(rawDesc) || rawDesc,
-                      is_durable_tool: Boolean(row.is_durable_tool),
-                      scrap_qty: '1',
-                      part_number_alias:
-                        row.part_number_alias ||
-                        extractOldMaterialNumber(rawName) ||
-                        extractOldMaterialNumber(rawDesc) ||
-                        '',
-                      quantity_on_hand: row.quantity_on_hand,
-                      unit_code: row.unit_code,
+                    if (!canManage || !navigation || !row.stock_id) return;
+                    navigateToOrgMaterialForm(navigation, {
+                      orgId: organizationId,
+                      stockId: row.stock_id,
                     });
                   }}
                 >
