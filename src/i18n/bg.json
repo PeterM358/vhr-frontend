@@ -2719,6 +2719,13 @@
     "providerTitle": "Изпълнител",
     "notesTitle": "Бележки и доказателства"
   },
+  "requestServiceWizard": {
+    "vehicleTitle": "Автомобил",
+    "problemTitle": "Проблем",
+    "photosTitle": "Снимки",
+    "whenTitle": "Посещение",
+    "routingTitle": "Към кого"
+  },
   "repairWizard": {
     "overviewTitle": "Преглед",
     "operationsTitle": "Операции",
@@ -3708,6 +3715,7 @@
     "editTitle": "Редактирай заявката",
     "saveChanges": "Запази промените",
     "requestingFrom": "Заявка към:",
+    "subtitle": "Поискай оферти или час от сервизи — това не е запис за вече свършена работа.",
     "change": "Смени",
     "changeVehicle": "Смени автомобил",
     "hideList": "Скрий списъка",

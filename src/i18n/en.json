@@ -2748,6 +2748,13 @@
     "providerTitle": "Provider",
     "notesTitle": "Notes & evidence"
   },
+  "requestServiceWizard": {
+    "vehicleTitle": "Vehicle",
+    "problemTitle": "Problem",
+    "photosTitle": "Photos",
+    "whenTitle": "Visit",
+    "routingTitle": "Where"
+  },
   "repairWizard": {
     "overviewTitle": "Overview",
     "operationsTitle": "Operations",
@@ -3752,6 +3759,7 @@
     "editTitle": "Edit Request",
     "saveChanges": "Save changes",
     "requestingFrom": "Requesting service from:",
+    "subtitle": "Ask service centers for quotes or a booking — not a completed service record.",
     "change": "Change",
     "changeVehicle": "Change vehicle",
     "hideList": "Hide list",

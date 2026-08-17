@@ -1,30 +1,22 @@
 /**
  * PATH: src/screens/CreateRepairScreen.js
+ * Marketplace Request Service — WizardEngine (same chrome as Log Service Record).
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  StyleSheet,
-  View,
-  Alert,
-  Pressable,
-} from 'react-native';
+import { StyleSheet, View, Alert } from 'react-native';
 import ScreenBackground from '../components/ScreenBackground';
 import AppNavigationBar from '../components/common/AppNavigationBar';
-import { useScrollShadow } from '../hooks/useScrollShadow';
 import { useServiceCentersBack } from '../navigation/appNavBarBack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import {
   Text,
-  TextInput,
   Button,
   ActivityIndicator,
   Portal,
   Dialog,
 } from 'react-native-paper';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 import { API_BASE_URL } from '../api/config';
 import { createRepair, getRepairById, updateRepair, uploadRepairMedia } from '../api/repairs';
@@ -33,16 +25,7 @@ import { getShopById } from '../api/shops';
 import { listOrgFleet } from '../api/fleet';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { resolveActiveOrganizationId } from '../utils/orgWorkspace';
-import FloatingCard from '../components/ui/FloatingCard';
-import RepairRequestHeader from '../components/repairRequest/RepairRequestHeader';
-import RepairProblemInput from '../components/repairRequest/RepairProblemInput';
-import RepairPopularServices from '../components/repairRequest/RepairPopularServices';
-import RepairServicePicker from '../components/repairRequest/RepairServicePicker';
-import SelectedServicePill from '../components/repairRequest/SelectedServicePill';
-import RepairMediaSection from '../components/repairRequest/RepairMediaSection';
-import PreferredVisitPicker from '../components/repairRequest/PreferredVisitPicker';
 import { resolveRepairTypeForSubmit } from '../utils/repairTypeSearch';
-import { COLORS } from '../constants/colors';
 import { parseOdometerKm } from '../utils/finalizeMileageValidation';
 import {
   buildVisitSlotOptions,
@@ -50,16 +33,18 @@ import {
   formatPreferredVisitNote,
 } from '../utils/shopVisitSlots';
 import { navigateToRepairRequestDetail } from '../navigation/webNavigation';
-import {
-  useScrollContentBottomPaddingWithFooter,
-} from '../utils/mobileWebInsets';
-import StickyFormFooter, { STICKY_FORM_FOOTER_HEIGHT } from '../components/common/StickyFormFooter';
 import { useTranslation } from '../i18n';
+import { WizardEngine, createMemoryAdapter } from '../wizard';
+import {
+  RepairRequestVehicleStep,
+  RepairRequestProblemStep,
+  RepairRequestPhotosStep,
+  RepairRequestWhenStep,
+  RepairRequestRoutingStep,
+} from './repairRequest/RepairRequestWizardSteps';
 
 export default function CreateRepairScreen({ navigation, route }) {
   const { t, locale } = useTranslation();
-  const scrollBottomPadding = useScrollContentBottomPaddingWithFooter(STICKY_FORM_FOOTER_HEIGHT, 24);
-  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useServiceCentersBack(navigation);
 
   const isEditMode = route.params?.mode === 'edit_request';
@@ -72,7 +57,6 @@ export default function CreateRepairScreen({ navigation, route }) {
     : route.params?.serviceCenter
       ? Number(route.params.serviceCenter)
       : null;
-  const fromVehicleDetail = route.params?.origin === 'VehicleDetail' || route.params?.returnTo === 'VehicleDetail';
   const [vehicles, setVehicles] = useState([]);
   const [repairTypes, setRepairTypes] = useState([]);
   const [fleetOrganizationId, setFleetOrganizationId] = useState(
@@ -107,7 +91,6 @@ export default function CreateRepairScreen({ navigation, route }) {
   const [preselectedCenter, setPreselectedCenter] = useState(null);
   const [browseServicesExpanded, setBrowseServicesExpanded] = useState(false);
   const [submitTypeNotice, setSubmitTypeNotice] = useState('');
-  const [showAdvancedPreferences, setShowAdvancedPreferences] = useState(false);
   const [centerPickerUnlocked, setCenterPickerUnlocked] = useState(!preselectedShopId);
 
   const [loading, setLoading] = useState(true);
@@ -449,32 +432,8 @@ export default function CreateRepairScreen({ navigation, route }) {
 
   const handleChangeServiceCenter = useCallback(() => {
     setCenterPickerUnlocked(true);
-    setShowAdvancedPreferences(true);
     setTargetingMode('selected_centers');
   }, []);
-
-  const hasServiceCenter = useMemo(() => {
-    if (preselectedShopId || targetingMode === 'selected_centers') {
-      return selectedCenterIds.length > 0;
-    }
-    return true;
-  }, [preselectedShopId, targetingMode, selectedCenterIds.length]);
-
-  const canSubmit = useMemo(() => {
-    if (!vehicleId || saving || !hasServiceCenter) return false;
-    const hasRepairType = Boolean(repairTypeId);
-    const hasWrittenDetails = Boolean(String(symptoms || '').trim());
-    const hasVisit = Boolean(selectedVisitDay && visitTimeSlot);
-    return hasVisit && (hasRepairType || hasWrittenDetails);
-  }, [
-    vehicleId,
-    saving,
-    hasServiceCenter,
-    repairTypeId,
-    symptoms,
-    selectedVisitDay,
-    visitTimeSlot,
-  ]);
 
   const inferredTypePreview = useMemo(() => {
     if (repairTypeId) return null;
@@ -485,7 +444,8 @@ export default function CreateRepairScreen({ navigation, route }) {
     return { type, source };
   }, [repairTypes, repairTypeId, symptoms]);
 
-  const handleSubmitRequest = () => {
+  const handleSubmitRequest = async () => {
+    if (saving) return;
     if (!vehicleId) {
       setDialogMessage(t('requestService.vehicleRequiredError'));
       setDialogVisible(true);
@@ -702,8 +662,178 @@ export default function CreateRepairScreen({ navigation, route }) {
     }
   };
 
+  const validateVehicleStep = useCallback(() => {
+    if (!vehicleId) {
+      return { ok: false, message: t('requestService.vehicleRequiredError') };
+    }
+    return { ok: true };
+  }, [t, vehicleId]);
+
+  const validateProblemStep = useCallback(() => {
+    const hasRepairType = Boolean(repairTypeId);
+    const hasWrittenDetails = Boolean(String(symptoms || '').trim());
+    if (!hasRepairType && !hasWrittenDetails) {
+      return { ok: false, message: t('requestService.describeOrPickType') };
+    }
+    return { ok: true };
+  }, [repairTypeId, symptoms, t]);
+
+  const validateWhenStep = useCallback(() => {
+    if (!selectedVisitDay || !visitTimeSlot) {
+      return { ok: false, message: t('requestService.preferredVisitHint') };
+    }
+    return { ok: true };
+  }, [selectedVisitDay, t, visitTimeSlot]);
+
+  const validateRoutingStep = useCallback(() => {
+    if (targetingMode === 'selected_centers' && selectedCenterIds.length === 0) {
+      return { ok: false, message: t('requestService.selectCenterOrMode') };
+    }
+    return { ok: true };
+  }, [selectedCenterIds.length, t, targetingMode]);
+
+  const formContext = useMemo(
+    () => ({
+      navigation,
+      isEditMode,
+      fleetOrganizationId,
+      vehicles,
+      vehicleId,
+      setVehicleId,
+      selectedVehicle,
+      showVehiclePicker,
+      setShowVehiclePicker,
+      headerServiceCenter,
+      preselectedShopId,
+      handleChangeServiceCenter,
+      symptoms,
+      setSymptoms,
+      repairTypes,
+      repairTypeId,
+      selectedRepairType,
+      selectRepairType,
+      clearRepairType,
+      browseServicesExpanded,
+      setBrowseServicesExpanded,
+      inferredTypePreview,
+      selectedMedia,
+      handlePickPhoto,
+      handlePickVideo,
+      removeSelectedMedia,
+      existingMedia,
+      visitDays,
+      visitDayOffset,
+      setVisitDayOffset,
+      visitTimeSlots,
+      visitTimeSlot,
+      setVisitTimeSlot,
+      selectedVisitDay,
+      visitExtraNotes,
+      setVisitExtraNotes,
+      kilometers,
+      setKilometers,
+      targetingMode,
+      setTargetingMode,
+      loadingCenters,
+      serviceCenters,
+      selectedCenterIds,
+      toggleServiceCenterSelection,
+      requiresGuarantee,
+      setRequiresGuarantee,
+      preferredRadiusKm,
+      setPreferredRadiusKm,
+      submitTypeNotice,
+    }),
+    [
+      browseServicesExpanded,
+      clearRepairType,
+      existingMedia,
+      fleetOrganizationId,
+      handleChangeServiceCenter,
+      handlePickPhoto,
+      handlePickVideo,
+      headerServiceCenter,
+      inferredTypePreview,
+      isEditMode,
+      kilometers,
+      loadingCenters,
+      navigation,
+      preferredRadiusKm,
+      preselectedShopId,
+      removeSelectedMedia,
+      repairTypeId,
+      repairTypes,
+      requiresGuarantee,
+      selectRepairType,
+      selectedCenterIds,
+      selectedMedia,
+      selectedRepairType,
+      selectedVehicle,
+      selectedVisitDay,
+      serviceCenters,
+      showVehiclePicker,
+      submitTypeNotice,
+      symptoms,
+      targetingMode,
+      vehicleId,
+      vehicles,
+      visitDayOffset,
+      visitDays,
+      visitExtraNotes,
+      visitTimeSlot,
+      visitTimeSlots,
+    ],
+  );
+
+  const wizardSteps = useMemo(
+    () => [
+      {
+        id: 'vehicle',
+        titleKey: 'requestServiceWizard.vehicleTitle',
+        title: 'Vehicle',
+        validate: () => validateVehicleStep(),
+        Component: RepairRequestVehicleStep,
+      },
+      {
+        id: 'problem',
+        titleKey: 'requestServiceWizard.problemTitle',
+        title: 'Problem',
+        validate: () => validateProblemStep(),
+        Component: RepairRequestProblemStep,
+      },
+      {
+        id: 'photos',
+        titleKey: 'requestServiceWizard.photosTitle',
+        title: 'Photos',
+        optional: true,
+        Component: RepairRequestPhotosStep,
+      },
+      {
+        id: 'when',
+        titleKey: 'requestServiceWizard.whenTitle',
+        title: 'Visit',
+        validate: () => validateWhenStep(),
+        Component: RepairRequestWhenStep,
+      },
+      {
+        id: 'routing',
+        titleKey: 'requestServiceWizard.routingTitle',
+        title: 'Routing',
+        validate: () => validateRoutingStep(),
+        Component: RepairRequestRoutingStep,
+      },
+    ],
+    [validateProblemStep, validateRoutingStep, validateVehicleStep, validateWhenStep],
+  );
+
+  const adapter = useMemo(() => createMemoryAdapter({}), []);
+
+  const onWizardFinish = useCallback(async () => {
+    await handleSubmitRequest();
+  }, [handleSubmitRequest]);
+
   if (loading) {
-    return <ActivityIndicator animating={true} size="large" style={{ flex: 1 }} />;
+    return <ActivityIndicator animating size="large" style={{ flex: 1 }} />;
   }
 
   return (
@@ -713,312 +843,16 @@ export default function CreateRepairScreen({ navigation, route }) {
           title={isEditMode ? t('requestService.editTitle') : t('repairs.requestService')}
           backLabel={t('common.back')}
           onBack={handleBack}
-          scrolled={scrolled}
         />
-        <KeyboardAwareScrollView
-          onScroll={onScroll}
-          scrollEventThrottle={scrollEventThrottle}
-          contentContainerStyle={[
-            styles.container,
-            { paddingTop: 12, paddingBottom: scrollBottomPadding },
-          ]}
-          keyboardShouldPersistTaps="always"
-        >
-          <RepairRequestHeader
-            serviceCenter={headerServiceCenter}
-            selectedVehicle={selectedVehicle}
-            onChangeVehicle={() => setShowVehiclePicker((prev) => !prev)}
-            onChangeServiceCenter={preselectedShopId ? handleChangeServiceCenter : null}
-            showVehiclePicker={showVehiclePicker}
-            isEditMode={isEditMode}
-          />
-
-          {!isEditMode && (!selectedVehicle || showVehiclePicker) ? (
-            <FloatingCard>
-              <Text variant="labelLarge" style={styles.label}>{t('requestService.vehicleRequired')}</Text>
-              {vehicles.length === 0 ? (
-                <View style={{ gap: 10, marginTop: 8 }}>
-                  <Text style={{ color: COLORS.TEXT_MUTED, lineHeight: 20 }}>
-                    {fleetOrganizationId
-                      ? t(
-                          'org.home.needVehicleBody',
-                          null,
-                          'Import your fleet register (or add vehicles), then request a repair the same way customers do.',
-                        )
-                      : t(
-                          'requestService.noVehicles',
-                          null,
-                          'Add a vehicle to your garage first, then request a repair.',
-                        )}
-                  </Text>
-                  {fleetOrganizationId ? (
-                    <Button
-                      mode="contained"
-                      onPress={() =>
-                        navigation.navigate('FleetRegisterImport', {
-                          organizationId: fleetOrganizationId,
-                        })
-                      }
-                    >
-                      {t('fleetImport.openAction', null, 'Import fleet')}
-                    </Button>
-                  ) : (
-                    <Button mode="contained" onPress={() => navigation.navigate('CreateVehicle')}>
-                      {t('vehicles.addVehicle', null, 'Add vehicle')}
-                    </Button>
-                  )}
-                </View>
-              ) : (
-                <View style={styles.pickerContainer}>
-                  <Picker selectedValue={vehicleId} onValueChange={setVehicleId} style={styles.picker}>
-                    {vehicles.map((v) => (
-                      <Picker.Item
-                        key={v.id}
-                        label={
-                          fleetOrganizationId
-                            ? `${v.license_plate || '—'} (${v.display_name || v.model_name || v.fleet_id || `#${v.id}`})`
-                            : `${v.license_plate} (${v.make_name} ${v.model_name})`
-                        }
-                        value={v.id.toString()}
-                      />
-                    ))}
-                  </Picker>
-                </View>
-              )}
-            </FloatingCard>
-          ) : null}
-
-          <FloatingCard>
-            <RepairProblemInput
-              value={symptoms}
-              onChangeText={setSymptoms}
-              repairTypes={repairTypes}
-              selectedTypeId={repairTypeId}
-              onSelectType={selectRepairType}
-            />
-          </FloatingCard>
-
-          <FloatingCard>
-            <RepairPopularServices
-              repairTypes={repairTypes}
-              selectedTypeId={repairTypeId}
-              onSelectType={selectRepairType}
-            />
-            <SelectedServicePill repairType={selectedRepairType} onChange={clearRepairType} />
-            <RepairServicePicker
-              repairTypes={repairTypes}
-              selectedTypeId={repairTypeId}
-              onSelectType={selectRepairType}
-              expanded={browseServicesExpanded}
-              onToggleExpanded={() => setBrowseServicesExpanded((prev) => !prev)}
-            />
-            {inferredTypePreview && !selectedRepairType ? (
-              <Text style={styles.inferredTypeNotice}>
-                {inferredTypePreview.source === 'matched'
-                  ? t('requestService.inferredMatched', { name: inferredTypePreview.type.name })
-                  : t('requestService.inferredDefault', { name: inferredTypePreview.type.name })}
-              </Text>
-            ) : null}
-          </FloatingCard>
-
-          <FloatingCard>
-            <RepairMediaSection
-              selectedMedia={selectedMedia}
-              onPickPhoto={handlePickPhoto}
-              onPickVideo={handlePickVideo}
-              onRemoveMedia={removeSelectedMedia}
-              existingMedia={existingMedia}
-              isEditMode={isEditMode}
-            />
-          </FloatingCard>
-
-          <FloatingCard>
-            <PreferredVisitPicker
-              visitDays={visitDays}
-              visitDayOffset={visitDayOffset}
-              onDayChange={setVisitDayOffset}
-              visitTimeSlots={visitTimeSlots}
-              visitTimeSlot={visitTimeSlot}
-              onTimeChange={setVisitTimeSlot}
-              selectedVisitDay={selectedVisitDay}
-            />
-            <TextInput
-              mode="outlined"
-              value={visitExtraNotes}
-              onChangeText={setVisitExtraNotes}
-              placeholder={t('requestService.extraTimingNotes')}
-              style={styles.input}
-              multiline
-            />
-            {submitTypeNotice ? (
-              <Text style={styles.submitTypeNotice}>{submitTypeNotice}</Text>
-            ) : null}
-
-            {fromVehicleDetail && selectedVehicle ? (
-              <View style={styles.optionalKmInline}>
-                <Text variant="labelLarge" style={styles.label}>{t('requestService.kilometersOptional')}</Text>
-                <TextInput
-                  mode="outlined"
-                  value={kilometers}
-                  onChangeText={setKilometers}
-                  placeholder={
-                    selectedVehicle.kilometers != null && selectedVehicle.kilometers !== ''
-                      ? t('requestService.kilometersShownOnVehicle', {
-                          km: Number(selectedVehicle.kilometers).toLocaleString(),
-                        })
-                      : t('requestService.kilometersCurrentOdometer')
-                  }
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-              </View>
-            ) : null}
-          </FloatingCard>
-
-          <FloatingCard>
-            <Pressable
-              onPress={() => setShowAdvancedPreferences((prev) => !prev)}
-              style={styles.preferencesToggle}
-            >
-              <Text variant="titleMedium" style={styles.sectionTitle}>
-                {t('requestService.routingPreferences')}
-              </Text>
-              <Text style={styles.preferencesToggleHint}>
-                {showAdvancedPreferences ? t('requestService.hideAdvanced') : t('requestService.showAdvanced')}
-              </Text>
-            </Pressable>
-
-            {showAdvancedPreferences || centerPickerUnlocked ? (
-              <>
-                <Text style={styles.sectionHint}>
-                  {t('requestService.routingHint')}
-                </Text>
-                <Text variant="labelLarge" style={styles.label}>{t('requestService.whoReceives')}</Text>
-                <View style={styles.targetingList}>
-                  {[
-                    { value: 'all_qualified', label: t('requestService.targetingAllQualified') },
-                    { value: 'selected_centers', label: t('requestService.targetingSelected') },
-                    { value: 'verified_only', label: t('requestService.targetingVerified') },
-                    { value: 'operator_assisted', label: t('requestService.targetingOperator') },
-                  ].map((opt) => {
-                    const selected = targetingMode === opt.value;
-                    return (
-                      <Pressable
-                        key={opt.value}
-                        onPress={() => setTargetingMode(opt.value)}
-                        style={[styles.targetingOption, selected && styles.targetingOptionSelected]}
-                      >
-                        <Text style={[styles.targetingOptionText, selected && styles.targetingOptionTextSelected]}>
-                          {opt.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                {targetingMode === 'selected_centers' ? (
-                  <View style={styles.centerBlock}>
-                    <Text style={styles.centerLabel}>{t('requestService.preferredCenters')}</Text>
-                    {loadingCenters ? (
-                      <ActivityIndicator size="small" />
-                    ) : serviceCenters.length ? (
-                      <View style={styles.centerChipsWrap}>
-                        {serviceCenters.map((c) => {
-                          const selected = selectedCenterIds.includes(Number(c.id));
-                          return (
-                            <Pressable
-                              key={c.id}
-                              onPress={() => toggleServiceCenterSelection(c.id)}
-                              style={[styles.centerChip, selected && styles.centerChipSelected]}
-                            >
-                              <Text style={[styles.centerChipText, selected && styles.centerChipTextSelected]}>
-                                {c.name || t('requestService.serviceCenterFallback', { id: c.id })}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    ) : (
-                      <Text style={styles.emptySmall}>
-                        {t('requestService.noMatchingCenters')}
-                      </Text>
-                    )}
-                  </View>
-                ) : null}
-
-                <Pressable
-                  onPress={() => setRequiresGuarantee((prev) => !prev)}
-                  style={[styles.guaranteeCard, requiresGuarantee && styles.guaranteeCardSelected]}
-                >
-                  <Text style={[styles.guaranteeTitle, requiresGuarantee && styles.guaranteeTitleSelected]}>
-                    {t('requestService.guaranteeTitle')}
-                  </Text>
-                  <Text style={[styles.guaranteeHelper, requiresGuarantee && styles.guaranteeHelperSelected]}>
-                    {t('requestService.guaranteeHelper')}
-                  </Text>
-                  <View style={styles.guaranteeStateRow}>
-                    <Text style={[styles.guaranteeStateText, requiresGuarantee && styles.guaranteeStateTextSelected]}>
-                      {requiresGuarantee ? t('requestService.enabled') : t('requestService.disabled')}
-                    </Text>
-                    <Button
-                      mode={requiresGuarantee ? 'contained-tonal' : 'outlined'}
-                      compact
-                      onPress={() => setRequiresGuarantee((prev) => !prev)}
-                    >
-                      {requiresGuarantee ? t('requestService.turnOff') : t('requestService.turnOn')}
-                    </Button>
-                  </View>
-                </Pressable>
-                <Text variant="labelLarge" style={styles.label}>{t('requestService.preferredRadius')}</Text>
-                <TextInput
-                  mode="outlined"
-                  value={preferredRadiusKm}
-                  onChangeText={setPreferredRadiusKm}
-                  keyboardType="numeric"
-                  placeholder={t('requestService.radiusPlaceholder')}
-                  style={styles.input}
-                />
-              </>
-            ) : (
-              <Text style={styles.sectionHint}>
-                {t('requestService.routingDefaultsHint')}
-              </Text>
-            )}
-          </FloatingCard>
-
-          {!(fromVehicleDetail && selectedVehicle) ? (
-            <FloatingCard>
-              <Text variant="titleMedium" style={styles.sectionTitle}>{t('vehicles.vehicleDetails')}</Text>
-              <Text variant="labelLarge" style={styles.label}>{t('requestService.kilometersOptional')}</Text>
-              <TextInput
-                mode="outlined"
-                value={kilometers}
-                onChangeText={setKilometers}
-                placeholder={t('requestService.kilometersPlaceholder')}
-                keyboardType="numeric"
-                style={styles.input}
-              />
-              <Text style={styles.sectionHint}>
-                {t('requestService.kilometersHint')}
-              </Text>
-            </FloatingCard>
-          ) : null}
-        </KeyboardAwareScrollView>
-
-        <StickyFormFooter
-          style={styles.bottomActionBar}
-        >
-          <Button
-            mode="contained"
-            onPress={handleSubmitRequest}
-            loading={saving}
-            disabled={!canSubmit}
-            style={styles.sendButton}
-            contentStyle={styles.sendButtonContent}
-          >
-            {isEditMode ? t('requestService.saveChanges') : t('repairs.sendRequest')}
-          </Button>
-        </StickyFormFooter>
+        <WizardEngine
+          steps={wizardSteps}
+          adapter={adapter}
+          context={formContext}
+          onFinish={onWizardFinish}
+          onExit={handleBack}
+          showFinishLater={false}
+          finishLabelKey={isEditMode ? 'requestService.saveChanges' : 'repairs.sendRequest'}
+        />
       </View>
 
       <Portal>
@@ -1044,187 +878,5 @@ export default function CreateRepairScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-  },
-  container: {
-    padding: 12,
-    gap: 8,
-  },
-  sectionTitle: {
-    color: COLORS.TEXT_DARK,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  sectionHint: {
-    color: COLORS.TEXT_MUTED,
-    marginBottom: 10,
-  },
-  inferredTypeNotice: {
-    marginTop: 10,
-    padding: 10,
-    borderRadius: 10,
-    backgroundColor: '#eff6ff',
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    color: '#1e40af',
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  submitTypeNotice: {
-    marginTop: 8,
-    padding: 10,
-    borderRadius: 10,
-    backgroundColor: '#f0fdf4',
-    borderWidth: 1,
-    borderColor: '#bbf7d0',
-    color: '#166534',
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  label: {
-    marginTop: 10,
-    marginBottom: 4,
-    fontWeight: '600',
-  },
-  input: {
-    marginBottom: 8,
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    marginBottom: 10,
-    backgroundColor: '#fff',
-  },
-  picker: {
-    width: '100%',
-  },
-  preferencesToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  preferencesToggleHint: {
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  targetingList: {
-    marginTop: 6,
-    gap: 8,
-    marginBottom: 8,
-  },
-  targetingOption: {
-    borderWidth: 1,
-    borderColor: 'rgba(15,76,129,0.25)',
-    backgroundColor: 'rgba(15,76,129,0.06)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-  },
-  targetingOptionSelected: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: COLORS.PRIMARY,
-  },
-  targetingOptionText: {
-    color: '#1e3a8a',
-    fontWeight: '600',
-  },
-  targetingOptionTextSelected: {
-    color: '#fff',
-  },
-  optionalKmInline: {
-    marginBottom: 8,
-  },
-  centerBlock: {
-    marginTop: 6,
-  },
-  centerLabel: {
-    fontWeight: '600',
-    color: COLORS.TEXT_DARK,
-    marginBottom: 8,
-  },
-  centerChipsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  centerChip: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(15,76,129,0.25)',
-    backgroundColor: 'rgba(15,76,129,0.07)',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    marginBottom: 6,
-  },
-  centerChipSelected: {
-    backgroundColor: COLORS.PRIMARY,
-    borderColor: COLORS.PRIMARY,
-  },
-  centerChipText: {
-    color: '#1e3a8a',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  centerChipTextSelected: {
-    color: '#fff',
-  },
-  guaranteeCard: {
-    marginTop: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(15,76,129,0.2)',
-    borderRadius: 12,
-    padding: 12,
-    backgroundColor: 'rgba(15,76,129,0.06)',
-  },
-  guaranteeCardSelected: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(15,76,129,0.14)',
-  },
-  guaranteeTitle: {
-    color: COLORS.TEXT_DARK,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  guaranteeTitleSelected: {
-    color: '#1e3a8a',
-  },
-  guaranteeHelper: {
-    color: COLORS.TEXT_MUTED,
-    fontSize: 12,
-    marginBottom: 8,
-  },
-  guaranteeHelperSelected: {
-    color: '#1e40af',
-  },
-  guaranteeStateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  guaranteeStateText: {
-    color: COLORS.TEXT_MUTED,
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  guaranteeStateTextSelected: {
-    color: '#1e3a8a',
-  },
-  emptySmall: {
-    color: COLORS.TEXT_MUTED,
-    marginTop: 6,
-  },
-  bottomActionBar: {
-    backgroundColor: 'rgba(4,14,30,0.88)',
-    borderTopColor: 'rgba(148,163,184,0.26)',
-    borderTopWidth: 1,
-  },
-  sendButton: {
-    borderRadius: 12,
-  },
-  sendButtonContent: {
-    minHeight: 48,
   },
 });
