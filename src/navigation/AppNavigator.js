@@ -47,6 +47,8 @@ import {
   OrgToolAssetDetailScreen,
   OrgToolNumberScreen,
   OrgWarehouseLocationDetailScreen,
+  OrgWarehouseZoneDetailScreen,
+  OrgWarehouseAddressDetailScreen,
   PartnerOnboardingScreen,
   CreatePromotionScreen,
   ShopRegisterClientScreen,
@@ -502,6 +504,16 @@ export default function AppNavigator() {
           name="OrgWarehouseLocationDetail"
           component={OrgWarehouseLocationDetailScreen}
           options={{ ...appNavBarScreenOptions, title: 'Location' }}
+        />
+        <Stack.Screen
+          name="OrgWarehouseZoneDetail"
+          component={OrgWarehouseZoneDetailScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Zone' }}
+        />
+        <Stack.Screen
+          name="OrgWarehouseAddressDetail"
+          component={OrgWarehouseAddressDetailScreen}
+          options={{ ...appNavBarScreenOptions, title: 'Address' }}
         />
         <Stack.Screen
           name="PartnerOnboarding"

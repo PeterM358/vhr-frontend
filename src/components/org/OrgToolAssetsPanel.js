@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Button, TextInput } from 'react-native-paper';
 
 import AppCard from '../ui/AppCard';
+import OrgKitToolPicker from './OrgKitToolPicker';
 import {
   createToolKit,
   deleteToolAsset,
@@ -209,10 +210,16 @@ export default function OrgToolAssetsPanel({ organizationId, canManage, navigati
     }
   };
 
-  const toggleKitAsset = (id) => {
-    setKitAssetIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id].slice(0, 40),
-    );
+  const toggleKitAssetIds = (ids) => {
+    const unique = [];
+    const seen = new Set();
+    (ids || []).forEach((raw) => {
+      const id = Number(raw);
+      if (!Number.isFinite(id) || seen.has(id)) return;
+      seen.add(id);
+      unique.push(id);
+    });
+    setKitAssetIds(unique.slice(0, 40));
   };
 
   const onCreateKit = async () => {
@@ -377,6 +384,83 @@ export default function OrgToolAssetsPanel({ organizationId, canManage, navigati
             const selected = selectedIds.includes(asset.id);
             return (
               <View key={asset.id} style={styles.assetRow}>
+                <View style={styles.assetTitleRow}>
+                  <Pressable
+                    onPress={() => {
+                      if (navigation) {
+                        navigateToOrgToolAssetDetail(navigation, {
+                          orgId: organizationId,
+                          assetId: asset.id,
+                        });
+                        return;
+                      }
+                      if (canManage) toggleSelect(asset.id);
+                    }}
+                    onLongPress={() => canManage && toggleSelect(asset.id)}
+                    style={styles.assetMain}
+                  >
+                    <Text style={styles.assetTag}>{asset.asset_tag}</Text>
+                  </Pressable>
+                  {canManage ? (
+                    <View style={styles.assetActions}>
+                      <Pressable onPress={() => toggleSelect(asset.id)} hitSlop={6}>
+                        <Text style={[styles.link, selected && styles.linkSelected]}>
+                          {selected
+                            ? t('org.warehouse.tools.selectedShort', null, 'Selected')
+                            : t('org.warehouse.tools.select', null, 'Select')}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() =>
+                          withToken((token) => openToolAssetLabel(token, organizationId, asset.id))
+                        }
+                        hitSlop={6}
+                      >
+                        <Text style={styles.link}>
+                          {t('org.warehouse.tools.printShort', null, 'Print')}
+                        </Text>
+                      </Pressable>
+                      {asset.status !== 'issued' ? (
+                        <Pressable
+                          disabled={busy}
+                          hitSlop={6}
+                          onPress={async () => {
+                            const ok = await confirmMessage(
+                              t('org.warehouse.tools.deleteTitle', null, 'Delete this number?'),
+                              t(
+                                'org.warehouse.tools.deleteBody',
+                                null,
+                                'Removes a mistaken numbered tool. Does NOT change stock quantity (unlike scrap).',
+                              ),
+                            );
+                            if (!ok) return;
+                            setBusy(true);
+                            try {
+                              await withToken((token) =>
+                                deleteToolAsset(token, organizationId, asset.id),
+                              );
+                              setMessage(
+                                t('org.warehouse.tools.deletedOk', null, 'Number deleted (stock unchanged).'),
+                              );
+                              await load();
+                            } catch (e) {
+                              setMessage(
+                                e.message
+                                  || t('org.warehouse.tools.deleteError', null, 'Could not delete.'),
+                              );
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          <Text style={styles.linkDanger}>
+                            {t('org.warehouse.tools.deleteShort', null, 'Delete')}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  ) : null}
+                </View>
                 <Pressable
                   onPress={() => {
                     if (navigation) {
@@ -384,88 +468,19 @@ export default function OrgToolAssetsPanel({ organizationId, canManage, navigati
                         orgId: organizationId,
                         assetId: asset.id,
                       });
-                      return;
                     }
-                    if (canManage) toggleSelect(asset.id);
                   }}
-                  onLongPress={() => canManage && toggleSelect(asset.id)}
-                  style={{ flex: 1 }}
                 >
-                  <Text style={styles.assetTag}>{asset.asset_tag}</Text>
-                  <Text style={styles.meta}>
-                    {asset.material?.name || ''} · {statusLabel(t, asset.status)}
+                  <Text style={styles.meta} numberOfLines={1}>
+                    {asset.material?.name || ''}
+                    {asset.material?.name ? ' · ' : ''}
+                    {statusLabel(t, asset.status)}
+                    {asset.kit?.name ? ` · ${asset.kit.name}` : ''}
                     {asset.current_employee?.display_name
                       ? ` · ${asset.current_employee.display_name}`
                       : ''}
-                    {canManage
-                      ? ` · ${t('org.warehouse.intake.tapToEdit', null, 'Tap to edit')}`
-                      : ''}
                   </Text>
-                  {selected ? (
-                    <Text style={styles.selectedMark}>
-                      {t('org.warehouse.tools.selected', null, 'Selected for print')}
-                    </Text>
-                  ) : null}
                 </Pressable>
-                {canManage ? (
-                  <View style={styles.assetActions}>
-                    <Button
-                      compact
-                      onPress={() =>
-                        withToken((token) => openToolAssetLabel(token, organizationId, asset.id))
-                      }
-                      textColor={ON_CARD}
-                    >
-                      {t('org.warehouse.printLabel', null, 'Print stamp')}
-                    </Button>
-                    <Button
-                      compact
-                      onPress={() => toggleSelect(asset.id)}
-                      textColor={ON_CARD}
-                    >
-                      {selected
-                        ? t('org.warehouse.tools.selected', null, 'Selected for print')
-                        : t('org.warehouse.tools.select', null, 'Select')}
-                    </Button>
-                    {asset.status !== 'issued' ? (
-                      <Button
-                        compact
-                        textColor="#B91C1C"
-                        disabled={busy}
-                        onPress={async () => {
-                          const ok = await confirmMessage(
-                            t('org.warehouse.tools.deleteTitle', null, 'Delete this number?'),
-                            t(
-                              'org.warehouse.tools.deleteBody',
-                              null,
-                              'Removes a mistaken numbered tool. Does NOT change stock quantity (unlike scrap).',
-                            ),
-                          );
-                          if (!ok) return;
-                          setBusy(true);
-                          try {
-                            await withToken((token) =>
-                              deleteToolAsset(token, organizationId, asset.id),
-                            );
-                            setMessage(
-                              t('org.warehouse.tools.deletedOk', null, 'Number deleted (stock unchanged).'),
-                            );
-                            await load();
-                          } catch (e) {
-                            setMessage(
-                              e.message
-                                || t('org.warehouse.tools.deleteError', null, 'Could not delete.'),
-                            );
-                          } finally {
-                            setBusy(false);
-                          }
-                        }}
-                      >
-                        {t('org.warehouse.tools.deleteNumber', null, 'Delete number')}
-                      </Button>
-                    ) : null}
-                  </View>
-                ) : null}
               </View>
             );
           })
@@ -481,7 +496,7 @@ export default function OrgToolAssetsPanel({ organizationId, canManage, navigati
             {t(
               'org.warehouse.tools.kitsHint',
               null,
-              'One QR on the bag issues every machine inside. A tool can belong to only one kit.',
+              'One QR on the bag issues every machine inside. A numbered tool can belong to only one kit, and cannot be added twice.',
             )}
           </Text>
           <TextInput
@@ -504,44 +519,37 @@ export default function OrgToolAssetsPanel({ organizationId, canManage, navigati
           <Text style={styles.meta}>
             {t('org.warehouse.tools.pickToolsForKit', null, 'Pick in-stock tools for this kit:')}
           </Text>
-          <View style={styles.chipWrap}>
-            {assets
-              .filter((a) => a.status === 'in_stock')
-              .map((a) => {
-                const active = kitAssetIds.includes(a.id);
-                return (
-                  <Pressable
-                    key={a.id}
-                    onPress={() => toggleKitAsset(a.id)}
-                    style={[styles.chip, active && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {a.asset_tag}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-          </View>
+          <OrgKitToolPicker
+            assets={assets}
+            selectedIds={kitAssetIds}
+            onChangeSelectedIds={toggleKitAssetIds}
+          />
           <Button mode="contained" loading={busy} disabled={busy} onPress={onCreateKit} style={{ marginTop: 8 }}>
             {t('org.warehouse.tools.createKit', null, 'Create kit')}
           </Button>
 
           {kits.map((kit) => (
-            <View key={kit.id} style={styles.assetRow}>
+            <View key={kit.id} style={styles.kitRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.assetTag}>{kit.name}</Text>
-                <Text style={styles.meta}>
-                  {kit.code} · {kit.item_count || kit.items?.length || 0}{' '}
+                <Text style={styles.meta} numberOfLines={2}>
+                  {kit.code}
+                  {` · ${kit.item_count || kit.items?.length || 0} `}
                   {t('org.warehouse.tools.toolsCount', null, 'tools')}
+                  {Array.isArray(kit.items) && kit.items.length
+                    ? ` · ${kit.items
+                        .map((item) => item.asset?.asset_tag || item.asset_tag)
+                        .filter(Boolean)
+                        .join(', ')}`
+                    : ''}
                 </Text>
               </View>
-              <Button
-                compact
+              <Pressable
                 onPress={() => withToken((token) => openToolKitLabel(token, organizationId, kit.id))}
-                textColor={ON_CARD}
+                hitSlop={6}
               >
-                {t('org.warehouse.printLabel', null, 'Print stamp')}
-              </Button>
+                <Text style={styles.link}>{t('org.warehouse.tools.printShort', null, 'Print')}</Text>
+              </Pressable>
             </View>
           ))}
         </AppCard>
@@ -601,14 +609,30 @@ const styles = StyleSheet.create({
   assetRow: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E2E8F0',
-    paddingVertical: 10,
+    paddingVertical: 8,
+  },
+  assetMain: { flex: 1 },
+  assetTitleRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 8,
   },
-  assetTag: { color: ON_CARD, fontWeight: '700', fontSize: 14 },
+  assetTag: { color: ON_CARD, fontWeight: '700', fontSize: 14, flexShrink: 1 },
   meta: { color: ON_CARD_MUTED, fontSize: 12, marginTop: 2 },
   selectedMark: { color: '#166534', fontSize: 11, marginTop: 2 },
-  assetActions: { alignItems: 'flex-end' },
+  assetActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, flexShrink: 0 },
+  kitRow: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E2E8F0',
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  link: { color: '#1D4ED8', fontSize: 12, fontWeight: '700' },
+  linkSelected: { color: '#166534' },
+  linkDanger: { color: '#B91C1C', fontSize: 12, fontWeight: '700' },
   scanBox: {
     marginTop: 8,
     padding: 10,

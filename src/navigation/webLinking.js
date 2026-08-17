@@ -57,6 +57,8 @@ import {
   partnerOrganizationToolAsset,
   partnerOrganizationToolNumber,
   partnerOrganizationWarehouseLocation,
+  partnerOrganizationWarehouseZone,
+  partnerOrganizationWarehouseAddress,
   partnerOrganizationTasks,
   partnerOrganizationCreateTask,
   partnerOrganizationOperations,
@@ -291,6 +293,33 @@ export function getCanonicalWebPath(state) {
       }
       return partnerOrganizationWarehouseLocation(locationId, {
         organizationId: params.organizationId || params.orgId,
+      });
+    }
+    case 'OrgWarehouseZoneDetail': {
+      const locationId = params.locationId;
+      const zone = params.zone;
+      if (locationId == null || zone == null || zone === '') {
+        return partnerOrganizationWarehouse({
+          organizationId: params.organizationId || params.orgId,
+          tab: 'list',
+        });
+      }
+      return partnerOrganizationWarehouseZone(locationId, zone, {
+        organizationId: params.organizationId || params.orgId,
+      });
+    }
+    case 'OrgWarehouseAddressDetail': {
+      const locationId = params.locationId;
+      if (locationId == null) {
+        return partnerOrganizationWarehouse({
+          organizationId: params.organizationId || params.orgId,
+          tab: 'list',
+        });
+      }
+      return partnerOrganizationWarehouseAddress(locationId, {
+        organizationId: params.organizationId || params.orgId,
+        ...(params.siteId != null ? { siteId: params.siteId } : {}),
+        ...(params.zone ? { zone: params.zone } : {}),
       });
     }
     case 'ShopDocumentImports':
@@ -1333,6 +1362,102 @@ export function getPartnerNavigationStateFromPath(path) {
         { name: 'OrgWarehouseLocationDetail', params },
       ],
       index: 1,
+    };
+  }
+  const orgZoneDetailMatch = pathPart.match(
+    /^partner\/organization\/warehouse\/locations\/([^/]+)\/zones\/([^/]+)$/,
+  );
+  if (orgZoneDetailMatch) {
+    const locationIdRaw = orgZoneDetailMatch[1];
+    const locationIdNum = parseInt(locationIdRaw, 10);
+    const locationId = Number.isFinite(locationIdNum) ? locationIdNum : locationIdRaw;
+    const zone = decodeURIComponent(String(orgZoneDetailMatch[2] || '').trim());
+    const params = { locationId, zone };
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) params.organizationId = organizationId;
+    return {
+      routes: [
+        {
+          name: 'OrgHome',
+          state: {
+            index: 1,
+            routes: [
+              { name: 'OrgOverview' },
+              {
+                name: 'OrgWarehouse',
+                params: organizationId
+                  ? { organizationId, tab: 'list' }
+                  : { tab: 'list' },
+              },
+            ],
+          },
+        },
+        {
+          name: 'OrgWarehouseLocationDetail',
+          params: { locationId, ...(organizationId ? { organizationId } : {}) },
+        },
+        { name: 'OrgWarehouseZoneDetail', params },
+      ],
+      index: 2,
+    };
+  }
+  const orgAddressDetailMatch = pathPart.match(
+    /^partner\/organization\/warehouse\/addresses\/([^/]+)$/,
+  );
+  if (orgAddressDetailMatch) {
+    const locationIdRaw = orgAddressDetailMatch[1];
+    const locationIdNum = parseInt(locationIdRaw, 10);
+    const locationId = Number.isFinite(locationIdNum) ? locationIdNum : locationIdRaw;
+    const params = { locationId };
+    const organizationId = parseOrganizationIdFromQuery(query);
+    if (organizationId) params.organizationId = organizationId;
+    const siteIdRaw = query?.siteId;
+    if (siteIdRaw != null && String(siteIdRaw).trim() !== '') {
+      const siteIdNum = parseInt(String(siteIdRaw), 10);
+      params.siteId = Number.isFinite(siteIdNum) ? siteIdNum : String(siteIdRaw).trim();
+    }
+    const zone = String(query?.zone || '').trim();
+    if (zone) params.zone = zone;
+    const stack = [
+      {
+        name: 'OrgHome',
+        state: {
+          index: 1,
+          routes: [
+            { name: 'OrgOverview' },
+            {
+              name: 'OrgWarehouse',
+              params: organizationId
+                ? { organizationId, tab: 'list' }
+                : { tab: 'list' },
+            },
+          ],
+        },
+      },
+    ];
+    if (params.siteId != null) {
+      stack.push({
+        name: 'OrgWarehouseLocationDetail',
+        params: {
+          locationId: params.siteId,
+          ...(organizationId ? { organizationId } : {}),
+        },
+      });
+      if (params.zone) {
+        stack.push({
+          name: 'OrgWarehouseZoneDetail',
+          params: {
+            locationId: params.siteId,
+            zone: params.zone,
+            ...(organizationId ? { organizationId } : {}),
+          },
+        });
+      }
+    }
+    stack.push({ name: 'OrgWarehouseAddressDetail', params });
+    return {
+      routes: stack,
+      index: stack.length - 1,
     };
   }
   if (pathPart === 'partner/organization/fleet') {

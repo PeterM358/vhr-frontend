@@ -741,6 +741,20 @@ export function partnerOrganizationWarehouseLocation(locationId, params = {}) {
   );
 }
 
+export function partnerOrganizationWarehouseZone(locationId, zone, params = {}) {
+  return buildPathWithQuery(
+    `${PARTNER}/organization/warehouse/locations/${normalizeId(locationId)}/zones/${encodeURIComponent(String(zone || ''))}`,
+    params,
+  );
+}
+
+export function partnerOrganizationWarehouseAddress(locationId, params = {}) {
+  return buildPathWithQuery(
+    `${PARTNER}/organization/warehouse/addresses/${normalizeId(locationId)}`,
+    params,
+  );
+}
+
 export function partnerOrganizationAccounting(params = {}) {
   return buildPathWithQuery(`${PARTNER}/organization/accounting`, params);
 }

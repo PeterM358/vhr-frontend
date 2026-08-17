@@ -54,6 +54,33 @@ export async function getWarehouseLocation(token, organizationId, locationId) {
   return response.json();
 }
 
+export async function listWarehouseZones(token, organizationId, locationId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/locations/${locationId}/zones/`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load zones'));
+  return response.json();
+}
+
+export async function getWarehouseZoneDetail(token, organizationId, locationId, zone) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/locations/${locationId}/zone/${buildQuery({ zone })}`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load zone'));
+  return response.json();
+}
+
+export async function getWarehouseLocationContents(token, organizationId, locationId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/locations/${locationId}/contents/`,
+    { headers: authHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load address contents'));
+  return response.json();
+}
+
 export async function getWarehouseSettings(token, organizationId) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/warehouse/settings/`,

@@ -81,6 +81,25 @@ export const linkingScreens = {
       },
     },
   },
+  OrgWarehouseZoneDetail: {
+    path: 'partner/organization/warehouse/locations/:locationId/zones/:zone',
+    parse: {
+      locationId: (value) => {
+        const id = parseInt(String(value), 10);
+        return Number.isFinite(id) ? id : String(value || '').trim();
+      },
+      zone: (value) => decodeURIComponent(String(value || '').trim()),
+    },
+  },
+  OrgWarehouseAddressDetail: {
+    path: 'partner/organization/warehouse/addresses/:locationId',
+    parse: {
+      locationId: (value) => {
+        const id = parseInt(String(value), 10);
+        return Number.isFinite(id) ? id : String(value || '').trim();
+      },
+    },
+  },
   ShopHome: {
     path: 'partner',
     screens: {

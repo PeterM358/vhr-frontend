@@ -71,6 +71,8 @@ import {
   partnerOrganizationToolAsset,
   partnerOrganizationToolNumber,
   partnerOrganizationWarehouseLocation,
+  partnerOrganizationWarehouseZone,
+  partnerOrganizationWarehouseAddress,
   partnerOrganizationAccounting,
   partnerOrganizationFleetPlanning,
   partnerOrganizationInvoicing,
@@ -1352,6 +1354,86 @@ export function navigateToOrgWarehouseLocation(navigation, params = {}) {
     return;
   }
   navigation.navigate('OrgWarehouseLocationDetail', detailParams);
+}
+
+export function navigateToOrgWarehouseZone(navigation, params = {}) {
+  const organizationId = params.orgId ?? params.organizationId;
+  const locationId = params.locationId;
+  const zone = params.zone;
+  if (locationId == null || zone == null || zone === '') return;
+  const detailParams = {
+    locationId,
+    zone: String(zone),
+    ...(organizationId != null ? { organizationId } : {}),
+  };
+  const warehouseRoute = orgWarehouseStackRoute(organizationId, 'list');
+  if (Platform.OS === 'web') {
+    const pathParams = { zone: String(zone) };
+    if (organizationId != null) pathParams.organizationId = organizationId;
+    resetPartnerStackWebRoutes(
+      navigation,
+      [
+        warehouseRoute,
+        {
+          name: 'OrgWarehouseLocationDetail',
+          params: { locationId, ...(organizationId != null ? { organizationId } : {}) },
+        },
+        { name: 'OrgWarehouseZoneDetail', params: detailParams },
+      ],
+      partnerOrganizationWarehouseZone(locationId, String(zone), {
+        organizationId,
+      }),
+    );
+    return;
+  }
+  navigation.navigate('OrgWarehouseZoneDetail', detailParams);
+}
+
+export function navigateToOrgWarehouseAddress(navigation, params = {}) {
+  const organizationId = params.orgId ?? params.organizationId;
+  const locationId = params.locationId;
+  if (locationId == null) return;
+  const detailParams = {
+    locationId,
+    ...(organizationId != null ? { organizationId } : {}),
+    ...(params.siteId != null ? { siteId: params.siteId } : {}),
+    ...(params.zone ? { zone: String(params.zone) } : {}),
+  };
+  const warehouseRoute = orgWarehouseStackRoute(organizationId, 'list');
+  if (Platform.OS === 'web') {
+    const pathParams = {};
+    if (organizationId != null) pathParams.organizationId = organizationId;
+    if (params.siteId != null) pathParams.siteId = params.siteId;
+    if (params.zone) pathParams.zone = String(params.zone);
+    const stack = [warehouseRoute];
+    if (params.siteId != null) {
+      stack.push({
+        name: 'OrgWarehouseLocationDetail',
+        params: {
+          locationId: params.siteId,
+          ...(organizationId != null ? { organizationId } : {}),
+        },
+      });
+      if (params.zone) {
+        stack.push({
+          name: 'OrgWarehouseZoneDetail',
+          params: {
+            locationId: params.siteId,
+            zone: String(params.zone),
+            ...(organizationId != null ? { organizationId } : {}),
+          },
+        });
+      }
+    }
+    stack.push({ name: 'OrgWarehouseAddressDetail', params: detailParams });
+    resetPartnerStackWebRoutes(
+      navigation,
+      stack,
+      partnerOrganizationWarehouseAddress(locationId, pathParams),
+    );
+    return;
+  }
+  navigation.navigate('OrgWarehouseAddressDetail', detailParams);
 }
 
 export function navigateToOrgAccounting(navigation, params = {}) {

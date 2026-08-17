@@ -32,6 +32,8 @@ export { default as OrgMaterialFormScreen } from '../screens/OrgMaterialFormScre
 export { default as OrgToolAssetDetailScreen } from '../screens/OrgToolAssetDetailScreen';
 export { default as OrgToolNumberScreen } from '../screens/OrgToolNumberScreen';
 export { default as OrgWarehouseLocationDetailScreen } from '../screens/OrgWarehouseLocationDetailScreen';
+export { default as OrgWarehouseZoneDetailScreen } from '../screens/OrgWarehouseZoneDetailScreen';
+export { default as OrgWarehouseAddressDetailScreen } from '../screens/OrgWarehouseAddressDetailScreen';
 export { default as PartnerOnboardingScreen } from '../screens/PartnerOnboardingScreen';
 export { default as CreatePromotionScreen } from '../screens/CreatePromotionScreen';
 export { default as ShopRegisterClientScreen } from '../screens/ShopRegisterClientScreen';

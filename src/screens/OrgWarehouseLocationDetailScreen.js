@@ -11,11 +11,16 @@ import {
   createWarehouseLocation,
   deactivateWarehouseLocation,
   getWarehouseLocation,
+  listWarehouseZones,
   openWarehouseLocationLabel,
   updateWarehouseLocation,
 } from '../api/orgWarehouse';
 import { resolveActiveOrganizationId } from '../utils/orgWorkspace';
-import { navigateToOrgWarehouse } from '../navigation/webNavigation';
+import {
+  navigateToOrgWarehouse,
+  navigateToOrgWarehouseAddress,
+  navigateToOrgWarehouseZone,
+} from '../navigation/webNavigation';
 import { useTranslation } from '../i18n';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { COLORS } from '../constants/colors';
@@ -60,6 +65,7 @@ export default function OrgWarehouseLocationDetailScreen({ navigation, route }) 
   const [editingZone, setEditingZone] = useState(null);
   const [zoneEditValue, setZoneEditValue] = useState('');
   const [extraZones, setExtraZones] = useState([]);
+  const [zoneSummaries, setZoneSummaries] = useState([]);
 
   const onBack = useCallback(() => {
     navigateToOrgWarehouse(navigation, {
@@ -67,6 +73,31 @@ export default function OrgWarehouseLocationDetailScreen({ navigation, route }) 
       tab: 'list',
     });
   }, [navigation, orgId, routeOrgId]);
+
+  const openZone = useCallback(
+    (zoneName) => {
+      if (!zoneName || !locationId) return;
+      navigateToOrgWarehouseZone(navigation, {
+        orgId: routeOrgId || orgId,
+        locationId,
+        zone: zoneName,
+      });
+    },
+    [locationId, navigation, orgId, routeOrgId],
+  );
+
+  const openAddress = useCallback(
+    (child) => {
+      if (!child?.id) return;
+      navigateToOrgWarehouseAddress(navigation, {
+        orgId: routeOrgId || orgId,
+        locationId: child.id,
+        siteId: locationId,
+        zone: child.address || '',
+      });
+    },
+    [locationId, navigation, orgId, routeOrgId],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,8 +110,12 @@ export default function OrgWarehouseLocationDetailScreen({ navigation, route }) 
         setError(t('org.warehouse.locationNotFound', null, 'Location not found.'));
         return;
       }
-      const row = await getWarehouseLocation(token, resolved, locationId);
+      const [row, zonesPayload] = await Promise.all([
+        getWarehouseLocation(token, resolved, locationId),
+        listWarehouseZones(token, resolved, locationId).catch(() => null),
+      ]);
       setSite(row);
+      setZoneSummaries(Array.isArray(zonesPayload?.results) ? zonesPayload.results : []);
       setCanManage(true);
     } catch (e) {
       setError(e.message || t('org.warehouse.loadError', null, 'Could not load warehouse.'));
@@ -96,15 +131,30 @@ export default function OrgWarehouseLocationDetailScreen({ navigation, route }) 
   );
 
   const children = Array.isArray(site?.children) ? site.children : [];
+  const zoneSummaryByName = useMemo(() => {
+    const map = new Map();
+    zoneSummaries.forEach((row) => {
+      const key = String(row.zone || '').trim().toLowerCase();
+      if (key) map.set(key, row);
+    });
+    return map;
+  }, [zoneSummaries]);
+
   const zones = useMemo(() => {
     const fromChildren = uniqueZones(children);
     const map = new Map(fromChildren.map((z) => [z.toLowerCase(), z]));
+    zoneSummaries.forEach((row) => {
+      const z = String(row.zone || '').trim();
+      if (!z || z === '—') return;
+      const key = z.toLowerCase();
+      if (!map.has(key)) map.set(key, z);
+    });
     extraZones.forEach((z) => {
       const key = String(z || '').trim().toLowerCase();
       if (key && !map.has(key)) map.set(key, String(z).trim());
     });
     return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
-  }, [children, extraZones]);
+  }, [children, extraZones, zoneSummaries]);
 
   const startAdd = () => {
     setEditingChildId(null);
@@ -277,7 +327,7 @@ export default function OrgWarehouseLocationDetailScreen({ navigation, route }) 
                 {t(
                   'org.warehouse.siteDetailLead',
                   null,
-                  'Zones (e.g. Hale 1) → warehouse addresses / cupboards (e.g. shkaf1). Put tools into an address from Tools.',
+                  'Open a zone (e.g. hale1) to see its addresses and article totals, then open an address to see tools and materials inside.',
                 )}
               </Text>
               {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -313,7 +363,7 @@ export default function OrgWarehouseLocationDetailScreen({ navigation, route }) 
                 {t(
                   'org.warehouse.zonesHint',
                   null,
-                  'Select a zone for the address form, or type a new name to create it. Tap Edit to rename.',
+                  'Open a zone for addresses and totals. Use selects it for the address form; Edit renames.',
                 )}
               </Text>
 
@@ -325,6 +375,9 @@ export default function OrgWarehouseLocationDetailScreen({ navigation, route }) 
                   <Text style={[styles.th, styles.colCount]}>
                     {t('org.warehouse.binsInZone', null, 'Addresses')}
                   </Text>
+                  <Text style={[styles.th, styles.colCount]}>
+                    {t('org.warehouse.articlesTotal', null, 'Articles')}
+                  </Text>
                   <Text style={[styles.th, styles.colActions]}>
                     {t('org.warehouse.actions', null, 'Actions')}
                   </Text>
@@ -335,9 +388,13 @@ export default function OrgWarehouseLocationDetailScreen({ navigation, route }) 
                   </Text>
                 ) : (
                   zones.map((zone) => {
-                    const count = children.filter(
-                      (c) => String(c.address || '').trim().toLowerCase() === zone.toLowerCase(),
-                    ).length;
+                    const summary = zoneSummaryByName.get(zone.toLowerCase());
+                    const count =
+                      summary?.address_count
+                      ?? children.filter(
+                        (c) => String(c.address || '').trim().toLowerCase() === zone.toLowerCase(),
+                      ).length;
+                    const articles = summary?.article_total ?? '—';
                     const selected =
                       String(form.address || '').trim().toLowerCase() === zone.toLowerCase();
                     const isEditing = editingZone === zone;
@@ -354,17 +411,18 @@ export default function OrgWarehouseLocationDetailScreen({ navigation, route }) 
                               textColor={ON_CARD}
                             />
                           ) : (
-                            <Pressable onPress={() => selectZone(zone)}>
+                            <Pressable onPress={() => openZone(zone)}>
                               <Text style={styles.td}>{zone}</Text>
-                              {selected ? (
-                                <Text style={styles.selectedMark}>
-                                  {t('org.warehouse.zoneSelectedShort', null, 'Selected')}
-                                </Text>
-                              ) : null}
+                              <Text style={styles.selectedMark}>
+                                {selected
+                                  ? t('org.warehouse.zoneSelectedShort', null, 'Selected')
+                                  : t('org.warehouse.tapToOpen', null, 'Tap to open')}
+                              </Text>
                             </Pressable>
                           )}
                         </View>
                         <Text style={[styles.td, styles.colCount]}>{count}</Text>
+                        <Text style={[styles.td, styles.colCount]}>{articles}</Text>
                         <View style={[styles.colActions, styles.rowActions]}>
                           {isEditing ? (
                             <>
@@ -380,23 +438,32 @@ export default function OrgWarehouseLocationDetailScreen({ navigation, route }) 
                                 <Text style={styles.linkMuted}>{t('common.cancel', null, 'Cancel')}</Text>
                               </Pressable>
                             </>
-                          ) : canManage ? (
+                          ) : (
                             <>
-                              <Pressable onPress={() => selectZone(zone)}>
+                              <Pressable onPress={() => openZone(zone)}>
                                 <Text style={styles.link}>
-                                  {t('org.warehouse.useZone', null, 'Use')}
+                                  {t('org.warehouse.openZone', null, 'Open')}
                                 </Text>
                               </Pressable>
-                              <Pressable
-                                onPress={() => {
-                                  setEditingZone(zone);
-                                  setZoneEditValue(zone);
-                                }}
-                              >
-                                <Text style={styles.link}>{t('common.edit', null, 'Edit')}</Text>
-                              </Pressable>
+                              {canManage ? (
+                                <>
+                                  <Pressable onPress={() => selectZone(zone)}>
+                                    <Text style={styles.link}>
+                                      {t('org.warehouse.useZone', null, 'Use')}
+                                    </Text>
+                                  </Pressable>
+                                  <Pressable
+                                    onPress={() => {
+                                      setEditingZone(zone);
+                                      setZoneEditValue(zone);
+                                    }}
+                                  >
+                                    <Text style={styles.link}>{t('common.edit', null, 'Edit')}</Text>
+                                  </Pressable>
+                                </>
+                              ) : null}
                             </>
-                          ) : null}
+                          )}
                         </View>
                       </View>
                     );
@@ -453,47 +520,57 @@ export default function OrgWarehouseLocationDetailScreen({ navigation, route }) 
                 ) : (
                   children.map((child) => (
                     <View key={child.id} style={styles.tableRow}>
-                      <Text style={[styles.td, styles.colName]} numberOfLines={2}>
-                        {child.name}
-                        {child.is_active
-                          ? ''
-                          : ` (${t('org.warehouse.inactive', null, 'Inactive')})`}
-                      </Text>
+                      <Pressable style={styles.colName} onPress={() => openAddress(child)}>
+                        <Text style={styles.td} numberOfLines={2}>
+                          {child.name}
+                          {child.is_active
+                            ? ''
+                            : ` (${t('org.warehouse.inactive', null, 'Inactive')})`}
+                        </Text>
+                        <Text style={styles.selectedMark}>
+                          {t('org.warehouse.tapToOpen', null, 'Tap to open')}
+                        </Text>
+                      </Pressable>
                       <Text style={[styles.td, styles.colCode]}>{child.code}</Text>
                       <Text style={[styles.td, styles.colZone]}>{child.address || '—'}</Text>
-                      {canManage ? (
-                        <View style={[styles.colActions, styles.rowActions]}>
-                          <Pressable onPress={() => startEditChild(child)}>
-                            <Text style={styles.link}>{t('common.edit', null, 'Edit')}</Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={async () => {
-                              try {
-                                const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-                                await openWarehouseLocationLabel(token, orgId, child.id);
-                              } catch (e) {
-                                setError(
-                                  e.message
-                                    || t('org.warehouse.labelError', null, 'Could not open label.'),
-                                );
-                              }
-                            }}
-                          >
-                            <Text style={styles.link}>
-                              {t('org.warehouse.printLabel', null, 'Print stamp')}
-                            </Text>
-                          </Pressable>
-                          <Pressable onPress={() => toggleChildActive(child)}>
-                            <Text style={styles.link}>
-                              {child.is_active
-                                ? t('org.warehouse.deactivate', null, 'Deactivate')
-                                : t('org.warehouse.activate', null, 'Activate')}
-                            </Text>
-                          </Pressable>
-                        </View>
-                      ) : (
-                        <View style={styles.colActions} />
-                      )}
+                      <View style={[styles.colActions, styles.rowActions]}>
+                        <Pressable onPress={() => openAddress(child)}>
+                          <Text style={styles.link}>
+                            {t('org.warehouse.openAddress', null, 'Open')}
+                          </Text>
+                        </Pressable>
+                        {canManage ? (
+                          <>
+                            <Pressable onPress={() => startEditChild(child)}>
+                              <Text style={styles.link}>{t('common.edit', null, 'Edit')}</Text>
+                            </Pressable>
+                            <Pressable
+                              onPress={async () => {
+                                try {
+                                  const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+                                  await openWarehouseLocationLabel(token, orgId, child.id);
+                                } catch (e) {
+                                  setError(
+                                    e.message
+                                      || t('org.warehouse.labelError', null, 'Could not open label.'),
+                                  );
+                                }
+                              }}
+                            >
+                              <Text style={styles.link}>
+                                {t('org.warehouse.printLabel', null, 'Print stamp')}
+                              </Text>
+                            </Pressable>
+                            <Pressable onPress={() => toggleChildActive(child)}>
+                              <Text style={styles.link}>
+                                {child.is_active
+                                  ? t('org.warehouse.deactivate', null, 'Deactivate')
+                                  : t('org.warehouse.activate', null, 'Activate')}
+                              </Text>
+                            </Pressable>
+                          </>
+                        ) : null}
+                      </View>
                     </View>
                   ))
                 )}
