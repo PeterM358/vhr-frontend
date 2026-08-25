@@ -2,8 +2,11 @@
  * Cookie / analytics consent (web). Necessary storage stays available without consent.
  * GA4 must only initialize after analytics consent.
  *
- * Persists to window.localStorage on web (primary) with AsyncStorage mirror for
- * migration. Banner is for anonymous visitors only — see CookieConsentBanner.
+ * Persists to window.localStorage on web (primary), document.cookie mirror (fallback
+ * when localStorage is blocked), and AsyncStorage mirror for migration.
+ * Banner is for anonymous visitors only — see CookieConsentBanner.
+ *
+ * Consent is NEVER keyed by IP (GDPR). Same browser + storage = no re-prompt.
  *
  * Non-cookie processors (document in privacy copy): Nominatim/OSM, Google Maps,
  * Firebase Cloud Messaging, Stripe, SMTP — see docs/GDPR_DATA_AUDIT.md.
@@ -19,6 +22,9 @@ export const CONSENT_REJECTED = 'rejected';
 /** Bump to re-prompt anonymous visitors after policy/copy changes. */
 export const CONSENT_POLICY_VERSION = 1;
 export const CONSENT_STORAGE_KEY = STORAGE_KEYS.COOKIE_CONSENT;
+/** Cookie name must be simple (no @) for document.cookie. */
+const CONSENT_COOKIE_NAME = 'veversal_cookie_consent';
+const CONSENT_COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 365;
 
 /** @typedef {{ necessary: true, analytics: boolean, marketing: boolean, version: number, decidedAt: string }} ConsentState */
 
@@ -90,7 +96,37 @@ function writeLocalStorageRaw(raw) {
     if (typeof window === 'undefined' || !window.localStorage) return;
     window.localStorage.setItem(CONSENT_STORAGE_KEY, raw);
   } catch {
-    // Private mode / quota — AsyncStorage mirror may still work.
+    // Private mode / quota — cookie + AsyncStorage may still work.
+  }
+}
+
+function readCookieRaw() {
+  try {
+    if (typeof document === 'undefined') return null;
+    const prefix = `${CONSENT_COOKIE_NAME}=`;
+    const parts = String(document.cookie || '').split(';');
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (trimmed.startsWith(prefix)) {
+        return decodeURIComponent(trimmed.slice(prefix.length));
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCookieRaw(raw) {
+  try {
+    if (typeof document === 'undefined') return;
+    const secure =
+      typeof window !== 'undefined' && window.location?.protocol === 'https:'
+        ? '; Secure'
+        : '';
+    document.cookie = `${CONSENT_COOKIE_NAME}=${encodeURIComponent(raw)}; Path=/; Max-Age=${CONSENT_COOKIE_MAX_AGE_SEC}; SameSite=Lax${secure}`;
+  } catch {
+    // ignore
   }
 }
 
@@ -98,10 +134,16 @@ async function readConsentRaw() {
   if (Platform.OS === 'web') {
     const fromLs = readLocalStorageRaw();
     if (fromLs != null && fromLs !== '') return fromLs;
+    const fromCookie = readCookieRaw();
+    if (fromCookie != null && fromCookie !== '') {
+      writeLocalStorageRaw(fromCookie);
+      return fromCookie;
+    }
     try {
       const fromAsync = await AsyncStorage.getItem(CONSENT_STORAGE_KEY);
       if (fromAsync != null && fromAsync !== '') {
         writeLocalStorageRaw(fromAsync);
+        writeCookieRaw(fromAsync);
         return fromAsync;
       }
     } catch {
@@ -119,11 +161,12 @@ async function readConsentRaw() {
 async function writeConsentRaw(raw) {
   if (Platform.OS === 'web') {
     writeLocalStorageRaw(raw);
+    writeCookieRaw(raw);
   }
   try {
     await AsyncStorage.setItem(CONSENT_STORAGE_KEY, raw);
   } catch {
-    // localStorage already written on web
+    // localStorage / cookie already written on web
   }
 }
 

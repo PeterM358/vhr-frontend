@@ -20,6 +20,7 @@ import {
   Marker,
   Popup,
   useMap,
+  useMapEvents,
   ZoomControl,
 } from 'react-leaflet';
 import L from 'leaflet';
@@ -42,7 +43,10 @@ import DiscoveryViewToggle from '../components/serviceCenters/DiscoveryViewToggl
 import DiscoverySortSheet, { DiscoverySortTrigger } from '../components/serviceCenters/DiscoverySortSheet';
 import DiscoveryCompactFooter from '../components/serviceCenters/DiscoveryCompactFooter';
 import DISCOVERY_MOBILE, { discoveryMinFont } from '../components/serviceCenters/discoveryMobileTokens';
-import { DISCOVERY_QUICK_VEHICLE_CHIPS } from '../api/serviceCenters';
+import {
+  DISCOVERY_DEFAULT_RADIUS_KM,
+  DISCOVERY_QUICK_VEHICLE_CHIPS,
+} from '../api/serviceCenters';
 import { spreadShopMarkersForMap } from '../utils/mapMarkerSpread';
 import { shopHasMappableCoordinates } from '../utils/mapDiscoveryData';
 import { getWebGeolocation } from '../utils/webGeolocation';
@@ -92,6 +96,35 @@ function ChangeView({ center, zoom }) {
   useEffect(() => {
     if (center) map.setView(center, zoom);
   }, [center, zoom, map]);
+  return null;
+}
+
+/** Debounced viewport → nearby refetch (expand map = load more). */
+function MapBoundsWatcher({ onBoundsChange, enabled = true }) {
+  const timerRef = useRef(null);
+  const map = useMapEvents({
+    moveend: () => {
+      if (!enabled) return;
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        const b = map.getBounds();
+        onBoundsChange?.({
+          min_lat: b.getSouth(),
+          max_lat: b.getNorth(),
+          min_lon: b.getWest(),
+          max_lon: b.getEast(),
+        });
+      }, 350);
+    },
+  });
+
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    []
+  );
+
   return null;
 }
 
@@ -179,6 +212,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
 
   const {
     shops,
+    resultMeta,
     loading,
     addressQuery,
     setAddressQuery,
@@ -197,10 +231,16 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     setVerifiedOnly,
     openNowOnly,
     setOpenNowOnly,
+    showInactive,
+    setShowInactive,
+    showClosed,
+    setShowClosed,
     minRating,
     setMinRating,
     radiusKm,
     setRadiusKm,
+    applyMapBounds,
+    clearMapBounds,
     citySlug,
     sort,
     setSort,
@@ -329,6 +369,8 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     try {
       const { latitude, longitude } = await getWebGeolocation();
       const coords = [latitude, longitude];
+      clearMapBounds();
+      setRadiusKm(DISCOVERY_DEFAULT_RADIUS_KM);
       setUserLocation(coords);
       setUserLocatedExplicitly(true);
       setCenter(coords);
@@ -489,10 +531,21 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     categoryOptions,
     repairTypeChipOptions,
     brands,
+    openNowOnly,
+    setOpenNowOnly,
+    verifiedOnly,
+    setVerifiedOnly,
+    showInactive,
+    setShowInactive,
+    showClosed,
+    setShowClosed,
   };
 
   const cityLabel = matchedCity?.name || 'Sofia';
-  const resultsLabel = t('serviceCenters.resultsCount', { count: shops.length });
+  const resultsLabel = t('serviceCenters.resultsCountInArea', { count: shops.length });
+  const truncatedHint = resultMeta?.truncated
+    ? t('serviceCenters.resultsTruncated')
+    : null;
 
   const quickChipsRow = (
     <ScrollView
@@ -714,6 +767,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
       {isDesktop ? (
         <View style={styles.listPanelHeader}>
           <Text style={styles.resultsCount}>{resultsLabel}</Text>
+          {truncatedHint ? <Text style={styles.truncatedHint}>{truncatedHint}</Text> : null}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -789,6 +843,10 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     <MapContainer center={center} zoom={zoom} style={mapStyle} zoomControl={false}>
       <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <ChangeView center={center} zoom={zoom} />
+      <MapBoundsWatcher
+        enabled={!citySlug && !activeSearchTerm}
+        onBoundsChange={applyMapBounds}
+      />
       {selectedShop ? (
         <FocusMarker
           position={[
@@ -1181,6 +1239,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#475569',
+  },
+  truncatedHint: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 4,
   },
   listScroll: { flex: 1 },
   listContent: {},

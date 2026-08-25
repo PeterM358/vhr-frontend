@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { getServiceCenters } from '../api/serviceCenters';
+import {
+  DISCOVERY_DEFAULT_CENTER,
+  DISCOVERY_DEFAULT_RADIUS_KM,
+  getServiceCenters,
+} from '../api/serviceCenters';
 import { searchDiscoveryCities } from '../api/profiles';
 import { API_BASE_URL } from '../api/config';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -56,6 +60,12 @@ export function useServiceCenterDiscovery({
   initialBrandSlug = null,
 } = {}) {
   const [allShops, setAllShops] = useState([]);
+  const [resultMeta, setResultMeta] = useState({
+    count: 0,
+    truncated: false,
+    limit: 0,
+    scope: null,
+  });
   const [loading, setLoading] = useState(true);
   const [addressQuery, setAddressQuery] = useState('');
   const [activeSearchTerm, setActiveSearchTerm] = useState('');
@@ -66,8 +76,11 @@ export function useServiceCenterDiscovery({
   const [brandSlug, setBrandSlug] = useState(initialBrandSlug);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [openNowOnly, setOpenNowOnly] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
+  const [showClosed, setShowClosed] = useState(false);
   const [minRating, setMinRating] = useState(null);
-  const [radiusKm, setRadiusKm] = useState(null);
+  const [radiusKm, setRadiusKm] = useState(DISCOVERY_DEFAULT_RADIUS_KM);
+  const [mapBounds, setMapBounds] = useState(null);
   const [citySlug, setCitySlug] = useState(initialCitySlug);
   const [matchedCity, setMatchedCity] = useState(null);
   const [sort, setSort] = useState('recommended');
@@ -84,12 +97,15 @@ export function useServiceCenterDiscovery({
   const matchedCityRef = useRef(null);
   const citySlugRef = useRef(initialCitySlug);
   const userLocRef = useRef(null);
+  const mapBoundsRef = useRef(null);
   const lastAnalyticsFingerprintRef = useRef('');
+  const fetchGenRef = useRef(0);
 
   activeSearchRef.current = activeSearchTerm;
   matchedCityRef.current = matchedCity;
   citySlugRef.current = citySlug;
   userLocRef.current = userLocatedExplicitly ? userLocation : null;
+  mapBoundsRef.current = mapBounds;
 
   const categoryOptions = useMemo(
     () => buildCategoryFilterOptions(repairTypes, { t, locale }),
@@ -175,7 +191,43 @@ export function useServiceCenterDiscovery({
     );
   }, []);
 
+  const applyMapBounds = useCallback((bounds) => {
+    if (
+      !bounds
+      || bounds.min_lat == null
+      || bounds.max_lat == null
+      || bounds.min_lon == null
+      || bounds.max_lon == null
+    ) {
+      return;
+    }
+    const next = {
+      min_lat: Number(bounds.min_lat),
+      max_lat: Number(bounds.max_lat),
+      min_lon: Number(bounds.min_lon),
+      max_lon: Number(bounds.max_lon),
+    };
+    const prev = mapBoundsRef.current;
+    if (
+      prev
+      && Math.abs(prev.min_lat - next.min_lat) < 0.0005
+      && Math.abs(prev.max_lat - next.max_lat) < 0.0005
+      && Math.abs(prev.min_lon - next.min_lon) < 0.0005
+      && Math.abs(prev.max_lon - next.max_lon) < 0.0005
+    ) {
+      return;
+    }
+    mapBoundsRef.current = next;
+    setMapBounds(next);
+  }, []);
+
+  const clearMapBounds = useCallback(() => {
+    mapBoundsRef.current = null;
+    setMapBounds(null);
+  }, []);
+
   const fetchShops = useCallback(async () => {
+    const gen = ++fetchGenRef.current;
     setLoading(true);
     setLoadError(null);
     setAuthRequired(false);
@@ -190,8 +242,9 @@ export function useServiceCenterDiscovery({
       const currentCity = matchedCityRef.current;
       const currentCitySlug = citySlugRef.current;
       const useCityFilter = shouldUseCityFilter(rawTerm, currentCity, currentCitySlug);
+      const bounds = mapBoundsRef.current;
 
-      const filters = { sort };
+      const filters = { sort, limit: 300 };
       if (rawTerm && !useCityFilter) filters.search = rawTerm;
       if (currentCitySlug) filters.city_slug = currentCitySlug;
       if (selectedVehicleType) filters.vehicle_type = selectedVehicleType;
@@ -199,19 +252,40 @@ export function useServiceCenterDiscovery({
       if (selectedRepairType) filters.repair_type = selectedRepairType;
       if (verifiedOnly) filters.verified = true;
       if (openNowOnly) filters.open_now = true;
+      if (showInactive) filters.show_inactive = true;
+      if (showClosed) filters.show_closed = true;
       if (minRating != null) filters.min_rating = minRating;
       if (selectedBrand) filters.brand = selectedBrand;
-      if (radiusKm != null && userLocRef.current) {
-        filters.radius_km = radiusKm;
-        filters.lat = userLocRef.current[0];
-        filters.lon = userLocRef.current[1];
-      } else if (userLocRef.current) {
-        filters.lat = userLocRef.current[0];
-        filters.lon = userLocRef.current[1];
+
+      if (bounds && !currentCitySlug && !(rawTerm && !useCityFilter)) {
+        filters.min_lat = bounds.min_lat;
+        filters.max_lat = bounds.max_lat;
+        filters.min_lon = bounds.min_lon;
+        filters.max_lon = bounds.max_lon;
+        if (userLocRef.current) {
+          filters.lat = userLocRef.current[0];
+          filters.lon = userLocRef.current[1];
+        }
+      } else {
+        const loc = userLocRef.current;
+        const lat = loc ? loc[0] : DISCOVERY_DEFAULT_CENTER.lat;
+        const lon = loc ? loc[1] : DISCOVERY_DEFAULT_CENTER.lon;
+        const effectiveRadius =
+          radiusKm != null ? radiusKm : DISCOVERY_DEFAULT_RADIUS_KM;
+        filters.lat = lat;
+        filters.lon = lon;
+        if (!currentCitySlug && !(rawTerm && !useCityFilter)) {
+          filters.radius_km = effectiveRadius;
+        } else if (radiusKm != null && loc) {
+          filters.radius_km = radiusKm;
+        }
       }
 
       const headers = hadValidToken ? { Authorization: `Bearer ${token}` } : {};
-      const shopsArray = await getServiceCenters(filters, { headers });
+      const payload = await getServiceCenters(filters, { headers });
+      if (gen !== fetchGenRef.current) return;
+
+      const shopsArray = payload.results || [];
       const normalized = shopsArray.map((shop) => ({
         ...shop,
         isMyShop:
@@ -224,13 +298,23 @@ export function useServiceCenterDiscovery({
         normalized_count: normalized.length,
         unique_count: uniqueShops.length,
         duplicate_ids: duplicateIds,
+        truncated: payload.truncated,
+        scope: payload.scope,
       });
 
       setAllShops(uniqueShops);
+      setResultMeta({
+        count: payload.count,
+        truncated: payload.truncated,
+        limit: payload.limit,
+        scope: payload.scope,
+      });
     } catch (error) {
+      if (gen !== fetchGenRef.current) return;
       const status = error.response?.status;
       console.error('Error fetching shops:', error);
       setAllShops([]);
+      setResultMeta({ count: 0, truncated: false, limit: 0, scope: null });
       if (status === 401) {
         setAuthRequired(true);
         setLoadError(error.message || 'Sign in required to view service centers');
@@ -245,7 +329,7 @@ export function useServiceCenterDiscovery({
         setLoadError(error.message || 'Could not load service centers');
       }
     } finally {
-      setLoading(false);
+      if (gen === fetchGenRef.current) setLoading(false);
     }
   }, [
     selectedVehicleType,
@@ -253,6 +337,8 @@ export function useServiceCenterDiscovery({
     selectedRepairType,
     verifiedOnly,
     openNowOnly,
+    showInactive,
+    showClosed,
     minRating,
     selectedBrand,
     radiusKm,
@@ -264,6 +350,7 @@ export function useServiceCenterDiscovery({
     const term = String(addressQuery || '').trim();
     setActiveSearchTerm(term);
     activeSearchRef.current = term;
+    clearMapBounds();
 
     if (!term) {
       setMatchedCity(null);
@@ -271,9 +358,6 @@ export function useServiceCenterDiscovery({
       setCitySlug(null);
       citySlugRef.current = null;
       await fetchShops();
-      if (__DEV__) {
-        console.log('[search] query= cleared matched_city= region=default');
-      }
       return { matchedCity: null, citySlug: null };
     }
 
@@ -306,20 +390,8 @@ export function useServiceCenterDiscovery({
     }
 
     await fetchShops();
-
-    if (__DEV__) {
-      console.log(
-        '[search] query=',
-        term,
-        'matched_city=',
-        nextMatchedCity?.name || nextMatchedCity?.slug_en || 'none',
-        'city_slug=',
-        nextCitySlug || 'none'
-      );
-    }
-
     return { matchedCity: nextMatchedCity, citySlug: nextCitySlug };
-  }, [addressQuery, fetchShops]);
+  }, [addressQuery, clearMapBounds, fetchShops]);
 
   const clearFilters = useCallback(
     async ({ keepCitySlug = null } = {}) => {
@@ -330,8 +402,11 @@ export function useServiceCenterDiscovery({
       setBrandSlug(null);
       setVerifiedOnly(false);
       setOpenNowOnly(false);
+      setShowInactive(false);
+      setShowClosed(false);
       setMinRating(null);
-      setRadiusKm(null);
+      setRadiusKm(DISCOVERY_DEFAULT_RADIUS_KM);
+      clearMapBounds();
       setAddressQuery('');
       setActiveSearchTerm('');
       activeSearchRef.current = '';
@@ -346,12 +421,13 @@ export function useServiceCenterDiscovery({
       }
       await fetchShops();
     },
-    [fetchShops]
+    [clearMapBounds, fetchShops]
   );
 
   const showAllInMatchedCity = useCallback(async () => {
     const slug = citySlugFromMatch(matchedCity) || citySlug || 'sofia';
     const cityName = matchedCity?.name || 'Sofia';
+    clearMapBounds();
     setAddressQuery('');
     setActiveSearchTerm('');
     activeSearchRef.current = '';
@@ -360,7 +436,7 @@ export function useServiceCenterDiscovery({
     setCitySlug(slug);
     citySlugRef.current = slug;
     await fetchShops();
-  }, [citySlug, fetchShops, matchedCity]);
+  }, [citySlug, clearMapBounds, fetchShops, matchedCity]);
 
   useEffect(() => {
     fetchShops().catch(() => {});
@@ -371,11 +447,14 @@ export function useServiceCenterDiscovery({
     citySlug,
     verifiedOnly,
     openNowOnly,
+    showInactive,
+    showClosed,
     minRating,
     selectedBrand,
     radiusKm,
     sort,
     userLocatedExplicitly,
+    mapBounds,
     fetchShops,
   ]);
 
@@ -423,6 +502,8 @@ export function useServiceCenterDiscovery({
     selectedCategory,
     verifiedOnly,
     openNowOnly,
+    showInactive,
+    showClosed,
     minRating,
     radiusKm,
     sort,
@@ -431,6 +512,7 @@ export function useServiceCenterDiscovery({
 
   return {
     shops,
+    resultMeta,
     loading,
     addressQuery,
     setAddressQuery,
@@ -449,10 +531,17 @@ export function useServiceCenterDiscovery({
     setVerifiedOnly,
     openNowOnly,
     setOpenNowOnly,
+    showInactive,
+    setShowInactive,
+    showClosed,
+    setShowClosed,
     minRating,
     setMinRating,
     radiusKm,
     setRadiusKm,
+    mapBounds,
+    applyMapBounds,
+    clearMapBounds,
     citySlug,
     setCitySlug,
     matchedCity,

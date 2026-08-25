@@ -4302,6 +4302,7 @@
     "applyFilters": "Apply filters",
     "resultsCount": "{count} service centers",
     "resultsCountInArea": "{count} in this area",
+    "resultsTruncated": "Showing top results — pan or zoom the map to load more.",
     "emptyTitle": "No service centers match these filters.",
     "clearFilters": "Clear filters",
     "showAllInCity": "Show all in {city}",

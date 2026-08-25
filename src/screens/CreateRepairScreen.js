@@ -339,7 +339,7 @@ export default function CreateRepairScreen({ navigation, route }) {
         const data = await getServiceCenters(filters, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
-        setServiceCenters(data);
+        setServiceCenters(Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : []);
       } catch (err) {
         console.warn('Failed to load service centers for targeting', err);
         setServiceCenters([]);

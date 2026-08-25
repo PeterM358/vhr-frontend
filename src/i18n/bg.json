@@ -4257,6 +4257,7 @@
     "applyFilters": "Приложи филтрите",
     "resultsCount": "{count} сервиза",
     "resultsCountInArea": "{count} в тази зона",
+    "resultsTruncated": "Показваме топ резултатите — преместете или приближете картата за още.",
     "emptyTitle": "Няма сервизи, отговарящи на филтрите.",
     "clearFilters": "Изчисти филтрите",
     "showAllInCity": "Покажи всички в {city}",
