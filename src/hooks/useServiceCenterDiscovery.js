@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import {
-  DISCOVERY_DEFAULT_CENTER,
-  DISCOVERY_DEFAULT_RADIUS_KM,
-  getServiceCenters,
-} from '../api/serviceCenters';
+import { getServiceCenters } from '../api/serviceCenters';
 import { searchDiscoveryCities } from '../api/profiles';
 import { API_BASE_URL } from '../api/config';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -79,8 +75,7 @@ export function useServiceCenterDiscovery({
   const [showInactive, setShowInactive] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
   const [minRating, setMinRating] = useState(null);
-  const [radiusKm, setRadiusKm] = useState(DISCOVERY_DEFAULT_RADIUS_KM);
-  const [mapBounds, setMapBounds] = useState(null);
+  const [radiusKm, setRadiusKm] = useState(null);
   const [citySlug, setCitySlug] = useState(initialCitySlug);
   const [matchedCity, setMatchedCity] = useState(null);
   const [sort, setSort] = useState('recommended');
@@ -97,7 +92,6 @@ export function useServiceCenterDiscovery({
   const matchedCityRef = useRef(null);
   const citySlugRef = useRef(initialCitySlug);
   const userLocRef = useRef(null);
-  const mapBoundsRef = useRef(null);
   const lastAnalyticsFingerprintRef = useRef('');
   const fetchGenRef = useRef(0);
 
@@ -105,7 +99,6 @@ export function useServiceCenterDiscovery({
   matchedCityRef.current = matchedCity;
   citySlugRef.current = citySlug;
   userLocRef.current = userLocatedExplicitly ? userLocation : null;
-  mapBoundsRef.current = mapBounds;
 
   const categoryOptions = useMemo(
     () => buildCategoryFilterOptions(repairTypes, { t, locale }),
@@ -191,41 +184,6 @@ export function useServiceCenterDiscovery({
     );
   }, []);
 
-  const applyMapBounds = useCallback((bounds) => {
-    if (
-      !bounds
-      || bounds.min_lat == null
-      || bounds.max_lat == null
-      || bounds.min_lon == null
-      || bounds.max_lon == null
-    ) {
-      return;
-    }
-    const next = {
-      min_lat: Number(bounds.min_lat),
-      max_lat: Number(bounds.max_lat),
-      min_lon: Number(bounds.min_lon),
-      max_lon: Number(bounds.max_lon),
-    };
-    const prev = mapBoundsRef.current;
-    if (
-      prev
-      && Math.abs(prev.min_lat - next.min_lat) < 0.0005
-      && Math.abs(prev.max_lat - next.max_lat) < 0.0005
-      && Math.abs(prev.min_lon - next.min_lon) < 0.0005
-      && Math.abs(prev.max_lon - next.max_lon) < 0.0005
-    ) {
-      return;
-    }
-    mapBoundsRef.current = next;
-    setMapBounds(next);
-  }, []);
-
-  const clearMapBounds = useCallback(() => {
-    mapBoundsRef.current = null;
-    setMapBounds(null);
-  }, []);
-
   const fetchShops = useCallback(async () => {
     const gen = ++fetchGenRef.current;
     setLoading(true);
@@ -242,9 +200,9 @@ export function useServiceCenterDiscovery({
       const currentCity = matchedCityRef.current;
       const currentCitySlug = citySlugRef.current;
       const useCityFilter = shouldUseCityFilter(rawTerm, currentCity, currentCitySlug);
-      const bounds = mapBoundsRef.current;
 
-      const filters = { sort, limit: 300 };
+      // Full pin dump by default (PHP-era). Optional radius only when user picks a distance filter.
+      const filters = { sort };
       if (rawTerm && !useCityFilter) filters.search = rawTerm;
       if (currentCitySlug) filters.city_slug = currentCitySlug;
       if (selectedVehicleType) filters.vehicle_type = selectedVehicleType;
@@ -256,29 +214,12 @@ export function useServiceCenterDiscovery({
       if (showClosed) filters.show_closed = true;
       if (minRating != null) filters.min_rating = minRating;
       if (selectedBrand) filters.brand = selectedBrand;
-
-      if (bounds && !currentCitySlug && !(rawTerm && !useCityFilter)) {
-        filters.min_lat = bounds.min_lat;
-        filters.max_lat = bounds.max_lat;
-        filters.min_lon = bounds.min_lon;
-        filters.max_lon = bounds.max_lon;
-        if (userLocRef.current) {
-          filters.lat = userLocRef.current[0];
-          filters.lon = userLocRef.current[1];
-        }
-      } else {
-        const loc = userLocRef.current;
-        const lat = loc ? loc[0] : DISCOVERY_DEFAULT_CENTER.lat;
-        const lon = loc ? loc[1] : DISCOVERY_DEFAULT_CENTER.lon;
-        const effectiveRadius =
-          radiusKm != null ? radiusKm : DISCOVERY_DEFAULT_RADIUS_KM;
-        filters.lat = lat;
-        filters.lon = lon;
-        if (!currentCitySlug && !(rawTerm && !useCityFilter)) {
-          filters.radius_km = effectiveRadius;
-        } else if (radiusKm != null && loc) {
-          filters.radius_km = radiusKm;
-        }
+      if (userLocRef.current) {
+        filters.lat = userLocRef.current[0];
+        filters.lon = userLocRef.current[1];
+      }
+      if (radiusKm != null && userLocRef.current) {
+        filters.radius_km = radiusKm;
       }
 
       const headers = hadValidToken ? { Authorization: `Bearer ${token}` } : {};
@@ -350,7 +291,6 @@ export function useServiceCenterDiscovery({
     const term = String(addressQuery || '').trim();
     setActiveSearchTerm(term);
     activeSearchRef.current = term;
-    clearMapBounds();
 
     if (!term) {
       setMatchedCity(null);
@@ -391,7 +331,7 @@ export function useServiceCenterDiscovery({
 
     await fetchShops();
     return { matchedCity: nextMatchedCity, citySlug: nextCitySlug };
-  }, [addressQuery, clearMapBounds, fetchShops]);
+  }, [addressQuery, fetchShops]);
 
   const clearFilters = useCallback(
     async ({ keepCitySlug = null } = {}) => {
@@ -405,8 +345,7 @@ export function useServiceCenterDiscovery({
       setShowInactive(false);
       setShowClosed(false);
       setMinRating(null);
-      setRadiusKm(DISCOVERY_DEFAULT_RADIUS_KM);
-      clearMapBounds();
+      setRadiusKm(null);
       setAddressQuery('');
       setActiveSearchTerm('');
       activeSearchRef.current = '';
@@ -421,13 +360,12 @@ export function useServiceCenterDiscovery({
       }
       await fetchShops();
     },
-    [clearMapBounds, fetchShops]
+    [fetchShops]
   );
 
   const showAllInMatchedCity = useCallback(async () => {
     const slug = citySlugFromMatch(matchedCity) || citySlug || 'sofia';
     const cityName = matchedCity?.name || 'Sofia';
-    clearMapBounds();
     setAddressQuery('');
     setActiveSearchTerm('');
     activeSearchRef.current = '';
@@ -436,7 +374,7 @@ export function useServiceCenterDiscovery({
     setCitySlug(slug);
     citySlugRef.current = slug;
     await fetchShops();
-  }, [citySlug, clearMapBounds, fetchShops, matchedCity]);
+  }, [citySlug, fetchShops, matchedCity]);
 
   useEffect(() => {
     fetchShops().catch(() => {});
@@ -454,7 +392,6 @@ export function useServiceCenterDiscovery({
     radiusKm,
     sort,
     userLocatedExplicitly,
-    mapBounds,
     fetchShops,
   ]);
 
@@ -539,9 +476,6 @@ export function useServiceCenterDiscovery({
     setMinRating,
     radiusKm,
     setRadiusKm,
-    mapBounds,
-    applyMapBounds,
-    clearMapBounds,
     citySlug,
     setCitySlug,
     matchedCity,

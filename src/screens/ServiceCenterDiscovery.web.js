@@ -20,7 +20,6 @@ import {
   Marker,
   Popup,
   useMap,
-  useMapEvents,
   ZoomControl,
 } from 'react-leaflet';
 import L from 'leaflet';
@@ -43,10 +42,7 @@ import DiscoveryViewToggle from '../components/serviceCenters/DiscoveryViewToggl
 import DiscoverySortSheet, { DiscoverySortTrigger } from '../components/serviceCenters/DiscoverySortSheet';
 import DiscoveryCompactFooter from '../components/serviceCenters/DiscoveryCompactFooter';
 import DISCOVERY_MOBILE, { discoveryMinFont } from '../components/serviceCenters/discoveryMobileTokens';
-import {
-  DISCOVERY_DEFAULT_RADIUS_KM,
-  DISCOVERY_QUICK_VEHICLE_CHIPS,
-} from '../api/serviceCenters';
+import { DISCOVERY_QUICK_VEHICLE_CHIPS } from '../api/serviceCenters';
 import { spreadShopMarkersForMap } from '../utils/mapMarkerSpread';
 import { shopHasMappableCoordinates } from '../utils/mapDiscoveryData';
 import { getWebGeolocation } from '../utils/webGeolocation';
@@ -91,40 +87,15 @@ function configureLeafletIcons() {
   });
 }
 
-function ChangeView({ center, zoom }) {
+function ChangeView({ center, zoom, revision }) {
   const map = useMap();
+  const lastRevisionRef = useRef(null);
   useEffect(() => {
-    if (center) map.setView(center, zoom);
-  }, [center, zoom, map]);
-  return null;
-}
-
-/** Debounced viewport → nearby refetch (expand map = load more). */
-function MapBoundsWatcher({ onBoundsChange, enabled = true }) {
-  const timerRef = useRef(null);
-  const map = useMapEvents({
-    moveend: () => {
-      if (!enabled) return;
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        const b = map.getBounds();
-        onBoundsChange?.({
-          min_lat: b.getSouth(),
-          max_lat: b.getNorth(),
-          min_lon: b.getWest(),
-          max_lon: b.getEast(),
-        });
-      }, 350);
-    },
-  });
-
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    },
-    []
-  );
-
+    if (!center || revision == null) return;
+    if (lastRevisionRef.current === revision) return;
+    lastRevisionRef.current = revision;
+    map.setView(center, zoom);
+  }, [center, zoom, revision, map]);
   return null;
 }
 
@@ -201,6 +172,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
 
   const [mapReady, setMapReady] = useState(false);
   const [center, setCenter] = useState(DEFAULT_MAP_CENTER);
+  const [viewRevision, setViewRevision] = useState(0);
   const [locating, setLocating] = useState(false);
   const [geoHint, setGeoHint] = useState('');
   const [mobileTab, setMobileTab] = useState('list');
@@ -239,8 +211,6 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     setMinRating,
     radiusKm,
     setRadiusKm,
-    applyMapBounds,
-    clearMapBounds,
     citySlug,
     sort,
     setSort,
@@ -318,18 +288,16 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   }, []);
 
   useEffect(() => {
+    // Only recenter for explicit city search — never on shops refetch (that snapped the map).
     if (matchedCity?.latitude != null && matchedCity?.longitude != null) {
       const lat = parseFloat(matchedCity.latitude);
       const lng = parseFloat(matchedCity.longitude);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) setCenter([lat, lng]);
-      return;
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        setCenter([lat, lng]);
+        setViewRevision((n) => n + 1);
+      }
     }
-    if (!userLocatedExplicitly && shops.length > 0) {
-      const lat = parseFloat(shops[0].latitude);
-      const lng = parseFloat(shops[0].longitude);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) setCenter([lat, lng]);
-    }
-  }, [shops, userLocatedExplicitly, matchedCity]);
+  }, [matchedCity]);
 
   useEffect(() => {
     if (!selectedListId) return;
@@ -369,11 +337,10 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     try {
       const { latitude, longitude } = await getWebGeolocation();
       const coords = [latitude, longitude];
-      clearMapBounds();
-      setRadiusKm(DISCOVERY_DEFAULT_RADIUS_KM);
       setUserLocation(coords);
       setUserLocatedExplicitly(true);
       setCenter(coords);
+      setViewRevision((n) => n + 1);
       await discovery.fetchShops();
     } catch (err) {
       setGeoHint(err?.message || t('serviceCenters.geoError'));
@@ -542,7 +509,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   };
 
   const cityLabel = matchedCity?.name || 'Sofia';
-  const resultsLabel = t('serviceCenters.resultsCountInArea', { count: shops.length });
+  const resultsLabel = t('serviceCenters.resultsCount', { count: shops.length });
   const truncatedHint = resultMeta?.truncated
     ? t('serviceCenters.resultsTruncated')
     : null;
@@ -842,11 +809,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   ) : (
     <MapContainer center={center} zoom={zoom} style={mapStyle} zoomControl={false}>
       <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      <ChangeView center={center} zoom={zoom} />
-      <MapBoundsWatcher
-        enabled={!citySlug && !activeSearchTerm}
-        onBoundsChange={applyMapBounds}
-      />
+      <ChangeView center={center} zoom={zoom} revision={viewRevision} />
       {selectedShop ? (
         <FocusMarker
           position={[
