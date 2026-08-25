@@ -86,8 +86,8 @@ Located under `src/components/ui/`:
 |------|----------------|
 | Dashboard entity name (shop/org) | Hidden on compact (`width < 768` / mobile web) in `PartnerAppHeader` / `OrgAppHeader` — use storefront / profile icon |
 | Sticky CTAs | **In document flow**, not `position: absolute` over the field (`WizardChrome`) |
-| While typing on compact | Hide bottom CTA (`useHideStickyChromeForKeyboard`) so the focused input stays visible above the keyboard (iPhone Safari / Chrome) |
-| Shared hooks | `useKeyboardOpen`, `useIsCompactChrome`, `useHideStickyChromeForKeyboard` |
+| While typing on compact | **Editing mode**: hide progress dots / big step title, hide bottom CTA, hide `AppFooter`, compact nav — driven by **input focus** + visualViewport baseline (`useCompactEditingChrome`) |
+| Shared hooks | `useKeyboardOpen`, `useTextInputFocused`, `useIsCompactChrome`, `useCompactEditingChrome` |
 | Form footers | `StickyFormFooter` default `variant="dock"`; `overlay` only for legacy absolute docks |
 
 Do **not** add one-off `bottom: keyboardHeight` hacks per screen — extend the shared chrome.

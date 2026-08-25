@@ -126,7 +126,8 @@ export default function WizardChrome({
   const chromeBottom = useMobileWebBrowserChromeBottom();
   const isCompact = useIsCompactChrome();
   const hideActionsForKeyboard = useHideStickyChromeForKeyboard();
-  const footerSafeBottom = hideActionsForKeyboard
+  const editingChrome = hideActionsForKeyboard;
+  const footerSafeBottom = editingChrome
     ? 0
     : Math.max(insets.bottom, chromeBottom, 12);
   const {
@@ -203,55 +204,66 @@ export default function WizardChrome({
 
   return (
     <View style={styles.host}>
-      {/* Progress header + interactive step bar */}
-      <View style={[styles.header, isCompact && styles.headerCompact]}>
-        <View style={styles.headerRow}>
-          <Text style={styles.stepCounter}>
-            {t('wizard.stepXofY', { current: index + 1, total }, `Step ${index + 1} of ${total}`)}
-          </Text>
-          <Text style={styles.percent}>{displayedPercent}%</Text>
-        </View>
-        {showStepBar && steps.length > 1 ? (
-          <WizardStepBar
-            steps={steps}
-            index={index}
-            completedStepIds={completedStepIds || []}
-            adapterProgress={adapterProgress}
-            goTo={goTo}
-            disabled={saving}
-            compact={isCompact}
+      {/* Collapse progress chrome while typing on compact — field needs the viewport. */}
+      {!editingChrome ? (
+        <View style={[styles.header, isCompact && styles.headerCompact]}>
+          <View style={styles.headerRow}>
+            <Text style={styles.stepCounter}>
+              {t('wizard.stepXofY', { current: index + 1, total }, `Step ${index + 1} of ${total}`)}
+            </Text>
+            <Text style={styles.percent}>{displayedPercent}%</Text>
+          </View>
+          {showStepBar && steps.length > 1 ? (
+            <WizardStepBar
+              steps={steps}
+              index={index}
+              completedStepIds={completedStepIds || []}
+              adapterProgress={adapterProgress}
+              goTo={goTo}
+              disabled={saving}
+              compact={isCompact}
+            />
+          ) : null}
+          {stepTitle ? (
+            <Text style={[styles.stepTitle, isCompact && styles.stepTitleCompact]}>{stepTitle}</Text>
+          ) : null}
+          <ProgressBar
+            progress={displayedProgress}
+            color={COLORS.PRIMARY}
+            style={styles.progressBar}
           />
-        ) : null}
-        {stepTitle ? (
-          <Text style={[styles.stepTitle, isCompact && styles.stepTitleCompact]}>{stepTitle}</Text>
-        ) : null}
-        <ProgressBar
-          progress={displayedProgress}
-          color={COLORS.PRIMARY}
-          style={styles.progressBar}
-        />
-      </View>
+        </View>
+      ) : (
+        <View style={styles.editingHeader} accessibilityRole="header">
+          <Text style={styles.editingHeaderText}>
+            {stepTitle
+              ? stepTitle
+              : t('wizard.stepXofY', { current: index + 1, total }, `Step ${index + 1} of ${total}`)}
+          </Text>
+        </View>
+      )}
 
       {/* Step body — flex:1 so the in-flow footer stays at the bottom of the host */}
       <KeyboardAwareScrollView
         style={styles.scroll}
         contentContainerStyle={[
           styles.body,
-          { paddingBottom: hideActionsForKeyboard ? 24 : 20 },
+          { paddingBottom: editingChrome ? 16 : 20 },
           contentContainerStyle,
         ]}
         keyboardShouldPersistTaps="always"
         enableOnAndroid
         enableAutomaticScroll
-        extraScrollHeight={isCompact ? 48 : 24}
+        extraScrollHeight={isCompact ? 72 : 24}
         keyboardOpeningTime={0}
+        enableResetScrollToCoords={false}
       >
         {StepComponent ? <StepComponent /> : null}
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </KeyboardAwareScrollView>
 
       {/* In-flow actions (not absolute). Hidden while typing on compact so fields stay visible. */}
-      {!hideActionsForKeyboard ? (
+      {!editingChrome ? (
         <View
           style={[styles.footer, { paddingBottom: footerSafeBottom }]}
           accessibilityRole="toolbar"
@@ -347,6 +359,16 @@ const styles = StyleSheet.create({
   headerCompact: {
     paddingTop: 4,
     paddingBottom: 8,
+  },
+  editingHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 6,
+  },
+  editingHeaderText: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: 13,
+    fontWeight: '700',
   },
   headerRow: {
     flexDirection: 'row',

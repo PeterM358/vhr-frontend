@@ -20,6 +20,7 @@ import { useGarageScene } from '../context/GarageSceneContext';
 import { useGarageSceneCrossfade } from '../hooks/useGarageSceneCrossfade';
 import { DEFAULT_SCENE_ID, getSceneById, getSceneImageSource } from '../theme/garageScenes';
 import { AuthContext } from '../context/AuthManager';
+import { useHideStickyChromeForKeyboard } from '../hooks/useCompactChrome';
 import AppFooter from './common/AppFooter';
 import { RouteFooterBridge } from './screenBackgroundRoute';
 
@@ -110,15 +111,17 @@ export default function ScreenBackground({
   const useGarageSceneBackground = source == null;
   const authContext = useContext(AuthContext);
   const isAuthenticated = !!authContext?.isAuthenticated;
+  const hideFooterForKeyboard = useHideStickyChromeForKeyboard();
 
   const renderBackground = (showFooter) => {
+    const footerVisible = showFooter && !hideFooterForKeyboard;
     if (useGarageSceneBackground) {
       return (
         <View style={[styles.image, style]}>
           <GarageSceneBackgroundLayers blurRadius={blurRadius} />
           <Wrapper style={[styles.content, contentStyle]}>
             <View style={styles.contentWrapper}>{children}</View>
-            {showFooter ? <AppFooter /> : null}
+            {footerVisible ? <AppFooter /> : null}
           </Wrapper>
         </View>
       );
@@ -136,7 +139,7 @@ export default function ScreenBackground({
         <SceneGradientOverlay stops={stops} />
         <Wrapper style={[styles.content, contentStyle]}>
           <View style={styles.contentWrapper}>{children}</View>
-          {showFooter ? <AppFooter /> : null}
+          {footerVisible ? <AppFooter /> : null}
         </Wrapper>
       </ImageBackground>
     );

@@ -94,6 +94,11 @@ export function PartnerBusinessTypeStep() {
           onChangeText={(v) => setValues({ name: v })}
           placeholder={t('partnerOnboarding.businessNamePlaceholder', null, 'e.g. Veversal Auto Service')}
           style={styles.input}
+          contentStyle={styles.nameInputContent}
+          autoCorrect={false}
+          autoCapitalize="words"
+          returnKeyType="done"
+          blurOnSubmit
         />
       </FloatingCard>
 
@@ -1228,6 +1233,11 @@ const styles = StyleSheet.create({
   input: {
     marginBottom: 4,
     backgroundColor: '#fff',
+  },
+  nameInputContent: {
+    fontSize: 18,
+    minHeight: 28,
+    paddingVertical: 6,
   },
   fieldLabel: {
     fontSize: 13,

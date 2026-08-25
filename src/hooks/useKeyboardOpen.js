@@ -1,22 +1,35 @@
 /**
- * Cross-platform keyboard visibility for chrome decisions (sticky CTAs, etc.).
+ * Cross-platform keyboard / soft-input visibility for chrome decisions.
  *
- * - Native: Keyboard will/did show|hide
- * - Web: visualViewport shrink vs layout viewport (mobile Safari/Chrome)
+ * Web note: iOS Safari often resizes *both* `innerHeight` and `visualViewport`,
+ * so `innerHeight - vv.height` stays ~0. We keep a rising baseline of the
+ * largest recent visualViewport height and treat shrinks from that as keyboard.
  */
 
 import { useEffect, useState } from 'react';
 import { Keyboard, Platform } from 'react-native';
 
 /** Layout viewport px obscured before we treat the software keyboard as open. */
-export const KEYBOARD_OPEN_THRESHOLD_PX = 120;
+export const KEYBOARD_OPEN_THRESHOLD_PX = 80;
 
-function measureWebKeyboardOpen() {
-  if (typeof window === 'undefined' || !window.visualViewport) {
+function measureWebKeyboardOpen(baselineRef) {
+  if (typeof window === 'undefined') {
     return false;
   }
   const vv = window.visualViewport;
-  const obscured = window.innerHeight - vv.height - vv.offsetTop;
+  if (!vv) {
+    return false;
+  }
+  const h = vv.height;
+  if (!baselineRef.current || h > baselineRef.current) {
+    baselineRef.current = h;
+  }
+  const fromBaseline = baselineRef.current - h - (vv.offsetTop || 0);
+  if (fromBaseline > KEYBOARD_OPEN_THRESHOLD_PX) {
+    return true;
+  }
+  // Fallback when layout viewport does not shrink with the keyboard.
+  const obscured = window.innerHeight - h - (vv.offsetTop || 0);
   return obscured > KEYBOARD_OPEN_THRESHOLD_PX;
 }
 
@@ -31,7 +44,8 @@ export default function useKeyboardOpen() {
       if (typeof window === 'undefined') {
         return undefined;
       }
-      const update = () => setOpen(measureWebKeyboardOpen());
+      const baselineRef = { current: window.visualViewport?.height || window.innerHeight };
+      const update = () => setOpen(measureWebKeyboardOpen(baselineRef));
       update();
       const vv = window.visualViewport;
       if (vv) {

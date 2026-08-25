@@ -15,6 +15,7 @@ import { useRoute } from '@react-navigation/native';
 
 import ScreenBackground from '../components/ScreenBackground';
 import AppNavigationBar from '../components/common/AppNavigationBar';
+import { useCompactEditingChrome } from '../hooks/useCompactChrome';
 import { useTranslation } from '../i18n';
 import { WizardEngine } from '../wizard';
 import { usePartnerOnboardingData } from './partner/usePartnerOnboardingData';
@@ -35,6 +36,7 @@ import {
 
 export default function PartnerOnboardingScreen({ navigation }) {
   const { t } = useTranslation();
+  const editingChrome = useCompactEditingChrome();
   const route = useRoute();
   const preferredStepId = route?.params?.stepId || null;
   const { ready, error, adapter, initialValues, taxonomy, getCompletion, refreshProfile } =
@@ -292,8 +294,14 @@ export default function PartnerOnboardingScreen({ navigation }) {
     <ScreenBackground safeArea={false}>
       <View style={{ flex: 1 }}>
         <AppNavigationBar
-          title={t('partnerOnboarding.title', null, 'Set up your shop')}
+          title={
+            editingChrome
+              ? undefined
+              : t('partnerOnboarding.title', null, 'Set up your shop')
+          }
           onBack={onExit}
+          compact={editingChrome}
+          iconOnlyBack
         />
         <WizardEngine
           steps={steps}

@@ -7,6 +7,7 @@ import { Platform, useWindowDimensions } from 'react-native';
 
 import { MOBILE_WEB_BREAKPOINT, isMobileWebViewport } from '../utils/mobileWebInsets';
 import useKeyboardOpen from './useKeyboardOpen';
+import useTextInputFocused from './useTextInputFocused';
 
 /**
  * Phone / narrow layout — hide dashboard entity titles, denser wizard chrome.
@@ -23,11 +24,19 @@ export function useIsCompactChrome() {
 }
 
 /**
- * Hide absolute/sticky bottom CTAs while typing on compact surfaces so the
- * focused field stays visible above the keyboard (mobile web + native phones).
+ * Compact surface is in "typing / soft-keyboard" mode.
+ * Prefer focus detection on web; keyboard viewport as backup (native + web).
  */
-export function useHideStickyChromeForKeyboard() {
+export function useCompactEditingChrome() {
   const compact = useIsCompactChrome();
   const keyboardOpen = useKeyboardOpen();
-  return compact && keyboardOpen;
+  const inputFocused = useTextInputFocused();
+  return compact && (keyboardOpen || inputFocused);
+}
+
+/**
+ * Hide sticky / docked bottom CTAs + site footer while typing on compact surfaces.
+ */
+export function useHideStickyChromeForKeyboard() {
+  return useCompactEditingChrome();
 }
