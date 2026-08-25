@@ -17,6 +17,7 @@ import CompactLanguageSelector from '../common/CompactLanguageSelector';
 import GlassNavIconButton from '../navigation/GlassNavIconButton';
 import { AuthContext } from '../../context/AuthManager';
 import { logout } from '../../api/auth';
+import { useIsCompactChrome } from '../../hooks/useCompactChrome';
 import { useTranslation } from '../../i18n';
 import useOrgHeaderChrome from '../../hooks/useOrgHeaderChrome';
 
@@ -42,6 +43,9 @@ export default function OrgAppHeader({
   const { t } = useTranslation();
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
   const isDashboard = mode === 'dashboard';
+  const isCompactChrome = useIsCompactChrome();
+  const chromeTitle = isDashboard && isCompactChrome ? undefined : title;
+  const chromeSubtitle = isDashboard && isCompactChrome ? undefined : subtitle;
   const chrome = useOrgHeaderChrome({
     loadCalendarBadge: showCalendar && loadCalendarBadge,
   });
@@ -103,11 +107,11 @@ export default function OrgAppHeader({
     return (
       <AppNavigationBar
         showBack={false}
-        title={title}
-        subtitle={subtitle}
+        title={chromeTitle}
+        subtitle={chromeSubtitle}
         onTitlePress={onTitlePress}
         scrolled={scrolled}
-        compact={compact}
+        compact={compact || isCompactChrome}
         showLanguageSelector={false}
         style={style}
         leftAction={

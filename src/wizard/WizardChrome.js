@@ -4,7 +4,8 @@
 // (react-native-paper + RN primitives, matching the Veversal design system):
 //   - Interactive step bar (clickable; completed/started/required/optional)
 //   - Scrollable step body (keyboard-aware)
-//   - Sticky bottom action bar: Back / Skip / Save & continue (Finish on last)
+//   - Bottom action bar in document flow (not absolute) — stays above the keyboard
+//   - On compact + keyboard: hide CTA so the focused field is never covered
 //   - "Finish later" affordance + inline loading / error
 //
 // Callers can replace this entirely and drive the wizard from useWizard().
@@ -16,6 +17,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '../constants/colors';
+import { useHideStickyChromeForKeyboard, useIsCompactChrome } from '../hooks/useCompactChrome';
 import { useTranslation } from '../i18n';
 import { useMobileWebBrowserChromeBottom } from '../utils/mobileWebInsets';
 import { useWizard } from './WizardContext';
@@ -47,7 +49,7 @@ function resolveStepVisualState(step, index, currentIndex, completedStepIds, ste
   return 'required_incomplete';
 }
 
-function WizardStepBar({ steps, index, completedStepIds, adapterProgress, goTo, disabled }) {
+function WizardStepBar({ steps, index, completedStepIds, adapterProgress, goTo, disabled, compact }) {
   const stepStatesById = useMemo(() => {
     const map = {};
     const rows = adapterProgress?.step_states || adapterProgress?.sections || [];
@@ -58,6 +60,8 @@ function WizardStepBar({ steps, index, completedStepIds, adapterProgress, goTo, 
     });
     return map;
   }, [adapterProgress]);
+
+  const dotSize = compact ? 26 : 30;
 
   // Wrap (not nested horizontal ScrollView) so numbered steps stay visible on web + native.
   return (
@@ -85,6 +89,9 @@ function WizardStepBar({ steps, index, completedStepIds, adapterProgress, goTo, 
             style={({ pressed }) => [
               styles.stepDot,
               {
+                width: dotSize,
+                height: dotSize,
+                borderRadius: dotSize / 2,
                 borderColor: color,
                 backgroundColor: fill,
                 opacity: pressed ? 0.8 : 1,
@@ -94,6 +101,7 @@ function WizardStepBar({ steps, index, completedStepIds, adapterProgress, goTo, 
             <Text
               style={[
                 styles.stepDotText,
+                compact && styles.stepDotTextCompact,
                 { color: isCurrent ? '#0F172A' : color },
               ]}
             >
@@ -116,9 +124,12 @@ export default function WizardChrome({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const chromeBottom = useMobileWebBrowserChromeBottom();
-  const footerSafeBottom = Math.max(insets.bottom, chromeBottom, 12);
+  const isCompact = useIsCompactChrome();
+  const hideActionsForKeyboard = useHideStickyChromeForKeyboard();
+  const footerSafeBottom = hideActionsForKeyboard
+    ? 0
+    : Math.max(insets.bottom, chromeBottom, 12);
   const {
-
     steps,
     currentStep,
     index,
@@ -193,7 +204,7 @@ export default function WizardChrome({
   return (
     <View style={styles.host}>
       {/* Progress header + interactive step bar */}
-      <View style={styles.header}>
+      <View style={[styles.header, isCompact && styles.headerCompact]}>
         <View style={styles.headerRow}>
           <Text style={styles.stepCounter}>
             {t('wizard.stepXofY', { current: index + 1, total }, `Step ${index + 1} of ${total}`)}
@@ -208,9 +219,12 @@ export default function WizardChrome({
             adapterProgress={adapterProgress}
             goTo={goTo}
             disabled={saving}
+            compact={isCompact}
           />
         ) : null}
-        {stepTitle ? <Text style={styles.stepTitle}>{stepTitle}</Text> : null}
+        {stepTitle ? (
+          <Text style={[styles.stepTitle, isCompact && styles.stepTitleCompact]}>{stepTitle}</Text>
+        ) : null}
         <ProgressBar
           progress={displayedProgress}
           color={COLORS.PRIMARY}
@@ -218,40 +232,84 @@ export default function WizardChrome({
         />
       </View>
 
-      {/* Step body */}
+      {/* Step body — flex:1 so the in-flow footer stays at the bottom of the host */}
       <KeyboardAwareScrollView
-        style={{ flex: 1 }}
+        style={styles.scroll}
         contentContainerStyle={[
           styles.body,
-          { paddingBottom: footerSafeBottom + 120 },
+          { paddingBottom: hideActionsForKeyboard ? 24 : 20 },
           contentContainerStyle,
         ]}
         keyboardShouldPersistTaps="always"
         enableOnAndroid
-        extraScrollHeight={20}
+        enableAutomaticScroll
+        extraScrollHeight={isCompact ? 48 : 24}
+        keyboardOpeningTime={0}
       >
         {StepComponent ? <StepComponent /> : null}
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </KeyboardAwareScrollView>
 
-      {/* Sticky bottom actions */}
-      <View
-        pointerEvents="box-none"
-        style={[styles.footer, { paddingBottom: footerSafeBottom }]}
-      >
-        <View style={styles.footerBar}>
-          <View style={styles.footerLeft}>
-            {!isFirst ? (
+      {/* In-flow actions (not absolute). Hidden while typing on compact so fields stay visible. */}
+      {!hideActionsForKeyboard ? (
+        <View
+          style={[styles.footer, { paddingBottom: footerSafeBottom }]}
+          accessibilityRole="toolbar"
+        >
+          <View style={styles.footerBar}>
+            <View style={styles.footerLeft}>
+              {!isFirst ? (
+                <Button
+                  mode="text"
+                  onPress={goBack}
+                  disabled={saving}
+                  textColor={COLORS.TEXT_DARK}
+                  compact
+                >
+                  {t('wizard.back', null, 'Back')}
+                </Button>
+              ) : showFinishLater ? (
+                <Button
+                  mode="text"
+                  onPress={finishLater}
+                  disabled={saving}
+                  textColor={COLORS.TEXT_MUTED}
+                  compact
+                >
+                  {t('wizard.finishLater', null, 'Finish later')}
+                </Button>
+              ) : (
+                <View />
+              )}
+            </View>
+
+            <View style={styles.footerRight}>
+              {currentStep.optional && !isLast ? (
+                <Button
+                  mode="text"
+                  onPress={skip}
+                  disabled={saving}
+                  textColor={COLORS.TEXT_MUTED}
+                  compact
+                  style={styles.skipBtn}
+                >
+                  {t('wizard.skip', null, 'Skip')}
+                </Button>
+              ) : null}
               <Button
-                mode="text"
-                onPress={goBack}
+                mode="contained"
+                onPress={goNext}
+                loading={saving}
                 disabled={saving}
-                textColor={COLORS.TEXT_DARK}
-                compact
+                style={styles.nextBtn}
+                contentStyle={styles.nextBtnContent}
               >
-                {t('wizard.back', null, 'Back')}
+                {nextLabel}
               </Button>
-            ) : showFinishLater ? (
+            </View>
+          </View>
+          {!isFirst && showFinishLater ? (
+            <View style={styles.finishLaterUnder}>
               <Button
                 mode="text"
                 onPress={finishLater}
@@ -261,69 +319,34 @@ export default function WizardChrome({
               >
                 {t('wizard.finishLater', null, 'Finish later')}
               </Button>
-            ) : (
-              <View />
-            )}
-          </View>
-
-          <View style={styles.footerRight}>
-            {currentStep.optional && !isLast ? (
-              <Button
-                mode="text"
-                onPress={skip}
-                disabled={saving}
-                textColor={COLORS.TEXT_MUTED}
-                compact
-                style={styles.skipBtn}
-              >
-                {t('wizard.skip', null, 'Skip')}
-              </Button>
-            ) : null}
-            <Button
-              mode="contained"
-              onPress={goNext}
-              loading={saving}
-              disabled={saving}
-              style={styles.nextBtn}
-              contentStyle={styles.nextBtnContent}
-            >
-              {nextLabel}
-            </Button>
-          </View>
+              <Text style={styles.finishLaterHint}>
+                {t(
+                  'wizard.finishLaterHint',
+                  null,
+                  'You can finish anytime from Center details or the setup banner.'
+                )}
+              </Text>
+            </View>
+          ) : null}
         </View>
-        {!isFirst && showFinishLater ? (
-          <View style={styles.finishLaterUnder}>
-            <Button
-              mode="text"
-              onPress={finishLater}
-              disabled={saving}
-              textColor={COLORS.TEXT_MUTED}
-              compact
-            >
-              {t('wizard.finishLater', null, 'Finish later')}
-            </Button>
-            <Text style={styles.finishLaterHint}>
-              {t(
-                'wizard.finishLaterHint',
-                null,
-                'You can finish anytime from Center details or the setup banner.'
-              )}
-            </Text>
-          </View>
-        ) : null}
-      </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   host: { flex: 1 },
+  scroll: { flex: 1, minHeight: 0 },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   mutedText: { color: COLORS.TEXT_MUTED },
   header: {
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 12,
+  },
+  headerCompact: {
+    paddingTop: 4,
+    paddingBottom: 8,
   },
   headerRow: {
     flexDirection: 'row',
@@ -349,6 +372,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 8,
   },
+  stepTitleCompact: {
+    fontSize: 17,
+    marginBottom: 6,
+  },
   stepBar: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -358,9 +385,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   stepDot: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
@@ -368,6 +392,9 @@ const styles = StyleSheet.create({
   stepDotText: {
     fontSize: 12,
     fontWeight: '800',
+  },
+  stepDotTextCompact: {
+    fontSize: 11,
   },
   progressBar: {
     height: 6,
@@ -377,6 +404,7 @@ const styles = StyleSheet.create({
   body: {
     paddingHorizontal: 16,
     paddingTop: 4,
+    flexGrow: 1,
   },
   errorText: {
     color: '#DC2626',
@@ -386,12 +414,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
     alignItems: 'center',
+    paddingTop: 8,
     zIndex: 50,
+    backgroundColor: 'transparent',
   },
   footerBar: {
     width: '94%',

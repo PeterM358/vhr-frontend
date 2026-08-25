@@ -14,6 +14,7 @@ import { Badge } from 'react-native-paper';
 import AppNavigationBar from '../common/AppNavigationBar';
 import CompactLanguageSelector from '../common/CompactLanguageSelector';
 import GlassNavIconButton from '../navigation/GlassNavIconButton';
+import { useIsCompactChrome } from '../../hooks/useCompactChrome';
 import usePartnerHeaderChrome from '../../hooks/usePartnerHeaderChrome';
 
 export default function PartnerAppHeader({
@@ -43,6 +44,10 @@ export default function PartnerAppHeader({
   ...rest
 }) {
   const isDashboard = mode === 'dashboard';
+  const isCompactChrome = useIsCompactChrome();
+  // Phone / mobile-web: free the bar for icons — shop name lives on Center details (storefront).
+  const chromeTitle = isDashboard && isCompactChrome ? undefined : title;
+  const chromeSubtitle = isDashboard && isCompactChrome ? undefined : subtitle;
   const chrome = usePartnerHeaderChrome({
     loadCalendarBadge: showCalendar && loadCalendarBadge && calendarBadgeProp == null,
     refreshCalendarBadge: isDashboard,
@@ -110,10 +115,10 @@ export default function PartnerAppHeader({
     return (
       <AppNavigationBar
         showBack={false}
-        title={title}
-        subtitle={subtitle}
+        title={chromeTitle}
+        subtitle={chromeSubtitle}
         scrolled={scrolled}
-        compact={compact}
+        compact={compact || isCompactChrome}
         showLanguageSelector={false}
         style={style}
         leftAction={

@@ -81,6 +81,7 @@ export default function AppNavigationBar({
   const pillBackground = scrolled ? theme.scrolledBackgroundColor : theme.backgroundColor;
   const pillBorder = scrolled ? theme.scrolledBorderColor : theme.borderColor;
   const showShadow = showPill && (scrolled || variant !== 'transparent');
+  const hasTitle = Boolean(title) || Boolean(subtitle);
 
   return (
     <View
@@ -128,7 +129,7 @@ export default function AppNavigationBar({
               ) : null)}
           </View>
 
-          {!largeTitle ? (
+          {!largeTitle && hasTitle ? (
             <View
               pointerEvents={onTitlePress ? 'box-none' : 'none'}
               style={styles.titleWrap}

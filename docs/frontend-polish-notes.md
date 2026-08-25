@@ -80,6 +80,18 @@ Located under `src/components/ui/`:
 - **Blue elsewhere:** primary actions (buttons), **active tab pills**, AppBar /
   headers — not routine repair/request list rows.
 
+### Mobile chrome + keyboard (forms / wizards)
+
+| Rule | Implementation |
+|------|----------------|
+| Dashboard entity name (shop/org) | Hidden on compact (`width < 768` / mobile web) in `PartnerAppHeader` / `OrgAppHeader` — use storefront / profile icon |
+| Sticky CTAs | **In document flow**, not `position: absolute` over the field (`WizardChrome`) |
+| While typing on compact | Hide bottom CTA (`useHideStickyChromeForKeyboard`) so the focused input stays visible above the keyboard (iPhone Safari / Chrome) |
+| Shared hooks | `useKeyboardOpen`, `useIsCompactChrome`, `useHideStickyChromeForKeyboard` |
+| Form footers | `StickyFormFooter` default `variant="dock"`; `overlay` only for legacy absolute docks |
+
+Do **not** add one-off `bottom: keyboardHeight` hacks per screen — extend the shared chrome.
+
 ### Shop “See all” → Repairs
 
 - Dashboard **See all** uses **`DrawerActions.jumpTo('RepairsList')`**, same as
