@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+# Prefer the canonical host (www). Apex redirects in nginx.
+# Category sitemap JSON API (until a static XML job ships):
+# https://api.veversal.com/api/public/seo/sitemap/categories/

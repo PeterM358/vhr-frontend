@@ -1,13 +1,17 @@
 # Veversal web deployment (Expo / React Native Web)
 
-Static web builds for **beta** (`beta.veversal.com`) and **production** (`app.veversal.com`).  
+Static web builds for **beta** (`beta.veversal.com`) and **production** (`www.veversal.com`).  
 The web app talks to the Django API on a separate subdomain.
+
+**Go-live (2026-08):** soft-promote production hostnames on the beta VPS — see backend `docs/production-go-live.md`.
 
 | Environment | Web URL | API URL |
 |-------------|---------|---------|
 | Local | `http://localhost:8081` (dev server) | `http://localhost:8000` |
 | Staging / beta | `https://beta.veversal.com` | `https://api-beta.veversal.com` |
-| Production | `https://app.veversal.com` | `https://api.veversal.com` |
+| Production | `https://www.veversal.com` (canonical) | `https://api.veversal.com` |
+
+Bare apex `https://veversal.com` is redirected to `https://www.veversal.com` by backend nginx (`docker/nginx/production.conf`). Do not point the API at the apex domain.
 
 ---
 
