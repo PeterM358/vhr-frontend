@@ -94,12 +94,6 @@ function findOption(options, planKey, billingInterval) {
   );
 }
 
-function fmtMoney(value) {
-  const num = Number(value);
-  if (!isFinite(num)) return '';
-  return Number.isInteger(num) ? String(num) : num.toFixed(2);
-}
-
 function savingsPercent(annualOpt) {
   const total = Number(annualOpt?.monthly_equivalent_annual_total);
   const save = Number(annualOpt?.annual_savings);
@@ -133,18 +127,12 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [profile, setProfile] = useState(null);
   const [optionsPayload, setOptionsPayload] = useState(null);
-  const [selected, setSelected] = useState({ planKey: 'premium', billingInterval: 'annual' });
+  const [selected, setSelected] = useState({ planKey: 'pro', billingInterval: 'annual' });
+  const [paymentMethod, setPaymentMethod] = useState('card');
+  const [showPlanDetails, setShowPlanDetails] = useState(false);
   const [payment, setPayment] = useState(null);
   const [error, setError] = useState(null);
   const scrollRef = useRef(null);
-  const paymentSectionY = useRef(0);
-
-  const scrollToPayment = useCallback(() => {
-    scrollRef.current?.scrollTo({
-      y: Math.max(paymentSectionY.current - 12, 0),
-      animated: true,
-    });
-  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -223,6 +211,59 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
 
   const selectedOption = findOption(options, selected.planKey, selected.billingInterval);
 
+  React.useEffect(() => {
+    if (stripeIncomplete && !bankIncomplete) {
+      setPaymentMethod('bank');
+    }
+  }, [stripeIncomplete, bankIncomplete]);
+
+  React.useEffect(() => {
+    setPayment(null);
+  }, [selected.planKey, selected.billingInterval]);
+
+  const priceDisplay = useMemo(() => {
+    const opt = selectedOption;
+    if (!opt) {
+      return { main: t('subscription.priceUnavailable'), sub: '', savings: null };
+    }
+    const currency = opt.currency || 'EUR';
+    if (isAnnual) {
+      const pct = savingsPercent(opt);
+      return {
+        main: `${opt.amount} ${currency}`,
+        sub: t('subscription.billedAnnually', { amount: opt.amount, currency }),
+        savings: pct != null ? t('subscription.billingAnnualSave', { percent: pct }) : null,
+      };
+    }
+    return {
+      main: `${opt.amount} ${currency}`,
+      sub: t('subscription.billedMonthly'),
+      savings: null,
+    };
+  }, [selectedOption, isAnnual, t]);
+
+  const planDetailFeatures = useMemo(() => {
+    const keys =
+      selected.planKey === 'premium'
+        ? PREMIUM_BENEFIT_KEYS.slice(0, 4)
+        : PRO_FEATURE_KEYS.slice(0, 5);
+    return keys.map((k) => t(k));
+  }, [selected.planKey, t]);
+
+  const handlePrimaryPay = () => {
+    if (paymentMethod === 'card') {
+      payByCard();
+      return;
+    }
+    requestPayment();
+  };
+
+  const primaryPayBusy = paymentMethod === 'card' ? checkoutSubmitting : submitting;
+  const primaryPayDisabled =
+    !selectedOption ||
+    primaryPayBusy ||
+    (paymentMethod === 'card' ? stripeIncomplete : bankIncomplete);
+
   const requestPayment = async () => {
     if (!profile?.id || bankIncomplete) return;
     setSubmitting(true);
@@ -233,6 +274,7 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
         billingInterval: selected.billingInterval,
       });
       setPayment(row);
+      scrollRef.current?.scrollToEnd({ animated: true });
     } catch (e) {
       setError(String(e?.message || e));
     } finally {
@@ -414,219 +456,225 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
               </View>
             ) : null}
 
-            {/* Billing interval toggle */}
-            <Text style={styles.sectionTitle}>{t('subscription.choosePlan')}</Text>
-            <View style={styles.toggle}>
-              <Pressable
-                onPress={() => setSelected((s) => ({ ...s, billingInterval: 'monthly' }))}
-                style={[styles.toggleBtn, !isAnnual && styles.toggleBtnActive]}
-              >
-                <Text style={[styles.toggleText, !isAnnual && styles.toggleTextActive]}>
-                  {t('subscription.billingMonthly')}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setSelected((s) => ({ ...s, billingInterval: 'annual' }))}
-                style={[styles.toggleBtn, isAnnual && styles.toggleBtnActive]}
-              >
-                <Text style={[styles.toggleText, isAnnual && styles.toggleTextActive]}>
-                  {t('subscription.billingAnnual')}
-                </Text>
-                {annualBadgePercent ? (
-                  <View style={styles.toggleSaveBadge}>
-                    <Text style={styles.toggleSaveBadgeText}>
-                      {t('subscription.billingAnnualSave', { percent: annualBadgePercent })}
-                    </Text>
-                  </View>
+            <View style={styles.checkoutCard}>
+              <Text style={styles.checkoutLabel}>{t('subscription.choosePlan')}</Text>
+              <View style={styles.toggle}>
+                <Pressable
+                  onPress={() => setSelected((s) => ({ ...s, planKey: 'pro' }))}
+                  style={[styles.toggleBtn, selected.planKey === 'pro' && styles.toggleBtnActiveLight]}
+                >
+                  <Text
+                    style={[
+                      styles.toggleTextDark,
+                      selected.planKey === 'pro' && styles.toggleTextDarkActive,
+                    ]}
+                  >
+                    {t('subscription.planPro')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setSelected((s) => ({ ...s, planKey: 'premium' }))}
+                  style={[styles.toggleBtn, selected.planKey === 'premium' && styles.toggleBtnActiveLight]}
+                >
+                  <Text
+                    style={[
+                      styles.toggleTextDark,
+                      selected.planKey === 'premium' && styles.toggleTextDarkActive,
+                    ]}
+                  >
+                    {t('subscription.planPremium')}
+                  </Text>
+                </Pressable>
+              </View>
+              <Text style={styles.planHint}>
+                {selected.planKey === 'premium'
+                  ? t('subscription.premiumTagline')
+                  : t('subscription.proTagline')}
+              </Text>
+
+              <Text style={[styles.checkoutLabel, styles.checkoutLabelSpaced]}>
+                {t('subscription.billingIntervalLabel')}
+              </Text>
+              <View style={styles.toggle}>
+                <Pressable
+                  onPress={() => setSelected((s) => ({ ...s, billingInterval: 'monthly' }))}
+                  style={[styles.toggleBtn, !isAnnual && styles.toggleBtnActiveLight]}
+                >
+                  <Text style={[styles.toggleTextDark, !isAnnual && styles.toggleTextDarkActive]}>
+                    {t('subscription.billingMonthly')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setSelected((s) => ({ ...s, billingInterval: 'annual' }))}
+                  style={[styles.toggleBtn, isAnnual && styles.toggleBtnActiveLight]}
+                >
+                  <Text style={[styles.toggleTextDark, isAnnual && styles.toggleTextDarkActive]}>
+                    {t('subscription.billingAnnual')}
+                  </Text>
+                  {annualBadgePercent ? (
+                    <View style={styles.toggleSaveBadgeDark}>
+                      <Text style={styles.toggleSaveBadgeDarkText}>
+                        {t('subscription.billingAnnualSave', { percent: annualBadgePercent })}
+                      </Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+              </View>
+
+              <View style={styles.priceHero}>
+                <Text style={styles.priceHeroAmount}>{priceDisplay.main}</Text>
+                {priceDisplay.sub ? <Text style={styles.priceHeroSub}>{priceDisplay.sub}</Text> : null}
+                {priceDisplay.savings ? (
+                  <Text style={styles.priceHeroSavings}>{priceDisplay.savings}</Text>
                 ) : null}
+              </View>
+
+              <Pressable
+                onPress={() => setShowPlanDetails((v) => !v)}
+                style={styles.detailsToggle}
+                accessibilityRole="button"
+              >
+                <Text style={styles.detailsToggleText}>
+                  {showPlanDetails ? t('subscription.hidePlanDetails') : t('subscription.showPlanDetails')}
+                </Text>
+                <MaterialCommunityIcons
+                  name={showPlanDetails ? 'chevron-up' : 'chevron-down'}
+                  size={20}
+                  color={COLORS.PRIMARY}
+                />
               </Pressable>
+              {showPlanDetails ? (
+                <View style={styles.detailsList}>
+                  {planDetailFeatures.map((label) => (
+                    <View key={label} style={styles.featureRowCompact}>
+                      <MaterialCommunityIcons name="check" size={16} color={COLORS.PRIMARY} />
+                      <Text style={styles.featureTextCompact}>{label}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              <Text style={[styles.checkoutLabel, styles.checkoutLabelSpaced]}>
+                {t('subscription.paymentMethodLabel')}
+              </Text>
+              <View style={styles.toggle}>
+                <Pressable
+                  onPress={() => setPaymentMethod('card')}
+                  disabled={stripeIncomplete}
+                  style={[
+                    styles.toggleBtn,
+                    paymentMethod === 'card' && styles.toggleBtnActiveLight,
+                    stripeIncomplete && styles.toggleBtnDisabled,
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="credit-card-outline"
+                    size={18}
+                    color={paymentMethod === 'card' ? COLORS.PRIMARY_DARK : COLORS.TEXT_MUTED}
+                  />
+                  <Text
+                    style={[
+                      styles.toggleTextDark,
+                      paymentMethod === 'card' && styles.toggleTextDarkActive,
+                    ]}
+                  >
+                    {t('subscription.payWithCard')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setPaymentMethod('bank')}
+                  disabled={bankIncomplete}
+                  style={[
+                    styles.toggleBtn,
+                    paymentMethod === 'bank' && styles.toggleBtnActiveLight,
+                    bankIncomplete && styles.toggleBtnDisabled,
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="bank-outline"
+                    size={18}
+                    color={paymentMethod === 'bank' ? COLORS.PRIMARY_DARK : COLORS.TEXT_MUTED}
+                  />
+                  <Text
+                    style={[
+                      styles.toggleTextDark,
+                      paymentMethod === 'bank' && styles.toggleTextDarkActive,
+                    ]}
+                  >
+                    {t('subscription.payWithBank')}
+                  </Text>
+                </Pressable>
+              </View>
+
+              {paymentMethod === 'card' && stripeIncomplete ? (
+                <View style={styles.warnCardInline}>
+                  <Text style={styles.warnTitle}>{t('subscription.stripeConfigMissingTitle')}</Text>
+                  <Text style={styles.warnBody}>{t('subscription.stripeConfigMissingBody')}</Text>
+                </View>
+              ) : null}
+              {paymentMethod === 'bank' && bankIncomplete ? (
+                <View style={styles.warnCardInline}>
+                  <Text style={styles.warnTitle}>{t('subscription.bankConfigMissingTitle')}</Text>
+                  <Text style={styles.warnBody}>{t('subscription.bankConfigMissingBody')}</Text>
+                </View>
+              ) : null}
+              {!(paymentMethod === 'card' ? stripeIncomplete : bankIncomplete) ? (
+                <Text style={styles.payHint}>
+                  {paymentMethod === 'card'
+                    ? t('subscription.cardCheckoutIntroShort')
+                    : t('subscription.bankTransferIntroShort')}
+                </Text>
+              ) : null}
+
+              {payment && paymentMethod === 'bank' ? (
+                <View style={styles.instructions}>
+                  <Text style={styles.instructionsTitle}>{t('subscription.paymentInstructions')}</Text>
+                  <Text style={styles.instructionsHint}>{t('subscription.useExactReference')}</Text>
+                  <Text style={styles.instructionsHint}>{t('subscription.activatedAfterConfirm')}</Text>
+
+                  <CopyRow
+                    label={t('subscription.paymentReference')}
+                    value={payment.payment_reference}
+                    onCopy={() => copyText(payment.payment_reference)}
+                    emphasize
+                  />
+                  <CopyRow
+                    label={t('subscription.amount')}
+                    value={`${payment.amount} ${payment.currency}`}
+                    onCopy={() => copyText(`${payment.amount} ${payment.currency}`)}
+                  />
+                  <CopyRow
+                    label={t('subscription.beneficiary')}
+                    value={payment.beneficiary || bank.beneficiary}
+                    onCopy={() => copyText(payment.beneficiary || bank.beneficiary)}
+                  />
+                  <CopyRow
+                    label={t('subscription.iban')}
+                    value={payment.iban || bank.iban}
+                    onCopy={() => copyText(payment.iban || bank.iban)}
+                  />
+                  {(payment.bic || bank.bic) ? (
+                    <CopyRow
+                      label={t('subscription.bic')}
+                      value={payment.bic || bank.bic}
+                      onCopy={() => copyText(payment.bic || bank.bic)}
+                    />
+                  ) : null}
+                  <Text style={styles.metaLine}>
+                    {t('subscription.period')}:{' '}
+                    {(payment.period_start || '').slice(0, 10)} → {(payment.period_end || '').slice(0, 10)}
+                  </Text>
+                  <Text style={styles.footnote}>{t('subscription.notAnInvoice')}</Text>
+                </View>
+              ) : null}
             </View>
 
-            {/* PRO */}
-            <PlanCard
-              planKey="pro"
-              title={t('subscription.planPro')}
-              tagline={t('subscription.proTagline')}
-              options={options}
-              isAnnual={isAnnual}
-              selected={selected.planKey === 'pro'}
-              onSelect={() => setSelected((s) => ({ ...s, planKey: 'pro' }))}
-              featuresTitle={t('subscription.proFeaturesTitle')}
-              features={PRO_FEATURE_KEYS.map((k) => t(k))}
-              selectLabel={t('subscription.selectLabel')}
-              selectedLabel={t('subscription.selectedLabel')}
-              t={t}
-            />
-
-            {/* Premium — visual standout */}
-            <PlanCard
-              planKey="premium"
-              title={t('subscription.planPremium')}
-              tagline={t('subscription.premiumTagline')}
-              options={options}
-              isAnnual={isAnnual}
-              selected={selected.planKey === 'premium'}
-              onSelect={() => setSelected((s) => ({ ...s, planKey: 'premium' }))}
-              featuresTitle={t('subscription.premiumEverythingInPro')}
-              features={PREMIUM_BENEFIT_KEYS.map((k) => t(k))}
-              badge={t('subscription.premiumBadge')}
-              highlight
-              selectLabel={t('subscription.selectLabel')}
-              selectedLabel={t('subscription.selectedLabel')}
-              t={t}
-            />
-
-            {/* Enterprise — small, contact sales */}
-            <View style={styles.enterpriseCard}>
-              <View style={styles.enterpriseHeader}>
-                <MaterialCommunityIcons name="office-building-outline" size={20} color={COLORS.PRIMARY_DARK} />
-                <Text style={styles.enterpriseTitle}>{t('subscription.enterpriseTitle')}</Text>
-              </View>
+            <View style={styles.enterpriseCardCompact}>
               <Text style={styles.enterpriseBody}>{t('subscription.enterpriseTagline')}</Text>
-              <Button mode="outlined" onPress={contactSales} style={{ marginTop: 10, alignSelf: 'flex-start' }}>
+              <Button mode="text" compact onPress={contactSales} textColor={COLORS.PRIMARY}>
                 {t('subscription.enterpriseCta')}
               </Button>
             </View>
-
-            {/* Payment */}
-            <View
-              onLayout={(e) => {
-                paymentSectionY.current = e.nativeEvent.layout.y;
-              }}
-            />
-            <View style={styles.paymentSummary}>
-              <MaterialCommunityIcons name="cart-outline" size={18} color={COLORS.PRIMARY_DARK} />
-              <Text style={styles.paymentSummaryText}>
-                {t('subscription.selectedSummary', {
-                  plan: selectedPlanName,
-                  interval: selectedIntervalName,
-                })}
-                {selectedOption ? `  ·  ${selectedOption.amount} ${selectedOption.currency}` : ''}
-              </Text>
-            </View>
-
-            <Text style={styles.sectionTitle}>{t('subscription.payByCard')}</Text>
-            <Text style={styles.sectionBody}>{t('subscription.cardCheckoutIntro')}</Text>
-            {stripeIncomplete ? (
-              <View style={styles.warnCard}>
-                <Text style={styles.warnTitle}>{t('subscription.stripeConfigMissingTitle')}</Text>
-                <Text style={styles.warnBody}>{t('subscription.stripeConfigMissingBody')}</Text>
-              </View>
-            ) : (
-              <Pressable
-                onPress={payByCard}
-                disabled={checkoutSubmitting || !selectedOption}
-                style={({ pressed }) => [
-                  styles.cta,
-                  styles.ctaCard,
-                  (pressed || checkoutSubmitting) && { opacity: 0.9 },
-                ]}
-              >
-                <View style={styles.ctaInner}>
-                  {checkoutSubmitting ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <>
-                      <Text style={styles.ctaText}>{t('subscription.payByCardCta')}</Text>
-                      <Text style={styles.ctaSub}>
-                        {selectedOption
-                          ? `${selectedOption.amount} ${selectedOption.currency}`
-                          : ''}
-                      </Text>
-                    </>
-                  )}
-                </View>
-              </Pressable>
-            )}
-
-            <Text style={styles.sectionTitle}>{t('subscription.payByBankTransfer')}</Text>
-            <Text style={styles.sectionBody}>{t('subscription.bankTransferIntro')}</Text>
-
-            <View style={styles.stepsCard}>
-              <Text style={styles.stepsTitle}>{t('subscription.bankStepsTitle')}</Text>
-              <StepRow index={1} text={t('subscription.bankStep1')} />
-              <StepRow index={2} text={t('subscription.bankStep2')} />
-              <StepRow index={3} text={t('subscription.bankStep3')} />
-              <Text style={styles.stepsNote}>{t('subscription.bankAccountingNote')}</Text>
-            </View>
-
-            {bankIncomplete ? (
-              <View style={styles.warnCard}>
-                <Text style={styles.warnTitle}>{t('subscription.bankConfigMissingTitle')}</Text>
-                <Text style={styles.warnBody}>{t('subscription.bankConfigMissingBody')}</Text>
-              </View>
-            ) : (
-              <Pressable
-                onPress={requestPayment}
-                disabled={submitting || !selectedOption}
-                style={({ pressed }) => [
-                  styles.cta,
-                  styles.ctaBank,
-                  (pressed || submitting) && { opacity: 0.9 },
-                ]}
-              >
-                <View style={styles.ctaInner}>
-                  {submitting ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <>
-                      <Text style={styles.ctaText}>{t('subscription.requestPaymentInstructions')}</Text>
-                      <Text style={styles.ctaSub}>
-                        {selectedOption
-                          ? `${selectedOption.amount} ${selectedOption.currency}`
-                          : ''}
-                      </Text>
-                    </>
-                  )}
-                </View>
-              </Pressable>
-            )}
-
-            {payment ? (
-              <View style={styles.instructions}>
-                <Text style={styles.instructionsTitle}>{t('subscription.paymentInstructions')}</Text>
-                <Text style={styles.instructionsHint}>{t('subscription.useExactReference')}</Text>
-                <Text style={styles.instructionsHint}>{t('subscription.activatedAfterConfirm')}</Text>
-
-                <CopyRow
-                  label={t('subscription.paymentReference')}
-                  value={payment.payment_reference}
-                  onCopy={() => copyText(payment.payment_reference)}
-                  emphasize
-                />
-                <CopyRow
-                  label={t('subscription.amount')}
-                  value={`${payment.amount} ${payment.currency}`}
-                  onCopy={() => copyText(`${payment.amount} ${payment.currency}`)}
-                />
-                <CopyRow
-                  label={t('subscription.beneficiary')}
-                  value={payment.beneficiary || bank.beneficiary}
-                  onCopy={() => copyText(payment.beneficiary || bank.beneficiary)}
-                />
-                <CopyRow
-                  label={t('subscription.iban')}
-                  value={payment.iban || bank.iban}
-                  onCopy={() => copyText(payment.iban || bank.iban)}
-                />
-                {(payment.bic || bank.bic) ? (
-                  <CopyRow
-                    label={t('subscription.bic')}
-                    value={payment.bic || bank.bic}
-                    onCopy={() => copyText(payment.bic || bank.bic)}
-                  />
-                ) : null}
-                <Text style={styles.metaLine}>
-                  {t('subscription.period')}:{' '}
-                  {(payment.period_start || '').slice(0, 10)} → {(payment.period_end || '').slice(0, 10)}
-                </Text>
-                <Text style={styles.metaLine}>
-                  {t('subscription.paymentStatus')}: {payment.status}
-                </Text>
-                <Text style={styles.footnote}>{t('subscription.bankAccountingNote')}</Text>
-                <Text style={styles.footnote}>{t('subscription.notAnInvoice')}</Text>
-              </View>
-            ) : null}
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
           </>
@@ -636,141 +684,37 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
       {!loading && selectedOption ? (
         <View style={styles.stickyBar} pointerEvents="box-none">
           <Pressable
-            onPress={scrollToPayment}
-            style={({ pressed }) => [styles.stickyBtn, pressed && { opacity: 0.9 }]}
+            onPress={handlePrimaryPay}
+            disabled={primaryPayDisabled}
+            style={({ pressed }) => [
+              styles.stickyBtn,
+              (pressed || primaryPayDisabled) && { opacity: primaryPayDisabled ? 0.55 : 0.92 },
+            ]}
             accessibilityRole="button"
           >
-            <View style={styles.stickyTextWrap}>
-              <Text style={styles.stickyBtnLabel}>{t('subscription.continueToPayment')}</Text>
-              <Text style={styles.stickyBtnSub}>
-                {`${selectedPlanName} · ${selectedIntervalName}`}
-              </Text>
-            </View>
-            <View style={styles.stickyPriceWrap}>
-              <Text style={styles.stickyBtnPrice}>
-                {`${selectedOption.amount} ${selectedOption.currency}`}
-              </Text>
-              <MaterialCommunityIcons name="arrow-down" size={20} color="#fff" />
-            </View>
+            {primaryPayBusy ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <View style={styles.stickyTextWrap}>
+                  <Text style={styles.stickyBtnLabel}>
+                    {paymentMethod === 'card'
+                      ? t('subscription.payByCardCta')
+                      : t('subscription.requestPaymentInstructions')}
+                  </Text>
+                  <Text style={styles.stickyBtnSub}>
+                    {`${selectedPlanName} · ${selectedIntervalName}`}
+                  </Text>
+                </View>
+                <Text style={styles.stickyBtnPrice}>
+                  {`${selectedOption.amount} ${selectedOption.currency}`}
+                </Text>
+              </>
+            )}
           </Pressable>
         </View>
       ) : null}
     </ScreenBackground>
-  );
-}
-
-function PlanCard({
-  planKey,
-  title,
-  tagline,
-  options,
-  isAnnual,
-  selected,
-  onSelect,
-  featuresTitle,
-  features,
-  badge,
-  highlight,
-  selectLabel,
-  selectedLabel,
-  t,
-}) {
-  const monthlyOpt = findOption(options, planKey, 'monthly');
-  const annualOpt = findOption(options, planKey, 'annual');
-  const activeOpt = isAnnual ? annualOpt : monthlyOpt;
-  const currency = activeOpt?.currency || monthlyOpt?.currency || 'EUR';
-
-  let priceMain = t('subscription.priceUnavailable');
-  let priceSub = null;
-  let savingsText = null;
-  if (activeOpt) {
-    if (isAnnual) {
-      const perMonth = fmtMoney(Number(activeOpt.amount) / 12);
-      priceMain = `${perMonth} ${currency}`;
-      priceSub = t('subscription.billedAnnually', { amount: activeOpt.amount, currency });
-      const pct = savingsPercent(activeOpt);
-      if (activeOpt.annual_savings && pct != null) {
-        savingsText = t('subscription.annualSavingsShort', {
-          amount: activeOpt.annual_savings,
-          currency,
-          percent: pct,
-        });
-      }
-    } else {
-      priceMain = `${activeOpt.amount} ${currency}`;
-      priceSub = t('subscription.billedMonthly');
-    }
-  }
-
-  return (
-    <Pressable
-      onPress={onSelect}
-      style={[
-        styles.planCard,
-        highlight && styles.planCardHighlight,
-        selected && styles.planCardSelected,
-      ]}
-    >
-      {badge ? (
-        <View style={styles.planBadge}>
-          <MaterialCommunityIcons name="star-four-points" size={12} color="#fff" />
-          <Text style={styles.planBadgeText}>{badge}</Text>
-        </View>
-      ) : null}
-
-      <View style={styles.planHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.planName}>{title}</Text>
-          <Text style={styles.planTagline}>{tagline}</Text>
-        </View>
-        <View style={[styles.radio, selected && styles.radioOn]}>
-          {selected ? <MaterialCommunityIcons name="check" size={14} color="#fff" /> : null}
-        </View>
-      </View>
-
-      <View style={styles.priceRow}>
-        <Text style={styles.priceMain}>{priceMain}</Text>
-        <Text style={styles.priceUnit}>{t('subscription.perMonth')}</Text>
-      </View>
-      {priceSub ? <Text style={styles.priceSub}>{priceSub}</Text> : null}
-      {savingsText ? (
-        <View style={styles.savingsPill}>
-          <MaterialCommunityIcons name="tag-outline" size={13} color={COLORS.PRIMARY_DARK} />
-          <Text style={styles.savingsPillText}>{savingsText}</Text>
-        </View>
-      ) : null}
-
-      <Text style={styles.featuresTitle}>{featuresTitle}</Text>
-      <View style={styles.featureList}>
-        {features.map((label) => (
-          <View key={label} style={styles.featureRow}>
-            <MaterialCommunityIcons
-              name="check-circle"
-              size={16}
-              color={highlight ? COLORS.PRIMARY : COLORS.PRIMARY_DARK}
-            />
-            <Text style={styles.featureText}>{label}</Text>
-          </View>
-        ))}
-      </View>
-
-      <View style={[styles.selectBtn, selected && styles.selectBtnOn, highlight && !selected && styles.selectBtnHighlight]}>
-        <Text style={[styles.selectBtnText, selected && styles.selectBtnTextOn]}>
-          {selected ? selectedLabel : selectLabel}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
-function StepRow({ index, text }) {
-  return (
-    <View style={styles.stepRow}>
-      <View style={styles.stepNum}>
-        <Text style={styles.stepNumText}>{index}</Text>
-      </View>
-      <Text style={styles.stepText}>{text}</Text>
-    </View>
   );
 }
 
@@ -990,6 +934,136 @@ const styles = StyleSheet.create({
   manageRefundHint: {
     marginTop: 12,
   },
+  checkoutCard: {
+    backgroundColor: COLORS.CARD_FLOATING,
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(15,76,129,0.14)',
+  },
+  checkoutLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.TEXT_MUTED,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  checkoutLabelSpaced: {
+    marginTop: 18,
+  },
+  planHint: {
+    fontSize: 14,
+    color: COLORS.TEXT_MUTED,
+    lineHeight: 20,
+    marginTop: 10,
+  },
+  toggleBtnActiveLight: {
+    backgroundColor: '#fff',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  toggleTextDark: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.TEXT_MUTED,
+  },
+  toggleTextDarkActive: {
+    color: COLORS.PRIMARY_DARK,
+  },
+  toggleBtnDisabled: {
+    opacity: 0.45,
+  },
+  toggleSaveBadgeDark: {
+    backgroundColor: COLORS.PRIMARY,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  toggleSaveBadgeDarkText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  priceHero: {
+    alignItems: 'center',
+    paddingVertical: 18,
+    marginTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(15,23,42,0.08)',
+  },
+  priceHeroAmount: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: COLORS.PRIMARY_DARK,
+    letterSpacing: -0.5,
+  },
+  priceHeroSub: {
+    fontSize: 14,
+    color: COLORS.TEXT_MUTED,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  priceHeroSavings: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.PRIMARY,
+    marginTop: 6,
+  },
+  detailsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 10,
+  },
+  detailsToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.PRIMARY,
+  },
+  detailsList: {
+    gap: 8,
+    marginBottom: 4,
+  },
+  featureRowCompact: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  featureTextCompact: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.TEXT_DARK,
+    lineHeight: 19,
+  },
+  payHint: {
+    fontSize: 13,
+    color: COLORS.TEXT_MUTED,
+    lineHeight: 19,
+    marginTop: 12,
+  },
+  warnCardInline: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(251, 191, 36, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.35)',
+  },
+  enterpriseCardCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: 4,
+    marginBottom: 8,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
@@ -1005,10 +1079,10 @@ const styles = StyleSheet.create({
   },
   toggle: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(15,23,42,0.06)',
     borderRadius: 14,
     padding: 4,
-    marginBottom: 16,
+    marginBottom: 4,
   },
   toggleBtn: {
     flex: 1,
