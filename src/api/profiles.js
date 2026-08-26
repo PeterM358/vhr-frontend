@@ -326,6 +326,25 @@ export async function createSubscriptionCheckout(shopId, { planKey, billingInter
   return res.json();
 }
 
+/** Cancel Stripe subscription at period end (keeps access until expiry). */
+export async function cancelSubscriptionAtPeriodEnd(shopId) {
+  const token = await AsyncStorage.getItem('@access_token');
+  const res = await fetch(
+    `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/subscription-cancel-at-period-end/`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || errorData.non_field_errors?.[0] || 'Failed to cancel subscription');
+  }
+  return res.json();
+}
+
 export async function listSubscriptionPaymentRequests(shopId) {
   const token = await AsyncStorage.getItem('@access_token');
   const res = await fetch(

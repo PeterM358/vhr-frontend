@@ -203,6 +203,7 @@
       "storageLocations": "Складови адреси",
       "priceList": "Ценоразпис",
       "notifications": "Известия",
+      "billing": "Планове и billing",
       "switchCenter": "Смени сервиз",
       "explore": "Разгледай"
     }
@@ -4651,6 +4652,7 @@
     "cookiePolicy": "{app} — Политика за бисквитки",
     "support": "{app} — Поддръжка",
     "partnerTerms": "{app} — Бизнес условия",
+    "subscriptionUpgrade": "{app} — Планове и billing",
     "dpa": "{app} — DPA",
     "subprocessors": "{app} — Subprocessors",
     "vehicleDetails": "{app} — Детайли",
@@ -5022,6 +5024,16 @@
     "period": "Период на услугата",
     "paymentStatus": "Статус",
     "notAnInvoice": "Това е платежна инструкция, не счетоводна фактура.",
+    "manageTitle": "Управление на абонамент",
+    "manageBody": "Отказ на бъдещи подновявания от тук. Възстановяванията следват политиката ни — картови refund-и не са автоматични в приложението.",
+    "cancelAtPeriodEndCta": "Отказ в края на периода",
+    "cancelAtPeriodEndConfirm": "Да спрем подновяването в края на платения период? Достъпът остава до тогава.",
+    "cancelScheduledTitle": "Отказът е насрочен",
+    "cancelScheduledBody": "Планът остава активен до датата по-горе. След това няма нови такси.",
+    "refundPolicyLink": "Политика за отказ и възстановяване",
+    "refundRequestBody": "За refund до 14 дни или billing проблеми: contact@veversal.com от имейла на акаунта.",
+    "cancelSubmitting": "Отказ…",
+    "cancelSuccess": "Подновяването е спряно. Достъпът продължава до края на платения период."
     "successTitle": "Плащането е получено",
     "successHeadline": "Благодарим — потвърждаваме плана",
     "successBody": "Плащането с карта приключи в Stripe. Абонаментът в Veversal се активира след потвърждение (обикновено за секунди). Тази страница се обновява автоматично.",

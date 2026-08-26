@@ -38,6 +38,7 @@ import {
   navigateToPartnerPurchaseOrders,
   navigateToPartnerStorageLocations,
   navigateToPartnerNetworkOrganization,
+  navigateToPartnerUpgrade,
   navigateToOrgHome,
 } from './webNavigation';
 import { readOrganizationMemberships } from '../utils/orgWorkspace';
@@ -157,6 +158,15 @@ function CustomDrawerContent(props) {
             openPartnerCenter(navigation, shopProfile);
           }}
           icon={({ color, size }) => <DrawerMenuIcon name="store-outline" color={color} size={size} />}
+          {...itemProps}
+        />
+
+        <DrawerItem
+          label={t('drawer.partner.billing')}
+          onPress={() => openStackRoute(navigateToPartnerUpgrade, 'ShopSubscriptionUpgrade')}
+          icon={({ color, size }) => (
+            <DrawerMenuIcon name="credit-card-outline" color={color} size={size} />
+          )}
           {...itemProps}
         />
 

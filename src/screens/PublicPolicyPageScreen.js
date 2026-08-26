@@ -7,6 +7,7 @@ import PolicyDocumentView from '../components/policies/PolicyDocumentView';
 import ScreenBackground from '../components/ScreenBackground';
 import DashboardCard from '../components/dashboard/DashboardCard';
 import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
+import BackHeaderButton from '../components/navigation/BackHeaderButton';
 import { useTranslation } from '../i18n';
 import { getPolicyLocaleContent } from '../policies/policyRegistry';
 import { FOOTER_POLICY_LINKS, localizedPolicyPath, openPolicyPath } from '../policies/policyPaths';
@@ -17,6 +18,14 @@ export default function PublicPolicyPageScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const policyKey = String(route?.params?.policyKey || route?.params?.policySlug || '').trim().toLowerCase();
   const payload = useMemo(() => getPolicyLocaleContent(policyKey, locale), [policyKey, locale]);
+
+  const onBack = React.useCallback(() => {
+    if (navigation.canGoBack?.()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('PublicHome');
+  }, [navigation]);
 
   React.useEffect(() => {
     if (Platform.OS !== 'web' || !payload?.content?.title) return;
@@ -51,9 +60,13 @@ export default function PublicPolicyPageScreen({ route, navigation }) {
     <ScreenBackground routeName="PublicPolicyPage" contentMaxWidth={840}>
       <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 12 }]}>
         <View style={styles.topBar}>
-          <Button mode="text" onPress={() => navigation.navigate('PublicHome')} textColor="#e2e8f0">
-            {t('policies.backToHome')}
-          </Button>
+          <BackHeaderButton
+            onPress={onBack}
+            label={t('policies.backToHome')}
+            variant="glass"
+            iconOnly
+            accessibilityLabel={t('navigation.back')}
+          />
           <AuthLanguageSelector compact />
         </View>
 

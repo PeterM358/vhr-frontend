@@ -938,6 +938,9 @@ export function getPartnerNavigationStateFromPath(path) {
       index: 1,
     };
   }
+  if (pathPart === 'partner/upgrade') {
+    return { routes: [partnerHome, { name: 'ShopSubscriptionUpgrade' }], index: 1 };
+  }
   if (pathPart === 'partner/analytics') {
     return { routes: [partnerHome, { name: 'ShopAnalytics' }], index: 1 };
   }

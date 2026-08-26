@@ -16,6 +16,7 @@ const PATH_TITLE_KEYS = {
   '/': null,
   '/dashboard': 'dashboard',
   '/partner/dashboard': 'partnerDashboard',
+  '/partner/upgrade': 'subscriptionUpgrade',
   '/partner/profile': 'partnerProfile',
   '/partner/public-preview': 'publicPreview',
   '/partner/repairs': 'repairs',

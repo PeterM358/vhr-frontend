@@ -42,6 +42,7 @@ import {
   partnerPromotions,
   partnerWarehouse,
   partnerInvoicing,
+  partnerUpgrade,
   partnerServices,
   partnerNotifications,
   partnerSwitchCenter,
@@ -860,6 +861,16 @@ export function navigateToPartnerInvoicing(navigation) {
   }
   const root = getRootNavigation(navigation);
   root.navigate('ShopInvoicing');
+}
+
+export function navigateToPartnerUpgrade(navigation, params = {}) {
+  const route = { name: 'ShopSubscriptionUpgrade', params };
+  if (Platform.OS === 'web') {
+    resetPartnerStackWebRoutes(navigation, [route], partnerUpgrade(params));
+    return;
+  }
+  const root = getRootNavigation(navigation);
+  root.navigate('ShopSubscriptionUpgrade', params);
 }
 
 export function navigateToPartnerServices(navigation) {

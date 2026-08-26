@@ -60,6 +60,7 @@ const PARTNER_ROUTE_SEGMENTS = new Set([
   'public-preview',
   'switch-center',
   'service-centers',
+  'upgrade',
 ]);
 
 function isAppCanonicalSegments(segments) {

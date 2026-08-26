@@ -12,6 +12,7 @@ import {
   Pressable,
   Share,
   Linking,
+  Alert,
 } from 'react-native';
 import { Text, Button, ActivityIndicator } from 'react-native-paper';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
@@ -25,7 +26,10 @@ import {
   getSubscriptionPaymentOptions,
   createSubscriptionPaymentRequest,
   createSubscriptionCheckout,
+  cancelSubscriptionAtPeriodEnd,
 } from '../api/profiles';
+import { openPolicyPath } from '../policies/policyPaths';
+import { POLICY_SLUGS } from '../policies/policySlugs';
 import { COLORS } from '../constants/colors';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useTranslation } from '../i18n';
@@ -126,6 +130,7 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [profile, setProfile] = useState(null);
   const [optionsPayload, setOptionsPayload] = useState(null);
   const [selected, setSelected] = useState({ planKey: 'premium', billingInterval: 'annual' });
@@ -188,6 +193,7 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   const options = optionsPayload?.options;
   const bankIncomplete = Boolean(bank.incomplete || bank.configured === false);
   const stripeIncomplete = Boolean(stripe.incomplete || stripe.configured === false);
+  const stripeSubscriptionId = optionsPayload?.stripe_subscription_id;
   const featureRequested =
     featureLabelParam ||
     (featureKey && FEATURE_LABEL_KEYS[featureKey]
@@ -278,6 +284,33 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
     isAnnual ? 'subscription.billingAnnual' : 'subscription.billingMonthly'
   );
 
+  const showManageSubscription =
+    isActive && currentPlan.isAssigned && planKeyLower && planKeyLower !== 'trial';
+
+  const handleCancelAtPeriodEnd = () => {
+    if (!profile?.id || cancelSubmitting) return;
+    Alert.alert(t('subscription.cancelAtPeriodEndCta'), t('subscription.cancelAtPeriodEndConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('subscription.cancelAtPeriodEndCta'),
+        style: 'destructive',
+        onPress: async () => {
+          setCancelSubmitting(true);
+          setError(null);
+          try {
+            await cancelSubscriptionAtPeriodEnd(profile.id);
+            await load();
+            Alert.alert(t('common.notice'), t('subscription.cancelSuccess'));
+          } catch (e) {
+            setError(String(e?.message || e));
+          } finally {
+            setCancelSubmitting(false);
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <ScreenBackground>
       <PartnerAppHeader
@@ -327,6 +360,40 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
                 </View>
               ) : null}
             </View>
+
+            {showManageSubscription ? (
+              <View style={styles.manageCard}>
+                <Text style={styles.manageTitle}>{t('subscription.manageTitle')}</Text>
+                <Text style={styles.manageBody}>{t('subscription.manageBody')}</Text>
+                {cancelAtPeriodEnd ? (
+                  <>
+                    <Text style={styles.cancelScheduledTitle}>{t('subscription.cancelScheduledTitle')}</Text>
+                    <Text style={styles.manageBody}>{t('subscription.cancelScheduledBody')}</Text>
+                  </>
+                ) : stripeSubscriptionId ? (
+                  <Button
+                    mode="outlined"
+                    loading={cancelSubmitting}
+                    disabled={cancelSubmitting}
+                    onPress={handleCancelAtPeriodEnd}
+                    style={styles.manageButton}
+                  >
+                    {cancelSubmitting ? t('subscription.cancelSubmitting') : t('subscription.cancelAtPeriodEndCta')}
+                  </Button>
+                ) : null}
+                <Text style={[styles.manageBody, styles.manageRefundHint]}>
+                  {t('subscription.refundRequestBody')}
+                </Text>
+                <Button
+                  mode="text"
+                  compact
+                  onPress={() => openPolicyPath(POLICY_SLUGS.refund, navigation)}
+                  textColor={COLORS.PRIMARY}
+                >
+                  {t('subscription.refundPolicyLink')}
+                </Button>
+              </View>
+            ) : null}
 
             {completion && !completion.ready_for_paid_plan ? (
               <View style={styles.completeCard}>
@@ -889,6 +956,39 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_MUTED,
     marginTop: 4,
     lineHeight: 20,
+  },
+  manageCard: {
+    backgroundColor: COLORS.CARD_FLOATING,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(15,76,129,0.2)',
+  },
+  manageTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.TEXT_DARK,
+    marginBottom: 6,
+  },
+  manageBody: {
+    fontSize: 14,
+    color: COLORS.TEXT_MUTED,
+    lineHeight: 20,
+  },
+  cancelScheduledTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.PRIMARY_DARK,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  manageButton: {
+    marginTop: 12,
+    alignSelf: 'flex-start',
+  },
+  manageRefundHint: {
+    marginTop: 12,
   },
   sectionTitle: {
     fontSize: 18,

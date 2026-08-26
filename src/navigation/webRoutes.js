@@ -600,6 +600,10 @@ export function partnerInvoicing(params = {}) {
   return buildPathWithQuery(`${PARTNER}/invoicing`, params);
 }
 
+export function partnerUpgrade(params = {}) {
+  return buildPathWithQuery(`${PARTNER}/upgrade`, params);
+}
+
 export function partnerServices(params = {}) {
   return buildPathWithQuery(`${PARTNER}/services`, params);
 }
