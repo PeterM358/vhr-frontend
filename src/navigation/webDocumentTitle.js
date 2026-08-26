@@ -51,6 +51,7 @@ const PATH_TITLE_KEYS = {
   '/terms': 'termsOfUse',
   '/cookies': 'cookiePolicy',
   '/support': 'support',
+  '/refund': 'refundPolicy',
   '/partner-terms': 'partnerTerms',
   '/dpa': 'dpa',
   '/subprocessors': 'subprocessors',

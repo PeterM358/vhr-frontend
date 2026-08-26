@@ -36,6 +36,7 @@ export default function AppFooter() {
       { label: t('footer.copyright') },
       { label: t('footer.privacy'), policySlug: POLICY_SLUGS.privacy },
       { label: t('footer.terms'), policySlug: POLICY_SLUGS.terms },
+      { label: t('footer.refund'), policySlug: POLICY_SLUGS.refund },
       { label: t('footer.cookiePolicy'), policySlug: POLICY_SLUGS.cookies },
       { label: t('footer.contact'), href: CONTACT_HREF },
       { label: t('footer.support'), policySlug: POLICY_SLUGS.support },
@@ -48,6 +49,7 @@ export default function AppFooter() {
     () => [
       { label: t('footer.privacy'), policySlug: POLICY_SLUGS.privacy },
       { label: t('footer.terms'), policySlug: POLICY_SLUGS.terms },
+      { label: t('footer.refund'), policySlug: POLICY_SLUGS.refund },
       { label: t('footer.cookiePolicy'), policySlug: POLICY_SLUGS.cookies },
       { label: t('footer.support'), policySlug: POLICY_SLUGS.support },
       { label: t('footer.versionMobile') },

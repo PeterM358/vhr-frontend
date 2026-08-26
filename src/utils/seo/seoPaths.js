@@ -41,6 +41,7 @@ const RESERVED_ROOT_SEGMENTS = new Set([
   'terms',
   'cookies',
   'support',
+  'refund',
   'partner-terms',
   'dpa',
   'subprocessors',

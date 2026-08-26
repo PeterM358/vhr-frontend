@@ -39,6 +39,7 @@ const APP_ROUTE_ROOTS = new Set([
   'terms',
   'cookies',
   'support',
+  'refund',
   'partner-terms',
   'dpa',
   'subprocessors',

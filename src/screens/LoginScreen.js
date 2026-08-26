@@ -22,6 +22,7 @@ import LoginGoogleOAuthBridge from '../components/auth/LoginGoogleOAuthBridge';
 import DashboardCard from '../components/dashboard/DashboardCard';
 import { useTranslation } from '../i18n';
 import AuthPublicEscape from '../components/auth/AuthPublicEscape';
+import AuthLegalLinks from '../components/auth/AuthLegalLinks';
 
 export default function LoginScreen({ navigation, route }) {
   const theme = useTheme();
@@ -401,6 +402,7 @@ export default function LoginScreen({ navigation, route }) {
             {t('auth.createAccount')}
           </Button>
         </DashboardCard>
+        <AuthLegalLinks />
       </ScrollView>
     </ScreenBackground>
   );

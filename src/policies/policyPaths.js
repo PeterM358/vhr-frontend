@@ -26,6 +26,7 @@ export function openPolicyPath(slug, navigation) {
 export const FOOTER_POLICY_LINKS = [
   { slug: POLICY_SLUGS.privacy, labelKey: 'footer.privacyPolicy' },
   { slug: POLICY_SLUGS.terms, labelKey: 'footer.termsOfService' },
+  { slug: POLICY_SLUGS.refund, labelKey: 'footer.refundPolicy' },
   { slug: POLICY_SLUGS.cookies, labelKey: 'footer.cookiePolicy' },
   { slug: POLICY_SLUGS.support, labelKey: 'footer.support' },
 ];

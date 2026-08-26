@@ -4,6 +4,7 @@ export const POLICY_SLUGS = {
   terms: 'terms',
   cookies: 'cookies',
   support: 'support',
+  refund: 'refund',
   partnerTerms: 'partner-terms',
   dpa: 'dpa',
   subprocessors: 'subprocessors',

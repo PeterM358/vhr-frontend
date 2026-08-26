@@ -2,6 +2,7 @@ import cookies from './content/cookies.js';
 import dpa from './content/dpa.js';
 import partnerTerms from './content/partnerTerms.js';
 import privacy from './content/privacy.js';
+import refund from './content/refund.js';
 import subprocessors from './content/subprocessors.js';
 import support from './content/support.js';
 import terms from './content/terms.js';
@@ -12,6 +13,7 @@ export const POLICY_DOCUMENTS = {
   terms,
   cookies,
   support,
+  refund,
   'partner-terms': partnerTerms,
   dpa,
   subprocessors,

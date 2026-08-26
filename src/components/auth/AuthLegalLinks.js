@@ -1,39 +1,33 @@
 import React, { useMemo } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import CompactLanguageSelector from '../common/CompactLanguageSelector';
 import { useTranslation } from '../../i18n';
 import { openPolicyPath } from '../../policies/policyPaths';
 import { POLICY_SLUGS } from '../../policies/policySlugs';
-import DISCOVERY_MOBILE from './discoveryMobileTokens';
 
 /**
- * Scoped compact footer for discovery screens — does not affect global AppFooter.
+ * Compact public legal links for Login / Register (AppFooter is auth-only).
  */
-export default function DiscoveryCompactFooter({ style }) {
+export default function AuthLegalLinks({ style, tone = 'dark' }) {
   const navigation = useNavigation();
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
 
   const links = useMemo(
     () => [
       { slug: POLICY_SLUGS.privacy, label: t('footer.privacy') },
       { slug: POLICY_SLUGS.terms, label: t('footer.terms') },
       { slug: POLICY_SLUGS.refund, label: t('footer.refund') },
-      { slug: POLICY_SLUGS.support, label: t('footer.support') },
+      { slug: POLICY_SLUGS.cookies, label: t('footer.cookiePolicy') },
     ],
     [t]
   );
 
+  const isLight = tone === 'light';
+
   return (
     <View
-      style={[
-        styles.footer,
-        { paddingBottom: Math.max(insets.bottom, 10) },
-        style,
-      ]}
+      style={[styles.wrap, style]}
       accessibilityRole={Platform.OS === 'web' ? 'contentinfo' : undefined}
     >
       <View style={styles.row}>
@@ -44,28 +38,25 @@ export default function DiscoveryCompactFooter({ style }) {
               accessibilityRole="link"
               accessibilityLabel={link.label}
             >
-              <Text style={styles.link}>{link.label}</Text>
+              <Text style={[styles.link, isLight ? styles.linkLight : null]}>{link.label}</Text>
             </Pressable>
-            {idx < links.length - 1 ? <Text style={styles.sep}>·</Text> : null}
+            {idx < links.length - 1 ? (
+              <Text style={[styles.sep, isLight ? styles.sepLight : null]}>·</Text>
+            ) : null}
           </React.Fragment>
         ))}
-      </View>
-      <View style={styles.langWrap}>
-        <CompactLanguageSelector variant="light" compact presentation="modal" />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  footer: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e2e8f0',
-    backgroundColor: DISCOVERY_MOBILE.color.surface,
-    paddingTop: 12,
-    paddingHorizontal: DISCOVERY_MOBILE.space.screenX,
-    alignItems: 'center',
-    gap: 10,
+  wrap: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+    marginTop: 16,
+    paddingBottom: 8,
   },
   row: {
     flexDirection: 'row',
@@ -74,18 +65,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   link: {
-    fontSize: DISCOVERY_MOBILE.type.meta,
+    fontSize: 12,
     fontWeight: '500',
-    color: DISCOVERY_MOBILE.color.textMuted,
-    lineHeight: 16,
+    color: 'rgba(226,232,240,0.78)',
     textDecorationLine: 'underline',
+    lineHeight: 18,
+  },
+  linkLight: {
+    color: '#64748b',
   },
   sep: {
-    fontSize: DISCOVERY_MOBILE.type.meta,
-    color: DISCOVERY_MOBILE.color.textSubtle,
+    fontSize: 12,
+    color: 'rgba(148,163,184,0.45)',
     marginHorizontal: 8,
+    lineHeight: 18,
   },
-  langWrap: {
-    alignItems: 'center',
+  sepLight: {
+    color: '#94a3b8',
   },
 });

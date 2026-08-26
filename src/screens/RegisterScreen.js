@@ -15,6 +15,7 @@ import { resetNavigationToCanonicalPath } from '../navigation/webLinking';
 import { safeError } from '../utils/logger';
 import DashboardCard from '../components/dashboard/DashboardCard';
 import AuthPublicEscape from '../components/auth/AuthPublicEscape';
+import AuthLegalLinks from '../components/auth/AuthLegalLinks';
 import { useTranslation } from '../i18n';
 import { applyAuthSession } from '../utils/authSession';
 
@@ -238,6 +239,7 @@ export default function RegisterScreen({ navigation }) {
             {t('auth.backToLogin')}
           </Button>
         </DashboardCard>
+        <AuthLegalLinks />
       </ScrollView>
 
       <Portal>
