@@ -452,9 +452,19 @@ export function getVehicleNavigationStateFromPath(path) {
   if (match) {
     const id = parseInt(match[1], 10);
     if (!Number.isFinite(id)) return null;
+    const expandReminders =
+      query.expandReminders === '1' ||
+      query.expandReminders === 'true' ||
+      query.expandReminders === true;
     return vehicleStackState([
       { name: 'ClientVehicles' },
-      { name: 'VehicleDetail', params: { vehicleId: id } },
+      {
+        name: 'VehicleDetail',
+        params: {
+          vehicleId: id,
+          ...(expandReminders ? { expandReminders: true } : {}),
+        },
+      },
     ]);
   }
 
