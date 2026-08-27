@@ -53,6 +53,14 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.mihailovv.vhrfrontend",
+      // Universal Links: https://…/path opens the installed app (emails, share).
+      // Requires apple-app-site-association on the host + TEAMID replaced (see docs).
+      associatedDomains: [
+        "applinks:beta.veversal.com",
+        "applinks:veversal.com",
+        "applinks:www.veversal.com",
+        "applinks:app.veversal.com",
+      ],
       ...(iosGoogleServicesFile ? { googleServicesFile: iosGoogleServicesFile } : {}),
     },
     android: {
@@ -61,6 +69,21 @@ export default {
         foregroundImage: "./src/assets/icons/adaptive-icon.png",
         backgroundColor: "#ffffff"
       },
+      // App Links: verified https hosts open the app when installed.
+      // Requires assetlinks.json on the host (Play signing SHA-256 must be listed).
+      intentFilters: [
+        {
+          action: "VIEW",
+          autoVerify: true,
+          category: ["BROWSABLE", "DEFAULT"],
+          data: [
+            { scheme: "https", host: "beta.veversal.com", pathPrefix: "/" },
+            { scheme: "https", host: "veversal.com", pathPrefix: "/" },
+            { scheme: "https", host: "www.veversal.com", pathPrefix: "/" },
+            { scheme: "https", host: "app.veversal.com", pathPrefix: "/" },
+          ],
+        },
+      ],
       ...(androidGoogleServicesFile ? { googleServicesFile: androidGoogleServicesFile } : {}),
       config: {
         googleMaps: {

@@ -224,7 +224,7 @@ In dev, check the browser console for:
 | **Core app** | Works — React Navigation + react-native-web |
 | **Maps** | Web uses Leaflet (`*.web.js` screens); native uses Google Maps |
 | **Push / FCM** | Limited on web; `firebase/messaging` in `App.js` may log warnings in browser |
-| **Deep links** | `service1001://` scheme is mobile; password-reset emails should use `https://beta.veversal.com/...` |
+| **Deep links** | Emails use `https://beta.veversal.com/...`. With Universal/App Links configured, the **installed native app** opens those URLs; otherwise web SPA. Custom `service1001://` is legacy only — see [`app-universal-links.md`](./app-universal-links.md). |
 | **Google login** | Requires a **Web** OAuth client ID in Google Cloud, authorized for `beta.veversal.com` |
 | **File uploads** | Web uses blob URLs / pickers; test document flows on beta |
 | **WebSockets** | Notifications WS must be reachable at `wss://api-beta.veversal.com`; Nginx must pass `Upgrade` headers on API host |

@@ -1,0 +1,27 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.com.mihailovv.vhrfrontend",
+        "paths": [
+          "/dashboard/*",
+          "/service-centers*",
+          "/login*",
+          "/bg/*",
+          "/en/*",
+          "/technical-inspection*",
+          "/oil-change*",
+          "/tire-change*",
+          "/brake-repair*",
+          "/battery-replacement*",
+          "NOT /api/*",
+          "NOT /.well-known/*"
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["TEAMID.com.mihailovv.vhrfrontend"]
+  }
+}

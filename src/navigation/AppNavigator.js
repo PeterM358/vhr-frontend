@@ -274,9 +274,18 @@ function createVehicleHeaderLeft(navigation) {
 }
 
 function getLinkingPrefixes() {
-  const prefixes = ['service1001://'];
+  // https hosts = Universal Links / App Links (email & share). Custom scheme = legacy/dev.
+  const prefixes = [
+    'service1001://',
+    'https://beta.veversal.com',
+    'https://veversal.com',
+    'https://www.veversal.com',
+    'https://app.veversal.com',
+  ];
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin) {
-    prefixes.push(window.location.origin);
+    if (!prefixes.includes(window.location.origin)) {
+      prefixes.push(window.location.origin);
+    }
   }
   return prefixes;
 }
