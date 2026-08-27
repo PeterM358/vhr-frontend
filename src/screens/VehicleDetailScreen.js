@@ -1030,8 +1030,24 @@ export default function VehicleDetailScreen({ route, navigation }) {
   if (!vehicle) {
     return (
       <ScreenBackground safeArea={false}>
+        <AppNavigationBar
+          title={t('vehicles.detail.title', null, 'Vehicle')}
+          onBack={handleBack}
+          scrolled={false}
+        />
         <View style={styles.center}>
-          <Text style={styles.emptyText}>Vehicle not found.</Text>
+          <Text style={styles.emptyTitle}>{t('vehicles.detail.notFoundTitle')}</Text>
+          <Text style={styles.emptyText}>{t('vehicles.detail.notFoundBody')}</Text>
+          <Button
+            mode="contained"
+            style={styles.emptyCta}
+            onPress={() => navigation.navigate('Login')}
+          >
+            {t('vehicles.detail.notFoundLoginCta')}
+          </Button>
+          <Button mode="text" textColor="#fff" onPress={() => navigation.navigate('ClientVehicles')}>
+            {t('vehicles.detail.notFoundListCta')}
+          </Button>
         </View>
       </ScreenBackground>
     );
@@ -1829,6 +1845,25 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 28,
+  },
+  emptyTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  emptyText: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  emptyCta: {
+    marginBottom: 8,
+    minWidth: 200,
   },
   heroCardWrap: {
     marginBottom: 14,

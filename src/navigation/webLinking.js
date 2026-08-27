@@ -189,6 +189,9 @@ export function getCanonicalWebPath(state) {
       return serviceCenters({
         vehicleId: params.vehicleId,
         returnTo: params.returnTo,
+        repairType: params.repairType,
+        vehicleType: params.vehicleType,
+        citySlug: params.citySlug,
       });
     case 'ShopDetail':
       if (params.centerSlug) {
@@ -498,7 +501,13 @@ export function getDashboardNavigationStateFromPath(path) {
     const routeParams = {
       repairType: query.repairType || undefined,
       vehicleType: query.vehicleType || undefined,
+      mode: query.mode || 'request',
     };
+    const vehicleIdRaw = query.vehicleId || query.vehicle_id;
+    if (vehicleIdRaw != null && vehicleIdRaw !== '') {
+      const vid = parseInt(String(vehicleIdRaw), 10);
+      if (Number.isFinite(vid)) routeParams.vehicleId = vid;
+    }
     if (centerId != null && Number.isFinite(centerId)) {
       routeParams.serviceCenter = centerId;
       routeParams.shopId = centerId;
@@ -666,6 +675,16 @@ export function getServiceCenterNavigationStateFromPath(path) {
           params: { citySlug: String(query.citySlug).toLowerCase(), ...vehicleContext },
         },
       ],
+    };
+  }
+
+  if (pathPart === 'service-centers') {
+    const params = { ...vehicleContext };
+    if (query.repairType) params.repairType = String(query.repairType);
+    if (query.vehicleType) params.vehicleType = String(query.vehicleType);
+    if (query.citySlug) params.citySlug = String(query.citySlug).toLowerCase();
+    return {
+      routes: [{ name: 'ShopMap', params }],
     };
   }
 
@@ -2056,7 +2075,9 @@ export async function redirectLegacyWebUrl() {
   ) {
     const authed = await hasStoredAuthToken();
     if (!authed) {
-      target = '/';
+      // Keep deep link (email / push) — login then return here.
+      await storeAuthReturnUrl(`${pathname}${search}${hash || ''}`);
+      target = '/login';
     } else {
       const dashboardTarget = await resolveDashboardRedirectTarget(pathname);
       if (dashboardTarget && dashboardTarget !== pathname) {

@@ -409,6 +409,12 @@ export function repairRequestNew(params = {}) {
   if (params.vehicleType != null && params.vehicleType !== '') {
     query.vehicleType = String(params.vehicleType);
   }
+  if (params.vehicleId != null && params.vehicleId !== '') {
+    query.vehicleId = String(normalizeId(params.vehicleId));
+  }
+  if (params.mode != null && params.mode !== '') {
+    query.mode = String(params.mode);
+  }
   return buildPathWithQuery(`${DASHBOARD}/repair-requests/new`, query);
 }
 
@@ -444,6 +450,15 @@ export function serviceCenters(params = {}) {
   }
   if (params.returnTo) {
     query.returnTo = String(params.returnTo);
+  }
+  if (params.repairType != null && params.repairType !== '') {
+    query.repairType = String(params.repairType);
+  }
+  if (params.vehicleType != null && params.vehicleType !== '') {
+    query.vehicleType = String(params.vehicleType);
+  }
+  if (params.citySlug != null && params.citySlug !== '') {
+    query.citySlug = String(params.citySlug).trim().toLowerCase();
   }
   return buildPathWithQuery(SERVICE_CENTERS, query);
 }

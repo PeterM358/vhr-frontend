@@ -13,6 +13,7 @@
     "logout": "Logout",
     "home": "Home",
     "menu": "Menu",
+    "notifications": "Notifications",
     "notice": "Notice",
     "add": "Add",
     "update": "Update",
@@ -2530,6 +2531,10 @@
     },
     "detail": {
       "viewSpecs": "View specs",
+      "notFoundTitle": "Vehicle not available",
+      "notFoundBody": "Sign in with the account that owns this vehicle. The email link only has the vehicle id — your login tells us who you are.",
+      "notFoundLoginCta": "Sign in",
+      "notFoundListCta": "My vehicles",
       "updateKilometers": "Update kilometers",
       "editTechnicalDetails": "Edit technical details",
       "vehicleInfo": "Vehicle info",
