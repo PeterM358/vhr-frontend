@@ -45,9 +45,11 @@ import PublishedServiceMenu from '../components/shop/PublishedServiceMenu';
 import { useTranslation } from '../i18n';
 import { joinList } from '../i18n/joinLocalizedList';
 import {
+  translateBusinessServiceLabel,
   translateRepairTypeLabels,
   translateVehicleTypePublicLabels,
 } from '../utils/translateShopTypeLabels';
+import { resolveShopBusinessTypeLabel } from '../utils/resolveShopBusinessTypeLabel';
 import { openShopInMaps, resolveShopMapsUrl } from '../utils/shopMapsLink';
 import ShopQuickRequestSheet from '../components/shop/ShopQuickRequestSheet';
 
@@ -154,6 +156,17 @@ function collectRepairNames(shop) {
   if (!Array.isArray(rel)) return [];
   return rel
     .map((r) => (typeof r === 'object' && r?.name ? r.name : ''))
+    .filter(Boolean)
+    .sort((a, b) => String(a).localeCompare(String(b)));
+}
+
+function collectBusinessServiceLabels(shop, t) {
+  const links = Array.isArray(shop?.business_services) ? shop.business_services : [];
+  return links
+    .map((row) => {
+      const svc = row?.service || row;
+      return translateBusinessServiceLabel(svc, t);
+    })
     .filter(Boolean)
     .sort((a, b) => String(a).localeCompare(String(b)));
 }
@@ -567,10 +580,12 @@ export default function ShopDetailScreen({ route, navigation }) {
 
   const serviceName = formatShopDisplayName(shop.name || genericServiceCenter);
 
+  const businessTypeLabel = resolveShopBusinessTypeLabel(shop, t);
   const vehicleNamesForSubtitleRaw = collectVehicleTypeNames(shop);
   const vehicleNamesForSubtitle = translateVehicleTypePublicLabels(vehicleNamesForSubtitleRaw, t);
   const subtitleType =
-    vehicleNamesForSubtitle.length > 0 ? joinList(vehicleNamesForSubtitle, { t }) : genericServiceCenter;
+    businessTypeLabel ||
+    (vehicleNamesForSubtitle.length > 0 ? joinList(vehicleNamesForSubtitle, { t }) : genericServiceCenter);
   const addr = typeof shop.address === 'string' ? shop.address.trim() : '';
   const phone =
     (typeof shop.display_phone === 'string' && shop.display_phone.trim()) ||
@@ -598,18 +613,27 @@ export default function ShopDetailScreen({ route, navigation }) {
 
   const repairNamesRaw = collectRepairNames(shop);
   const repairNames = translateRepairTypeLabels(repairNamesRaw, t);
+  const businessServiceNames = collectBusinessServiceLabels(shop, t);
+  const offeredServiceNames = [...new Set([...repairNames, ...businessServiceNames])];
 
   const vehicleList = vehicleNamesForSubtitle.length
     ? joinList(vehicleNamesForSubtitle, { t })
     : '';
-  const servicesList = repairNames.length ? joinList(repairNames, { t }) : '';
+  const servicesList = offeredServiceNames.length ? joinList(offeredServiceNames, { t }) : '';
 
+  const centerKind = businessTypeLabel
+    ? t('serviceCenterProfile.centerKindCategory', {
+        category:
+          businessTypeLabel.charAt(0).toLowerCase() + businessTypeLabel.slice(1),
+      })
+    : t('serviceCenterProfile.centerKindDefault');
   const vehiclePhrase = vehicleList ? t('serviceCenterProfile.vehiclePhrase', { vehicleTypes: vehicleList }) : '';
   const servicesPhrase = servicesList ? t('serviceCenterProfile.servicesPhrase', { services: servicesList }) : '';
   const locationPhrase = locationLine ? t('serviceCenterProfile.locationPhrase', { locationLine }) : '';
 
   const aboutLead = t('serviceCenterProfile.aboutTemplate', {
     serviceCenterName: serviceName,
+    centerKind,
     vehiclePhrase,
     servicesPhrase,
     locationPhrase,
@@ -854,8 +878,10 @@ export default function ShopDetailScreen({ route, navigation }) {
 
         <SectionHeading title={t('serviceCenters.profile.services')} />
         <FloatingCard>
-          {repairNames.length ? (
-            <ChipWrap labels={repairNames} />
+          {offeredServiceNames.length ? (
+            <ChipWrap labels={offeredServiceNames} />
+          ) : businessTypeLabel ? (
+            <ChipWrap labels={[businessTypeLabel]} />
           ) : (
             <Text style={styles.placeholderMuted}>{t('serviceCenters.profile.servicesNotAdded')}</Text>
           )}

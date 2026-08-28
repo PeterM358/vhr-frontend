@@ -1062,7 +1062,9 @@
     "other": "Other"
   },
   "serviceCenterProfile": {
-    "aboutTemplate": "{serviceCenterName} is a service center{vehiclePhrase}{servicesPhrase}{locationPhrase}.",
+    "aboutTemplate": "{serviceCenterName} is {centerKind}{vehiclePhrase}{servicesPhrase}{locationPhrase}.",
+    "centerKindDefault": "a service center",
+    "centerKindCategory": "a {category}",
     "vehiclePhrase": " servicing {vehicleTypes}",
     "servicesPhrase": " offering {services}",
     "locationPhrase": " in {locationLine}"

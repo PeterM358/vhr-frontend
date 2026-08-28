@@ -12,6 +12,7 @@ import VeversalScoreBadge from './VeversalScoreBadge';
 import { COLORS } from '../../styles/colors';
 import { useTranslation } from '../../i18n';
 import { joinList } from '../../i18n/joinLocalizedList';
+import { resolveShopBusinessTypeLabel } from '../../utils/resolveShopBusinessTypeLabel';
 import { translateRepairTypeLabels, translateVehicleTypePublicLabels } from '../../utils/translateShopTypeLabels';
 import DISCOVERY_MOBILE, { discoveryMinFont } from './discoveryMobileTokens';
 
@@ -56,6 +57,7 @@ export default function DiscoverySelectedServicePanel({
     : null;
   const openNow = shop.is_open_now ?? isShopOpenNow(shop.working_hours);
   const isVerified = shop.is_verified || shop.verification_status === 'verified_partner';
+  const businessTypeLabel = resolveShopBusinessTypeLabel(shop, t);
   const vehicleTypesTranslated = translateVehicleTypePublicLabels(shop.supported_vehicle_type_names || [], t);
   const vehicleSummary = vehicleTypesTranslated.length ? joinList(vehicleTypesTranslated, { t }) : '';
   const serviceNamesRaw = shop.observed_repair_type_names || shop.available_repair_names || [];
@@ -117,6 +119,12 @@ export default function DiscoverySelectedServicePanel({
           numberOfLines={1}
         >
           {distanceLabel}
+        </Text>
+      ) : null}
+
+      {businessTypeLabel ? (
+        <Text style={styles.businessType} numberOfLines={1}>
+          {businessTypeLabel}
         </Text>
       ) : null}
 
@@ -255,6 +263,13 @@ const styles = StyleSheet.create({
   },
   distanceUnavailable: {
     fontStyle: 'italic',
+  },
+  businessType: {
+    marginTop: 4,
+    fontSize: discoveryMinFont(13),
+    lineHeight: 18,
+    fontWeight: '700',
+    color: DISCOVERY_MOBILE.color.text,
   },
   summary: {
     marginTop: 4,

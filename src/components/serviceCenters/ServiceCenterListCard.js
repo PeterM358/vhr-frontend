@@ -9,6 +9,7 @@ import VeversalScoreBadge from './VeversalScoreBadge';
 import { COLORS } from '../../styles/colors';
 import { useTranslation } from '../../i18n';
 import { joinList } from '../../i18n/joinLocalizedList';
+import { resolveShopBusinessTypeLabel } from '../../utils/resolveShopBusinessTypeLabel';
 import { translateRepairTypeLabels, translateVehicleTypePublicLabels } from '../../utils/translateShopTypeLabels';
 import DISCOVERY_MOBILE, { discoveryMinFont } from './discoveryMobileTokens';
 
@@ -72,6 +73,7 @@ export default function ServiceCenterListCard({
   const isVerified = shop.is_verified || shop.verification_status === 'verified_partner';
   const isReported = shop.source === 'owner_reported';
   const allBrands = shop.all_brands_serviced || (shop.brand_names || []).includes('All brands');
+  const businessTypeLabel = resolveShopBusinessTypeLabel(shop, t);
   const vehicleTypesTranslated = translateVehicleTypePublicLabels(shop.supported_vehicle_type_names || [], t);
   const vehicleTypes = vehicleTypesTranslated.length ? joinList(vehicleTypesTranslated, { t }) : '';
   const serviceNamesRaw = shop.observed_repair_type_names || shop.available_repair_names || [];
@@ -173,6 +175,15 @@ export default function ServiceCenterListCard({
         {openNow === false ? <Text style={styles.closed}>{t('serviceCenters.closed')}</Text> : null}
         {distanceLabel ? <Text style={styles.distanceHint}>{distanceLabel}</Text> : null}
       </View>
+
+      {businessTypeLabel ? (
+        <Text
+          style={[styles.businessType, (compact || mobile) && styles.tagsCompact]}
+          numberOfLines={1}
+        >
+          {businessTypeLabel}
+        </Text>
+      ) : null}
 
       {vehicleTypes ? (
         <Text style={[styles.tags, (compact || mobile) && styles.tagsCompact]} numberOfLines={compact ? 1 : 2}>
@@ -341,6 +352,13 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: discoveryMinFont(12),
     color: '#475569',
+    lineHeight: 18,
+  },
+  businessType: {
+    marginTop: 8,
+    fontSize: discoveryMinFont(13),
+    fontWeight: '700',
+    color: '#0f172a',
     lineHeight: 18,
   },
   tagsCompact: {

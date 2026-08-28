@@ -4461,7 +4461,9 @@
     }
   },
   "serviceCenterProfile": {
-    "aboutTemplate": "{serviceCenterName} е сервиз{vehiclePhrase}{servicesPhrase}{locationPhrase}.",
+    "aboutTemplate": "{serviceCenterName} е {centerKind}{vehiclePhrase}{servicesPhrase}{locationPhrase}.",
+    "centerKindDefault": "сервиз",
+    "centerKindCategory": "{category}",
     "vehiclePhrase": ", който обслужва {vehicleTypes}",
     "servicesPhrase": " и предлага {services}",
     "locationPhrase": ". Намира се на {locationLine}"
