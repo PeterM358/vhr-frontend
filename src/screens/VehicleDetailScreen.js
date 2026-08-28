@@ -284,14 +284,20 @@ export default function VehicleDetailScreen({ route, navigation }) {
     navigation,
   ]);
 
-  const openTechnicalDetails = () => {
+  const openTechnicalDetails = (options = {}) => {
     if (!vehicle) return;
     navigation.navigate('EditVehicleDetails', {
       vehicleId,
       ...(isOrgFleet
         ? { organizationId, returnTo: 'OrgFleetVehicleDetail' }
         : {}),
+      ...options,
     });
+  };
+
+  const openVinEditor = () => {
+    const hasVin = Boolean(String(vehicle?.vin || '').trim());
+    openTechnicalDetails({ focusVin: !hasVin });
   };
 
   const openVehicleSpecs = () => {
@@ -1184,12 +1190,15 @@ export default function VehicleDetailScreen({ route, navigation }) {
     );
   };
 
-  const infoTile = (label, value, { onPress, showChevron = false } = {}) => {
+  const infoTile = (label, value, { onPress, showChevron = false, hintStyle = false } = {}) => {
     const row = (
       <View style={styles.infoTileRow}>
         <View style={styles.infoTileTextCol}>
           <Text style={styles.infoLabel}>{label}</Text>
-          <Text style={styles.infoValue} numberOfLines={label === 'VIN' ? 3 : 2}>
+          <Text
+            style={[styles.infoValue, hintStyle && styles.infoValueHint]}
+            numberOfLines={label === t('vehicles.detail.vin') ? 3 : 2}
+          >
             {value}
           </Text>
         </View>
@@ -1376,8 +1385,15 @@ export default function VehicleDetailScreen({ route, navigation }) {
                     })
                 : null}
               {String(vehicle.vin || '').trim()
-                ? infoTile('VIN', vehicle.vin, {})
-                : infoTile('VIN', t('vehicles.detail.vinHint'), {})}
+                ? infoTile(t('vehicles.detail.vin'), vehicle.vin, {
+                    onPress: !isShopView ? () => openTechnicalDetails() : undefined,
+                    showChevron: !isShopView,
+                  })
+                : infoTile(t('vehicles.detail.vin'), t('vehicles.detail.vinHint'), {
+                    onPress: !isShopView ? openVinEditor : undefined,
+                    showChevron: !isShopView,
+                    hintStyle: true,
+                  })}
               {isOrgFleet
                 ? infoTile(
                     t('org.workforce.assignedDriver', null, 'Assigned driver'),
@@ -2108,6 +2124,11 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_DARK,
     fontSize: 14,
     fontWeight: '700',
+  },
+  infoValueHint: {
+    color: COLORS.PRIMARY,
+    fontWeight: '600',
+    fontSize: 13,
   },
   repairCard: {
     backgroundColor: 'rgba(255,255,255,0.95)',

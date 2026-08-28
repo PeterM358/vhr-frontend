@@ -36,8 +36,8 @@ export const VEHICLE_OPTIONAL_GROUPS = [
     fields: [
       { key: 'oil_specification', label: 'Oil specification', kind: 'text', placeholder: 'e.g. 5W-30, 0W-30, ACEA C3, VW 504/507' },
       { key: 'battery_type', label: 'Battery type', kind: 'text', placeholder: 'e.g. AGM 70Ah, EFB 60Ah' },
-      { key: 'tire_size_front', label: 'Tire size (front)', kind: 'text', placeholder: 'e.g. 225/45 R17' },
-      { key: 'tire_size_rear', label: 'Tire size (rear)', kind: 'text', placeholder: 'e.g. 225/45 R17' },
+      { key: 'tire_size_front', label: 'Tire size (front)', kind: 'tire_size' },
+      { key: 'tire_size_rear', label: 'Tire size (rear)', kind: 'tire_size' },
       { key: 'brake_disc_front', label: 'Brake disc (front)', kind: 'text', placeholder: 'e.g. 312 mm ventilated' },
       { key: 'brake_disc_rear', label: 'Brake disc (rear)', kind: 'text', placeholder: 'e.g. 300 mm' },
       { key: 'current_tire_set', label: 'Current tire set', kind: 'text', placeholder: 'e.g. Summer, Winter, All-season' },

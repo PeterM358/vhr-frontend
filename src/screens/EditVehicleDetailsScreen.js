@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,9 +48,12 @@ import { translateVehicleTypeLabel } from '../utils/translateShopTypeLabels';
 export default function EditVehicleDetailsScreen({ navigation, route }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { vehicleId, organizationId, returnTo } = route.params || {};
+  const { vehicleId, organizationId, returnTo, focusVin } = route.params || {};
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBack = useGoBackOr(navigation);
+  const scrollRef = useRef(null);
+  const vinSectionRef = useRef(null);
+  const vinInputRef = useRef(null);
 
   const [vehicleChoices, setVehicleChoices] = useState({});
   const [countriesState, setCountriesState] = useState({
@@ -394,6 +397,23 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
     };
   }, [vehicleId]);
 
+  useEffect(() => {
+    if (loading || !focusVin) return undefined;
+    const timer = setTimeout(() => {
+      if (vinSectionRef.current && scrollRef.current?.scrollTo) {
+        vinSectionRef.current.measureLayout(
+          scrollRef.current.getInnerViewNode?.() ?? scrollRef.current,
+          (_x, y) => {
+            scrollRef.current?.scrollTo({ y: Math.max(0, y - 24), animated: true });
+          },
+          () => {}
+        );
+      }
+      vinInputRef.current?.focus?.();
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [loading, focusVin]);
+
   const toggleOptional = (key) => setExpandedOptional((prev) => ({ ...prev, [key]: !prev[key] }));
   const changeOptionalString = (key, value) => setOptionalStrings((prev) => ({ ...prev, [key]: value }));
   const changeOptionalBool = (key, value) => setOptionalBools((prev) => ({ ...prev, [key]: value }));
@@ -417,10 +437,8 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
       payload.first_registration_date = fr || null;
       const rc = String(regCountryIso ?? '').trim().toUpperCase();
       payload.registration_country = rc || null;
-      if (!vinLocked) {
-        const v = String(vinEditable ?? '').trim();
-        payload.vin = v || null;
-      }
+      const v = String(vinEditable ?? '').trim();
+      payload.vin = v || null;
       if (String(selectedVehicleTypeId || '') !== String(initialVehicleTypeId || '')) {
         payload.vehicle_type = selectedVehicleTypeId ? parseInt(selectedVehicleTypeId, 10) : null;
       }
@@ -457,6 +475,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
           scrolled={scrolled}
         />
         <KeyboardAwareScrollView
+          ref={scrollRef}
           style={{ flex: 1 }}
           onScroll={onScroll}
           scrollEventThrottle={scrollEventThrottle}
@@ -498,26 +517,25 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
                 <Text style={styles.identityLabel}>{t('vehicles.detail.brandModel')}</Text>
                 <Text style={styles.identityValue}>{identityBrandModel}</Text>
               </View>
-              {vinLocked ? (
-                <View style={styles.identityRow}>
-                  <Text style={styles.identityLabel}>{t('vehicles.detail.vin')}</Text>
-                  <Text style={styles.identityValue} selectable>
-                    {identityVin}
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  <Text style={styles.identityLabel}>{t('vehicles.detail.vinOptional')}</Text>
-                  <TextInput
-                    mode="outlined"
-                    value={vinEditable}
-                    onChangeText={setVinEditable}
-                    placeholder={t('vehicles.detail.vinPlaceholder')}
-                    autoCapitalize="characters"
-                    style={{ marginBottom: 8 }}
-                  />
-                </>
-              )}
+              <View ref={vinSectionRef} collapsable={false}>
+                <Text style={styles.identityLabel}>
+                  {vinLocked ? t('vehicles.detail.vin') : t('vehicles.detail.vinOptional')}
+                </Text>
+                <TextInput
+                  ref={vinInputRef}
+                  mode="outlined"
+                  value={vinEditable}
+                  onChangeText={setVinEditable}
+                  placeholder={t('vehicles.detail.vinPlaceholder')}
+                  autoCapitalize="characters"
+                  style={{ marginBottom: 8 }}
+                />
+                <Text style={styles.hintMuted}>
+                  {vinLocked
+                    ? t('vehicles.editDetails.vinChangeHint')
+                    : t('vehicles.editDetails.vinAddHint')}
+                </Text>
+              </View>
               <View style={styles.identityRow}>
                 <Text style={styles.identityLabel}>First registration</Text>
                 <Text style={styles.identityValue}>{registrationDateLabel}</Text>
@@ -545,9 +563,7 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
                 />
               </Pressable>
               <Text style={styles.hintMuted}>
-                {vinLocked
-                  ? 'Plate, make/model, and VIN are locked after creation. Changing vehicle type asks for confirmation. Registration: add date once if you skipped it at create; country can change later. Kilometers are on the vehicle screen.'
-                  : 'Add your VIN once, then save. Registration is optional and edited below when expanded.'}
+                {t('vehicles.editDetails.identityHint')}
               </Text>
             </FloatingCard>
           ) : (
@@ -568,26 +584,25 @@ export default function EditVehicleDetailsScreen({ navigation, route }) {
                 <Text style={styles.identityLabel}>{t('vehicles.detail.brandModel')}</Text>
                 <Text style={styles.identityValue}>{identityBrandModel}</Text>
               </View>
-              {vinLocked ? (
-                <View style={styles.identityRow}>
-                  <Text style={styles.identityLabel}>{t('vehicles.detail.vin')}</Text>
-                  <Text style={styles.identityValue} selectable>
-                    {identityVin}
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  <Text style={styles.identityLabel}>{t('vehicles.detail.vinOptional')}</Text>
-                  <TextInput
-                    mode="outlined"
-                    value={vinEditable}
-                    onChangeText={setVinEditable}
-                    placeholder={t('vehicles.detail.vinPlaceholder')}
-                    autoCapitalize="characters"
-                    style={{ marginBottom: 8 }}
-                  />
-                </>
-              )}
+              <View ref={vinSectionRef} collapsable={false}>
+                <Text style={styles.identityLabel}>
+                  {vinLocked ? t('vehicles.detail.vin') : t('vehicles.detail.vinOptional')}
+                </Text>
+                <TextInput
+                  ref={vinInputRef}
+                  mode="outlined"
+                  value={vinEditable}
+                  onChangeText={setVinEditable}
+                  placeholder={t('vehicles.detail.vinPlaceholder')}
+                  autoCapitalize="characters"
+                  style={{ marginBottom: 8 }}
+                />
+                <Text style={styles.hintMuted}>
+                  {vinLocked
+                    ? t('vehicles.editDetails.vinChangeHint')
+                    : t('vehicles.editDetails.vinAddHint')}
+                </Text>
+              </View>
               <View style={styles.identityRow}>
                 <Text style={styles.identityLabel}>First registration</Text>
                 <Text style={styles.identityValue}>{registrationDateLabel}</Text>

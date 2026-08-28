@@ -1873,6 +1873,7 @@
     "openRequestsEmptySubtitle": "New customer repair requests are waiting for your offer.",
     "completedCount": "Completed ({count})",
     "viewRequests": "View Requests",
+    "homeRepairsPreviewMore": "Showing {{shown}} of {{total}} active requests — open Repairs for the full list and filters.",
     "viewRepair": "View Repair",
     "operationsTitle": "Operations",
     "operationsSubtitle": "Daily partner workflows — requests, offers, schedule and your public presence.",
@@ -2676,8 +2677,17 @@
       "loadTypesError": "Could not load vehicle types.",
       "savedTitle": "Saved",
       "savedBody": "Vehicle details updated.",
-      "saveError": "Could not save vehicle."
+      "saveError": "Could not save vehicle.",
+      "vinAddHint": "Add your VIN here, then save. You can also set registration below.",
+      "vinChangeHint": "Change the VIN only if the previous value was wrong, then save.",
+      "identityHint": "Plate and make/model stay as entered at creation. Vehicle type changes ask for confirmation. Kilometers are updated on the vehicle screen."
     }
+  },
+  "vehicleFields": {
+    "tireWidth": "Width",
+    "tireProfile": "Profile",
+    "tireRim": "Rim",
+    "tireSizeHint": "Example: 225 / 45 / R17"
   },
   "fuelTypes": {
     "diesel": "diesel",

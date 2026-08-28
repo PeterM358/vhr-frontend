@@ -33,6 +33,7 @@ import { partnerInAppAlertCopy } from '../utils/partnerInAppAlert';
 import {
   comparePartnerLifecycle,
   countByLifecycle,
+  filterActivePartnerRepairs,
   formatLifecycleCounterLine,
 } from '../utils/partnerRepairLifecycle';
 import {
@@ -71,6 +72,9 @@ import { todayCalendarRange, isScheduledToday } from '../utils/dashboardDate';
 import { showMessage } from '../utils/crossPlatformAlert';
 import { resetShopDrawerRepairs } from '../navigation/drawerNavigation';
 import { useTranslation } from '../i18n';
+
+/** Home dashboard preview — full list lives in Repairs tab with filters. */
+const HOME_REPAIR_PREVIEW_LIMIT = 5;
 
 function asRepairRows(data) {
   if (Array.isArray(data)) return data;
@@ -111,8 +115,12 @@ export default function ShopHomeScreen() {
   const lastRepairNotifIdRef = React.useRef(null);
   const lastInAppAlertIdRef = React.useRef(null);
 
-  const openRepairs = dashboardRepairs;
-  const lifecycleCounts = useMemo(() => countByLifecycle(dashboardRepairs), [dashboardRepairs]);
+  const activeDashboardRepairs = useMemo(
+    () => filterActivePartnerRepairs(dashboardRepairs),
+    [dashboardRepairs]
+  );
+  const openRepairs = activeDashboardRepairs;
+  const lifecycleCounts = useMemo(() => countByLifecycle(activeDashboardRepairs), [activeDashboardRepairs]);
   const lifecycleCounterLine = useMemo(
     () => formatLifecycleCounterLine(lifecycleCounts, t),
     [lifecycleCounts, t]
@@ -121,9 +129,14 @@ export default function ShopHomeScreen() {
   const canSendOffers = canSendPartnerOffers(shopProfile);
 
   const sortedDashboardRepairs = useMemo(
-    () => [...dashboardRepairs].sort(comparePartnerLifecycle),
-    [dashboardRepairs]
+    () => [...activeDashboardRepairs].sort(comparePartnerLifecycle),
+    [activeDashboardRepairs]
   );
+  const previewDashboardRepairs = useMemo(
+    () => sortedDashboardRepairs.slice(0, HOME_REPAIR_PREVIEW_LIMIT),
+    [sortedDashboardRepairs]
+  );
+  const hasMoreDashboardRepairs = sortedDashboardRepairs.length > HOME_REPAIR_PREVIEW_LIMIT;
 
   const loadDashboardRepairs = React.useCallback(async ({ background = false } = {}) => {
     if (!background) setRepairsLoading(true);
@@ -132,23 +145,17 @@ export default function ShopHomeScreen() {
       const shopId = await AsyncStorage.getItem('@current_shop_id');
       const shopFilter = shopId ? { shop_profile_id: shopId } : {};
 
-      const [openRows, ongoingRows, doneRows, deniedRows] = await Promise.all([
+      const [openRows, ongoingRows] = await Promise.all([
         getRepairs(token, { status: 'open', ...shopFilter })
           .then(asRepairRows)
           .catch(() => []),
         getRepairs(token, { status: 'ongoing', ...shopFilter })
           .then(asRepairRows)
           .catch(() => []),
-        getRepairs(token, { status: 'done', ...shopFilter })
-          .then(asRepairRows)
-          .catch(() => []),
-        getRepairs(token, { status: 'denied', ...shopFilter })
-          .then(asRepairRows)
-          .catch(() => []),
       ]);
 
       const merged = new Map();
-      [...openRows, ...ongoingRows, ...doneRows, ...deniedRows].forEach((row) => {
+      [...openRows, ...ongoingRows].forEach((row) => {
         if (row?.id != null) merged.set(row.id, row);
       });
       const rows = [...merged.values()];
@@ -547,7 +554,17 @@ export default function ShopHomeScreen() {
           ) : sortedDashboardRepairs.length === 0 ? (
             <PartnerEmptyRequestsState />
           ) : (
-            sortedDashboardRepairs.slice(0, 8).map(renderDashboardRepair)
+            <>
+              {previewDashboardRepairs.map(renderDashboardRepair)}
+              {hasMoreDashboardRepairs ? (
+                <Text style={styles.previewMoreHint}>
+                  {t('partnerDashboard.homeRepairsPreviewMore', {
+                    shown: HOME_REPAIR_PREVIEW_LIMIT,
+                    total: sortedDashboardRepairs.length,
+                  })}
+                </Text>
+              ) : null}
+            </>
           )}
         </DashboardSection>
 
@@ -581,5 +598,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  previewMoreHint: {
+    marginTop: 8,
+    marginBottom: 4,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.78)',
+    textAlign: 'center',
   },
 });

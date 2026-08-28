@@ -100,6 +100,13 @@ export function getLifecyclePill(repair, translateFn = defaultT) {
   };
 }
 
+export function filterActivePartnerRepairs(repairs) {
+  return (repairs || []).filter((repair) => {
+    const key = resolvePartnerLifecycle(repair);
+    return key !== PARTNER_LIFECYCLE.COMPLETED && key !== PARTNER_LIFECYCLE.DECLINED;
+  });
+}
+
 export function comparePartnerLifecycle(a, b) {
   const orderA = LIFECYCLE_SORT_ORDER[resolvePartnerLifecycle(a)] ?? 99;
   const orderB = LIFECYCLE_SORT_ORDER[resolvePartnerLifecycle(b)] ?? 99;

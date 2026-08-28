@@ -7,6 +7,7 @@ import FloatingCard from '../ui/FloatingCard';
 import { COLORS } from '../../constants/colors';
 import { VEHICLE_OPTIONAL_GROUPS, ODOMETER_SOURCE_OPTIONS } from './vehicleFormConfig';
 import ServiceRecordDatePicker from './ServiceRecordDatePicker';
+import TireSizeInput from './TireSizeInput';
 import { useTranslation, translateVehicleGroupTitle, translateVehicleGroupHelper } from '../../i18n';
 
 export default function VehicleCollapsibleFormSections({
@@ -84,6 +85,17 @@ export default function VehicleCollapsibleFormSections({
                   }
                   if (field.kind === 'date') {
                     return renderDateField(field);
+                  }
+                  if (field.kind === 'tire_size') {
+                    return (
+                      <View key={field.key} style={styles.fieldBlock}>
+                        <TireSizeInput
+                          label={field.label}
+                          value={strings[field.key] ?? ''}
+                          onChange={(v) => onChangeString(field.key, v)}
+                        />
+                      </View>
+                    );
                   }
                   if (field.kind === 'choice') {
                     const extra = choiceExtras[field.key];
