@@ -377,95 +377,92 @@ function CompactJobCard({
       ? t('partnerDashboard.calendar.occupancy.multiDayHint')
       : null;
 
-  const cardBody = (
-    <>
-      <View style={styles.compactHeader}>
-        <View style={styles.compactHeaderLeft}>
-          {showBay ? <BayChip bayNumber={bayNumber} t={t} /> : null}
-          <Text
-            style={[
-              styles.compactTime,
-              isRequest && styles.compactTimeRequest,
-              pending && !showBay && styles.compactTimePending,
-            ]}
-          >
-            {timeLabel}
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.kindPill,
-            badgeKind === 'client_request' && styles.kindPillRequest,
-            badgeKind === 'ready' && styles.kindPillReady,
-            badgeKind === 'pending_confirm' && styles.kindPillPending,
-            badgeKind === 'booked' && styles.kindPillBooked,
-          ]}
-        >
-          <Text
-            style={[
-              styles.kindPillText,
-              badgeKind === 'client_request' && styles.kindPillTextRequest,
-              badgeKind === 'ready' && styles.kindPillTextReady,
-              badgeKind === 'pending_confirm' && styles.kindPillTextPending,
-            ]}
-          >
-            {badgeLabel}
-          </Text>
-        </View>
-      </View>
-      <Text style={styles.compactVehicle} numberOfLines={1}>
-        {plate ? `${plate} · ${vehicle}` : vehicle}
+  const badge = (
+    <View
+      style={[
+        styles.kindPill,
+        badgeKind === 'client_request' && styles.kindPillRequest,
+        badgeKind === 'ready' && styles.kindPillReady,
+        badgeKind === 'pending_confirm' && styles.kindPillPending,
+        badgeKind === 'booked' && styles.kindPillBooked,
+      ]}
+    >
+      <Text
+        style={[
+          styles.kindPillText,
+          badgeKind === 'client_request' && styles.kindPillTextRequest,
+          badgeKind === 'ready' && styles.kindPillTextReady,
+          badgeKind === 'pending_confirm' && styles.kindPillTextPending,
+        ]}
+      >
+        {badgeLabel}
       </Text>
-      {!isReadyDay ? (
-        <Text style={styles.compactService} numberOfLines={dense ? 1 : 2}>
-          {repairTypeLabel || t('partnerDashboard.calendar.repairTypeMissing')}
-          {vehicleTypeLabel
-            ? ` · ${vehicleTypeLabel}`
-            : ` · ${t('partnerDashboard.calendar.vehicleTypeMissing')}`}
-        </Text>
-      ) : null}
-      {occupancyHint ? <Text style={styles.compactHint}>{occupancyHint}</Text> : null}
-      {statusHint ? <Text style={styles.compactHint}>{statusHint}</Text> : null}
-    </>
+    </View>
   );
 
-  const actionRow =
+  const metaLine = !isReadyDay
+    ? [
+        repairTypeLabel || t('partnerDashboard.calendar.repairTypeMissing'),
+        vehicleTypeLabel || t('partnerDashboard.calendar.vehicleTypeMissing'),
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : null;
+
+  const actionChip = (label, onPress, { loading, destructive, primary } = {}) => (
+    <Pressable
+      key={label}
+      onPress={() => onPress?.(item)}
+      disabled={loading}
+      style={({ pressed }) => [
+        styles.actionChip,
+        primary && styles.actionChipPrimary,
+        destructive && styles.actionChipDestructive,
+        pressed && { opacity: 0.85 },
+        loading && { opacity: 0.55 },
+      ]}
+      hitSlop={6}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color={primary ? '#fff' : COLORS.PRIMARY} />
+      ) : (
+        <Text
+          style={[
+            styles.actionChipText,
+            primary && styles.actionChipTextPrimary,
+            destructive && styles.actionChipTextDestructive,
+          ]}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+      )}
+    </Pressable>
+  );
+
+  const actions =
     primaryLabel || secondaryLabel ? (
-      <View style={styles.compactActions}>
-        {primaryLabel ? (
-          <Button
-            mode="contained"
-            compact
-            onPress={() => onPrimary?.(item)}
-            loading={loadingPrimary}
-            disabled={loadingPrimary}
-            style={styles.compactBtn}
-          >
-            {primaryLabel}
-          </Button>
-        ) : null}
-        {secondaryLabel ? (
-          <Button
-            mode="outlined"
-            compact
-            onPress={() => onSecondary?.(item)}
-            loading={loadingSecondary}
-            disabled={loadingSecondary}
-            style={styles.compactBtn}
-            textColor={secondaryDestructive ? '#B91C1C' : undefined}
-          >
-            {secondaryLabel}
-          </Button>
-        ) : null}
+      <View style={[styles.compactActions, dense && styles.compactActionsInline]}>
+        {primaryLabel
+          ? actionChip(primaryLabel, onPrimary, { loading: loadingPrimary, primary: true })
+          : null}
+        {secondaryLabel
+          ? actionChip(secondaryLabel, onSecondary, {
+              loading: loadingSecondary,
+              destructive: secondaryDestructive,
+            })
+          : null}
       </View>
     ) : null;
 
-  if (actionRow) {
+  // Wide web: one dense row — identity left, badge + actions right.
+  if (dense) {
     return (
       <View
         style={[
           styles.compactCard,
-          dense && styles.compactCardDense,
+          styles.compactCardDense,
+          styles.compactCardRow,
           isRequest && styles.compactCardRequest,
           bayAccent && {
             borderLeftWidth: 3,
@@ -474,31 +471,80 @@ function CompactJobCard({
           !bayAccent && pending && styles.compactCardPending,
         ]}
       >
-        <Pressable onPress={() => onOpen?.(item)} style={({ pressed }) => [pressed && { opacity: 0.92 }]}>
-          {cardBody}
+        <Pressable
+          onPress={() => onOpen?.(item)}
+          style={({ pressed }) => [styles.compactIdentity, pressed && { opacity: 0.92 }]}
+        >
+          <View style={styles.compactHeaderLeft}>
+            {showBay ? <BayChip bayNumber={bayNumber} t={t} /> : null}
+            <Text
+              style={[
+                styles.compactTime,
+                isRequest && styles.compactTimeRequest,
+                pending && !showBay && styles.compactTimePending,
+              ]}
+            >
+              {timeLabel}
+            </Text>
+            {badge}
+          </View>
+          <Text style={styles.compactVehicle} numberOfLines={1}>
+            {plate ? `${plate} · ${vehicle}` : vehicle}
+            {metaLine ? ` · ${metaLine}` : ''}
+          </Text>
+          {occupancyHint || statusHint ? (
+            <Text style={styles.compactHint} numberOfLines={1}>
+              {statusHint || occupancyHint}
+            </Text>
+          ) : null}
         </Pressable>
-        {actionRow}
+        {actions}
       </View>
     );
   }
 
+  // Mobile / narrow: stacked identity, compact chip actions (not full-width Paper buttons).
   return (
-    <Pressable
-      onPress={() => onOpen?.(item)}
-      style={({ pressed }) => [
+    <View
+      style={[
         styles.compactCard,
-        dense && styles.compactCardDense,
         isRequest && styles.compactCardRequest,
         bayAccent && {
           borderLeftWidth: 3,
           borderLeftColor: bayAccent.border,
         },
         !bayAccent && pending && styles.compactCardPending,
-        pressed && { opacity: 0.92 },
       ]}
     >
-      {cardBody}
-    </Pressable>
+      <Pressable onPress={() => onOpen?.(item)} style={({ pressed }) => [pressed && { opacity: 0.92 }]}>
+        <View style={styles.compactHeader}>
+          <View style={styles.compactHeaderLeft}>
+            {showBay ? <BayChip bayNumber={bayNumber} t={t} /> : null}
+            <Text
+              style={[
+                styles.compactTime,
+                isRequest && styles.compactTimeRequest,
+                pending && !showBay && styles.compactTimePending,
+              ]}
+            >
+              {timeLabel}
+            </Text>
+          </View>
+          {badge}
+        </View>
+        <Text style={styles.compactVehicle} numberOfLines={1}>
+          {plate ? `${plate} · ${vehicle}` : vehicle}
+        </Text>
+        {metaLine ? (
+          <Text style={styles.compactService} numberOfLines={1}>
+            {metaLine}
+          </Text>
+        ) : null}
+        {occupancyHint ? <Text style={styles.compactHint}>{occupancyHint}</Text> : null}
+        {statusHint ? <Text style={styles.compactHint}>{statusHint}</Text> : null}
+      </Pressable>
+      {actions}
+    </View>
   );
 }
 
@@ -728,7 +774,7 @@ export default function ShopCalendarScreen() {
     return 28;
   }, [boardViewportWidth, monthIso, windowWidth]);
   const occupancyLabelWidth = Platform.OS === 'web' ? 96 : 108;
-  const isWideWeb = Platform.OS === 'web' && windowWidth >= 900;
+  const isWideWeb = Platform.OS === 'web' && windowWidth >= 720;
   const dailyLoadMap = useMemo(
     () => buildDailyLoadMap(calendar.daily_load),
     [calendar.daily_load]
@@ -1417,6 +1463,7 @@ export default function ShopCalendarScreen() {
               rows={occupancyBoard.rows}
               dayWidth={occupancyDayWidth}
               labelWidth={occupancyLabelWidth}
+              rowHeight={Platform.OS === 'web' ? 28 : 36}
               canEdit
               scrollToToday={Platform.OS !== 'web'}
               rowColLabel={t('partnerDashboard.calendar.occupancy.bayCol', null, 'Bay')}
@@ -1795,16 +1842,25 @@ const styles = StyleSheet.create({
   laborBarLabelFull: { color: '#fca5a5', fontWeight: '600' },
   compactCard: {
     backgroundColor: 'rgba(255,255,255,0.96)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 6,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 5,
   },
   compactCardDense: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     marginBottom: 4,
-    borderRadius: 10,
+    borderRadius: 8,
+  },
+  compactCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  compactIdentity: {
+    flex: 1,
+    minWidth: 0,
   },
   compactCardRequest: {
     borderLeftWidth: 3,
@@ -1850,13 +1906,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   compactHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     flexShrink: 1,
+    flexWrap: 'wrap',
   },
   compactTime: {
     fontSize: 13,
@@ -1871,20 +1928,21 @@ const styles = StyleSheet.create({
   },
   kindPill: {
     borderRadius: 999,
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 2,
+    backgroundColor: 'rgba(15,76,129,0.12)',
+  },
+  kindPillBooked: {
+    backgroundColor: 'rgba(15,76,129,0.12)',
   },
   kindPillRequest: {
     backgroundColor: 'rgba(220,38,38,0.12)',
   },
   kindPillReady: {
-    backgroundColor: 'rgba(13,148,136,0.14)',
+    backgroundColor: 'rgba(15,118,110,0.12)',
   },
   kindPillPending: {
-    backgroundColor: 'rgba(217,119,6,0.16)',
-  },
-  kindPillBooked: {
-    backgroundColor: 'rgba(15,76,129,0.1)',
+    backgroundColor: 'rgba(217,119,6,0.14)',
   },
   kindPillText: {
     fontSize: 10,
@@ -1903,25 +1961,60 @@ const styles = StyleSheet.create({
     color: '#B45309',
   },
   compactVehicle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: COLORS.TEXT_DARK,
   },
   compactService: {
     fontSize: 12,
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 1,
   },
   compactHint: {
     fontSize: 11,
     color: '#64748B',
-    marginTop: 4,
+    marginTop: 2,
     fontStyle: 'italic',
   },
   compactActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 6,
-    marginTop: 8,
+    marginTop: 6,
+  },
+  compactActionsInline: {
+    marginTop: 0,
+    flexShrink: 0,
+    alignItems: 'center',
+  },
+  actionChip: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(15,76,129,0.35)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: '#fff',
+    minHeight: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionChipPrimary: {
+    backgroundColor: COLORS.PRIMARY,
+    borderColor: COLORS.PRIMARY,
+  },
+  actionChipDestructive: {
+    borderColor: 'rgba(185,28,28,0.45)',
+  },
+  actionChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.PRIMARY,
+  },
+  actionChipTextPrimary: {
+    color: '#fff',
+  },
+  actionChipTextDestructive: {
+    color: '#B91C1C',
   },
   compactBtn: {
     flex: 1,
