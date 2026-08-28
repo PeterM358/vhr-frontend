@@ -9,6 +9,8 @@ import { navigateToShopDashboard } from './drawerNavigation';
 import {
   navigateToDashboard,
   navigateToPartnerCalendar,
+  navigateToPartnerRepairs,
+  navigateToRepairRequests,
   navigateToServiceCenters,
   navigateToVehicleDetail,
   navigateToVehicleList,
@@ -27,7 +29,8 @@ export function useGoBackOr(navigation, fallback) {
 }
 
 export function useClientDashboardBack(navigation) {
-  return useCallback(() => navigateToDashboard(navigation), [navigation]);
+  // Prefer real stack history (e.g. OrgHome → ClientProfile) over jumping to client Home.
+  return useGoBackOr(navigation, navigateToDashboard);
 }
 
 export function usePartnerDashboardBack(navigation) {
@@ -35,11 +38,16 @@ export function usePartnerDashboardBack(navigation) {
 }
 
 export function useVehicleListBack(navigation) {
-  return useCallback(() => navigateToVehicleList(navigation), [navigation]);
+  // RN7: navigate('ClientVehicles') pushes a duplicate list and creates List↔Detail loops.
+  return useGoBackOr(navigation, navigateToVehicleList);
 }
 
 export function useVehicleDetailBack(navigation, vehicleId) {
   return useCallback(() => {
+    if (navigation?.canGoBack?.()) {
+      navigation.goBack();
+      return;
+    }
     if (vehicleId) {
       navigateToVehicleDetail(navigation, vehicleId);
       return;
@@ -50,6 +58,10 @@ export function useVehicleDetailBack(navigation, vehicleId) {
 
 export function useServiceRecordBack(navigation, vehicleId) {
   return useCallback(() => {
+    if (navigation?.canGoBack?.()) {
+      navigation.goBack();
+      return;
+    }
     if (vehicleId) {
       navigateToVehicleServiceRecordNew(navigation, vehicleId);
       return;
@@ -76,6 +88,22 @@ export function useRouteBackLabel(route, fallbackKey = 'common.back') {
 export function useReturnToBack(navigation, returnTo, backLabel, returnParams) {
   return useCallback(() => {
     const routeName = normalizeReturnToRoute(returnTo);
+
+    // List hubs: always land on the list (don't pop CreateRepair / nested detail).
+    if (routeName === 'ClientRepairs') {
+      navigateToRepairRequests(navigation, returnParams || {});
+      return;
+    }
+    if (routeName === 'RepairsList') {
+      navigateToPartnerRepairs(navigation);
+      return;
+    }
+
+    // RN7: navigate(returnTo) can push a duplicate — prefer popping history first.
+    if (navigation?.canGoBack?.()) {
+      navigation.goBack();
+      return;
+    }
     if (routeName === 'Home' || routeName === 'HomeMain') {
       if (Platform.OS === 'web') {
         navigateToDashboard(navigation);
@@ -87,12 +115,7 @@ export function useReturnToBack(navigation, returnTo, backLabel, returnParams) {
       return;
     }
     // ShopCalendar lives inside ShopHome drawer — not a root stack route.
-    // Prefer history (calendar → detail push/reset), else partner calendar helper.
     if (routeName === 'ShopCalendar') {
-      if (navigation?.canGoBack?.()) {
-        navigation.goBack();
-        return;
-      }
       navigateToPartnerCalendar(navigation, returnParams || {});
       return;
     }
@@ -102,10 +125,6 @@ export function useReturnToBack(navigation, returnTo, backLabel, returnParams) {
         return;
       }
       navigation.navigate(routeName);
-      return;
-    }
-    if (navigation?.canGoBack?.()) {
-      navigation.goBack();
     }
   }, [navigation, returnTo, backLabel, returnParams]);
 }

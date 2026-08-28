@@ -16,9 +16,16 @@ import AppNavigationBar from '../common/AppNavigationBar';
 import { useScrollShadow } from '../../hooks/useScrollShadow';
 import { useClientDashboardBack, useGoBackOr } from '../../navigation/appNavBarBack';
 import { syncWebPath } from '../../navigation/authNavigation';
-import { navigateToRepairRequestDetail } from '../../navigation/webNavigation';
+import { navigateToRepairDetail } from '../../navigation/webNavigation';
 import { repairRequests } from '../../navigation/webRoutes';
 import { useTranslation } from '../../i18n';
+import { translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
+import {
+  formatRepairListDate,
+  repairHistoryTotalLabel,
+  repairListDateLabel,
+  repairListKmValue,
+} from '../../utils/repairListUtils';
 
 const TAB_KEYS = ['open', 'offers', 'ongoing', 'done'];
 
@@ -27,6 +34,14 @@ const TAB_I18N_KEYS = {
   offers: 'repairs.tabs.offers',
   ongoing: 'repairs.tabs.active',
   done: 'repairs.tabs.completed',
+};
+
+const STATUS_BADGE_I18N = {
+  open: 'partnerDashboard.repairsList.status.open',
+  ongoing: 'partnerDashboard.repairsList.status.ongoing',
+  done: 'partnerDashboard.repairsList.status.done',
+  requested: 'partnerDashboard.repairsList.status.requested',
+  booked: 'partnerDashboard.repairsList.status.booked',
 };
 
 function resolveInitialTab(route) {
@@ -93,19 +108,71 @@ export default function ClientRepairsList({ navigation, route }) {
     return repairs.filter((r) => Number(r.vehicle) === scopedVehicleId);
   }, [repairs, scopedVehicleId]);
 
+  const resolveStatusBadgeLabel = (statusKey) => {
+    const key = String(statusKey || '').toLowerCase();
+    const labelKey = STATUS_BADGE_I18N[key];
+    return labelKey ? t(labelKey) : undefined;
+  };
+
   const renderRepair = ({ item }) => {
     const title =
       `${item.vehicle_make ?? ''} ${item.vehicle_model ?? ''}`.trim() ||
-      'Vehicle';
-    const plate = item.vehicle_license_plate;
+      t('repairs.vehicleFallback');
+    const plate = String(item.vehicle_license_plate || '').trim();
+    const shopName = String(item.shop_profile_name || '').trim();
+    const serviceTypeName =
+      item.final_repair_type_name ||
+      item.effective_repair_type_name ||
+      item.repair_type_name ||
+      null;
+    const serviceTypeLabel = serviceTypeName
+      ? translateRepairTypeLabel(
+          {
+            name: serviceTypeName,
+            repair_type_name: serviceTypeName,
+            slug: item.repair_type_slug || item.effective_repair_type_slug,
+          },
+          t
+        ) || serviceTypeName
+      : null;
+
+    const statusLower = String(item.status || '').toLowerCase();
+    const isBookedAwaiting =
+      statusLower === 'open' &&
+      (Boolean(item.scheduled_start) ||
+        item.partner_lifecycle_status === 'OFFER_ACCEPTED');
+    const isDirectRequest =
+      statusLower === 'open' &&
+      item.request_targeting_mode === 'selected_centers' &&
+      !isBookedAwaiting;
+    const badgeStatus = isBookedAwaiting
+      ? 'booked'
+      : isDirectRequest
+        ? 'requested'
+        : item.status;
+    const badgeLabel = resolveStatusBadgeLabel(badgeStatus);
+
+    const sortDate = formatRepairListDate(
+      statusFilter === 'done'
+        ? item.completed_at || item.created_at
+        : isBookedAwaiting && item.scheduled_start
+          ? item.scheduled_start
+          : item.created_at || item.completed_at
+    );
+    const dateMetaLabel = isBookedAwaiting
+      ? t('partnerDashboard.repairsList.status.booked')
+      : repairListDateLabel(statusFilter, t);
+    const kmValue = repairListKmValue(item, statusFilter);
+    const totalLabel = repairHistoryTotalLabel(item);
 
     return (
       <FloatingCard
         onPress={() =>
-          navigateToRepairRequestDetail(navigation, item.id, {
+          navigateToRepairDetail(navigation, item.id, {
             returnTo: 'ClientRepairs',
             initialTab: statusFilter,
             fromVehicleDetail: route.params?.fromVehicleDetail || false,
+            backLabelKey: 'repairs.navBackToRequests',
           })
         }
       >
@@ -119,9 +186,20 @@ export default function ClientRepairsList({ navigation, route }) {
                 {plate}
               </Text>
             )}
+            {!!shopName && (
+              <Text style={styles.cardShop} numberOfLines={1}>
+                {shopName}
+              </Text>
+            )}
           </View>
-          <StatusBadge status={item.status} />
+          <StatusBadge status={badgeStatus} label={badgeLabel} />
         </View>
+
+        {serviceTypeLabel ? (
+          <Text style={styles.cardServiceType} numberOfLines={1}>
+            {serviceTypeLabel}
+          </Text>
+        ) : null}
 
         {!!item.description && (
           <Text style={styles.cardDescription} numberOfLines={2}>
@@ -129,11 +207,21 @@ export default function ClientRepairsList({ navigation, route }) {
           </Text>
         )}
 
-        {item.kilometers != null && item.kilometers !== '' && (
-          <Text style={styles.cardMeta}>
-            {Number(item.kilometers).toLocaleString()} km
-          </Text>
-        )}
+        <View style={styles.cardFooter}>
+          {sortDate ? (
+            <Text style={styles.cardMeta}>
+              {dateMetaLabel} · {sortDate}
+            </Text>
+          ) : (
+            <Text style={styles.cardMeta}>{t('repairs.list.dateNotRecorded')}</Text>
+          )}
+          <View style={styles.cardFooterRight}>
+            {kmValue != null ? (
+              <Text style={styles.cardKm}>{Number(kmValue).toLocaleString()} km</Text>
+            ) : null}
+            {totalLabel ? <Text style={styles.cardPrice}>{totalLabel}</Text> : null}
+          </View>
+        </View>
       </FloatingCard>
     );
   };
@@ -188,6 +276,8 @@ export default function ClientRepairsList({ navigation, route }) {
             data={visibleRepairs}
             keyExtractor={(item) => item.id.toString()}
             renderItem={renderRepair}
+            onScroll={onScroll}
+            scrollEventThrottle={scrollEventThrottle}
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               <EmptyStateCard
@@ -258,8 +348,8 @@ const styles = StyleSheet.create({
   },
   cardTopRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
+    alignItems: 'flex-start',
+    marginBottom: 4,
   },
   cardTitleWrap: {
     flex: 1,
@@ -276,15 +366,50 @@ const styles = StyleSheet.create({
     marginTop: 2,
     letterSpacing: 0.4,
   },
+  cardShop: {
+    fontSize: 12,
+    color: COLORS.TEXT_DARK,
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  cardServiceType: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.PRIMARY,
+    marginTop: 4,
+    marginBottom: 2,
+  },
   cardDescription: {
     fontSize: 13,
     color: COLORS.TEXT_MUTED,
     marginTop: 2,
     lineHeight: 18,
   },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    gap: 8,
+  },
+  cardFooterRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   cardMeta: {
+    flex: 1,
     fontSize: 12,
     color: COLORS.TEXT_MUTED,
-    marginTop: 6,
+  },
+  cardKm: {
+    fontSize: 12,
+    color: COLORS.TEXT_MUTED,
+    fontWeight: '600',
+  },
+  cardPrice: {
+    fontSize: 13,
+    color: COLORS.TEXT_DARK,
+    fontWeight: '700',
   },
 });

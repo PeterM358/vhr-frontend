@@ -410,11 +410,15 @@ export function navigateToRepairDetail(navigation, repairId, params = {}) {
 }
 
 export function navigateToRepairRequestDetail(navigation, repairId, params = {}) {
-  const { returnTo, shopId, backLabel, initialTab, tab, ...rest } = params;
+  const { returnTo, shopId, backLabel, backLabelKey, initialTab, tab, statusFilter, ...rest } =
+    params;
+  const listTab = initialTab || tab || statusFilter;
   const routeParams = buildRepairDetailRouteParams(repairId, {
     returnTo,
     shopId,
     backLabel,
+    backLabelKey,
+    ...(listTab ? { initialTab: listTab } : {}),
     ...rest,
   });
   const path = repairRequestDetail(repairId);
@@ -425,7 +429,6 @@ export function navigateToRepairRequestDetail(navigation, repairId, params = {})
       tailRoutes.push({ name: 'ShopMap' });
       tailRoutes.push({ name: 'ShopDetail', params: { shopId } });
     } else if (returnTo === 'ClientRepairs') {
-      const listTab = initialTab || tab;
       const listParams = listTab ? { initialTab: listTab } : undefined;
       tailRoutes.push({ name: 'ClientRepairs', params: listParams });
     }
@@ -434,7 +437,8 @@ export function navigateToRepairRequestDetail(navigation, repairId, params = {})
     return;
   }
 
-  navigation.navigate('RepairDetail', routeParams);
+  const root = getRootNavigation(navigation);
+  root.navigate('RepairDetail', routeParams);
 }
 
 export function navigateToServiceHistory(navigation) {
@@ -491,12 +495,12 @@ export function navigateToDocuments(navigation) {
   });
 }
 
-export function navigateToProfile(navigation) {
+export function navigateToProfile(navigation, params = {}) {
   if (Platform.OS === 'web') {
-    resetWebRoutes(navigation, [{ name: 'ClientProfile' }], profile());
+    resetWebRoutes(navigation, [{ name: 'ClientProfile', params }], profile());
     return;
   }
-  navigation.navigate('ClientProfile');
+  navigation.navigate('ClientProfile', params);
 }
 
 export function navigateToVehicleServiceRecordCenterAdd(navigation, vehicleId, params = {}) {
@@ -1042,7 +1046,18 @@ export function navigateToOrgHome(navigation, params = {}) {
     resetPartnerStackWebRoutes(navigation, [{ name: 'OrgHome', params }], partnerOrganizationHome(params));
     return;
   }
-  navigation.navigate('OrgHome', params);
+  // Drawer hubs (Fleet/Tasks/…) already live inside OrgHome — bare navigate('OrgHome')
+  // is often a no-op. Always land on OrgOverview so custom back buttons work.
+  const { orgId, organizationId, ...rest } = params || {};
+  const overviewParams = {
+    ...rest,
+    ...(orgId != null ? { orgId } : {}),
+    ...(organizationId != null ? { organizationId } : {}),
+  };
+  navigation.navigate('OrgHome', {
+    screen: 'OrgOverview',
+    params: Object.keys(overviewParams).length ? overviewParams : undefined,
+  });
 }
 
 export function navigateToOrgCalendar(navigation, params = {}) {
