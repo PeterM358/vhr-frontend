@@ -24,6 +24,10 @@ import { useHideStickyChromeForKeyboard } from '../hooks/useCompactChrome';
 import AppFooter from './common/AppFooter';
 import { RouteFooterBridge } from './screenBackgroundRoute';
 
+/** Shared with web — calendar/dense screens may pass a wider column on web only. */
+export const WEB_CONTENT_MAX_WIDTH_DEFAULT = 720;
+export const WEB_CONTENT_MAX_WIDTH_WIDE = 1100;
+
 const DEFAULT_STOPS = [
   { offset: '0', color: '#000', opacity: '0.65' },
   { offset: '0.5', color: '#000', opacity: '0.45' },
@@ -100,6 +104,8 @@ export default function ScreenBackground({
   resizeMode = 'cover',
   safeArea = true,
   gradientStops,
+  /** Web-only; ignored on native (kept for a shared call site). */
+  contentMaxWidth: _contentMaxWidth,
   style,
   contentStyle,
   children,

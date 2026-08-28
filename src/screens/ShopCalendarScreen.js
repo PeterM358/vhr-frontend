@@ -24,7 +24,9 @@ import {
   proposeRepairSchedule,
   shopConfirmVehicleArrival,
 } from '../api/repairs';
-import ScreenBackground from '../components/ScreenBackground';
+import ScreenBackground, {
+  WEB_CONTENT_MAX_WIDTH_WIDE,
+} from '../components/ScreenBackground';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { COLORS } from '../constants/colors';
 import {
@@ -281,6 +283,7 @@ function CompactJobCard({
   statusHint,
   occupancyRole = null,
   bayNumber = null,
+  dense = false,
   t,
   locale,
 }) {
@@ -414,7 +417,7 @@ function CompactJobCard({
         {plate ? `${plate} · ${vehicle}` : vehicle}
       </Text>
       {!isReadyDay ? (
-        <Text style={styles.compactService} numberOfLines={2}>
+        <Text style={styles.compactService} numberOfLines={dense ? 1 : 2}>
           {repairTypeLabel || t('partnerDashboard.calendar.repairTypeMissing')}
           {vehicleTypeLabel
             ? ` · ${vehicleTypeLabel}`
@@ -457,12 +460,12 @@ function CompactJobCard({
       </View>
     ) : null;
 
-  // Keep Arrived / Change time outside Pressable so web clicks do not open Booking detail.
   if (actionRow) {
     return (
       <View
         style={[
           styles.compactCard,
+          dense && styles.compactCardDense,
           isRequest && styles.compactCardRequest,
           bayAccent && {
             borderLeftWidth: 3,
@@ -484,6 +487,7 @@ function CompactJobCard({
       onPress={() => onOpen?.(item)}
       style={({ pressed }) => [
         styles.compactCard,
+        dense && styles.compactCardDense,
         isRequest && styles.compactCardRequest,
         bayAccent && {
           borderLeftWidth: 3,
@@ -524,6 +528,7 @@ function DayJobCard({
   confirming,
   declining,
   bayNumber = null,
+  dense = false,
   t,
   locale,
 }) {
@@ -560,6 +565,7 @@ function DayJobCard({
         item={item}
         occupancyRole={occupancyRole}
         bayNumber={bayNumber}
+        dense={dense}
         onOpen={onOpen}
         primaryLabel={t('partnerDashboard.calendar.scheduleVisit')}
         onPrimary={onReschedule}
@@ -581,6 +587,7 @@ function DayJobCard({
       item={item}
       occupancyRole={occupancyRole}
       bayNumber={bayNumber}
+      dense={dense}
       onOpen={onOpen}
       primaryLabel={showActions && canConfirmArrival ? t('partnerDashboard.calendar.arrived') : null}
       onPrimary={showActions && canConfirmArrival ? onConfirmArrival : null}
@@ -615,6 +622,8 @@ export default function ShopCalendarScreen() {
     navigation.navigate(returnTo);
   };
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  /** Measured month-board column width (web column can be narrower than the window). */
+  const [boardViewportWidth, setBoardViewportWidth] = useState(0);
   /** Same Expo screen (web + apps): Month occupancy board default; Days/timeline is alternate. */
   const [layoutMode, setLayoutMode] = useState('month');
   const [monthIso, setMonthIso] = useState(() => currentMonthIso());
@@ -701,17 +710,25 @@ export default function ShopCalendarScreen() {
       }),
     [calendar.scheduled, t],
   );
-  /** Web: fit the month in one viewport when possible; native keeps a compact strip + scroll-to-today. */
+  /**
+   * Fit all days of the month in the board column when possible.
+   * Web uses a wider content shell + measured width (not full window — DevTools/gutters matter).
+   * Native keeps a compact strip with scroll-to-today.
+   */
   const occupancyDayWidth = useMemo(() => {
     const dayCount = daysInMonth(monthIso).length || 31;
-    const labelWidth = 108;
-    const horizontalPad = 48;
-    if (Platform.OS === 'web' && windowWidth >= 720) {
-      const usable = Math.max(320, windowWidth - labelWidth - horizontalPad);
-      return Math.max(28, Math.min(44, Math.floor(usable / dayCount)));
+    const labelWidth = 96;
+    if (Platform.OS === 'web') {
+      const fallback = Math.min(windowWidth, WEB_CONTENT_MAX_WIDTH_WIDE) - 24;
+      const container = boardViewportWidth > 0 ? boardViewportWidth : fallback;
+      const usable = Math.max(240, container - labelWidth);
+      // Prefer fitting the full month; allow a bit denser than 28px on wide desks.
+      return Math.max(22, Math.min(40, Math.floor(usable / dayCount)));
     }
     return 28;
-  }, [monthIso, windowWidth]);
+  }, [boardViewportWidth, monthIso, windowWidth]);
+  const occupancyLabelWidth = Platform.OS === 'web' ? 96 : 108;
+  const isWideWeb = Platform.OS === 'web' && windowWidth >= 900;
   const dailyLoadMap = useMemo(
     () => buildDailyLoadMap(calendar.daily_load),
     [calendar.daily_load]
@@ -1262,7 +1279,10 @@ export default function ShopCalendarScreen() {
     : t('partnerDashboard.calendar.scheduleTitle');
 
   return (
-    <ScreenBackground safeArea={false}>
+    <ScreenBackground
+      safeArea={false}
+      contentMaxWidth={Platform.OS === 'web' ? WEB_CONTENT_MAX_WIDTH_WIDE : undefined}
+    >
       <PartnerAppHeader
         title={t('drawer.partner.calendar')}
         backLabel={backLabel}
@@ -1385,13 +1405,20 @@ export default function ShopCalendarScreen() {
               ))}
             </View>
           ) : null}
-          <View style={[styles.section, styles.occupancySection]}>
+          <View
+            style={[styles.section, styles.occupancySection]}
+            onLayout={(e) => {
+              const w = Math.round(e?.nativeEvent?.layout?.width || 0);
+              if (w > 0 && w !== boardViewportWidth) setBoardViewportWidth(w);
+            }}
+          >
             <OccupancyMonthBoard
               month={monthIso}
               rows={occupancyBoard.rows}
               dayWidth={occupancyDayWidth}
+              labelWidth={occupancyLabelWidth}
               canEdit
-              scrollToToday
+              scrollToToday={Platform.OS !== 'web'}
               rowColLabel={t('partnerDashboard.calendar.occupancy.bayCol', null, 'Bay')}
               createHint={t('partnerDashboard.calendar.occupancy.selected', null, 'Selected')}
               moveHint={t(
@@ -1405,8 +1432,8 @@ export default function ShopCalendarScreen() {
                 'No repairs in this month yet.',
               )}
               onOpenSpan={(span) => openRepairDetail(span.job || { id: span.id })}
-              onCreateRange={onOccupancyCreateRange}
               onRescheduleSpan={onOccupancyReschedule}
+              onCreateRange={onOccupancyCreateRange}
             />
             {saving ? <ActivityIndicator style={{ marginTop: 12 }} color="#fff" /> : null}
           </View>
@@ -1451,6 +1478,7 @@ export default function ShopCalendarScreen() {
                     item={job}
                     dayDate={bucket.date}
                     bayNumber={bayByJobId.get(job.id) || null}
+                    dense={isWideWeb}
                     onOpen={openRepairDetail}
                     onReschedule={openMoveModal}
                     onConfirmArrival={confirmArrival}
@@ -1721,7 +1749,6 @@ const styles = StyleSheet.create({
   weekLabel: { color: '#fff', fontSize: 15, fontWeight: '600', flex: 1, textAlign: 'center', minWidth: 96 },
   occupancySection: {
     paddingBottom: 24,
-    overflow: 'hidden',
   },
   unscheduledBanner: {
     marginHorizontal: 12,
@@ -1772,6 +1799,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 6,
+  },
+  compactCardDense: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 4,
+    borderRadius: 10,
   },
   compactCardRequest: {
     borderLeftWidth: 3,

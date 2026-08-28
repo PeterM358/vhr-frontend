@@ -1,7 +1,7 @@
 // PATH: src/components/shop/RepairsList.js
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useContext } from 'react';
-import { View, FlatList, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, FlatList, StyleSheet, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import {
@@ -52,6 +52,7 @@ import {
 import { translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
 import { localizePreferredVisitNote } from '../../utils/shopVisitSlots';
 import { WebSocketContext } from '../../context/WebSocketManager';
+import { showMessage } from '../../utils/crossPlatformAlert';
 import { useTranslation } from '../../i18n';
 
 const SHOP_TOP_BAR = 'rgba(11,18,32,0.92)';
@@ -423,9 +424,10 @@ export default function RepairsList() {
 
   const toggleRepairSelection = useCallback((item) => {
     if (item.has_issued_invoice) {
-      Alert.alert(
+      showMessage(
         t('common.notice'),
-        t('partnerDashboard.repairsList.platformInvoiceIssued')
+        t('partnerDashboard.repairsList.platformInvoiceAlreadyIssued'),
+        { variant: 'info' }
       );
       return;
     }
@@ -439,7 +441,18 @@ export default function RepairsList() {
         const anchorClient = anchor?.client ?? null;
         const nextClient = item.client ?? null;
         if (anchorClient != null && nextClient != null && Number(anchorClient) !== Number(nextClient)) {
-          Alert.alert(t('common.notice'), t('partnerDashboard.repairsList.selectInvoiceHint'));
+          const selectedName = String(anchor?.client_display_name || '').trim();
+          const nextName = String(item?.client_display_name || '').trim();
+          showMessage(
+            t('common.notice'),
+            selectedName && nextName
+              ? t('partnerDashboard.repairsList.invoiceDifferentClientsNamed', {
+                  selected: selectedName,
+                  next: nextName,
+                })
+              : t('partnerDashboard.repairsList.invoiceDifferentClients'),
+            { variant: 'info' }
+          );
           return prev;
         }
       }
@@ -461,7 +474,9 @@ export default function RepairsList() {
       exitInvoiceSelectMode();
       navigation.navigate('ShopInvoiceDetail', { invoiceId: invoice.id });
     } catch (err) {
-      Alert.alert(t('common.error'), err.message || t('partnerDashboard.repairsList.createInvoiceError'));
+      showMessage(t('common.error'), err.message || t('partnerDashboard.repairsList.createInvoiceError'), {
+        variant: 'error',
+      });
     } finally {
       setCreatingInvoice(false);
     }
@@ -476,7 +491,9 @@ export default function RepairsList() {
         const invoice = await draftInvoiceFromRepairs(token, [item.id]);
         navigation.navigate('ShopInvoiceDetail', { invoiceId: invoice.id });
       } catch (err) {
-        Alert.alert(t('common.error'), err.message || t('partnerDashboard.repairsList.createInvoiceError'));
+        showMessage(t('common.error'), err.message || t('partnerDashboard.repairsList.createInvoiceError'), {
+          variant: 'error',
+        });
       } finally {
         setInvoicingRepairId(null);
       }

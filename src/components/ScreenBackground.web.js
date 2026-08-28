@@ -14,8 +14,8 @@ import { RouteFooterBridge } from './screenBackgroundRoute';
 /** Default centered content column on web (maps use `contentMaxWidth={false}`). */
 export const WEB_CONTENT_MAX_WIDTH_DEFAULT = 720;
 
-/** Shop dashboard / dense tables — pass as `contentMaxWidth` when wiring those screens. */
-export const WEB_CONTENT_MAX_WIDTH_WIDE = 960;
+/** Shop calendar / dense boards — wide enough for a full month grid. */
+export const WEB_CONTENT_MAX_WIDTH_WIDE = 1100;
 
 const WEB_OVERLAY = {
   ...StyleSheet.absoluteFillObject,
