@@ -6,17 +6,28 @@ if [[ "${EAS_BUILD_PLATFORM:-}" != "android" ]]; then
   exit 0
 fi
 
-echo "Decoding google-services.json from GOOGLE_SERVICES_JSON_BASE64..."
-
-if [[ -z "${GOOGLE_SERVICES_JSON_BASE64:-}" ]]; then
-  echo "GOOGLE_SERVICES_JSON_BASE64 env variable not found"
-  exit 1
-fi
-
 mkdir -p android/app
+TARGET="android/app/google-services.json"
 
-if ! echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > android/app/google-services.json; then
-  echo "Failed to decode GOOGLE_SERVICES_JSON_BASE64"
+write_from_base64() {
+  echo "Decoding google-services.json from GOOGLE_SERVICES_JSON_BASE64..."
+  if ! echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > "$TARGET"; then
+    echo "Failed to decode GOOGLE_SERVICES_JSON_BASE64"
+    exit 1
+  fi
+}
+
+write_from_raw_json() {
+  echo "Writing google-services.json from GOOGLE_SERVICES_JSON..."
+  printf '%s' "$GOOGLE_SERVICES_JSON" > "$TARGET"
+}
+
+if [[ -n "${GOOGLE_SERVICES_JSON_BASE64:-}" ]]; then
+  write_from_base64
+elif [[ -n "${GOOGLE_SERVICES_JSON:-}" ]]; then
+  write_from_raw_json
+else
+  echo "Neither GOOGLE_SERVICES_JSON_BASE64 nor GOOGLE_SERVICES_JSON is set"
   exit 1
 fi
 
