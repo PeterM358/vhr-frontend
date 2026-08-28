@@ -54,6 +54,10 @@ export default function VehicleCreateCatalogStep({
   const modelsMissing = Boolean(catalogBrand) && mergedModels.length === 0;
   const canPickModel = Boolean(catalogBrand) && mergedModels.length > 0;
   const modelReady = Boolean(selectedModelKey);
+  const typeSelected = !hasVehicleTypePicker || Boolean(selectedVehicleType);
+  const brandPlaceholder = typeSelected
+    ? t('createVehicle.selectBrand')
+    : t('createVehicle.selectBrandAfterType');
 
   const handleYearChange = (year) => {
     onSelectedYearChange(year);
@@ -69,13 +73,11 @@ export default function VehicleCreateCatalogStep({
 
   return (
     <View>
-      <Text style={styles.lead}>
-        Select your vehicle type, brand, model, year, and fuel type from our catalog.
-      </Text>
+      <Text style={styles.lead}>{t('createVehicle.catalogLead')}</Text>
 
       {hasVehicleTypePicker ? (
         <>
-          <Text style={styles.label}>Vehicle type *</Text>
+          <Text style={styles.label}>{t('createVehicle.vehicleTypeLabel')}</Text>
           <View style={styles.pickerContainer}>
             <Picker
               selectedValue={selectedVehicleType}
@@ -91,10 +93,15 @@ export default function VehicleCreateCatalogStep({
         </>
       ) : null}
 
-      <Text style={styles.label}>Make / brand *</Text>
-      <View style={styles.pickerContainer}>
-        <Picker selectedValue={catalogBrand} onValueChange={onCatalogBrandChange} style={styles.picker}>
-          <Picker.Item label={t('createVehicle.selectBrand')} value="" />
+      <Text style={styles.label}>{t('createVehicle.makeBrandLabel')}</Text>
+      <View style={[styles.pickerContainer, !typeSelected && styles.pickerDisabled]}>
+        <Picker
+          selectedValue={catalogBrand}
+          onValueChange={onCatalogBrandChange}
+          style={styles.picker}
+          enabled={typeSelected}
+        >
+          <Picker.Item label={brandPlaceholder} value="" />
           {catalogBrands.map((b) => (
             <Picker.Item key={b.id} label={b.name} value={String(b.id)} />
           ))}
@@ -103,19 +110,17 @@ export default function VehicleCreateCatalogStep({
 
       {modelsMissing ? (
         <View style={styles.gapBox}>
-          <Text style={styles.gapTitle}>No models found for this brand</Text>
-          <Text style={styles.gapText}>
-            You can still add your vehicle by entering the model name manually.
-          </Text>
+          <Text style={styles.gapTitle}>{t('createVehicle.noModelsTitle')}</Text>
+          <Text style={styles.gapText}>{t('createVehicle.noModelsBody')}</Text>
           <Button mode="contained" onPress={onOpenManual} style={styles.gapBtn}>
-            Add model manually
+            {t('createVehicle.addModelManually')}
           </Button>
         </View>
       ) : null}
 
       {canPickModel ? (
         <>
-          <Text style={styles.label}>Model *</Text>
+          <Text style={styles.label}>{t('createVehicle.modelLabel')}</Text>
           <View style={styles.pickerContainer}>
             <Picker
               selectedValue={selectedModelKey}
@@ -129,16 +134,14 @@ export default function VehicleCreateCatalogStep({
             </Picker>
           </View>
           <Pressable onPress={onOpenManual} style={styles.inlineManualLink}>
-            <Text style={styles.inlineManualLinkText}>
-              Can&apos;t find your model? Add model manually
-            </Text>
+            <Text style={styles.inlineManualLinkText}>{t('createVehicle.otherModelFallback')}</Text>
           </Pressable>
         </>
       ) : null}
 
       {modelReady ? (
         <>
-          <Text style={styles.label}>Year *</Text>
+          <Text style={styles.label}>{t('createVehicle.yearLabel')}</Text>
           <View style={styles.pickerContainer}>
             <Picker
               selectedValue={selectedYear}
@@ -156,7 +159,7 @@ export default function VehicleCreateCatalogStep({
 
           {matchingEngines.length > 1 ? (
             <>
-              <Text style={styles.label}>Engine / variant</Text>
+              <Text style={styles.label}>{t('createVehicle.engineVariantLabel')}</Text>
               <View style={styles.pickerContainer}>
                 <Picker
                   selectedValue={catalogEngine}
@@ -172,16 +175,16 @@ export default function VehicleCreateCatalogStep({
             </>
           ) : null}
 
-          <Text style={styles.label}>Registration number</Text>
+          <Text style={styles.label}>{t('createVehicle.registrationNumberLabel')}</Text>
           <TextInput
             mode="outlined"
             value={licensePlate}
             onChangeText={onLicensePlateChange}
-            placeholder="e.g. CA1234AB"
+            placeholder={t('createVehicle.registrationNumberPlaceholder')}
             style={styles.input}
           />
 
-          <Text style={styles.label}>VIN (optional)</Text>
+          <Text style={styles.label}>{t('createVehicle.vinLabel')}</Text>
           <TextInput
             mode="outlined"
             value={vin}
@@ -228,6 +231,9 @@ const styles = StyleSheet.create({
   },
   picker: {
     width: '100%',
+  },
+  pickerDisabled: {
+    opacity: 0.55,
   },
   gapBox: {
     marginTop: 12,

@@ -2977,6 +2977,7 @@
     "firstRegistrationOptional": "Първа регистрация (по избор)",
     "selectType": "Избери тип",
     "selectBrand": "Избери марка",
+    "selectBrandAfterType": "Първо избери тип превозно средство",
     "selectModel": "Избери модел",
     "selectYear": "Избери година",
     "selectEngine": "Избери двигател",

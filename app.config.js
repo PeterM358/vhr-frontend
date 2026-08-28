@@ -22,7 +22,7 @@ export default {
     name: "Veversal",
     slug: "vhr-frontend",
     scheme: "service1001",
-    version: "1.0.0",
+    version: "1.0.2",
     orientation: "portrait",
     icon: "./src/assets/icons/icon.png",
     userInterfaceStyle: "light",

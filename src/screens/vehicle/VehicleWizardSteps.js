@@ -37,7 +37,7 @@ export function VehicleIdentityStep() {
             hasVehicleTypePicker={form.hasVehicleTypePicker}
             vehicleTypes={form.vehicleTypes}
             selectedVehicleType={form.selectedVehicleType}
-            onVehicleTypeChange={form.setSelectedVehicleType}
+            onVehicleTypeChange={form.onVehicleTypeChange}
             catalogBrands={form.catalogBrands}
             catalogModels={form.catalogModels}
             legacyModels={form.legacyModels}

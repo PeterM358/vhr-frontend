@@ -134,7 +134,23 @@ export function useVehicleCreateForm({ clientEmail = null, clientPhone = null } 
     catalogGeneration,
     selectedMake,
     makes,
+    requireVehicleType: hasVehicleTypePicker,
   });
+
+  const onVehicleTypeChange = (v) => {
+    setSelectedVehicleType(v);
+    setCatalogBrand('');
+    setCatalogModel('');
+    setCatalogGeneration('');
+    setCatalogEngine('');
+    setCatalogTrim('');
+    setSelectedModelKey('');
+    setSelectedModelLegacy('');
+    setSelectedMake('');
+    setSelectedYear('');
+    setSpecApplied(false);
+    changeOptionalString('fuel_type', '');
+  };
 
   const onCatalogBrandChange = (v) => {
     setCatalogBrand(v);
@@ -419,6 +435,9 @@ export function useVehicleCreateForm({ clientEmail = null, clientPhone = null } 
       }
       return { ok: true };
     }
+    if (hasVehicleTypePicker && !selectedVehicleType) {
+      return { ok: false, message: t('createVehicle.errors.selectTypeFirst') };
+    }
     if (!catalogBrand || (!catalogModel && !selectedModelLegacy)) {
       return { ok: false, message: t('createVehicle.errors.chooseCatalogOrManual') };
     }
@@ -439,6 +458,8 @@ export function useVehicleCreateForm({ clientEmail = null, clientPhone = null } 
     catalogBrand,
     catalogModel,
     selectedModelLegacy,
+    hasVehicleTypePicker,
+    selectedVehicleType,
     t,
   ]);
 
@@ -576,7 +597,7 @@ export function useVehicleCreateForm({ clientEmail = null, clientPhone = null } 
     manualMode,
     setManualMode: setManualModeWrapped,
     selectedVehicleType,
-    setSelectedVehicleType,
+    onVehicleTypeChange,
     catalogBrand,
     onCatalogBrandChange,
     catalogModel,

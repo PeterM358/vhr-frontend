@@ -63,6 +63,18 @@ function setModuleLocale(locale) {
   notifyLocaleListeners();
 }
 
+function readNativeDeviceLocale() {
+  if (Platform.OS === 'web') return null;
+  try {
+    const resolved = Intl.DateTimeFormat().resolvedOptions().locale || '';
+    const base = String(resolved).trim().toLowerCase().split('-')[0];
+    if (SUPPORTED_LOCALES.includes(base)) return base;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 function readWebLocale() {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
   try {
@@ -192,6 +204,13 @@ export async function loadPersistedLocale() {
         setModuleLocale(stored);
         writeWebLocale(stored);
         return stored;
+      }
+      const fromDevice = readNativeDeviceLocale();
+      if (fromDevice) {
+        setModuleLocale(fromDevice);
+        writeWebLocale(fromDevice);
+        AsyncStorage.setItem(STORAGE_KEY_LOCALE, fromDevice).catch(() => {});
+        return fromDevice;
       }
       setModuleLocale(DEFAULT_LOCALE);
       return DEFAULT_LOCALE;

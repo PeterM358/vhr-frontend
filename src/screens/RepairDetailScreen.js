@@ -62,7 +62,7 @@ import AppNavigationBar from '../components/common/AppNavigationBar';
 import PartnerAppHeader from '../components/partner/PartnerAppHeader';
 import ScreenBackground from '../components/ScreenBackground';
 import { useScrollShadow } from '../hooks/useScrollShadow';
-import { useReturnToBack, useGoBackOr, useRouteBackLabel } from '../navigation/appNavBarBack';
+import { useReturnToBack, useGoBackOr, useRouteBackLabel, useHardwareBackHandler } from '../navigation/appNavBarBack';
 import RepairMediaThumbnail from '../components/repair/RepairMediaThumbnail';
 import { navigateToPartnerRepairOffer } from '../navigation/webNavigation';
 import { markRepairNotificationsRead } from '../api/notifications';
@@ -308,6 +308,7 @@ export default function RepairDetailScreen({ route, navigation }) {
   const handleBack = useReturnToBack(navigation, returnTo, backLabel, returnParams);
   const fallbackBack = useGoBackOr(navigation);
   const onBack = returnTo || route.params?.backLabel || route.params?.backLabelKey ? handleBack : fallbackBack;
+  useHardwareBackHandler(onBack);
   const { setNotifications, refreshUnreadFromRest } = useContext(WebSocketContext);
   const theme = useTheme();
   const shopRepairWizardAdapter = useMemo(() => createMemoryAdapter({}), []);

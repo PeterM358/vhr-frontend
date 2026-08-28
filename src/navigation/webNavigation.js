@@ -338,7 +338,13 @@ export function navigateToRepairRequests(navigation, params = {}) {
     resetWebRoutes(navigation, [{ name: 'ClientRepairs', params: routeParams }], path);
     return;
   }
-  navigation.navigate('ClientRepairs', routeParams);
+  const root = getRootNavigation(navigation);
+  root.dispatch(
+    CommonActions.reset({
+      index: 1,
+      routes: [HOME_ROUTE, { name: 'ClientRepairs', params: routeParams }],
+    })
+  );
 }
 
 export async function navigateToRepairRequestNew(navigation, params = {}) {
@@ -393,20 +399,14 @@ function buildRepairDetailRouteParams(repairId, params = {}) {
   return routeParams;
 }
 
-/** Web-safe repair detail navigation — resets stack + syncs URL (avoids blank screen without fetch). */
 export function navigateToRepairDetail(navigation, repairId, params = {}) {
   if (repairId == null || repairId === '') return;
   const returnTo = params.returnTo;
-  if (Platform.OS === 'web') {
-    if (PARTNER_REPAIR_DETAIL_RETURN_TOS.has(returnTo)) {
-      navigateToPartnerRepairDetail(navigation, repairId, params);
-      return;
-    }
-    navigateToRepairRequestDetail(navigation, repairId, params);
+  if (PARTNER_REPAIR_DETAIL_RETURN_TOS.has(returnTo)) {
+    navigateToPartnerRepairDetail(navigation, repairId, params);
     return;
   }
-  const root = getRootNavigation(navigation);
-  root.navigate('RepairDetail', buildRepairDetailRouteParams(repairId, params));
+  navigateToRepairRequestDetail(navigation, repairId, params);
 }
 
 export function navigateToRepairRequestDetail(navigation, repairId, params = {}) {
@@ -438,6 +438,20 @@ export function navigateToRepairRequestDetail(navigation, repairId, params = {})
   }
 
   const root = getRootNavigation(navigation);
+  if (returnTo === 'ClientRepairs') {
+    const listParams = listTab ? { initialTab: listTab } : undefined;
+    root.dispatch(
+      CommonActions.reset({
+        index: 2,
+        routes: [
+          HOME_ROUTE,
+          { name: 'ClientRepairs', params: listParams },
+          { name: 'RepairDetail', params: routeParams },
+        ],
+      })
+    );
+    return;
+  }
   root.navigate('RepairDetail', routeParams);
 }
 

@@ -1,5 +1,5 @@
-import { useCallback } from 'react';
-import { Platform } from 'react-native';
+import { useCallback, useEffect } from 'react';
+import { BackHandler, Platform } from 'react-native';
 import { useTranslation } from '../i18n';
 import {
   normalizeReturnToRoute,
@@ -127,4 +127,18 @@ export function useReturnToBack(navigation, returnTo, backLabel, returnParams) {
       navigation.navigate(routeName);
     }
   }, [navigation, returnTo, backLabel, returnParams]);
+}
+
+/** Android hardware back — same path as header back (RepairDetail etc.). */
+export function useHardwareBackHandler(onBack, enabled = true) {
+  useEffect(() => {
+    if (!enabled || Platform.OS !== 'android' || typeof onBack !== 'function') {
+      return undefined;
+    }
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [onBack, enabled]);
 }

@@ -16,15 +16,19 @@ export function uniqueLegacyModels(models) {
   });
 }
 
-/** Catalog-only list when a vehicle type is selected; legacy merge only without type filter. */
+/** Catalog list when type is selected; legacy merge only as fallback when catalog is empty. */
 export function modelsForVehiclePicker(catalogModels, legacyModels, selectedVehicleType) {
   const catalog = catalogModels || [];
+  const catalogItems = catalog.map((m) => ({
+    ...m,
+    source: 'catalog',
+    key: `catalog:${m.id}`,
+  }));
   if (selectedVehicleType) {
-    return catalog.map((m) => ({
-      ...m,
-      source: 'catalog',
-      key: `catalog:${m.id}`,
-    }));
+    if (catalogItems.length > 0) {
+      return catalogItems;
+    }
+    return mergeCatalogAndLegacyModels([], legacyModels);
   }
   return mergeCatalogAndLegacyModels(catalog, legacyModels);
 }

@@ -3021,6 +3021,7 @@
     "firstRegistrationOptional": "First registration (optional)",
     "selectType": "Select type",
     "selectBrand": "Select brand",
+    "selectBrandAfterType": "Select vehicle type first",
     "selectModel": "Select model",
     "selectYear": "Select year",
     "selectEngine": "Select engine",

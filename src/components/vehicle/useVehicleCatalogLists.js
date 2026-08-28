@@ -30,6 +30,7 @@ export function useVehicleCatalogLists({
   selectedMake,
   makes,
   catalogBrands,
+  requireVehicleType = false,
 }) {
   const [catalogBrandsState, setCatalogBrandsState] = useState([]);
   const [catalogModels, setCatalogModels] = useState([]);
@@ -51,6 +52,10 @@ export function useVehicleCatalogLists({
     if (manualMode) {
       return undefined;
     }
+    if (requireVehicleType && !selectedVehicleType) {
+      setCatalogBrandsState([]);
+      return undefined;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -64,7 +69,7 @@ export function useVehicleCatalogLists({
     return () => {
       cancelled = true;
     };
-  }, [manualMode, selectedVehicleType]);
+  }, [manualMode, selectedVehicleType, requireVehicleType]);
 
   useEffect(() => {
     if (manualMode) {
@@ -146,7 +151,7 @@ export function useVehicleCatalogLists({
   }, [manualMode, catalogGeneration]);
 
   useEffect(() => {
-    if (!legacyMakeId || selectedVehicleType) {
+    if (!legacyMakeId) {
       setLegacyModels([]);
       return undefined;
     }
@@ -163,7 +168,7 @@ export function useVehicleCatalogLists({
     return () => {
       cancelled = true;
     };
-  }, [legacyMakeId, selectedVehicleType]);
+  }, [legacyMakeId, catalogBrand]);
 
   return {
     catalogBrands: catalogBrandsList,
