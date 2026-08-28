@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Searchbar,
   Checkbox,
+  Button,
 } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -19,7 +20,7 @@ import {
   gateRepairNavigation,
 } from '../../utils/shopProfileGate';
 import { openPartnerCenter } from '../../utils/partnerSetupGate';
-import { navigateToPartnerRepairDetail } from '../../navigation/webNavigation';
+import { navigateToPartnerRepairDetail, navigateToPartnerRepairOffer } from '../../navigation/webNavigation';
 import ShopProfileSetupBanner from './ShopProfileSetupBanner';
 import {
   fetchShopRepairsTab,
@@ -51,6 +52,12 @@ import {
 } from '../../utils/repairListUtils';
 import { translateRepairTypeLabel } from '../../utils/translateShopTypeLabels';
 import { localizePreferredVisitNote } from '../../utils/shopVisitSlots';
+import {
+  PARTNER_LIFECYCLE,
+  getLifecyclePill,
+  resolvePartnerLifecycle,
+} from '../../utils/partnerRepairLifecycle';
+import { DEFAULT_CURRENCY, formatMoneyAmount } from '../../constants/currency';
 import { WebSocketContext } from '../../context/WebSocketManager';
 import { showMessage } from '../../utils/crossPlatformAlert';
 import { useTranslation } from '../../i18n';
@@ -518,6 +525,30 @@ export default function RepairsList() {
     });
   };
 
+  const handleOfferPress = useCallback(
+    (repair) => {
+      const repairId = repair?.id;
+      if (!repairId) return;
+      if (
+        !gateRepairNavigation(navigation, {
+          isComplete: profileComplete,
+          missingFields: missingProfileFields,
+        })
+      ) {
+        return;
+      }
+      const offerParams = {
+        selectedOfferParts: [],
+        includeRepairDetail: false,
+      };
+      if (repair?.current_offer_id) {
+        offerParams.offerId = repair.current_offer_id;
+      }
+      navigateToPartnerRepairOffer(navigation, repairId, offerParams);
+    },
+    [navigation, profileComplete, missingProfileFields]
+  );
+
   const renderRepair = ({ item }) => {
     const title =
       `${item.vehicle_make ?? ''} ${item.vehicle_model ?? ''}`.trim() ||
@@ -538,10 +569,12 @@ export default function RepairsList() {
         ) || serviceTypeName
       : null;
     const statusLower = String(item.status || '').toLowerCase();
+    const lifecycle = resolvePartnerLifecycle(item);
+    const lifecyclePill = getLifecyclePill(item, t);
     const isBookedAwaiting =
       statusLower === 'open' &&
       (Boolean(item.scheduled_start) ||
-        item.partner_lifecycle_status === 'OFFER_ACCEPTED');
+        lifecycle === PARTNER_LIFECYCLE.OFFER_ACCEPTED);
     const sortDate = formatRepairListDate(
       selectedTab === 'done'
         ? item.completed_at || item.created_at
@@ -553,13 +586,15 @@ export default function RepairsList() {
     const isDirectRequest =
       statusLower === 'open' &&
       item.request_targeting_mode === 'selected_centers' &&
-      !isBookedAwaiting;
+      !isBookedAwaiting &&
+      lifecycle === PARTNER_LIFECYCLE.WAITING_FOR_OFFER;
     const badgeStatus = isBookedAwaiting
       ? 'booked'
       : isDirectRequest
         ? 'requested'
         : item.status;
     const badgeLabel = resolveStatusBadgeLabel(badgeStatus);
+    const useLifecycleBadge = selectedTab === 'open';
     const dateMetaLabel = isBookedAwaiting
       ? t('partnerDashboard.repairsList.status.booked')
       : repairListDateLabel(selectedTab, t);
@@ -568,6 +603,32 @@ export default function RepairsList() {
     const alreadyInvoiced = Boolean(item.has_issued_invoice);
     const paymentStatusText = formatRepairPaymentStatus(item.payment_status, t);
     const paymentSettled = isRepairPaymentSettled(item.payment_status);
+    const offerAmount =
+      item.current_offer_amount != null && item.current_offer_amount !== ''
+        ? formatMoneyAmount(
+            item.current_offer_amount,
+            item.current_offer_currency || DEFAULT_CURRENCY
+          )
+        : null;
+    const showOfferSummary =
+      selectedTab === 'open' &&
+      offerAmount &&
+      (lifecycle === PARTNER_LIFECYCLE.OFFER_SENT ||
+        lifecycle === PARTNER_LIFECYCLE.OFFER_ACCEPTED);
+    const showOfferAction =
+      !invoiceSelectMode &&
+      selectedTab === 'open' &&
+      (lifecycle === PARTNER_LIFECYCLE.WAITING_FOR_OFFER ||
+        lifecycle === PARTNER_LIFECYCLE.OFFER_SENT);
+    const offerActionLabel =
+      lifecycle === PARTNER_LIFECYCLE.OFFER_SENT
+        ? t('partnerDashboard.actions.editOffer')
+        : t('partnerDashboard.actions.sendOffer');
+    const descriptionText = String(item.description || '').trim();
+    const showDescription =
+      Boolean(descriptionText) &&
+      descriptionText.toLowerCase() !== String(serviceTypeLabel || '').toLowerCase() &&
+      descriptionText.toLowerCase() !== String(serviceTypeName || '').toLowerCase();
 
     const onCardPress = () => {
       if (invoiceSelectMode) {
@@ -613,7 +674,15 @@ export default function RepairsList() {
               </Text>
             ) : null}
           </View>
-          <StatusBadge status={badgeStatus} label={badgeLabel} />
+          {useLifecycleBadge ? (
+            <View style={[styles.lifecyclePill, { backgroundColor: lifecyclePill.bg }]}>
+              <Text style={[styles.lifecyclePillText, { color: lifecyclePill.fg }]} numberOfLines={2}>
+                {lifecyclePill.label}
+              </Text>
+            </View>
+          ) : (
+            <StatusBadge status={badgeStatus} label={badgeLabel} />
+          )}
         </View>
 
         {alreadyInvoiced && selectedTab === 'done' ? (
@@ -669,11 +738,17 @@ export default function RepairsList() {
           </Text>
         ) : null}
 
-        {!!item.description && (
-          <Text style={styles.cardDescription} numberOfLines={2}>
-            {item.description}
+        {showOfferSummary ? (
+          <Text style={styles.cardOfferSummary} numberOfLines={1}>
+            {offerAmount}
           </Text>
-        )}
+        ) : null}
+
+        {showDescription ? (
+          <Text style={styles.cardDescription} numberOfLines={2}>
+            {descriptionText}
+          </Text>
+        ) : null}
 
         <View style={styles.cardFooter}>
           {sortDate ? (
@@ -687,6 +762,22 @@ export default function RepairsList() {
             <Text style={styles.cardKm}>{Number(kmValue).toLocaleString()} km</Text>
           ) : null}
         </View>
+
+        {showOfferAction ? (
+          <View style={styles.cardActions}>
+            <Button
+              mode="contained"
+              compact
+              onPress={(e) => {
+                e?.stopPropagation?.();
+                handleOfferPress(item);
+              }}
+              style={styles.cardActionPrimary}
+            >
+              {offerActionLabel}
+            </Button>
+          </View>
+        ) : null}
       </FloatingCard>
     );
   };
@@ -1231,11 +1322,36 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     lineHeight: 17,
   },
+  cardOfferSummary: {
+    fontSize: 13,
+    color: TEXT_DARK,
+    marginTop: 4,
+    fontWeight: '700',
+  },
   cardDescription: {
     fontSize: 13,
     color: TEXT_MUTED,
     marginTop: 2,
     lineHeight: 18,
+  },
+  lifecyclePill: {
+    maxWidth: 140,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  lifecyclePillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  cardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  cardActionPrimary: {
+    borderRadius: 8,
   },
   cardFooter: {
     flexDirection: 'row',

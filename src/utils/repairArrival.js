@@ -1,5 +1,7 @@
 /** Client-side helpers for scheduled vs in-shop repair phases. */
 
+import { localizePreferredVisitNote } from './shopVisitSlots';
+
 export function normalizeRepairStatus(status) {
   const s = String(status || '').trim().toLowerCase();
   return s === 'cancelled' ? 'canceled' : s;
@@ -51,17 +53,31 @@ function formatSlotRange(startIso, endIso) {
 }
 
 /** Visit line for repair detail — prefers confirmed schedule over stale pending notes. */
-export function getVisitDisplayText(repair) {
+export function getVisitDisplayText(repair, translateFn) {
   if (!repair) return null;
   if (repair.scheduled_start) {
     const slot = formatSlotRange(repair.scheduled_start, repair.scheduled_end);
-    return slot ? `Scheduled visit: ${slot}` : null;
+    if (!slot) return null;
+    if (translateFn) {
+      return translateFn('repairs.detail.scheduledVisitSummary', { slot }, `Scheduled visit: ${slot}`);
+    }
+    return `Scheduled visit: ${slot}`;
   }
   const notes = String(repair.availability_notes || '').trim();
-  if (notes) return notes;
+  if (notes) {
+    return localizePreferredVisitNote(notes, translateFn) || notes;
+  }
   if (repair.client_preferred_start) {
     const slot = formatSlotRange(repair.client_preferred_start, repair.client_preferred_end);
-    return slot ? `Preferred visit: ${slot} (pending shop confirmation)` : null;
+    if (!slot) return null;
+    if (translateFn) {
+      return translateFn(
+        'repairs.detail.preferredVisitPendingSlot',
+        { slot },
+        `Preferred visit: ${slot} (pending service center confirmation)`
+      );
+    }
+    return `Preferred visit: ${slot} (pending service center confirmation)`;
   }
   return null;
 }

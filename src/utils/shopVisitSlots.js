@@ -139,6 +139,15 @@ export function formatPreferredVisitNote(dayOption, timeSlot, translateFn) {
   return `Preferred visit: ${dateLabel}, ${timeSlot} (pending service center confirmation)`;
 }
 
+/** Translate stored English Today/Tomorrow fragments inside preferred-visit notes. */
+export function localizeRelativeDayLabel(label, translateFn) {
+  const raw = String(label || '').trim();
+  if (!raw || !translateFn) return raw;
+  if (/^today$/i.test(raw)) return translateFn('requestService.today');
+  if (/^tomorrow$/i.test(raw)) return translateFn('requestService.tomorrow');
+  return raw;
+}
+
 /**
  * Re-localize English preferred-visit notes stored on repairs for display.
  * Keeps the date/time fragment; wraps with the current locale template.
@@ -153,7 +162,7 @@ export function localizePreferredVisitNote(notes, translateFn) {
   );
   if (withTime) {
     return translateFn('requestService.preferredVisitSummaryWithTime', {
-      date: withTime[1].trim(),
+      date: localizeRelativeDayLabel(withTime[1].trim(), translateFn),
       time: withTime[2],
     });
   }
@@ -163,7 +172,7 @@ export function localizePreferredVisitNote(notes, translateFn) {
   );
   if (dateOnly) {
     return translateFn('requestService.preferredVisitSummary', {
-      date: dateOnly[1].trim(),
+      date: localizeRelativeDayLabel(dateOnly[1].trim(), translateFn),
     });
   }
 

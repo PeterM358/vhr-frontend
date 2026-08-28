@@ -61,10 +61,13 @@ export function formatOfferPricingLines(offer, currency = DEFAULT_CURRENCY) {
   return { estimateLine, quotedLine };
 }
 
-export function formatOfferPrimaryPrice(offer, currency = DEFAULT_CURRENCY) {
+export function formatOfferPrimaryPrice(offer, currency = DEFAULT_CURRENCY, translateFn) {
   const { estimateLine, quotedLine } = formatOfferPricingLines(offer, currency);
   if (quotedLine) return quotedLine.replace('Quoted total ', '');
   if (estimateLine) return estimateLine.replace('Estimate ', '');
   if (offer?.price != null) return formatMoneyAmount(offer.price, currency);
+  if (translateFn) {
+    return translateFn('repairs.detail.quotePending', null, 'Quote pending');
+  }
   return 'Quote pending';
 }

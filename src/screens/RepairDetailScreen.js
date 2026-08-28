@@ -2360,7 +2360,7 @@ export default function RepairDetailScreen({ route, navigation }) {
   const isOngoingStatus = statusLower === 'ongoing';
   const vehicleAtShop = isVehicleAtShop(repair);
   const upcomingAppointment = isUpcomingAppointment(repair);
-  const visitDisplayText = getVisitDisplayText(repair);
+  const visitDisplayText = getVisitDisplayText(repair, t);
   const ownerCheckedIn = clientReportedArrival(repair);
   const isOwnerLoggedServiceRecord = sourceLower === 'owner_logged' && isDone;
   const ownerLoggedConfirmation = ownerLoggedConfirmationStatus(repair);
@@ -3246,12 +3246,26 @@ export default function RepairDetailScreen({ route, navigation }) {
           {offers.length === 0 ? (
             <>
               <Text style={styles.offerEmptyText}>
-                {isShop ? 'Be the first to send an offer.' : 'Service centers have not sent offers yet.'}
+                {isShop
+                  ? t('repairs.detail.offersEmptyShop', null, 'Be the first to send an offer.')
+                  : t(
+                      'repairs.detail.offersEmptyClient',
+                      null,
+                      'Service centers have not sent offers yet.'
+                    )}
               </Text>
               <Text style={styles.offerEmptyHint}>
                 {isShop
-                  ? 'Send an offer to start the conversation.'
-                  : 'Chat becomes available after a service center sends an offer.'}
+                  ? t(
+                      'repairs.detail.offersEmptyShopHint',
+                      null,
+                      'Send an offer to start the conversation.'
+                    )
+                  : t(
+                      'repairs.detail.offersEmptyClientHint',
+                      null,
+                      'Chat becomes available after a service center sends an offer.'
+                    )}
               </Text>
             </>
           ) : (
@@ -3263,30 +3277,42 @@ export default function RepairDetailScreen({ route, navigation }) {
                   <View style={styles.offerTopRow}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.offerShopName}>
-                        {offer.shop_name || offer.shop_profile_name || 'Service Center'}
+                        {offer.shop_name ||
+                          offer.shop_profile_name ||
+                          t('repairs.detail.serviceCenter', null, 'Service center')}
                       </Text>
                       <View style={styles.offerBadgesRow}>
                         {offer.is_booked ? (
                           <View style={styles.offerBadgeBooked}>
-                            <Text style={styles.offerBadgeBookedText}>Booked</Text>
+                            <Text style={styles.offerBadgeBookedText}>
+                              {t('repairs.detail.offerBooked', null, 'Booked')}
+                            </Text>
                           </View>
                         ) : (
                           <View style={styles.offerBadgeSoft}>
-                            <Text style={styles.offerBadgeSoftText}>Best match</Text>
+                            <Text style={styles.offerBadgeSoftText}>
+                              {t('repairs.detail.bestMatch', null, 'Best match')}
+                            </Text>
                           </View>
                         )}
                         <View style={styles.offerBadgeSoft}>
-                          <Text style={styles.offerBadgeSoftText}>Fast response</Text>
+                          <Text style={styles.offerBadgeSoftText}>
+                            {t('repairs.detail.fastResponse', null, 'Fast response')}
+                          </Text>
                         </View>
                       </View>
                     </View>
-                    <Text style={styles.offerPrice}>{formatOfferPrimaryPrice(offer)}</Text>
+                    <Text style={styles.offerPrice}>{formatOfferPrimaryPrice(offer, DEFAULT_CURRENCY, t)}</Text>
                     {(() => {
                       const pricing = formatOfferPricingLines(offer);
                       if (pricing.estimateLine && pricing.quotedLine) {
                         return (
                           <Text style={styles.offerMetaText}>
-                            {pricing.estimateLine.replace(/^Estimate\s+/, 'Est. ')}
+                            {t(
+                              'repairs.detail.estimateAbbrev',
+                              { amount: pricing.estimateLine.replace(/^Estimate\s+/, '') },
+                              `Est. ${pricing.estimateLine.replace(/^Estimate\s+/, '')}`
+                            )}
                           </Text>
                         );
                       }
@@ -3295,26 +3321,49 @@ export default function RepairDetailScreen({ route, navigation }) {
                   </View>
 
                   <Text style={styles.offerDescription}>
-                    {offer.description || 'Service proposal available.'}
+                    {offer.description ||
+                      t('repairs.detail.proposalAvailable', null, 'Service proposal available.')}
                   </Text>
                   {offer.availability_note ? (
-                    <Text style={styles.offerMetaText}>Availability: {offer.availability_note}</Text>
+                    <Text style={styles.offerMetaText}>
+                      {t(
+                        'repairs.detail.offerAvailability',
+                        { note: offer.availability_note },
+                        `Availability: ${offer.availability_note}`
+                      )}
+                    </Text>
                   ) : offer.available_from ? (
                     <Text style={styles.offerMetaText}>
-                      Available from: {new Date(offer.available_from).toLocaleString()}
+                      {t(
+                        'repairs.detail.offerAvailableFrom',
+                        { date: new Date(offer.available_from).toLocaleString() },
+                        `Available from: ${new Date(offer.available_from).toLocaleString()}`
+                      )}
                     </Text>
                   ) : null}
                   {offer.is_guaranteed ? (
                     <View style={styles.offerBadgeSoft}>
-                      <Text style={styles.offerBadgeSoftText}>Guarantee included</Text>
+                      <Text style={styles.offerBadgeSoftText}>
+                        {t('repairs.detail.guaranteeIncluded', null, 'Guarantee included')}
+                      </Text>
                     </View>
                   ) : null}
                   {offer.parts?.length ? (
-                    <Text style={styles.offerMetaText}>Included parts: {offer.parts.length}</Text>
+                    <Text style={styles.offerMetaText}>
+                      {t(
+                        'repairs.detail.includedParts',
+                        { count: offer.parts.length },
+                        `Included parts: ${offer.parts.length}`
+                      )}
+                    </Text>
                   ) : null}
                   {offer.estimated_duration_minutes ? (
                     <Text style={styles.offerMetaText}>
-                      Estimated duration: {offer.estimated_duration_minutes} min
+                      {t(
+                        'repairs.detail.estimatedDuration',
+                        { minutes: offer.estimated_duration_minutes },
+                        `Estimated duration: ${offer.estimated_duration_minutes} min`
+                      )}
                     </Text>
                   ) : null}
 
@@ -3331,20 +3380,20 @@ export default function RepairDetailScreen({ route, navigation }) {
                             })
                           }
                         >
-                          Edit offer
+                          {t('repairs.detail.editOffer', null, 'Edit offer')}
                         </Button>
                         <Button mode="text" textColor="#dc2626" onPress={() => handleDeleteOffer(offer.id)}>
-                          Delete offer
+                          {t('repairs.detail.deleteOffer', null, 'Delete offer')}
                         </Button>
                         <Button mode="outlined" onPress={handleOpenOfferChat}>
-                          Open chat
+                          {t('repairs.detail.openChat', null, 'Open chat')}
                         </Button>
                         {offer.phone_call_allowed && (offer.shop_phone_e164 || offer.shop_phone) ? (
                           <Button
                             mode="text"
                             onPress={() => handleCallShop(offer.shop_phone_e164 || offer.shop_phone)}
                           >
-                            Call
+                            {t('repairs.detail.call', null, 'Call')}
                           </Button>
                         ) : null}
                       </>
@@ -3353,23 +3402,25 @@ export default function RepairDetailScreen({ route, navigation }) {
                       <>
                         {!hasBooked && !offer.is_booked ? (
                           <Button mode="contained" onPress={() => handleBookOffer(offer.id)}>
-                            {offer.is_promotion ? 'Book promotion' : 'Book offer'}
+                            {offer.is_promotion
+                              ? t('repairs.detail.bookPromotion', null, 'Book promotion')
+                              : t('repairs.detail.bookOffer', null, 'Book offer')}
                           </Button>
                         ) : null}
                         <Button mode="outlined" onPress={handleOpenOfferChat}>
-                          Open chat
+                          {t('repairs.detail.openChat', null, 'Open chat')}
                         </Button>
                         {offer.phone_call_allowed && (offer.shop_phone_e164 || offer.shop_phone) ? (
                           <Button
                             mode="text"
                             onPress={() => handleCallShop(offer.shop_phone_e164 || offer.shop_phone)}
                           >
-                            Call
+                            {t('repairs.detail.call', null, 'Call')}
                           </Button>
                         ) : null}
                         {offer.is_booked ? (
                           <Button mode="text" onPress={() => handleUnbookOffer(offer.id)}>
-                            Cancel booking
+                            {t('repairs.detail.cancelBooking', null, 'Cancel booking')}
                           </Button>
                         ) : null}
                       </>
