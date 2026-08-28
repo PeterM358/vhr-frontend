@@ -1857,6 +1857,17 @@ export default function RepairDetailScreen({ route, navigation }) {
     return Boolean(String(repair.vehicle_license_plate || '').trim());
   }, [repair, isShop]);
 
+  /** VIN for parts — API returns it when shop may see VIN (booked or open lead). */
+  const canViewerSeeVehicleVin = useMemo(() => {
+    if (!repair) return false;
+    if (!isShop) return true;
+    return (
+      repair.vehicle_vin != null ||
+      canViewerSeeVehiclePlate ||
+      Boolean(repair.shop_data_access_scope && repair.shop_data_access_scope !== 'none')
+    );
+  }, [repair, isShop, canViewerSeeVehiclePlate]);
+
   const canOpenVehicleProfile = useMemo(
     () => isShop && Boolean(repair?.can_open_vehicle_profile && repair?.vehicle),
     [isShop, repair?.can_open_vehicle_profile, repair?.vehicle]
@@ -3455,7 +3466,17 @@ export default function RepairDetailScreen({ route, navigation }) {
                     {canOpenVehicleProfile ? (
                       <Text style={styles.heroVehicleLink}>{t('repairs.detail.tapOpenVehicleProfile')}</Text>
                     ) : null}
-                    {repair.vehicle_vin ? (
+                    {isShop && (canViewerSeeVehicleVin || canViewerSeeVehiclePlate) ? (
+                      <Text style={styles.heroMeta}>
+                        {t('repairs.detail.vinLabel')}:{' '}
+                        {String(repair.vehicle_vin || '').trim() ||
+                          t(
+                            'repairs.detail.vinMissing',
+                            null,
+                            'Not on file — ask the owner before ordering parts'
+                          )}
+                      </Text>
+                    ) : repair.vehicle_vin ? (
                       <Text style={styles.heroMeta}>
                         {t('repairs.detail.vinLabel')}: {repair.vehicle_vin}
                       </Text>

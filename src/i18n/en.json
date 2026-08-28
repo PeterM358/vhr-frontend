@@ -3380,6 +3380,9 @@
       "anyService": "Any service",
       "heading": "Filters",
       "intro": "Make and model identify the car. Years are separate: registration on the vehicle profile vs when the service happened.",
+      "introShort": "Narrow by vehicle, year, or service type.",
+      "searchOptions": "Search…",
+      "noOptions": "No matching options.",
       "make": "Make",
       "model": "Model",
       "anyMake": "Any make",
@@ -3468,6 +3471,7 @@
       "plateHiddenUntilBooking": "Plate hidden until booking",
       "tapOpenVehicleProfile": "Tap to open vehicle profile",
       "vinLabel": "VIN",
+      "vinMissing": "Not on file — ask the owner before ordering parts",
       "historyAccess": {
         "cardTitle": "Vehicle history access",
         "cardHint": "Ask the owner to approve temporary access to customer-visible service history for this job.",
