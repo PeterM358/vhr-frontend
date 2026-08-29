@@ -106,7 +106,9 @@ function detectTaskFlavor(activities) {
   const manufacturing = [...kinds].some(isManufacturingActivityKind);
   if (transport && (field || manufacturing)) return 'generic';
   if (transport) return 'transport';
-  if (manufacturing && !field) return 'production';
+  // Construction + production catalog → generic (not "site-only" lead).
+  if (manufacturing && field) return 'generic';
+  if (manufacturing) return 'production';
   if (field) return 'construction';
   return 'generic';
 }
@@ -220,6 +222,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [formMessage, setFormMessage] = useState('');
 
   const [activities, setActivities] = useState([]);
+  const [allowedActivityKinds, setAllowedActivityKinds] = useState([]);
   const [members, setMembers] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -252,6 +255,16 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [documentRef, setDocumentRef] = useState('');
 
   const flavor = useMemo(() => detectTaskFlavor(activities), [activities]);
+  const hasManufacturingOps = useMemo(
+    () => (activities || []).some((a) => isManufacturingActivityKind(a.activity_kind)),
+    [activities],
+  );
+  const manufacturingAllowed = useMemo(
+    () =>
+      hasManufacturingOps ||
+      (allowedActivityKinds || []).some((k) => isManufacturingActivityKind(k)),
+    [allowedActivityKinds, hasManufacturingOps],
+  );
   const hasTransportOps = useMemo(
     () => selectedOpsHaveTransport(selectedOps, activities),
     [selectedOps, activities],
@@ -447,6 +460,9 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       ]);
       const activeOps = (opsData?.results || []).filter((row) => row.is_active !== false);
       setActivities(activeOps);
+      setAllowedActivityKinds(
+        Array.isArray(opsData?.allowed_activity_kinds) ? opsData.allowed_activity_kinds : [],
+      );
       setMembers(Array.isArray(workforce?.results) ? workforce.results : []);
       const fleetRows = Array.isArray(fleet?.results)
         ? fleet.results
@@ -1041,6 +1057,21 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     if (stepId === 'project') {
       return (
         <>
+          {manufacturingAllowed ? (
+            <Text style={styles.helper}>
+              {hasManufacturingOps
+                ? t(
+                    'org.tasks.productionOrderPathHint',
+                    null,
+                    'Production order: later, on the Operations step, pick a Manufacturing op or the “Production order” template.',
+                  )
+                : t(
+                    'org.tasks.productionNeedsOpHint',
+                    null,
+                    'Production is enabled, but you have no Manufacturing operation yet. Create one under Operations (kind: Manufacturing), then come back.',
+                  )}
+            </Text>
+          ) : null}
           <Text style={styles.fieldLabel}>
             {t('org.tasks.project', null, 'Project')}
           </Text>
@@ -1346,7 +1377,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       }
       const templateLabels = {
         transport_day: t('org.tasks.templates.transportDay', null, 'Transport day'),
-        marking_day: t('org.tasks.templates.markingDay', null, 'Marking day'),
+        marking_day: t('org.tasks.templates.markingDay', null, 'Painting day'),
         mixed_day: t('org.tasks.templates.mixedDay', null, 'Mixed day'),
         production_day: t(
           'org.tasks.templates.productionDay',
@@ -1399,11 +1430,29 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
               </View>
             </>
           ) : null}
+          {manufacturingAllowed && !hasManufacturingOps ? (
+            <Text style={styles.helper}>
+              {t(
+                'org.tasks.productionNeedsOpHint',
+                null,
+                'Production is enabled, but you have no Manufacturing operation yet. Create one under Operations (kind: Manufacturing), then come back.',
+              )}
+            </Text>
+          ) : null}
+          {hasManufacturingOps ? (
+            <Text style={styles.helper}>
+              {t(
+                'org.tasks.productionOpsPickHint',
+                null,
+                'For a production order: choose the “Production order” template or tick Manufacturing operations below.',
+              )}
+            </Text>
+          ) : null}
           <Text style={styles.helper}>
             {t(
               'org.tasks.opsMixedHint',
               null,
-              'Example: transport op (haul machine) + road marking op (m² + hours) on the same work card.',
+              'Example: transport op + painting/site op on the same work card.',
             )}
           </Text>
           {hasTransportOps ? (
@@ -1678,11 +1727,17 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
           </Text>
         ) : (
           <Text style={styles.lead}>
-            {t(
-              'org.tasks.createLead',
-              null,
-              'Create a multi-step work card. Workers tap Start and End themselves.',
-            )}
+            {manufacturingAllowed
+              ? t(
+                  'org.tasks.wizard.leadMixedWithProduction',
+                  null,
+                  'Create a work card. For production: add a Manufacturing operation under Operations, then pick it (or “Production order”) on the Operations step.',
+                )
+              : t(
+                  'org.tasks.createLead',
+                  null,
+                  'Create a multi-step work card. Workers tap Start and End themselves.',
+                )}
           </Text>
         )}
 

@@ -459,7 +459,7 @@
       "saveError": "Could not save operation.",
       "kinds": {
         "transport": "Transport",
-        "road_marking": "Road marking",
+        "road_marking": "Painting",
         "field_service": "Field service",
         "construction": "Construction",
         "manufacturing": "Manufacturing",
@@ -506,7 +506,7 @@
         "examples": {
           "transport": "Example: Sofia–Varna haul → worker reports km (meter start/end) + hours.",
           "construction": "Example: hidroizolaciq → worker reports m² done (+ hours if selected).",
-          "road_marking": "Example: marking machine → worker reports m² + working hours.",
+          "road_marking": "Example: paint job → worker reports m² + working hours.",
           "field_service": "Example: field visit → worker reports hours or job count.",
           "manufacturing": "Example: assemble widget → BOM materials + finished good into stock on complete.",
           "warehouse_task": "Example: warehouse move → worker reports loads or pieces.",
@@ -1275,11 +1275,12 @@
         "leadTransport": "Transport-style task (наряд / пътен лист). Workers start and end themselves.",
         "leadConstruction": "Site-style task (обект). Workers start and end themselves.",
         "leadProduction": "Production order: pick manufacturing ops, people, and qty. Issue materials, then Complete production to receive finished goods.",
+        "leadMixedWithProduction": "Create a work card. For production: add a Manufacturing operation under Operations, then pick it (or “Production order”) on the Operations step.",
         "whenLabel": "When"
       },
       "templates": {
         "transportDay": "Transport day",
-        "markingDay": "Field work day",
+        "markingDay": "Painting day",
         "mixedDay": "Mixed day",
         "productionDay": "Production order"
       },
@@ -1292,9 +1293,12 @@
       "opsSummaryLabel": "Operations mix",
       "projectOptionalAnyHint": "Optional. One-time jobs can use “No project” plus a contract/request number.",
       "shipmentsLaterHint": "Shipments (пратки) appear after you select a transport operation.",
+      "productionOrderPathHint": "Production order: later, on the Operations step, pick a Manufacturing op or the “Production order” template.",
+      "productionNeedsOpHint": "Production is enabled, but you have no Manufacturing operation yet. Create one under Operations (kind: Manufacturing), then come back.",
+      "productionOpsPickHint": "For a production order: choose the “Production order” template or tick Manufacturing operations below.",
       "taskKinds": {
         "transport": "Transport",
-        "road_marking": "Road marking / field",
+        "road_marking": "Painting / field",
         "construction": "Construction / roofs",
         "manufacturing": "Manufacturing / production",
         "mixed": "Mixed operations",
@@ -1368,7 +1372,7 @@
         "transport": "Transport",
         "construction": "Construction",
         "field_service": "Field service",
-        "road_marking": "Road marking",
+        "road_marking": "Painting",
         "other": "Other"
       }
     },
