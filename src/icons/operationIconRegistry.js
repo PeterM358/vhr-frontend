@@ -109,12 +109,25 @@ export const SEEDED_OPERATION_ICON_KEYS = Object.freeze({
   'general-inspection': 'general_inspection',
 });
 
-/** ServiceCategory slug → semantic icon_key */
+/** ServiceCategory slug → semantic icon_key (vehicle systems). */
 export const CATEGORY_ICON_KEYS = Object.freeze({
+  brakes: 'brake_service',
+  engine: 'engine',
+  drivetrain: 'transmission',
+  suspension: 'suspension',
+  electrical: 'electrical_diagnostics',
+  'tires-wheels': 'tire_service',
+  climate: 'ac_service',
+  'body-glass': 'bodywork',
+  'care-detailing': 'detailing',
+  inspections: 'inspections',
+  'documents-assistance': 'insurance_documents',
+  accessories: 'accessories',
+  other: GENERIC_SERVICE_ICON_KEY,
+  // Legacy
   maintenance: 'maintenance',
   mechanical: 'mechanical',
   'electrical-diagnostics': 'electrical_diagnostics',
-  'tires-wheels': 'tire_service',
   'bodywork-paint': 'bodywork',
   'air-conditioning': 'ac_service',
   'battery-charging': 'battery',
@@ -122,7 +135,6 @@ export const CATEGORY_ICON_KEYS = Object.freeze({
   'insurance-documents': 'insurance_documents',
   'inspections-legal': 'inspections',
   'accessories-installation': 'accessories',
-  other: GENERIC_SERVICE_ICON_KEY,
 });
 
 /**

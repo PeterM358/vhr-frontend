@@ -7,10 +7,23 @@
  */
 
 const SERVICE_CATEGORY_TO_BUSINESS_KEYS = {
+  brakes: ['car_repair'],
+  engine: ['car_repair'],
+  drivetrain: ['car_repair'],
+  suspension: ['car_repair'],
+  electrical: ['car_repair', 'auto_electrician', 'ev_charging'],
+  'tires-wheels': ['tire_shop'],
+  climate: ['car_repair'],
+  'body-glass': ['body_shop'],
+  'care-detailing': ['detailing', 'car_wash'],
+  inspections: ['vehicle_inspection', 'car_repair'],
+  'documents-assistance': ['car_repair', 'roadside_assistance'],
+  accessories: ['car_repair'],
+  other: ['car_repair'],
+  // Legacy pre–system-axis slugs
   maintenance: ['car_repair'],
   mechanical: ['car_repair'],
   'electrical-diagnostics': ['car_repair', 'auto_electrician'],
-  'tires-wheels': ['tire_shop'],
   'bodywork-paint': ['body_shop'],
   'air-conditioning': ['car_repair'],
   'battery-charging': ['car_repair', 'auto_electrician', 'ev_charging'],
@@ -18,7 +31,6 @@ const SERVICE_CATEGORY_TO_BUSINESS_KEYS = {
   'insurance-documents': ['car_repair', 'roadside_assistance'],
   'inspections-legal': ['vehicle_inspection', 'car_repair'],
   'accessories-installation': ['car_repair'],
-  other: ['car_repair'],
 };
 
 const REPAIR_SLUG_TO_BUSINESS_KEYS = {

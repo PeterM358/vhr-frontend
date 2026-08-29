@@ -151,12 +151,25 @@ function humanizeSlugLabel(slug) {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
-/** Slug → serviceCategories.* i18n key (camelCase slug). */
+/** Slug → serviceCategories.* i18n key (vehicle-system axis). */
 const SERVICE_CATEGORY_I18N_KEY_BY_SLUG = {
+  brakes: 'serviceCategories.brakes',
+  engine: 'serviceCategories.engine',
+  drivetrain: 'serviceCategories.drivetrain',
+  suspension: 'serviceCategories.suspension',
+  electrical: 'serviceCategories.electrical',
+  'tires-wheels': 'serviceCategories.tiresWheels',
+  climate: 'serviceCategories.climate',
+  'body-glass': 'serviceCategories.bodyGlass',
+  'care-detailing': 'serviceCategories.careDetailing',
+  inspections: 'serviceCategories.inspections',
+  'documents-assistance': 'serviceCategories.documentsAssistance',
+  accessories: 'serviceCategories.accessories',
+  other: 'serviceCategories.other',
+  // Legacy slugs (API may still return until re-seed)
   maintenance: 'serviceCategories.maintenance',
   mechanical: 'serviceCategories.mechanical',
   'electrical-diagnostics': 'serviceCategories.electricalDiagnostics',
-  'tires-wheels': 'serviceCategories.tiresWheels',
   'bodywork-paint': 'serviceCategories.bodyworkPaint',
   'air-conditioning': 'serviceCategories.airConditioning',
   'battery-charging': 'serviceCategories.batteryCharging',
@@ -164,7 +177,6 @@ const SERVICE_CATEGORY_I18N_KEY_BY_SLUG = {
   'insurance-documents': 'serviceCategories.insuranceDocuments',
   'inspections-legal': 'serviceCategories.inspectionsLegal',
   'accessories-installation': 'serviceCategories.accessoriesInstallation',
-  other: 'serviceCategories.other',
 };
 
 function resolveCategorySlug(value) {
@@ -226,7 +238,7 @@ export function translateRepairTypeLabel(value, t, { locale } = {}) {
 }
 
 /**
- * Service category = grouping (Maintenance, Mechanical, …).
+ * Service category = vehicle system grouping (Brakes, Engine, …).
  * Repair type / operation = leaf service under a category.
  */
 export function translateServiceCategoryLabel(value, t, { locale } = {}) {

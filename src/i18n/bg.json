@@ -4269,18 +4269,29 @@
     "serviceCenters": "Сервизи"
   },
   "serviceCategories": {
+    "brakes": "Спирачки",
+    "engine": "Двигател",
+    "drivetrain": "Задвижване",
+    "suspension": "Окачване",
+    "electrical": "Електрика",
+    "tiresWheels": "Гуми и джанти",
+    "climate": "Климатик",
+    "bodyGlass": "Купе и стъкла",
+    "careDetailing": "Грижа и детайлинг",
+    "inspections": "Прегледи",
+    "documentsAssistance": "Документи и помощ",
+    "accessories": "Аксесоари",
+    "other": "Други",
     "maintenance": "Поддръжка",
     "mechanical": "Механика",
     "electricalDiagnostics": "Електрика и диагностика",
-    "tiresWheels": "Гуми и джанти",
     "bodyworkPaint": "Купе и боя",
     "airConditioning": "Климатик",
     "batteryCharging": "Акумулатор и зареждане",
     "cleaningDetailing": "Почистване и детайлинг",
     "insuranceDocuments": "Застраховки и документи",
     "inspectionsLegal": "Прегледи и документи",
-    "accessoriesInstallation": "Аксесоари и монтаж",
-    "other": "Други"
+    "accessoriesInstallation": "Аксесоари и монтаж"
   },
   "materialCategories": {
     "brakes": "Спирачки",

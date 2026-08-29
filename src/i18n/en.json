@@ -4314,18 +4314,29 @@
     "serviceCenters": "Service Centers"
   },
   "serviceCategories": {
+    "brakes": "Brakes",
+    "engine": "Engine",
+    "drivetrain": "Drivetrain",
+    "suspension": "Suspension",
+    "electrical": "Electrical",
+    "tiresWheels": "Tires & wheels",
+    "climate": "Climate",
+    "bodyGlass": "Body & glass",
+    "careDetailing": "Care & detailing",
+    "inspections": "Inspections",
+    "documentsAssistance": "Documents & assistance",
+    "accessories": "Accessories",
+    "other": "Other",
     "maintenance": "Maintenance",
     "mechanical": "Mechanical",
     "electricalDiagnostics": "Electrical & Diagnostics",
-    "tiresWheels": "Tires & Wheels",
     "bodyworkPaint": "Bodywork & Paint",
     "airConditioning": "Air Conditioning",
     "batteryCharging": "Battery & Charging",
     "cleaningDetailing": "Cleaning & Detailing",
     "insuranceDocuments": "Insurance & Documents",
     "inspectionsLegal": "Inspections & Legal",
-    "accessoriesInstallation": "Accessories & Installation",
-    "other": "Other"
+    "accessoriesInstallation": "Accessories & Installation"
   },
   "materialCategories": {
     "brakes": "Brakes",

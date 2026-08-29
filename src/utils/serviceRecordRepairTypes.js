@@ -3,7 +3,10 @@
  * Obligations (insurance, vignette, road tax, inspection due-only) use AddObligationPayment.
  */
 
-const OBLIGATION_CATEGORY_SLUGS = new Set(['insurance-documents']);
+const OBLIGATION_CATEGORY_SLUGS = new Set([
+  'documents-assistance',
+  'insurance-documents', // legacy slug
+]);
 
 export function filterServiceRecordRepairTypes(types) {
   if (!Array.isArray(types)) return [];
