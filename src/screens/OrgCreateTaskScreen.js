@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
@@ -253,10 +253,16 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [selectedOps, setSelectedOps] = useState([]);
   const [photoRef, setPhotoRef] = useState('');
   const [documentRef, setDocumentRef] = useState('');
+  /** Explicit mode when org has both site and production — site | production | null */
+  const [taskMode, setTaskMode] = useState(null);
 
   const flavor = useMemo(() => detectTaskFlavor(activities), [activities]);
   const hasManufacturingOps = useMemo(
     () => (activities || []).some((a) => isManufacturingActivityKind(a.activity_kind)),
+    [activities],
+  );
+  const hasFieldOps = useMemo(
+    () => (activities || []).some((a) => isFieldActivityKind(a.activity_kind)),
     [activities],
   );
   const manufacturingAllowed = useMemo(
@@ -265,6 +271,19 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       (allowedActivityKinds || []).some((k) => isManufacturingActivityKind(k)),
     [allowedActivityKinds, hasManufacturingOps],
   );
+  const showTaskModeChooser = manufacturingAllowed && (hasFieldOps || hasManufacturingOps);
+
+  useEffect(() => {
+    if (!showTaskModeChooser) {
+      if (hasManufacturingOps && !hasFieldOps) setTaskMode('production');
+      else if (hasFieldOps && !hasManufacturingOps) setTaskMode('site');
+      return;
+    }
+    if (taskMode == null && hasManufacturingOps && !hasFieldOps) {
+      setTaskMode('production');
+    }
+  }, [hasFieldOps, hasManufacturingOps, showTaskModeChooser, taskMode]);
+
   const hasTransportOps = useMemo(
     () => selectedOpsHaveTransport(selectedOps, activities),
     [selectedOps, activities],
@@ -279,13 +298,32 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     const hasTransport = [...kinds].some(isTransportActivityKind);
     const hasField = [...kinds].some(isFieldActivityKind);
     const hasManufacturing = [...kinds].some(isManufacturingActivityKind);
+    if (taskMode === 'production') {
+      return hasManufacturing ? ['production_day'] : [];
+    }
     const list = [];
-    if (hasTransport) list.push('transport_day');
-    if (hasField) list.push('marking_day');
-    if (hasTransport && hasField) list.push('mixed_day');
-    if (hasManufacturing) list.push('production_day');
+    if (taskMode !== 'production') {
+      if (hasTransport) list.push('transport_day');
+      if (hasField) list.push('marking_day');
+      if (hasTransport && hasField) list.push('mixed_day');
+    }
+    if (taskMode !== 'site' && hasManufacturing) list.push('production_day');
     return list;
-  }, [activities]);
+  }, [activities, taskMode]);
+
+  const visibleActivities = useMemo(() => {
+    if (taskMode === 'production') {
+      return (activities || []).filter((a) =>
+        isManufacturingActivityKind(a.activity_kind),
+      );
+    }
+    if (taskMode === 'site') {
+      return (activities || []).filter(
+        (a) => !isManufacturingActivityKind(a.activity_kind),
+      );
+    }
+    return activities || [];
+  }, [activities, taskMode]);
 
   const localDriverRoute = useMemo(() => {
     const buildPhase = (rows, direction, idxStart, roles) => {
@@ -1057,20 +1095,77 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     if (stepId === 'project') {
       return (
         <>
-          {manufacturingAllowed ? (
-            <Text style={styles.helper}>
-              {hasManufacturingOps
-                ? t(
-                    'org.tasks.productionOrderPathHint',
-                    null,
-                    'Production order: later, on the Operations step, pick a Manufacturing op or the “Production order” template.',
-                  )
-                : t(
+          {showTaskModeChooser || manufacturingAllowed ? (
+            <>
+              <Text style={styles.fieldLabel}>
+                {t('org.tasks.taskModeLabel', null, 'What are you creating?')}
+              </Text>
+              <Text style={styles.helper}>
+                {t(
+                  'org.tasks.taskModeHint',
+                  null,
+                  'Same work-card spine — different outcome. Site = m² / job on location. Production = finished goods into warehouse.',
+                )}
+              </Text>
+              <View style={styles.chipWrap}>
+                <Pressable
+                  onPress={() => {
+                    setTaskMode('site');
+                    setTemplateId(null);
+                    setSelectedOps([]);
+                  }}
+                  style={[styles.chip, taskMode === 'site' && styles.chipActive]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      taskMode === 'site' && styles.chipTextActive,
+                    ]}
+                  >
+                    {t('org.tasks.taskModeSite', null, 'Site work card')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setTaskMode('production');
+                    setTemplateId(null);
+                    setSelectedOps([]);
+                    if (hasManufacturingOps) applyTemplate('production_day');
+                  }}
+                  style={[
+                    styles.chip,
+                    taskMode === 'production' && styles.chipActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      taskMode === 'production' && styles.chipTextActive,
+                    ]}
+                  >
+                    {t('org.tasks.taskModeProduction', null, 'Production order')}
+                  </Text>
+                </Pressable>
+              </View>
+              {taskMode === 'production' && !hasManufacturingOps ? (
+                <Text style={styles.helper}>
+                  {t(
                     'org.tasks.productionNeedsOpHint',
                     null,
                     'Production is enabled, but you have no Manufacturing operation yet. Create one under Operations (kind: Manufacturing), then come back.',
                   )}
-            </Text>
+                </Text>
+              ) : null}
+              {taskMode === 'production' && hasManufacturingOps ? (
+                <Text style={styles.helper}>
+                  {t(
+                    'org.tasks.productionOrderPathHint',
+                    null,
+                    'Production order: on the Operations step, Manufacturing ops are listed (or use the Production order template).',
+                  )}
+                </Text>
+              ) : null}
+            </>
           ) : null}
           <Text style={styles.fieldLabel}>
             {t('org.tasks.project', null, 'Project')}
@@ -1472,7 +1567,22 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
               )}
             </Text>
           )}
-          {activities.map((activity) => {
+          {visibleActivities.length === 0 ? (
+            <Text style={styles.empty}>
+              {taskMode === 'production'
+                ? t(
+                    'org.tasks.productionNeedsOpHint',
+                    null,
+                    'Production is enabled, but you have no Manufacturing operation yet. Create one under Operations (kind: Manufacturing), then come back.',
+                  )
+                : t(
+                    'org.tasks.noOperations',
+                    null,
+                    'No active operations yet. Create them under Operations first.',
+                  )}
+            </Text>
+          ) : null}
+          {visibleActivities.map((activity) => {
             const selected = selectedActivityIds.has(activity.id);
             const line = selectedOps.find((row) => row.activityId === activity.id);
             return (
@@ -1705,25 +1815,29 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         contentContainerStyle={[styles.scroll, { paddingBottom: scrollBottomPadding }]}
         keyboardShouldPersistTaps="handled"
       >
-        {flavor !== 'generic' ? (
+        {taskMode === 'production' || flavor === 'production' ? (
           <Text style={styles.lead}>
-            {flavor === 'transport'
-              ? t(
-                  'org.tasks.wizard.leadTransport',
-                  null,
-                  'Transport-style task (наряд / пътен лист). Workers start and end themselves.',
-                )
-              : flavor === 'production'
-                ? t(
-                    'org.tasks.wizard.leadProduction',
-                    null,
-                    'Production order: pick manufacturing ops, people, and qty. Issue materials, then Complete production to receive finished goods.',
-                  )
-                : t(
-                    'org.tasks.wizard.leadConstruction',
-                    null,
-                    'Site-style task (обект). Workers start and end themselves.',
-                  )}
+            {t(
+              'org.tasks.wizard.leadProduction',
+              null,
+              'Production order: pick manufacturing ops, people, and qty. Issue materials, then Complete production to receive finished goods.',
+            )}
+          </Text>
+        ) : taskMode === 'site' || flavor === 'construction' ? (
+          <Text style={styles.lead}>
+            {t(
+              'org.tasks.wizard.leadConstruction',
+              null,
+              'Site-style task (обект). Workers start and end themselves. Materials/waste on the work card — no finished goods into stock.',
+            )}
+          </Text>
+        ) : flavor === 'transport' ? (
+          <Text style={styles.lead}>
+            {t(
+              'org.tasks.wizard.leadTransport',
+              null,
+              'Transport-style task (наряд / пътен лист). Workers start and end themselves.',
+            )}
           </Text>
         ) : (
           <Text style={styles.lead}>
@@ -1731,7 +1845,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
               ? t(
                   'org.tasks.wizard.leadMixedWithProduction',
                   null,
-                  'Create a work card. For production: add a Manufacturing operation under Operations, then pick it (or “Production order”) on the Operations step.',
+                  'Choose Site work card or Production order above. Same spine — different outcome (site job vs warehouse finished goods).',
                 )
               : t(
                   'org.tasks.createLead',

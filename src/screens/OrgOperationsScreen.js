@@ -610,20 +610,37 @@ export default function OrgOperationsScreen({ navigation, route }) {
       {
         key: 'output',
         title: t('org.operations.wizard.stepOutput', null, 'Worker reports'),
-        hint: t(
-          'org.operations.wizard.stepOutputHint',
-          null,
-          'Multi-select what the worker reports on this operation (m², hours, km, liters…).',
-        ),
+        hint:
+          form.kind === 'manufacturing'
+            ? t(
+                'org.operations.wizard.stepOutputHintManufacturing',
+                null,
+                'Usually pieces (бр) of finished product. Hours once on the work card. Materials are issued from the BOM — not reported as leftover paint here.',
+              )
+            : t(
+                'org.operations.wizard.stepOutputHint',
+                null,
+                'Multi-select what the worker reports on this operation (m², hours, km, liters…).',
+              ),
       },
       {
         key: 'materials',
-        title: t('org.operations.wizard.stepMaterialsNorms', null, 'Materials + norms'),
-        hint: t(
-          'org.operations.wizard.stepMaterialsNormsHint',
-          null,
-          'Toggle labor-only vs labor + materials. Each SKU has its own basis — paint per m² and fuel per working hour can both be set on the same operation.',
-        ),
+        title:
+          form.kind === 'manufacturing'
+            ? t('org.operations.wizard.stepBom', null, 'BOM + finished good')
+            : t('org.operations.wizard.stepMaterialsNorms', null, 'Materials + norms'),
+        hint:
+          form.kind === 'manufacturing'
+            ? t(
+                'org.operations.wizard.stepBomHint',
+                null,
+                'Recipe (catalog), not a production order. List raw SKUs + rates, then the finished-good SKU received into stock on Complete production.',
+              )
+            : t(
+                'org.operations.wizard.stepMaterialsNormsHint',
+                null,
+                'Toggle labor-only vs labor + materials. Each SKU has its own basis — paint per m² and fuel per working hour can both be set on the same operation.',
+              ),
       },
       {
         key: 'review',
@@ -635,7 +652,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
         ),
       },
     ],
-    [t],
+    [form.kind, t],
   );
 
   const load = useCallback(async () => {
@@ -1351,6 +1368,15 @@ export default function OrgOperationsScreen({ navigation, route }) {
               );
             })}
           </View>
+          {form.kind === 'manufacturing' ? (
+            <Text style={styles.helper}>
+              {t(
+                'org.operations.recipeNotOrderHint',
+                null,
+                'This is a recipe in the catalog (BOM + finished good) — not a production order. After you save, create a task and pick this operation to run an order.',
+              )}
+            </Text>
+          ) : null}
           <Text style={styles.helper}>
             {t(
               kindExampleKey(form.kind),
@@ -1358,7 +1384,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
               form.kind === 'transport'
                 ? 'Example: Sofia–Varna haul → worker reports km (meter start/end) + ~9 h time norm.'
                 : form.kind === 'construction' || form.kind === 'road_marking'
-                  ? 'Example: hidroizolaciq / marking → worker reports m² done.'
+                  ? 'Example: hidroizolaciq / painting → worker reports m² done.'
                   : 'Pick a kind to suggest the right output units and norms.',
             )}
           </Text>
