@@ -462,12 +462,17 @@
         "road_marking": "Road marking",
         "field_service": "Field service",
         "construction": "Construction",
+        "manufacturing": "Manufacturing",
         "warehouse_task": "Warehouse task",
         "labor_only": "Labor only",
         "inspection": "Inspection",
         "workshop_service": "Workshop service",
         "other": "Other"
       },
+      "finishedGood": "Finished good (stock receipt)",
+      "finishedGoodHint": "SKU received into warehouse when the production order is completed. Qty per reported unit (e.g. 1 pcs per 1 batch).",
+      "searchFinishedGood": "Search finished-good SKU",
+      "outputQtyPerUnit": "Finished qty per reported unit",
       "defaultUnitPlaceholder": "m², km, L, hours…",
       "plannedHours": "Time norm (hours)",
       "wizard": {
@@ -503,6 +508,7 @@
           "construction": "Example: hidroizolaciq → worker reports m² done (+ hours if selected).",
           "road_marking": "Example: marking machine → worker reports m² + working hours.",
           "field_service": "Example: field visit → worker reports hours or job count.",
+          "manufacturing": "Example: assemble widget → BOM materials + finished good into stock on complete.",
           "warehouse_task": "Example: warehouse move → worker reports loads or pieces.",
           "labor_only": "Example: labor-only → worker reports hours.",
           "inspection": "Example: inspection → worker reports count or hours.",
@@ -1264,15 +1270,18 @@
         "stepA11y": "Step {n}: {title}",
         "nounTransport": "waybill / work card",
         "nounConstruction": "site / work card",
+        "nounProduction": "production order",
         "nounGeneric": "work card",
         "leadTransport": "Transport-style task (наряд / пътен лист). Workers start and end themselves.",
         "leadConstruction": "Site-style task (обект). Workers start and end themselves.",
+        "leadProduction": "Production order: pick manufacturing ops, people, and qty. Issue materials, then Complete production to receive finished goods.",
         "whenLabel": "When"
       },
       "templates": {
         "transportDay": "Transport day",
         "markingDay": "Field work day",
-        "mixedDay": "Mixed day"
+        "mixedDay": "Mixed day",
+        "productionDay": "Production order"
       },
       "templatesLabel": "Quick templates (optional)",
       "templatesHint": "Pre-selects operations — you can still add or remove any ops below.",
@@ -1287,9 +1296,15 @@
         "transport": "Transport",
         "road_marking": "Road marking / field",
         "construction": "Construction / roofs",
+        "manufacturing": "Manufacturing / production",
         "mixed": "Mixed operations",
         "other": "Other / generic"
       },
+      "completeProductionCta": "Complete production",
+      "completeProductionTitle": "Complete production",
+      "completeProductionToast": "Finished goods received into stock (qty {qty}).",
+      "completeProductionError": "Could not complete production.",
+      "productionReceived": "Finished goods received ({qty})",
       "startOpenWizard": "Start (enter km / L)",
       "startWizardHintRequired": "Enter starting odometer and fuel in tank, then start. These lock after save.",
       "startReadingsLocked": "Start readings (saved)",
@@ -1670,12 +1685,14 @@
       "types": {
         "transport": "Transport",
         "construction": "Construction",
+        "production": "Production",
         "serviceCenter": "Service center",
         "other": "Other"
       },
       "typeHints": {
         "transport": "Fleet & jobs; request repairs from service centers",
         "construction": "Sites & fleet; request repairs from service centers",
+        "production": "Manufacture goods: BOM, issue materials, receive finished stock",
         "serviceCenter": "Provide service; appear on the map and public listing",
         "other": "Company that needs service from service centers"
       }
@@ -1695,12 +1712,14 @@
       "types": {
         "transport": "Transport",
         "construction": "Construction",
+        "production": "Production",
         "serviceCenter": "Service center",
         "other": "Other"
       },
       "typeHints": {
         "transport": "Fleet & jobs; request repairs from service centers",
         "construction": "Sites & fleet; request repairs from service centers",
+        "production": "Manufacture goods: BOM, issue materials, receive finished stock",
         "serviceCenter": "Provide service; appear on the map and public listing",
         "other": "Company that needs service from service centers"
       }

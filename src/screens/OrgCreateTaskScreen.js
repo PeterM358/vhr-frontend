@@ -84,6 +84,10 @@ function isTransportActivityKind(kind) {
   return String(kind || '').toLowerCase() === 'transport';
 }
 
+function isManufacturingActivityKind(kind) {
+  return String(kind || '').toLowerCase() === 'manufacturing';
+}
+
 function isFieldActivityKind(kind) {
   const k = String(kind || '').toLowerCase();
   return [
@@ -99,8 +103,10 @@ function detectTaskFlavor(activities) {
   const kinds = new Set((activities || []).map((a) => a.activity_kind).filter(Boolean));
   const transport = [...kinds].some(isTransportActivityKind);
   const field = [...kinds].some(isFieldActivityKind);
-  if (transport && field) return 'generic';
+  const manufacturing = [...kinds].some(isManufacturingActivityKind);
+  if (transport && (field || manufacturing)) return 'generic';
   if (transport) return 'transport';
+  if (manufacturing && !field) return 'production';
   if (field) return 'construction';
   return 'generic';
 }
@@ -114,8 +120,11 @@ function deriveTaskKindFromOps(selectedOps, activities) {
   });
   const hasTransport = [...kinds].some(isTransportActivityKind);
   const hasField = [...kinds].some(isFieldActivityKind);
-  if (hasTransport && hasField) return 'mixed';
+  const hasManufacturing = [...kinds].some(isManufacturingActivityKind);
+  if (hasTransport && (hasField || hasManufacturing)) return 'mixed';
   if (hasTransport) return 'transport';
+  if (hasManufacturing && hasField) return 'mixed';
+  if (hasManufacturing) return 'manufacturing';
   if (kinds.has('road_marking') && !kinds.has('construction')) return 'road_marking';
   if (kinds.has('construction')) return 'construction';
   return 'other';
@@ -187,6 +196,11 @@ function templateOpIds(activities, templateId) {
     );
     return [transport?.id, marking?.id].filter((id) => id != null);
   }
+  if (templateId === 'production_day') {
+    return rows
+      .filter((a) => isManufacturingActivityKind(a.activity_kind))
+      .map((a) => a.id);
+  }
   return [];
 }
 
@@ -251,10 +265,12 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     const kinds = new Set((activities || []).map((a) => a.activity_kind).filter(Boolean));
     const hasTransport = [...kinds].some(isTransportActivityKind);
     const hasField = [...kinds].some(isFieldActivityKind);
+    const hasManufacturing = [...kinds].some(isManufacturingActivityKind);
     const list = [];
     if (hasTransport) list.push('transport_day');
     if (hasField) list.push('marking_day');
     if (hasTransport && hasField) list.push('mixed_day');
+    if (hasManufacturing) list.push('production_day');
     return list;
   }, [activities]);
 
@@ -318,7 +334,9 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         ? t('org.tasks.wizard.nounTransport', null, 'waybill / work card')
         : flavor === 'construction'
           ? t('org.tasks.wizard.nounConstruction', null, 'site / work card')
-          : t('org.tasks.wizard.nounGeneric', null, 'work card');
+          : flavor === 'production'
+            ? t('org.tasks.wizard.nounProduction', null, 'production order')
+            : t('org.tasks.wizard.nounGeneric', null, 'work card');
     const steps = [
       {
         id: 'project',
@@ -1330,6 +1348,11 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         transport_day: t('org.tasks.templates.transportDay', null, 'Transport day'),
         marking_day: t('org.tasks.templates.markingDay', null, 'Marking day'),
         mixed_day: t('org.tasks.templates.mixedDay', null, 'Mixed day'),
+        production_day: t(
+          'org.tasks.templates.productionDay',
+          null,
+          'Production order',
+        ),
       };
       return (
         <>
@@ -1513,6 +1536,11 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         null,
         'Construction / roofs',
       ),
+      manufacturing: t(
+        'org.tasks.taskKinds.manufacturing',
+        null,
+        'Manufacturing / production',
+      ),
       mixed: t('org.tasks.taskKinds.mixed', null, 'Mixed operations'),
       other: t('org.tasks.taskKinds.other', null, 'Other / generic'),
     };
@@ -1636,11 +1664,17 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                   null,
                   'Transport-style task (наряд / пътен лист). Workers start and end themselves.',
                 )
-              : t(
-                  'org.tasks.wizard.leadConstruction',
-                  null,
-                  'Site-style task (обект). Workers start and end themselves.',
-                )}
+              : flavor === 'production'
+                ? t(
+                    'org.tasks.wizard.leadProduction',
+                    null,
+                    'Production order: pick manufacturing ops, people, and qty. Issue materials, then Complete production to receive finished goods.',
+                  )
+                : t(
+                    'org.tasks.wizard.leadConstruction',
+                    null,
+                    'Site-style task (обект). Workers start and end themselves.',
+                  )}
           </Text>
         ) : (
           <Text style={styles.lead}>

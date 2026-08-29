@@ -20,6 +20,7 @@ import {
   deleteWorkOrderShipment,
   draftInvoiceFromWorkOrders,
   endWorkOrder,
+  completeProductionWorkOrder,
   getWorkOrder,
   issueWorkOrderMaterials,
   listUnitsOfMeasure,
@@ -81,6 +82,21 @@ function isOpenTaskStatus(status) {
 function isCompletedTaskStatus(status) {
   const value = String(status || '').toLowerCase();
   return value === 'done' || value === 'cancelled';
+}
+
+function taskHasManufacturing(task) {
+  if (String(task?.task_kind || '').toLowerCase() === 'manufacturing') return true;
+  const ops = Array.isArray(task?.operations) ? task.operations : [];
+  return ops.some(
+    (op) =>
+      String(op?.activity?.activity_kind || op?.activity_kind || '').toLowerCase() ===
+      'manufacturing',
+  );
+}
+
+function productionReceiptDone(task) {
+  const receipt = task?.production_receipt;
+  return Boolean(receipt && typeof receipt === 'object' && receipt.received_at);
 }
 
 function statusLabel(status, t) {
@@ -1296,6 +1312,72 @@ export default function OrgTasksScreen({ navigation, route }) {
     }
   };
 
+  const completeProduction = async (task) => {
+    if (!orgId || !task?.id) return;
+    if (taskHasPendingMaterialConfirm(task)) {
+      Alert.alert(
+        t('org.tasks.completeProductionTitle', null, 'Complete production'),
+        t(
+          'org.tasks.confirmMaterialsFirst',
+          null,
+          'Confirm warehouse materials first',
+        ),
+      );
+      return;
+    }
+    setBusyAction(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const operations = buildOperationsPayload();
+      const payload = { operations };
+      appendHoursMeterPayload(payload, task);
+      const plannedOrActual = (task.operations || []).find(
+        (op) =>
+          String(op?.activity?.activity_kind || '').toLowerCase() === 'manufacturing' &&
+          (op.actual_qty != null || op.planned_qty != null),
+      );
+      const qty =
+        plannedOrActual?.actual_qty != null
+          ? String(plannedOrActual.actual_qty)
+          : plannedOrActual?.planned_qty != null
+            ? String(plannedOrActual.planned_qty)
+            : null;
+      if (qty) payload.output_qty = qty;
+      const updated = await completeProductionWorkOrder(token, orgId, task.id, payload);
+      replaceTask(updated);
+      const receipt = updated?.production_receipt || {};
+      Alert.alert(
+        t('org.tasks.completeProductionTitle', null, 'Complete production'),
+        t(
+          'org.tasks.completeProductionToast',
+          { qty: receipt.qty || qty || '—', materialId: receipt.material_id || '—' },
+          `Finished goods received into stock (qty ${receipt.qty || qty || '—'}).`,
+        ),
+      );
+    } catch (e) {
+      const message =
+        e?.code === 'materials_pending_confirm' ||
+        e?.fieldErrors?.code === 'materials_pending_confirm'
+          ? t(
+              'org.tasks.confirmMaterialsFirst',
+              null,
+              'Confirm warehouse materials first',
+            )
+          : e.message ||
+            t(
+              'org.tasks.completeProductionError',
+              null,
+              'Could not complete production.',
+            );
+      Alert.alert(
+        t('org.tasks.completeProductionTitle', null, 'Complete production'),
+        message,
+      );
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
   const openEndWizard = (task) => {
     if (taskHasPendingMaterialConfirm(task)) {
       Alert.alert(
@@ -1920,6 +2002,11 @@ export default function OrgTasksScreen({ navigation, route }) {
     const pendingMaterials = taskHasPendingMaterialConfirm(task);
     const pendingIssue = pendingMaterials ? firstPendingMaterialIssue(task) : null;
     const showEnd = canShowEndButton(task);
+    const isManufacturing = taskHasManufacturing(task);
+    const showCompleteProduction =
+      isManufacturing &&
+      !productionReceiptDone(task) &&
+      (showEnd || (task.status === 'done' && !productionReceiptDone(task)));
     return (
       <View style={styles.actionBlock}>
         {needsSeen ? (
@@ -2007,7 +2094,21 @@ export default function OrgTasksScreen({ navigation, route }) {
           </View>
         ) : null}
 
-        {showEnd && !pendingMaterials ? (
+        {showCompleteProduction && !pendingMaterials ? (
+          <Button
+            mode="contained"
+            loading={busyAction}
+            disabled={busyAction}
+            onPress={() => completeProduction(task)}
+            style={styles.endBtn}
+            contentStyle={styles.startBtnContent}
+            labelStyle={styles.startBtnLabel}
+          >
+            {t('org.tasks.completeProductionCta', null, 'Complete production')}
+          </Button>
+        ) : null}
+
+        {showEnd && !pendingMaterials && !isManufacturing ? (
           <Button
             mode="contained"
             loading={busyAction}
@@ -2019,6 +2120,18 @@ export default function OrgTasksScreen({ navigation, route }) {
           >
             {t('org.tasks.endCta', null, 'End work')}
           </Button>
+        ) : null}
+
+        {productionReceiptDone(task) ? (
+          <Text style={styles.endedBadge}>
+            {t(
+              'org.tasks.productionReceived',
+              {
+                qty: task.production_receipt?.qty || '—',
+              },
+              `Finished goods received (${task.production_receipt?.qty || '—'})`,
+            )}
+          </Text>
         ) : null}
 
         {task.ended_at ? (

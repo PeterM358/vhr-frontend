@@ -29,7 +29,7 @@ import { COLORS } from '../constants/colors';
 const ON_CARD = '#0F172A';
 const ON_CARD_MUTED = '#475569';
 
-const ACTIVITY_OPTIONS = ['transport', 'construction', 'service_center', 'other'];
+const ACTIVITY_OPTIONS = ['transport', 'construction', 'production', 'service_center', 'other'];
 
 export default function OrgActivitiesScreen({
   navigation,
@@ -56,6 +56,7 @@ export default function OrgActivitiesScreen({
     () => ({
       transport: t('org.activities.types.transport', null, 'Transport'),
       construction: t('org.activities.types.construction', null, 'Construction'),
+      production: t('org.activities.types.production', null, 'Production'),
       service_center: t('org.activities.types.serviceCenter', null, 'Service center'),
       other: t('org.activities.types.other', null, 'Other'),
     }),
@@ -73,6 +74,11 @@ export default function OrgActivitiesScreen({
         'org.activities.typeHints.construction',
         null,
         'Sites & fleet; request repairs from service centers',
+      ),
+      production: t(
+        'org.activities.typeHints.production',
+        null,
+        'Manufacture goods: BOM, issue materials, receive finished stock',
       ),
       service_center: t(
         'org.activities.typeHints.serviceCenter',

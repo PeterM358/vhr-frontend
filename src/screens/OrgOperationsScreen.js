@@ -47,6 +47,7 @@ const KIND_OPTIONS = [
   { value: 'road_marking', labelKey: 'org.operations.kinds.road_marking' },
   { value: 'field_service', labelKey: 'org.operations.kinds.field_service' },
   { value: 'construction', labelKey: 'org.operations.kinds.construction' },
+  { value: 'manufacturing', labelKey: 'org.operations.kinds.manufacturing' },
   { value: 'warehouse_task', labelKey: 'org.operations.kinds.warehouse_task' },
   { value: 'labor_only', labelKey: 'org.operations.kinds.labor_only' },
   { value: 'inspection', labelKey: 'org.operations.kinds.inspection' },
@@ -59,6 +60,7 @@ const KIND_OUTPUT_MEASURES = {
   construction: ['area', 'volume', 'mass', 'count', 'duration', 'distance'],
   road_marking: ['area', 'distance', 'count', 'duration', 'volume', 'mass'],
   field_service: ['count', 'duration', 'area', 'distance', 'volume', 'mass'],
+  manufacturing: ['count', 'mass', 'volume', 'duration'],
   warehouse_task: ['count', 'mass', 'volume', 'duration'],
   labor_only: ['duration', 'count'],
   inspection: ['count', 'duration'],
@@ -82,6 +84,7 @@ const KIND_INPUT_MEASURES = {
   construction: ['volume', 'mass'],
   road_marking: ['volume', 'mass'],
   field_service: ['volume', 'count', 'mass'],
+  manufacturing: ['mass', 'volume', 'count'],
   warehouse_task: ['count', 'mass', 'volume'],
   labor_only: [],
   inspection: [],
@@ -226,6 +229,10 @@ function emptyFormState() {
     normRate: '',
     normBasisQty: '1',
     normInputUnitId: null,
+    outputMaterialId: null,
+    outputMaterialLabel: '',
+    outputQtyPerUnit: '1',
+    outputSearch: '',
   };
 }
 
@@ -235,6 +242,7 @@ function hydrateFromRow(row) {
   const labor = norms.labor || {};
   const materials = norms.materials || {};
   const generic = norms.generic || {};
+  const output = norms.output || {};
   const materialIds = Array.isArray(materials.default_material_ids)
     ? materials.default_material_ids
     : Array.isArray(row.default_material_ids)
@@ -381,6 +389,11 @@ function hydrateFromRow(row) {
     normRate: legacyRate,
     normBasisQty: legacyPer,
     normInputUnitId: legacyUnit,
+    outputMaterialId: output.material_id ? Number(output.material_id) : null,
+    outputMaterialLabel: '',
+    outputQtyPerUnit:
+      output.qty_per_unit != null ? String(output.qty_per_unit) : '1',
+    outputSearch: '',
   };
 }
 
@@ -469,6 +482,13 @@ function buildNormsPayload(form) {
     // already set above
   } else if (planned && !norms.labor) {
     norms.labor = { preset_hours: planned };
+  }
+
+  if (form.kind === 'manufacturing' && form.outputMaterialId) {
+    norms.output = {
+      material_id: Number(form.outputMaterialId),
+      qty_per_unit: String(form.outputQtyPerUnit || '1').trim() || '1',
+    };
   }
 
   return norms;
@@ -1312,7 +1332,16 @@ export default function OrgOperationsScreen({ navigation, route }) {
               return (
                 <Pressable
                   key={option.value}
-                  onPress={() => setField('kind', option.value)}
+                  onPress={() => {
+                    const nextKind = option.value;
+                    setForm((prev) => ({
+                      ...prev,
+                      kind: nextKind,
+                      ...(nextKind === 'manufacturing'
+                        ? { consumesMaterials: true }
+                        : {}),
+                    }));
+                  }}
                   style={[styles.kindChip, active && styles.kindChipActive]}
                 >
                   <Text style={[styles.kindChipText, active && styles.kindChipTextActive]}>
@@ -1849,6 +1878,99 @@ export default function OrgOperationsScreen({ navigation, route }) {
                 'No tools selected. Mark warehouse SKUs as “durable tool” when adding them.',
               )}
             </Text>
+          ) : null}
+          {form.kind === 'manufacturing' ? (
+            <>
+              <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
+                {t(
+                  'org.operations.finishedGood',
+                  null,
+                  'Finished good (stock receipt)',
+                )}
+              </Text>
+              <Text style={styles.helper}>
+                {t(
+                  'org.operations.finishedGoodHint',
+                  null,
+                  'SKU received into warehouse when the production order is completed. Qty per reported unit (e.g. 1 pcs per 1 batch).',
+                )}
+              </Text>
+              <TextInput
+                label={t(
+                  'org.operations.searchFinishedGood',
+                  null,
+                  'Search finished-good SKU',
+                )}
+                value={form.outputSearch}
+                onChangeText={(value) => {
+                  setField('outputSearch', value);
+                  searchMaterials(value);
+                }}
+                mode="outlined"
+                style={styles.input}
+                textColor={ON_CARD}
+              />
+              <View style={styles.kindWrap}>
+                {[
+                  ...(form.outputMaterialId && form.outputMaterialLabel
+                    ? [
+                        {
+                          id: form.outputMaterialId,
+                          name: form.outputMaterialLabel,
+                        },
+                      ]
+                    : []),
+                  ...catalogRows.filter(
+                    (m) =>
+                      Number(m.id) !== Number(form.outputMaterialId) &&
+                      !m.is_durable_tool,
+                  ),
+                ].map((mat) => {
+                  const active = Number(form.outputMaterialId) === Number(mat.id);
+                  return (
+                    <Pressable
+                      key={`fg-${mat.id}`}
+                      onPress={() => {
+                        setForm((prev) => ({
+                          ...prev,
+                          outputMaterialId: active ? null : Number(mat.id),
+                          outputMaterialLabel: active
+                            ? ''
+                            : materialLabel(mat),
+                          outputSearch: '',
+                        }));
+                      }}
+                      style={[styles.kindChip, active && styles.kindChipActive]}
+                    >
+                      <Text
+                        style={[
+                          styles.kindChipText,
+                          active && styles.kindChipTextActive,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {materialLabel(mat)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <TextInput
+                label={t(
+                  'org.operations.outputQtyPerUnit',
+                  null,
+                  'Finished qty per reported unit',
+                )}
+                value={form.outputQtyPerUnit || '1'}
+                onChangeText={(value) =>
+                  setField('outputQtyPerUnit', sanitizeDecimalInput(value))
+                }
+                mode="outlined"
+                keyboardType="decimal-pad"
+                style={styles.input}
+                textColor={ON_CARD}
+              />
+            </>
           ) : null}
         </>
       );

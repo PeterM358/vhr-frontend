@@ -395,6 +395,27 @@ export async function endWorkOrder(token, organizationId, workOrderId, payload =
   return response.json();
 }
 
+export async function completeProductionWorkOrder(
+  token,
+  organizationId,
+  workOrderId,
+  payload = {},
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/complete-production/`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    },
+  );
+  if (!response.ok) await throwApiError(response, 'Failed to complete production');
+  return response.json();
+}
+
 export async function checkInWorkOrder(token, organizationId, workOrderId, payload = {}) {
   const response = await fetch(
     `${API_BASE_URL}/api/organizations/${organizationId}/work-orders/${workOrderId}/check-in/`,

@@ -20,7 +20,7 @@ import {
 import { COLORS } from '../constants/colors';
 import BaseStyles from '../styles/base';
 
-const ACTIVITY_OPTIONS = ['transport', 'construction', 'service_center', 'other'];
+const ACTIVITY_OPTIONS = ['transport', 'construction', 'production', 'service_center', 'other'];
 
 export default function OrganizationOnboardingScreen({ navigation }) {
   const theme = useTheme();
@@ -56,6 +56,7 @@ export default function OrganizationOnboardingScreen({ navigation }) {
     () => ({
       transport: t('org.onboarding.types.transport', null, 'Transport'),
       construction: t('org.onboarding.types.construction', null, 'Construction'),
+      production: t('org.onboarding.types.production', null, 'Production'),
       service_center: t('org.onboarding.types.serviceCenter', null, 'Service center'),
       other: t('org.onboarding.types.other', null, 'Other'),
     }),
@@ -73,6 +74,11 @@ export default function OrganizationOnboardingScreen({ navigation }) {
         'org.onboarding.typeHints.construction',
         null,
         'Sites & fleet; request repairs from service centers',
+      ),
+      production: t(
+        'org.onboarding.typeHints.production',
+        null,
+        'Manufacture goods: BOM, issue materials, receive finished stock',
       ),
       service_center: t(
         'org.onboarding.typeHints.serviceCenter',
