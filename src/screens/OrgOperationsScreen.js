@@ -1643,6 +1643,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
               )}
             </Text>
           ) : null}
+          <TextInput
             label={t('org.operations.notes', null, 'Notes')}
             value={form.notes}
             onChangeText={(value) => setField('notes', value)}
@@ -2751,7 +2752,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
             : t(
                 'org.operations.leadOperations',
                 null,
-                'Operations = work steps for site tasks and for production-order routing. Recipes (BOM) live on the Recipes tab.',
+                'Operations = work steps for site tasks and for production-order routing. Use the Recipes tab to add finished-product BOMs.',
               )}
         </Text>
 
@@ -2764,15 +2765,13 @@ export default function OrgOperationsScreen({ navigation, route }) {
             }}
             style={[
               styles.modeChip,
-              catalogTab === 'operations' && mode === 'list' && styles.modeChipActive,
+              catalogTab === 'operations' && styles.modeChipActive,
             ]}
           >
             <Text
               style={[
                 styles.modeChipText,
-                catalogTab === 'operations' &&
-                  mode === 'list' &&
-                  styles.modeChipTextActive,
+                catalogTab === 'operations' && styles.modeChipTextActive,
               ]}
             >
               {t('org.operations.tabOperations', null, 'Operations')}
@@ -2787,15 +2786,13 @@ export default function OrgOperationsScreen({ navigation, route }) {
               }}
               style={[
                 styles.modeChip,
-                catalogTab === 'recipes' && mode === 'list' && styles.modeChipActive,
+                catalogTab === 'recipes' && styles.modeChipActive,
               ]}
             >
               <Text
                 style={[
                   styles.modeChipText,
-                  catalogTab === 'recipes' &&
-                    mode === 'list' &&
-                    styles.modeChipTextActive,
+                  catalogTab === 'recipes' && styles.modeChipTextActive,
                 ]}
               >
                 {t('org.operations.tabRecipes', null, 'Recipes')}
@@ -2938,29 +2935,13 @@ export default function OrgOperationsScreen({ navigation, route }) {
                     )}
                   </Button>
                 ) : (
-                  <>
-                    <Button
-                      mode="contained"
-                      onPress={startCreateOperation}
-                      style={styles.primaryBtn}
-                    >
-                      {t('org.operations.addOperation', null, 'Add operation')}
-                    </Button>
-                    {manufacturingAllowed ? (
-                      <Button
-                        mode="outlined"
-                        textColor={ON_CARD}
-                        onPress={startCreateRecipe}
-                        style={styles.secondaryAddBtn}
-                      >
-                        {t(
-                          'org.operations.addRecipeCta',
-                          null,
-                          'Add recipe (finished product)',
-                        )}
-                      </Button>
-                    ) : null}
-                  </>
+                  <Button
+                    mode="contained"
+                    onPress={startCreateOperation}
+                    style={styles.primaryBtn}
+                  >
+                    {t('org.operations.addOperation', null, 'Add operation')}
+                  </Button>
                 )}
               </View>
             ) : null}
