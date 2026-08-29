@@ -88,15 +88,22 @@ function isManufacturingActivityKind(kind) {
   return String(kind || '').toLowerCase() === 'manufacturing';
 }
 
+function isPaintingActivityKind(kind) {
+  const k = String(kind || '').toLowerCase();
+  return k === 'painting' || k === 'road_marking';
+}
+
 function isFieldActivityKind(kind) {
   const k = String(kind || '').toLowerCase();
-  return [
-    'road_marking',
-    'construction',
-    'field_service',
-    'workshop_service',
-    'warehouse_task',
-  ].includes(k);
+  return (
+    isPaintingActivityKind(k) ||
+    [
+      'construction',
+      'field_service',
+      'workshop_service',
+      'warehouse_task',
+    ].includes(k)
+  );
 }
 
 function detectTaskFlavor(activities) {
@@ -127,7 +134,12 @@ function deriveTaskKindFromOps(selectedOps, activities) {
   if (hasTransport) return 'transport';
   if (hasManufacturing && hasField) return 'mixed';
   if (hasManufacturing) return 'manufacturing';
-  if (kinds.has('road_marking') && !kinds.has('construction')) return 'road_marking';
+  if (
+    [...kinds].some(isPaintingActivityKind) &&
+    !kinds.has('construction')
+  ) {
+    return 'painting';
+  }
   if (kinds.has('construction')) return 'construction';
   return 'other';
 }
@@ -182,20 +194,26 @@ function templateOpIds(activities, templateId) {
   }
   if (templateId === 'marking_day') {
     return rows
-      .filter((a) =>
-        ['road_marking', 'construction', 'field_service'].includes(
-          String(a.activity_kind || '').toLowerCase(),
-        ),
-      )
+      .filter((a) => {
+        const k = String(a.activity_kind || '').toLowerCase();
+        return (
+          isPaintingActivityKind(k) ||
+          k === 'construction' ||
+          k === 'field_service'
+        );
+      })
       .map((a) => a.id);
   }
   if (templateId === 'mixed_day') {
     const transport = rows.find((a) => isTransportActivityKind(a.activity_kind));
-    const marking = rows.find((a) =>
-      ['road_marking', 'construction', 'field_service'].includes(
-        String(a.activity_kind || '').toLowerCase(),
-      ),
-    );
+    const marking = rows.find((a) => {
+      const k = String(a.activity_kind || '').toLowerCase();
+      return (
+        isPaintingActivityKind(k) ||
+        k === 'construction' ||
+        k === 'field_service'
+      );
+    });
     return [transport?.id, marking?.id].filter((id) => id != null);
   }
   if (templateId === 'production_day') {
@@ -1685,10 +1703,11 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       .filter(Boolean);
     const kindLabels = {
       transport: t('org.tasks.taskKinds.transport', null, 'Transport'),
+      painting: t('org.tasks.taskKinds.painting', null, 'Painting / field'),
       road_marking: t(
-        'org.tasks.taskKinds.road_marking',
+        'org.tasks.taskKinds.painting',
         null,
-        'Road marking / field',
+        'Painting / field',
       ),
       construction: t(
         'org.tasks.taskKinds.construction',

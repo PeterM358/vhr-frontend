@@ -467,7 +467,8 @@
         "labor_only": "Labor only",
         "inspection": "Inspection",
         "workshop_service": "Workshop service",
-        "other": "Other"
+        "other": "Other",
+        "painting": "Painting"
       },
       "finishedGood": "Finished good (stock receipt)",
       "finishedGoodHint": "SKU received into warehouse when the production order is completed. Qty per reported unit (e.g. 1 pcs per 1 batch).",
@@ -517,7 +518,8 @@
           "labor_only": "Example: labor-only → worker reports hours.",
           "inspection": "Example: inspection → worker reports count or hours.",
           "workshop_service": "Example: workshop job → worker reports hours.",
-          "other": "Pick a kind to suggest the right report units and norms."
+          "other": "Pick a kind to suggest the right report units and norms.",
+          "painting": "Example: paint job → worker reports m² + working hours."
         },
         "none": "None",
         "yes": "Yes",
@@ -548,7 +550,7 @@
       "openSite": "Open / addresses",
       "editSite": "Rename site",
       "nameRequired": "Name is required.",
-      "saveError": "Could not save.",
+      "saveError": "Could not save location.",
       "siteDetailLead": "Open a zone (e.g. hale1) to see its addresses and article totals, then open an address to see tools and materials inside.",
       "zonesTitle": "Zones",
       "zonesHint": "Open a zone for addresses and totals. Use selects it for the address form; Edit renames.",
@@ -701,9 +703,7 @@
       "deactivate": "Deactivate",
       "created": "Location created.",
       "updated": "Location updated.",
-      "nameRequired": "Name is required.",
       "loadError": "Could not load warehouse.",
-      "saveError": "Could not save location.",
       "settings": {
         "title": "Who can add invoices",
         "lead": "Controls who may upload and confirm supplier invoices into stock. Outbound issue on tasks stays warehouse/ops.",
@@ -1310,7 +1310,8 @@
         "construction": "Construction / roofs",
         "manufacturing": "Manufacturing / production",
         "mixed": "Mixed operations",
-        "other": "Other / generic"
+        "other": "Other / generic",
+        "painting": "Painting / field"
       },
       "completeProductionCta": "Complete production",
       "completeProductionTitle": "Complete production",
@@ -1381,7 +1382,8 @@
         "construction": "Construction",
         "field_service": "Field service",
         "road_marking": "Painting",
-        "other": "Other"
+        "other": "Other",
+        "painting": "Painting"
       }
     },
     "switcher": {
@@ -3738,7 +3740,7 @@
       "failedDeletePart": "Failed to delete part.",
       "failedUpdatePart": "Failed to update part.",
       "missingOfferOrVehicle": "Missing offer or vehicle information.",
-      "offerBooked": "Offer booked!",
+      "offerBooked": "Booked",
       "failedBookOffer": "Failed to book offer",
       "bookingCancelledTitle": "Booking Cancelled",
       "bookingCancelledBody": "You have cancelled your booking.",
@@ -3750,7 +3752,6 @@
       "preferredVisitPendingSlot": "Preferred visit: {slot} (pending service center confirmation)",
       "bestMatch": "Best match",
       "fastResponse": "Fast response",
-      "offerBooked": "Booked",
       "proposalAvailable": "Service proposal available.",
       "editOffer": "Edit offer",
       "deleteOffer": "Delete offer",

@@ -44,7 +44,7 @@ const CARD_SURFACE = { color: ON_CARD };
 
 const KIND_OPTIONS = [
   { value: 'transport', labelKey: 'org.operations.kinds.transport' },
-  { value: 'road_marking', labelKey: 'org.operations.kinds.road_marking' },
+  { value: 'painting', labelKey: 'org.operations.kinds.painting' },
   { value: 'field_service', labelKey: 'org.operations.kinds.field_service' },
   { value: 'construction', labelKey: 'org.operations.kinds.construction' },
   { value: 'manufacturing', labelKey: 'org.operations.kinds.manufacturing' },
@@ -58,6 +58,8 @@ const KIND_OPTIONS = [
 const KIND_OUTPUT_MEASURES = {
   transport: ['distance', 'duration', 'count', 'mass'],
   construction: ['area', 'volume', 'mass', 'count', 'duration', 'distance'],
+  painting: ['area', 'distance', 'count', 'duration', 'volume', 'mass'],
+  // Legacy API value — same measures as painting.
   road_marking: ['area', 'distance', 'count', 'duration', 'volume', 'mass'],
   field_service: ['count', 'duration', 'area', 'distance', 'volume', 'mass'],
   manufacturing: ['count', 'mass', 'volume', 'duration'],
@@ -82,6 +84,7 @@ const REPORT_MEASURE_KINDS = [
 const KIND_INPUT_MEASURES = {
   transport: ['volume'],
   construction: ['volume', 'mass'],
+  painting: ['volume', 'mass'],
   road_marking: ['volume', 'mass'],
   field_service: ['volume', 'count', 'mass'],
   manufacturing: ['mass', 'volume', 'count'],
@@ -1383,7 +1386,9 @@ export default function OrgOperationsScreen({ navigation, route }) {
               null,
               form.kind === 'transport'
                 ? 'Example: Sofia–Varna haul → worker reports km (meter start/end) + ~9 h time norm.'
-                : form.kind === 'construction' || form.kind === 'road_marking'
+                : form.kind === 'construction' ||
+                    form.kind === 'painting' ||
+                    form.kind === 'road_marking'
                   ? 'Example: hidroizolaciq / painting → worker reports m² done.'
                   : 'Pick a kind to suggest the right output units and norms.',
             )}

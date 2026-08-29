@@ -23,7 +23,7 @@ const KIND_OPTIONS = [
   { value: 'transport', labelKey: 'org.projects.kinds.transport', fallback: 'Transport' },
   { value: 'construction', labelKey: 'org.projects.kinds.construction', fallback: 'Construction' },
   { value: 'field_service', labelKey: 'org.projects.kinds.field_service', fallback: 'Field service' },
-  { value: 'road_marking', labelKey: 'org.projects.kinds.road_marking', fallback: 'Road marking' },
+  { value: 'painting', labelKey: 'org.projects.kinds.painting', fallback: 'Painting' },
   { value: 'other', labelKey: 'org.projects.kinds.other', fallback: 'Other' },
 ];
 
