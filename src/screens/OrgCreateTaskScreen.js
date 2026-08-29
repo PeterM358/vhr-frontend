@@ -269,6 +269,8 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [peopleQuery, setPeopleQuery] = useState('');
   const [projectQuery, setProjectQuery] = useState('');
   const [selectedOps, setSelectedOps] = useState([]);
+  /** Production order: exactly one manufacturing recipe (BOM + FG). */
+  const [selectedRecipeId, setSelectedRecipeId] = useState(null);
   const [photoRef, setPhotoRef] = useState('');
   const [documentRef, setDocumentRef] = useState('');
   /** Explicit mode when org has both site and production — site | production | null */
@@ -306,9 +308,29 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     () => selectedOpsHaveTransport(selectedOps, activities),
     [selectedOps, activities],
   );
-  const derivedTaskKind = useMemo(
-    () => deriveTaskKindFromOps(selectedOps, activities),
-    [selectedOps, activities],
+  const derivedTaskKind = useMemo(() => {
+    if (taskMode === 'production' || selectedRecipeId) {
+      const routingKinds = deriveTaskKindFromOps(selectedOps, activities);
+      if (routingKinds === 'other' || routingKinds === 'manufacturing') return 'manufacturing';
+      if (routingKinds === 'transport') return 'mixed';
+      return routingKinds === 'mixed' ? 'mixed' : 'manufacturing';
+    }
+    return deriveTaskKindFromOps(selectedOps, activities);
+  }, [activities, selectedOps, selectedRecipeId, taskMode]);
+
+  const recipeActivities = useMemo(
+    () => (activities || []).filter((a) => isManufacturingActivityKind(a.activity_kind)),
+    [activities],
+  );
+  const routingActivities = useMemo(
+    () =>
+      (activities || []).filter((a) => {
+        const k = String(a.activity_kind || '').toLowerCase();
+        if (isManufacturingActivityKind(k)) return false;
+        if (taskMode === 'production' && isTransportActivityKind(k)) return false;
+        return true;
+      }),
+    [activities, taskMode],
   );
 
   const availableTemplates = useMemo(() => {
@@ -320,28 +342,40 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       return hasManufacturing ? ['production_day'] : [];
     }
     const list = [];
-    if (taskMode !== 'production') {
-      if (hasTransport) list.push('transport_day');
-      if (hasField) list.push('marking_day');
-      if (hasTransport && hasField) list.push('mixed_day');
-    }
-    if (taskMode !== 'site' && hasManufacturing) list.push('production_day');
+    if (hasTransport) list.push('transport_day');
+    if (hasField) list.push('marking_day');
+    if (hasTransport && hasField) list.push('mixed_day');
     return list;
   }, [activities, taskMode]);
 
   const visibleActivities = useMemo(() => {
+    if (taskMode === 'production') return routingActivities;
+    return (activities || []).filter(
+      (a) => !isManufacturingActivityKind(a.activity_kind),
+    );
+  }, [activities, routingActivities, taskMode]);
+
+  useEffect(() => {
     if (taskMode === 'production') {
-      return (activities || []).filter((a) =>
-        isManufacturingActivityKind(a.activity_kind),
+      setSelectedOps((prev) =>
+        prev.filter((row) => {
+          const act = (activities || []).find((a) => a.id === row.activityId);
+          if (!act) return false;
+          if (isManufacturingActivityKind(act.activity_kind)) return false;
+          if (isTransportActivityKind(act.activity_kind)) return false;
+          return true;
+        }),
+      );
+    } else if (taskMode === 'site') {
+      setSelectedRecipeId(null);
+      setSelectedOps((prev) =>
+        prev.filter((row) => {
+          const act = (activities || []).find((a) => a.id === row.activityId);
+          return act && !isManufacturingActivityKind(act.activity_kind);
+        }),
       );
     }
-    if (taskMode === 'site') {
-      return (activities || []).filter(
-        (a) => !isManufacturingActivityKind(a.activity_kind),
-      );
-    }
-    return activities || [];
-  }, [activities, taskMode]);
+  }, [taskMode, activities]);
 
   const localDriverRoute = useMemo(() => {
     const buildPhase = (rows, direction, idxStart, roles) => {
@@ -712,9 +746,22 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         return false;
       }
     }
-    if (stepId === 'operations' && selectedOps.length === 0) {
-      setFormMessage(t('org.tasks.operationsRequired', null, 'Pick at least one operation.'));
-      return false;
+    if (stepId === 'operations') {
+      if (taskMode === 'production') {
+        if (!selectedRecipeId) {
+          setFormMessage(
+            t(
+              'org.tasks.recipeRequired',
+              null,
+              'Pick exactly one recipe (finished product / BOM).',
+            ),
+          );
+          return false;
+        }
+      } else if (selectedOps.length === 0) {
+        setFormMessage(t('org.tasks.operationsRequired', null, 'Pick at least one operation.'));
+        return false;
+      }
     }
     setFormMessage('');
     return true;
@@ -750,7 +797,18 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       setFormMessage(t('org.tasks.titleRequired', null, 'Title is required.'));
       return;
     }
-    if (selectedOps.length === 0) {
+    if (taskMode === 'production') {
+      if (!selectedRecipeId) {
+        setFormMessage(
+          t(
+            'org.tasks.recipeRequired',
+            null,
+            'Pick exactly one recipe (finished product / BOM).',
+          ),
+        );
+        return;
+      }
+    } else if (selectedOps.length === 0) {
       setFormMessage(t('org.tasks.operationsRequired', null, 'Pick at least one operation.'));
       return;
     }
@@ -762,6 +820,23 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     setFormMessage('');
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const operationLines = [];
+      if (taskMode === 'production' && selectedRecipeId) {
+        operationLines.push({
+          activity_definition_id: selectedRecipeId,
+          sort_order: 0,
+          notes: '',
+          assignee_user_ids: overallAssignees,
+        });
+      }
+      selectedOps.forEach((row) => {
+        operationLines.push({
+          activity_definition_id: row.activityId,
+          sort_order: operationLines.length,
+          notes: row.notes.trim(),
+          assignee_user_ids: row.assigneeIds,
+        });
+      });
       const payload = {
         title: trimmed,
         instructions: instructions.trim(),
@@ -780,12 +855,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         assignee_user_ids: overallAssignees,
         allow_vehicle_overlap: allowVehicle || undefined,
         allow_assignee_overlap: allowAssignee || undefined,
-        operations: selectedOps.map((row, idx) => ({
-          activity_definition_id: row.activityId,
-          sort_order: idx,
-          notes: row.notes.trim(),
-          assignee_user_ids: row.assigneeIds,
-        })),
+        operations: operationLines,
       };
       if (hasTransportOps) {
         payload.load_type = loadType;
@@ -1011,6 +1081,15 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
 
   const applyTemplate = (id) => {
     setTemplateId(id);
+    if (id === 'production_day') {
+      const firstRecipe = recipeActivities[0];
+      setSelectedRecipeId(firstRecipe ? firstRecipe.id : null);
+      setSelectedOps([]);
+      setOutboundShipments([]);
+      setReturnShipments([]);
+      return;
+    }
+    setSelectedRecipeId(null);
     const ids = templateOpIds(activities, id);
     setSelectedOps((prev) => {
       const keepNotes = new Map(prev.map((row) => [row.activityId, row]));
@@ -1130,6 +1209,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                   onPress={() => {
                     setTaskMode('site');
                     setTemplateId(null);
+                    setSelectedRecipeId(null);
                     setSelectedOps([]);
                   }}
                   style={[styles.chip, taskMode === 'site' && styles.chipActive]}
@@ -1168,9 +1248,9 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
               {taskMode === 'production' && !hasManufacturingOps ? (
                 <Text style={styles.helper}>
                   {t(
-                    'org.tasks.productionNeedsOpHint',
+                    'org.tasks.productionNeedsRecipeHint',
                     null,
-                    'Production is enabled, but you have no Manufacturing operation yet. Create one under Operations (kind: Manufacturing), then come back.',
+                    'Production is enabled, but you have no recipe yet. Create one under Operations → Recipes, then come back.',
                   )}
                 </Text>
               ) : null}
@@ -1179,7 +1259,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                   {t(
                     'org.tasks.productionOrderPathHint',
                     null,
-                    'Production order: on the Operations step, Manufacturing ops are listed (or use the Production order template).',
+                    'Next: pick one recipe + optional work-step operations.',
                   )}
                 </Text>
               ) : null}
@@ -1477,7 +1557,134 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     }
 
     if (stepId === 'operations') {
-      if (activities.length === 0) {
+      if (taskMode === 'production') {
+        return (
+          <>
+            <Text style={styles.fieldLabel}>
+              {t('org.tasks.recipeSelectLabel', null, 'Recipe (exactly one)')}
+            </Text>
+            <Text style={styles.helper}>
+              {t(
+                'org.tasks.recipeSelectHint',
+                null,
+                'Finished product + BOM. Only one recipe per production order.',
+              )}
+            </Text>
+            {recipeActivities.length === 0 ? (
+              <Text style={styles.empty}>
+                {t(
+                  'org.tasks.productionNeedsRecipeHint',
+                  null,
+                  'No recipes yet. Create one under Operations → Recipes.',
+                )}
+              </Text>
+            ) : (
+              recipeActivities.map((activity) => {
+                const active = Number(selectedRecipeId) === Number(activity.id);
+                return (
+                  <Pressable
+                    key={`recipe-${activity.id}`}
+                    onPress={() => {
+                      setTemplateId(null);
+                      setSelectedRecipeId(active ? null : activity.id);
+                    }}
+                    style={[styles.opToggle, active && styles.opToggleActive]}
+                  >
+                    <Text style={styles.opToggleText}>
+                      {active ? '✓ ' : ''}
+                      {activity.name}
+                    </Text>
+                    <Text style={styles.opKind}>
+                      {t('org.operations.tabRecipes', null, 'Recipe')}
+                    </Text>
+                  </Pressable>
+                );
+              })
+            )}
+            <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
+              {t('org.tasks.routingOpsLabel', null, 'Operations (optional)')}
+            </Text>
+            <Text style={styles.helper}>
+              {t(
+                'org.tasks.routingOpsHint',
+                null,
+                'Work steps on this PO (setup, pack…). Transport hauls stay on site/transport tasks — not here.',
+              )}
+            </Text>
+            {visibleActivities.length === 0 ? (
+              <Text style={styles.helper}>
+                {t(
+                  'org.tasks.routingOpsEmpty',
+                  null,
+                  'No routing operations in the catalog yet — recipe alone is enough to start.',
+                )}
+              </Text>
+            ) : (
+              visibleActivities.map((activity) => {
+                const selected = selectedActivityIds.has(activity.id);
+                const line = selectedOps.find((row) => row.activityId === activity.id);
+                return (
+                  <View key={activity.id} style={styles.opBlock}>
+                    <Pressable
+                      onPress={() => {
+                        setTemplateId(null);
+                        toggleOperation(activity.id);
+                      }}
+                      style={[styles.opToggle, selected && styles.opToggleActive]}
+                    >
+                      <Text style={styles.opToggleText}>
+                        {selected ? '✓ ' : ''}
+                        {activity.name}
+                      </Text>
+                      {activity.activity_kind ? (
+                        <Text style={styles.opKind}>{activity.activity_kind}</Text>
+                      ) : null}
+                    </Pressable>
+                    {selected && line ? (
+                      <View style={styles.opDetails}>
+                        <TextInput
+                          label={t('org.tasks.operationNotes', null, 'Notes for this step')}
+                          value={line.notes}
+                          onChangeText={(value) => updateOpNotes(activity.id, value)}
+                          mode="outlined"
+                          style={styles.input}
+                          textColor={ON_CARD}
+                        />
+                        <Text style={styles.fieldLabel}>
+                          {t('org.tasks.operationPeople', null, 'People for this step')}
+                        </Text>
+                        <View style={styles.chipWrap}>
+                          {members.slice(0, MAX_SEARCH_RESULTS).map((member) => {
+                            const uid = member.user_id;
+                            const chipActive = line.assigneeIds.includes(uid);
+                            return (
+                              <Pressable
+                                key={`${activity.id}-${uid}`}
+                                onPress={() => toggleOpAssignee(activity.id, uid)}
+                                style={[styles.chip, chipActive && styles.chipActive]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.chipText,
+                                    chipActive && styles.chipTextActive,
+                                  ]}
+                                >
+                                  {memberLabel(member)}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })
+            )}
+          </>
+        );
+      }
+      if (visibleActivities.length === 0 && activities.length === 0) {
         return (
           <Text style={styles.empty}>
             {t(
@@ -1543,24 +1750,6 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
               </View>
             </>
           ) : null}
-          {manufacturingAllowed && !hasManufacturingOps ? (
-            <Text style={styles.helper}>
-              {t(
-                'org.tasks.productionNeedsOpHint',
-                null,
-                'Production is enabled, but you have no Manufacturing operation yet. Create one under Operations (kind: Manufacturing), then come back.',
-              )}
-            </Text>
-          ) : null}
-          {hasManufacturingOps ? (
-            <Text style={styles.helper}>
-              {t(
-                'org.tasks.productionOpsPickHint',
-                null,
-                'For a production order: choose the “Production order” template or tick Manufacturing operations below.',
-              )}
-            </Text>
-          ) : null}
           <Text style={styles.helper}>
             {t(
               'org.tasks.opsMixedHint',
@@ -1587,17 +1776,11 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
           )}
           {visibleActivities.length === 0 ? (
             <Text style={styles.empty}>
-              {taskMode === 'production'
-                ? t(
-                    'org.tasks.productionNeedsOpHint',
-                    null,
-                    'Production is enabled, but you have no Manufacturing operation yet. Create one under Operations (kind: Manufacturing), then come back.',
-                  )
-                : t(
-                    'org.tasks.noOperations',
-                    null,
-                    'No active operations yet. Create them under Operations first.',
-                  )}
+              {t(
+                'org.tasks.noOperations',
+                null,
+                'No active operations yet. Create them under Operations first.',
+              )}
             </Text>
           ) : null}
           {visibleActivities.map((activity) => {
@@ -1652,14 +1835,19 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                     <View style={styles.chipWrap}>
                       {members.slice(0, MAX_SEARCH_RESULTS).map((member) => {
                         const uid = member.user_id;
-                        const active = line.assigneeIds.includes(uid);
+                        const chipActive = line.assigneeIds.includes(uid);
                         return (
                           <Pressable
                             key={`${activity.id}-${uid}`}
                             onPress={() => toggleOpAssignee(activity.id, uid)}
-                            style={[styles.chip, active && styles.chipActive]}
+                            style={[styles.chip, chipActive && styles.chipActive]}
                           >
-                            <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                            <Text
+                              style={[
+                                styles.chipText,
+                                chipActive && styles.chipTextActive,
+                              ]}
+                            >
                               {memberLabel(member)}
                             </Text>
                           </Pressable>
@@ -1763,12 +1951,23 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                 .join(', ')
             : t('org.tasks.noPeople', null, 'No people assigned')}
         </Text>
+        {taskMode === 'production' && selectedRecipeId ? (
+          <Text style={styles.reviewLine}>
+            <Text style={styles.reviewKey}>
+              {t('org.tasks.recipeSelectLabel', null, 'Recipe')}:{' '}
+            </Text>
+            {recipeActivities.find((a) => a.id === selectedRecipeId)?.name || '—'}
+          </Text>
+        ) : null}
         <Text style={styles.reviewLine}>
           <Text style={styles.reviewKey}>{t('org.tasks.operationsTitle', null, 'Operations')}: </Text>
           {selectedOps
             .map((row) => activities.find((a) => a.id === row.activityId)?.name)
             .filter(Boolean)
-            .join(', ') || '—'}
+            .join(', ') ||
+            (taskMode === 'production'
+              ? t('org.tasks.routingOpsNoneReview', null, 'None (recipe only)')
+              : '—')}
         </Text>
         <Text style={styles.reviewLine}>
           <Text style={styles.reviewKey}>{t('org.tasks.materialsTitle', null, 'Materials')}: </Text>
@@ -1839,7 +2038,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             {t(
               'org.tasks.wizard.leadProduction',
               null,
-              'Production order: pick manufacturing ops, people, and qty. Issue materials, then Complete production to receive finished goods.',
+              'Production order: one recipe + optional operations. Issue materials, then Complete production for finished goods.',
             )}
           </Text>
         ) : taskMode === 'site' || flavor === 'construction' ? (
