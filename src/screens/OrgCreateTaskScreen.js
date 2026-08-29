@@ -1116,13 +1116,13 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
           {showTaskModeChooser || manufacturingAllowed ? (
             <>
               <Text style={styles.fieldLabel}>
-                {t('org.tasks.taskModeLabel', null, 'What are you creating?')}
+                {t('org.tasks.taskModeLabel', null, 'Task or production order?')}
               </Text>
               <Text style={styles.helper}>
                 {t(
                   'org.tasks.taskModeHint',
                   null,
-                  'Same work-card spine — different outcome. Site = m² / job on location. Production = finished goods into warehouse.',
+                  'Task = site work card. Production order = self PO from a manufacturing recipe (BOM).',
                 )}
               </Text>
               <View style={styles.chipWrap}>

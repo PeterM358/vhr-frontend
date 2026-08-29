@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -23,7 +23,7 @@ import {
   listUnitsOfMeasure,
   updateActivityDefinition,
 } from '../api/orgOperations';
-import { listOrgMaterials } from '../api/orgWarehouse';
+import { createOrgMaterial, listOrgMaterials } from '../api/orgWarehouse';
 import { getMaterialsCatalog } from '../api/materials';
 import {
   readOrganizationMemberships,
@@ -579,6 +579,13 @@ export default function OrgOperationsScreen({ navigation, route }) {
   const [busy, setBusy] = useState(false);
   const [formMessage, setFormMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  /** Manufacturing recipe step: materials | tools | finished */
+  const [bomSubTab, setBomSubTab] = useState('materials');
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddMode, setQuickAddMode] = useState('material'); // material | tool
+  const [quickAddName, setQuickAddName] = useState('');
+  const [quickAddUnit, setQuickAddUnit] = useState('piece');
+  const [quickAddBusy, setQuickAddBusy] = useState(false);
 
   const setField = useCallback((key, value) => {
     setFieldErrors((prev) => {
@@ -599,8 +606,39 @@ export default function OrgOperationsScreen({ navigation, route }) {
     return filtered.length ? filtered : KIND_OPTIONS;
   }, [allowedActivityKinds]);
 
-  const stepDefs = useMemo(
-    () => [
+  const stepDefs = useMemo(() => {
+    if (form.kind === 'manufacturing') {
+      return [
+        {
+          key: 'basics',
+          title: t('org.operations.wizard.stepBasics', null, 'Basics'),
+          hint: t(
+            'org.operations.wizard.stepBasicsHintRecipe',
+            null,
+            'Name = finished product. This is a recipe (BOM), not a production order yet.',
+          ),
+        },
+        {
+          key: 'materials',
+          title: t('org.operations.wizard.stepRecipe', null, 'Recipe'),
+          hint: t(
+            'org.operations.wizard.stepRecipeHint',
+            null,
+            'Three tabs: materials, tools, finished product. Pick existing or add manually.',
+          ),
+        },
+        {
+          key: 'review',
+          title: t('org.operations.wizard.stepReview', null, 'Review'),
+          hint: t(
+            'org.operations.wizard.stepReviewHintRecipe',
+            null,
+            'Save the recipe, then create a Production order from Tasks.',
+          ),
+        },
+      ];
+    }
+    return [
       {
         key: 'basics',
         title: t('org.operations.wizard.stepBasics', null, 'Basics'),
@@ -613,37 +651,20 @@ export default function OrgOperationsScreen({ navigation, route }) {
       {
         key: 'output',
         title: t('org.operations.wizard.stepOutput', null, 'Worker reports'),
-        hint:
-          form.kind === 'manufacturing'
-            ? t(
-                'org.operations.wizard.stepOutputHintManufacturing',
-                null,
-                'Usually pieces (бр) of finished product. Hours once on the work card. Materials are issued from the BOM — not reported as leftover paint here.',
-              )
-            : t(
-                'org.operations.wizard.stepOutputHint',
-                null,
-                'Multi-select what the worker reports on this operation (m², hours, km, liters…).',
-              ),
+        hint: t(
+          'org.operations.wizard.stepOutputHint',
+          null,
+          'Multi-select what the worker reports on this operation (m², hours, km, liters…).',
+        ),
       },
       {
         key: 'materials',
-        title:
-          form.kind === 'manufacturing'
-            ? t('org.operations.wizard.stepBom', null, 'BOM + finished good')
-            : t('org.operations.wizard.stepMaterialsNorms', null, 'Materials + norms'),
-        hint:
-          form.kind === 'manufacturing'
-            ? t(
-                'org.operations.wizard.stepBomHint',
-                null,
-                'Recipe (catalog), not a production order. List raw SKUs + rates, then the finished-good SKU received into stock on Complete production.',
-              )
-            : t(
-                'org.operations.wizard.stepMaterialsNormsHint',
-                null,
-                'Toggle labor-only vs labor + materials. Each SKU has its own basis — paint per m² and fuel per working hour can both be set on the same operation.',
-              ),
+        title: t('org.operations.wizard.stepMaterialsNorms', null, 'Materials + norms'),
+        hint: t(
+          'org.operations.wizard.stepMaterialsNormsHint',
+          null,
+          'Toggle labor-only vs labor + materials. Each SKU has its own basis — paint per m² and fuel per working hour can both be set on the same operation.',
+        ),
       },
       {
         key: 'review',
@@ -654,9 +675,14 @@ export default function OrgOperationsScreen({ navigation, route }) {
           'Check output unit, time norm, rates, and materials, then save.',
         ),
       },
-    ],
-    [form.kind, t],
-  );
+    ];
+  }, [form.kind, t]);
+
+  useEffect(() => {
+    if (wizardStep >= stepDefs.length) {
+      setWizardStep(Math.max(0, stepDefs.length - 1));
+    }
+  }, [stepDefs.length, wizardStep]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -781,6 +807,10 @@ export default function OrgOperationsScreen({ navigation, route }) {
     setFormMessage('');
     setWizardStep(0);
     setMaxReachedWizardStep(0);
+    setBomSubTab('materials');
+    setQuickAddOpen(false);
+    setQuickAddName('');
+    setQuickAddUnit('piece');
   };
 
   const startCreate = () => {
@@ -877,11 +907,13 @@ export default function OrgOperationsScreen({ navigation, route }) {
       if (exists) {
         delete nextNorms[id];
       } else if (!nextNorms[id]) {
-        // Smart default: 1st SKU → output (m²/km); additional SKUs → work_hours (fuel).
+        // Manufacturing recipes: all lines per finished unit. Site ops: 1st→output, next→hours.
+        const mfg = prev.kind === 'manufacturing';
         const alreadyHasOutput = Object.values(nextNorms).some(
           (m) => (m?.basis || 'output_unit') === 'output_unit' && String(m?.rate || '').trim(),
         );
-        const preferHours = alreadyHasOutput || Object.keys(nextNorms).length > 0;
+        const preferHours =
+          !mfg && (alreadyHasOutput || Object.keys(nextNorms).length > 0);
         nextNorms[id] = emptyMaterialNorm({
           rate: preferHours ? '' : prev.normRate || '',
           perQty: preferHours ? '1' : prev.normBasisQty || '1',
@@ -939,6 +971,82 @@ export default function OrgOperationsScreen({ navigation, route }) {
     }));
   };
 
+  const openQuickAdd = (mode) => {
+    setQuickAddMode(mode);
+    setQuickAddName('');
+    setQuickAddUnit('piece');
+    setQuickAddOpen(true);
+  };
+
+  const submitQuickAdd = async () => {
+    if (!orgId || !quickAddName.trim()) {
+      setFormMessage(
+        t('org.operations.quickAddNameRequired', null, 'Enter a name for the new SKU.'),
+      );
+      return;
+    }
+    setQuickAddBusy(true);
+    setFormMessage('');
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const created = await createOrgMaterial(token, orgId, {
+        description: quickAddName.trim(),
+        quantity: '0',
+        unit_code: quickAddUnit || 'piece',
+        unit_price: '0',
+        is_durable_tool: quickAddMode === 'tool',
+      });
+      setQuickAddOpen(false);
+      setQuickAddName('');
+      if (quickAddMode === 'tool') {
+        toggleTool(created);
+        searchTools('');
+        setBomSubTab('tools');
+      } else {
+        toggleMaterial(created);
+        searchMaterials('');
+        setBomSubTab('materials');
+      }
+    } catch (e) {
+      setFormMessage(
+        e.message || t('org.operations.quickAddError', null, 'Could not add SKU.'),
+      );
+    } finally {
+      setQuickAddBusy(false);
+    }
+  };
+
+  const ensureFinishedGoodSku = async (token, trimmedName) => {
+    if (form.outputMaterialId) {
+      return {
+        id: Number(form.outputMaterialId),
+        label: form.outputMaterialLabel || trimmedName,
+      };
+    }
+    const needle = trimmedName.toLowerCase();
+    const match = (materialCatalog || []).find(
+      (m) =>
+        !m.is_durable_tool &&
+        String(m.name || m.label || '')
+          .toLowerCase()
+          .trim() === needle,
+    );
+    if (match?.id) {
+      return { id: Number(match.id), label: materialLabel(match) };
+    }
+    const created = await createOrgMaterial(token, orgId, {
+      description: trimmedName,
+      quantity: '0',
+      unit_code: 'piece',
+      unit_price: '0',
+      is_durable_tool: false,
+    });
+    return {
+      id: Number(created.id),
+      label: materialLabel(created) || trimmedName,
+    };
+  };
+
   const save = async () => {
     if (!orgId || !canManage) return;
     const trimmedName = form.name.trim();
@@ -952,38 +1060,72 @@ export default function OrgOperationsScreen({ navigation, route }) {
     setFieldErrors({});
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const norms = buildNormsPayload(form);
+      let workingForm = form;
+      if (form.kind === 'manufacturing') {
+        const fg = await ensureFinishedGoodSku(token, trimmedName);
+        let reportUnitIds = form.reportUnitIds || [];
+        if (!reportUnitIds.length) {
+          const pcs =
+            units.find(
+              (u) =>
+                String(u.measure_kind || '').toLowerCase() === 'count' ||
+                String(u.symbol || '').toLowerCase() === 'pcs' ||
+                String(u.symbol || '').toLowerCase() === 'бр',
+            ) || units.find((u) => String(u.code || '').toLowerCase() === 'piece');
+          if (pcs?.id) reportUnitIds = [Number(pcs.id)];
+        }
+        workingForm = {
+          ...form,
+          outputMaterialId: fg.id,
+          outputMaterialLabel: fg.label,
+          outputQtyPerUnit: form.outputQtyPerUnit || '1',
+          consumesMaterials: true,
+          reportUnitIds,
+          unitId: reportUnitIds[0] || form.unitId,
+        };
+        setForm(workingForm);
+      }
+      const norms = buildNormsPayload(workingForm);
       const plannedHours =
-        sanitizeHoursInput(form.plannedHours) ||
-        sanitizeHoursInput(form.laborPresetHours) ||
+        sanitizeHoursInput(workingForm.plannedHours) ||
+        sanitizeHoursInput(workingForm.laborPresetHours) ||
         null;
       const payload = {
         name: trimmedName,
-        code: form.code.trim(),
-        activity_kind: form.kind,
-        report_unit_ids: (form.reportUnitIds || []).slice(0, 12),
-        unit_id: (form.reportUnitIds && form.reportUnitIds[0]) || form.unitId || null,
-        notes: form.notes.trim(),
+        code: workingForm.code.trim(),
+        activity_kind: workingForm.kind,
+        report_unit_ids: (workingForm.reportUnitIds || []).slice(0, 12),
+        unit_id:
+          (workingForm.reportUnitIds && workingForm.reportUnitIds[0]) ||
+          workingForm.unitId ||
+          null,
+        notes: workingForm.notes.trim(),
         planned_hours: plannedHours,
-        consumes_materials: form.kind === 'labor_only' ? false : Boolean(form.consumesMaterials),
+        consumes_materials:
+          workingForm.kind === 'labor_only'
+            ? false
+            : Boolean(workingForm.consumesMaterials),
         norms,
-        is_active: form.isActive,
+        is_active: workingForm.isActive,
       };
-      if (form.kind === 'transport') {
-        payload.norm_rate = form.transportBaseRate.trim() || null;
-        payload.norm_basis_qty = form.transportBaseRate.trim() ? '1' : null;
-        payload.norm_input_unit_id = form.transportRateUnitId || null;
-      } else if (form.kind !== 'labor_only') {
-        const firstOutputLine = (form.defaultMaterialIds || [])
-          .map((mid) => (form.materialNorms && form.materialNorms[mid]) || {})
+      if (workingForm.kind === 'transport') {
+        payload.norm_rate = workingForm.transportBaseRate.trim() || null;
+        payload.norm_basis_qty = workingForm.transportBaseRate.trim() ? '1' : null;
+        payload.norm_input_unit_id = workingForm.transportRateUnitId || null;
+      } else if (workingForm.kind !== 'labor_only') {
+        const firstOutputLine = (workingForm.defaultMaterialIds || [])
+          .map((mid) => (workingForm.materialNorms && workingForm.materialNorms[mid]) || {})
           .find((meta) => meta.basis !== 'work_hours' && String(meta.rate || '').trim());
         const firstMeta = firstOutputLine || {};
         payload.norm_rate =
-          String(firstMeta.rate || '').trim() || form.normRate.trim() || null;
+          String(firstMeta.rate || '').trim() || workingForm.normRate.trim() || null;
         payload.norm_basis_qty =
-          String(firstMeta.perQty || '').trim() || form.normBasisQty.trim() || null;
+          String(firstMeta.perQty || '').trim() || workingForm.normBasisQty.trim() || null;
         payload.norm_input_unit_id =
-          firstMeta.unitId || form.normInputUnitId || form.materialUnitId || null;
+          firstMeta.unitId ||
+          workingForm.normInputUnitId ||
+          workingForm.materialUnitId ||
+          null;
       } else {
         payload.norm_rate = null;
         payload.norm_basis_qty = null;
@@ -1318,7 +1460,15 @@ export default function OrgOperationsScreen({ navigation, route }) {
       return (
         <>
           <TextInput
-            label={t('org.operations.name', null, 'Name')}
+            label={
+              form.kind === 'manufacturing'
+                ? t(
+                    'org.operations.recipeName',
+                    null,
+                    'Product / recipe name',
+                  )
+                : t('org.operations.name', null, 'Name')
+            }
             value={form.name}
             onChangeText={(value) => setField('name', value)}
             mode="outlined"
@@ -1326,6 +1476,15 @@ export default function OrgOperationsScreen({ navigation, route }) {
             textColor={ON_CARD}
             error={Boolean(fieldErrors.name)}
           />
+          {form.kind === 'manufacturing' ? (
+            <Text style={styles.helper}>
+              {t(
+                'org.operations.recipeNameHint',
+                null,
+                'This name is the finished product that enters stock when you complete a production order.',
+              )}
+            </Text>
+          ) : null}
           {fieldErrors.name ? <Text style={styles.fieldError}>{fieldErrors.name}</Text> : null}
           <TextInput
             label={t('org.operations.code', null, 'Code (optional)')}
@@ -1361,6 +1520,11 @@ export default function OrgOperationsScreen({ navigation, route }) {
                         ? { consumesMaterials: true }
                         : {}),
                     }));
+                    if (nextKind === 'manufacturing') {
+                      setBomSubTab('materials');
+                      setWizardStep(0);
+                      setMaxReachedWizardStep(0);
+                    }
                   }}
                   style={[styles.kindChip, active && styles.kindChipActive]}
                 >
@@ -1480,6 +1644,318 @@ export default function OrgOperationsScreen({ navigation, route }) {
       );
     }
     if (stepKey === 'materials') {
+      if (form.kind === 'manufacturing') {
+        const selectedIds = form.defaultMaterialIds || [];
+        const catalogRows = [
+          ...selectedMaterials,
+          ...materialCatalog.filter(
+            (m) =>
+              !m.is_durable_tool &&
+              !selectedMaterials.some((s) => Number(s.id) === Number(m.id)),
+          ),
+        ];
+        const toolRows = [
+          ...selectedTools,
+          ...toolCatalog.filter(
+            (m) => !selectedTools.some((s) => Number(s.id) === Number(m.id)),
+          ),
+        ];
+        const bomTabs = [
+          {
+            id: 'materials',
+            label: t('org.operations.bomTabMaterials', null, 'Materials'),
+          },
+          {
+            id: 'tools',
+            label: t('org.operations.bomTabTools', null, 'Tools'),
+          },
+          {
+            id: 'finished',
+            label: t('org.operations.bomTabFinished', null, 'Finished product'),
+          },
+        ];
+        return (
+          <>
+            <View style={styles.kindWrap}>
+              {bomTabs.map((tab) => {
+                const active = bomSubTab === tab.id;
+                return (
+                  <Pressable
+                    key={tab.id}
+                    onPress={() => setBomSubTab(tab.id)}
+                    style={[styles.kindChip, active && styles.kindChipActive]}
+                  >
+                    <Text
+                      style={[
+                        styles.kindChipText,
+                        active && styles.kindChipTextActive,
+                      ]}
+                    >
+                      {tab.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {bomSubTab === 'materials' ? (
+              <>
+                <Text style={styles.helper}>
+                  {t(
+                    'org.operations.bomMaterialsHint',
+                    null,
+                    'Pick existing SKUs or add a material manually. Optional rate per 1 finished unit.',
+                  )}
+                </Text>
+                <Button
+                  mode="outlined"
+                  textColor={ON_CARD}
+                  onPress={() => openQuickAdd('material')}
+                  style={styles.quickAddBtn}
+                >
+                  {t('org.operations.addMaterialManual', null, 'Add material manually')}
+                </Button>
+                <TextInput
+                  label={t('org.operations.searchMaterials', null, 'Search materials')}
+                  value={form.materialSearch}
+                  onChangeText={(value) => {
+                    setField('materialSearch', value);
+                    searchMaterials(value);
+                  }}
+                  mode="outlined"
+                  style={styles.input}
+                  textColor={ON_CARD}
+                />
+                <View style={styles.kindWrap}>
+                  {catalogRows.map((mat) => {
+                    const active = selectedIds.includes(Number(mat.id));
+                    return (
+                      <Pressable
+                        key={mat.id}
+                        onPress={() => toggleMaterial(mat)}
+                        style={[styles.kindChip, active && styles.kindChipActive]}
+                      >
+                        <Text
+                          style={[
+                            styles.kindChipText,
+                            active && styles.kindChipTextActive,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {materialLabel(mat)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {selectedIds.length === 0 ? (
+                  <Text style={styles.helper}>
+                    {t(
+                      'org.operations.noMaterialsSelectedShort',
+                      null,
+                      'No materials yet — search or add manually.',
+                    )}
+                  </Text>
+                ) : (
+                  selectedIds.map((mid) => {
+                    const mat =
+                      selectedMaterials.find((m) => Number(m.id) === Number(mid)) ||
+                      catalogRows.find((m) => Number(m.id) === Number(mid));
+                    const meta =
+                      (form.materialNorms && form.materialNorms[mid]) ||
+                      emptyMaterialNorm();
+                    const unitLbl =
+                      materialUnitDisplay(mat, findUnit, meta) ||
+                      t('org.operations.unitNone', null, '—');
+                    return (
+                      <View key={mid} style={styles.materialNormCard}>
+                        <Text style={styles.opTitleInline}>
+                          {materialLabel(mat) || `#${mid}`}
+                        </Text>
+                        <TextInput
+                          label={t(
+                            'org.operations.materialNormRateSimple',
+                            { unit: unitLbl },
+                            `Qty ${unitLbl} per 1 finished`,
+                          )}
+                          value={meta.rate || ''}
+                          onChangeText={(value) => {
+                            setMaterialNormField(mid, 'rate', sanitizeDecimalInput(value));
+                            setMaterialNormField(mid, 'basis', 'output_unit');
+                            setMaterialNormField(mid, 'perQty', '1');
+                          }}
+                          mode="outlined"
+                          keyboardType="decimal-pad"
+                          style={styles.input}
+                          textColor={ON_CARD}
+                        />
+                      </View>
+                    );
+                  })
+                )}
+              </>
+            ) : null}
+
+            {bomSubTab === 'tools' ? (
+              <>
+                <Text style={styles.helper}>
+                  {t(
+                    'org.operations.bomToolsHint',
+                    null,
+                    'Durable tools for the checklist — stock is not consumed.',
+                  )}
+                </Text>
+                <Button
+                  mode="outlined"
+                  textColor={ON_CARD}
+                  onPress={() => openQuickAdd('tool')}
+                  style={styles.quickAddBtn}
+                >
+                  {t('org.operations.addToolManual', null, 'Add tool manually')}
+                </Button>
+                <TextInput
+                  label={t('org.operations.searchTools', null, 'Search tools')}
+                  value={form.toolSearch}
+                  onChangeText={(value) => {
+                    setField('toolSearch', value);
+                    searchTools(value);
+                  }}
+                  mode="outlined"
+                  style={styles.input}
+                  textColor={ON_CARD}
+                />
+                <View style={styles.kindWrap}>
+                  {toolRows.map((mat) => {
+                    const active = (form.requiredToolIds || []).includes(Number(mat.id));
+                    return (
+                      <Pressable
+                        key={`tool-${mat.id}`}
+                        onPress={() => toggleTool(mat)}
+                        style={[styles.kindChip, active && styles.kindChipActive]}
+                      >
+                        <Text
+                          style={[
+                            styles.kindChipText,
+                            active && styles.kindChipTextActive,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {materialLabel(mat)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {(form.requiredToolIds || []).length === 0 ? (
+                  <Text style={styles.helper}>
+                    {t(
+                      'org.operations.noToolsSelectedShort',
+                      null,
+                      'No tools yet — optional.',
+                    )}
+                  </Text>
+                ) : null}
+              </>
+            ) : null}
+
+            {bomSubTab === 'finished' ? (
+              <>
+                <Text style={styles.helper}>
+                  {t(
+                    'org.operations.bomFinishedHint',
+                    null,
+                    'Finished product = the name from step 1. We create or reuse that SKU on save. Or pick an existing SKU below.',
+                  )}
+                </Text>
+                <Text style={styles.opTitleInline}>
+                  {form.name.trim() ||
+                    t('org.operations.recipeNamePlaceholder', null, '(set name in Basics)')}
+                </Text>
+                <TextInput
+                  label={t(
+                    'org.operations.outputQtyPerUnit',
+                    null,
+                    'Finished qty per order unit',
+                  )}
+                  value={form.outputQtyPerUnit || '1'}
+                  onChangeText={(value) =>
+                    setField('outputQtyPerUnit', sanitizeDecimalInput(value))
+                  }
+                  mode="outlined"
+                  keyboardType="decimal-pad"
+                  style={styles.input}
+                  textColor={ON_CARD}
+                />
+                <Text style={styles.fieldLabel}>
+                  {t(
+                    'org.operations.orPickExistingFg',
+                    null,
+                    'Or pick existing finished SKU',
+                  )}
+                </Text>
+                <TextInput
+                  label={t(
+                    'org.operations.searchFinishedGood',
+                    null,
+                    'Search finished-good SKU',
+                  )}
+                  value={form.outputSearch}
+                  onChangeText={(value) => {
+                    setField('outputSearch', value);
+                    searchMaterials(value);
+                  }}
+                  mode="outlined"
+                  style={styles.input}
+                  textColor={ON_CARD}
+                />
+                <View style={styles.kindWrap}>
+                  {[
+                    ...(form.outputMaterialId && form.outputMaterialLabel
+                      ? [
+                          {
+                            id: form.outputMaterialId,
+                            name: form.outputMaterialLabel,
+                          },
+                        ]
+                      : []),
+                    ...catalogRows.filter(
+                      (m) => Number(m.id) !== Number(form.outputMaterialId),
+                    ),
+                  ].map((mat) => {
+                    const active = Number(form.outputMaterialId) === Number(mat.id);
+                    return (
+                      <Pressable
+                        key={`fg-${mat.id}`}
+                        onPress={() => {
+                          setForm((prev) => ({
+                            ...prev,
+                            outputMaterialId: active ? null : Number(mat.id),
+                            outputMaterialLabel: active
+                              ? ''
+                              : materialLabel(mat),
+                            outputSearch: '',
+                          }));
+                        }}
+                        style={[styles.kindChip, active && styles.kindChipActive]}
+                      >
+                        <Text
+                          style={[
+                            styles.kindChipText,
+                            active && styles.kindChipTextActive,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {materialLabel(mat)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </>
+            ) : null}
+          </>
+        );
+      }
       if (form.kind === 'labor_only') {
         return (
           <Text style={styles.helper}>
@@ -1910,99 +2386,6 @@ export default function OrgOperationsScreen({ navigation, route }) {
               )}
             </Text>
           ) : null}
-          {form.kind === 'manufacturing' ? (
-            <>
-              <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
-                {t(
-                  'org.operations.finishedGood',
-                  null,
-                  'Finished good (stock receipt)',
-                )}
-              </Text>
-              <Text style={styles.helper}>
-                {t(
-                  'org.operations.finishedGoodHint',
-                  null,
-                  'SKU received into warehouse when the production order is completed. Qty per reported unit (e.g. 1 pcs per 1 batch).',
-                )}
-              </Text>
-              <TextInput
-                label={t(
-                  'org.operations.searchFinishedGood',
-                  null,
-                  'Search finished-good SKU',
-                )}
-                value={form.outputSearch}
-                onChangeText={(value) => {
-                  setField('outputSearch', value);
-                  searchMaterials(value);
-                }}
-                mode="outlined"
-                style={styles.input}
-                textColor={ON_CARD}
-              />
-              <View style={styles.kindWrap}>
-                {[
-                  ...(form.outputMaterialId && form.outputMaterialLabel
-                    ? [
-                        {
-                          id: form.outputMaterialId,
-                          name: form.outputMaterialLabel,
-                        },
-                      ]
-                    : []),
-                  ...catalogRows.filter(
-                    (m) =>
-                      Number(m.id) !== Number(form.outputMaterialId) &&
-                      !m.is_durable_tool,
-                  ),
-                ].map((mat) => {
-                  const active = Number(form.outputMaterialId) === Number(mat.id);
-                  return (
-                    <Pressable
-                      key={`fg-${mat.id}`}
-                      onPress={() => {
-                        setForm((prev) => ({
-                          ...prev,
-                          outputMaterialId: active ? null : Number(mat.id),
-                          outputMaterialLabel: active
-                            ? ''
-                            : materialLabel(mat),
-                          outputSearch: '',
-                        }));
-                      }}
-                      style={[styles.kindChip, active && styles.kindChipActive]}
-                    >
-                      <Text
-                        style={[
-                          styles.kindChipText,
-                          active && styles.kindChipTextActive,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {materialLabel(mat)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <TextInput
-                label={t(
-                  'org.operations.outputQtyPerUnit',
-                  null,
-                  'Finished qty per reported unit',
-                )}
-                value={form.outputQtyPerUnit || '1'}
-                onChangeText={(value) =>
-                  setField('outputQtyPerUnit', sanitizeDecimalInput(value))
-                }
-                mode="outlined"
-                keyboardType="decimal-pad"
-                style={styles.input}
-                textColor={ON_CARD}
-              />
-            </>
-          ) : null}
         </>
       );
     }
@@ -2118,6 +2501,15 @@ export default function OrgOperationsScreen({ navigation, route }) {
             {materialNames}
           </Text>
         ) : null}
+        {form.kind === 'manufacturing' ? (
+          <Text style={styles.reviewLine}>
+            <Text style={styles.reviewKey}>
+              {t('org.operations.bomTabFinished', null, 'Finished product')}:{' '}
+            </Text>
+            {form.outputMaterialLabel || form.name.trim() || '—'}
+            {` × ${form.outputQtyPerUnit || '1'}`}
+          </Text>
+        ) : null}
         {form.notes.trim() ? (
           <Text style={styles.reviewLine}>
             <Text style={styles.reviewKey}>{t('org.operations.notes', null, 'Notes')}: </Text>
@@ -2147,8 +2539,12 @@ export default function OrgOperationsScreen({ navigation, route }) {
             <View style={styles.wizardHeaderRow}>
               <Text style={[styles.sectionTitle, styles.wizardHeaderTitle]}>
                 {editingId
-                  ? t('org.operations.editOperation', null, 'Edit operation')
-                  : t('org.operations.addOperation', null, 'Add operation')}
+                  ? form.kind === 'manufacturing'
+                    ? t('org.operations.editRecipe', null, 'Edit recipe')
+                    : t('org.operations.editOperation', null, 'Edit operation')
+                  : form.kind === 'manufacturing'
+                    ? t('org.operations.addRecipe', null, 'Add recipe')
+                    : t('org.operations.addOperation', null, 'Add operation')}
               </Text>
               <Pressable onPress={closeWizard} hitSlop={8} style={styles.wizardExitBtn}>
                 <Text style={styles.wizardExitText}>
@@ -2258,9 +2654,9 @@ export default function OrgOperationsScreen({ navigation, route }) {
       >
         <Text style={styles.lead}>
           {t(
-            'org.operations.lead',
+            'org.operations.leadWithRecipes',
             null,
-            'Define the operations your company uses on work cards — transport, marking, field work, and more.',
+            'Site operations for work cards, and manufacturing recipes (BOM) for production orders. Create a Production order from Tasks after you save a recipe.',
           )}
         </Text>
 
@@ -2367,6 +2763,84 @@ export default function OrgOperationsScreen({ navigation, route }) {
         )}
       </ScrollView>
       {renderWizardModal()}
+      <Modal
+        visible={quickAddOpen}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setQuickAddOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalSheet, styles.quickAddSheet]}>
+            <Text style={styles.sectionTitle}>
+              {quickAddMode === 'tool'
+                ? t('org.operations.addToolManual', null, 'Add tool manually')
+                : t('org.operations.addMaterialManual', null, 'Add material manually')}
+            </Text>
+            <Text style={styles.helper}>
+              {t(
+                'org.operations.quickAddHint',
+                null,
+                'Creates a warehouse SKU with qty 0. You can stock it later.',
+              )}
+            </Text>
+            <TextInput
+              label={t('org.operations.quickAddName', null, 'Name')}
+              value={quickAddName}
+              onChangeText={setQuickAddName}
+              mode="outlined"
+              style={styles.input}
+              textColor={ON_CARD}
+            />
+            <Text style={styles.fieldLabel}>
+              {t('org.warehouse.intake.unit', null, 'Unit')}
+            </Text>
+            <View style={styles.kindWrap}>
+              {[
+                { code: 'piece', label: t('org.warehouse.intake.units.piece', null, 'pcs') },
+                { code: 'kg', label: t('org.warehouse.intake.units.kg', null, 'kg') },
+                { code: 'L', label: t('org.warehouse.intake.units.L', null, 'L') },
+                { code: 'm2', label: t('org.warehouse.intake.units.m2', null, 'm²') },
+              ].map((u) => {
+                const active = quickAddUnit === u.code;
+                return (
+                  <Pressable
+                    key={u.code}
+                    onPress={() => setQuickAddUnit(u.code)}
+                    style={[styles.kindChip, active && styles.kindChipActive]}
+                  >
+                    <Text
+                      style={[
+                        styles.kindChipText,
+                        active && styles.kindChipTextActive,
+                      ]}
+                    >
+                      {u.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={styles.wizardNav}>
+              <Button
+                mode="contained"
+                loading={quickAddBusy}
+                disabled={quickAddBusy}
+                onPress={submitQuickAdd}
+              >
+                {t('common.save', null, 'Save')}
+              </Button>
+              <Button
+                mode="text"
+                textColor={ON_CARD_MUTED}
+                onPress={() => setQuickAddOpen(false)}
+                disabled={quickAddBusy}
+              >
+                {t('common.cancel', null, 'Cancel')}
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenBackground>
   );
 }
@@ -2524,6 +2998,17 @@ const styles = StyleSheet.create({
   input: {
     marginBottom: 10,
     backgroundColor: '#fff',
+  },
+  quickAddBtn: {
+    marginBottom: 12,
+    borderColor: '#CBD5E1',
+  },
+  quickAddSheet: {
+    marginHorizontal: 16,
+    marginBottom: 40,
+    padding: 16,
+    borderRadius: 16,
+    maxHeight: '80%',
   },
   fieldLabel: {
     color: ON_CARD,
