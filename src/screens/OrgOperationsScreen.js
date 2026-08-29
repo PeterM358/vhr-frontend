@@ -214,6 +214,8 @@ function emptyFormState() {
     kind: 'transport',
     unitId: null,
     reportUnitIds: [],
+    /** Recipe finished-good measure: count | volume | mass (pcs / L / kg). */
+    outputMeasure: '',
     notes: '',
     isActive: true,
     plannedHours: '',
@@ -236,6 +238,58 @@ function emptyFormState() {
     outputQtyPerUnit: '1',
     outputSearch: '',
   };
+}
+
+/** Map recipe output measure → warehouse unit_code for FG SKU create. */
+function outputMeasureToUnitCode(measure) {
+  const m = String(measure || '').toLowerCase();
+  if (m === 'volume') return 'L';
+  if (m === 'mass') return 'kg';
+  return 'piece';
+}
+
+function outputMeasureLabel(measure, t) {
+  const m = String(measure || '').toLowerCase();
+  if (m === 'volume') return t('org.operations.fgUnitLiter', null, 'L');
+  if (m === 'mass') return t('org.operations.fgUnitKg', null, 'kg');
+  if (m === 'count') return t('org.operations.fgUnitPcs', null, 'pcs');
+  return t('org.operations.fgUnitUnset', null, 'finished');
+}
+
+function inferOutputMeasureFromUnits(reportUnitIds, units) {
+  const id = Array.isArray(reportUnitIds) && reportUnitIds[0];
+  if (!id || !Array.isArray(units)) return '';
+  const u = units.find((row) => Number(row.id) === Number(id));
+  const kind = String(u?.measure_kind || '').toLowerCase();
+  if (kind === 'volume') return 'volume';
+  if (kind === 'mass') return 'mass';
+  if (kind === 'count') return 'count';
+  const code = String(u?.code || u?.symbol || '').toLowerCase();
+  if (['l', 'lt', 'liter', 'litre', 'ml'].includes(code)) return 'volume';
+  if (['kg', 'g', 'кг'].includes(code)) return 'mass';
+  if (['pcs', 'piece', 'бр', 'бр.'].includes(code)) return 'count';
+  return '';
+}
+
+function resolveUnitIdForMeasure(units, measure) {
+  const want = String(measure || '').toLowerCase();
+  if (!want || !Array.isArray(units)) return null;
+  const byKind = units.find(
+    (u) => String(u.measure_kind || '').toLowerCase() === want,
+  );
+  if (byKind?.id) return Number(byKind.id);
+  const aliases =
+    want === 'volume'
+      ? ['l', 'lt', 'liter', 'litre']
+      : want === 'mass'
+        ? ['kg', 'кг']
+        : ['pcs', 'piece', 'бр'];
+  const byCode = units.find((u) => {
+    const c = String(u.code || '').toLowerCase();
+    const s = String(u.symbol || '').toLowerCase();
+    return aliases.includes(c) || aliases.includes(s);
+  });
+  return byCode?.id ? Number(byCode.id) : null;
 }
 
 function hydrateFromRow(row) {
@@ -340,19 +394,21 @@ function hydrateFromRow(row) {
       ? row.required_tool_ids.map((id) => Number(id)).filter(Boolean)
       : [];
   const toolIds = [...new Set([...toolIdsRaw, ...durableFromMaterials])];
+  const reportUnitIds = (() => {
+    const fromList = Array.isArray(row.report_unit_ids)
+      ? row.report_unit_ids.map((id) => Number(id)).filter(Boolean)
+      : [];
+    if (fromList.length) return fromList;
+    const primary = row.unit_id || row.unit?.id;
+    return primary ? [Number(primary)] : [];
+  })();
   return {
     name: row.name || '',
     code: row.code || '',
     kind: row.activity_kind || 'other',
     unitId: row.unit_id || row.unit?.id || null,
-    reportUnitIds: (() => {
-      const fromList = Array.isArray(row.report_unit_ids)
-        ? row.report_unit_ids.map((id) => Number(id)).filter(Boolean)
-        : [];
-      if (fromList.length) return fromList;
-      const primary = row.unit_id || row.unit?.id;
-      return primary ? [Number(primary)] : [];
-    })(),
+    reportUnitIds,
+    outputMeasure: '',
     notes: row.notes || '',
     isActive: row.is_active !== false,
     plannedHours: row.planned_hours != null ? String(row.planned_hours) : '',
@@ -471,11 +527,15 @@ function buildNormsPayload(form) {
         : null,
       default_material_ids: ids,
       material_lines: materialLines,
-      required_tool_lines: (form.requiredToolIds || []).slice(0, 40).map((mid) => ({
-        material_id: mid,
-        qty: '1',
-        notes: '',
-      })),
+      // Tools belong on operations / work cards — not on manufacturing recipes (BOM).
+      required_tool_lines:
+        form.kind === 'manufacturing'
+          ? []
+          : (form.requiredToolIds || []).slice(0, 40).map((mid) => ({
+              material_id: mid,
+              qty: '1',
+              notes: '',
+            })),
     };
   }
 
@@ -632,7 +692,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
           hint: t(
             'org.operations.wizard.stepBasicsHintRecipe',
             null,
-            'Name = finished product. This is a recipe (BOM), not a production order yet.',
+            'Name the finished product and choose its unit (pcs / L / kg). Recipe = BOM, not an order yet.',
           ),
         },
         {
@@ -641,7 +701,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
           hint: t(
             'org.operations.wizard.stepRecipeHint',
             null,
-            'Three tabs: materials, tools, finished product. Pick existing or add manually.',
+            'Materials (rates per 1 finished unit) and finished product SKU.',
           ),
         },
         {
@@ -871,6 +931,13 @@ export default function OrgOperationsScreen({ navigation, route }) {
   const startEdit = (row) => {
     const hydrated = hydrateFromRow(row);
     const isRecipe = isManufacturingKind(row.activity_kind);
+    if (isRecipe) {
+      hydrated.outputMeasure = inferOutputMeasureFromUnits(
+        hydrated.reportUnitIds,
+        units,
+      );
+      hydrated.requiredToolIds = [];
+    }
     setCatalogTab(isRecipe ? 'recipes' : 'operations');
     setEditingId(row.id);
     setForm(hydrated);
@@ -898,9 +965,29 @@ export default function OrgOperationsScreen({ navigation, route }) {
         setFormMessage(t('org.operations.nameRequired', null, 'Name is required.'));
         return false;
       }
+      if (form.kind === 'manufacturing' && !form.outputMeasure) {
+        setFormMessage(
+          t(
+            'org.operations.fgUnitRequired',
+            null,
+            'Choose the finished-product unit (pcs, L, or kg).',
+          ),
+        );
+        return false;
+      }
     }
     setFormMessage('');
     return true;
+  };
+
+  const applyOutputMeasure = (measure) => {
+    const uid = resolveUnitIdForMeasure(units, measure);
+    setForm((prev) => ({
+      ...prev,
+      outputMeasure: measure,
+      reportUnitIds: uid ? [uid] : prev.reportUnitIds,
+      unitId: uid || prev.unitId,
+    }));
   };
 
   const goNext = () => {
@@ -1088,7 +1175,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
     const created = await createOrgMaterial(token, orgId, {
       description: trimmedName,
       quantity: '0',
-      unit_code: 'piece',
+      unit_code: outputMeasureToUnitCode(form.outputMeasure),
       unit_price: '0',
       is_durable_tool: false,
     });
@@ -1113,9 +1200,23 @@ export default function OrgOperationsScreen({ navigation, route }) {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       let workingForm = form;
       if (form.kind === 'manufacturing') {
+        if (!form.outputMeasure) {
+          setFormMessage(
+            t(
+              'org.operations.fgUnitRequired',
+              null,
+              'Choose the finished-product unit (pcs, L, or kg).',
+            ),
+          );
+          setWizardStep(0);
+          setBusy(false);
+          return;
+        }
         const fg = await ensureFinishedGoodSku(token, trimmedName);
         let reportUnitIds = form.reportUnitIds || [];
-        if (!reportUnitIds.length) {
+        const measureUid = resolveUnitIdForMeasure(units, form.outputMeasure);
+        if (measureUid) reportUnitIds = [measureUid];
+        else if (!reportUnitIds.length) {
           const pcs =
             units.find(
               (u) =>
@@ -1131,6 +1232,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
           outputMaterialLabel: fg.label,
           outputQtyPerUnit: form.outputQtyPerUnit || '1',
           consumesMaterials: true,
+          requiredToolIds: [],
           reportUnitIds,
           unitId: reportUnitIds[0] || form.unitId,
         };
@@ -1569,6 +1671,94 @@ export default function OrgOperationsScreen({ navigation, route }) {
             </Text>
           ) : null}
           {fieldErrors.name ? <Text style={styles.fieldError}>{fieldErrors.name}</Text> : null}
+          {form.kind === 'manufacturing' ? (
+            <>
+              <Text style={styles.fieldLabel}>
+                {t(
+                  'org.operations.fgUnitLabel',
+                  null,
+                  'Finished product unit',
+                )}
+              </Text>
+              <Text style={styles.helper}>
+                {t(
+                  'org.operations.fgUnitHint',
+                  null,
+                  'BOM rates are per 1 of this unit. Tubes → pcs; bulk mix → L or kg. Ingredient units stay as in the warehouse (e.g. kg paint per 1 L finished) — we do not convert automatically.',
+                )}
+              </Text>
+              <View style={styles.kindWrap}>
+                {[
+                  {
+                    value: 'count',
+                    label: t('org.operations.fgUnitPcs', null, 'pcs'),
+                    hint: t(
+                      'org.operations.fgUnitPcsHint',
+                      null,
+                      'Tubes, cans, pieces',
+                    ),
+                  },
+                  {
+                    value: 'volume',
+                    label: t('org.operations.fgUnitLiter', null, 'L'),
+                    hint: t(
+                      'org.operations.fgUnitLiterHint',
+                      null,
+                      'Liters of finished mix',
+                    ),
+                  },
+                  {
+                    value: 'mass',
+                    label: t('org.operations.fgUnitKg', null, 'kg'),
+                    hint: t(
+                      'org.operations.fgUnitKgHint',
+                      null,
+                      'Kilograms of finished product',
+                    ),
+                  },
+                ].map((opt) => {
+                  const active = form.outputMeasure === opt.value;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      onPress={() => applyOutputMeasure(opt.value)}
+                      style={[styles.kindChip, active && styles.kindChipActive]}
+                    >
+                      <Text
+                        style={[
+                          styles.kindChipText,
+                          active && styles.kindChipTextActive,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {form.outputMeasure ? (
+                <Text style={styles.helper}>
+                  {form.outputMeasure === 'count'
+                    ? t(
+                        'org.operations.fgUnitPcsHint',
+                        null,
+                        'Tubes, cans, pieces',
+                      )
+                    : form.outputMeasure === 'volume'
+                      ? t(
+                          'org.operations.fgUnitLiterHint',
+                          null,
+                          'Liters of finished mix',
+                        )
+                      : t(
+                          'org.operations.fgUnitKgHint',
+                          null,
+                          'Kilograms of finished product',
+                        )}
+                </Text>
+              ) : null}
+            </>
+          ) : null}
           <TextInput
             label={t('org.operations.code', null, 'Code (optional)')}
             value={form.code}
@@ -1740,31 +1930,24 @@ export default function OrgOperationsScreen({ navigation, route }) {
               !selectedMaterials.some((s) => Number(s.id) === Number(m.id)),
           ),
         ];
-        const toolRows = [
-          ...selectedTools,
-          ...toolCatalog.filter(
-            (m) => !selectedTools.some((s) => Number(s.id) === Number(m.id)),
-          ),
-        ];
+        const fgUnitLbl = outputMeasureLabel(form.outputMeasure, t);
         const bomTabs = [
           {
             id: 'materials',
             label: t('org.operations.bomTabMaterials', null, 'Materials'),
           },
           {
-            id: 'tools',
-            label: t('org.operations.bomTabTools', null, 'Tools'),
-          },
-          {
             id: 'finished',
             label: t('org.operations.bomTabFinished', null, 'Finished product'),
           },
         ];
+        const activeBom =
+          bomSubTab === 'tools' ? 'materials' : bomSubTab || 'materials';
         return (
           <>
             <View style={styles.kindWrap}>
               {bomTabs.map((tab) => {
-                const active = bomSubTab === tab.id;
+                const active = activeBom === tab.id;
                 return (
                   <Pressable
                     key={tab.id}
@@ -1784,13 +1967,15 @@ export default function OrgOperationsScreen({ navigation, route }) {
               })}
             </View>
 
-            {bomSubTab === 'materials' ? (
+            {activeBom === 'materials' ? (
               <>
                 <Text style={styles.helper}>
                   {t(
                     'org.operations.bomMaterialsHint',
-                    null,
-                    'Pick existing SKUs or add a material manually. Optional rate per 1 finished unit.',
+                    {
+                      finished: fgUnitLbl,
+                    },
+                    `Pick materials. Enter qty in each SKU’s warehouse unit per 1 ${fgUnitLbl} finished. No auto unit conversion.`,
                   )}
                 </Text>
                 <Button
@@ -1861,8 +2046,8 @@ export default function OrgOperationsScreen({ navigation, route }) {
                         <TextInput
                           label={t(
                             'org.operations.materialNormRateSimple',
-                            { unit: unitLbl },
-                            `Qty ${unitLbl} per 1 finished`,
+                            { unit: unitLbl, finished: fgUnitLbl },
+                            `Qty ${unitLbl} per 1 ${fgUnitLbl}`,
                           )}
                           value={meta.rate || ''}
                           onChangeText={(value) => {
@@ -1882,86 +2067,27 @@ export default function OrgOperationsScreen({ navigation, route }) {
               </>
             ) : null}
 
-            {bomSubTab === 'tools' ? (
-              <>
-                <Text style={styles.helper}>
-                  {t(
-                    'org.operations.bomToolsHint',
-                    null,
-                    'Durable tools for the checklist — stock is not consumed.',
-                  )}
-                </Text>
-                <Button
-                  mode="outlined"
-                  textColor={ON_CARD}
-                  onPress={() => openQuickAdd('tool')}
-                  style={styles.quickAddBtn}
-                >
-                  {t('org.operations.addToolManual', null, 'Add tool manually')}
-                </Button>
-                <TextInput
-                  label={t('org.operations.searchTools', null, 'Search tools')}
-                  value={form.toolSearch}
-                  onChangeText={(value) => {
-                    setField('toolSearch', value);
-                    searchTools(value);
-                  }}
-                  mode="outlined"
-                  style={styles.input}
-                  textColor={ON_CARD}
-                />
-                <View style={styles.kindWrap}>
-                  {toolRows.map((mat) => {
-                    const active = (form.requiredToolIds || []).includes(Number(mat.id));
-                    return (
-                      <Pressable
-                        key={`tool-${mat.id}`}
-                        onPress={() => toggleTool(mat)}
-                        style={[styles.kindChip, active && styles.kindChipActive]}
-                      >
-                        <Text
-                          style={[
-                            styles.kindChipText,
-                            active && styles.kindChipTextActive,
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {materialLabel(mat)}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                {(form.requiredToolIds || []).length === 0 ? (
-                  <Text style={styles.helper}>
-                    {t(
-                      'org.operations.noToolsSelectedShort',
-                      null,
-                      'No tools yet — optional.',
-                    )}
-                  </Text>
-                ) : null}
-              </>
-            ) : null}
-
-            {bomSubTab === 'finished' ? (
+            {activeBom === 'finished' ? (
               <>
                 <Text style={styles.helper}>
                   {t(
                     'org.operations.bomFinishedHint',
-                    null,
-                    'Finished product = the name from step 1. We create or reuse that SKU on save. Or pick an existing SKU below.',
+                    {
+                      unit: fgUnitLbl,
+                    },
+                    `Finished product = name from Basics (${fgUnitLbl}). We create or reuse that SKU on save. Or pick an existing SKU below.`,
                   )}
                 </Text>
                 <Text style={styles.opTitleInline}>
-                  {form.name.trim() ||
-                    t('org.operations.recipeNamePlaceholder', null, '(set name in Basics)')}
+                  {(form.name.trim() ||
+                    t('org.operations.recipeNamePlaceholder', null, '(set name in Basics)')) +
+                    (form.outputMeasure ? ` · ${fgUnitLbl}` : '')}
                 </Text>
                 <TextInput
                   label={t(
                     'org.operations.outputQtyPerUnit',
-                    null,
-                    'Finished qty per order unit',
+                    { unit: fgUnitLbl },
+                    `Finished qty (${fgUnitLbl}) per reported unit`,
                   )}
                   value={form.outputQtyPerUnit || '1'}
                   onChangeText={(value) =>
@@ -2588,13 +2714,21 @@ export default function OrgOperationsScreen({ navigation, route }) {
           </Text>
         ) : null}
         {form.kind === 'manufacturing' ? (
-          <Text style={styles.reviewLine}>
-            <Text style={styles.reviewKey}>
-              {t('org.operations.bomTabFinished', null, 'Finished product')}:{' '}
+          <>
+            <Text style={styles.reviewLine}>
+              <Text style={styles.reviewKey}>
+                {t('org.operations.fgUnitLabel', null, 'Finished product unit')}:{' '}
+              </Text>
+              {outputMeasureLabel(form.outputMeasure, t)}
             </Text>
-            {form.outputMaterialLabel || form.name.trim() || '—'}
-            {` × ${form.outputQtyPerUnit || '1'}`}
-          </Text>
+            <Text style={styles.reviewLine}>
+              <Text style={styles.reviewKey}>
+                {t('org.operations.bomTabFinished', null, 'Finished product')}:{' '}
+              </Text>
+              {form.outputMaterialLabel || form.name.trim() || '—'}
+              {` × ${form.outputQtyPerUnit || '1'} ${outputMeasureLabel(form.outputMeasure, t)}`}
+            </Text>
+          </>
         ) : null}
         {form.notes.trim() ? (
           <Text style={styles.reviewLine}>

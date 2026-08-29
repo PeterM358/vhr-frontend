@@ -271,6 +271,8 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [selectedOps, setSelectedOps] = useState([]);
   /** Production order: exactly one manufacturing recipe (BOM + FG). */
   const [selectedRecipeId, setSelectedRecipeId] = useState(null);
+  /** How many finished units this PO produces (scales BOM issue + FG receipt). */
+  const [productionQty, setProductionQty] = useState('1');
   const [photoRef, setPhotoRef] = useState('');
   const [documentRef, setDocumentRef] = useState('');
   /** Explicit mode when org has both site and production — site | production | null */
@@ -758,6 +760,17 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
           );
           return false;
         }
+        const qtyNum = Number(String(productionQty || '').replace(',', '.'));
+        if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+          setFormMessage(
+            t(
+              'org.tasks.productionQtyRequired',
+              null,
+              'Enter how many finished units this order produces (e.g. 10 or 100).',
+            ),
+          );
+          return false;
+        }
       } else if (selectedOps.length === 0) {
         setFormMessage(t('org.tasks.operationsRequired', null, 'Pick at least one operation.'));
         return false;
@@ -808,6 +821,17 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         );
         return;
       }
+      const qtyNum = Number(String(productionQty || '').replace(',', '.'));
+      if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+        setFormMessage(
+          t(
+            'org.tasks.productionQtyRequired',
+            null,
+            'Enter how many finished units this order produces (e.g. 10 or 100).',
+          ),
+        );
+        return;
+      }
     } else if (selectedOps.length === 0) {
       setFormMessage(t('org.tasks.operationsRequired', null, 'Pick at least one operation.'));
       return;
@@ -822,10 +846,12 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       const operationLines = [];
       if (taskMode === 'production' && selectedRecipeId) {
+        const qtyRaw = String(productionQty || '1').replace(',', '.').trim() || '1';
         operationLines.push({
           activity_definition_id: selectedRecipeId,
           sort_order: 0,
           notes: '',
+          planned_qty: qtyRaw,
           assignee_user_ids: overallAssignees,
         });
       }
@@ -1601,6 +1627,33 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                 );
               })
             )}
+            {selectedRecipeId ? (
+              <>
+                <TextInput
+                  label={t(
+                    'org.tasks.productionQtyLabel',
+                    null,
+                    'Finished quantity (this order)',
+                  )}
+                  value={productionQty}
+                  onChangeText={(value) =>
+                    setProductionQty(String(value || '').replace(/[^\d.,]/g, ''))
+                  }
+                  mode="outlined"
+                  keyboardType="decimal-pad"
+                  style={styles.input}
+                  textColor={ON_CARD}
+                  placeholder="10"
+                />
+                <Text style={styles.helper}>
+                  {t(
+                    'org.tasks.productionQtyHint',
+                    null,
+                    'BOM rates are for 1 finished unit. Enter 10 or 100 here — issue suggestions and Complete production scale by this qty.',
+                  )}
+                </Text>
+              </>
+            ) : null}
             <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
               {t('org.tasks.routingOpsLabel', null, 'Operations (optional)')}
             </Text>
@@ -1952,12 +2005,20 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             : t('org.tasks.noPeople', null, 'No people assigned')}
         </Text>
         {taskMode === 'production' && selectedRecipeId ? (
-          <Text style={styles.reviewLine}>
-            <Text style={styles.reviewKey}>
-              {t('org.tasks.recipeSelectLabel', null, 'Recipe')}:{' '}
+          <>
+            <Text style={styles.reviewLine}>
+              <Text style={styles.reviewKey}>
+                {t('org.tasks.recipeSelectLabel', null, 'Recipe')}:{' '}
+              </Text>
+              {recipeActivities.find((a) => a.id === selectedRecipeId)?.name || '—'}
             </Text>
-            {recipeActivities.find((a) => a.id === selectedRecipeId)?.name || '—'}
-          </Text>
+            <Text style={styles.reviewLine}>
+              <Text style={styles.reviewKey}>
+                {t('org.tasks.productionQtyLabel', null, 'Finished quantity')}:{' '}
+              </Text>
+              {String(productionQty || '1').trim() || '1'}
+            </Text>
+          </>
         ) : null}
         <Text style={styles.reviewLine}>
           <Text style={styles.reviewKey}>{t('org.tasks.operationsTitle', null, 'Operations')}: </Text>

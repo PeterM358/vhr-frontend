@@ -21,6 +21,7 @@ import {
   buildOrgNavItems,
   isServiceCenterOnlyOrg,
   orgHasServiceCenterActivity,
+  orgHasProductionActivity,
   orgShowsConstructionOpsSurfaces,
   orgShowsFleetSurfaces,
   organizationMembershipFor,
@@ -334,6 +335,7 @@ export default function OrganizationHomeScreen() {
   const showFleetSurfaces = orgShowsFleetSurfaces(org);
   const showOpsSurfaces = orgShowsConstructionOpsSurfaces(org);
   const canManageOps = Boolean(org?.manage_org_operations || org?.manage_fleet);
+  const hasProduction = orgHasProductionActivity(org);
   const canViewAccounting = Boolean(org?.view_org_accounting);
 
   const { todayTasks, upcomingTasks } = useMemo(() => {
@@ -586,12 +588,20 @@ export default function OrganizationHomeScreen() {
       tiles.push({
         key: 'operations',
         icon: 'clipboard-list-outline',
-        title: t('org.nav.operations', null, 'Operations'),
-        subtitle: t(
-          'org.home.actions.operationsSubtitle',
-          null,
-          'Define company operations used on work cards.',
-        ),
+        title: hasProduction
+          ? t('org.nav.operationsAndRecipes', null, 'Operations & recipes')
+          : t('org.nav.operations', null, 'Operations'),
+        subtitle: hasProduction
+          ? t(
+              'org.home.actions.operationsAndRecipesSubtitle',
+              null,
+              'Work steps for tasks, and recipes (BOM) for production orders.',
+            )
+          : t(
+              'org.home.actions.operationsSubtitle',
+              null,
+              'Define company operations used on work cards.',
+            ),
         onPress: () => navigateToOrgOperations(navigation, { orgId: org?.id }),
       });
     }
@@ -658,6 +668,7 @@ export default function OrganizationHomeScreen() {
   }, [
     canManageOps,
     canViewAccounting,
+    hasProduction,
     isDriver,
     navRoutes,
     navigation,

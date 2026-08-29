@@ -90,6 +90,12 @@ export function orgHasServiceCenterActivity(org) {
   return activities.includes('service_center');
 }
 
+export function orgHasProductionActivity(org) {
+  if (!org) return false;
+  const activities = Array.isArray(org.activities) ? org.activities : [];
+  return activities.includes('production');
+}
+
 /**
  * Service-center-only org: has service_center and no transport/construction.
  * These should not see fleet planning, fleet totals, or construction-style
@@ -159,7 +165,9 @@ export function buildOrgNavItems(org, t) {
     OrgOverview: t('org.nav.overview', null, 'Overview'),
     OrgLocations: t('org.nav.locations', null, 'Locations'),
     OrgFleet: t('org.nav.fleet', null, 'Fleet'),
-    OrgOperations: t('org.nav.operations', null, 'Operations'),
+    OrgOperations: orgHasProductionActivity(org)
+      ? t('org.nav.operationsAndRecipes', null, 'Operations & recipes')
+      : t('org.nav.operations', null, 'Operations'),
     OrgTasks: t('org.nav.tasks', null, 'Tasks'),
     OrgWorkOrders: t('org.nav.tasks', null, 'Tasks'),
     OrgProjects: t('org.nav.projects', null, 'Projects'),
