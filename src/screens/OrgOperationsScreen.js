@@ -95,10 +95,9 @@ const KIND_INPUT_MEASURES = {
   other: null,
 };
 
-const MODES = [
-  { id: 'list', labelKey: 'org.operations.allOperations' },
-  { id: 'add', labelKey: 'org.operations.addOperation' },
-];
+function isManufacturingKind(kind) {
+  return String(kind || '').toLowerCase() === 'manufacturing';
+}
 
 function unitLabel(unit) {
   if (!unit) return '';
@@ -572,6 +571,9 @@ export default function OrgOperationsScreen({ navigation, route }) {
   const [selectedMaterials, setSelectedMaterials] = useState([]);
   const [selectedTools, setSelectedTools] = useState([]);
   const [mode, setMode] = useState('list');
+  /** Catalog list: operations (site/labor) vs recipes (manufacturing BOM). */
+  const [catalogTab, setCatalogTab] = useState('operations');
+  const [listQuery, setListQuery] = useState('');
   const [wizardStep, setWizardStep] = useState(0);
   const [maxReachedWizardStep, setMaxReachedWizardStep] = useState(0);
   const [editingId, setEditingId] = useState(null);
@@ -597,14 +599,29 @@ export default function OrgOperationsScreen({ navigation, route }) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const visibleKindOptions = useMemo(() => {
-    if (!Array.isArray(allowedActivityKinds) || allowedActivityKinds.length === 0) {
-      return KIND_OPTIONS;
-    }
-    const allowed = new Set(allowedActivityKinds);
-    const filtered = KIND_OPTIONS.filter((option) => allowed.has(option.value));
-    return filtered.length ? filtered : KIND_OPTIONS;
+  const manufacturingAllowed = useMemo(() => {
+    if (!Array.isArray(allowedActivityKinds)) return true;
+    return allowedActivityKinds.includes('manufacturing');
   }, [allowedActivityKinds]);
+
+  const visibleKindOptions = useMemo(() => {
+    let options = KIND_OPTIONS;
+    if (Array.isArray(allowedActivityKinds) && allowedActivityKinds.length > 0) {
+      const allowed = new Set(allowedActivityKinds);
+      const filtered = KIND_OPTIONS.filter((option) => allowed.has(option.value));
+      options = filtered.length ? filtered : KIND_OPTIONS;
+    }
+    if (catalogTab === 'recipes' || form.kind === 'manufacturing') {
+      return options.filter((option) => option.value === 'manufacturing');
+    }
+    return options.filter((option) => option.value !== 'manufacturing');
+  }, [allowedActivityKinds, catalogTab, form.kind]);
+
+  useEffect(() => {
+    if (!manufacturingAllowed && catalogTab === 'recipes') {
+      setCatalogTab('operations');
+    }
+  }, [manufacturingAllowed, catalogTab]);
 
   const stepDefs = useMemo(() => {
     if (form.kind === 'manufacturing') {
@@ -813,15 +830,48 @@ export default function OrgOperationsScreen({ navigation, route }) {
     setQuickAddUnit('piece');
   };
 
-  const startCreate = () => {
+  const startCreateOperation = () => {
     resetForm();
+    setCatalogTab('operations');
+    const firstOp =
+      KIND_OPTIONS.find(
+        (o) =>
+          o.value !== 'manufacturing' &&
+          (!Array.isArray(allowedActivityKinds) ||
+            allowedActivityKinds.length === 0 ||
+            allowedActivityKinds.includes(o.value)),
+      )?.value || 'other';
+    setForm({
+      ...emptyFormState(),
+      kind: firstOp,
+    });
     setMode('add');
     searchMaterials('');
     searchTools('');
   };
 
+  const startCreateRecipe = () => {
+    resetForm();
+    setCatalogTab('recipes');
+    setForm({
+      ...emptyFormState(),
+      kind: 'manufacturing',
+      consumesMaterials: true,
+    });
+    setMode('add');
+    searchMaterials('');
+    searchTools('');
+  };
+
+  const startCreate = () => {
+    if (catalogTab === 'recipes') startCreateRecipe();
+    else startCreateOperation();
+  };
+
   const startEdit = (row) => {
     const hydrated = hydrateFromRow(row);
+    const isRecipe = isManufacturingKind(row.activity_kind);
+    setCatalogTab(isRecipe ? 'recipes' : 'operations');
     setEditingId(row.id);
     setForm(hydrated);
     setSelectedMaterials(
@@ -831,6 +881,7 @@ export default function OrgOperationsScreen({ navigation, route }) {
     setFormMessage('');
     setWizardStep(0);
     setMaxReachedWizardStep(0);
+    setBomSubTab('materials');
     setMode('add');
     searchMaterials('');
     searchTools('');
@@ -1203,7 +1254,39 @@ export default function OrgOperationsScreen({ navigation, route }) {
     }
   };
 
-  const activeCount = useMemo(() => rows.filter((row) => row.is_active).length, [rows]);
+  const operationRows = useMemo(
+    () => rows.filter((row) => !isManufacturingKind(row.activity_kind)),
+    [rows],
+  );
+  const recipeRows = useMemo(
+    () => rows.filter((row) => isManufacturingKind(row.activity_kind)),
+    [rows],
+  );
+  const catalogRows = catalogTab === 'recipes' ? recipeRows : operationRows;
+
+  const filteredCatalogRows = useMemo(() => {
+    const q = listQuery.trim().toLowerCase();
+    if (!q) return catalogRows;
+    return catalogRows.filter((row) => {
+      const blob = [
+        row.name,
+        row.code,
+        row.activity_kind,
+        row.notes,
+        row.norms?.output?.material_id,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return blob.includes(q);
+    });
+  }, [catalogRows, listQuery]);
+
+  const activeCount = useMemo(
+    () => filteredCatalogRows.filter((row) => row.is_active).length,
+    [filteredCatalogRows],
+  );
+  const catalogTotal = catalogRows.length;
 
   const renderUnitChips = (selectedId, onSelect, unitList = units) => (
     <View style={styles.kindWrap}>
@@ -1504,60 +1587,62 @@ export default function OrgOperationsScreen({ navigation, route }) {
             )}
           </Text>
           {fieldErrors.code ? <Text style={styles.fieldError}>{fieldErrors.code}</Text> : null}
-          <Text style={styles.fieldLabel}>{t('org.operations.kind', null, 'Kind')}</Text>
-          <View style={styles.kindWrap}>
-            {visibleKindOptions.map((option) => {
-              const active = form.kind === option.value;
-              return (
-                <Pressable
-                  key={option.value}
-                  onPress={() => {
-                    const nextKind = option.value;
-                    setForm((prev) => ({
-                      ...prev,
-                      kind: nextKind,
-                      ...(nextKind === 'manufacturing'
-                        ? { consumesMaterials: true }
-                        : {}),
-                    }));
-                    if (nextKind === 'manufacturing') {
-                      setBomSubTab('materials');
-                      setWizardStep(0);
-                      setMaxReachedWizardStep(0);
-                    }
-                  }}
-                  style={[styles.kindChip, active && styles.kindChipActive]}
-                >
-                  <Text style={[styles.kindChipText, active && styles.kindChipTextActive]}>
-                    {t(option.labelKey, null, option.value)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          {form.kind === 'manufacturing' ? (
+            <Text style={styles.helper}>
+              {t(
+                'org.operations.recipeKindLocked',
+                null,
+                'Kind: recipe (finished product + BOM). Work steps stay on the Operations tab.',
+              )}
+            </Text>
+          ) : (
+            <>
+              <Text style={styles.fieldLabel}>{t('org.operations.kind', null, 'Kind')}</Text>
+              <View style={styles.kindWrap}>
+                {visibleKindOptions.map((option) => {
+                  const active = form.kind === option.value;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => {
+                        setForm((prev) => ({
+                          ...prev,
+                          kind: option.value,
+                        }));
+                      }}
+                      style={[styles.kindChip, active && styles.kindChipActive]}
+                    >
+                      <Text style={[styles.kindChipText, active && styles.kindChipTextActive]}>
+                        {t(option.labelKey, null, option.value)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.helper}>
+                {t(
+                  kindExampleKey(form.kind),
+                  null,
+                  form.kind === 'transport'
+                    ? 'Example: Sofia–Varna haul → worker reports km (meter start/end) + ~9 h time norm.'
+                    : form.kind === 'construction' ||
+                        form.kind === 'painting' ||
+                        form.kind === 'road_marking'
+                      ? 'Example: hidroizolaciq / painting → worker reports m² done.'
+                      : 'Pick a kind to suggest the right output units and norms.',
+                )}
+              </Text>
+            </>
+          )}
           {form.kind === 'manufacturing' ? (
             <Text style={styles.helper}>
               {t(
                 'org.operations.recipeNotOrderHint',
                 null,
-                'This is a recipe in the catalog (BOM + finished good) — not a production order. After you save, create a task and pick this operation to run an order.',
+                'Recipe in the catalog — not an order. After save: Tasks → Production order and pick this recipe.',
               )}
             </Text>
           ) : null}
-          <Text style={styles.helper}>
-            {t(
-              kindExampleKey(form.kind),
-              null,
-              form.kind === 'transport'
-                ? 'Example: Sofia–Varna haul → worker reports km (meter start/end) + ~9 h time norm.'
-                : form.kind === 'construction' ||
-                    form.kind === 'painting' ||
-                    form.kind === 'road_marking'
-                  ? 'Example: hidroizolaciq / painting → worker reports m² done.'
-                  : 'Pick a kind to suggest the right output units and norms.',
-            )}
-          </Text>
-          <TextInput
             label={t('org.operations.notes', null, 'Notes')}
             value={form.notes}
             onChangeText={(value) => setField('notes', value)}
@@ -2645,7 +2730,11 @@ export default function OrgOperationsScreen({ navigation, route }) {
     <ScreenBackground safeArea={false}>
       <OrgAppHeader
         mode="detail"
-        title={t('org.operations.title', null, 'Operations')}
+        title={
+          catalogTab === 'recipes'
+            ? t('org.operations.recipesTitle', null, 'Recipes')
+            : t('org.operations.title', null, 'Operations')
+        }
         onBack={onBack}
       />
       <ScrollView
@@ -2653,30 +2742,66 @@ export default function OrgOperationsScreen({ navigation, route }) {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.lead}>
-          {t(
-            'org.operations.leadWithRecipes',
-            null,
-            'Site operations for work cards, and manufacturing recipes (BOM) for production orders. Create a Production order from Tasks after you save a recipe.',
-          )}
+          {catalogTab === 'recipes'
+            ? t(
+                'org.operations.leadRecipes',
+                null,
+                'Recipes = finished product + BOM. A production order uses a recipe (materials) and can also use operations as work steps.',
+              )
+            : t(
+                'org.operations.leadOperations',
+                null,
+                'Operations = work steps for site tasks and for production-order routing. Recipes (BOM) live on the Recipes tab.',
+              )}
         </Text>
 
         <View style={styles.modeRow}>
-          {MODES.map((item) => {
-            const active = mode === item.id;
-            const disabled = item.id === 'add' && !canManage;
-            return (
-              <Pressable
-                key={item.id}
-                disabled={disabled}
-                onPress={() => (item.id === 'add' ? startCreate() : setMode('list'))}
-                style={[styles.modeChip, active && styles.modeChipActive, disabled && styles.modeChipDisabled]}
+          <Pressable
+            onPress={() => {
+              setCatalogTab('operations');
+              setListQuery('');
+              setMode('list');
+            }}
+            style={[
+              styles.modeChip,
+              catalogTab === 'operations' && mode === 'list' && styles.modeChipActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.modeChipText,
+                catalogTab === 'operations' &&
+                  mode === 'list' &&
+                  styles.modeChipTextActive,
+              ]}
+            >
+              {t('org.operations.tabOperations', null, 'Operations')}
+            </Text>
+          </Pressable>
+          {manufacturingAllowed ? (
+            <Pressable
+              onPress={() => {
+                setCatalogTab('recipes');
+                setListQuery('');
+                setMode('list');
+              }}
+              style={[
+                styles.modeChip,
+                catalogTab === 'recipes' && mode === 'list' && styles.modeChipActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.modeChipText,
+                  catalogTab === 'recipes' &&
+                    mode === 'list' &&
+                    styles.modeChipTextActive,
+                ]}
               >
-                <Text style={[styles.modeChipText, active && styles.modeChipTextActive]}>
-                  {t(item.labelKey, null, item.id)}
-                </Text>
-              </Pressable>
-            );
-          })}
+                {t('org.operations.tabRecipes', null, 'Recipes')}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {loading ? (
@@ -2691,25 +2816,69 @@ export default function OrgOperationsScreen({ navigation, route }) {
         ) : (
           <AppCard style={styles.card} contentStyle={CARD_SURFACE}>
             <Text style={styles.sectionTitle}>
-              {t('org.operations.catalogTitle', null, 'Company operations')}
+              {catalogTab === 'recipes'
+                ? t('org.operations.recipesCatalogTitle', null, 'Production recipes')
+                : t('org.operations.catalogTitle', null, 'Company operations')}
             </Text>
             <Text style={styles.meta}>
               {t(
                 'org.operations.count',
-                { active: activeCount, total: rows.length },
-                `${activeCount} active of ${rows.length}`,
+                {
+                  active: activeCount,
+                  total: listQuery.trim()
+                    ? filteredCatalogRows.length
+                    : catalogTotal,
+                },
+                `${activeCount} active of ${
+                  listQuery.trim() ? filteredCatalogRows.length : catalogTotal
+                }`,
               )}
+              {listQuery.trim() && catalogTotal !== filteredCatalogRows.length
+                ? ` · ${t(
+                    'org.operations.ofTotal',
+                    { total: catalogTotal },
+                    `of ${catalogTotal}`,
+                  )}`
+                : ''}
             </Text>
-            {rows.length === 0 ? (
+            {(catalogTab === 'recipes' || catalogTotal > 12) && catalogTotal > 0 ? (
+              <TextInput
+                label={
+                  catalogTab === 'recipes'
+                    ? t(
+                        'org.operations.searchRecipes',
+                        null,
+                        'Search recipes / products',
+                      )
+                    : t('org.operations.searchOperations', null, 'Search operations')
+                }
+                value={listQuery}
+                onChangeText={setListQuery}
+                mode="outlined"
+                style={styles.input}
+                textColor={ON_CARD}
+              />
+            ) : null}
+            {catalogTotal === 0 ? (
               <Text style={styles.empty}>
-                {t(
-                  'org.operations.empty',
-                  null,
-                  'No operations yet. Create transport, road marking, or other work types your team uses.',
-                )}
+                {catalogTab === 'recipes'
+                  ? t(
+                      'org.operations.emptyRecipes',
+                      null,
+                      'No recipes yet. Add a recipe for each finished product (BOM + materials).',
+                    )
+                  : t(
+                      'org.operations.emptyOperations',
+                      null,
+                      'No operations yet. Add work steps your team uses on site tasks (and later on production orders).',
+                    )}
+              </Text>
+            ) : filteredCatalogRows.length === 0 ? (
+              <Text style={styles.empty}>
+                {t('org.operations.searchNoResults', null, 'No matches for this search.')}
               </Text>
             ) : (
-              rows.map((row) => (
+              filteredCatalogRows.map((row) => (
                 <View key={row.id} style={styles.row}>
                   <View style={styles.rowBody}>
                     <Text style={styles.rowTitle}>{row.name}</Text>
@@ -2755,9 +2924,45 @@ export default function OrgOperationsScreen({ navigation, route }) {
               ))
             )}
             {canManage ? (
-              <Button mode="contained" onPress={startCreate} style={styles.primaryBtn}>
-                {t('org.operations.addOperation', null, 'Add operation')}
-              </Button>
+              <View style={styles.addBtnStack}>
+                {catalogTab === 'recipes' ? (
+                  <Button
+                    mode="contained"
+                    onPress={startCreateRecipe}
+                    style={styles.primaryBtn}
+                  >
+                    {t(
+                      'org.operations.addRecipeCta',
+                      null,
+                      'Add recipe (finished product)',
+                    )}
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      mode="contained"
+                      onPress={startCreateOperation}
+                      style={styles.primaryBtn}
+                    >
+                      {t('org.operations.addOperation', null, 'Add operation')}
+                    </Button>
+                    {manufacturingAllowed ? (
+                      <Button
+                        mode="outlined"
+                        textColor={ON_CARD}
+                        onPress={startCreateRecipe}
+                        style={styles.secondaryAddBtn}
+                      >
+                        {t(
+                          'org.operations.addRecipeCta',
+                          null,
+                          'Add recipe (finished product)',
+                        )}
+                      </Button>
+                    ) : null}
+                  </>
+                )}
+              </View>
             ) : null}
           </AppCard>
         )}
@@ -3063,6 +3268,14 @@ const styles = StyleSheet.create({
   primaryBtn: {
     marginTop: 4,
     marginBottom: 4,
+  },
+  addBtnStack: {
+    marginTop: 4,
+    gap: 8,
+  },
+  secondaryAddBtn: {
+    marginTop: 4,
+    borderColor: '#CBD5E1',
   },
   stepRow: {
     flexDirection: 'row',

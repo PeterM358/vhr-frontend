@@ -550,7 +550,21 @@
       "quickAddName": "Name",
       "quickAddHint": "Creates a warehouse SKU with qty 0. You can stock it later.",
       "quickAddNameRequired": "Enter a name for the new SKU.",
-      "quickAddError": "Could not add SKU."
+      "quickAddError": "Could not add SKU.",
+      "tabOperations": "Operations",
+      "tabRecipes": "Recipes",
+      "recipesTitle": "Recipes",
+      "recipesCatalogTitle": "Production recipes",
+      "leadOperations": "Operations = work steps for site tasks and for production-order routing. Recipes (BOM) live on the Recipes tab.",
+      "leadRecipes": "Recipes = finished product + BOM. A production order uses a recipe (materials) and can also use operations as work steps.",
+      "addRecipeCta": "Add recipe (finished product)",
+      "emptyRecipes": "No recipes yet. Add a recipe for each finished product (BOM + materials).",
+      "emptyOperations": "No operations yet. Add work steps your team uses on site tasks (and later on production orders).",
+      "searchRecipes": "Search recipes / products",
+      "searchOperations": "Search operations",
+      "searchNoResults": "No matches for this search.",
+      "ofTotal": "of {total}",
+      "recipeKindLocked": "Kind: recipe (finished product + BOM). Work steps stay on the Operations tab."
     },
     "warehouse": {
       "title": "Warehouse",
