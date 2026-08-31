@@ -229,6 +229,9 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const routeOrgId = route?.params?.organizationId || route?.params?.orgId;
   const returnTo = route?.params?.returnTo;
   const returnMonth = route?.params?.returnMonth;
+  const initialTaskMode = route?.params?.taskMode === 'production' || route?.params?.taskMode === 'site'
+    ? route.params.taskMode
+    : null;
   const scrollBottomPadding = useScrollContentBottomPadding(40);
 
   const [orgId, setOrgId] = useState(null);
@@ -276,7 +279,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
   const [photoRef, setPhotoRef] = useState('');
   const [documentRef, setDocumentRef] = useState('');
   /** Explicit mode when org has both site and production — site | production | null */
-  const [taskMode, setTaskMode] = useState(null);
+  const [taskMode, setTaskMode] = useState(initialTaskMode);
 
   const flavor = useMemo(() => detectTaskFlavor(activities), [activities]);
   const hasManufacturingOps = useMemo(
@@ -433,15 +436,17 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     return { full, mapsUrl };
   }, [outboundShipments, returnShipments]);
 
+  const isProductionOrder =
+    taskMode === 'production' || (taskMode == null && flavor === 'production');
+
   const stepDefs = useMemo(() => {
-    const taskNoun =
-      flavor === 'transport'
+    const taskNoun = isProductionOrder
+      ? t('org.tasks.wizard.nounProduction', null, 'production order')
+      : flavor === 'transport'
         ? t('org.tasks.wizard.nounTransport', null, 'waybill / work card')
         : flavor === 'construction'
           ? t('org.tasks.wizard.nounConstruction', null, 'site / work card')
-          : flavor === 'production'
-            ? t('org.tasks.wizard.nounProduction', null, 'production order')
-            : t('org.tasks.wizard.nounGeneric', null, 'work card');
+          : t('org.tasks.wizard.nounGeneric', null, 'work card');
     const steps = [
       {
         id: 'project',
@@ -461,7 +466,10 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
           'Schedule date and planned start for reminders. Workers tap Start/End themselves.',
         ),
       },
-      {
+    ];
+    // Production orders are shop/warehouse work — no fleet vehicles step.
+    if (!isProductionOrder) {
+      steps.push({
         id: 'vehicle',
         title: t('org.tasks.wizard.stepVehicle', null, 'Vehicles'),
         hint: t(
@@ -469,7 +477,9 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
           null,
           'Select one or more fleet vehicles. Filter by readiness and type. Warnings show when not ready.',
         ),
-      },
+      });
+    }
+    steps.push(
       {
         id: 'people',
         title: t('org.tasks.wizard.stepPeople', null, 'People'),
@@ -481,15 +491,23 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
       },
       {
         id: 'operations',
-        title: t('org.tasks.wizard.stepOperations', null, 'Operations'),
-        hint: t(
-          'org.tasks.wizard.stepOperationsHintMixed',
-          null,
-          'Pick one or more operations. You can mix transport + marking on the same work card; assign people per operation.',
-        ),
+        title: isProductionOrder
+          ? t('org.tasks.wizard.stepRecipeAndOps', null, 'Recipe')
+          : t('org.tasks.wizard.stepOperations', null, 'Operations'),
+        hint: isProductionOrder
+          ? t(
+              'org.tasks.wizard.stepRecipeAndOpsHint',
+              null,
+              'Pick the recipe, how many units to produce, then optional work steps. Next: issue materials from warehouse.',
+            )
+          : t(
+              'org.tasks.wizard.stepOperationsHintMixed',
+              null,
+              'Pick one or more operations. You can mix transport + marking on the same work card; assign people per operation.',
+            ),
       },
-    ];
-    if (hasTransportOps) {
+    );
+    if (hasTransportOps && !isProductionOrder) {
       steps.push({
         id: 'shipments',
         title: t('org.tasks.wizard.stepShipments', null, 'Shipments'),
@@ -503,14 +521,20 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     steps.push({
       id: 'review',
       title: t('org.tasks.wizard.stepReview', null, 'Review'),
-      hint: t(
-        'org.tasks.wizard.stepReviewHint',
-        null,
-        'Confirm and create. You will go to the tasks list.',
-      ),
+      hint: isProductionOrder
+        ? t(
+            'org.tasks.wizard.stepReviewHintProduction',
+            null,
+            'Confirm recipe and quantity. After create: issue materials from warehouse, then Complete production.',
+          )
+        : t(
+            'org.tasks.wizard.stepReviewHint',
+            null,
+            'Confirm and create. You will go to the tasks list.',
+          ),
     });
     return steps;
-  }, [flavor, t, hasTransportOps]);
+  }, [flavor, t, hasTransportOps, isProductionOrder]);
 
   const goAfterLeave = useCallback(() => {
     const id = routeOrgId || orgId;
@@ -876,8 +900,8 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
         planned_end: plannedEnd.trim() || null,
         photo_refs: photoRef.trim() ? [photoRef.trim()] : [],
         document_refs: documentRef.trim() ? [documentRef.trim()] : [],
-        vehicle_ids: vehicleIds,
-        vehicle_id: vehicleIds[0] || null,
+        vehicle_ids: isProductionOrder ? [] : vehicleIds,
+        vehicle_id: isProductionOrder ? null : vehicleIds[0] || null,
         assignee_user_ids: overallAssignees,
         allow_vehicle_overlap: allowVehicle || undefined,
         allow_assignee_overlap: allowAssignee || undefined,
@@ -1254,6 +1278,9 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                     setTaskMode('production');
                     setTemplateId(null);
                     setSelectedOps([]);
+                    setVehicleIds([]);
+                    setOutboundShipments([]);
+                    setReturnShipments([]);
                     if (hasManufacturingOps) applyTemplate('production_day');
                   }}
                   style={[
@@ -1633,7 +1660,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                   label={t(
                     'org.tasks.productionQtyLabel',
                     null,
-                    'Finished quantity (this order)',
+                    'Quantity to produce',
                   )}
                   value={productionQty}
                   onChangeText={(value) =>
@@ -1649,7 +1676,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                   {t(
                     'org.tasks.productionQtyHint',
                     null,
-                    'BOM rates are for 1 finished unit. Enter 10 or 100 here — issue suggestions and Complete production scale by this qty.',
+                    'How many of this product to make now (e.g. 10 or 150). Warehouse will issue materials for that many; Complete production receives them into stock.',
                   )}
                 </Text>
               </>
@@ -1990,12 +2017,14 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             .filter(Boolean)
             .join(' ')}
         </Text>
-        <Text style={styles.reviewLine}>
-          <Text style={styles.reviewKey}>{t('org.tasks.vehicles', null, 'Vehicles')}: </Text>
-          {selectedVehicles.length
-            ? selectedVehicles.map(vehicleLabel).join(', ')
-            : t('org.tasks.noVehicle', null, 'None')}
-        </Text>
+        {!isProductionOrder ? (
+          <Text style={styles.reviewLine}>
+            <Text style={styles.reviewKey}>{t('org.tasks.vehicles', null, 'Vehicles')}: </Text>
+            {selectedVehicles.length
+              ? selectedVehicles.map(vehicleLabel).join(', ')
+              : t('org.tasks.noVehicle', null, 'None')}
+          </Text>
+        ) : null}
         <Text style={styles.reviewLine}>
           <Text style={styles.reviewKey}>{t('org.tasks.overallPeople', null, 'People')}: </Text>
           {overallAssignees.length
@@ -2004,7 +2033,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                 .join(', ')
             : t('org.tasks.noPeople', null, 'No people assigned')}
         </Text>
-        {taskMode === 'production' && selectedRecipeId ? (
+        {isProductionOrder && selectedRecipeId ? (
           <>
             <Text style={styles.reviewLine}>
               <Text style={styles.reviewKey}>
@@ -2014,19 +2043,24 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
             </Text>
             <Text style={styles.reviewLine}>
               <Text style={styles.reviewKey}>
-                {t('org.tasks.productionQtyLabel', null, 'Finished quantity')}:{' '}
+                {t('org.tasks.productionQtyLabel', null, 'Quantity to produce')}:{' '}
               </Text>
               {String(productionQty || '1').trim() || '1'}
             </Text>
           </>
         ) : null}
         <Text style={styles.reviewLine}>
-          <Text style={styles.reviewKey}>{t('org.tasks.operationsTitle', null, 'Operations')}: </Text>
+          <Text style={styles.reviewKey}>
+            {isProductionOrder
+              ? t('org.tasks.routingOpsLabel', null, 'Operations (optional)')
+              : t('org.tasks.operationsTitle', null, 'Operations')}
+            :{' '}
+          </Text>
           {selectedOps
             .map((row) => activities.find((a) => a.id === row.activityId)?.name)
             .filter(Boolean)
             .join(', ') ||
-            (taskMode === 'production'
+            (isProductionOrder
               ? t('org.tasks.routingOpsNoneReview', null, 'None (recipe only)')
               : '—')}
         </Text>
@@ -2034,8 +2068,7 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
           <Text style={styles.reviewKey}>{t('org.tasks.materialsTitle', null, 'Materials')}: </Text>
           {(() => {
             const seen = new Map();
-            selectedOps.forEach((row) => {
-              const act = activities.find((a) => a.id === row.activityId);
+            const addMats = (act) => {
               (act?.default_materials || []).forEach((mat) => {
                 if (mat?.id != null && !seen.has(mat.id)) {
                   const unit =
@@ -2048,11 +2081,23 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                   );
                 }
               });
+            };
+            if (isProductionOrder && selectedRecipeId) {
+              addMats(recipeActivities.find((a) => a.id === selectedRecipeId));
+            }
+            selectedOps.forEach((row) => {
+              addMats(activities.find((a) => a.id === row.activityId));
             });
             const names = [...seen.values()];
             return names.length
               ? names.join(', ')
-              : t('org.tasks.materialsNoneYet', null, 'None from selected operations');
+              : isProductionOrder
+                ? t(
+                    'org.tasks.materialsFromRecipeNone',
+                    null,
+                    'None on recipe yet — add materials on the recipe, then issue from warehouse',
+                  )
+                : t('org.tasks.materialsNoneYet', null, 'None from selected operations');
           })()}
         </Text>
         <TextInput
@@ -2087,19 +2132,23 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
     <ScreenBackground safeArea={false}>
       <OrgAppHeader
         mode="detail"
-        title={t('org.tasks.createTitle', null, 'Create task')}
+        title={
+          isProductionOrder
+            ? t('org.tasks.createProductionTitle', null, 'Create production order')
+            : t('org.tasks.createTitle', null, 'Create task')
+        }
         onBack={onBack}
       />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: scrollBottomPadding }]}
         keyboardShouldPersistTaps="handled"
       >
-        {taskMode === 'production' || flavor === 'production' ? (
+        {isProductionOrder ? (
           <Text style={styles.lead}>
             {t(
               'org.tasks.wizard.leadProduction',
               null,
-              'Production order: one recipe + optional operations. Issue materials, then Complete production for finished goods.',
+              'Production order: recipe + quantity. Then issue paint/materials from warehouse and Complete production.',
             )}
           </Text>
         ) : taskMode === 'site' || flavor === 'construction' ? (
@@ -2227,7 +2276,9 @@ export default function OrgCreateTaskScreen({ navigation, route }) {
                   onPress={save}
                   style={styles.navBtn}
                 >
-                  {t('org.tasks.save', null, 'Create task')}
+                  {isProductionOrder
+                    ? t('org.tasks.saveProduction', null, 'Create production order')
+                    : t('org.tasks.save', null, 'Create task')}
                 </Button>
               )}
             </View>

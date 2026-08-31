@@ -36,7 +36,7 @@ import UnitOfMeasurePicker from '../components/org/UnitOfMeasurePicker';
 import WorkOrderShipmentsEditor from '../components/org/WorkOrderShipmentsEditor';
 import { compressImageForUpload } from '../utils/compressImage';
 import { listOrgMaterials, listWarehouseLocations } from '../api/orgWarehouse';
-import { resolveActiveOrganizationId } from '../utils/orgWorkspace';
+import { resolveActiveOrganizationId, orgHasProductionActivity, organizationMembershipFor, readOrganizationMemberships } from '../utils/orgWorkspace';
 import {
   navigateToOrgCreateTask,
   navigateToOrgHome,
@@ -756,6 +756,9 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [editPlannedStart, setEditPlannedStart] = useState('');
   const [editPlannedEnd, setEditPlannedEnd] = useState('');
 
+  const [createChooserOpen, setCreateChooserOpen] = useState(false);
+  const [hasProduction, setHasProduction] = useState(false);
+
   const onBack = useCallback(() => {
     if (selectedId) {
       setSelectedId(null);
@@ -765,9 +768,24 @@ export default function OrgTasksScreen({ navigation, route }) {
     navigateToOrgHome(navigation, { orgId: routeOrgId || orgId });
   }, [navigation, orgId, routeOrgId, selectedId]);
 
-  const openCreateTab = useCallback(() => {
-    navigateToOrgCreateTask(navigation, { orgId: routeOrgId || orgId });
-  }, [navigation, orgId, routeOrgId]);
+  const openCreateTab = useCallback(
+    (mode) => {
+      setCreateChooserOpen(false);
+      navigateToOrgCreateTask(navigation, {
+        orgId: routeOrgId || orgId,
+        ...(mode === 'production' || mode === 'site' ? { taskMode: mode } : {}),
+      });
+    },
+    [navigation, orgId, routeOrgId],
+  );
+
+  const onPressAddFab = useCallback(async () => {
+    if (hasProduction) {
+      setCreateChooserOpen(true);
+      return;
+    }
+    openCreateTab();
+  }, [hasProduction, openCreateTab]);
 
   const selectTab = useCallback((tabId) => {
     setActiveTab(tabId);
@@ -796,6 +814,13 @@ export default function OrgTasksScreen({ navigation, route }) {
         setError(t('org.tasks.loadError', null, 'Could not load tasks.'));
         setRows([]);
         return;
+      }
+      try {
+        const memberships = await readOrganizationMemberships();
+        const membership = organizationMembershipFor(memberships, resolved);
+        setHasProduction(orgHasProductionActivity(membership));
+      } catch (_) {
+        setHasProduction(false);
       }
       const params = { compact: 1 };
       if (filterFrom) params.from = filterFrom;
@@ -3880,11 +3905,61 @@ export default function OrgTasksScreen({ navigation, route }) {
         <FAB
           icon="plus"
           style={[styles.fab, { backgroundColor: COLORS.PRIMARY }]}
-          onPress={openCreateTab}
-          label={t('org.tasks.addTask', null, 'Add task')}
+          onPress={onPressAddFab}
+          label={
+            hasProduction
+              ? t('org.tasks.addTaskOrPo', null, 'Add task / PO')
+              : t('org.tasks.addTask', null, 'Add task')
+          }
           color="#fff"
         />
       ) : null}
+
+      <Modal
+        visible={createChooserOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCreateChooserOpen(false)}
+      >
+        <Pressable
+          style={styles.wizardBackdrop}
+          onPress={() => setCreateChooserOpen(false)}
+        >
+          <View style={styles.wizardCard}>
+            <Text style={styles.wizardTitle}>
+              {t('org.tasks.taskModeLabel', null, 'Task or production order?')}
+            </Text>
+            <Text style={styles.wizardHint}>
+              {t(
+                'org.tasks.createChooserHint',
+                null,
+                'Site task = work on object. Production order = make products from a recipe, then pick materials from warehouse.',
+              )}
+            </Text>
+            <Button
+              mode="contained"
+              onPress={() => openCreateTab('site')}
+              style={{ marginTop: 12 }}
+            >
+              {t('org.tasks.taskModeSite', null, 'Site work card')}
+            </Button>
+            <Button
+              mode="contained"
+              onPress={() => openCreateTab('production')}
+              style={{ marginTop: 10 }}
+            >
+              {t('org.tasks.taskModeProduction', null, 'Production order')}
+            </Button>
+            <Button
+              mode="text"
+              onPress={() => setCreateChooserOpen(false)}
+              style={{ marginTop: 8 }}
+            >
+              {t('common.cancel', null, 'Cancel')}
+            </Button>
+          </View>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={startWizardOpen}

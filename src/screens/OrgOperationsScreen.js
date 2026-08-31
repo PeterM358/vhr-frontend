@@ -274,22 +274,30 @@ function inferOutputMeasureFromUnits(reportUnitIds, units) {
 function resolveUnitIdForMeasure(units, measure) {
   const want = String(measure || '').toLowerCase();
   if (!want || !Array.isArray(units)) return null;
-  const byKind = units.find(
-    (u) => String(u.measure_kind || '').toLowerCase() === want,
-  );
-  if (byKind?.id) return Number(byKind.id);
   const aliases =
     want === 'volume'
       ? ['l', 'lt', 'liter', 'litre']
       : want === 'mass'
         ? ['kg', 'кг']
-        : ['pcs', 'piece', 'бр'];
+        : ['pcs', 'piece', 'бр', 'бр.'];
+  // Prefer kg / L / pcs — never the first mass unit (often mg).
   const byCode = units.find((u) => {
     const c = String(u.code || '').toLowerCase();
     const s = String(u.symbol || '').toLowerCase();
     return aliases.includes(c) || aliases.includes(s);
   });
-  return byCode?.id ? Number(byCode.id) : null;
+  if (byCode?.id) return Number(byCode.id);
+  const skipTiny = new Set(['mg', 'g', 'ml', 'мм', 'mm']);
+  const byKind = units.find((u) => {
+    if (String(u.measure_kind || '').toLowerCase() !== want) return false;
+    const c = String(u.code || '').toLowerCase();
+    const s = String(u.symbol || '').toLowerCase();
+    if ((want === 'mass' || want === 'volume') && (skipTiny.has(c) || skipTiny.has(s))) {
+      return false;
+    }
+    return true;
+  });
+  return byKind?.id ? Number(byKind.id) : null;
 }
 
 function hydrateFromRow(row) {
@@ -2628,7 +2636,9 @@ export default function OrgOperationsScreen({ navigation, route }) {
       );
     } else if (selectedIdsReview.length) {
       const reviewOutputLbl =
-        unitLabel(resolveOutputBasisUnit(form, findUnit)) || 'm²';
+        form.kind === 'manufacturing'
+          ? outputMeasureLabel(form.outputMeasure, t)
+          : unitLabel(resolveOutputBasisUnit(form, findUnit)) || 'm²';
       const parts = selectedIdsReview
         .map((mid) => {
           const meta = (form.materialNorms && form.materialNorms[mid]) || {};
@@ -2674,45 +2684,6 @@ export default function OrgOperationsScreen({ navigation, route }) {
           <Text style={styles.reviewKey}>{t('org.operations.kind', null, 'Kind')}: </Text>
           {kindLabel(form.kind)}
         </Text>
-        <Text style={styles.reviewLine}>
-          <Text style={styles.reviewKey}>
-            {t('org.operations.wizard.workerReportsLabel', null, 'Worker reports')}:{' '}
-          </Text>
-          {(form.reportUnitIds || [])
-            .map((id) => unitLabel(findUnit(id)))
-            .filter(Boolean)
-            .join(' · ') ||
-            unitLabel(findUnit(form.unitId)) ||
-            t('org.operations.unitNone', null, 'None')}
-        </Text>
-        <Text style={styles.reviewLine}>
-          <Text style={styles.reviewKey}>
-            {t('org.operations.plannedHours', null, 'Time norm (hours)')}:{' '}
-          </Text>
-          {hours}
-        </Text>
-        <Text style={styles.reviewLine}>
-          <Text style={styles.reviewKey}>
-            {t('org.operations.wizard.ratesReview', null, 'Norm rates')}:{' '}
-          </Text>
-          {rateLine}
-        </Text>
-        <Text style={styles.reviewLine}>
-          <Text style={styles.reviewKey}>
-            {t('org.operations.consumesMaterials', null, 'Consumes materials')}:{' '}
-          </Text>
-          {form.kind === 'labor_only' || !form.consumesMaterials
-            ? t('org.operations.wizard.no', null, 'No')
-            : t('org.operations.wizard.yes', null, 'Yes')}
-        </Text>
-        {form.consumesMaterials && materialNames ? (
-          <Text style={styles.reviewLine}>
-            <Text style={styles.reviewKey}>
-              {t('org.operations.defaultMaterials', null, 'Default materials')}:{' '}
-            </Text>
-            {materialNames}
-          </Text>
-        ) : null}
         {form.kind === 'manufacturing' ? (
           <>
             <Text style={styles.reviewLine}>
@@ -2728,8 +2699,64 @@ export default function OrgOperationsScreen({ navigation, route }) {
               {form.outputMaterialLabel || form.name.trim() || '—'}
               {` × ${form.outputQtyPerUnit || '1'} ${outputMeasureLabel(form.outputMeasure, t)}`}
             </Text>
+            <Text style={styles.reviewLine}>
+              <Text style={styles.reviewKey}>
+                {t('org.operations.wizard.ratesReview', null, 'BOM rates')}:{' '}
+              </Text>
+              {rateLine}
+            </Text>
+            {form.consumesMaterials && materialNames ? (
+              <Text style={styles.reviewLine}>
+                <Text style={styles.reviewKey}>
+                  {t('org.operations.defaultMaterials', null, 'Materials')}:{' '}
+                </Text>
+                {materialNames}
+              </Text>
+            ) : null}
           </>
-        ) : null}
+        ) : (
+          <>
+            <Text style={styles.reviewLine}>
+              <Text style={styles.reviewKey}>
+                {t('org.operations.wizard.workerReportsLabel', null, 'Worker reports')}:{' '}
+              </Text>
+              {(form.reportUnitIds || [])
+                .map((id) => unitLabel(findUnit(id)))
+                .filter(Boolean)
+                .join(' · ') ||
+                unitLabel(findUnit(form.unitId)) ||
+                t('org.operations.unitNone', null, 'None')}
+            </Text>
+            <Text style={styles.reviewLine}>
+              <Text style={styles.reviewKey}>
+                {t('org.operations.plannedHours', null, 'Time norm (hours)')}:{' '}
+              </Text>
+              {hours}
+            </Text>
+            <Text style={styles.reviewLine}>
+              <Text style={styles.reviewKey}>
+                {t('org.operations.wizard.ratesReview', null, 'Norm rates')}:{' '}
+              </Text>
+              {rateLine}
+            </Text>
+            <Text style={styles.reviewLine}>
+              <Text style={styles.reviewKey}>
+                {t('org.operations.consumesMaterials', null, 'Consumes materials')}:{' '}
+              </Text>
+              {form.kind === 'labor_only' || !form.consumesMaterials
+                ? t('org.operations.wizard.no', null, 'No')
+                : t('org.operations.wizard.yes', null, 'Yes')}
+            </Text>
+            {form.consumesMaterials && materialNames ? (
+              <Text style={styles.reviewLine}>
+                <Text style={styles.reviewKey}>
+                  {t('org.operations.defaultMaterials', null, 'Default materials')}:{' '}
+                </Text>
+                {materialNames}
+              </Text>
+            ) : null}
+          </>
+        )}
         {form.notes.trim() ? (
           <Text style={styles.reviewLine}>
             <Text style={styles.reviewKey}>{t('org.operations.notes', null, 'Notes')}: </Text>
