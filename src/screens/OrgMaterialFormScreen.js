@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, Button, Switch, Text, TextInput } from 'react-native-paper';
+import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 
 import ScreenBackground from '../components/ScreenBackground';
@@ -55,6 +55,7 @@ export default function OrgMaterialFormScreen({ navigation, route }) {
   const [unitPrice, setUnitPrice] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [isDurable, setIsDurable] = useState(false);
+  const [isFinishedGood, setIsFinishedGood] = useState(false);
   const [locationId, setLocationId] = useState(null);
   const [materialId, setMaterialId] = useState(null);
   const [stockId, setStockId] = useState(null);
@@ -134,6 +135,7 @@ export default function OrgMaterialFormScreen({ navigation, route }) {
         setQuantity(String(row.quantity_on_hand ?? '0'));
         setUnitCode(row.unit_code || 'piece');
         setIsDurable(Boolean(row.is_durable_tool));
+        setIsFinishedGood(Boolean(row.is_finished_good));
         setLocationId(row.location_id || null);
         setNumberedCount(
           row.tool_assets_numbered != null ? Number(row.tool_assets_numbered) : null,
@@ -148,6 +150,7 @@ export default function OrgMaterialFormScreen({ navigation, route }) {
         setUnitPrice('');
         setInvoiceNumber('');
         setIsDurable(false);
+        setIsFinishedGood(false);
         setLocationId(locRows.find((r) => r.is_active !== false)?.id || null);
         setNumberedCount(null);
       }
@@ -163,6 +166,21 @@ export default function OrgMaterialFormScreen({ navigation, route }) {
       load();
     }, [load]),
   );
+
+  const stockKind = isDurable ? 'tool' : isFinishedGood ? 'finished' : 'raw';
+
+  const setStockKind = (kind) => {
+    if (kind === 'tool') {
+      setIsDurable(true);
+      setIsFinishedGood(false);
+    } else if (kind === 'finished') {
+      setIsDurable(false);
+      setIsFinishedGood(true);
+    } else {
+      setIsDurable(false);
+      setIsFinishedGood(false);
+    }
+  };
 
   const onSave = async () => {
     if (!orgId || !canManage) return;
@@ -198,6 +216,8 @@ export default function OrgMaterialFormScreen({ navigation, route }) {
           unit_price: unitPrice || '0',
           invoice_number: invoiceNumber.trim() || undefined,
           is_durable_tool: Boolean(isDurable),
+          is_finished_good: Boolean(isFinishedGood) && !isDurable,
+          stock_kind: stockKind,
           location_id: locationId || undefined,
         });
       } else {
@@ -206,6 +226,8 @@ export default function OrgMaterialFormScreen({ navigation, route }) {
           part_number: partNumber.trim(),
           description: name.trim(),
           is_durable_tool: Boolean(isDurable),
+          is_finished_good: Boolean(isFinishedGood) && !isDurable,
+          stock_kind: stockKind,
           quantity_on_hand: String(quantity || '0'),
           location_id: locationId || undefined,
         });
@@ -364,20 +386,44 @@ export default function OrgMaterialFormScreen({ navigation, route }) {
               })}
             </View>
 
-            <View style={styles.switchRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>
-                  {t('org.warehouse.intake.durableTool', null, 'Durable tool (hand machine)')}
-                </Text>
-                <Text style={styles.hint}>
-                  {t(
-                    'org.warehouse.intake.durableToolHint',
-                    null,
-                    'Drill, grinder, etc. — not consumed on tasks; write off via scrap when broken.',
-                  )}
-                </Text>
-              </View>
-              <Switch value={isDurable} onValueChange={setIsDurable} />
+            <Text style={styles.label}>
+              {t('org.warehouse.intake.stockKindLabel', null, 'Material type')}
+            </Text>
+            <Text style={styles.hint}>
+              {t(
+                'org.warehouse.intake.stockKindHint',
+                null,
+                'Raw = ingredients. Finished = ready goods (recipe output). Tool = durable machine — not consumed.',
+              )}
+            </Text>
+            <View style={styles.chipRow}>
+              {[
+                {
+                  id: 'raw',
+                  label: t('org.warehouse.intake.stockKindRaw', null, 'Raw material'),
+                },
+                {
+                  id: 'finished',
+                  label: t('org.warehouse.intake.stockKindFinished', null, 'Finished product'),
+                },
+                {
+                  id: 'tool',
+                  label: t('org.warehouse.intake.stockKindTool', null, 'Tool'),
+                },
+              ].map((opt) => {
+                const active = stockKind === opt.id;
+                return (
+                  <Pressable
+                    key={opt.id}
+                    onPress={() => setStockKind(opt.id)}
+                    style={[styles.chip, active && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
 
             <View style={styles.actions}>

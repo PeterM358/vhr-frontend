@@ -708,6 +708,10 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [activeTab, setActiveTab] = useState(
     routeTab === 'all' || routeTab === 'completed' ? routeTab : 'open',
   );
+  /** work | production — when org has production activity */
+  const [orderSurface, setOrderSurface] = useState(
+    route?.params?.orderSurface === 'production' ? 'production' : 'work',
+  );
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
   const [periodSummary, setPeriodSummary] = useState(null);
@@ -756,7 +760,6 @@ export default function OrgTasksScreen({ navigation, route }) {
   const [editPlannedStart, setEditPlannedStart] = useState('');
   const [editPlannedEnd, setEditPlannedEnd] = useState('');
 
-  const [createChooserOpen, setCreateChooserOpen] = useState(false);
   const [hasProduction, setHasProduction] = useState(false);
 
   const onBack = useCallback(() => {
@@ -770,22 +773,28 @@ export default function OrgTasksScreen({ navigation, route }) {
 
   const openCreateTab = useCallback(
     (mode) => {
-      setCreateChooserOpen(false);
+      const resolvedMode =
+        mode === 'production' || mode === 'site'
+          ? mode
+          : orderSurface === 'production'
+            ? 'production'
+            : 'site';
       navigateToOrgCreateTask(navigation, {
         orgId: routeOrgId || orgId,
-        ...(mode === 'production' || mode === 'site' ? { taskMode: mode } : {}),
+        taskMode: resolvedMode,
       });
     },
-    [navigation, orgId, routeOrgId],
+    [navigation, orgId, orderSurface, routeOrgId],
   );
 
-  const onPressAddFab = useCallback(async () => {
-    if (hasProduction) {
-      setCreateChooserOpen(true);
+  const onPressAddFab = useCallback(() => {
+    if (!hasProduction) {
+      openCreateTab('site');
       return;
     }
-    openCreateTab();
-  }, [hasProduction, openCreateTab]);
+    // Surface already chose work vs PO — open that create path directly.
+    openCreateTab(orderSurface === 'production' ? 'production' : 'site');
+  }, [hasProduction, openCreateTab, orderSurface]);
 
   const selectTab = useCallback((tabId) => {
     setActiveTab(tabId);
@@ -795,13 +804,19 @@ export default function OrgTasksScreen({ navigation, route }) {
 
   const visibleRows = useMemo(() => {
     let list = rows;
+    if (hasProduction) {
+      list = list.filter((row) => {
+        const isPo = taskHasManufacturing(row);
+        return orderSurface === 'production' ? isPo : !isPo;
+      });
+    }
     if (activeTab === 'open') {
       list = list.filter((row) => isOpenTaskStatus(row.status));
     } else if (activeTab === 'completed') {
       list = list.filter((row) => isCompletedTaskStatus(row.status));
     }
     return list;
-  }, [activeTab, rows]);
+  }, [activeTab, hasProduction, orderSurface, rows]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -2306,8 +2321,12 @@ export default function OrgTasksScreen({ navigation, route }) {
         mode="detail"
         title={
           selected
-            ? t('org.tasks.detailTitle', null, 'Task')
-            : t('org.tasks.listTitle', null, 'Tasks')
+            ? taskHasManufacturing(selected)
+              ? t('org.tasks.detailTitleProduction', null, 'Production order')
+              : t('org.tasks.detailTitle', null, 'Task')
+            : hasProduction
+              ? t('org.tasks.listTitleOrders', null, 'Work & production orders')
+              : t('org.tasks.listTitle', null, 'Tasks')
         }
         onBack={onBack}
       />
@@ -2328,6 +2347,41 @@ export default function OrgTasksScreen({ navigation, route }) {
           <>
             {!selected ? (
               <>
+              {hasProduction ? (
+                <View style={styles.modeRow}>
+                  {[
+                    {
+                      id: 'work',
+                      label: t('org.tasks.surfaceWork', null, 'Work orders'),
+                    },
+                    {
+                      id: 'production',
+                      label: t('org.tasks.surfaceProduction', null, 'Production orders'),
+                    },
+                  ].map((item) => {
+                    const active = orderSurface === item.id;
+                    return (
+                      <Pressable
+                        key={item.id}
+                        onPress={() => setOrderSurface(item.id)}
+                        style={[
+                          styles.modeChip,
+                          active && styles.modeChipActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.modeChipText,
+                            active && styles.modeChipTextActive,
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
               <View style={styles.modeRow}>
                 {TASK_TABS.map((item) => {
                   const active = activeTab === item.id;
@@ -3833,11 +3887,23 @@ export default function OrgTasksScreen({ navigation, route }) {
           <>
             <Text style={styles.lead}>
               {canManage
-                ? t(
-                    'org.tasks.listLead',
-                    null,
-                    'Create multi-operation work cards and track status for your team.',
-                  )
+                ? hasProduction && orderSurface === 'production'
+                  ? t(
+                      'org.tasks.listLeadProduction',
+                      null,
+                      'Production orders from recipes. Issue materials from warehouse, then Complete production.',
+                    )
+                  : hasProduction
+                    ? t(
+                        'org.tasks.listLeadWork',
+                        null,
+                        'Site work cards (tasks). Production orders are on the other tab.',
+                      )
+                    : t(
+                        'org.tasks.listLead',
+                        null,
+                        'Create multi-operation work cards and track status for your team.',
+                      )
                 : t(
                     'org.tasks.workerListLead',
                     null,
@@ -3847,11 +3913,17 @@ export default function OrgTasksScreen({ navigation, route }) {
             <AppCard style={styles.card}>
               {visibleRows.length === 0 ? (
                 <Text style={styles.empty}>
-                  {activeTab === 'open'
-                    ? t('org.tasks.openEmpty', null, 'No open tasks.')
-                    : activeTab === 'completed'
-                      ? t('org.tasks.completedEmpty', null, 'No completed tasks.')
-                      : t('org.tasks.listEmpty', null, 'No tasks yet. Create the first work card.')}
+                  {hasProduction && orderSurface === 'production'
+                    ? t(
+                        'org.tasks.productionEmpty',
+                        null,
+                        'No production orders yet. Add one from a recipe.',
+                      )
+                    : activeTab === 'open'
+                      ? t('org.tasks.openEmpty', null, 'No open tasks.')
+                      : activeTab === 'completed'
+                        ? t('org.tasks.completedEmpty', null, 'No completed tasks.')
+                        : t('org.tasks.listEmpty', null, 'No tasks yet. Create the first work card.')}
                 </Text>
               ) : (
                 visibleRows.map((row) => (
@@ -3907,59 +3979,13 @@ export default function OrgTasksScreen({ navigation, route }) {
           style={[styles.fab, { backgroundColor: COLORS.PRIMARY }]}
           onPress={onPressAddFab}
           label={
-            hasProduction
-              ? t('org.tasks.addTaskOrPo', null, 'Add task / PO')
+            hasProduction && orderSurface === 'production'
+              ? t('org.tasks.addProductionOrder', null, 'Add production order')
               : t('org.tasks.addTask', null, 'Add task')
           }
           color="#fff"
         />
       ) : null}
-
-      <Modal
-        visible={createChooserOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setCreateChooserOpen(false)}
-      >
-        <Pressable
-          style={styles.wizardBackdrop}
-          onPress={() => setCreateChooserOpen(false)}
-        >
-          <View style={styles.wizardCard}>
-            <Text style={styles.wizardTitle}>
-              {t('org.tasks.taskModeLabel', null, 'Task or production order?')}
-            </Text>
-            <Text style={styles.wizardHint}>
-              {t(
-                'org.tasks.createChooserHint',
-                null,
-                'Site task = work on object. Production order = make products from a recipe, then pick materials from warehouse.',
-              )}
-            </Text>
-            <Button
-              mode="contained"
-              onPress={() => openCreateTab('site')}
-              style={{ marginTop: 12 }}
-            >
-              {t('org.tasks.taskModeSite', null, 'Site work card')}
-            </Button>
-            <Button
-              mode="contained"
-              onPress={() => openCreateTab('production')}
-              style={{ marginTop: 10 }}
-            >
-              {t('org.tasks.taskModeProduction', null, 'Production order')}
-            </Button>
-            <Button
-              mode="text"
-              onPress={() => setCreateChooserOpen(false)}
-              style={{ marginTop: 8 }}
-            >
-              {t('common.cancel', null, 'Cancel')}
-            </Button>
-          </View>
-        </Pressable>
-      </Modal>
 
       <Modal
         visible={startWizardOpen}

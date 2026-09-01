@@ -1186,6 +1186,8 @@ export default function OrgOperationsScreen({ navigation, route }) {
       unit_code: outputMeasureToUnitCode(form.outputMeasure),
       unit_price: '0',
       is_durable_tool: false,
+      is_finished_good: true,
+      stock_kind: 'finished',
     });
     return {
       id: Number(created.id),

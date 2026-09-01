@@ -560,12 +560,20 @@ export default function OrganizationHomeScreen() {
       tiles.push({
         key: 'tasks',
         icon: 'clipboard-check-outline',
-        title: t('org.nav.tasks', null, 'Tasks'),
-        subtitle: t(
-          'org.home.actions.tasksSubtitle',
-          null,
-          'Open, all, and add work cards.',
-        ),
+        title: hasProduction
+          ? t('org.nav.workAndProductionOrders', null, 'Work & production orders')
+          : t('org.nav.tasks', null, 'Tasks'),
+        subtitle: hasProduction
+          ? t(
+              'org.home.actions.ordersSubtitle',
+              null,
+              'Work cards on site, and production orders from recipes.',
+            )
+          : t(
+              'org.home.actions.tasksSubtitle',
+              null,
+              'Open, all, and add work cards.',
+            ),
         onPress: () => navigateToOrgTasks(navigation, { orgId: org?.id }),
       });
     }

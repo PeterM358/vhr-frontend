@@ -168,8 +168,12 @@ export function buildOrgNavItems(org, t) {
     OrgOperations: orgHasProductionActivity(org)
       ? t('org.nav.operationsAndRecipes', null, 'Operations & recipes')
       : t('org.nav.operations', null, 'Operations'),
-    OrgTasks: t('org.nav.tasks', null, 'Tasks'),
-    OrgWorkOrders: t('org.nav.tasks', null, 'Tasks'),
+    OrgTasks: orgHasProductionActivity(org)
+      ? t('org.nav.workAndProductionOrders', null, 'Work & production orders')
+      : t('org.nav.tasks', null, 'Tasks'),
+    OrgWorkOrders: orgHasProductionActivity(org)
+      ? t('org.nav.workAndProductionOrders', null, 'Work & production orders')
+      : t('org.nav.tasks', null, 'Tasks'),
     OrgProjects: t('org.nav.projects', null, 'Projects'),
     OrgWarehouse: t('org.nav.warehouse', null, 'Warehouse'),
     OrgWorkforce: t('org.nav.workforce', null, 'Workforce'),
