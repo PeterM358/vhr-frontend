@@ -543,19 +543,6 @@ export default function OrganizationHomeScreen() {
 
     const tiles = [];
 
-    // Company setup stays available but secondary to repairs for SC homes.
-    tiles.push({
-      key: 'company-account',
-      icon: 'domain',
-      title: t('org.drawer.companyAccount', null, 'Company account'),
-      subtitle: t(
-        'org.home.actions.companyAccountSubtitle',
-        null,
-        'Legal details, activities, public listing, and setup checklist.',
-      ),
-      onPress: () => navigateToOrgCompanyAccount(navigation, { orgId: org?.id }),
-    });
-
     if (showOpsSurfaces && (canManageOps || navRoutes.has('OrgTasks'))) {
       tiles.push({
         key: 'tasks',
