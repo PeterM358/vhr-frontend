@@ -35,6 +35,7 @@ import FloatingCard from '../components/ui/FloatingCard';
 import StatusBadge from '../components/ui/StatusBadge';
 import { COLORS } from '../constants/colors';
 import { DEFAULT_CURRENCY } from '../constants/currency';
+import { resolveRepairDisplayTotal } from '../utils/repairDisplayTotal';
 import OptionalVehicleGroupsReadonly from '../components/vehicle/OptionalVehicleGroupsReadonly';
 import ServiceRecordDatePicker from '../components/vehicle/ServiceRecordDatePicker';
 import { isoToDisplayDate } from '../components/vehicle/dateFieldUtils';
@@ -791,9 +792,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
     completedRepairs.forEach((r) => {
       const labor = r.labor_price != null ? Number(r.labor_price) : null;
       const parts = r.parts_price != null ? Number(r.parts_price) : null;
-      const total = r.total_price != null
-        ? Number(r.total_price)
-        : (r.calculated_total_price != null ? Number(r.calculated_total_price) : null);
+      const total = resolveRepairDisplayTotal(r);
       if (labor != null && Number.isFinite(labor)) {
         totalLabor += labor;
         hasLabor = true;
@@ -804,9 +803,6 @@ export default function VehicleDetailScreen({ route, navigation }) {
       }
       if (total != null && Number.isFinite(total)) {
         totalSpent += total;
-        hasTotalSpent = true;
-      } else if (labor != null && parts != null && Number.isFinite(labor) && Number.isFinite(parts)) {
-        totalSpent += labor + parts;
         hasTotalSpent = true;
       }
     });
@@ -1013,11 +1009,15 @@ export default function VehicleDetailScreen({ route, navigation }) {
           {t('vehicles.detail.kilometersLabel')}: {km}
           {item.final_kilometers != null ? ` (${t('vehicles.detail.kilometersFinal')})` : ''}
         </Text>
-        {item.total_price != null && item.total_price !== '' ? (
-          <Text style={styles.repairTotalLine}>
-            {t('vehicles.detail.total')}: {Number(item.total_price).toLocaleString()} {currency}
-          </Text>
-        ) : null}
+        {(() => {
+          const displayTotal = resolveRepairDisplayTotal(item);
+          if (displayTotal == null) return null;
+          return (
+            <Text style={styles.repairTotalLine}>
+              {t('vehicles.detail.total')}: {Number(displayTotal).toLocaleString()} {currency}
+            </Text>
+          );
+        })()}
         </View>
       </TouchableRipple>
     );

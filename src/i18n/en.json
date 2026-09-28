@@ -4858,7 +4858,9 @@
       "submit": "Submit review",
       "resolvedAfterFollowup": "Resolved after follow-up",
       "alreadySubmitted": "You already submitted a review for this service.",
-      "onlyWhenDone": "Reviews are available after the service is completed."
+      "onlyWhenDone": "Reviews are available after the service is completed.",
+      "ratedNoComplaintBubble": "Rated {{rating}}/5 · no complaint",
+      "ratedWithComplaintBubble": "Rated {{rating}}/5 · complaint filed"
     },
     "clientComplaint": {
       "title": "Report an issue",
@@ -4866,7 +4868,8 @@
       "description": "Describe the issue",
       "submit": "Submit complaint",
       "alreadyFiled": "You already filed a complaint for this service.",
-      "onlyWhenDone": "Complaints are available after the service is completed."
+      "onlyWhenDone": "Complaints are available after the service is completed.",
+      "hideForm": "Hide"
     }
   },
   "seo": {

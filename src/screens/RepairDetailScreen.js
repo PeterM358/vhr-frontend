@@ -4123,6 +4123,9 @@ export default function RepairDetailScreen({ route, navigation }) {
               <RepairOutcomePanel
                 repair={repair}
                 shopProfileId={Number(repair.shop_profile)}
+                onSubmitted={() => {
+                  refreshRepair();
+                }}
               />
             ) : null}
 

@@ -97,13 +97,15 @@ export const drawerGlassStyles = StyleSheet.create({
       : {}),
   },
   container: {
-    flex: 1,
+    // flexGrow (not flex:1) so short menus still fill the drawer, but tall
+    // partner menus can scroll past Notifications → Explore / Switch center.
+    flexGrow: 1,
     justifyContent: 'space-between',
     paddingTop: 36,
     paddingBottom: 16,
   },
   menuContainer: {
-    flexGrow: 1,
+    flexGrow: 0,
   },
   drawerTitle: {
     marginLeft: 20,

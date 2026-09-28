@@ -121,7 +121,11 @@ export default function CreateRepairScreen({ navigation, route }) {
       }
       if (route.params.kilometers !== undefined) setKilometers(route.params.kilometers);
       if (route.params.targetingMode) setTargetingMode(route.params.targetingMode);
-      if (route.params.selectedCenterIds) setSelectedCenterIds(route.params.selectedCenterIds);
+      if (route.params.selectedCenterIds) {
+        setSelectedCenterIds(
+          route.params.selectedCenterIds.map((id) => Number(id)).filter((id) => !Number.isNaN(id)),
+        );
+      }
       if (route.params.requiresGuarantee !== undefined) setRequiresGuarantee(!!route.params.requiresGuarantee);
       if (route.params.preferredRadiusKm !== undefined) {
         setPreferredRadiusKm(route.params.preferredRadiusKm ? String(route.params.preferredRadiusKm) : '');
@@ -139,19 +143,55 @@ export default function CreateRepairScreen({ navigation, route }) {
     [repairTypes, repairTypeId]
   );
 
+  /**
+   * Discovery list is filtered (vehicle/repair type) and paginated — the shop the
+   * user started from (e.g. Kokis) may be missing. Always pin it so the last step
+   * shows it selected.
+   */
+  const centersForPicker = useMemo(() => {
+    if (!centerPickerUnlocked && preselectedCenter) {
+      return [preselectedCenter];
+    }
+    const list = Array.isArray(serviceCenters) ? [...serviceCenters] : [];
+    if (
+      preselectedCenter &&
+      !list.some((c) => Number(c.id) === Number(preselectedCenter.id))
+    ) {
+      list.unshift(preselectedCenter);
+    }
+    return list;
+  }, [serviceCenters, preselectedCenter, centerPickerUnlocked]);
+
   const headerServiceCenter = useMemo(() => {
     if (preselectedCenter && !centerPickerUnlocked) return preselectedCenter;
-    if (preselectedShopId && selectedCenterIds.length === 1 && serviceCenters.length) {
-      return serviceCenters.find((c) => Number(c.id) === Number(selectedCenterIds[0])) || preselectedCenter;
+    if (preselectedShopId && selectedCenterIds.length === 1 && centersForPicker.length) {
+      return (
+        centersForPicker.find((c) => Number(c.id) === Number(selectedCenterIds[0])) ||
+        preselectedCenter
+      );
     }
     return preselectedCenter;
-  }, [preselectedCenter, centerPickerUnlocked, preselectedShopId, selectedCenterIds, serviceCenters]);
+  }, [
+    preselectedCenter,
+    centerPickerUnlocked,
+    preselectedShopId,
+    selectedCenterIds,
+    centersForPicker,
+  ]);
 
   useEffect(() => {
     if (selectedVehicle) {
       setShowVehiclePicker(false);
     }
   }, [selectedVehicle]);
+
+  // Keep the entry shop selected while the picker is still locked to that center.
+  useEffect(() => {
+    if (!preselectedShopId || targetingMode !== 'selected_centers') return;
+    if (!centerPickerUnlocked) {
+      setSelectedCenterIds([preselectedShopId]);
+    }
+  }, [preselectedShopId, targetingMode, centerPickerUnlocked]);
 
   useEffect(() => {
     if (isEditMode || !selectedVehicle) return;
@@ -735,7 +775,7 @@ export default function CreateRepairScreen({ navigation, route }) {
       targetingMode,
       setTargetingMode,
       loadingCenters,
-      serviceCenters,
+      serviceCenters: centersForPicker,
       selectedCenterIds,
       toggleServiceCenterSelection,
       requiresGuarantee,
@@ -770,7 +810,7 @@ export default function CreateRepairScreen({ navigation, route }) {
       selectedRepairType,
       selectedVehicle,
       selectedVisitDay,
-      serviceCenters,
+      centersForPicker,
       showVehiclePicker,
       submitTypeNotice,
       symptoms,
