@@ -97,9 +97,10 @@ export default function AuthorizedClients({ navigation }) {
   const renderClient = ({ item }) => {
     const expanded = expandedClientIds.includes(item.client.id);
     const clientLabel =
+      item.display_name ||
       item.client.email ||
       item.client.phone ||
-      'Unnamed Client';
+      t('partnerDashboard.clients.unnamed');
     const vehicleCount = item.vehicles?.length ?? 0;
     const stats = item.shop_stats || {};
     const paidLabel = formatMoney(stats.paid_total, stats.currency);
@@ -110,6 +111,8 @@ export default function AuthorizedClients({ navigation }) {
     const invoiceableIds = Array.isArray(stats.unpaid_invoiceable_repair_ids)
       ? stats.unpaid_invoiceable_repair_ids
       : [];
+    const isAuthorized = Boolean(item.authorized);
+    const isCompany = item.billing_kind === 'company';
 
     const openUnpaidForInvoice = () => {
       if (!invoiceableIds.length && unpaidJobs === 0) return;
@@ -128,12 +131,38 @@ export default function AuthorizedClients({ navigation }) {
         <Pressable onPress={() => toggleExpand(item.client.id)}>
           <View style={styles.clientRow}>
             <View style={styles.avatar}>
-              <MaterialCommunityIcons name="account" size={22} color={PRIMARY} />
+              <MaterialCommunityIcons
+                name={isCompany ? 'office-building-outline' : 'account'}
+                size={22}
+                color={PRIMARY}
+              />
             </View>
             <View style={styles.clientInfo}>
               <Text style={styles.clientLabel} numberOfLines={2}>
                 {clientLabel}
               </Text>
+              <View style={styles.badgeRow}>
+                {isAuthorized ? (
+                  <View style={styles.badgeAuthorized}>
+                    <Text style={styles.badgeAuthorizedText}>
+                      {t('partnerDashboard.clients.badgeAuthorized')}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.badgeCustomer}>
+                    <Text style={styles.badgeCustomerText}>
+                      {t('partnerDashboard.clients.badgeCustomer')}
+                    </Text>
+                  </View>
+                )}
+                {isCompany ? (
+                  <View style={styles.badgeCustomer}>
+                    <Text style={styles.badgeCustomerText}>
+                      {t('partnerDashboard.clients.badgeCompany')}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
               <Text style={styles.clientMeta}>
                 {vehicleCount} {vehicleCount === 1 ? 'vehicle' : 'vehicles'}
                 {completedJobs ? ` · ${completedJobs} jobs` : ''}
@@ -275,13 +304,13 @@ export default function AuthorizedClients({ navigation }) {
           <View style={styles.heroRow}>
             <View style={styles.heroIconWrap}>
               <MaterialCommunityIcons
-                name="shield-account-outline"
+                name="account-group-outline"
                 size={28}
                 color={PRIMARY_LIGHT}
               />
             </View>
             <View style={styles.heroTextWrap}>
-              <Text style={styles.heroTitle}>{t('partnerDashboard.clients.authorizedTitle')}</Text>
+              <Text style={styles.heroTitle}>{t('partnerDashboard.clients.title')}</Text>
               <Text style={styles.heroSubtitle}>
                 {clients.length === 1
                   ? t('partnerDashboard.clients.clientCountOne')
@@ -388,6 +417,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: TEXT_DARK,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  badgeAuthorized: {
+    backgroundColor: 'rgba(22,163,74,0.14)',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  badgeAuthorizedText: {
+    color: '#15803d',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  badgeCustomer: {
+    backgroundColor: 'rgba(15,76,129,0.12)',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  badgeCustomerText: {
+    color: PRIMARY,
+    fontSize: 11,
+    fontWeight: '700',
   },
   clientMeta: {
     fontSize: 12,

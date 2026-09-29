@@ -2382,12 +2382,17 @@
       }
     },
     "clients": {
-      "authorizedTitle": "Authorized Clients",
-      "clientCountOne": "1 client authorized",
-      "clientCountMany": "{count} clients authorized",
+      "title": "Clients",
+      "authorizedTitle": "Clients",
+      "clientCountOne": "1 client in your CRM",
+      "clientCountMany": "{count} clients in your CRM",
       "addClient": "Add Client",
-      "emptyTitle": "No authorized clients yet",
-      "emptySubtitle": "Add a client or authorize a vehicle to start managing repairs."
+      "emptyTitle": "No clients yet",
+      "emptySubtitle": "Clients appear after you complete a repair, register a walk-in, or when an owner authorizes your shop.",
+      "unnamed": "Unnamed client",
+      "badgeAuthorized": "Vehicle access",
+      "badgeCustomer": "Customer",
+      "badgeCompany": "Company"
     },
     "promotions": {
       "createButton": "Create Promotion",
@@ -5319,13 +5324,18 @@
     "create": {
       "screenTitle": "Create promotion",
       "basics": "Promotion details",
+      "basicsStep": "Basics",
+      "offerStep": "Offer",
+      "scheduleStep": "Schedule",
       "title": "Title",
       "description": "Description",
       "repairType": "Repair / service type",
       "price": "Promotional price",
+      "priceHint": "EUR — what the customer pays for this promotion",
       "validity": "Validity",
       "validFrom": "Valid from",
       "validUntil": "Valid until",
+      "dateHint": "Use YYYY-MM-DD (optional)",
       "maxBookings": "Booking limit (optional)",
       "preview": "Preview",
       "titleRequired": "Title is required.",
@@ -5336,7 +5346,8 @@
       "loadTypesError": "Could not load repair types.",
       "noRepairTypes": "No repair types available.",
       "saveFailed": "Failed to save promotion.",
-      "success": "Promotion created."
+      "success": "Promotion created.",
+      "finish": "Publish promotion"
     },
     "detail": {
       "price": "Price: {amount}",

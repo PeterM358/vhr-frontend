@@ -2382,12 +2382,17 @@
       }
     },
     "clients": {
-      "authorizedTitle": "Оторизирани клиенти",
-      "clientCountOne": "1 оторизиран клиент",
-      "clientCountMany": "{count} оторизирани клиенти",
+      "title": "Клиенти",
+      "authorizedTitle": "Клиенти",
+      "clientCountOne": "1 клиент в CRM",
+      "clientCountMany": "{count} клиенти в CRM",
       "addClient": "Добави клиент",
-      "emptyTitle": "Все още няма оторизирани клиенти",
-      "emptySubtitle": "Добавете клиент или оторизирайте автомобил, за да започнете да управлявате ремонти."
+      "emptyTitle": "Все още няма клиенти",
+      "emptySubtitle": "Клиентите се появяват след завършен ремонт, walk-in регистрация или когато собственик оторизира сервиза.",
+      "unnamed": "Клиент без име",
+      "badgeAuthorized": "Достъп до МПС",
+      "badgeCustomer": "Клиент",
+      "badgeCompany": "Фирма"
     },
     "promotions": {
       "createButton": "Създай промоция",
@@ -5291,13 +5296,18 @@
     "create": {
       "screenTitle": "Нова промоция",
       "basics": "Детайли на промоцията",
+      "basicsStep": "Основни",
+      "offerStep": "Оферта",
+      "scheduleStep": "График",
       "title": "Заглавие",
       "description": "Описание",
       "repairType": "Тип ремонт / услуга",
       "price": "Промоционална цена",
+      "priceHint": "EUR — какво плаща клиентът за промоцията",
       "validity": "Валидност",
       "validFrom": "Валидна от",
       "validUntil": "Валидна до",
+      "dateHint": "Формат ГГГГ-ММ-ДД (по избор)",
       "maxBookings": "Лимит на резервации (по избор)",
       "preview": "Преглед",
       "titleRequired": "Заглавието е задължително.",
@@ -5308,7 +5318,8 @@
       "loadTypesError": "Типовете ремонти не можаха да се заредят.",
       "noRepairTypes": "Няма налични типове ремонти.",
       "saveFailed": "Промоцията не можа да се запише.",
-      "success": "Промоцията е създадена."
+      "success": "Промоцията е създадена.",
+      "finish": "Публикувай промоция"
     },
     "detail": {
       "price": "Цена: {amount}",
