@@ -131,6 +131,9 @@ for (const ev of [
 const clientRouting = read('src/utils/clientNotificationRouting.js');
 assert.ok(clientRouting.includes('vehicleIdFromNotification'), 'client VHA vehicle id helper');
 assert.ok(clientRouting.includes('requestId'), 'client VHA passes requestId');
+assert.ok(clientRouting.includes('isVehicleReminderNotification'), 'client reminder open helper');
+assert.ok(clientRouting.includes('vehicle_reminder_due_soon'), 'client routes reminder due soon');
+assert.ok(clientRouting.includes('expandReminders'), 'client reminder open expands reminders');
 
 assert.ok(read('src/components/partner/PartnerAppHeader.js').includes('bell-outline'));
 assert.ok(read('src/screens/ShopHomeScreen.js').includes('PartnerAppHeader'));

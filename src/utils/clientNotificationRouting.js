@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 import {
   navigateToOrgTasks,
   navigateToRepairDetail,
+  navigateToVehicleDetail,
   navigateToVehicleHistoryAccess,
 } from '../navigation/webNavigation';
 import { isVehicleHistoryAccessClientEvent } from './partnerNavChrome';
@@ -28,6 +29,18 @@ function vehicleIdFromNotification(item) {
     null;
   if (raw == null || raw === '') return null;
   return String(raw);
+}
+
+const VEHICLE_REMINDER_EVENTS = new Set([
+  'vehicle_reminder_due_soon',
+  'vehicle_reminder_overdue',
+  'vehicle_reminder_email_fallback',
+]);
+
+export function isVehicleReminderNotification(item) {
+  const t = String(notificationEventType(item)).toLowerCase();
+  if (VEHICLE_REMINDER_EVENTS.has(t)) return true;
+  return t.startsWith('vehicle_reminder_');
 }
 
 function workOrderIdsFromNotification(item) {
@@ -110,6 +123,25 @@ export function navigateForClientNotification(navigation, item, options = {}) {
     }
   }
 
+  if (isVehicleReminderNotification(item)) {
+    const vehicleId = vehicleIdFromNotification(item);
+    if (vehicleId) {
+      const reminderParams = {
+        expandReminders: true,
+        returnTo: returnTo || 'ClientVehicles',
+      };
+      if (Platform.OS === 'web') {
+        navigateToVehicleDetail(navigation, vehicleId, reminderParams);
+      } else {
+        navigation.navigate('VehicleDetail', {
+          vehicleId,
+          ...reminderParams,
+        });
+      }
+      return true;
+    }
+  }
+
   if (isVehicleHistoryAccessNotification(item)) {
     const vehicleId = vehicleIdFromNotification(item);
     if (vehicleId) {
@@ -160,6 +192,9 @@ export function navigateForClientNotification(navigation, item, options = {}) {
 export function notificationActionHint(item) {
   if (isWorkOrderNotification(item)) {
     return 'Tap to open task';
+  }
+  if (isVehicleReminderNotification(item)) {
+    return 'Tap to open vehicle reminders';
   }
   if (isRescheduleNotification(item)) {
     return 'Tap to accept or decline the new time';
