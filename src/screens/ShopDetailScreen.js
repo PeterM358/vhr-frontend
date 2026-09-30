@@ -621,15 +621,6 @@ export default function ShopDetailScreen({ route, navigation }) {
     Array.isArray(shop.nearby_accepting_alternatives) &&
     shop.nearby_accepting_alternatives.length > 0;
 
-  const addr = revealPublicContact && typeof shop.address === 'string' ? shop.address.trim() : '';
-  const phone = revealPublicContact
-    ? (
-        (typeof shop.display_phone === 'string' && shop.display_phone.trim()) ||
-        (typeof shop.phone_e164 === 'string' && shop.phone_e164.trim()) ||
-        (typeof shop.phone === 'string' && shop.phone.trim()) ||
-        ''
-      )
-    : '';
   const cityName =
     (typeof shop.city_name === 'string' && shop.city_name.trim()) ||
     (typeof shop.seo_city === 'string' && shop.seo_city.trim()) ||
@@ -639,9 +630,20 @@ export default function ShopDetailScreen({ route, navigation }) {
     (typeof shop.seo_country === 'string' && shop.seo_country.trim()) ||
     '';
 
+  // Street/phone stay gated. City (locality) stays public for SEO + orientation
+  // even when the listing is not accepting requests.
+  const addr = revealPublicContact && typeof shop.address === 'string' ? shop.address.trim() : '';
+  const phone = revealPublicContact
+    ? (
+        (typeof shop.display_phone === 'string' && shop.display_phone.trim()) ||
+        (typeof shop.phone_e164 === 'string' && shop.phone_e164.trim()) ||
+        (typeof shop.phone === 'string' && shop.phone.trim()) ||
+        ''
+      )
+    : '';
   const locationLine = revealPublicContact
     ? [addr, cityName, countryName].filter(Boolean).join(', ')
-    : '';
+    : [cityName, countryName].filter(Boolean).join(', ');
   const mapsUrl = revealPublicContact
     ? resolveShopMapsUrl({
         googleMapsUrl: shop.google_maps_url,
@@ -858,14 +860,16 @@ export default function ShopDetailScreen({ route, navigation }) {
           {locationLine ? (
             <Pressable
               onPress={() =>
-                openShopInMaps({
-                  googleMapsUrl: shop.google_maps_url,
-                  latitude: shop.latitude,
-                  longitude: shop.longitude,
-                  address: addr,
-                  cityName,
-                  countryName,
-                })
+                revealPublicContact
+                  ? openShopInMaps({
+                      googleMapsUrl: shop.google_maps_url,
+                      latitude: shop.latitude,
+                      longitude: shop.longitude,
+                      address: addr,
+                      cityName,
+                      countryName,
+                    })
+                  : null
               }
               disabled={!mapsUrl}
               hitSlop={8}
