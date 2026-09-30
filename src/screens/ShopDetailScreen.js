@@ -28,7 +28,6 @@ import { useScrollShadow } from '../hooks/useScrollShadow';
 import AppCard from '../components/ui/AppCard';
 import FloatingCard from '../components/ui/FloatingCard';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
-import StatusBadge from '../components/ui/StatusBadge';
 import { COLORS } from '../constants/colors';
 import { formatAuthorizeConfirmMessage, formatRevokeConfirmMessage } from '../utils/shopDataAccess';
 import {
@@ -52,6 +51,10 @@ import {
 import { resolveShopBusinessTypeLabel } from '../utils/resolveShopBusinessTypeLabel';
 import { openShopInMaps, resolveShopMapsUrl } from '../utils/shopMapsLink';
 import ShopQuickRequestSheet from '../components/shop/ShopQuickRequestSheet';
+import {
+  resolveShopClientBadge,
+  resolveShopOwnerPreviewAction,
+} from '../utils/shopPublicBadges';
 
 const WEEKDAYS_MON_FIRST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -586,12 +589,30 @@ export default function ShopDetailScreen({ route, navigation }) {
   const subtitleType =
     businessTypeLabel ||
     (vehicleNamesForSubtitle.length > 0 ? joinList(vehicleNamesForSubtitle, { t }) : genericServiceCenter);
-  const addr = typeof shop.address === 'string' ? shop.address.trim() : '';
-  const phone =
-    (typeof shop.display_phone === 'string' && shop.display_phone.trim()) ||
-    (typeof shop.phone_e164 === 'string' && shop.phone_e164.trim()) ||
-    (typeof shop.phone === 'string' && shop.phone.trim()) ||
-    '';
+
+  const showOwnerControls = isOwner && !publicPreview;
+  const clientBadge = resolveShopClientBadge(shop);
+  const ownerPreviewAction =
+    (isOwner || publicPreview) ? resolveShopOwnerPreviewAction(shop) : null;
+  // Clients (and owner public-preview) only get contact when the shop accepts work.
+  const revealPublicContact =
+    showOwnerControls ||
+    (shop.is_claimed !== false &&
+      (shop.accepting_requests != null
+        ? Boolean(shop.accepting_requests)
+        : clientBadge.kind !== 'not_accepting'));
+  const showClientRequest =
+    !isOwner && !isShopAccount && revealPublicContact && clientBadge.kind !== 'not_accepting';
+
+  const addr = revealPublicContact && typeof shop.address === 'string' ? shop.address.trim() : '';
+  const phone = revealPublicContact
+    ? (
+        (typeof shop.display_phone === 'string' && shop.display_phone.trim()) ||
+        (typeof shop.phone_e164 === 'string' && shop.phone_e164.trim()) ||
+        (typeof shop.phone === 'string' && shop.phone.trim()) ||
+        ''
+      )
+    : '';
   const cityName =
     (typeof shop.city_name === 'string' && shop.city_name.trim()) ||
     (typeof shop.seo_city === 'string' && shop.seo_city.trim()) ||
@@ -601,15 +622,19 @@ export default function ShopDetailScreen({ route, navigation }) {
     (typeof shop.seo_country === 'string' && shop.seo_country.trim()) ||
     '';
 
-  const locationLine = [addr, cityName, countryName].filter(Boolean).join(', ');
-  const mapsUrl = resolveShopMapsUrl({
-    googleMapsUrl: shop.google_maps_url,
-    latitude: shop.latitude,
-    longitude: shop.longitude,
-    address: addr,
-    cityName,
-    countryName,
-  });
+  const locationLine = revealPublicContact
+    ? [addr, cityName, countryName].filter(Boolean).join(', ')
+    : '';
+  const mapsUrl = revealPublicContact
+    ? resolveShopMapsUrl({
+        googleMapsUrl: shop.google_maps_url,
+        latitude: shop.latitude,
+        longitude: shop.longitude,
+        address: addr,
+        cityName,
+        countryName,
+      })
+    : null;
 
   const repairNamesRaw = collectRepairNames(shop);
   const repairNames = translateRepairTypeLabels(repairNamesRaw, t);
@@ -653,16 +678,27 @@ export default function ShopDetailScreen({ route, navigation }) {
 
   const imagesList = Array.isArray(shop.images) ? shop.images : [];
 
-  const showClientRequest = !isOwner && !isShopAccount;
-  const showOwnerControls = isOwner && !publicPreview;
+  const handleOwnerBadgePress = () => {
+    if (!ownerPreviewAction) return;
+    if (ownerPreviewAction.target === 'ShopSubscriptionUpgrade') {
+      navigation.navigate(
+        'ShopSubscriptionUpgrade',
+        ownerPreviewAction.navParams || {},
+      );
+      return;
+    }
+    navigation.navigate(ownerPreviewAction.target);
+  };
 
-  const linkRow = [
-    { key: 'website', icon: 'web', url: shop.website },
-    { key: 'maps', icon: 'map-marker', url: shop.google_maps_url },
-    { key: 'youtube', icon: 'youtube', url: shop.youtube_url },
-    { key: 'facebook', icon: 'facebook', url: shop.facebook_url },
-    { key: 'instagram', icon: 'instagram', url: shop.instagram_url },
-  ].filter((x) => x.url && String(x.url).trim());
+  const linkRow = revealPublicContact
+    ? [
+        { key: 'website', icon: 'web', url: shop.website },
+        { key: 'maps', icon: 'map-marker', url: shop.google_maps_url },
+        { key: 'youtube', icon: 'youtube', url: shop.youtube_url },
+        { key: 'facebook', icon: 'facebook', url: shop.facebook_url },
+        { key: 'instagram', icon: 'instagram', url: shop.instagram_url },
+      ].filter((x) => x.url && String(x.url).trim())
+    : [];
 
   function HeroIconRow({
     icon,
@@ -737,36 +773,58 @@ export default function ShopDetailScreen({ route, navigation }) {
           <View style={styles.heroTitleBlock}>
             <View style={styles.heroTitleRow}>
               <Text style={styles.heroTitle}>{serviceName}</Text>
-              {shop.is_verified ? <StatusBadge status="verified" /> : null}
+              {clientBadge.kind === 'verified' ? (
+                <Chip
+                  compact
+                  icon={({ size }) => (
+                    <MaterialCommunityIcons name="shield-check" size={size} color="#BBF7D0" />
+                  )}
+                  style={styles.verifiedChip}
+                  textStyle={styles.verifiedChipText}
+                >
+                  {t('serviceCenters.badge.verifiedPartner')}
+                </Chip>
+              ) : null}
             </View>
-            {!shop.is_verified && shop.verification_status_label ? (
+            {clientBadge.kind === 'not_accepting' ? (
               <Chip
                 compact
                 icon={({ size }) => (
                   <MaterialCommunityIcons
-                    name="information-outline"
+                    name="pause-circle-outline"
+                    size={size}
+                    color="#FDE68A"
+                  />
+                )}
+                style={styles.notAcceptingChip}
+                textStyle={styles.notAcceptingChipText}
+              >
+                {t('serviceCenters.badge.mayNotAcceptWork')}
+              </Chip>
+            ) : null}
+            {ownerPreviewAction ? (
+              <Chip
+                compact
+                icon={({ size }) => (
+                  <MaterialCommunityIcons
+                    name={ownerPreviewAction.icon}
                     size={size}
                     color="#E2E8F0"
                   />
                 )}
-                style={[
-                  styles.verificationChip,
-                  (isOwner || publicPreview) && styles.verificationChipAction,
-                ]}
+                style={styles.verificationChipAction}
                 textStyle={styles.verificationChipText}
-                onPress={
-                  isOwner || publicPreview
-                    ? () => navigation.navigate('ShopProfile')
-                    : undefined
-                }
-                accessibilityRole={isOwner || publicPreview ? 'button' : 'text'}
+                onPress={handleOwnerBadgePress}
+                accessibilityRole="button"
                 accessibilityLabel={
-                  isOwner || publicPreview
-                    ? t('serviceCenters.profile.verificationChipContinueA11y')
-                    : shop.verification_status_label
+                  ownerPreviewAction.kind === 'activate_plan'
+                    ? t('serviceCenters.badge.activatePlanA11y')
+                    : t('serviceCenters.badge.completeProfileA11y')
                 }
               >
-                {shop.verification_status_label}
+                {ownerPreviewAction.kind === 'activate_plan'
+                  ? t('serviceCenters.badge.activatePlan')
+                  : t('serviceCenters.badge.completeProfile')}
               </Chip>
             ) : null}
           </View>
@@ -820,6 +878,12 @@ export default function ShopDetailScreen({ route, navigation }) {
                 })
               : t('serviceCenters.profile.completedJobsUnknown')}
           </HeroIconRow>
+
+          {!revealPublicContact && !showOwnerControls ? (
+            <Text style={styles.contactRestrictedHint}>
+              {t('serviceCenters.badge.contactHiddenHint')}
+            </Text>
+          ) : null}
         </AppCard>
 
         {isClientAccount ? (
@@ -1151,7 +1215,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(226, 232, 240, 0.45)',
   },
   verificationChipAction: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
     backgroundColor: 'rgba(59, 130, 246, 0.35)',
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(147, 197, 253, 0.65)',
   },
   verificationChipText: {
@@ -1159,6 +1226,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     flexShrink: 1,
+  },
+  verifiedChip: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(34, 197, 94, 0.28)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(134, 239, 172, 0.55)',
+  },
+  verifiedChipText: {
+    color: '#DCFCE7',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  notAcceptingChip: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    backgroundColor: 'rgba(245, 158, 11, 0.28)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(253, 230, 138, 0.55)',
+  },
+  notAcceptingChipText: {
+    color: '#FEF3C7',
+    fontSize: 12,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  contactRestrictedHint: {
+    marginTop: 10,
+    color: 'rgba(254, 243, 199, 0.92)',
+    fontSize: 13,
+    lineHeight: 18,
   },
   heroTitle: {
     fontSize: 22,

@@ -4456,6 +4456,15 @@
     "drive": "Задвижване"
   },
   "serviceCenters": {
+    "badge": {
+      "verifiedPartner": "Потвърден партньор",
+      "mayNotAcceptWork": "Може да не приема заявки в момента",
+      "completeProfile": "Довърши профила",
+      "completeProfileA11y": "Продължи попълването на профила на сервиза",
+      "activatePlan": "Активирай план за заявки",
+      "activatePlanA11y": "Отвори плановете и започни да приемаш заявки",
+      "contactHiddenHint": "Телефон и локация са скрити, докато сервизът не приема заявки през Veversal."
+    },
     "findTitle": "Намери сервиз",
     "authorizeTitle": "Оторизирай сервиз",
     "exploreTitle": "Разгледай сервизи",
