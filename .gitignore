@@ -42,6 +42,14 @@ yarn-error.*
 
 !.env*.example
 
+# Playwright
+e2e/logs/*
+!e2e/logs/.gitkeep
+e2e/test-results/
+e2e/playwright-report/
+playwright/.cache/
+.env.e2e
+
 
 # typescript
 *.tsbuildinfo
