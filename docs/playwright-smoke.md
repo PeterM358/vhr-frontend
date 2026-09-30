@@ -1,63 +1,82 @@
-# Playwright smoke (manual)
+# Playwright multi-role smoke (manual → pro)
 
-**Target:** live web `https://www.veversal.com` (same stack you ship to).  
+**Target:** live web `https://www.veversal.com`.  
 **Mode now:** run by hand → read a log file. Daily job later.
 
-## What Playwright is (30 seconds)
+## Roles (how we tell users apart)
 
-Playwright launches a real browser (Chromium), opens your site, clicks/types, and asserts what it sees. Think of it as a scripted person on the web — not unit tests of React components.
+Credentials live only in **local** `.env.e2e` (gitignored). After login, sessions are saved under `e2e/.auth/` (also gitignored):
 
-| Term | Meaning |
-|------|---------|
-| **spec** | A test file (`e2e/smoke.spec.js`) |
-| **page** | One browser tab |
-| **locator** | How to find a button/input (`getByText`, `getByRole`, …) |
-| **expect** | Assertion — fail the run if not true |
-| **headed** | See the browser window (`--headed`) |
-| **UI mode** | Interactive runner (`--ui`) |
+| Env keys | Auth file | Playwright project | Spec |
+|----------|-----------|--------------------|------|
+| `E2E_SHOP_EMAIL` / `E2E_SHOP_PASSWORD` | `e2e/.auth/shop.json` | `partner` | `partner.spec.js` |
+| `E2E_CLIENT_EMAIL` / `E2E_CLIENT_PASSWORD` | `e2e/.auth/client.json` | `client` | `client.spec.js` |
+| `E2E_ORG_EMAIL` / `E2E_ORG_PASSWORD` | `e2e/.auth/org.json` | `org` | `org.spec.js` |
+
+Missing a role → that role’s tests **skip**; public smoke still runs.
+
+Legacy `E2E_EMAIL` / `E2E_PASSWORD` still map to **shop** if the new keys are empty.
+
+## Layout
+
+```
+e2e/
+  helpers/env.js      # loads .env.e2e, roles + auth paths
+  helpers/auth.js     # loginWithPassword, expectAppShell
+  auth.setup.js       # 3 logins → shop/client/org.json
+  public.spec.js
+  partner.spec.js     # shop
+  client.spec.js
+  org.spec.js
+  reporters/file-log.js
+  logs/
+  .auth/              # gitignored session dumps
+```
 
 ## One-time setup
 
 ```bash
 cd /Users/client/vhr-frontend
-npm install          # already adds @playwright/test
-npx playwright install chromium   # downloads the browser (~once per machine)
-```
+npm install
+npx playwright install chromium
 
-Optional login smoke:
-
-```bash
 cp .env.e2e.example .env.e2e
-# edit E2E_EMAIL / E2E_PASSWORD (test account — not your only admin password)
+# fill E2E_SHOP_* / E2E_CLIENT_* / E2E_ORG_* (dedicated test accounts)
 ```
 
-## Run (manual)
+## Run
 
 ```bash
-npm run test:e2e              # headless, writes e2e/logs/smoke-….log
-npm run test:e2e:headed       # watch the browser
-npm run test:e2e:ui           # Playwright UI to pick/debug tests
+npm run test:e2e
+npm run test:e2e:headed
+npm run test:e2e:ui
+
+npx playwright test --project=public
+npx playwright test --project=partner
+npx playwright test --project=client
+npx playwright test --project=org
 ```
 
-After a run:
+After a run: `e2e/logs/smoke-….log`, HTML report under `e2e/playwright-report/`.
 
-- **Log:** `e2e/logs/smoke-<timestamp>.log` — pass/fail lines  
-- **HTML report:** `e2e/playwright-report/` → `npx playwright show-report e2e/playwright-report`  
-- **Failures:** screenshots/video under `e2e/test-results/`
+## What each suite covers (smoke, not full QA)
 
-## What the smoke covers today
+### Public
+Home, login chrome, service-centers discovery.
 
-1. App shell loads on `/`  
-2. `/login` is reachable  
-3. Service-centers / explore path loads  
-4. *(optional)* email/password login leaves `/login`
+### Partner (shop)
+Dashboard, calendar, notifications, Clients CRM, Invoicing tabs (+ contrast), Promotions + create wizard opens.
 
-Expand later: Clients CRM, invoicing tabs contrast, create promotion wizard.
+### Client
+`/dashboard`, vehicles list, notifications/activity.
+
+### Org
+Org home, fleet, accounting, org calendar — authenticated shell (soft if entitlement redirects).
 
 ## Daily job (later)
 
-Same command in GitHub Actions / Cursor Automation cron — keep the log artifact. Do not put real passwords in CI secrets until you have a dedicated E2E user.
+Same command in CI / Cursor Automation. Secrets per role — never personal admin passwords.
 
 ## Form consistency note
 
-E2E catches broken pages; it does **not** replace shared form chrome (`FloatingCard` / FormSection). Prefer fixing primitives so every screen inherits readable contrast.
+E2E catches broken pages and contrast regressions; shared form chrome (`FloatingCard` / FormSection) is still the product fix for every screen.

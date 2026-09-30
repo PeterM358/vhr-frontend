@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Platform, ScrollView, Share, StyleSheet } from 'react-native';
+import { Alert, Platform, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,13 +8,14 @@ import ScreenBackground from '../components/ScreenBackground';
 import AppCard from '../components/ui/AppCard';
 import OrgAppHeader from '../components/org/OrgAppHeader';
 import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
-import { createOrganizationMembershipInvite, getMyOrganization } from '../api/network';
+import { createOrganizationMembershipInvite, createMyOrganization, getMyOrganization } from '../api/network';
 import {
   isFleetFocusedOrg,
   resolveActiveOrganizationId,
   resolveIsOrgOnlySession,
 } from '../utils/orgWorkspace';
 import { navigateToOrgFleet, navigateToOrgHome } from '../navigation/webNavigation';
+import { openPartnerCenter } from '../utils/partnerSetupGate';
 import { useTranslation } from '../i18n';
 
 async function copyInviteLink(text) {
@@ -25,6 +26,15 @@ async function copyInviteLink(text) {
   await Share.share({ message: text });
 }
 
+function isMissingOrgError(message) {
+  const m = String(message || '').toLowerCase();
+  return (
+    m.includes('no business organization') ||
+    m.includes('organization:') ||
+    m.includes('няма бизнес организация')
+  );
+}
+
 export default function NetworkOrganizationScreen({ navigation, route }) {
   const onBack = usePartnerDashboardBack(navigation);
   const { t } = useTranslation();
@@ -32,16 +42,19 @@ export default function NetworkOrganizationScreen({ navigation, route }) {
   const [org, setOrg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [missingOrg, setMissingOrg] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('transport');
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
   const [inviteMessage, setInviteMessage] = useState('');
   const [orgOnly, setOrgOnly] = useState(false);
+  const [enablingOrg, setEnablingOrg] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
+    setMissingOrg(false);
     try {
       const token = await AsyncStorage.getItem('@access_token');
       const orgId = await resolveActiveOrganizationId(routeOrgId);
@@ -49,14 +62,19 @@ export default function NetworkOrganizationScreen({ navigation, route }) {
       setOrgOnly(isOrgOnly);
       if (!orgId && isOrgOnly) {
         setOrg(null);
-        setError(t('network.common.error'));
+        setMissingOrg(true);
         return;
       }
       const data = await getMyOrganization(token, orgId);
       setOrg(data);
     } catch (e) {
       setOrg(null);
-      setError(e.message || t('network.common.error'));
+      const msg = e.message || t('network.common.error');
+      if (isMissingOrgError(msg)) {
+        setMissingOrg(true);
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -134,6 +152,27 @@ export default function NetworkOrganizationScreen({ navigation, route }) {
     });
   };
 
+  const goEnableCompanyAccount = async () => {
+    setEnablingOrg(true);
+    setError('');
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      const data = await createMyOrganization(token, {
+        roles: ['SERVICE_CENTER'],
+      });
+      setOrg(data);
+      setMissingOrg(false);
+    } catch (e) {
+      setError(e.message || t('network.organization.createOrgError'));
+    } finally {
+      setEnablingOrg(false);
+    }
+  };
+
+  const goCenterDetails = () => {
+    openPartnerCenter(navigation);
+  };
+
   return (
     <ScreenBackground>
       <OrgAppHeader
@@ -150,6 +189,28 @@ export default function NetworkOrganizationScreen({ navigation, route }) {
       <ScrollView contentContainerStyle={styles.content}>
         {loading ? <ActivityIndicator /> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        {!loading && missingOrg && !org ? (
+          <AppCard variant="dark" style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>{t('network.organization.noOrgTitle')}</Text>
+            <Text style={styles.emptyBody}>{t('network.organization.noOrgBody')}</Text>
+            <Button
+              mode="contained"
+              icon="domain-plus"
+              loading={enablingOrg}
+              disabled={enablingOrg}
+              onPress={goEnableCompanyAccount}
+            >
+              {enablingOrg
+                ? t('network.organization.createOrgBusy')
+                : t('network.organization.createOrg')}
+            </Button>
+            <Button mode="text" textColor="#fff" onPress={goCenterDetails} disabled={enablingOrg}>
+              {t('drawer.partner.centerDetails')}
+            </Button>
+          </AppCard>
+        ) : null}
+
         {org ? (
           <AppCard>
             <Text variant="titleMedium">{org.display_name}</Text>
@@ -221,16 +282,22 @@ export default function NetworkOrganizationScreen({ navigation, route }) {
           </>
         ) : null}
 
-        <Button mode="contained" onPress={openFleet}>
-          {t('fleet.openFleet')}
-        </Button>
-        <Button mode="outlined" onPress={() => navigation.navigate('FleetRegisterImport')}>
-          {t('fleetImport.openAction')}
-        </Button>
-        {fleetFocused ? (
-          <Button mode="outlined" onPress={goRequestRepair}>
-            {t('org.home.requestRepair', null, 'Request repair')}
-          </Button>
+        {/* Company fleet (org vehicles) — not personal garage cars. Only when org exists. */}
+        {org ? (
+          <View style={styles.fleetBlock}>
+            <Text style={styles.fleetHint}>{t('network.organization.fleetHint')}</Text>
+            <Button mode="contained" onPress={openFleet}>
+              {t('fleet.openFleet')}
+            </Button>
+            <Button mode="outlined" onPress={() => navigation.navigate('FleetRegisterImport')}>
+              {t('fleetImport.openAction')}
+            </Button>
+            {fleetFocused ? (
+              <Button mode="outlined" onPress={goRequestRepair}>
+                {t('org.home.requestRepair', null, 'Request repair')}
+              </Button>
+            ) : null}
+          </View>
         ) : null}
       </ScrollView>
     </ScreenBackground>
@@ -243,4 +310,9 @@ const styles = StyleSheet.create({
   success: { color: '#1b5e20' },
   helper: { color: '#555', marginTop: 8 },
   link: { fontSize: 12, marginVertical: 8 },
+  emptyCard: { gap: 10 },
+  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  emptyBody: { color: 'rgba(255,255,255,0.78)', fontSize: 14, lineHeight: 20, marginBottom: 4 },
+  fleetBlock: { gap: 8 },
+  fleetHint: { color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 18 },
 });

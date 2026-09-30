@@ -510,6 +510,7 @@ export default function ShopHomeScreen() {
         unreadCount={unreadCount}
         calendarBadgeCount={unscheduledCount}
         loadCalendarBadge={false}
+        profileIncomplete={!setupComplete}
         onTitlePress={() => openCenter()}
         onLogoutPress={handleLogout}
       />

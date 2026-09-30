@@ -23,6 +23,22 @@
         "EXPO_PUBLIC_WS_ENABLED": "true"
       }
     },
-    "production": {}
+    "play-internal": {
+      "environment": "preview",
+      "distribution": "store",
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.veversal.com",
+        "EXPO_PUBLIC_WS_BASE_URL": "wss://api.veversal.com",
+        "EXPO_PUBLIC_WS_ENABLED": "true"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
   }
 }

@@ -96,7 +96,7 @@
         "missing": "Missing"
       }
     },
-    "openFleet": "View fleet"
+    "openFleet": "View company fleet"
   },
   "fleetImport": {
     "title": "Import fleet register",
@@ -2469,7 +2469,23 @@
       "sortName": "Name",
       "sortQty": "Qty",
       "sortPartNumber": "Material #",
-      "sortBrand": "Brand"
+      "sortBrand": "Brand",
+      "receiving": {
+        "invoiceTitle": "Receive supplier invoice",
+        "invoiceLead": "Supplier sends an invoice when goods arrive. Upload it here to receive stock into your catalog.",
+        "uploadInvoice": "Upload supplier invoice",
+        "uploadInvoiceHint": "PDF or photo — we read line items when possible.",
+        "addManually": "Add manually",
+        "addManuallyHint": "Type header and parts yourself, or import CSV.",
+        "creditNoteLink": "Returning goods to supplier? Record a credit note",
+        "backToInvoice": "Back to supplier invoice",
+        "creditNoteTitle": "Supplier credit note",
+        "creditNoteLead": "Use this after you return goods to a supplier and they send a credit note — stock goes down when you complete.",
+        "uploadCreditNote": "Upload credit note",
+        "uploadCreditNoteHint": "PDF or photo from supplier after you return goods.",
+        "addReturnManually": "Add return manually",
+        "addReturnManuallyHint": "Enter credit note header and part lines to remove from stock."
+      }
     },
     "marketComparison": {
       "title": "Compare with mine",
@@ -4665,8 +4681,10 @@
     "learnFromHistory": "Learn from history",
     "pickServiceType": "Pick a service type",
     "searchPlaceholder": "Oil, brakes, diagnostics…",
-    "noMatchingTypes": "No matching types — try another search.",
+    "noMatchingTypes": "No matching catalog types — try another search.",
+    "noMatchingTypesHint": "Specialty work (painting, renovation, custom jobs) appears only when that service type exists for your shop category. Contact support to request a new type.",
     "allTypesAlreadyAdded": "All common service types are already on your price list.",
+    "allTypesHint": "Need painting or another specialty service? Ask Veversal support to add the catalog type for your center.",
     "emptyTitle": "No services on your price list yet",
     "emptyBody": "Tap Add service to pick oil change, brakes, diagnostics, and more — or learn price ranges automatically from completed jobs.",
     "published": "Published",
@@ -5016,7 +5034,13 @@
     },
     "organization": {
       "title": "My organization",
-      "status": "Status"
+      "status": "Status",
+      "noOrgTitle": "Enable your company account",
+      "noOrgBody": "Your service center (workshop on the map) already exists. Business network, company fleet, and org accounting need a company account linked to it — the legal firm behind the shop. This is not the same as filling Center details for customers; one tap creates that company link from your shop.",
+      "createOrg": "Enable company account",
+      "createOrgBusy": "Enabling…",
+      "createOrgError": "Could not enable company account. Check Center details (company name) and try again.",
+      "fleetHint": "Company fleet = vehicles owned or managed by the organization (shared company cars), not private client cars."
     },
     "roles": {
       "title": "Business roles",

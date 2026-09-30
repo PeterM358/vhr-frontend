@@ -571,11 +571,18 @@ export default function ShopServiceMenuScreen() {
             />
             <View style={styles.typeGrid}>
               {addableTypes.length === 0 ? (
-                <Text style={styles.addEmpty}>
-                  {addSearch.trim()
-                    ? t('serviceMenu.noMatchingTypes')
-                    : t('serviceMenu.allTypesAlreadyAdded')}
-                </Text>
+                <View style={styles.addEmptyWrap}>
+                  <Text style={styles.addEmpty}>
+                    {addSearch.trim()
+                      ? t('serviceMenu.noMatchingTypes')
+                      : t('serviceMenu.allTypesAlreadyAdded')}
+                  </Text>
+                  <Text style={styles.addEmptyHint}>
+                    {addSearch.trim()
+                      ? t('serviceMenu.noMatchingTypesHint')
+                      : t('serviceMenu.allTypesHint')}
+                  </Text>
+                </View>
               ) : (
                 addableTypes.slice(0, 24).map((type) => (
                   <Pressable
@@ -703,6 +710,16 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_MUTED,
     fontSize: 13,
     lineHeight: 18,
+  },
+  addEmptyWrap: {
+    gap: 6,
+    paddingVertical: 4,
+  },
+  addEmptyHint: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 12,
+    lineHeight: 17,
+    opacity: 0.9,
   },
   loader: {
     marginTop: 24,

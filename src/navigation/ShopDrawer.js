@@ -17,15 +17,13 @@ import ShopPromotions from '../components/shop/ShopPromotions';
 import NotificationsList from '../components/shop/NotificationsList';
 import ChooseShopScreen from '../screens/ChooseShopScreen';
 
-import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import { logout } from '../api/auth';
 import { getMyShopProfiles } from '../api/profiles';
-import { resetFromShopDrawer, resetShopDrawerRepairs, resetShopDrawerCalendar } from './drawerNavigation';
+import { resetFromShopDrawer, resetShopDrawerRepairs } from './drawerNavigation';
 import {
   navigateToPartnerClients,
   navigateToPartnerInvoicing,
-  navigateToPartnerNotifications,
   navigateToPartnerPromotions,
   navigateToPartnerServiceCenters,
   navigateToPartnerServices,
@@ -42,7 +40,6 @@ import {
   navigateToOrgHome,
 } from './webNavigation';
 import { readOrganizationMemberships } from '../utils/orgWorkspace';
-import { readCachedUnscheduledCount } from '../utils/shopCalendarBadge';
 import { openPartnerCenter } from '../utils/partnerSetupGate';
 import {
   canAccessPartnerRoute,
@@ -52,7 +49,6 @@ import {
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import {
   DrawerMenuIcon,
-  DrawerLabelWithBadge,
   DrawerVeversalLogoFooter,
   drawerGlassStyles,
   drawerMenuItemProps,
@@ -66,20 +62,17 @@ const Drawer = createDrawerNavigator();
 function CustomDrawerContent(props) {
   const navigation = useNavigation();
   const { t } = useTranslation();
-  const { unreadCount } = useContext(WebSocketContext);
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
-  const [unscheduledCount, setUnscheduledCount] = useState(0);
   const [shopProfile, setShopProfile] = useState(null);
   const [membership, setMembership] = useState(null);
   const [hasOrganizations, setHasOrganizations] = useState(false);
 
   const loadErpContext = useCallback(async () => {
     try {
-      const [shopId, memberships, profiles, token] = await Promise.all([
+      const [shopId, memberships, profiles] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID),
         readShopMemberships(),
         getMyShopProfiles(),
-        AsyncStorage.getItem('@access_token'),
       ]);
       const profile =
         profiles?.find((row) => String(row.id) === String(shopId)) || profiles?.[0] || null;
@@ -96,15 +89,7 @@ function CustomDrawerContent(props) {
 
   useFocusEffect(
     React.useCallback(() => {
-      let active = true;
-      (async () => {
-        const count = await readCachedUnscheduledCount();
-        if (active) setUnscheduledCount(count);
-      })();
       loadErpContext();
-      return () => {
-        active = false;
-      };
     }, [loadErpContext])
   );
 
@@ -170,19 +155,7 @@ function CustomDrawerContent(props) {
           {...itemProps}
         />
 
-        <DrawerItem
-          label={() => <DrawerLabelWithBadge label={t('drawer.partner.calendar')} badge={unscheduledCount} />}
-          onPress={() => {
-            props.navigation.closeDrawer();
-            resetShopDrawerCalendar(props.navigation, {
-              backLabel: t('common.home'),
-            });
-          }}
-          icon={({ color, size }) => (
-            <DrawerMenuIcon name="calendar-month-outline" color={color} size={size} />
-          )}
-          {...itemProps}
-        />
+        {/* Calendar lives in PartnerAppHeader (top navbar) — avoid duplicate entry */}
 
         <DrawerItem
           label={t('drawer.partner.repairs')}
@@ -326,18 +299,7 @@ function CustomDrawerContent(props) {
           {...itemProps}
         />
 
-        <DrawerItem
-          label={() => <DrawerLabelWithBadge label={t('drawer.partner.notifications')} badge={unreadCount} />}
-          onPress={() => {
-            if (Platform.OS === 'web') {
-              navigateToPartnerNotifications(navigation);
-            } else {
-              resetFromShopDrawer(navigation, 'NotificationsList');
-            }
-          }}
-          icon={({ color, size }) => <DrawerMenuIcon name="bell-outline" color={color} size={size} />}
-          {...itemProps}
-        />
+        {/* Notifications live in PartnerAppHeader (bell) — avoid duplicate entry */}
 
         <DrawerItem
           label={t('drawer.partner.explore')}

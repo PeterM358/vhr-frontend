@@ -1,19 +1,25 @@
 /**
- * Playwright config — smoke against live www.veversal.com (manual for now).
+ * Playwright — multi-role smoke against live www.veversal.com.
  *
- * First time on this machine:
- *   npx playwright install chromium
- *
- * Run:
- *   npm run test:e2e
- * Logs land in e2e/logs/
+ * .env.e2e roles:
+ *   E2E_SHOP_*   → partner / service center
+ *   E2E_CLIENT_* → private client garage
+ *   E2E_ORG_*    → organization fleet / accounting
  */
 
 const path = require('path');
 const fs = require('fs');
+const { roles } = require('./e2e/helpers/env');
 
 const logsDir = path.join(__dirname, 'e2e', 'logs');
 fs.mkdirSync(logsDir, { recursive: true });
+// Ensure auth dir + empty files exist so storageState paths resolve before setup runs
+fs.mkdirSync(path.dirname(roles.shop.authFile), { recursive: true });
+for (const role of Object.values(roles)) {
+  if (!fs.existsSync(role.authFile)) {
+    fs.writeFileSync(role.authFile, JSON.stringify({ cookies: [], origins: [] }), 'utf8');
+  }
+}
 
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const logFile = path.join(logsDir, `smoke-${stamp}.log`);
@@ -42,8 +48,41 @@ module.exports = {
   outputDir: 'e2e/test-results',
   projects: [
     {
-      name: 'chromium',
+      name: 'setup',
+      testMatch: /auth\.setup\.js/,
       use: { browserName: 'chromium' },
+    },
+    {
+      name: 'public',
+      testMatch: /public\.spec\.js/,
+      use: { browserName: 'chromium' },
+    },
+    {
+      name: 'partner',
+      testMatch: /partner\.spec\.js/,
+      dependencies: ['setup'],
+      use: {
+        browserName: 'chromium',
+        storageState: roles.shop.authFile,
+      },
+    },
+    {
+      name: 'client',
+      testMatch: /client\.spec\.js/,
+      dependencies: ['setup'],
+      use: {
+        browserName: 'chromium',
+        storageState: roles.client.authFile,
+      },
+    },
+    {
+      name: 'org',
+      testMatch: /org\.spec\.js/,
+      dependencies: ['setup'],
+      use: {
+        browserName: 'chromium',
+        storageState: roles.org.authFile,
+      },
     },
   ],
 };

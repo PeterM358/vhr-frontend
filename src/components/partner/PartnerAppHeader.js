@@ -26,6 +26,7 @@ export default function PartnerAppHeader({
   onBack,
   iconOnlyBack = true,
   onTitlePress,
+  profileIncomplete = false,
   showCalendar = true,
   showNotifications = true,
   showLogout = mode === 'dashboard',
@@ -94,11 +95,16 @@ export default function PartnerAppHeader({
         </View>
       ) : null}
       {onTitlePress ? (
-        <GlassNavIconButton
-          icon="storefront-outline"
-          onPress={onTitlePress}
-          accessibilityLabel="Open center details"
-        />
+        <View style={styles.iconWrap}>
+          <GlassNavIconButton
+            icon="storefront-outline"
+            onPress={onTitlePress}
+            accessibilityLabel="Open center details"
+          />
+          {profileIncomplete ? (
+            <Badge style={styles.profileBadge} size={10} />
+          ) : null}
+        </View>
       ) : null}
       {showLogout && onLogoutPress ? (
         <GlassNavIconButton
@@ -193,5 +199,13 @@ const styles = StyleSheet.create({
     minWidth: 16,
     height: 16,
     lineHeight: 16,
+  },
+  profileBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#f59e0b',
+    minWidth: 10,
+    height: 10,
   },
 });
