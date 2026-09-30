@@ -884,6 +884,62 @@ export default function ShopDetailScreen({ route, navigation }) {
               {t('serviceCenters.badge.contactHiddenHint')}
             </Text>
           ) : null}
+
+          {!revealPublicContact &&
+          !showOwnerControls &&
+          Array.isArray(shop.nearby_accepting_alternatives) &&
+          shop.nearby_accepting_alternatives.length > 0 ? (
+            <View style={styles.alternativesBlock}>
+              <Text style={styles.alternativesHeading}>
+                {t('serviceCenters.badge.nearbyAlternativesTitle')}
+              </Text>
+              {shop.nearby_accepting_alternatives.map((alt) => {
+                const altName = formatShopDisplayName(alt?.name || genericServiceCenter);
+                const distanceLabel =
+                  alt?.distance_km != null && !Number.isNaN(Number(alt.distance_km))
+                    ? t('serviceCenters.badge.nearbyAlternativesDistance', {
+                        km: Number(alt.distance_km).toFixed(1),
+                      })
+                    : '';
+                const cityPart = typeof alt?.city_name === 'string' ? alt.city_name.trim() : '';
+                const meta = [distanceLabel, cityPart].filter(Boolean).join(' · ');
+                return (
+                  <Pressable
+                    key={`alt-${alt.id}`}
+                    onPress={() =>
+                      navigation.push
+                        ? navigation.push('ShopDetail', { shopId: alt.id })
+                        : navigation.navigate('ShopDetail', { shopId: alt.id })
+                    }
+                    style={({ pressed }) => [
+                      styles.alternativeRow,
+                      pressed && styles.alternativeRowPressed,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('serviceCenters.badge.nearbyAlternativesOpenA11y', {
+                      name: altName,
+                    })}
+                  >
+                    <View style={styles.alternativeTextCol}>
+                      <Text style={styles.alternativeName} numberOfLines={1}>
+                        {altName}
+                      </Text>
+                      {meta ? (
+                        <Text style={styles.alternativeMeta} numberOfLines={1}>
+                          {meta}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {alt?.is_verified ? (
+                      <MaterialCommunityIcons name="shield-check" size={18} color="#BBF7D0" />
+                    ) : (
+                      <MaterialCommunityIcons name="chevron-right" size={20} color="rgba(255,255,255,0.7)" />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
         </AppCard>
 
         {isClientAccount ? (
@@ -1256,6 +1312,44 @@ const styles = StyleSheet.create({
     color: 'rgba(254, 243, 199, 0.92)',
     fontSize: 13,
     lineHeight: 18,
+  },
+  alternativesBlock: {
+    marginTop: 14,
+    gap: 8,
+  },
+  alternativesHeading: {
+    color: 'rgba(255,255,255,0.95)',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  alternativeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  alternativeRowPressed: {
+    opacity: 0.82,
+  },
+  alternativeTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  alternativeName: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  alternativeMeta: {
+    marginTop: 2,
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12,
   },
   heroTitle: {
     fontSize: 22,
