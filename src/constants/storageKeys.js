@@ -20,6 +20,9 @@ export const STORAGE_KEYS = {
   COOKIE_CONSENT: '@cookie_consent',
   /** Soft org-home public-listing tip dismissed for this organization */
   orgListingCtaDismissedKey: (orgId) => `@org_listing_cta_dismissed_${orgId}`,
+  /** Partner home shop-name context bar dismissed for this shop (compact only) */
+  partnerShopContextBarDismissedKey: (shopId) =>
+    `@partner_shop_context_bar_dismissed_${shopId}`,
   logServiceRecordDraftKey: (vehicleId) => `@log_service_record_draft_${vehicleId}`,
   serviceRecordDraftKey: (vehicleId) => `serviceRecordDraft:${vehicleId}`,
   serviceRecordManualDraftKey: (vehicleId) => `serviceRecordManualDraft:${vehicleId}`,

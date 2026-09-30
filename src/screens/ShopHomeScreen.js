@@ -29,6 +29,7 @@ import {
 import { setCachedShopRepairs } from '../utils/shopRepairsPrefetch';
 import PartnerRepairRequestCard from '../components/shop/PartnerRepairRequestCard';
 import PartnerAppHeader from '../components/partner/PartnerAppHeader';
+import PartnerShopContextBar from '../components/partner/PartnerShopContextBar';
 import { partnerInAppAlertCopy } from '../utils/partnerInAppAlert';
 import {
   comparePartnerLifecycle,
@@ -513,6 +514,12 @@ export default function ShopHomeScreen() {
         profileIncomplete={!setupComplete}
         onTitlePress={() => openCenter()}
         onLogoutPress={handleLogout}
+      />
+
+      <PartnerShopContextBar
+        shopId={shopProfile?.id}
+        shopName={shopDisplayName}
+        onPress={() => openCenter()}
       />
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">

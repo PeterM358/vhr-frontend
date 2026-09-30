@@ -2176,6 +2176,11 @@
       "continueButton": "Continue setup",
       "resumeHint": "You can finish anytime from Center details or this banner."
     },
+    "shopContext": {
+      "label": "Service center",
+      "openA11y": "Open center details for {name}",
+      "dismissA11y": "Hide service center name"
+    },
     "comingSoonDialog": {
       "title": "Coming soon",
       "documentsBody": "Central document import is on the Veversal partner roadmap.",

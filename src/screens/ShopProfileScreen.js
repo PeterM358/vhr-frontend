@@ -18,6 +18,7 @@ import {
   partnerSetupPercent,
 } from '../utils/partnerSetupGate';
 import ShopProfileCompletionCard from '../components/shop/ShopProfileCompletionCard';
+import { formatShopDisplayName } from '../utils/shopDisplayName';
 import ShopViewPublicProfileButton from '../components/shop/ShopViewPublicProfileButton';
 import { useTranslation } from '../i18n';
 
@@ -125,11 +126,14 @@ export default function ShopProfileScreen({ navigation, route }) {
 
   const backendCompletion = getProfileCompletion(profile);
   const completionPercent = partnerSetupPercent(profile);
+  const rawShopName = profile?.name?.trim();
+  const shopName = rawShopName ? formatShopDisplayName(rawShopName) : '';
 
   return (
     <ScreenBackground safeArea={false}>
       <PartnerAppHeader
-        title={t('partnerProfile.title')}
+        title={shopName || t('partnerProfile.title')}
+        subtitle={shopName ? t('partnerProfile.title') : undefined}
         backLabel={t('navigation.backToDashboard')}
         onBack={handleBack}
         iconOnlyBack
