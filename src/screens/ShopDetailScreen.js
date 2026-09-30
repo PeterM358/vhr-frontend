@@ -734,11 +734,38 @@ export default function ShopDetailScreen({ route, navigation }) {
         keyboardShouldPersistTaps="handled"
       >
         <AppCard variant="dark" contentStyle={styles.heroInner}>
-          <View style={styles.heroTitleRow}>
-            <Text style={styles.heroTitle}>{serviceName}</Text>
-            {shop.is_verified ? <StatusBadge status="verified" /> : null}
+          <View style={styles.heroTitleBlock}>
+            <View style={styles.heroTitleRow}>
+              <Text style={styles.heroTitle}>{serviceName}</Text>
+              {shop.is_verified ? <StatusBadge status="verified" /> : null}
+            </View>
             {!shop.is_verified && shop.verification_status_label ? (
-              <Chip compact icon="information-outline" style={styles.verificationChip}>
+              <Chip
+                compact
+                icon={({ size }) => (
+                  <MaterialCommunityIcons
+                    name="information-outline"
+                    size={size}
+                    color="#E2E8F0"
+                  />
+                )}
+                style={[
+                  styles.verificationChip,
+                  (isOwner || publicPreview) && styles.verificationChipAction,
+                ]}
+                textStyle={styles.verificationChipText}
+                onPress={
+                  isOwner || publicPreview
+                    ? () => navigation.navigate('ShopProfile')
+                    : undefined
+                }
+                accessibilityRole={isOwner || publicPreview ? 'button' : 'text'}
+                accessibilityLabel={
+                  isOwner || publicPreview
+                    ? t('serviceCenters.profile.verificationChipContinueA11y')
+                    : shop.verification_status_label
+                }
+              >
                 {shop.verification_status_label}
               </Chip>
             ) : null}
@@ -1106,6 +1133,9 @@ const styles = StyleSheet.create({
   heroInner: {
     paddingBottom: 4,
   },
+  heroTitleBlock: {
+    gap: 8,
+  },
   heroTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1114,7 +1144,21 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   verificationChip: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    backgroundColor: 'rgba(148, 163, 184, 0.28)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(226, 232, 240, 0.45)',
+  },
+  verificationChipAction: {
+    backgroundColor: 'rgba(59, 130, 246, 0.35)',
+    borderColor: 'rgba(147, 197, 253, 0.65)',
+  },
+  verificationChipText: {
+    color: '#F8FAFC',
+    fontSize: 12,
+    fontWeight: '600',
+    flexShrink: 1,
   },
   heroTitle: {
     fontSize: 22,

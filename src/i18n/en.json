@@ -4578,6 +4578,7 @@
       "authorized": "Authorized",
       "unclaimedTitle": "Owner-reported · not claimed yet",
       "unclaimedBody": "This service center was added from a customer service record. The business can claim this profile later to manage bookings and confirm records.",
+      "verificationChipContinueA11y": "Continue filling your service center profile",
       "photos": "Photos",
       "noPhotosTitle": "No photos yet",
       "noPhotosSubtitle": "This service center has not uploaded photos.",
