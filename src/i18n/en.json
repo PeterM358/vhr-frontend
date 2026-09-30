@@ -4506,8 +4506,11 @@
       "completeProfileA11y": "Continue filling your service center profile",
       "activatePlan": "Activate plan to accept work",
       "activatePlanA11y": "Open plans and start accepting requests",
-      "contactHiddenHint": "Contact and map details are hidden while this center is not accepting requests on Veversal. Try a nearby center that is available.",
-      "nearbyAlternativesTitle": "Nearby centers accepting requests",
+      "contactHiddenHint": "Contact and map details are hidden while this center is not accepting requests on Veversal. See similar centers that are available.",
+      "similarAlternativesTitle": "See similar",
+      "similarAlternativesDistance": "{km} km away",
+      "similarAlternativesOpenA11y": "Open {name}",
+      "nearbyAlternativesTitle": "See similar",
       "nearbyAlternativesDistance": "{km} km away",
       "nearbyAlternativesOpenA11y": "Open {name}"
     },

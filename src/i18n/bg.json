@@ -4463,8 +4463,11 @@
       "completeProfileA11y": "Продължи попълването на профила на сервиза",
       "activatePlan": "Активирай план за заявки",
       "activatePlanA11y": "Отвори плановете и започни да приемаш заявки",
-      "contactHiddenHint": "Телефон и локация са скрити, докато сервизът не приема заявки през Veversal. Вижте близки сервизи, които приемат.",
-      "nearbyAlternativesTitle": "Близки сервизи, които приемат заявки",
+      "contactHiddenHint": "Телефон и локация са скрити, докато сервизът не приема заявки през Veversal. Вижте подобни сервизи, които приемат.",
+      "similarAlternativesTitle": "Виж подобни",
+      "similarAlternativesDistance": "на {km} км",
+      "similarAlternativesOpenA11y": "Отвори {name}",
+      "nearbyAlternativesTitle": "Виж подобни",
       "nearbyAlternativesDistance": "на {km} км",
       "nearbyAlternativesOpenA11y": "Отвори {name}"
     },

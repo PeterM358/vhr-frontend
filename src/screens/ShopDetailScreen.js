@@ -314,6 +314,8 @@ export default function ShopDetailScreen({ route, navigation }) {
       const token = await AsyncStorage.getItem('@access_token');
       const storedUserId = await AsyncStorage.getItem('@user_id');
       const storedIsShop = await AsyncStorage.getItem('@is_shop');
+      // Public preview must match the anonymous client payload (redacted contact + alternatives).
+      const detailToken = publicPreview ? null : token;
 
       let shopData;
       let seoPayload = null;
@@ -322,7 +324,7 @@ export default function ShopDetailScreen({ route, navigation }) {
         locale: locale || 'en',
         citySlug,
         centerSlug: resolvedCenterSlug,
-        token,
+        token: detailToken,
         getShopById,
       });
       shopData = detail.shop;
@@ -333,6 +335,16 @@ export default function ShopDetailScreen({ route, navigation }) {
           applySeoPageMeta(seoPayload.meta, seoPayload.structured_data);
         }
         syncShopDetailWebUrl(shopData, shopData?.id || resolvedShopId);
+      }
+
+      if (publicPreview) {
+        setShop(shopData);
+        setIsOwner(storedIsShop === 'true');
+        setIsShopAccount(storedIsShop === 'true');
+        setIsClientAccount(false);
+        setIsLoggedIn(Boolean(token));
+        setVehicles([]);
+        return;
       }
 
       if (!token) {
@@ -381,7 +393,7 @@ export default function ShopDetailScreen({ route, navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [resolvedShopId, locale, citySlug, centerSlug]);
+  }, [resolvedShopId, locale, citySlug, centerSlug, publicPreview]);
 
   useEffect(() => {
     loadData();
@@ -594,15 +606,20 @@ export default function ShopDetailScreen({ route, navigation }) {
   const clientBadge = resolveShopClientBadge(shop);
   const ownerPreviewAction =
     (isOwner || publicPreview) ? resolveShopOwnerPreviewAction(shop) : null;
-  // Clients (and owner public-preview) only get contact when the shop accepts work.
-  const revealPublicContact =
-    showOwnerControls ||
-    (shop.is_claimed !== false &&
-      (shop.accepting_requests != null
-        ? Boolean(shop.accepting_requests)
-        : clientBadge.kind !== 'not_accepting'));
+  // Clients and owner public-preview only get contact when the shop accepts work.
+  const shopAcceptingPublicly =
+    shop.is_claimed !== false &&
+    (shop.accepting_requests != null
+      ? Boolean(shop.accepting_requests)
+      : clientBadge.kind !== 'not_accepting');
+  const revealPublicContact = showOwnerControls || shopAcceptingPublicly;
   const showClientRequest =
-    !isOwner && !isShopAccount && revealPublicContact && clientBadge.kind !== 'not_accepting';
+    !isOwner && !isShopAccount && !publicPreview && revealPublicContact && clientBadge.kind !== 'not_accepting';
+  const showSimilarAlternatives =
+    Boolean(publicPreview || !showOwnerControls) &&
+    !shopAcceptingPublicly &&
+    Array.isArray(shop.nearby_accepting_alternatives) &&
+    shop.nearby_accepting_alternatives.length > 0;
 
   const addr = revealPublicContact && typeof shop.address === 'string' ? shop.address.trim() : '';
   const phone = revealPublicContact
@@ -879,25 +896,22 @@ export default function ShopDetailScreen({ route, navigation }) {
               : t('serviceCenters.profile.completedJobsUnknown')}
           </HeroIconRow>
 
-          {!revealPublicContact && !showOwnerControls ? (
+          {!revealPublicContact && (publicPreview || !showOwnerControls) ? (
             <Text style={styles.contactRestrictedHint}>
               {t('serviceCenters.badge.contactHiddenHint')}
             </Text>
           ) : null}
 
-          {!revealPublicContact &&
-          !showOwnerControls &&
-          Array.isArray(shop.nearby_accepting_alternatives) &&
-          shop.nearby_accepting_alternatives.length > 0 ? (
+          {showSimilarAlternatives ? (
             <View style={styles.alternativesBlock}>
               <Text style={styles.alternativesHeading}>
-                {t('serviceCenters.badge.nearbyAlternativesTitle')}
+                {t('serviceCenters.badge.similarAlternativesTitle')}
               </Text>
               {shop.nearby_accepting_alternatives.map((alt) => {
                 const altName = formatShopDisplayName(alt?.name || genericServiceCenter);
                 const distanceLabel =
                   alt?.distance_km != null && !Number.isNaN(Number(alt.distance_km))
-                    ? t('serviceCenters.badge.nearbyAlternativesDistance', {
+                    ? t('serviceCenters.badge.similarAlternativesDistance', {
                         km: Number(alt.distance_km).toFixed(1),
                       })
                     : '';
@@ -916,7 +930,7 @@ export default function ShopDetailScreen({ route, navigation }) {
                       pressed && styles.alternativeRowPressed,
                     ]}
                     accessibilityRole="button"
-                    accessibilityLabel={t('serviceCenters.badge.nearbyAlternativesOpenA11y', {
+                    accessibilityLabel={t('serviceCenters.badge.similarAlternativesOpenA11y', {
                       name: altName,
                     })}
                   >
@@ -930,11 +944,7 @@ export default function ShopDetailScreen({ route, navigation }) {
                         </Text>
                       ) : null}
                     </View>
-                    {alt?.is_verified ? (
-                      <MaterialCommunityIcons name="shield-check" size={18} color="#BBF7D0" />
-                    ) : (
-                      <MaterialCommunityIcons name="chevron-right" size={20} color="rgba(255,255,255,0.7)" />
-                    )}
+                    <MaterialCommunityIcons name="chevron-right" size={20} color="rgba(255,255,255,0.7)" />
                   </Pressable>
                 );
               })}
