@@ -296,7 +296,10 @@ export default function HomeScreen({ navigation }) {
   const goVehicleDetail = (vehicle) => {
     if (!vehicle?.id) return;
     const root = navigation.getParent?.() || navigation;
-    navigateToVehicleDetail(root, vehicle.id);
+    navigateToVehicleDetail(root, vehicle.id, {
+      returnTo: 'Home',
+      backLabelKey: 'navigation.back',
+    });
   };
   const goVehicles = () => {
     const root = navigation.getParent?.() || navigation;
@@ -321,15 +324,26 @@ export default function HomeScreen({ navigation }) {
   const goRepairDetail = (repairId) => {
     if (!repairId) return;
     const root = navigation.getParent?.() || navigation;
-    navigateToRepairDetail(root, repairId, { returnTo: 'Home' });
+    navigateToRepairDetail(root, repairId, {
+      returnTo: 'Home',
+      backLabelKey: 'navigation.back',
+    });
   };
 
   const handleRecommendedAction = (item) => {
-    if (!item?.vehicleId) return;
+    if (!item) return;
 
     switch (item.actionKey) {
+      case 'view_repair':
+        if (item.repairId) {
+          goRepairDetail(item.repairId);
+          return;
+        }
+        goRepairs();
+        break;
       case 'schedule_maintenance':
       case 'book_repair':
+        if (!item.vehicleId) return;
         navigation.navigate('CreateRepair', {
           vehicleId: item.vehicleId,
           mode: 'request',
@@ -338,6 +352,7 @@ export default function HomeScreen({ navigation }) {
         });
         break;
       case 'add_service_history':
+        if (!item.vehicleId) return;
         navigateToVehicleServiceRecordNew(navigation, item.vehicleId, {
           returnTo: 'Home',
           origin: 'Home',
@@ -345,10 +360,11 @@ export default function HomeScreen({ navigation }) {
         break;
       case 'update_km':
       case 'configure_reminders':
+        if (!item.vehicleId) return;
         goVehicleDetail({ id: item.vehicleId });
         break;
       default:
-        goVehicleDetail({ id: item.vehicleId });
+        if (item.vehicleId) goVehicleDetail({ id: item.vehicleId });
         break;
     }
   };

@@ -1974,7 +1974,8 @@
       "noVehiclesTitle": "Все още няма автомобили",
       "noVehiclesBody": "Добави автомобил, за да виждаш състоянието, пропуски в обслужването и препоръки.",
       "viewRequest": "Виж заявката",
-      "requestService": "Заяви ремонт"
+      "requestService": "Заяви ремонт",
+      "vehicleDetails": "Детайли"
     },
     "partner": {
       "title": "Партньорско табло",

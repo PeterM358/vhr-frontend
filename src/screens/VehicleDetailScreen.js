@@ -56,7 +56,7 @@ import {
 } from '../utils/mileageConfidence';
 import { mapHealthFromApi } from '../utils/vehicleHealthStatus';
 import { formatRevokeConfirmMessage } from '../utils/shopDataAccess';
-import { navigateToVehicleServiceRecordNew, navigateToVehicleReminderNew, navigateToVehicleManageServiceCenters, navigateToVehicleSpecs } from '../navigation/webNavigation';
+import { navigateToDashboard, navigateToVehicleServiceRecordNew, navigateToVehicleReminderNew, navigateToVehicleManageServiceCenters, navigateToVehicleSpecs } from '../navigation/webNavigation';
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
 import {
   useTranslation,
@@ -110,19 +110,33 @@ export default function VehicleDetailScreen({ route, navigation }) {
     vehicleId,
     mileageIntent: mileageIntentParam,
     backLabel: backLabelParam,
+    backLabelKey,
+    returnTo,
     organizationId,
   } = route.params || {};
   const isOrgFleet = organizationId != null && organizationId !== '';
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
-  const handleBack = useVehicleListBack(navigation);
+  const handleBackToVehicleList = useVehicleListBack(navigation);
+  const fromHome = returnTo === 'Home' || returnTo === 'HomeMain';
   const backLabel =
     backLabelParam ||
-    (isOrgFleet ? t('fleet.detail.backToFleet') : t('vehicles.backToVehicles'));
+    (backLabelKey ? t(backLabelKey) : null) ||
+    (fromHome
+      ? t('navigation.back')
+      : isOrgFleet
+        ? t('fleet.detail.backToFleet')
+        : t('vehicles.backToVehicles'));
   const onBack = isOrgFleet
     ? () => navigation.navigate('FleetDashboard', { organizationId })
-    : backLabelParam
-      ? () => navigation.goBack()
-      : handleBack;
+    : fromHome || backLabelParam || backLabelKey
+      ? () => {
+          if (navigation.canGoBack?.()) {
+            navigation.goBack();
+            return;
+          }
+          navigateToDashboard(navigation);
+        }
+      : handleBackToVehicleList;
   const [vehicle, setVehicle] = useState(null);
   const [repairs, setRepairs] = useState([]);
   const [vehicleDocuments, setVehicleDocuments] = useState([]);

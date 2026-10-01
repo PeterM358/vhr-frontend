@@ -14,7 +14,14 @@ import { useTranslation } from '../../i18n';
 const MAX_VISIBLE = 3;
 
 function repairVehicleId(repair) {
-  return repair?.vehicle ?? repair?.vehicle_id ?? null;
+  const raw = repair?.vehicle ?? repair?.vehicle_id ?? null;
+  if (raw == null) return null;
+  if (typeof raw === 'object') {
+    const nested = raw.id ?? raw.pk ?? null;
+    return nested == null ? null : Number(nested);
+  }
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
 }
 
 function primaryIssueLabel(health, t) {
@@ -50,7 +57,7 @@ export default function VehicleHealthSection({
           activeRepairs
         );
         const activeRepair = (activeRepairs || []).find(
-          (repair) => Number(repairVehicleId(repair)) === Number(vehicle.id)
+          (repair) => repairVehicleId(repair) === Number(vehicle.id)
         );
         return { vehicle, health, activeRepair };
       }),
@@ -59,7 +66,7 @@ export default function VehicleHealthSection({
 
   if (!vehicles.length) {
     return (
-      <FloatingCard accent={false}>
+      <FloatingCard accent={false} style={styles.emptyCard}>
         <Text style={styles.emptyTitle}>{t('dashboard.health.noVehiclesTitle')}</Text>
         <Text style={styles.emptyBody}>{t('dashboard.health.noVehiclesBody')}</Text>
       </FloatingCard>
@@ -83,34 +90,41 @@ export default function VehicleHealthSection({
 
         return (
           <FloatingCard key={String(vehicle.id)} statusAccent={health.status} style={styles.card}>
-            <View style={styles.headerRow}>
-              <View style={styles.titleBlock}>
-                <Text style={styles.vehicleTitle}>{title}</Text>
+            <View style={styles.row}>
+              <View style={styles.copy}>
+                <Text style={styles.vehicleTitle} numberOfLines={1}>
+                  {title}
+                </Text>
                 <View style={styles.statusRow}>
-                  <MaterialCommunityIcons name={health.icon} size={16} color={health.color} />
-                  <Text style={[styles.statusLabel, { color: health.color }]}>
+                  <MaterialCommunityIcons name={health.icon} size={14} color={health.color} />
+                  <Text style={[styles.statusLabel, { color: health.color }]} numberOfLines={1}>
                     {health.status_label || health.label}
                   </Text>
                 </View>
+                <Text style={styles.issue} numberOfLines={1}>
+                  {issue}
+                </Text>
               </View>
-              <Button mode="text" compact onPress={() => onVehiclePress?.(vehicle)} labelStyle={styles.linkLabel}>
-                {t('common.view')}
-              </Button>
+              <View style={styles.actions}>
+                <Button
+                  mode="contained"
+                  compact
+                  onPress={handlePrimaryPress}
+                  style={styles.primaryCta}
+                  labelStyle={styles.primaryCtaLabel}
+                >
+                  {ctaLabel}
+                </Button>
+                <Button
+                  mode="text"
+                  compact
+                  onPress={() => onVehiclePress?.(vehicle)}
+                  labelStyle={styles.linkLabel}
+                >
+                  {t('dashboard.health.vehicleDetails')}
+                </Button>
+              </View>
             </View>
-
-            <Text style={styles.issue} numberOfLines={2}>
-              {issue}
-            </Text>
-
-            <Button
-              mode="contained"
-              compact
-              onPress={handlePrimaryPress}
-              style={styles.primaryCta}
-              labelStyle={styles.primaryCtaLabel}
-            >
-              {ctaLabel}
-            </Button>
           </FloatingCard>
         );
       })}
@@ -128,52 +142,61 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   card: {
-    marginBottom: 10,
-    paddingVertical: 14,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 8,
     marginBottom: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
-  titleBlock: {
+  emptyCard: {
+    paddingVertical: 12,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  copy: {
     flex: 1,
     minWidth: 0,
   },
   vehicleTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: COLORS.TEXT_DARK,
-    marginBottom: 4,
   },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
+    marginTop: 2,
   },
   statusLabel: {
     fontSize: 12,
     fontWeight: '600',
+    flexShrink: 1,
   },
   linkLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
+    marginVertical: 0,
   },
   issue: {
-    fontSize: 13,
+    marginTop: 2,
+    fontSize: 12,
     color: COLORS.TEXT_MUTED,
-    lineHeight: 18,
-    marginBottom: 10,
+    lineHeight: 16,
+  },
+  actions: {
+    alignItems: 'flex-end',
+    flexShrink: 0,
+    gap: 0,
   },
   primaryCta: {
-    alignSelf: 'flex-start',
     borderRadius: 10,
   },
   primaryCtaLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
+    marginVertical: 0,
   },
   viewAllBtn: {
     alignSelf: 'flex-start',

@@ -58,7 +58,14 @@ function inServiceHealth(atShop, translateFn = t) {
 }
 
 function repairVehicleId(repair) {
-  return repair?.vehicle ?? repair?.vehicle_id ?? null;
+  const raw = repair?.vehicle ?? repair?.vehicle_id ?? null;
+  if (raw == null) return null;
+  if (typeof raw === 'object') {
+    const nested = raw.id ?? raw.pk ?? null;
+    return nested == null ? null : Number(nested);
+  }
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
 }
 
 /** When a vehicle has a non-terminal repair, show in-service instead of needs-attention. */
@@ -67,7 +74,7 @@ export function applyActiveRepairHealthOverride(health, vehicleId, activeRepairs
   if (vid == null || Number.isNaN(vid)) return health;
 
   const activeRepair = (activeRepairs || []).find((repair) => {
-    if (Number(repairVehicleId(repair)) !== vid) return false;
+    if (repairVehicleId(repair) !== vid) return false;
     return !isTerminalRepairStatus(repair?.status);
   });
   if (!activeRepair) return health;

@@ -39,25 +39,26 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   card: {
-    marginBottom: 10,
-    paddingVertical: 14,
+    marginBottom: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   copy: {
     flex: 1,
     minWidth: 0,
   },
   title: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: COLORS.TEXT_DARK,
   },
   vehicle: {
-    marginTop: 3,
+    marginTop: 2,
     fontSize: 12,
     color: COLORS.TEXT_MUTED,
   },
@@ -68,5 +69,6 @@ const styles = StyleSheet.create({
   ctaLabel: {
     fontSize: 12,
     fontWeight: '700',
+    marginVertical: 0,
   },
 });

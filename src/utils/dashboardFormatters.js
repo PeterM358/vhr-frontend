@@ -3,6 +3,7 @@ import {
   mapHealthFromApi,
   vehicleDisplayTitle,
 } from './vehicleHealthStatus';
+import { isTerminalRepairStatus } from './repairArrival';
 import { t } from '../i18n';
 
 const REASON_ACTION_META = {
@@ -51,11 +52,6 @@ const REASON_ACTION_META = {
     ctaKey: 'dashboard.recommendedActions.cta.configure',
     actionKey: 'configure_reminders',
   },
-  active_repairs: {
-    titleKey: 'dashboard.recommendedActions.titles.activeRepair',
-    ctaKey: 'dashboard.recommendedActions.cta.viewRequest',
-    actionKey: 'book_repair',
-  },
   denied_repairs: {
     titleKey: 'dashboard.recommendedActions.titles.repairNeedsAttention',
     ctaKey: 'dashboard.recommendedActions.cta.requestService',
@@ -65,8 +61,51 @@ const REASON_ACTION_META = {
 
 const SEVERITY_RANK = { needs_attention: 0, maintenance_recommended: 1, healthy: 2, in_service: 3 };
 
+function repairVehicleId(repair) {
+  const raw = repair?.vehicle ?? repair?.vehicle_id ?? null;
+  if (raw == null) return null;
+  if (typeof raw === 'object') {
+    const nested = raw.id ?? raw.pk ?? null;
+    return nested == null ? null : Number(nested);
+  }
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function buildRecommendedActions(vehicles = [], activeRepairs = [], translateFn = t) {
   const actions = [];
+  const vehiclesById = new Map(
+    (vehicles || [])
+      .filter((v) => v?.id != null)
+      .map((v) => [Number(v.id), v])
+  );
+
+  // Active requests first — always deep-link to request detail (never CreateRepair).
+  for (const repair of activeRepairs || []) {
+    if (isTerminalRepairStatus(repair?.status)) continue;
+    const vehicleId = repairVehicleId(repair);
+    if (vehicleId == null) continue;
+    const vehicle = vehiclesById.get(vehicleId);
+    const vehicleName = vehicle
+      ? vehicleDisplayTitle(vehicle, translateFn)
+      : String(repair.vehicle_license_plate || '').trim() ||
+        translateFn('dashboard.recommendedActions.vehicleFallback', null, 'Your vehicle');
+    actions.push({
+      id: `repair-${repair.id}`,
+      vehicleId,
+      repairId: repair.id,
+      vehicleName,
+      title: translateFn(
+        'dashboard.recommendedActions.titles.activeRepair',
+        null,
+        'Active repair in progress'
+      ),
+      cta: translateFn('dashboard.recommendedActions.cta.viewRequest', null, 'View request'),
+      actionKey: 'view_repair',
+      severity: 'needs_attention',
+      healthStatus: 'needs_attention',
+    });
+  }
 
   for (const vehicle of vehicles) {
     const health = applyActiveRepairHealthOverride(
@@ -78,6 +117,9 @@ export function buildRecommendedActions(vehicles = [], activeRepairs = [], trans
 
     const vehicleName = vehicleDisplayTitle(vehicle, translateFn);
     for (const reason of health.reasons || []) {
+      // Covered by explicit repair rows above.
+      if (reason.key === 'active_repairs') continue;
+
       const meta = REASON_ACTION_META[reason.key];
       if (!meta) {
         if (String(reason.key || '').startsWith('obligation_overdue_')) {
@@ -113,7 +155,7 @@ export function buildRecommendedActions(vehicles = [], activeRepairs = [], trans
   const seen = new Set();
   return actions
     .filter((item) => {
-      const key = `${item.vehicleId}-${item.title}`;
+      const key = `${item.actionKey}-${item.repairId || item.vehicleId}-${item.title}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;

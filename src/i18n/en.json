@@ -1974,7 +1974,8 @@
       "noVehiclesTitle": "No vehicles yet",
       "noVehiclesBody": "Add a vehicle to see health status, maintenance gaps, and service recommendations.",
       "viewRequest": "View request",
-      "requestService": "Request Service"
+      "requestService": "Request Service",
+      "vehicleDetails": "Details"
     },
     "partner": {
       "title": "Partner dashboard",

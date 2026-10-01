@@ -178,18 +178,20 @@ export function navigateToVehicleAdd(navigation) {
 }
 
 export function navigateToVehicleDetail(navigation, vehicleId, params = {}) {
+  const { returnTo, ...rest } = params;
+  const detailParams = { vehicleId, ...(returnTo ? { returnTo } : {}), ...rest };
   if (Platform.OS === 'web') {
-    resetWebRoutes(
-      navigation,
-      [
-        { name: 'ClientVehicles' },
-        { name: 'VehicleDetail', params: { vehicleId, ...params } },
-      ],
-      vehicleDetail(vehicleId)
-    );
+    const fromHome = returnTo === 'Home' || returnTo === 'HomeMain';
+    const tailRoutes = fromHome
+      ? [{ name: 'VehicleDetail', params: detailParams }]
+      : [
+          { name: 'ClientVehicles' },
+          { name: 'VehicleDetail', params: detailParams },
+        ];
+    resetWebRoutes(navigation, tailRoutes, vehicleDetail(vehicleId));
     return;
   }
-  navigation.navigate('VehicleDetail', { vehicleId, ...params });
+  navigation.navigate('VehicleDetail', detailParams);
 }
 
 export function navigateToVehicleSpecs(navigation, vehicleId, params = {}) {
@@ -431,6 +433,8 @@ export function navigateToRepairRequestDetail(navigation, repairId, params = {})
     } else if (returnTo === 'ClientRepairs') {
       const listParams = listTab ? { initialTab: listTab } : undefined;
       tailRoutes.push({ name: 'ClientRepairs', params: listParams });
+    } else if (returnTo === 'Home' || returnTo === 'HomeMain') {
+      // HOME_ROUTE is prepended by resetWebRoutes — keep stack Home → detail.
     }
     tailRoutes.push({ name: 'RepairDetail', params: routeParams });
     resetWebRoutes(navigation, tailRoutes, path);
