@@ -448,6 +448,22 @@ export async function cancelScheduledAppointment(token, repairId, { note } = {})
   return response.json();
 }
 
+/** Owner cancels an open marketplace request with no booking. */
+export async function cancelOpenRepairRequest(token, repairId, { note } = {}) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair/${repairId}/cancel-request/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ note: note || '' }),
+  });
+  if (!response.ok) {
+    await throwApiError(response, 'Could not cancel request');
+  }
+  return response.json();
+}
+
 export async function dismissRepairFromScheduleQueue(token, repairId) {
   const response = await fetch(`${API_BASE_URL}/api/repairs/repair/${repairId}/schedule/dismiss/`, {
     method: 'POST',

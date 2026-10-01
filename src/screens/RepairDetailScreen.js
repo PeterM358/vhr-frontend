@@ -50,6 +50,7 @@ import {
   shopConfirmVehicleArrival,
   clientReportVehicleArrival,
   cancelScheduledAppointment,
+  cancelOpenRepairRequest,
   uploadRepairMedia,
   deleteRepairMedia,
 } from '../api/repairs';
@@ -393,6 +394,7 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [submittingCounter, setSubmittingCounter] = useState(false);
   const [respondingArrival, setRespondingArrival] = useState(false);
   const [cancelingAppointment, setCancelingAppointment] = useState(false);
+  const [cancelingRequest, setCancelingRequest] = useState(false);
   const [relatedServiceHistory, setRelatedServiceHistory] = useState(null);
   const [relatedHistoryLoading, setRelatedHistoryLoading] = useState(false);
   const [historyAccessRequest, setHistoryAccessRequest] = useState(null);
@@ -2797,6 +2799,44 @@ export default function RepairDetailScreen({ route, navigation }) {
     );
   };
 
+  const handleCancelOpenRequest = () => {
+    if (!canEditClientRequest || cancelingRequest) return;
+    Alert.alert(
+      t('repairs.detail.cancelRequestTitle'),
+      t('repairs.detail.cancelRequestBody'),
+      [
+        { text: t('repairs.detail.keepRequest'), style: 'cancel' },
+        {
+          text: t('repairs.detail.cancelRequestConfirm'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setCancelingRequest(true);
+              const token = await AsyncStorage.getItem('@access_token');
+              await cancelOpenRepairRequest(token, repairId);
+              await markRepairNotificationsRead(repairId, {
+                setNotifications,
+                refreshUnreadFromRest,
+              });
+              await refreshRepair();
+              Alert.alert(
+                t('repairs.detail.requestCanceledTitle'),
+                t('repairs.detail.requestCanceledBody')
+              );
+            } catch (err) {
+              Alert.alert(
+                t('repairs.detail.couldNotCancelRequest'),
+                parseApiErrorMessage(err, t('repairs.detail.pleaseTryAgain'))
+              );
+            } finally {
+              setCancelingRequest(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const afterRescheduleAction = async (action) => {
     await markRepairNotificationsRead(repairId, {
       setNotifications,
@@ -4391,9 +4431,24 @@ export default function RepairDetailScreen({ route, navigation }) {
             <FloatingCard>
               <Text style={styles.cardTitle}>{t('repairs.detail.requestDetails', null, 'Request details')}</Text>
               {canEditClientRequest ? (
-                <Button mode="outlined" onPress={handleEditRequest} style={styles.editRequestButton}>
-                  Edit request
-                </Button>
+                <>
+                  <Button mode="outlined" onPress={handleEditRequest} style={styles.editRequestButton}>
+                    {t('repairs.detail.editRequest')}
+                  </Button>
+                  <Text style={[styles.mutedText, { marginTop: 8 }]}>
+                    {t('repairs.detail.openRequestExpiryHint')}
+                  </Text>
+                  <Button
+                    mode="text"
+                    textColor="#dc2626"
+                    onPress={handleCancelOpenRequest}
+                    loading={cancelingRequest}
+                    disabled={cancelingRequest}
+                    style={{ marginTop: 4, alignSelf: 'flex-start' }}
+                  >
+                    {t('repairs.detail.cancelRequest')}
+                  </Button>
+                </>
               ) : null}
               {repair.symptoms ? <Text style={styles.detailLine}>{t('repairs.detail.symptoms', { value: repair.symptoms }, `Symptoms: ${repair.symptoms}`)}</Text> : null}
               {repair.description ? <Text style={styles.detailLine}>{t('repairs.detail.descriptionLabel', { value: repair.description }, `Description: ${repair.description}`)}</Text> : null}
