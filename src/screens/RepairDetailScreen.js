@@ -5347,6 +5347,24 @@ export default function RepairDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
+  cancelRequestTopBar: {
+    marginHorizontal: 4,
+    marginBottom: 4,
+  },
+  cancelRequestTopButton: {
+    borderColor: 'rgba(220, 38, 38, 0.55)',
+    alignSelf: 'stretch',
+  },
+  cancelRequestTopButtonContent: {
+    paddingVertical: 2,
+  },
+  cancelRequestTopHint: {
+    marginTop: 6,
+    marginHorizontal: 2,
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 12,
+    lineHeight: 16,
+  },
   heroWrap: {
     marginHorizontal: 0,
     marginTop: 8,

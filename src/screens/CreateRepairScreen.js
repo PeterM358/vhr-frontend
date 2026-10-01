@@ -553,17 +553,17 @@ export default function CreateRepairScreen({ navigation, route }) {
         symptoms: symptomText,
         kilometers: kmForApi,
         status,
-        request_targeting_mode: targetingMode,
-        preferred_service_centers:
-          targetingMode === 'selected_centers' ? selectedCenterIds : [],
-        requires_guarantee: requiresGuarantee,
-        preferred_radius_km: preferredRadiusKm ? parseInt(preferredRadiusKm, 10) : null,
         availability_notes: availabilityText || null,
         client_preferred_start: preferredTimes.start,
         client_preferred_end: preferredTimes.end,
         repair_parts_data: [],
       };
       if (!isEditMode) {
+        body.request_targeting_mode = targetingMode;
+        body.preferred_service_centers =
+          targetingMode === 'selected_centers' ? selectedCenterIds : [];
+        body.requires_guarantee = requiresGuarantee;
+        body.preferred_radius_km = preferredRadiusKm ? parseInt(preferredRadiusKm, 10) : null;
         body.vehicle = parsedVehicleId;
         body.source = 'marketplace_request';
         body.status = 'open';
@@ -589,14 +589,11 @@ export default function CreateRepairScreen({ navigation, route }) {
             repair_type: editPayload.repair_type,
             description: editPayload.description,
             symptoms: editPayload.symptoms,
-            request_targeting_mode: editPayload.request_targeting_mode,
-            requires_guarantee: editPayload.requires_guarantee,
-            preferred_radius_km: editPayload.preferred_radius_km,
             kilometers: editPayload.kilometers,
+            availability_notes: editPayload.availability_notes,
+            client_preferred_start: editPayload.client_preferred_start,
+            client_preferred_end: editPayload.client_preferred_end,
           };
-          if (Array.isArray(editPayload.preferred_service_centers)) {
-            minimalPayload.preferred_service_centers = editPayload.preferred_service_centers;
-          }
           await updateRepair(token, editRepairId, minimalPayload);
         }
       } else {
@@ -825,8 +822,8 @@ export default function CreateRepairScreen({ navigation, route }) {
     ],
   );
 
-  const wizardSteps = useMemo(
-    () => [
+  const wizardSteps = useMemo(() => {
+    const steps = [
       {
         id: 'vehicle',
         titleKey: 'requestServiceWizard.vehicleTitle',
@@ -855,16 +852,20 @@ export default function CreateRepairScreen({ navigation, route }) {
         validate: () => validateWhenStep(),
         Component: RepairRequestWhenStep,
       },
-      {
+    ];
+    // Targeting is fixed at create time: public stays public; direct stays direct.
+    // Edit never retargets — owner cancels and creates a new request instead.
+    if (!isEditMode) {
+      steps.push({
         id: 'routing',
         titleKey: 'requestServiceWizard.routingTitle',
         title: 'Routing',
         validate: () => validateRoutingStep(),
         Component: RepairRequestRoutingStep,
-      },
-    ],
-    [validateProblemStep, validateRoutingStep, validateVehicleStep, validateWhenStep],
-  );
+      });
+    }
+    return steps;
+  }, [isEditMode, validateProblemStep, validateRoutingStep, validateVehicleStep, validateWhenStep]);
 
   const adapter = useMemo(() => createMemoryAdapter({}), []);
 
