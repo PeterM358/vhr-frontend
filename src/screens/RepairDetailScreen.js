@@ -4058,6 +4058,25 @@ export default function RepairDetailScreen({ route, navigation }) {
         ]}
       >
           <View>
+            {canEditClientRequest ? (
+              <View style={styles.cancelRequestTopBar}>
+                <Button
+                  mode="outlined"
+                  textColor="#dc2626"
+                  onPress={handleCancelOpenRequest}
+                  loading={cancelingRequest}
+                  disabled={cancelingRequest}
+                  style={styles.cancelRequestTopButton}
+                  contentStyle={styles.cancelRequestTopButtonContent}
+                >
+                  {t('repairs.detail.cancelRequest')}
+                </Button>
+                <Text style={styles.cancelRequestTopHint}>
+                  {t('repairs.detail.openRequestExpiryHint')}
+                </Text>
+              </View>
+            ) : null}
+
             {renderHeroSummaryCard()}
 
             {renderShopFinalizeServiceTypeCard()}
@@ -4431,24 +4450,9 @@ export default function RepairDetailScreen({ route, navigation }) {
             <FloatingCard>
               <Text style={styles.cardTitle}>{t('repairs.detail.requestDetails', null, 'Request details')}</Text>
               {canEditClientRequest ? (
-                <>
-                  <Button mode="outlined" onPress={handleEditRequest} style={styles.editRequestButton}>
-                    {t('repairs.detail.editRequest')}
-                  </Button>
-                  <Text style={[styles.mutedText, { marginTop: 8 }]}>
-                    {t('repairs.detail.openRequestExpiryHint')}
-                  </Text>
-                  <Button
-                    mode="text"
-                    textColor="#dc2626"
-                    onPress={handleCancelOpenRequest}
-                    loading={cancelingRequest}
-                    disabled={cancelingRequest}
-                    style={{ marginTop: 4, alignSelf: 'flex-start' }}
-                  >
-                    {t('repairs.detail.cancelRequest')}
-                  </Button>
-                </>
+                <Button mode="outlined" onPress={handleEditRequest} style={styles.editRequestButton}>
+                  {t('repairs.detail.editRequest')}
+                </Button>
               ) : null}
               {repair.symptoms ? <Text style={styles.detailLine}>{t('repairs.detail.symptoms', { value: repair.symptoms }, `Symptoms: ${repair.symptoms}`)}</Text> : null}
               {repair.description ? <Text style={styles.detailLine}>{t('repairs.detail.descriptionLabel', { value: repair.description }, `Description: ${repair.description}`)}</Text> : null}
