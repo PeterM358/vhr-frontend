@@ -3,7 +3,6 @@ import {
   mapHealthFromApi,
   vehicleDisplayTitle,
 } from './vehicleHealthStatus';
-import { isTerminalRepairStatus } from './repairArrival';
 import { t } from '../i18n';
 
 const REASON_ACTION_META = {
@@ -61,51 +60,21 @@ const REASON_ACTION_META = {
 
 const SEVERITY_RANK = { needs_attention: 0, maintenance_recommended: 1, healthy: 2, in_service: 3 };
 
-function repairVehicleId(repair) {
-  const raw = repair?.vehicle ?? repair?.vehicle_id ?? null;
-  if (raw == null) return null;
-  if (typeof raw === 'object') {
-    const nested = raw.id ?? raw.pk ?? null;
-    return nested == null ? null : Number(nested);
-  }
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : null;
-}
+/** Matches VehicleHealthSection — primary issue stays on those cards. */
+const HEALTH_CARD_VISIBLE = 3;
 
+/**
+ * Recommended Actions = gaps / follow-ups not already owned by Vehicle Health.
+ * - Active open requests stay on health cards (View request).
+ * - For the first N vehicles (same as health cards), skip the primary reason
+ *   already shown as the card issue line + Request Service CTA.
+ * - Extra reasons on those vehicles, and all gaps on vehicles past N, still list here.
+ */
 export function buildRecommendedActions(vehicles = [], activeRepairs = [], translateFn = t) {
   const actions = [];
-  const vehiclesById = new Map(
-    (vehicles || [])
-      .filter((v) => v?.id != null)
-      .map((v) => [Number(v.id), v])
+  const healthCardVehicleIds = new Set(
+    (vehicles || []).slice(0, HEALTH_CARD_VISIBLE).map((v) => Number(v.id))
   );
-
-  // Active requests first — always deep-link to request detail (never CreateRepair).
-  for (const repair of activeRepairs || []) {
-    if (isTerminalRepairStatus(repair?.status)) continue;
-    const vehicleId = repairVehicleId(repair);
-    if (vehicleId == null) continue;
-    const vehicle = vehiclesById.get(vehicleId);
-    const vehicleName = vehicle
-      ? vehicleDisplayTitle(vehicle, translateFn)
-      : String(repair.vehicle_license_plate || '').trim() ||
-        translateFn('dashboard.recommendedActions.vehicleFallback', null, 'Your vehicle');
-    actions.push({
-      id: `repair-${repair.id}`,
-      vehicleId,
-      repairId: repair.id,
-      vehicleName,
-      title: translateFn(
-        'dashboard.recommendedActions.titles.activeRepair',
-        null,
-        'Active repair in progress'
-      ),
-      cta: translateFn('dashboard.recommendedActions.cta.viewRequest', null, 'View request'),
-      actionKey: 'view_repair',
-      severity: 'needs_attention',
-      healthStatus: 'needs_attention',
-    });
-  }
 
   for (const vehicle of vehicles) {
     const health = applyActiveRepairHealthOverride(
@@ -113,13 +82,16 @@ export function buildRecommendedActions(vehicles = [], activeRepairs = [], trans
       vehicle.id,
       activeRepairs
     );
+    // In-service / healthy vehicles are covered by health cards (or need no action).
     if (health.status === 'healthy' || health.status === 'in_service') continue;
 
     const vehicleName = vehicleDisplayTitle(vehicle, translateFn);
-    for (const reason of health.reasons || []) {
-      // Covered by explicit repair rows above.
-      if (reason.key === 'active_repairs') continue;
+    const reasons = (health.reasons || []).filter((reason) => reason?.key !== 'active_repairs');
+    const onHealthCard = healthCardVehicleIds.has(Number(vehicle.id));
+    // Primary reason is already the health-card copy — only list extras for those vehicles.
+    const listReasons = onHealthCard ? reasons.slice(1) : reasons;
 
+    for (const reason of listReasons) {
       const meta = REASON_ACTION_META[reason.key];
       if (!meta) {
         if (String(reason.key || '').startsWith('obligation_overdue_')) {
@@ -155,7 +127,7 @@ export function buildRecommendedActions(vehicles = [], activeRepairs = [], trans
   const seen = new Set();
   return actions
     .filter((item) => {
-      const key = `${item.actionKey}-${item.repairId || item.vehicleId}-${item.title}`;
+      const key = `${item.actionKey}-${item.vehicleId}-${item.title}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;

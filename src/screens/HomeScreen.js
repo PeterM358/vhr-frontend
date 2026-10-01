@@ -516,7 +516,11 @@ export default function HomeScreen({ navigation }) {
 
         <DashboardSection
           title={t('dashboard.health.sectionTitle')}
-          subtitle={t('dashboard.health.noVehiclesBody')}
+          subtitle={
+            hasVehicles
+              ? t('dashboard.health.sectionSubtitle')
+              : t('dashboard.health.noVehiclesBody')
+          }
           actionLabel={hasVehicles ? t('vehicles.title') : undefined}
           onActionPress={hasVehicles ? goVehicles : undefined}
         >

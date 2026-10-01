@@ -33,7 +33,7 @@ function primaryIssueLabel(health, t) {
   return health?.status_label || health?.label || t('common.allClear');
 }
 
-function primaryCtaLabel(health, hasActiveRepair, t) {
+function primaryCtaLabel(hasActiveRepair, t) {
   if (hasActiveRepair) return t('dashboard.health.viewRequest');
   return t('dashboard.health.requestService');
 }
@@ -78,7 +78,7 @@ export default function VehicleHealthSection({
       {rows.map(({ vehicle, health, activeRepair }) => {
         const title = vehicleDisplayTitle(vehicle, t);
         const issue = primaryIssueLabel(health, t);
-        const ctaLabel = primaryCtaLabel(health, Boolean(activeRepair), t);
+        const ctaLabel = primaryCtaLabel(Boolean(activeRepair), t);
 
         const handlePrimaryPress = () => {
           if (activeRepair?.id) {
@@ -89,7 +89,14 @@ export default function VehicleHealthSection({
         };
 
         return (
-          <FloatingCard key={String(vehicle.id)} statusAccent={health.status} style={styles.card}>
+          <FloatingCard
+            key={String(vehicle.id)}
+            statusAccent={health.status}
+            style={styles.card}
+            onPress={() => onVehiclePress?.(vehicle)}
+            accessibilityRole="button"
+            accessibilityLabel={t('dashboard.health.openVehicleA11y', { vehicle: title })}
+          >
             <View style={styles.row}>
               <View style={styles.copy}>
                 <Text style={styles.vehicleTitle} numberOfLines={1}>
@@ -105,25 +112,18 @@ export default function VehicleHealthSection({
                   {issue}
                 </Text>
               </View>
-              <View style={styles.actions}>
-                <Button
-                  mode="contained"
-                  compact
-                  onPress={handlePrimaryPress}
-                  style={styles.primaryCta}
-                  labelStyle={styles.primaryCtaLabel}
-                >
-                  {ctaLabel}
-                </Button>
-                <Button
-                  mode="text"
-                  compact
-                  onPress={() => onVehiclePress?.(vehicle)}
-                  labelStyle={styles.linkLabel}
-                >
-                  {t('dashboard.health.vehicleDetails')}
-                </Button>
-              </View>
+              <Button
+                mode="contained"
+                compact
+                onPress={(e) => {
+                  e?.stopPropagation?.();
+                  handlePrimaryPress();
+                }}
+                style={styles.primaryCta}
+                labelStyle={styles.primaryCtaLabel}
+              >
+                {ctaLabel}
+              </Button>
             </View>
           </FloatingCard>
         );
@@ -174,24 +174,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flexShrink: 1,
   },
-  linkLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginVertical: 0,
-  },
   issue: {
     marginTop: 2,
     fontSize: 12,
     color: COLORS.TEXT_MUTED,
     lineHeight: 16,
   },
-  actions: {
-    alignItems: 'flex-end',
-    flexShrink: 0,
-    gap: 0,
-  },
   primaryCta: {
     borderRadius: 10,
+    flexShrink: 0,
   },
   primaryCtaLabel: {
     fontSize: 12,

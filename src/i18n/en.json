@@ -1945,7 +1945,7 @@
     },
     "recommendedActions": {
       "title": "Recommended Actions",
-      "subtitle": "Maintenance and updates that need your attention.",
+      "subtitle": "Extra maintenance gaps beyond the status cards above.",
       "titles": {
         "oilServiceDue": "Oil service due",
         "oilServiceDueSoon": "Oil service due soon",
@@ -1970,12 +1970,14 @@
     },
     "health": {
       "sectionTitle": "Vehicle Health",
+      "sectionSubtitle": "Status and next step for each vehicle. Tap a card to open it.",
       "viewAll": "View all",
       "noVehiclesTitle": "No vehicles yet",
       "noVehiclesBody": "Add a vehicle to see health status, maintenance gaps, and service recommendations.",
       "viewRequest": "View request",
       "requestService": "Request Service",
-      "vehicleDetails": "Details"
+      "vehicleDetails": "Details",
+      "openVehicleA11y": "Open {vehicle}"
     },
     "partner": {
       "title": "Partner dashboard",
