@@ -289,7 +289,16 @@ export default function ShopHomeScreen() {
     }, [refreshProfileGate, loadDashboardRepairs, loadDashboardMetrics, refreshUnreadFromRest])
   );
 
-  const handleRepairPress = (repairId) => {
+  const handleRepairPress = (repair) => {
+    const repairId = typeof repair === 'object' ? repair?.id : repair;
+    if (!repairId) return;
+    if (isLeadTeaserLocked(typeof repair === 'object' ? repair : null)) {
+      navigation.navigate(
+        'ShopSubscriptionUpgrade',
+        upgradeNavigationParams({ featureKey: FEATURES.MARKETPLACE_FULL })
+      );
+      return;
+    }
     if (
       !gateRepairNavigation(navigation, {
         isComplete: profileComplete,
@@ -346,19 +355,13 @@ export default function ShopHomeScreen() {
   const operationsTiles = useMemo(
     () => [
       {
-        key: 'pending-offers',
-        icon: 'file-send-outline',
-        title: t('partnerDashboard.pendingOffersTitle'),
-        subtitle: t('partnerDashboard.pendingOffersSubtitle'),
-        count: pendingOffers.length,
-        onPress: () => resetShopDrawerRepairs(navigation),
-      },
-      {
-        key: 'active',
-        icon: 'car-wrench',
-        title: t('partnerDashboard.activeRepairsTitle'),
-        subtitle: t('partnerDashboard.activeRepairsSubtitle'),
-        count: ongoingRepairs.length,
+        key: 'requests',
+        icon: 'clipboard-text-outline',
+        title: t('partnerDashboard.openRepairRequests'),
+        subtitle: partnerActive
+          ? t('partnerDashboard.operationsRequestsSubtitle')
+          : t('partnerDashboard.operationsRequestsLockedSubtitle'),
+        count: openRepairs.length || ongoingRepairs.length || undefined,
         onPress: () => resetShopDrawerRepairs(navigation),
       },
       {
@@ -416,11 +419,12 @@ export default function ShopHomeScreen() {
     ],
     [
       navigation,
-      pendingOffers.length,
       todayBookings.length,
+      openRepairs.length,
       ongoingRepairs.length,
       unscheduledCount,
       setupComplete,
+      partnerActive,
       openCenter,
       t,
     ]
@@ -487,9 +491,9 @@ export default function ShopHomeScreen() {
       key={String(item.id)}
       repair={item}
       canSendOffers={canSendOffers}
-      onPressDetails={(repair) => handleRepairPress(repair.id)}
+      onPressDetails={handleRepairPress}
       onPressOffer={handleRepairOffer}
-      onPressPrimary={(repair) => handleRepairPress(repair.id)}
+      onPressPrimary={handleRepairPress}
     />
   );
 
@@ -552,7 +556,9 @@ export default function ShopHomeScreen() {
         <DashboardSection
           title={t('partnerDashboard.openRepairRequests')}
           subtitle={
-            lifecycleCounterLine || t('partnerDashboard.openRequestsEmptySubtitle')
+            !partnerActive
+              ? t('partnerDashboard.openRequestsLockedSubtitle')
+              : lifecycleCounterLine || t('partnerDashboard.openRequestsEmptySubtitle')
           }
           actionLabel={t('partnerDashboard.viewRequests')}
           onActionPress={() => resetShopDrawerRepairs(navigation)}

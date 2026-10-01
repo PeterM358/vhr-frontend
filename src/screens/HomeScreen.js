@@ -55,6 +55,7 @@ import {
   isDriverMembership,
   pickActiveOrganization,
   setWorkspaceMode,
+  shouldShowPersonalWorkModeSwitch,
 } from '../utils/orgRoleHome';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import { toCanonicalAppPath } from '../navigation/localizedRoutes';
@@ -120,8 +121,9 @@ export default function HomeScreen({ navigation }) {
       const resolveDriverOrg = async () => {
         const rows = await readOrganizationMemberships();
         const active = pickActiveOrganization(rows);
+        const eligible = shouldShowPersonalWorkModeSwitch(active) ? active : null;
         if (!cancelled) {
-          setDriverOrg(isDriverMembership(active) ? active : null);
+          setDriverOrg(eligible);
         }
         return active;
       };
@@ -304,10 +306,6 @@ export default function HomeScreen({ navigation }) {
     const root = navigation.getParent?.() || navigation;
     navigateToRepairRequests(root);
   };
-  const goPendingOffers = () => {
-    const root = navigation.getParent?.() || navigation;
-    navigateToRepairRequests(root, { tab: 'offers' });
-  };
   const goDocuments = () => {
     const root = navigation.getParent?.() || navigation;
     navigateToDocuments(root);
@@ -360,15 +358,9 @@ export default function HomeScreen({ navigation }) {
       { key: 'vehicles', value: vehicles.length, label: t('dashboard.summary.vehicles'), onPress: goVehicles },
       {
         key: 'requests',
-        value: openRequestsCount,
+        value: Math.max(openRequestsCount, pendingOffersCount),
         label: t('dashboard.summary.openRequests'),
         onPress: goRepairs,
-      },
-      {
-        key: 'offers',
-        value: pendingOffersCount,
-        label: t('dashboard.summary.pendingOffers'),
-        onPress: goPendingOffers,
       },
       {
         key: 'alerts',

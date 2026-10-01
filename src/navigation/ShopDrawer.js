@@ -64,6 +64,7 @@ function CustomDrawerContent(props) {
   const { t } = useTranslation();
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
   const [shopProfile, setShopProfile] = useState(null);
+  const [shopProfileCount, setShopProfileCount] = useState(0);
   const [membership, setMembership] = useState(null);
   const [hasOrganizations, setHasOrganizations] = useState(false);
 
@@ -74,14 +75,17 @@ function CustomDrawerContent(props) {
         readShopMemberships(),
         getMyShopProfiles(),
       ]);
+      const list = Array.isArray(profiles) ? profiles : [];
       const profile =
-        profiles?.find((row) => String(row.id) === String(shopId)) || profiles?.[0] || null;
+        list.find((row) => String(row.id) === String(shopId)) || list[0] || null;
       setShopProfile(profile);
+      setShopProfileCount(list.length);
       setMembership(shopMembershipFor(memberships, profile?.id ?? shopId));
       const orgRows = await readOrganizationMemberships();
       setHasOrganizations(Array.isArray(orgRows) && orgRows.length > 0);
     } catch {
       setShopProfile(null);
+      setShopProfileCount(0);
       setMembership(null);
       setHasOrganizations(false);
     }
@@ -311,18 +315,20 @@ function CustomDrawerContent(props) {
           {...itemProps}
         />
 
-        <DrawerItem
-          label={t('drawer.partner.switchCenter')}
-          onPress={() => {
-            if (Platform.OS === 'web') {
-              navigateToPartnerSwitchCenter(navigation);
-            } else {
-              resetFromShopDrawer(navigation, 'ChooseShop');
-            }
-          }}
-          icon={({ color, size }) => <DrawerMenuIcon name="swap-horizontal" color={color} size={size} />}
-          {...itemProps}
-        />
+        {shopProfileCount > 1 ? (
+          <DrawerItem
+            label={t('drawer.partner.switchCenter')}
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                navigateToPartnerSwitchCenter(navigation);
+              } else {
+                resetFromShopDrawer(navigation, 'ChooseShop');
+              }
+            }}
+            icon={({ color, size }) => <DrawerMenuIcon name="swap-horizontal" color={color} size={size} />}
+            {...itemProps}
+          />
+        ) : null}
 
         <View style={drawerGlassStyles.languageSection}>
           <Text style={drawerGlassStyles.languageLabel}>{t('language.label')}</Text>

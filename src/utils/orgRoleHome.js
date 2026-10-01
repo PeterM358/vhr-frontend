@@ -15,9 +15,16 @@ export function isDriverMembership(orgOrMembership) {
   const role = String(orgOrMembership.membership_role || orgOrMembership.role || '')
     .trim()
     .toLowerCase();
-  if (role !== 'transport') return false;
+  // Only hired transport drivers get personal↔work mode. Shop/org admins do not.
+  if (role !== 'transport' && role !== 'driver') return false;
   if (orgOrMembership.manage_fleet === true) return false;
+  if (orgOrMembership.is_admin === true || orgOrMembership.is_owner === true) return false;
   return true;
+}
+
+/** Show Working/Personal balloon only for hired drivers of a Veversal org. */
+export function shouldShowPersonalWorkModeSwitch(orgOrMembership) {
+  return isDriverMembership(orgOrMembership);
 }
 
 export function pickActiveOrganization(memberships = [], preferredId = null) {

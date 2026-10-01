@@ -15,6 +15,7 @@ import {
   formatTimeSince,
   resolvePartnerLifecycle,
 } from '../../utils/partnerRepairLifecycle';
+import { isLeadTeaserLocked } from '../../utils/partnerEntitlements';
 
 function formatVisitTime(repair) {
   const visit =
@@ -50,6 +51,55 @@ export default function PartnerRepairRequestCard({
 
   if (!repair || repair.id == null) {
     return null;
+  }
+
+  const locked = isLeadTeaserLocked(repair);
+  const teaserOperation = String(
+    repair?.teaser_operation ||
+      repair?.effective_repair_type_name ||
+      repair?.final_repair_type_name ||
+      repair?.repair_type_name ||
+      ''
+  ).trim();
+  const teaserCity = String(repair?.teaser_city || repair?.broad_region || '').trim();
+
+  if (locked) {
+    return (
+      <FloatingCard style={[styles.card, styles.lockedCard]}>
+        <Pressable
+          onPress={() => onPressOffer?.(repair)}
+          accessibilityRole="button"
+          accessibilityLabel={t('partnerDashboard.card.lockedA11y')}
+        >
+          <View style={styles.headerRow}>
+            <View style={styles.headerText}>
+              <Text style={styles.title} numberOfLines={1}>
+                {teaserOperation || t('partnerDashboard.card.lockedRepairFallback')}
+              </Text>
+              <Text style={styles.meta} numberOfLines={1}>
+                {teaserCity
+                  ? t('partnerDashboard.card.lockedNearCity', { city: teaserCity })
+                  : t('partnerDashboard.card.lockedNearby')}
+              </Text>
+            </View>
+            <View style={[styles.pill, styles.lockedPill]}>
+              <Text style={[styles.pillText, styles.lockedPillText]} numberOfLines={2}>
+                {t('partnerDashboard.card.lockedBadge')}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.lockedHint} numberOfLines={2}>
+            {t('partnerDashboard.card.lockedHint')}
+          </Text>
+          <View style={styles.blurMask} pointerEvents="none" />
+        </Pressable>
+        <View style={styles.actions}>
+          <Button mode="contained" compact onPress={() => onPressOffer?.(repair)} style={styles.primaryBtn}>
+            {t('partnerDashboard.card.lockedActivate')}
+          </Button>
+        </View>
+      </FloatingCard>
+    );
   }
 
   const lifecycle = resolvePartnerLifecycle(repair);
@@ -182,6 +232,26 @@ export default function PartnerRepairRequestCard({
 const styles = StyleSheet.create({
   card: {
     marginBottom: 8,
+  },
+  lockedCard: {
+    overflow: 'hidden',
+    opacity: 0.96,
+  },
+  blurMask: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(248,250,252,0.45)',
+  },
+  lockedHint: {
+    fontSize: 12,
+    color: COLORS.TEXT_MUTED,
+    lineHeight: 17,
+    marginTop: 8,
+  },
+  lockedPill: {
+    backgroundColor: 'rgba(180,83,9,0.14)',
+  },
+  lockedPillText: {
+    color: '#92400e',
   },
   headerRow: {
     flexDirection: 'row',
