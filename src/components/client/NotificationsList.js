@@ -1,7 +1,7 @@
 // PATH: src/components/client/NotificationsList.js
 
-import React, { useState, useContext, useCallback } from 'react';
-import { View, FlatList, Alert, StyleSheet } from 'react-native';
+import React, { useState, useContext, useCallback, useMemo } from 'react';
+import { View, FlatList, Alert, StyleSheet, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Text, ActivityIndicator } from 'react-native-paper';
@@ -9,6 +9,7 @@ import { Text, ActivityIndicator } from 'react-native-paper';
 import {
   getNotifications,
   markNotificationRead,
+  markAllNotificationsRead,
   patchNotificationReadInList,
 } from '../../api/notifications';
 import { WebSocketContext } from '../../context/WebSocketManager';
@@ -59,9 +60,12 @@ const UI_STYLE_BORDER = {
 export default function NotificationsList({
   activityReturnTo = 'ClientActivity',
   embedded = false,
+  ListFooterComponent = null,
 }) {
   const [loading, setLoading] = useState(true);
   const [remoteNotifications, setRemoteNotifications] = useState([]);
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
   const {
     notifications: liveNotifications = [],
     setNotifications,
@@ -74,7 +78,7 @@ export default function NotificationsList({
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('@access_token');
-      const data = await getNotifications(token);
+      const data = await getNotifications(token, { force: true });
       setRemoteNotifications(Array.isArray(data) ? data : data?.results ?? []);
       if (typeof refreshUnreadFromRest === 'function') {
         await refreshUnreadFromRest();
@@ -108,6 +112,26 @@ export default function NotificationsList({
     }
   };
 
+  const handleMarkAllRead = async () => {
+    setMarkingAll(true);
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      await markAllNotificationsRead(token);
+      setRemoteNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      if (typeof setNotifications === 'function') {
+        setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      }
+      if (typeof refreshUnreadFromRest === 'function') {
+        await refreshUnreadFromRest();
+      }
+    } catch (err) {
+      console.error('Failed to mark all read', err);
+      Alert.alert(t('common.error'), t('notifications.markAllError'));
+    } finally {
+      setMarkingAll(false);
+    }
+  };
+
   const handlePress = async (item) => {
     try {
       const token = await AsyncStorage.getItem('@access_token');
@@ -126,13 +150,27 @@ export default function NotificationsList({
     }
   };
 
-  const mergedMap = new Map();
-  [...(remoteNotifications || []), ...(liveNotifications || [])].forEach((n) => {
-    if (n?.id != null && !mergedMap.has(n.id)) mergedMap.set(n.id, n);
-  });
-  const mergedNotifications = Array.from(mergedMap.values()).sort(
-    (a, b) => new Date(b.created_at) - new Date(a.created_at)
-  );
+  const mergedNotifications = useMemo(() => {
+    const mergedMap = new Map();
+    [...(remoteNotifications || []), ...(liveNotifications || [])].forEach((n) => {
+      if (n?.id != null && !mergedMap.has(n.id)) mergedMap.set(n.id, n);
+    });
+    const rows = Array.from(mergedMap.values()).sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    );
+    return unreadOnly ? rows.filter((n) => !n.is_read) : rows;
+  }, [remoteNotifications, liveNotifications, unreadOnly]);
+
+  const unreadCount = useMemo(() => {
+    const seen = new Set();
+    let count = 0;
+    for (const n of [...(remoteNotifications || []), ...(liveNotifications || [])]) {
+      if (n?.id == null || seen.has(n.id)) continue;
+      seen.add(n.id);
+      if (!n.is_read) count += 1;
+    }
+    return count;
+  }, [remoteNotifications, liveNotifications]);
 
   const renderItem = ({ item }) => {
     const unread = !item.is_read;
@@ -174,6 +212,30 @@ export default function NotificationsList({
     );
   };
 
+  const toolbar = (
+    <View style={styles.toolbar}>
+      <Pressable
+        onPress={() => setUnreadOnly((v) => !v)}
+        style={[styles.filterChip, unreadOnly && styles.filterChipActive]}
+      >
+        <Text style={[styles.filterChipText, unreadOnly && styles.filterChipTextActive]}>
+          {unreadOnly ? t('notifications.unreadOnly') : t('notifications.all')}
+        </Text>
+      </Pressable>
+      {unreadCount > 0 ? (
+        <Pressable
+          onPress={handleMarkAllRead}
+          disabled={markingAll}
+          style={styles.markAllBtn}
+        >
+          <Text style={styles.markAllText}>
+            {markingAll ? t('notifications.markingAll') : t('notifications.markAllRead')}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+
   if (loading) {
     return (
       <View style={[styles.center, embedded && styles.embeddedCenter]}>
@@ -182,36 +244,53 @@ export default function NotificationsList({
     );
   }
 
-  const listBody =
-    mergedNotifications.length === 0 ? (
-      embedded ? (
-        <Text style={styles.embeddedEmpty}>{t('notifications.emptyEmbedded')}</Text>
-      ) : (
-        <EmptyStateCard
-          icon="bell-outline"
-          title={t('notifications.emptyTitle')}
-          subtitle={t('notifications.emptySubtitle')}
-        />
-      )
-    ) : embedded ? (
-      <View style={styles.embeddedList}>
-        {mergedNotifications.slice(0, 8).map((item) => (
-          <View key={item.id?.toString() ?? Math.random().toString()}>
-            {renderItem({ item })}
+  if (embedded) {
+    const rows = mergedNotifications.slice(0, 8);
+    return (
+      <View style={[styles.container, styles.embeddedContainer]}>
+        {toolbar}
+        {rows.length === 0 ? (
+          <Text style={styles.embeddedEmpty}>
+            {unreadOnly ? t('notifications.emptyUnreadTitle') : t('notifications.emptyEmbedded')}
+          </Text>
+        ) : (
+          <View style={styles.embeddedList}>
+            {rows.map((item) => (
+              <View key={item.id?.toString()}>{renderItem({ item })}</View>
+            ))}
           </View>
-        ))}
+        )}
+        {ListFooterComponent}
       </View>
-    ) : (
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {toolbar}
       <FlatList
         data={mergedNotifications}
         keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <EmptyStateCard
+            icon="bell-outline"
+            title={
+              unreadOnly
+                ? t('notifications.emptyUnreadTitle')
+                : t('notifications.emptyTitle')
+            }
+            subtitle={
+              unreadOnly
+                ? t('notifications.emptyUnreadSubtitle')
+                : t('notifications.emptySubtitle')
+            }
+          />
+        }
+        ListFooterComponent={ListFooterComponent}
       />
-    );
-
-  return (
-    <View style={[styles.container, embedded && styles.embeddedContainer]}>{listBody}</View>
+    </View>
   );
 }
 
@@ -223,14 +302,12 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingHorizontal: 12,
-    paddingTop: 12,
+    paddingHorizontal: 0,
+    paddingTop: 0,
     backgroundColor: 'transparent',
   },
   embeddedContainer: {
     flex: 0,
-    paddingHorizontal: 0,
-    paddingTop: 0,
   },
   embeddedCenter: {
     minHeight: 80,
@@ -245,15 +322,44 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 12,
   },
-  heading: {
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 10,
+  },
+  filterChip: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  filterChipActive: {
+    backgroundColor: 'rgba(255,255,255,0.92)',
+  },
+  filterChipText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  filterChipTextActive: {
+    color: '#0f172a',
+  },
+  markAllBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+  },
+  markAllText: {
+    color: '#93c5fd',
+    fontSize: 13,
     fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 12,
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 28,
+    flexGrow: 1,
   },
   readCard: {
     opacity: 0.78,
