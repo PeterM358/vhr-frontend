@@ -36,8 +36,17 @@
       }
     },
     "production": {
+      "environment": "production",
+      "ios": {
+        "resourceClass": "m-medium"
+      },
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.veversal.com",
+        "EXPO_PUBLIC_WS_BASE_URL": "wss://api.veversal.com",
+        "EXPO_PUBLIC_WS_ENABLED": "true"
       }
     }
   }

@@ -195,19 +195,56 @@ From `eas.json`:
 |---------|-----|----------------|
 | `development` | Dev client, internal distribution | Upload google-services.json + GoogleService-Info.plist via EAS secrets or local files at build time |
 | `preview` | Internal APK/IPA | Same client configs required |
-| `production` | Store builds | Same; production APNs entitlements needed for iOS push |
+| `production` | Store / TestFlight | Same; production APNs entitlements needed for iOS push |
 
 EAS project ID: `cde03e84-e27d-4ec0-9712-519a847ceb2d` (owner: `mihailovv`).
+
+### EAS secrets (required — files are gitignored)
+
+`eas-build-pre-install.sh` injects configs on the build worker:
+
+| Env var | Platform | How to create |
+|---------|----------|---------------|
+| `GOOGLE_SERVICES_JSON_BASE64` | Android | already used for Play builds |
+| `GOOGLE_SERVICES_PLIST_BASE64` | **iOS** | see below |
+
+```bash
+cd /Users/client/vhr-frontend
+# one-line secret (paste into eas env:create when prompted, or --value)
+base64 -i GoogleService-Info.plist | tr -d '\n' | pbcopy
+eas env:create --name GOOGLE_SERVICES_PLIST_BASE64 --scope project --type secret --environment production
+# also add for preview if you build iOS preview:
+# eas env:create --name GOOGLE_SERVICES_PLIST_BASE64 --scope project --type secret --environment preview
+```
+
+Without `GOOGLE_SERVICES_PLIST_BASE64`, iOS EAS fails: `GoogleService-Info.plist` not found (Xcode references `../GoogleService-Info.plist`).
+
+### APNs `.p8` for Firebase (not the same as Expo “Push key” row)
+
+Expo Credentials shows **Key ID** `27M9GHDRDW` but often **does not download** the private `.p8`. Firebase needs the file.
+
+**Create/download from Apple (once):**
+
+1. [developer.apple.com/account/resources/authkeys](https://developer.apple.com/account/resources/authkeys/list) (Team VEVERSAL LTD EOOD)
+2. **+** → enable **Apple Push Notifications service (APNs)** → Continue → Register
+3. **Download** `.p8` immediately (Apple shows it **once**)
+4. Note **Key ID** + Team ID `GR95RKY24P`
+5. Firebase → **veversal-app** → Project settings → Cloud Messaging → Apple app → upload `.p8` (use for **both** development + production fields if UI asks)
+6. Optionally replace Expo’s push key with this same key (`eas credentials`) so EAS and Firebase share one APNs key
+
+If you already generated a key via EAS and cannot download `.p8`, generate a **new** Apple key for Firebase (you can have multiple APNs keys) or download from Expo ⋮ if Download appears.
 
 Profile support:
 
 - **A.** Local dev build: `npx expo run:android` / `npx expo run:ios` with local plist/json
 - **B.** EAS development Android (physical): `eas build --profile development --platform android`
 - **C.** Internal Android APK: `eas build --profile preview --platform android`
-- **D.** Google Play AAB: configure `production` with `buildType: app-bundle` when ready
-- **E.** iOS dev / TestFlight: `eas build --profile development|preview|production --platform ios` (requires Apple credentials + APNs)
+- **D.** Google Play AAB: `play-internal` / `production` app-bundle
+- **E.** iOS TestFlight: `eas build --profile production --platform ios` after plist secret + Apple login
 
 Do not run paid EAS builds without explicit approval.
+
+**Store Xcode requirement (2026):** App Store submissions need a current EAS image / Xcode (Apple’s Xcode 26+ rule). If Expo warns the build image is too old to submit, bump the image in `eas.json` / use latest before `eas submit`.
 
 ## Beta server deployment plan (`veversal-app` credential)
 

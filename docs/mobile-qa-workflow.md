@@ -53,6 +53,8 @@ Preview profile should use the same beta URLs as `.env.staging`. Set `GOOGLE_SER
 eas build --profile preview --platform android
 ```
 
+**Play / TestFlight version log** (which `versionCode` is which release): sibling backend repo `vhr/docs/mobile-store-releases.md` — bump `versionCode` before every store upload.
+
 ## Common mistake
 
 `./gradlew assembleRelease` **without** `with-mobile-env.js staging` bakes `.env.local` LAN IP into the APK → empty app on phone. Always use `npm run android:beta:apk` for beta testing.
