@@ -9,6 +9,7 @@ import {
 import { DiscoveryFilterChip } from './DiscoveryFilterChip';
 import { useTranslation } from '../../i18n';
 import { chipIconGlyph } from '../../utils/discoveryFilterTaxonomy';
+import { DISCOVERY_CITY_CHIPS } from '../../utils/discoverySearch';
 
 const RATING_FILTER_KEYS = {
   null: 'any',
@@ -63,11 +64,34 @@ export default function DiscoveryExpandedFiltersPanel({
   categoryOptions,
   repairTypeChipOptions,
   brands,
+  citySlug = null,
+  onSelectCity,
 }) {
   const { t } = useTranslation();
 
   return (
     <View style={styles.panel}>
+      {typeof onSelectCity === 'function' ? (
+        <FilterSection title={t('serviceCenters.city')}>
+          <DiscoveryFilterChip
+            label={t('serviceCenters.anyCity')}
+            selected={!citySlug}
+            onPress={() => onSelectCity(null)}
+          />
+          {DISCOVERY_CITY_CHIPS.map((city) => {
+            const selected = citySlug === city.slug_en || citySlug === city.slug_bg;
+            return (
+              <DiscoveryFilterChip
+                key={city.slug_en}
+                label={t(`serviceCenters.cities.${city.nameKey}`, null, city.slug_en)}
+                selected={selected}
+                onPress={() => onSelectCity(selected ? null : city)}
+              />
+            );
+          })}
+        </FilterSection>
+      ) : null}
+
       {typeof setOpenNowOnly === 'function' || typeof setVerifiedOnly === 'function' ? (
         <FilterSection title={t('serviceCenters.filters')}>
           {typeof setOpenNowOnly === 'function' ? (

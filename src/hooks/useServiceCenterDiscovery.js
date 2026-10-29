@@ -383,6 +383,36 @@ export function useServiceCenterDiscovery({
     [fetchShops]
   );
 
+  /** Chip / select city — no free-text required (works for BG/EN slugs). */
+  const selectCity = useCallback((cityOrNull) => {
+    if (!cityOrNull) {
+      setMatchedCity(null);
+      matchedCityRef.current = null;
+      setCitySlug(null);
+      citySlugRef.current = null;
+      setAddressQuery('');
+      setActiveSearchTerm('');
+      activeSearchRef.current = '';
+      return;
+    }
+    const slug = citySlugFromMatch(cityOrNull);
+    const label = cityOrNull.name || cityOrNull.slug_en || slug || '';
+    const next = {
+      name: label,
+      slug_en: cityOrNull.slug_en || slug,
+      slug_bg: cityOrNull.slug_bg || null,
+      latitude: cityOrNull.latitude,
+      longitude: cityOrNull.longitude,
+    };
+    setMatchedCity(next);
+    matchedCityRef.current = next;
+    setCitySlug(slug);
+    citySlugRef.current = slug;
+    setAddressQuery(label);
+    setActiveSearchTerm('');
+    activeSearchRef.current = '';
+  }, []);
+
   const showAllInMatchedCity = useCallback(async () => {
     const slug = citySlugFromMatch(matchedCity) || citySlug || 'sofia';
     const cityName = matchedCity?.name || 'Sofia';
@@ -499,6 +529,7 @@ export function useServiceCenterDiscovery({
     citySlug,
     setCitySlug,
     matchedCity,
+    selectCity,
     sort,
     setSort,
     repairTypes,

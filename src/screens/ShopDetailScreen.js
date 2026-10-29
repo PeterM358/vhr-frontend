@@ -613,8 +613,9 @@ export default function ShopDetailScreen({ route, navigation }) {
       ? Boolean(shop.accepting_requests)
       : clientBadge.kind !== 'not_accepting');
   const revealPublicContact = showOwnerControls || shopAcceptingPublicly;
-  const showClientRequest =
-    !isOwner && !isShopAccount && !publicPreview && revealPublicContact && clientBadge.kind !== 'not_accepting';
+  // Match discovery cards: guests/clients can always start a request from the profile.
+  // Contact redaction for not-accepting shops stays separate via revealPublicContact.
+  const showClientRequest = !isOwner && !isShopAccount && !publicPreview;
   const showSimilarAlternatives =
     Boolean(publicPreview || !showOwnerControls) &&
     !shopAcceptingPublicly &&
@@ -630,7 +631,7 @@ export default function ShopDetailScreen({ route, navigation }) {
     (typeof shop.seo_country === 'string' && shop.seo_country.trim()) ||
     '';
 
-  // Street/phone stay gated. City (locality) stays public for SEO + orientation
+  // Street/phone/email stay gated. City (locality) stays public for SEO + orientation
   // even when the listing is not accepting requests.
   const addr = revealPublicContact && typeof shop.address === 'string' ? shop.address.trim() : '';
   const phone = revealPublicContact
@@ -640,6 +641,9 @@ export default function ShopDetailScreen({ route, navigation }) {
         (typeof shop.phone === 'string' && shop.phone.trim()) ||
         ''
       )
+    : '';
+  const email = revealPublicContact
+    ? (typeof shop.email === 'string' && shop.email.trim()) || ''
     : '';
   const locationLine = revealPublicContact
     ? [addr, cityName, countryName].filter(Boolean).join(', ')
@@ -883,6 +887,17 @@ export default function ShopDetailScreen({ route, navigation }) {
           {phone ? (
             <Pressable onPress={() => Linking.openURL(`tel:${phone.replace(/\s+/g, '')}`)} hitSlop={8}>
               <HeroIconRow icon="phone-outline">{phone}</HeroIconRow>
+            </Pressable>
+          ) : null}
+
+          {email ? (
+            <Pressable
+              onPress={() => Linking.openURL(`mailto:${email}`)}
+              hitSlop={8}
+              accessibilityRole="link"
+              accessibilityLabel={t('common.email')}
+            >
+              <HeroIconRow icon="email-outline">{email}</HeroIconRow>
             </Pressable>
           ) : null}
 

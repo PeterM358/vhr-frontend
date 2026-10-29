@@ -117,6 +117,12 @@ const DISTANCE_SUMMARY_KEYS = { 10: '10km', 25: '25km', 50: '50km', 100: '100km'
 
 function buildActiveFilterSummary(filters, t) {
   const parts = [];
+  if (filters.citySlug || filters.matchedCity?.name) {
+    parts.push(
+      filters.matchedCity?.name
+        || t(`serviceCenters.cities.${filters.citySlug}`, null, filters.citySlug),
+    );
+  }
   if (filters.selectedVehicleType) {
     parts.push(t(`vehicleTypes.${filters.selectedVehicleType}`, null, filters.selectedVehicleType));
   }
@@ -205,6 +211,8 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
     radiusKm,
     setRadiusKm,
     matchedCity,
+    citySlug,
+    selectCity,
     sort,
     setSort,
     brands,
@@ -537,28 +545,6 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
     [sort, sortOptions, t]
   );
 
-  const expandedFilterProps = {
-    selectedVehicleType,
-    setSelectedVehicleType,
-    selectedCategory,
-    setSelectedCategory,
-    selectedRepairType,
-    setSelectedRepairType,
-    selectedBrand,
-    setSelectedBrand: handleBrandChange,
-    minRating,
-    setMinRating,
-    radiusKm,
-    setRadiusKm,
-    categoryOptions,
-    repairTypeChipOptions,
-    brands,
-    openNowOnly,
-    setOpenNowOnly,
-    verifiedOnly,
-    setVerifiedOnly,
-  };
-
   const cityLabel = matchedCity?.name || 'Sofia';
 
   const handleLocateMe = async () => {
@@ -666,6 +652,46 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
     lastSelectedListIdRef.current = null;
   }, []);
 
+  const handleSelectCityFilter = useCallback(
+    (city) => {
+      selectCity(city);
+      deselectShop();
+      if (city) {
+        setUserLocatedExplicitly(false);
+        autoFitRegionRef.current = true;
+        const region = resolveCityMapRegion(city);
+        if (region) {
+          applyMapRegion(region);
+        }
+      }
+    },
+    [applyMapRegion, deselectShop, selectCity, setUserLocatedExplicitly]
+  );
+
+  const expandedFilterProps = {
+    selectedVehicleType,
+    setSelectedVehicleType,
+    selectedCategory,
+    setSelectedCategory,
+    selectedRepairType,
+    setSelectedRepairType,
+    selectedBrand,
+    setSelectedBrand: handleBrandChange,
+    minRating,
+    setMinRating,
+    radiusKm,
+    setRadiusKm,
+    categoryOptions,
+    repairTypeChipOptions,
+    brands,
+    openNowOnly,
+    setOpenNowOnly,
+    verifiedOnly,
+    setVerifiedOnly,
+    citySlug,
+    onSelectCity: handleSelectCityFilter,
+  };
+
   const scrollSheetListToTop = useCallback(() => {
     requestAnimationFrame(() => {
       listRef.current?.scrollToOffset?.({ offset: 0, animated: true });
@@ -673,11 +699,12 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
     });
   }, []);
 
+  // Preview snap (~34%) keeps the map visible with one selected card — not full sheet.
   const expandSheetForSelection = useCallback(
-    (targetSnap = 2) => {
+    (targetSnap = 1) => {
       requestAnimationFrame(() => {
         sheetRef.current?.snapTo?.(targetSnap);
-        setTimeout(() => scrollSheetListToTop(), 320);
+        setTimeout(() => scrollSheetListToTop(), 280);
       });
     },
     [scrollSheetListToTop]
@@ -705,39 +732,27 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
         skipNextRegionSyncRef.current = true;
         const region = sanitizeMapRegion({
           ...coord,
-          latitudeDelta: 0.06,
-          longitudeDelta: 0.06,
+          latitudeDelta: 0.045,
+          longitudeDelta: 0.045,
         });
+        // Keep viewport in sync so the pin stays rendered while the sheet is open.
         setMapRegion(region);
+        setViewportRegion(region);
         mapRef.current?.animateToRegion?.(region, 280);
       }
 
-      expandSheetForSelection(2);
+      expandSheetForSelection(1);
     },
     [expandSheetForSelection]
   );
 
-  useEffect(() => {
-    if (!selectedListId) return;
-    const stillVisible = visibleShops.some((shop) => shopListId(shop) === selectedListId);
-    if (!stillVisible) {
-      deselectShop();
-    }
-  }, [deselectShop, selectedListId, visibleShops]);
-
   const sheetShops = useMemo(() => {
     if (!selectedListId) return visibleShops;
-    const selectedIndex = visibleShops.findIndex((shop) => shopListId(shop) === selectedListId);
-    if (selectedIndex <= 0) return visibleShops;
-    const selected = visibleShops[selectedIndex];
-    const rest = visibleShops.filter((_, index) => index !== selectedIndex);
-    return [selected, ...rest];
-  }, [selectedListId, visibleShops]);
-
-  useEffect(() => {
-    if (!selectedListId || sheetSnapRef.current === 0) return;
-    scrollSheetListToTop();
-  }, [scrollSheetListToTop, selectedListId, sheetShops]);
+    // One selection in the sheet — full list stays for map markers via visibleMapShops.
+    const selected = shops.find((shop) => shopListId(shop) === selectedListId)
+      || visibleShops.find((shop) => shopListId(shop) === selectedListId);
+    return selected ? [selected] : visibleShops;
+  }, [selectedListId, shops, visibleShops]);
 
   const handleBack = () => {
     if (route.params?.returnTo === 'ManageVehicleServiceCenters' && authorizeVehicleId != null) {

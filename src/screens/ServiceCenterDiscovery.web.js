@@ -227,6 +227,8 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     userLocatedExplicitly,
     setUserLocatedExplicitly,
     matchedCity,
+    citySlug,
+    selectCity,
     runSearch,
     clearFilters,
     showAllInMatchedCity,
@@ -546,6 +548,17 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     [sort, sortOptions, t]
   );
 
+  const handleSelectCityFilter = useCallback(
+    (city) => {
+      selectCity(city);
+      setSelectedListId(null);
+      if (city) {
+        setUserLocatedExplicitly(false);
+      }
+    },
+    [selectCity, setUserLocatedExplicitly]
+  );
+
   const expandedFilterProps = {
     selectedVehicleType,
     setSelectedVehicleType,
@@ -570,6 +583,8 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     setShowInactive,
     showClosed,
     setShowClosed,
+    citySlug,
+    onSelectCity: handleSelectCityFilter,
   };
 
   const cityLabel = matchedCity?.name || 'Sofia';
