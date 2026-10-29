@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 3.13.0",
-    "appVersionSource": "local"
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -14,6 +14,7 @@
     "preview": {
       "environment": "preview",
       "distribution": "internal",
+      "autoIncrement": "versionCode",
       "android": {
         "buildType": "apk"
       },
@@ -26,6 +27,7 @@
     "play-internal": {
       "environment": "preview",
       "distribution": "store",
+      "autoIncrement": "versionCode",
       "android": {
         "buildType": "app-bundle"
       },
@@ -37,8 +39,10 @@
     },
     "production": {
       "environment": "production",
+      "autoIncrement": true,
       "ios": {
-        "resourceClass": "m-medium"
+        "resourceClass": "m-medium",
+        "image": "macos-sequoia-15.6-xcode-26.2"
       },
       "android": {
         "buildType": "app-bundle"
@@ -47,6 +51,13 @@
         "EXPO_PUBLIC_API_BASE_URL": "https://api.veversal.com",
         "EXPO_PUBLIC_WS_BASE_URL": "wss://api.veversal.com",
         "EXPO_PUBLIC_WS_ENABLED": "true"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6820957515"
       }
     }
   }

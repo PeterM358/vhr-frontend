@@ -48,11 +48,16 @@ export default {
     splash: {
       image: "./src/assets/icons/splash-icon.png",
       resizeMode: "contain",
-      backgroundColor: "#ffffff"
+      backgroundColor: "#0b1220"
     },
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.mihailovv.vhrfrontend",
+      buildNumber: "2",
+      // Exempt encryption (HTTPS only) — skips App Store Connect compliance prompt each build.
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
+      },
       // Universal Links: https://…/path opens the installed app (emails, share).
       // Requires apple-app-site-association on the host + TEAMID replaced (see docs).
       associatedDomains: [
@@ -65,6 +70,7 @@ export default {
     },
     android: {
       package: "com.mihailovv.vhrfrontend",
+      versionCode: 6,
       adaptiveIcon: {
         foregroundImage: "./src/assets/icons/adaptive-icon.png",
         backgroundColor: "#ffffff"
