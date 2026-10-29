@@ -1,6 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { Chip, Text } from 'react-native-paper';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Chip } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { formatDistanceAway, discoveryDistanceKm } from '../../utils/distance';
@@ -35,6 +35,8 @@ function CardActionButton({ label, icon, onPress, primary = false, mobile = fals
         mobile && (primary ? styles.actionBtnPrimaryMobile : styles.actionBtnMobile),
         pressed && styles.actionBtnPressed,
       ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       <MaterialCommunityIcons
         name={icon}
@@ -42,7 +44,12 @@ function CardActionButton({ label, icon, onPress, primary = false, mobile = fals
         color={primary ? '#fff' : COLORS.primary}
         style={styles.actionBtnIcon}
       />
-      <Text style={[styles.actionBtnText, primary && styles.actionBtnTextPrimary]}>{label}</Text>
+      <Text
+        style={[styles.actionBtnText, primary && styles.actionBtnTextPrimary]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -99,14 +106,19 @@ export default function ServiceCenterListCard({
     <>
       {onViewProfile ? (
         <CardActionButton
-          label={t('serviceCenters.viewProfile')}
-          icon="store-outline"
+          label={mobile ? t('serviceCenters.viewProfileShort') : t('serviceCenters.viewProfile')}
+          icon="storefront-outline"
           onPress={onViewProfile}
           mobile={mobile}
         />
       ) : null}
       {onDirections ? (
-        <CardActionButton label={t('serviceCenters.directions')} icon="directions" onPress={onDirections} mobile={mobile} />
+        <CardActionButton
+          label={mobile ? t('serviceCenters.directionsShort') : t('serviceCenters.directions')}
+          icon="map-marker-path"
+          onPress={onDirections}
+          mobile={mobile}
+        />
       ) : null}
     </>
   );
@@ -216,19 +228,19 @@ export default function ServiceCenterListCard({
       ) : null}
 
       {!hideActions ? (
-        <View style={[styles.actions, (compact || mobile) && styles.actionsCompact, mobile && styles.actionsMobile]}>
-          {mobile ? (
-            <>
-              {requestAction}
+        mobile ? (
+          <View style={[styles.actionsColumn, (compact || mobile) && styles.actionsCompact]}>
+            {requestAction}
+            {onViewProfile || onDirections ? (
               <View style={styles.secondaryRow}>{secondaryActions}</View>
-            </>
-          ) : (
-            <>
-              {secondaryActions}
-              {requestAction}
-            </>
-          )}
-        </View>
+            ) : null}
+          </View>
+        ) : (
+          <View style={[styles.actions, compact && styles.actionsCompact]}>
+            {secondaryActions}
+            {requestAction}
+          </View>
+        )
       ) : null}
     </Pressable>
   );
@@ -393,20 +405,23 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#e2e8f0',
   },
+  actionsColumn: {
+    flexDirection: 'column',
+    alignSelf: 'stretch',
+    gap: 8,
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e2e8f0',
+  },
   actionsCompact: {
     marginTop: 10,
     paddingTop: 10,
-  },
-  actionsMobile: {
-    flexDirection: 'column',
-    gap: 8,
-    flexShrink: 0,
   },
   secondaryRow: {
     flexDirection: 'row',
     gap: 8,
     alignSelf: 'stretch',
-    flexShrink: 0,
   },
   actionBtn: {
     flexDirection: 'row',
@@ -421,7 +436,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: DISCOVERY_MOBILE.height.cta,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
   },
   actionBtnSecondary: {
     backgroundColor: '#f8fafc',
@@ -450,6 +465,7 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: '700',
     fontSize: discoveryMinFont(12),
+    flexShrink: 0,
   },
   actionBtnTextPrimary: {
     color: '#fff',

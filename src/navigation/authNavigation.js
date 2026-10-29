@@ -207,11 +207,37 @@ export function resetToSignIn(navigation) {
 }
 
 /**
- * Push sign-in while preserving history so public map/home remain reachable via back.
- * On web, stores the current public path as post-login return when available.
+ * Canonical path used after login/register to resume a repair request.
+ * Consumed by resetNavigationToCanonicalPath on both web and native.
  */
-export async function navigateToSignIn(navigation) {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+export function buildRepairRequestReturnPath({
+  serviceCenter,
+  shopId,
+  repairType,
+  vehicleType,
+  vehicleId,
+} = {}) {
+  const params = new URLSearchParams();
+  const center = serviceCenter ?? shopId;
+  if (center != null && center !== '') params.set('serviceCenter', String(center));
+  if (repairType) params.set('repairType', String(repairType));
+  if (vehicleType) params.set('vehicleType', String(vehicleType));
+  if (vehicleId != null && vehicleId !== '') params.set('vehicleId', String(vehicleId));
+  const qs = params.toString();
+  return qs
+    ? `/dashboard/repair-requests/new?${qs}`
+    : '/dashboard/repair-requests/new';
+}
+
+/**
+ * Push sign-in while preserving history so public map/home remain reachable via back.
+ * Optional returnPath is stored for post-login resume (native + web).
+ * On web, defaults to the current public path when returnPath is omitted.
+ */
+export async function navigateToSignIn(navigation, { returnPath } = {}) {
+  if (returnPath) {
+    await storeAuthReturnUrl(returnPath);
+  } else if (Platform.OS === 'web' && typeof window !== 'undefined') {
     const currentPath = `${window.location.pathname || ''}${window.location.search || ''}`;
     await storeAuthReturnUrl(currentPath);
   }

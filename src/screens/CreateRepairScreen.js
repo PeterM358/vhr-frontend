@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { StyleSheet, View, Alert } from 'react-native';
+import { StyleSheet, View, Alert, Platform } from 'react-native';
 import ScreenBackground from '../components/ScreenBackground';
 import AppNavigationBar from '../components/common/AppNavigationBar';
 import { useServiceCentersBack } from '../navigation/appNavBarBack';
@@ -33,6 +33,10 @@ import {
   formatPreferredVisitNote,
 } from '../utils/shopVisitSlots';
 import { navigateToRepairRequestDetail } from '../navigation/webNavigation';
+import {
+  buildRepairRequestReturnPath,
+  navigateToSignIn,
+} from '../navigation/authNavigation';
 import { useTranslation } from '../i18n';
 import { WizardEngine, createMemoryAdapter } from '../wizard';
 import {
@@ -180,9 +184,16 @@ export default function CreateRepairScreen({ navigation, route }) {
   ]);
 
   useEffect(() => {
-    if (selectedVehicle) {
-      setShowVehiclePicker(false);
+    if (!selectedVehicle) return;
+    // Blur before unmounting the picker so web compact-chrome does not stay stuck.
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      try {
+        document.activeElement?.blur?.();
+      } catch {
+        /* ignore */
+      }
     }
+    setShowVehiclePicker(false);
   }, [selectedVehicle]);
 
   // Keep the entry shop selected while the picker is still locked to that center.
@@ -258,6 +269,18 @@ export default function CreateRepairScreen({ navigation, route }) {
     const fetchFormData = async () => {
       try {
         const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+        if (!token || token === 'null' || token === 'undefined') {
+          setLoading(false);
+          await navigateToSignIn(navigation, {
+            returnPath: buildRepairRequestReturnPath({
+              serviceCenter: preselectedShopId,
+              repairType: route.params?.repairType,
+              vehicleType: route.params?.vehicleType,
+              vehicleId: preselectedVehicleId || undefined,
+            }),
+          });
+          return;
+        }
         const orgId = organizationIdParam
           ? await resolveActiveOrganizationId(organizationIdParam)
           : null;
@@ -268,6 +291,17 @@ export default function CreateRepairScreen({ navigation, route }) {
           const vehicleRes = await fetch(`${API_BASE_URL}/api/vehicles/`, {
             headers: { Authorization: `Bearer ${token}` },
           });
+          if (vehicleRes.status === 401) {
+            await navigateToSignIn(navigation, {
+              returnPath: buildRepairRequestReturnPath({
+                serviceCenter: preselectedShopId,
+                repairType: route.params?.repairType,
+                vehicleType: route.params?.vehicleType,
+                vehicleId: preselectedVehicleId || undefined,
+              }),
+            });
+            return [];
+          }
           if (!vehicleRes.ok) throw new Error('Failed to fetch form data');
           return vehicleRes.json();
         };

@@ -41,11 +41,12 @@ import DiscoveryFiltersBottomSheet from '../components/serviceCenters/DiscoveryF
 import DiscoveryViewToggle from '../components/serviceCenters/DiscoveryViewToggle';
 import DiscoverySortSheet, { DiscoverySortTrigger } from '../components/serviceCenters/DiscoverySortSheet';
 import DiscoveryCompactFooter from '../components/serviceCenters/DiscoveryCompactFooter';
+import DiscoverySearchInput from '../components/serviceCenters/DiscoverySearchInput';
 import DISCOVERY_MOBILE, { discoveryMinFont } from '../components/serviceCenters/discoveryMobileTokens';
 import { DISCOVERY_QUICK_VEHICLE_CHIPS } from '../api/serviceCenters';
 import { spreadShopMarkersForMap } from '../utils/mapMarkerSpread';
 import { shopHasMappableCoordinates } from '../utils/mapDiscoveryData';
-import { getWebGeolocation } from '../utils/webGeolocation';
+import { resolveDiscoveryUserLocation } from '../utils/discoveryUserLocation';
 import { ensureLeafletCss } from '../utils/leafletAssets.web';
 import createVeversalLeafletPinIcon from '../components/maps/VeversalMapPin.web';
 import {
@@ -64,7 +65,11 @@ import {
   navigateToServiceCenterDetail,
 } from '../navigation/serviceCentersNavigation';
 import { navigateToPartnerDashboard, navigateToVehicleServiceRecordNew, navigateToRepairRequestNew } from '../navigation/webNavigation';
-import { navigateToSignIn, resetToPublicHome } from '../navigation/authNavigation';
+import {
+  buildRepairRequestReturnPath,
+  navigateToSignIn,
+  resetToPublicHome,
+} from '../navigation/authNavigation';
 import { AuthContext } from '../context/AuthManager';
 import {
   loadServiceRecordFormDraft,
@@ -175,6 +180,7 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   const [viewRevision, setViewRevision] = useState(0);
   const [locating, setLocating] = useState(false);
   const [geoHint, setGeoHint] = useState('');
+  const searchInputRef = useRef(null);
   const [mobileTab, setMobileTab] = useState('list');
   const [selectedListId, setSelectedListId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -187,7 +193,6 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     resultMeta,
     loading,
     addressQuery,
-    setAddressQuery,
     activeSearchTerm,
     selectedVehicleType,
     setSelectedVehicleType,
@@ -269,8 +274,8 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     }
   }, [filtersOpen, closeFilters, openFilters]);
 
-  const handleSearch = useCallback(async () => {
-    await runSearch();
+  const handleSearch = useCallback(async (term) => {
+    await runSearch(term);
     closeFilters();
   }, [runSearch, closeFilters]);
 
@@ -331,23 +336,70 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
 
   const selectedShop = mapShops.find((s) => (s.list_id || `shop-${s.id}`) === selectedListId);
 
+  const applyResolvedLocation = useCallback(
+    async (result) => {
+      if (!result?.coords) return false;
+      setUserLocation(result.coords);
+      if (result.source === 'gps') {
+        setUserLocatedExplicitly(true);
+        setGeoHint('');
+      } else {
+        setUserLocatedExplicitly(false);
+        const place = result.city || result.countryCode || '';
+        setGeoHint(
+          place
+            ? t('serviceCenters.geoApproxIp', { place })
+            : t('serviceCenters.geoApproxIpGeneric'),
+        );
+      }
+      setCenter(result.coords);
+      setViewRevision((n) => n + 1);
+      await discovery.fetchShops();
+      return true;
+    },
+    [discovery, setUserLocatedExplicitly, setUserLocation, t],
+  );
+
   const handleLocateMe = async () => {
     setLocating(true);
     setGeoHint('');
     try {
-      const { latitude, longitude } = await getWebGeolocation();
-      const coords = [latitude, longitude];
-      setUserLocation(coords);
-      setUserLocatedExplicitly(true);
-      setCenter(coords);
-      setViewRevision((n) => n + 1);
-      await discovery.fetchShops();
+      const result = await resolveDiscoveryUserLocation({ preferGps: true });
+      if (!(await applyResolvedLocation(result))) {
+        setGeoHint(
+          result.permissionDenied
+            ? t('serviceCenters.geoPermissionDenied')
+            : t('serviceCenters.geoError'),
+        );
+      }
     } catch (err) {
       setGeoHint(err?.message || t('serviceCenters.geoError'));
     } finally {
       setLocating(false);
     }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLocating(true);
+      try {
+        const result = await resolveDiscoveryUserLocation({ preferGps: true });
+        if (cancelled) return;
+        if (!(await applyResolvedLocation(result)) && result.permissionDenied) {
+          setGeoHint(t('serviceCenters.geoPermissionDenied'));
+        }
+      } catch {
+        if (!cancelled) setGeoHint(t('serviceCenters.geoError'));
+      } finally {
+        if (!cancelled) setLocating(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once on open
+  }, []);
 
   const pickForServiceRecord = Boolean(route.params?.pickShopForServiceRecord);
   const authorizeVehicleId = resolveAuthorizeVehicleId(route.params);
@@ -428,10 +480,22 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
   };
 
   const handleRequestService = (shop) => {
+    const repairType = route.params?.repairType || selectedRepairType || undefined;
+    const vehicleType = route.params?.vehicleType || selectedVehicleType || undefined;
+    if (!isAuthenticated) {
+      navigateToSignIn(navigation, {
+        returnPath: buildRepairRequestReturnPath({
+          serviceCenter: shop.id,
+          repairType,
+          vehicleType,
+        }),
+      }).catch(() => {});
+      return;
+    }
     navigateToRepairRequestNew(navigation, {
       serviceCenter: shop.id,
-      repairType: route.params?.repairType || selectedRepairType || undefined,
-      vehicleType: route.params?.vehicleType || selectedVehicleType || undefined,
+      repairType,
+      vehicleType,
     });
   };
 
@@ -619,22 +683,18 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
       </View>
 
       <View style={[styles.searchRow, isMobileWeb && styles.searchRowMobile]}>
-        <View style={[styles.searchInputWrap, isMobileWeb && styles.searchInputWrapMobile]}>
-          <MaterialCommunityIcons name="magnify" size={18} color="#64748b" style={styles.searchIcon} />
-          <TextInput
-            placeholder={
-              isNarrowMobile
-                ? t('serviceCenters.searchPlaceholderShort', null, 'Search centers…')
-                : t('serviceCenters.searchPlaceholder')
-            }
-            value={addressQuery}
-            onChangeText={setAddressQuery}
-            onSubmitEditing={() => handleSearch().catch(() => {})}
-            style={[styles.searchInput, isMobileWeb && styles.searchInputMobile]}
-            returnKeyType="search"
-            placeholderTextColor="#94a3b8"
-          />
-        </View>
+        <DiscoverySearchInput
+          ref={searchInputRef}
+          committedValue={addressQuery}
+          onSubmit={(term) => handleSearch(term).catch(() => {})}
+          placeholder={
+            isNarrowMobile
+              ? t('serviceCenters.searchPlaceholderShort', null, 'Search centers…')
+              : t('serviceCenters.searchPlaceholder')
+          }
+          wrapStyle={[styles.searchInputWrap, isMobileWeb && styles.searchInputWrapMobile]}
+          inputStyle={[styles.searchInput, isMobileWeb && styles.searchInputMobile]}
+        />
         <Pressable
           style={[
             isMobileWeb ? styles.locateIconBtn : styles.locatePill,
@@ -661,7 +721,13 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
           ) : null}
         </Pressable>
         {isDesktop ? (
-          <Pressable style={styles.searchButton} onPress={() => handleSearch().catch(() => {})}>
+          <Pressable
+            style={styles.searchButton}
+            onPress={() => {
+              const draft = searchInputRef.current?.getDraft?.();
+              handleSearch(draft !== undefined ? draft : addressQuery).catch(() => {});
+            }}
+          >
             <Text style={styles.searchButtonText}>{t('serviceCenters.search')}</Text>
           </Pressable>
         ) : null}

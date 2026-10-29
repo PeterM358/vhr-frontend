@@ -2,22 +2,22 @@
 /**
  * Native service center discovery — map-first with draggable results sheet.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   Pressable,
   ActivityIndicator,
   Platform,
   Dimensions,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
-import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import { AuthContext } from '../context/AuthManager';
 
 import { COLORS } from '../styles/colors';
 import { API_BASE_URL } from '../api/config';
@@ -27,6 +27,7 @@ import ScreenBackground from '../components/ScreenBackground';
 import DiscoveryFiltersBottomSheet from '../components/serviceCenters/DiscoveryFiltersBottomSheet';
 import DiscoverySortSheet from '../components/serviceCenters/DiscoverySortSheet';
 import DiscoveryMapBottomSheet from '../components/serviceCenters/DiscoveryMapBottomSheet';
+import DiscoverySearchInput from '../components/serviceCenters/DiscoverySearchInput';
 import DISCOVERY_MOBILE, { discoveryMinFont } from '../components/serviceCenters/discoveryMobileTokens';
 import {
   spreadShopMarkersForMap,
@@ -46,7 +47,7 @@ import {
   shopStableListId,
 } from '../utils/mapDiscoveryData';
 import { openShopInMaps } from '../utils/shopMapsLink';
-import { sanitizeUserLocation } from '../utils/distance';
+import { resolveDiscoveryUserLocation } from '../utils/discoveryUserLocation';
 import ServiceCenterMapMarker, {
   buildServiceCenterMarkerKey,
 } from '../components/maps/ServiceCenterMapMarker';
@@ -61,7 +62,10 @@ import {
   navigateToServiceCenterDetail,
 } from '../navigation/serviceCentersNavigation';
 import { navigateToPartnerDashboard } from '../navigation/webNavigation';
-import { navigateToSignIn } from '../navigation/authNavigation';
+import {
+  buildRepairRequestReturnPath,
+  navigateToSignIn,
+} from '../navigation/authNavigation';
 import {
   loadServiceRecordFormDraft,
   saveServiceRecordFormDraft,
@@ -98,15 +102,10 @@ function sanitizeMapRegion(region) {
 
 function clampMapDelta(value, fallback = MIN_MAP_REGION_DELTA) {
   const n = Number(value);
-  if (!Number.isFinite(n) || n < MIN_MAP_REGION_DELTA) return fallback;
+  // Invalid → fallback. Too-zoomed-in → floor at MIN (do NOT jump to city-wide DEFAULT).
+  if (!Number.isFinite(n)) return fallback;
+  if (n < MIN_MAP_REGION_DELTA) return MIN_MAP_REGION_DELTA;
   return Math.min(n, 45);
-}
-
-function withTimeout(promise, ms = 6000) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
-  ]);
 }
 
 function shopListId(shop) {
@@ -165,6 +164,7 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
   const sheetSnapRef = useRef(0);
   const lastSelectedListIdRef = useRef(null);
   const viewportDebounceRef = useRef(null);
+  const { isAuthenticated } = useContext(AuthContext);
 
   const discovery = useServiceCenterDiscovery({
     initialCitySlug: route.params?.citySlug || null,
@@ -186,7 +186,6 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
     shops,
     loading,
     addressQuery,
-    setAddressQuery,
     selectedVehicleType,
     setSelectedVehicleType,
     selectedCategory,
@@ -348,9 +347,9 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
     [applyMapRegion]
   );
 
-  const handleSearch = useCallback(async () => {
+  const handleSearch = useCallback(async (term) => {
     autoFitRegionRef.current = true;
-    const { matchedCity: searchedCity } = await runSearch();
+    const { matchedCity: searchedCity } = await runSearch(term);
     if (searchedCity) {
       setUserLocatedExplicitly(false);
       panToMatchedCity(searchedCity);
@@ -380,20 +379,70 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
   useEffect(() => {
     if (!autoFitRegionRef.current) return;
     const region = buildDiscoveryMapRegion(mappableShops, {
-      userLocation: userLocatedExplicitly ? userLocation : null,
+      userLocation: userLocation || null,
       matchedCity,
     });
     applyMapRegion(region);
-  }, [applyMapRegion, mappableShops, matchedCity, userLocatedExplicitly, userLocation]);
+  }, [applyMapRegion, mappableShops, matchedCity, userLocation]);
 
   const handleMapReady = useCallback(() => {
     if (!autoFitRegionRef.current) return;
     const region = buildDiscoveryMapRegion(mappableShops, {
-      userLocation: userLocatedExplicitly ? userLocation : null,
+      userLocation: userLocation || null,
       matchedCity,
     });
     applyMapRegion(region);
-  }, [applyMapRegion, mappableShops, matchedCity, userLocatedExplicitly, userLocation]);
+  }, [applyMapRegion, mappableShops, matchedCity, userLocation]);
+
+  // Resolve GPS/IP in the background. First shop fetch already runs from the hook
+  // (Sofia nearby soft radius) so the map is usable without waiting on permission.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLocating(true);
+      setGeoHint('');
+      try {
+        const result = await resolveDiscoveryUserLocation({ preferGps: true });
+        if (cancelled) return;
+        if (!result.coords) {
+          if (result.permissionDenied) {
+            setGeoHint(t('serviceCenters.geoPermissionDenied'));
+          }
+          return;
+        }
+        setUserLocation(result.coords);
+        if (result.source === 'gps') {
+          setUserLocatedExplicitly(true);
+        } else {
+          setUserLocatedExplicitly(false);
+          const place = result.city || result.countryCode || '';
+          setGeoHint(
+            place
+              ? t('serviceCenters.geoApproxIp', { place })
+              : t('serviceCenters.geoApproxIpGeneric'),
+          );
+        }
+        autoFitRegionRef.current = true;
+        applyMapRegion(
+          sanitizeMapRegion({
+            latitude: result.coords[0],
+            longitude: result.coords[1],
+            ...regionDeltaForRadiusKm(DEFAULT_NEARBY_RADIUS_KM, result.coords[0]),
+          }),
+        );
+        // Refetch with resolved coords (GPS also flips userLocatedExplicitly for distance UI).
+        await discovery.fetchShops();
+      } catch {
+        if (!cancelled) setGeoHint(t('serviceCenters.geoError'));
+      } finally {
+        if (!cancelled) setLocating(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once on open
+  }, []);
 
   useEffect(
     () => () => {
@@ -516,38 +565,35 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
     setLocating(true);
     setGeoHint('');
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setGeoHint(t('serviceCenters.geoPermissionDenied'));
+      const result = await resolveDiscoveryUserLocation({ preferGps: true });
+      if (!result.coords) {
+        setGeoHint(
+          result.permissionDenied
+            ? t('serviceCenters.geoPermissionDenied')
+            : t('serviceCenters.geoError'),
+        );
         return;
       }
-      let position;
-      try {
-        position = await withTimeout(Location.getCurrentPositionAsync({}));
-      } catch {
-        position = await Location.getLastKnownPositionAsync({});
+      setUserLocation(result.coords);
+      if (result.source === 'gps') {
+        setUserLocatedExplicitly(true);
+      } else {
+        setUserLocatedExplicitly(false);
+        const place = result.city || result.countryCode || '';
+        setGeoHint(
+          place
+            ? t('serviceCenters.geoApproxIp', { place })
+            : t('serviceCenters.geoApproxIpGeneric'),
+        );
       }
-      if (!position?.coords) {
-        setGeoHint(t('serviceCenters.geoError'));
-        return;
-      }
-      const coords = sanitizeUserLocation([
-        position.coords.latitude,
-        position.coords.longitude,
-      ]);
-      if (!coords) {
-        setGeoHint(t('serviceCenters.geoError'));
-        return;
-      }
-      setUserLocation(coords);
-      setUserLocatedExplicitly(true);
       autoFitRegionRef.current = true;
-      const region = sanitizeMapRegion({
-        latitude: coords[0],
-        longitude: coords[1],
-        ...regionDeltaForRadiusKm(DEFAULT_NEARBY_RADIUS_KM, coords[0]),
-      });
-      applyMapRegion(region);
+      applyMapRegion(
+        sanitizeMapRegion({
+          latitude: result.coords[0],
+          longitude: result.coords[1],
+          ...regionDeltaForRadiusKm(DEFAULT_NEARBY_RADIUS_KM, result.coords[0]),
+        }),
+      );
       await discovery.fetchShops();
     } catch {
       setGeoHint(t('serviceCenters.geoError'));
@@ -585,10 +631,22 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
   };
 
   const handleRequestService = (shop) => {
+    const repairType = route.params?.repairType || selectedRepairType || undefined;
+    const vehicleType = route.params?.vehicleType || selectedVehicleType || undefined;
+    if (!isAuthenticated) {
+      navigateToSignIn(navigation, {
+        returnPath: buildRepairRequestReturnPath({
+          serviceCenter: shop.id,
+          repairType,
+          vehicleType,
+        }),
+      }).catch(() => {});
+      return;
+    }
     navigation.navigate('CreateRepair', {
       serviceCenter: shop.id,
-      repairType: route.params?.repairType || selectedRepairType || undefined,
-      vehicleType: route.params?.vehicleType || selectedVehicleType || undefined,
+      repairType,
+      vehicleType,
     });
   };
 
@@ -816,18 +874,13 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
             </Text>
           </View>
 
-          <View style={styles.searchFloating}>
-            <MaterialCommunityIcons name="magnify" size={18} color="#64748b" style={styles.searchIcon} />
-            <TextInput
-              placeholder={t('serviceCenters.searchPlaceholder')}
-              placeholderTextColor="#94a3b8"
-              value={addressQuery}
-              onChangeText={setAddressQuery}
-              onSubmitEditing={() => handleSearch().catch(() => {})}
-              style={styles.searchInput}
-              returnKeyType="search"
-            />
-          </View>
+          <DiscoverySearchInput
+            committedValue={addressQuery}
+            onSubmit={(term) => handleSearch(term).catch(() => {})}
+            placeholder={t('serviceCenters.searchPlaceholder')}
+            wrapStyle={styles.searchFloating}
+            inputStyle={styles.searchInput}
+          />
 
           <View style={styles.filtersRow}>
             <Pressable

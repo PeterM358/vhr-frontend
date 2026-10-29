@@ -2,8 +2,7 @@
  * Compact premium selected-service panel for native map-first discovery.
  */
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { discoveryDistanceKm, formatDistanceAway } from '../../utils/distance';
@@ -26,6 +25,7 @@ function PanelActionButton({ label, icon, onPress, primary = false }) {
         pressed && styles.actionBtnPressed,
       ]}
       accessibilityRole="button"
+      accessibilityLabel={label}
     >
       <MaterialCommunityIcons
         name={icon}
@@ -33,7 +33,12 @@ function PanelActionButton({ label, icon, onPress, primary = false }) {
         color={primary ? '#fff' : COLORS.primary}
         style={styles.actionBtnIcon}
       />
-      <Text style={[styles.actionBtnText, primary && styles.actionBtnTextPrimary]}>{label}</Text>
+      <Text
+        style={[styles.actionBtnText, primary && styles.actionBtnTextPrimary]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -149,22 +154,24 @@ export default function DiscoverySelectedServicePanel({
             primary
           />
         ) : null}
-        <View style={styles.secondaryRow}>
-          {onViewProfile ? (
-            <PanelActionButton
-              label={t('serviceCenters.viewProfile')}
-              icon="store-outline"
-              onPress={onViewProfile}
-            />
-          ) : null}
-          {onDirections ? (
-            <PanelActionButton
-              label={t('serviceCenters.directions')}
-              icon="directions"
-              onPress={onDirections}
-            />
-          ) : null}
-        </View>
+        {onViewProfile || onDirections ? (
+          <View style={styles.secondaryRow}>
+            {onViewProfile ? (
+              <PanelActionButton
+                label={t('serviceCenters.viewProfileShort')}
+                icon="storefront-outline"
+                onPress={onViewProfile}
+              />
+            ) : null}
+            {onDirections ? (
+              <PanelActionButton
+                label={t('serviceCenters.directionsShort')}
+                icon="map-marker-path"
+                onPress={onDirections}
+              />
+            ) : null}
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -314,6 +321,7 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: '700',
     fontSize: discoveryMinFont(12),
+    flexShrink: 0,
   },
   actionBtnTextPrimary: {
     color: '#fff',

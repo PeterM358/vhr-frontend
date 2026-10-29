@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { getServiceCenters } from '../api/serviceCenters';
+import {
+  DISCOVERY_DEFAULT_CENTER,
+  getServiceCenters,
+} from '../api/serviceCenters';
 import { searchDiscoveryCities } from '../api/profiles';
 import { API_BASE_URL } from '../api/config';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -26,6 +29,7 @@ import {
   buildCategoryFilterOptions,
   normalizeRepairTypeForFilter,
 } from '../utils/discoveryFilterTaxonomy';
+import { DEFAULT_NEARBY_RADIUS_KM } from '../utils/mapMarkerSpread';
 import { useTranslation } from '../i18n';
 
 export const SORT_OPTIONS = [
@@ -98,7 +102,8 @@ export function useServiceCenterDiscovery({
   activeSearchRef.current = activeSearchTerm;
   matchedCityRef.current = matchedCity;
   citySlugRef.current = citySlug;
-  userLocRef.current = userLocatedExplicitly ? userLocation : null;
+  // Use any resolved coords for API geo scope; distance labels stay gated on explicit GPS.
+  userLocRef.current = userLocation;
 
   const categoryOptions = useMemo(
     () => buildCategoryFilterOptions(repairTypes, { t, locale }),
@@ -214,12 +219,23 @@ export function useServiceCenterDiscovery({
       if (showClosed) filters.show_closed = true;
       if (minRating != null) filters.min_rating = minRating;
       if (selectedBrand) filters.brand = selectedBrand;
-      if (userLocRef.current) {
-        filters.lat = userLocRef.current[0];
-        filters.lon = userLocRef.current[1];
+      // Soft nearby radius by default — full national dumps make the map feel stuck.
+      // City slug searches stay city-scoped; explicit distance filter overrides radius.
+      const loc = userLocRef.current;
+      const hasCityScope = Boolean(currentCitySlug);
+      if (loc) {
+        filters.lat = loc[0];
+        filters.lon = loc[1];
+      } else if (!hasCityScope) {
+        filters.lat = DISCOVERY_DEFAULT_CENTER.lat;
+        filters.lon = DISCOVERY_DEFAULT_CENTER.lon;
       }
-      if (radiusKm != null && userLocRef.current) {
-        filters.radius_km = radiusKm;
+      if (!hasCityScope || radiusKm != null) {
+        if (radiusKm != null) {
+          filters.radius_km = radiusKm;
+        } else if (filters.lat != null && filters.lon != null) {
+          filters.radius_km = DEFAULT_NEARBY_RADIUS_KM;
+        }
       }
 
       const headers = hadValidToken ? { Authorization: `Bearer ${token}` } : {};
@@ -287,8 +303,12 @@ export function useServiceCenterDiscovery({
     shouldUseCityFilter,
   ]);
 
-  const runSearch = useCallback(async () => {
-    const term = String(addressQuery || '').trim();
+  const runSearch = useCallback(async (termOverride) => {
+    const term = String(
+      termOverride !== undefined && termOverride !== null ? termOverride : addressQuery || '',
+    ).trim();
+    // Keep the controlled search field in sync when search runs from Enter / button / chips.
+    setAddressQuery(term);
     setActiveSearchTerm(term);
     activeSearchRef.current = term;
 

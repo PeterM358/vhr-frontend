@@ -52,7 +52,9 @@ export function shopMapCoordinate(shop) {
 
 function clampRegionDelta(value, fallback = MIN_MAP_REGION_DELTA) {
   const n = Number(value);
-  if (!Number.isFinite(n) || n < MIN_MAP_REGION_DELTA) return fallback;
+  // Invalid → fallback. Below MIN → clamp to MIN (never replace with a larger city-scale delta).
+  if (!Number.isFinite(n)) return fallback;
+  if (n < MIN_MAP_REGION_DELTA) return MIN_MAP_REGION_DELTA;
   return Math.min(n, 45);
 }
 
