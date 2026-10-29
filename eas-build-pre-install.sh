@@ -2,23 +2,52 @@
 # Inject Firebase client configs on EAS (files are gitignored).
 # Android: GOOGLE_SERVICES_JSON_BASE64 or GOOGLE_SERVICES_JSON
 # iOS:    GOOGLE_SERVICES_PLIST_BASE64
+#
+# EAS "file" secrets set the env var to a path under
+# /home/expo/workingdir/eas-environment-secrets/ — not the file contents.
 set -euo pipefail
 
 PLATFORM="${EAS_BUILD_PLATFORM:-}"
+
+# Resolve env value that may be inline content, base64, or an EAS file-secret path.
+write_from_env_value() {
+  local value="$1"
+  local target="$2"
+  local mode="$3" # json | base64 | raw
+
+  if [[ -f "$value" ]]; then
+    echo "Using EAS file secret at path: $value"
+    if [[ "$mode" == "base64" ]]; then
+      base64 -d < "$value" > "$target"
+    else
+      cp "$value" "$target"
+    fi
+    return 0
+  fi
+
+  if [[ "$mode" == "base64" ]]; then
+    printf '%s' "$value" | base64 -d > "$target"
+  else
+    printf '%s' "$value" > "$target"
+  fi
+}
 
 if [[ "$PLATFORM" == "android" ]]; then
   mkdir -p android/app
   TARGET="android/app/google-services.json"
 
   if [[ -n "${GOOGLE_SERVICES_JSON_BASE64:-}" ]]; then
-    echo "Decoding google-services.json from GOOGLE_SERVICES_JSON_BASE64..."
-    if ! echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > "$TARGET"; then
-      echo "Failed to decode GOOGLE_SERVICES_JSON_BASE64"
+    echo "Writing google-services.json from GOOGLE_SERVICES_JSON_BASE64..."
+    if ! write_from_env_value "$GOOGLE_SERVICES_JSON_BASE64" "$TARGET" base64; then
+      echo "Failed to write GOOGLE_SERVICES_JSON_BASE64"
       exit 1
     fi
   elif [[ -n "${GOOGLE_SERVICES_JSON:-}" ]]; then
     echo "Writing google-services.json from GOOGLE_SERVICES_JSON..."
-    printf '%s' "$GOOGLE_SERVICES_JSON" > "$TARGET"
+    if ! write_from_env_value "$GOOGLE_SERVICES_JSON" "$TARGET" json; then
+      echo "Failed to write GOOGLE_SERVICES_JSON"
+      exit 1
+    fi
   else
     echo "Neither GOOGLE_SERVICES_JSON_BASE64 nor GOOGLE_SERVICES_JSON is set"
     exit 1
@@ -26,6 +55,8 @@ if [[ "$PLATFORM" == "android" ]]; then
 
   if ! node -e "JSON.parse(require('fs').readFileSync('android/app/google-services.json','utf8'))"; then
     echo "Decoded google-services.json is not valid JSON"
+    echo "Hint: if GOOGLE_SERVICES_JSON is an EAS file secret, the script now copies that path;"
+    echo "      prefer GOOGLE_SERVICES_JSON_BASE64 (string secret) for production."
     exit 1
   fi
 
@@ -44,9 +75,9 @@ if [[ "$PLATFORM" == "ios" ]]; then
     exit 1
   fi
 
-  echo "Decoding GoogleService-Info.plist from GOOGLE_SERVICES_PLIST_BASE64..."
-  if ! echo "$GOOGLE_SERVICES_PLIST_BASE64" | base64 -d > "$TARGET"; then
-    echo "Failed to decode GOOGLE_SERVICES_PLIST_BASE64"
+  echo "Writing GoogleService-Info.plist from GOOGLE_SERVICES_PLIST_BASE64..."
+  if ! write_from_env_value "$GOOGLE_SERVICES_PLIST_BASE64" "$TARGET" base64; then
+    echo "Failed to write GOOGLE_SERVICES_PLIST_BASE64"
     exit 1
   fi
 

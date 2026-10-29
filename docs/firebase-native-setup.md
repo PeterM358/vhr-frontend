@@ -205,12 +205,19 @@ EAS project ID: `cde03e84-e27d-4ec0-9712-519a847ceb2d` (owner: `mihailovv`).
 
 | Env var | Platform | How to create |
 |---------|----------|---------------|
-| `GOOGLE_SERVICES_JSON_BASE64` | Android | already used for Play builds |
-| `GOOGLE_SERVICES_PLIST_BASE64` | **iOS** | see below |
+| `GOOGLE_SERVICES_JSON_BASE64` | Android | **string** secret (preferred) — base64 of `android/app/google-services.json` |
+| `GOOGLE_SERVICES_JSON` | Android | optional; EAS **file** secret OK (`eas-build-pre-install.sh` copies the path) |
+| `GOOGLE_SERVICES_PLIST_BASE64` | **iOS** | **string** secret — see below |
+
+Prefer **string** secrets for base64 vars. If you upload a **file** secret named `GOOGLE_SERVICES_JSON`, EAS sets the env to a path under `eas-environment-secrets/` — the pre-install script detects that and copies the file (do not paste the path as JSON).
 
 ```bash
 cd /Users/client/vhr-frontend
-# one-line secret (paste into eas env:create when prompted, or --value)
+# Android (string secret — preferred)
+base64 -i android/app/google-services.json | tr -d '\n' | pbcopy
+eas env:create --name GOOGLE_SERVICES_JSON_BASE64 --scope project --type secret --environment production
+
+# iOS
 base64 -i GoogleService-Info.plist | tr -d '\n' | pbcopy
 eas env:create --name GOOGLE_SERVICES_PLIST_BASE64 --scope project --type secret --environment production
 # also add for preview if you build iOS preview:
@@ -244,7 +251,7 @@ Profile support:
 
 Do not run paid EAS builds without explicit approval.
 
-**Store Xcode requirement (2026):** App Store submissions need a current EAS image / Xcode (Apple’s Xcode 26+ rule). If Expo warns the build image is too old to submit, bump the image in `eas.json` / use latest before `eas submit`.
+**Store Xcode requirement (2026):** App Store Connect rejects binaries not built with the **iOS 26 SDK** (Xcode 26+) — ITMS-90725. Production profile pins `"image": "macos-sequoia-15.6-xcode-26.2"` in `eas.json`. Expo SDK 53 default image is too old; prefer upgrading to SDK 54+ later so the default image already includes Xcode 26.
 
 ## Beta server deployment plan (`veversal-app` credential)
 
