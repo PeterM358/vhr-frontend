@@ -53,7 +53,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.mihailovv.vhrfrontend",
-      buildNumber: "2",
+      buildNumber: "3",
       // Exempt encryption (HTTPS only) — skips App Store Connect compliance prompt each build.
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
