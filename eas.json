@@ -14,7 +14,7 @@
     "preview": {
       "environment": "preview",
       "distribution": "internal",
-      "autoIncrement": "versionCode",
+      "autoIncrement": true,
       "android": {
         "buildType": "apk"
       },
@@ -27,7 +27,7 @@
     "play-internal": {
       "environment": "preview",
       "distribution": "store",
-      "autoIncrement": "versionCode",
+      "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
       },
