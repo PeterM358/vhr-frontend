@@ -227,7 +227,6 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
     userLocatedExplicitly,
     setUserLocatedExplicitly,
     matchedCity,
-    citySlug,
     selectCity,
     runSearch,
     clearFilters,
