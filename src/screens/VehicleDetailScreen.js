@@ -278,7 +278,7 @@ export default function VehicleDetailScreen({ route, navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [vehicleId, isOrgFleet, organizationId]);
+  }, [vehicleId, isOrgFleet, organizationId, navigation, route.params?.expandReminders]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -658,6 +658,9 @@ export default function VehicleDetailScreen({ route, navigation }) {
             ...orgReturnParams,
           });
           break;
+        case 'view_active_repairs':
+          scrollToActiveRepairsSection();
+          break;
         case 'reminders':
         case 'configure_reminders':
           scrollToRemindersSection();
@@ -666,7 +669,15 @@ export default function VehicleDetailScreen({ route, navigation }) {
           break;
       }
     },
-    [navigation, vehicleId, navigateLogServiceRecord, scrollToRemindersSection, openKmModal, orgReturnParams]
+    [
+      navigation,
+      vehicleId,
+      navigateLogServiceRecord,
+      scrollToRemindersSection,
+      scrollToActiveRepairsSection,
+      openKmModal,
+      orgReturnParams,
+    ]
   );
 
   const handleMileageFactorPress = useCallback(
@@ -1393,6 +1404,25 @@ export default function VehicleDetailScreen({ route, navigation }) {
             ) : null}
           </AppCard>
 
+          {!isShopView && activeRepairsList.length ? (
+            <View
+              collapsable={false}
+              onLayout={(e) => {
+                sectionScrollYs.current.activeRepairs = e.nativeEvent.layout.y;
+              }}
+            >
+              <FloatingCard>
+                <Text style={styles.sectionTitle}>{t('vehicles.detail.activeRepairs')}</Text>
+                <Text style={styles.sectionHint}>
+                  {t('vehicles.detail.activeRepairsHint')}
+                </Text>
+                {activeRepairsList.map((item) => (
+                  <View key={`active-top-${item.id}`}>{renderActiveRepairCard(item)}</View>
+                ))}
+              </FloatingCard>
+            </View>
+          ) : null}
+
           {!isShopView ? (
             <VehicleHealthCard health={vehicleHealth} onAction={handleHealthAction} />
           ) : null}
@@ -1564,26 +1594,22 @@ export default function VehicleDetailScreen({ route, navigation }) {
             </View>
           </FloatingCard>
 
-          <View
-            collapsable={false}
-            onLayout={(e) => {
-              sectionScrollYs.current.activeRepairs = e.nativeEvent.layout.y;
-            }}
-          >
-            <FloatingCard>
-              <Text style={styles.sectionTitle}>{t('vehicles.detail.activeRepairs')}</Text>
-              <Text style={styles.sectionHint}>
-                {t('vehicles.detail.activeRepairsHint')}
-              </Text>
-              {activeRepairsList.length ? (
-                activeRepairsList.map((item) => (
-                  <View key={`active-${item.id}`}>{renderActiveRepairCard(item)}</View>
-                ))
-              ) : (
+          {!activeRepairsList.length ? (
+            <View
+              collapsable={false}
+              onLayout={(e) => {
+                sectionScrollYs.current.activeRepairs = e.nativeEvent.layout.y;
+              }}
+            >
+              <FloatingCard>
+                <Text style={styles.sectionTitle}>{t('vehicles.detail.activeRepairs')}</Text>
+                <Text style={styles.sectionHint}>
+                  {t('vehicles.detail.activeRepairsHint')}
+                </Text>
                 <Text style={styles.inlineEmptyMuted}>{t('vehicles.detail.activeRepairsEmpty')}</Text>
-              )}
-            </FloatingCard>
-          </View>
+              </FloatingCard>
+            </View>
+          ) : null}
 
           <View
             collapsable={false}

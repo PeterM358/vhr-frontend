@@ -64,11 +64,21 @@ function setModuleLocale(locale) {
 }
 
 function readNativeDeviceLocale() {
-  if (Platform.OS === 'web') return null;
   try {
     const resolved = Intl.DateTimeFormat().resolvedOptions().locale || '';
     const base = String(resolved).trim().toLowerCase().split('-')[0];
     if (SUPPORTED_LOCALES.includes(base)) return base;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+/** Soft default for Bulgarian market installs with no saved locale yet. */
+function readMarketFallbackLocale() {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    if (tz === 'Europe/Sofia') return 'bg';
   } catch {
     // ignore
   }
@@ -211,6 +221,13 @@ export async function loadPersistedLocale() {
         writeWebLocale(fromDevice);
         AsyncStorage.setItem(STORAGE_KEY_LOCALE, fromDevice).catch(() => {});
         return fromDevice;
+      }
+      const fromMarket = readMarketFallbackLocale();
+      if (fromMarket) {
+        setModuleLocale(fromMarket);
+        writeWebLocale(fromMarket);
+        AsyncStorage.setItem(STORAGE_KEY_LOCALE, fromMarket).catch(() => {});
+        return fromMarket;
       }
       setModuleLocale(DEFAULT_LOCALE);
       return DEFAULT_LOCALE;
@@ -661,12 +678,14 @@ export function translateHealthDomainLabel(domainId, fallback, translateFn = t) 
 }
 
 export function translateHealthInlineAction(actionKey, fallback, translateFn = t) {
+  // Prefer dedicated short labels — avoid overloaded common.add/book/setup.
   const map = {
-    add_service_history: 'common.add',
-    schedule_maintenance: 'common.configure',
-    configure_reminders: 'common.setup',
-    update_km: 'common.update',
-    book_repair: 'common.book',
+    add_service_history: 'health.inline.add_history',
+    schedule_maintenance: 'health.inline.schedule',
+    configure_reminders: 'health.inline.open_reminders',
+    update_km: 'health.inline.update_km',
+    book_repair: 'health.inline.request_repair',
+    view_active_repairs: 'health.inline.view_repairs',
   };
   const key = map[actionKey];
   return key ? translateFn(key, null, fallback) : fallback;

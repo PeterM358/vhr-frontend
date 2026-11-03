@@ -2215,10 +2215,40 @@ export async function redirectLegacyWebUrl() {
   syncWebDocumentTitle(target || pathname);
 }
 
+function getNavigationStateFromDeepLinkPath(path) {
+  const legacyRepair = legacyRepairDetailNavigationState();
+  if (legacyRepair) {
+    return legacyRepair;
+  }
+  const legacyOffer = legacyCreateOrUpdateOfferNavigationState();
+  if (legacyOffer) {
+    return legacyOffer;
+  }
+  const legacyShop = legacyShopDetailNavigationState();
+  if (legacyShop) {
+    return legacyShop;
+  }
+  const legacyProfile = legacyShopProfileNavigationState();
+  if (legacyProfile) {
+    return legacyProfile;
+  }
+  // Email / open-app links often include /bg|en/... — strip before matching routes.
+  const normalized = normalizeWebLinkingPath(path);
+  const resolved = resolveNavigationStateFromCanonicalPath(normalized);
+  if (resolved?.routes) {
+    return resolved;
+  }
+  return getStateFromPathDefault(normalized, linkingConfig);
+}
+
 export function buildAppLinking(prefixes) {
   const base = {
     prefixes,
     config: linkingConfig,
+    // Native + web: resolve language-prefixed email deep links to real screens.
+    getStateFromPath(path, options) {
+      return getNavigationStateFromDeepLinkPath(path);
+    },
   };
 
   if (Platform.OS !== 'web') {
@@ -2227,30 +2257,6 @@ export function buildAppLinking(prefixes) {
 
   return {
     ...base,
-    getStateFromPath(path, options) {
-      const legacyRepair = legacyRepairDetailNavigationState();
-      if (legacyRepair) {
-        return legacyRepair;
-      }
-      const legacyOffer = legacyCreateOrUpdateOfferNavigationState();
-      if (legacyOffer) {
-        return legacyOffer;
-      }
-      const legacyShop = legacyShopDetailNavigationState();
-      if (legacyShop) {
-        return legacyShop;
-      }
-      const legacyProfile = legacyShopProfileNavigationState();
-      if (legacyProfile) {
-        return legacyProfile;
-      }
-      const normalized = normalizeWebLinkingPath(path);
-      const resolved = resolveNavigationStateFromCanonicalPath(normalized);
-      if (resolved?.routes) {
-        return resolved;
-      }
-      return getStateFromPathDefault(normalized, linkingConfig);
-    },
     getPathFromState(state, options) {
       const seoPath = getSeoPathFromNavigationState(state);
       if (seoPath) {

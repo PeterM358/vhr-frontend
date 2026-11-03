@@ -3458,7 +3458,16 @@
       "add_service_history": "Add service history",
       "configure_reminders": "Configure reminders",
       "schedule_maintenance": "Schedule maintenance",
-      "book_repair": "Book repair"
+      "book_repair": "Book repair",
+      "view_active_repairs": "View active repairs"
+    },
+    "inline": {
+      "add_history": "Add record",
+      "schedule": "Request",
+      "open_reminders": "Reminders",
+      "update_km": "Update km",
+      "request_repair": "Request",
+      "view_repairs": "View"
     }
   },
   "reminders": {
@@ -4335,6 +4344,7 @@
     "contactHelper": "This information helps service centers contact you about repairs and service updates.",
     "notificationsSection": "Notifications",
     "notificationsHelper": "Control push alerts and reminder emails for insurance, inspection, oil, and other vehicle dues.",
+    "languageNotificationsHelper": "App language for screens and alerts. Bulgarian phones default to Bulgarian when no language is saved yet.",
     "pushNotifications": "Push notifications",
     "pushNotificationsHint": "Alerts on this device when something is due or overdue.",
     "emailReminders": "Reminder emails",

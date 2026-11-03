@@ -500,6 +500,8 @@ export default function ClientProfileScreen({ navigation }) {
         <FloatingCard>
           <Text style={styles.sectionTitle}>{t('profile.notificationsSection')}</Text>
           <Text style={styles.helper}>{t('profile.notificationsHelper')}</Text>
+          <LanguagePicker />
+          <Text style={styles.helper}>{t('profile.languageNotificationsHelper')}</Text>
           <View style={styles.toggleRow}>
             <View style={styles.toggleCopy}>
               <Text style={styles.toggleLabel}>{t('profile.pushNotifications')}</Text>
@@ -530,8 +532,7 @@ export default function ClientProfileScreen({ navigation }) {
 
         <FloatingCard>
           <Text style={styles.sectionTitle}>{t('profile.appearance')}</Text>
-          <LanguagePicker />
-          <Text variant="labelLarge" style={[styles.label, styles.languageSpacer]}>{t('profile.garageScene')}</Text>
+          <Text variant="labelLarge" style={styles.label}>{t('profile.garageScene')}</Text>
           <View style={styles.pickerWrap}>
             <Picker
               selectedValue={garageScene.id}
@@ -623,8 +624,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     fontWeight: '700',
   },
-  languageSpacer: {
-    marginTop: 16,
+  // kept for older layout references
+  languageSpacer: {    marginTop: 16,
   },
   helper: {
     color: COLORS.TEXT_MUTED,

@@ -3416,7 +3416,16 @@
       "add_service_history": "Добави сервизна история",
       "configure_reminders": "Настрой напомняния",
       "schedule_maintenance": "Насрочи обслужване",
-      "book_repair": "Заяви ремонт"
+      "book_repair": "Заяви ремонт",
+      "view_active_repairs": "Виж активните ремонти"
+    },
+    "inline": {
+      "add_history": "Добави запис",
+      "schedule": "Заяви",
+      "open_reminders": "Напомняния",
+      "update_km": "Пробег",
+      "request_repair": "Заяви",
+      "view_repairs": "Виж"
     }
   },
   "reminders": {
@@ -4287,6 +4296,7 @@
     "contactHelper": "Тази информация помага на сервизите да се свържат с теб за ремонти и актуализации.",
     "notificationsSection": "Известия",
     "notificationsHelper": "Управлявай push и имейл напомняния за застраховка, преглед, масло и други срокове.",
+    "languageNotificationsHelper": "Език на екраните и известията. На български телефони по подразбиране е български, ако още не си избрал език.",
     "pushNotifications": "Push известия",
     "pushNotificationsHint": "Известия на това устройство при наближаващ или просрочен срок.",
     "emailReminders": "Имейл напомняния",

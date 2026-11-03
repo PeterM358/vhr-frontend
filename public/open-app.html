@@ -106,6 +106,12 @@
         path = '/';
       }
       path = path.replace(/^\/+/, '');
+      // Native linking routes are language-free (dashboard/vehicles/:id).
+      // Email links often include /bg/ or /en/ — strip so the app opens the vehicle.
+      path = path.replace(/^(en|bg|de|it|fr|es)(\/|$)/i, function (_, _lang, slash) {
+        return slash === '/' ? '' : '';
+      });
+      path = path.replace(/^\/+/, '');
 
       var ua = navigator.userAgent || '';
       var isAndroid = /Android/i.test(ua);

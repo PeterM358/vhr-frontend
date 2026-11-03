@@ -23,13 +23,13 @@ const REASON_ROW_MAP = {
     id: 'oil',
     domainId: 'oil',
     icon: 'engine-oil',
-    actionKey: 'schedule_maintenance',
+    actionKey: 'configure_reminders',
   },
   oil_service_due_soon: {
     id: 'oil',
     domainId: 'oil',
     icon: 'engine-oil',
-    actionKey: 'schedule_maintenance',
+    actionKey: 'configure_reminders',
   },
   no_brake_check_history: {
     id: 'brake',
@@ -41,13 +41,13 @@ const REASON_ROW_MAP = {
     id: 'brake',
     domainId: 'brake',
     icon: 'car-brake-alert',
-    actionKey: 'schedule_maintenance',
+    actionKey: 'configure_reminders',
   },
   brake_check_due_soon: {
     id: 'brake',
     domainId: 'brake',
     icon: 'car-brake-alert',
-    actionKey: 'schedule_maintenance',
+    actionKey: 'configure_reminders',
   },
   no_reminders: {
     id: 'reminders',
@@ -71,13 +71,13 @@ const REASON_ROW_MAP = {
     id: 'active_repairs',
     domainId: 'active_repairs',
     icon: 'wrench',
-    actionKey: 'book_repair',
+    actionKey: 'view_active_repairs',
   },
   denied_repairs: {
     id: 'denied_repairs',
     domainId: 'denied_repairs',
     icon: 'close-circle-outline',
-    actionKey: 'book_repair',
+    actionKey: 'view_active_repairs',
   },
 };
 
