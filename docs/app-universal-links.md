@@ -2,9 +2,12 @@
 
 Emails and shares must use **https://…** on staging/production — Gmail strips custom schemes.
 
-**Practical path (preferred for QA + pre-store):** reminder emails use **Open in the app** → `/open-app.html?to=…`, which tries `service1001://` / Android intent, then offers [Google Play](https://play.google.com/store/apps/details?id=com.mihailovv.vhrfrontend) + [App Store](https://apps.apple.com/app/id6820957515). Test that page in Chrome on the phone; do not depend on Gmail → App Links.
+**Practical path (preferred for QA + pre-store):** reminder emails use **Open in the app** → `/open-app.html?to=…`.
 
-Universal / App Links remain optional polish for bare https CTAs once store builds verify cleanly.
+- **Android:** intent → installed APK, else Play.
+- **iOS:** user must tap again on the bridge (Mail blocks silent `service1001://`). App Store button uses ASC id `6820957515`. **If the listing is not public yet**, another Apple ID cannot install from the store — only TestFlight invitees or **Continue in browser**.
+
+Universal / App Links remain optional polish once public store builds verify cleanly.
 
 ## Goal
 

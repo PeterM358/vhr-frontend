@@ -18,7 +18,7 @@
       margin: 0;
       min-height: 100vh;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: linear-gradient(165deg, #eef2ff 0%, var(--bg) 42%, #fff 100%);
+      background: linear-gradient(165deg, #dbeafe 0%, var(--bg) 45%, #fff 100%);
       color: var(--ink);
       display: flex;
       align-items: center;
@@ -37,7 +37,7 @@
       margin: 0 0 8px;
     }
     p {
-      margin: 0 0 20px;
+      margin: 0 0 16px;
       color: var(--muted);
       line-height: 1.5;
       font-size: 15px;
@@ -69,30 +69,31 @@
       font-size: 14px;
     }
     .hint {
-      margin-top: 8px;
+      margin-top: 4px;
       font-size: 12px;
       color: #94a3b8;
+      line-height: 1.45;
     }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
   <main>
     <h1 class="brand">Veversal</h1>
-    <p id="msg">Отваряне на приложението…</p>
+    <p id="msg">Избери как да продължиш</p>
     <a id="openApp" class="btn btn-primary" href="#">Отвори приложението</a>
-    <a id="play" class="btn btn-secondary" href="https://play.google.com/store/apps/details?id=com.mihailovv.vhrfrontend" target="_blank" rel="noopener">Google Play</a>
-    <a id="appstore" class="btn btn-secondary" href="https://apps.apple.com/app/id6820957515" target="_blank" rel="noopener">App Store</a>
+    <a id="appstore" class="btn btn-secondary" href="https://apps.apple.com/app/id6820957515">App Store</a>
+    <a id="play" class="btn btn-secondary" href="https://play.google.com/store/apps/details?id=com.mihailovv.vhrfrontend">Google Play</a>
     <a id="web" class="btn btn-ghost" href="/">Продължи в браузъра</a>
-    <p class="hint" id="hint">Ако app-ът е инсталиран, бутонът по-горе го отваря директно (без Universal Links).</p>
+    <p class="hint" id="hint"></p>
   </main>
   <script>
     (function () {
       var params = new URLSearchParams(window.location.search);
       var raw = params.get('to') || '/';
       var lang = (params.get('lang') || '').toLowerCase();
-      var en = lang === 'en' || (raw.indexOf('/en/') === 0);
+      var en = lang === 'en' || raw.indexOf('/en/') === 0;
 
-      // Accept absolute or relative target; keep only path+query for the native scheme.
       var path;
       try {
         if (/^https?:\/\//i.test(raw)) {
@@ -106,33 +107,104 @@
       }
       path = path.replace(/^\/+/, '');
 
+      var ua = navigator.userAgent || '';
+      var isAndroid = /Android/i.test(ua);
+      var isIOS = /iPhone|iPad|iPod/i.test(ua);
+      var playUrl = 'https://play.google.com/store/apps/details?id=com.mihailovv.vhrfrontend';
+      // https listing (works in Mail) + itms-apps for installed App Store app
+      var appStoreHttps = 'https://apps.apple.com/bg/app/id6820957515';
+      var appStoreNative = 'itms-apps://apps.apple.com/app/id6820957515';
       var schemeUrl = 'service1001://' + path;
-      var playFallback = 'https://play.google.com/store/apps/details?id=com.mihailovv.vhrfrontend';
       var intentUrl =
         'intent://' + path +
         '#Intent;scheme=service1001;package=com.mihailovv.vhrfrontend;S.browser_fallback_url=' +
-        encodeURIComponent(playFallback) + ';end';
-
+        encodeURIComponent(playUrl) + ';end';
       var webUrl = '/' + path;
-      var isAndroid = /Android/i.test(navigator.userAgent);
 
       var openBtn = document.getElementById('openApp');
-      openBtn.href = isAndroid ? intentUrl : schemeUrl;
-      document.getElementById('web').href = webUrl;
+      var playBtn = document.getElementById('play');
+      var storeBtn = document.getElementById('appstore');
+      var webBtn = document.getElementById('web');
+      var msg = document.getElementById('msg');
+      var hint = document.getElementById('hint');
 
-      if (en) {
-        document.documentElement.lang = 'en';
-        document.getElementById('msg').textContent = 'Opening the app…';
-        openBtn.textContent = 'Open the app';
-        document.getElementById('web').textContent = 'Continue in browser';
-        document.getElementById('hint').textContent =
-          'If Veversal is installed, the button above opens it directly (no Universal Links needed).';
+      playBtn.href = playUrl;
+      storeBtn.href = appStoreHttps;
+      webBtn.href = webUrl;
+
+      if (isAndroid) {
+        openBtn.href = intentUrl;
+        storeBtn.classList.add('hidden');
+        if (en) {
+          msg.textContent = 'Open Veversal or get it from Play';
+          openBtn.textContent = 'Open the app';
+          playBtn.textContent = 'Get on Google Play';
+          webBtn.textContent = 'Continue in browser';
+          hint.textContent = 'If the app is installed, “Open the app” launches it. Otherwise use Google Play.';
+        } else {
+          msg.textContent = 'Отвори Veversal или го вземи от Play';
+          openBtn.textContent = 'Отвори приложението';
+          playBtn.textContent = 'Изтегли от Google Play';
+          webBtn.textContent = 'Продължи в браузъра';
+          hint.textContent = 'Ако app-ът е инсталиран, „Отвори приложението“ го пуска. Иначе ползвай Google Play.';
+        }
+        // Android: auto-try intent once (user already tapped email CTA).
+        setTimeout(function () {
+          window.location.href = intentUrl;
+        }, 200);
+        return;
       }
 
-      // Auto-try once; user can tap again if the OS blocked the first attempt.
-      setTimeout(function () {
-        window.location.href = openBtn.href;
-      }, 120);
+      if (isIOS) {
+        playBtn.classList.add('hidden');
+        openBtn.href = schemeUrl;
+        // Do NOT auto-redirect to custom scheme on iOS — Mail/Safari block it
+        // without a fresh user gesture and can leave the page looking broken.
+        storeBtn.addEventListener('click', function (ev) {
+          // Prefer native App Store URL when possible; fall back to https.
+          ev.preventDefault();
+          window.location.href = appStoreNative;
+          setTimeout(function () {
+            window.location.href = appStoreHttps;
+          }, 400);
+        });
+        if (en) {
+          msg.textContent = 'Open Veversal, or the App Store if it is not installed';
+          openBtn.textContent = 'Open the app';
+          storeBtn.textContent = 'Open App Store';
+          webBtn.textContent = 'Continue in browser';
+          hint.textContent =
+            'Tap “Open the app” only if Veversal is already installed (TestFlight / App Store). ' +
+            'If the store says the app is unavailable, it is not public yet — use the browser or ask for a TestFlight invite.';
+        } else {
+          msg.textContent = 'Отвори Veversal, или App Store ако не е инсталиран';
+          openBtn.textContent = 'Отвори приложението';
+          storeBtn.textContent = 'Отвори App Store';
+          webBtn.textContent = 'Продължи в браузъра';
+          hint.textContent =
+            '„Отвори приложението“ работи само ако Veversal вече е инсталиран (TestFlight / App Store). ' +
+            'Ако App Store каже, че приложението не е налично — още не е публично: ползвай браузъра или поискай TestFlight покана.';
+        }
+        return;
+      }
+
+      // Desktop / other: show both stores, no auto scheme.
+      openBtn.href = schemeUrl;
+      if (en) {
+        msg.textContent = 'Continue in the browser, or install the mobile app';
+        openBtn.textContent = 'Try opening the app';
+        playBtn.textContent = 'Google Play';
+        storeBtn.textContent = 'App Store';
+        webBtn.textContent = 'Continue in browser';
+        hint.textContent = 'On a phone with Veversal installed, “Open the app” works best.';
+      } else {
+        msg.textContent = 'Продължи в браузъра или инсталирай мобилното приложение';
+        openBtn.textContent = 'Опитай да отвориш приложението';
+        playBtn.textContent = 'Google Play';
+        storeBtn.textContent = 'App Store';
+        webBtn.textContent = 'Продължи в браузъра';
+        hint.textContent = 'На телефон с инсталиран Veversal бутонът „Отвори приложението“ работи най-добре.';
+      }
     })();
   </script>
 </body>
