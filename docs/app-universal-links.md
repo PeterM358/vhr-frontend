@@ -46,12 +46,21 @@ Gmail’s in-app browser often **does not** hand off to App Links. Test with:
 
 ## Adding a new Android signing cert
 
-After Play App Signing or a new upload key, append its SHA-256 (lowercase, no colons) to `public/.well-known/assetlinks.json` and redeploy web.
+After Play App Signing or a new upload key, append its SHA-256 to `public/.well-known/assetlinks.json` and redeploy web.
+
+**Format must be colon-separated uppercase hex** (Google rejects fingerprints without colons → Android always opens the browser):
+
+`FA:C6:17:45:DC:09:…:3B:9C`
 
 ```bash
 # From an APK/AAB you ship:
 $ANDROID_HOME/build-tools/*/apksigner verify --print-certs path/to.apk | grep SHA-256
+# Then insert colons every 2 hex chars and uppercase.
 ```
+
+**Quick phone test (not Gmail):** open Chrome → paste  
+`https://beta.veversal.com/en/oil-change/sofia`  
+→ should open Veversal app. Gmail’s in-app browser often skips App Links.
 
 ## Why email still uses https
 
