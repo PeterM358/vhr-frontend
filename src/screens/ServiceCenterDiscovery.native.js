@@ -475,6 +475,7 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
   }, []);
 
   const activeAdvancedFilterCount = [
+    citySlug,
     selectedCategory,
     selectedRepairType,
     selectedBrand,
@@ -501,6 +502,8 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
     () =>
       buildActiveFilterSummary(
         {
+          citySlug,
+          matchedCity,
           selectedVehicleType,
           openNowOnly,
           verifiedOnly,
@@ -518,6 +521,8 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
     [
       brands,
       categoryOptions,
+      citySlug,
+      matchedCity,
       minRating,
       openNowOnly,
       radiusKm,
@@ -892,7 +897,11 @@ export default function ServiceCenterDiscovery({ navigation, route, partnerMode 
           <DiscoverySearchInput
             committedValue={addressQuery}
             onSubmit={(term) => handleSearch(term).catch(() => {})}
-            placeholder={t('serviceCenters.searchPlaceholder')}
+            onSelectCity={(city) => {
+              handleSelectCityFilter(city);
+              handleSearch(city?.name || '').catch(() => {});
+            }}
+            placeholder={t('serviceCenters.searchPlaceholderCity')}
             wrapStyle={styles.searchFloating}
             inputStyle={styles.searchInput}
           />
@@ -1024,14 +1033,15 @@ const styles = StyleSheet.create({
     textShadowRadius: 6,
   },
   searchFloating: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    zIndex: 20,
     borderWidth: 1,
     borderColor: DISCOVERY_MOBILE.color.border,
     borderRadius: DISCOVERY_MOBILE.radius.search,
     backgroundColor: 'rgba(255,255,255,0.97)',
     paddingHorizontal: 10,
+    paddingVertical: 2,
     minHeight: DISCOVERY_MOBILE.height.search,
+    overflow: 'visible',
     ...DISCOVERY_MOBILE.shadow.card,
   },
   searchIcon: { marginRight: 6 },

@@ -126,6 +126,7 @@ export function useServiceCenterDiscovery({
       && (
         normalizeDiscoverySearchTerm(term) === normalizeDiscoverySearchTerm(matchedCity.name)
         || normalizeDiscoverySearchTerm(term) === normalizeDiscoverySearchTerm(matchedCity.slug_en)
+        || normalizeDiscoverySearchTerm(term) === normalizeDiscoverySearchTerm(matchedCity.slug_bg)
       );
     if (!term || citySearch) {
       return sortDiscoveryItems(allShops, sort);
@@ -349,7 +350,8 @@ export function useServiceCenterDiscovery({
 
     try {
       const cities = await searchDiscoveryCities(term, { country: 'BG', limit: 8 });
-      const match = findExactCityMatch(cities, term);
+      // Prefer exact/prefix match; if API returned cities for Cyrillic/Latin query, take best.
+      const match = findExactCityMatch(cities, term) || (cities.length === 1 ? cities[0] : null);
       if (match) {
         const slug = citySlugFromMatch(match);
         nextMatchedCity = match;

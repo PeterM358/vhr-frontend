@@ -92,6 +92,11 @@ export default function DiscoveryExpandedFiltersPanel({
         </FilterSection>
       ) : null}
 
+      <View style={styles.mapLangBlock}>
+        <Text style={styles.sectionTitle}>{t('serviceCenters.mapLabelsTitle')}</Text>
+        <Text style={styles.mapLangHint}>{t('serviceCenters.mapLabelsHint')}</Text>
+      </View>
+
       {typeof setOpenNowOnly === 'function' || typeof setVerifiedOnly === 'function' ? (
         <FilterSection title={t('serviceCenters.filters')}>
           {typeof setOpenNowOnly === 'function' ? (
@@ -238,5 +243,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingRight: 8,
+  },
+  mapLangBlock: {
+    marginBottom: 14,
+    paddingHorizontal: 2,
+    gap: 6,
+  },
+  mapLangHint: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#64748b',
   },
 });

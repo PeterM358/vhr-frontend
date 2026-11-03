@@ -701,10 +701,14 @@ export default function ServiceCenterDiscovery({ partnerMode = false }) {
           ref={searchInputRef}
           committedValue={addressQuery}
           onSubmit={(term) => handleSearch(term).catch(() => {})}
+          onSelectCity={(city) => {
+            handleSelectCityFilter(city);
+            handleSearch(city?.name || '').catch(() => {});
+          }}
           placeholder={
             isNarrowMobile
-              ? t('serviceCenters.searchPlaceholderShort', null, 'Search centers…')
-              : t('serviceCenters.searchPlaceholder')
+              ? t('serviceCenters.searchPlaceholderCityShort', null, 'City or center…')
+              : t('serviceCenters.searchPlaceholderCity')
           }
           wrapStyle={[styles.searchInputWrap, isMobileWeb && styles.searchInputWrapMobile]}
           inputStyle={[styles.searchInput, isMobileWeb && styles.searchInputMobile]}
@@ -1142,15 +1146,16 @@ const styles = StyleSheet.create({
   },
   searchInputWrap: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    zIndex: 30,
     borderWidth: 1,
     borderColor: '#cbd5e1',
     borderRadius: 12,
     backgroundColor: '#fff',
     paddingHorizontal: 10,
+    paddingVertical: 2,
     minHeight: 42,
     minWidth: 0,
+    overflow: 'visible',
   },
   searchInputWrapMobile: {
     borderRadius: DISCOVERY_MOBILE.radius.search,
