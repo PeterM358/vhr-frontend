@@ -156,6 +156,8 @@ const transparentStackHeader = {
   headerShadowVisible: false,
   /** Android/Web default is left-aligned title; iOS is always centered. */
   headerTitleAlign: 'center',
+  /** Avoid white flash under transparent headers while ScreenBackground paints. */
+  contentStyle: { backgroundColor: '#0b1220' },
 };
 
 /** Auth cards render their own logo + headings — hide stack header title everywhere. */
@@ -276,7 +278,8 @@ function createVehicleHeaderLeft(navigation) {
 function getLinkingPrefixes() {
   // https hosts = Universal Links / App Links (email & share). Custom scheme = legacy/dev.
   const prefixes = [
-    'service1001://',
+    'veversal://',
+    'service1001://', // legacy scheme from pre-rebrand installs
     'https://beta.veversal.com',
     'https://veversal.com',
     'https://www.veversal.com',

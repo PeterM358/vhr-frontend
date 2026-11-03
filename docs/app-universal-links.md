@@ -5,7 +5,9 @@ Emails and shares must use **https://…** on staging/production — Gmail strip
 **Practical path (preferred for QA + pre-store):** reminder emails use **Open in the app** → `/open-app.html?to=…`.
 
 - **Android:** intent → installed APK, else Play.
-- **iOS:** user must tap again on the bridge (Mail blocks silent `service1001://`). App Store button uses ASC id `6820957515`. **If the listing is not public yet**, another Apple ID cannot install from the store — only TestFlight invitees or **Continue in browser**.
+- **iOS:** user must tap again on the bridge (Mail blocks silent custom schemes). Opens `veversal://` then legacy `service1001://`. App Store button uses ASC id `6820957515`.
+
+**Scheme rename:** deep links use **`veversal://`** (brand). `service1001://` is legacy only — not a website. Native `Info.plist` / `AndroidManifest` must list both; **new TestFlight / Play build required** before iOS opens from email (older iOS builds were missing the URL scheme entirely).
 
 Universal / App Links remain optional polish once public store builds verify cleanly.
 

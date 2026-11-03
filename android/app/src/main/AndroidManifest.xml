@@ -36,6 +36,7 @@
         <action android:name="android.intent.action.VIEW" />
         <category android:name="android.intent.category.DEFAULT" />
         <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="veversal" />
         <data android:scheme="service1001" />
       </intent-filter>
     </activity>

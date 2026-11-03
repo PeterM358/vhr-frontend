@@ -18,17 +18,17 @@ import CookieConsentBanner from './components/common/CookieConsentBanner';
 
 const handleDeepLink = ({ url }) => {
   if (!url) return;
-  // https://host/reset-password/uid/token or service1001://reset-password/uid/token
+  // https://host/reset-password/uid/token or veversal://reset-password/uid/token
   const resetMatch = url.match(/reset-password\/([^/?#]+)\/([^/?#]+)/);
   if (resetMatch) {
     const [, uid, token] = resetMatch;
-    Linking.openURL(`service1001://reset-password/${uid}/${token}`);
+    Linking.openURL(`veversal://reset-password/${uid}/${token}`);
     return;
   }
   const verifyMatch = url.match(/verify-email\/([^/?#]+)\/([^/?#]+)/);
   if (verifyMatch) {
     const [, uid, token] = verifyMatch;
-    Linking.openURL(`service1001://verify-email/${uid}/${token}`);
+    Linking.openURL(`veversal://verify-email/${uid}/${token}`);
   }
 };
 

@@ -114,8 +114,14 @@
       // https listing (works in Mail) + itms-apps for installed App Store app
       var appStoreHttps = 'https://apps.apple.com/bg/app/id6820957515';
       var appStoreNative = 'itms-apps://apps.apple.com/app/id6820957515';
-      var schemeUrl = 'service1001://' + path;
+      // Primary brand scheme; service1001 kept for older Android installs only.
+      var schemeUrl = 'veversal://' + path;
+      var legacySchemeUrl = 'service1001://' + path;
       var intentUrl =
+        'intent://' + path +
+        '#Intent;scheme=veversal;package=com.mihailovv.vhrfrontend;S.browser_fallback_url=' +
+        encodeURIComponent(playUrl) + ';end';
+      var legacyIntentUrl =
         'intent://' + path +
         '#Intent;scheme=service1001;package=com.mihailovv.vhrfrontend;S.browser_fallback_url=' +
         encodeURIComponent(playUrl) + ';end';
@@ -148,9 +154,12 @@
           webBtn.textContent = 'Продължи в браузъра';
           hint.textContent = 'Ако app-ът е инсталиран, „Отвори приложението“ го пуска. Иначе ползвай Google Play.';
         }
-        // Android: auto-try intent once (user already tapped email CTA).
+        // Android: try brand scheme, then legacy scheme for older APKs.
         setTimeout(function () {
           window.location.href = intentUrl;
+          setTimeout(function () {
+            window.location.href = legacyIntentUrl;
+          }, 700);
         }, 200);
         return;
       }
@@ -158,10 +167,16 @@
       if (isIOS) {
         playBtn.classList.add('hidden');
         openBtn.href = schemeUrl;
-        // Do NOT auto-redirect to custom scheme on iOS — Mail/Safari block it
-        // without a fresh user gesture and can leave the page looking broken.
+        // Do NOT auto-redirect on iOS — Mail/Safari need a real tap.
+        // Current TestFlight builds may still only know service1001 until rebuild.
+        openBtn.addEventListener('click', function (ev) {
+          ev.preventDefault();
+          window.location.href = schemeUrl;
+          setTimeout(function () {
+            window.location.href = legacySchemeUrl;
+          }, 500);
+        });
         storeBtn.addEventListener('click', function (ev) {
-          // Prefer native App Store URL when possible; fall back to https.
           ev.preventDefault();
           window.location.href = appStoreNative;
           setTimeout(function () {
@@ -169,21 +184,21 @@
           }, 400);
         });
         if (en) {
-          msg.textContent = 'Open Veversal, or the App Store if it is not installed';
+          msg.textContent = 'Open Veversal, or continue in the browser';
           openBtn.textContent = 'Open the app';
           storeBtn.textContent = 'Open App Store';
           webBtn.textContent = 'Continue in browser';
           hint.textContent =
-            'Tap “Open the app” only if Veversal is already installed (TestFlight / App Store). ' +
-            'If the store says the app is unavailable, it is not public yet — use the browser or ask for a TestFlight invite.';
+            'Needs a build that registers veversal:// (or legacy service1001://). ' +
+            'Shop login (e.g. Kokis) is fine — the app still opens. If nothing happens, install the new TestFlight build or use the browser.';
         } else {
-          msg.textContent = 'Отвори Veversal, или App Store ако не е инсталиран';
+          msg.textContent = 'Отвори Veversal, или продължи в браузъра';
           openBtn.textContent = 'Отвори приложението';
           storeBtn.textContent = 'Отвори App Store';
           webBtn.textContent = 'Продължи в браузъра';
           hint.textContent =
-            '„Отвори приложението“ работи само ако Veversal вече е инсталиран (TestFlight / App Store). ' +
-            'Ако App Store каже, че приложението не е налично — още не е публично: ползвай браузъра или поискай TestFlight покана.';
+            'Трябва билд с veversal:// (или стария service1001://). ' +
+            'Логнат автосервиз (напр. Кокис) е ОК — app-ът пак трябва да се отвори. Ако нищо не стане: нов TestFlight билд или браузър.';
         }
         return;
       }

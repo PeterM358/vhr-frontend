@@ -21,7 +21,8 @@ export default {
   expo: {
     name: "Veversal",
     slug: "vhr-frontend",
-    scheme: "service1001",
+    // Primary deep-link scheme is veversal://. Keep service1001 for older installs.
+    scheme: ["veversal", "service1001"],
     version: "1.0.3",
     orientation: "portrait",
     icon: "./src/assets/icons/icon.png",
