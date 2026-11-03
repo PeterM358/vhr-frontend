@@ -14,6 +14,7 @@ import {
   Dialog,
   ActivityIndicator,
   SegmentedButtons,
+  Switch,
 } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
 
@@ -298,6 +299,8 @@ export default function ClientProfileScreen({ navigation }) {
       city: profile.city || null,
       town: selectedCity?.name || profile.town || '',
       phone: mergedPhone || '',
+      email_notifications_enabled: profile.email_notifications_enabled !== false,
+      push_notifications_enabled: profile.push_notifications_enabled !== false,
     };
 
     setSaving(true);
@@ -495,6 +498,37 @@ export default function ClientProfileScreen({ navigation }) {
         </FloatingCard>
 
         <FloatingCard>
+          <Text style={styles.sectionTitle}>{t('profile.notificationsSection')}</Text>
+          <Text style={styles.helper}>{t('profile.notificationsHelper')}</Text>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleCopy}>
+              <Text style={styles.toggleLabel}>{t('profile.pushNotifications')}</Text>
+              <Text style={styles.toggleHint}>{t('profile.pushNotificationsHint')}</Text>
+            </View>
+            <Switch
+              value={profile.push_notifications_enabled !== false}
+              onValueChange={(value) =>
+                setProfile({ ...profile, push_notifications_enabled: value })
+              }
+              color={COLORS.PRIMARY}
+            />
+          </View>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleCopy}>
+              <Text style={styles.toggleLabel}>{t('profile.emailReminders')}</Text>
+              <Text style={styles.toggleHint}>{t('profile.emailRemindersHint')}</Text>
+            </View>
+            <Switch
+              value={profile.email_notifications_enabled !== false}
+              onValueChange={(value) =>
+                setProfile({ ...profile, email_notifications_enabled: value })
+              }
+              color={COLORS.PRIMARY}
+            />
+          </View>
+        </FloatingCard>
+
+        <FloatingCard>
           <Text style={styles.sectionTitle}>{t('profile.appearance')}</Text>
           <LanguagePicker />
           <Text variant="labelLarge" style={[styles.label, styles.languageSpacer]}>{t('profile.garageScene')}</Text>
@@ -596,6 +630,28 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_MUTED,
     marginBottom: 10,
     lineHeight: 18,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 14,
+  },
+  toggleCopy: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  toggleLabel: {
+    color: COLORS.TEXT_DARK,
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  toggleHint: {
+    color: COLORS.TEXT_MUTED,
+    fontSize: 13,
+    lineHeight: 17,
   },
   pickerWrap: {
     borderWidth: 1,

@@ -13,5 +13,7 @@ export function buildClientProfileSaveSnapshot({
     city: profile.city ?? null,
     phone: phoneE164 || '',
     contactPreference: contactPreference || 'phone',
+    email_notifications_enabled: profile.email_notifications_enabled !== false,
+    push_notifications_enabled: profile.push_notifications_enabled !== false,
   });
 }
