@@ -1,10 +1,19 @@
 # Universal Links (iOS) + App Links (Android)
 
-Emails and shares must use **https://beta.veversal.com/…** (or production hosts), not `service1001://` — Gmail strips custom schemes.
+Emails and shares must use **https://beta.veversal.com/…** on staging (or production hosts), not `service1001://` — Gmail strips custom schemes.
 
 ## Goal
 
 If the user has the Veversal app installed, tapping an https link opens **the app** on that screen. If not installed, the same URL opens in the browser (web SPA).
+
+## Default staging behaviour
+
+| Setting | Value |
+|---------|--------|
+| Backend `APP_PUBLIC_BASE_URL` | `https://beta.veversal.com` (staging defaults in `vhr/settings/staging.py`) |
+| AASA `appID` | `GR95RKY24P.com.mihailovv.vhrfrontend` (Apple Team VEVERSAL LTD EOOD) |
+| Android package | `com.mihailovv.vhrfrontend` |
+| `assetlinks.json` fingerprints | EAS/release + local debug keystore |
 
 ## What we ship in the repo
 
@@ -13,20 +22,36 @@ If the user has the Veversal app installed, tapping an https link opens **the ap
 | `app.config.js` → `ios.associatedDomains` | Declares applinks hosts for iOS builds |
 | `app.config.js` → `android.intentFilters` (`autoVerify: true`) | Declares https hosts for Android App Links |
 | `AppNavigator` linking `prefixes` | Includes those https origins so React Navigation parses the path |
-| `public/.well-known/assetlinks.json` | Android Digital Asset Links (package + cert SHA-256) |
-| `public/.well-known/apple-app-site-association` | iOS AASA (replace `TEAMID`) |
+| `public/.well-known/assetlinks.json` | Android Digital Asset Links |
+| `public/.well-known/apple-app-site-association` | iOS AASA |
 
 Custom scheme `service1001://` remains as a legacy/dev fallback only.
 
-## Ops checklist (required for “open in app” to work)
+## Ops checklist
 
-1. **Deploy web** so `https://beta.veversal.com/.well-known/assetlinks.json` and `…/apple-app-site-association` return **200** (not SPA `index.html`). Nginx already prefers real files via `try_files $uri`.
-2. **Android:** put the **Play App Signing** (and upload key if needed) SHA-256 fingerprints into `assetlinks.json`. The repo currently lists the **local debug** keystore fingerprint for USB/debug APKs.
-3. **iOS:** replace `TEAMID` in `apple-app-site-association` with the Apple Developer Team ID (`ABCDE12345.com.mihailovv.vhrfrontend`).
-4. **New native builds** after `app.config.js` changes (EAS preview/production). Config plugins do not apply to an already-installed APK without rebuild.
-5. Verify:
-   - Android: `adb shell pm get-app-links com.mihailovv.vhrfrontend`
-   - iOS: tap a beta https vehicle link from Mail with the app installed
+1. **Server `.env.staging`:** `APP_PUBLIC_BASE_URL=https://beta.veversal.com` (and `API_PUBLIC_BASE_URL=https://api-beta.veversal.com`). Then restart api/worker so **new** emails use beta links.
+2. **Deploy web** so `https://beta.veversal.com/.well-known/assetlinks.json` and `…/apple-app-site-association` return **200** JSON (not SPA `index.html`).
+3. **Installed build** must include associated domains / intent filters (any EAS preview/production/play-internal after those were added in `app.config.js`). No rebuild needed only to pick up AASA/assetlinks **file** changes on the server.
+4. **Verify**
+   - Android: `adb shell pm get-app-links com.mihailovv.vhrfrontend` → host `beta.veversal.com` should be **verified**
+   - iOS: long-press a beta https link in **Mail** / Safari (not always Gmail’s in-app browser)
+   - Paste `https://beta.veversal.com/en/oil-change/sofia` into Chrome → should offer / open Veversal
+
+## Gmail caveat
+
+Gmail’s in-app browser often **does not** hand off to App Links. Test with:
+
+- Android: ⋮ → **Open in Chrome** (or copy link → Chrome)
+- iOS: open the link in **Mail** or Safari
+
+## Adding a new Android signing cert
+
+After Play App Signing or a new upload key, append its SHA-256 (lowercase, no colons) to `public/.well-known/assetlinks.json` and redeploy web.
+
+```bash
+# From an APK/AAB you ship:
+$ANDROID_HOME/build-tools/*/apksigner verify --print-certs path/to.apk | grep SHA-256
+```
 
 ## Why email still uses https
 
