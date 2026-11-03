@@ -3,25 +3,17 @@
     "apps": [],
     "details": [
       {
-        "appID": "TEAMID.com.mihailovv.vhrfrontend",
+        "appID": "GR95RKY24P.com.mihailovv.vhrfrontend",
         "paths": [
-          "/dashboard/*",
-          "/service-centers*",
-          "/login*",
-          "/bg/*",
-          "/en/*",
-          "/technical-inspection*",
-          "/oil-change*",
-          "/tire-change*",
-          "/brake-repair*",
-          "/battery-replacement*",
+          "*",
           "NOT /api/*",
-          "NOT /.well-known/*"
+          "NOT /.well-known/*",
+          "NOT /admin/*"
         ]
       }
     ]
   },
   "webcredentials": {
-    "apps": ["TEAMID.com.mihailovv.vhrfrontend"]
+    "apps": ["GR95RKY24P.com.mihailovv.vhrfrontend"]
   }
 }

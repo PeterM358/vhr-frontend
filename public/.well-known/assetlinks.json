@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "com.mihailovv.vhrfrontend",
       "sha256_cert_fingerprints": [
-        "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c"
+        "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
+        "87d993bbb08398b7a1941b46852f78a82640410f41e0ffe4a4e4e75e3307ca99"
       ]
     }
   }
