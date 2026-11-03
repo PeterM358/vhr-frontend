@@ -1,6 +1,10 @@
 # Universal Links (iOS) + App Links (Android)
 
-Emails and shares must use **https://beta.veversal.com/…** on staging (or production hosts), not `service1001://` — Gmail strips custom schemes.
+Emails and shares must use **https://…** on staging/production — Gmail strips custom schemes.
+
+**Practical path (preferred for QA + pre-store):** reminder emails use **Open in the app** → `/open-app.html?to=…`, which tries `service1001://` / Android intent, then offers [Google Play](https://play.google.com/store/apps/details?id=com.mihailovv.vhrfrontend) + [App Store](https://apps.apple.com/app/id6820957515). Test that page in Chrome on the phone; do not depend on Gmail → App Links.
+
+Universal / App Links remain optional polish for bare https CTAs once store builds verify cleanly.
 
 ## Goal
 

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Veversal</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --blue: #2563eb;
+      --bg: #f8fafc;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: linear-gradient(165deg, #eef2ff 0%, var(--bg) 42%, #fff 100%);
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    main {
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+    }
+    .brand {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 0 0 8px;
+    }
+    p {
+      margin: 0 0 20px;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 15px;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      text-decoration: none;
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 16px;
+      font-weight: 650;
+      margin: 0 0 12px;
+    }
+    .btn-primary {
+      background: var(--ink);
+      color: #fff;
+    }
+    .btn-secondary {
+      background: #fff;
+      color: var(--blue);
+      border: 2px solid var(--blue);
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      font-weight: 550;
+      font-size: 14px;
+    }
+    .hint {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1 class="brand">Veversal</h1>
+    <p id="msg">Отваряне на приложението…</p>
+    <a id="openApp" class="btn btn-primary" href="#">Отвори приложението</a>
+    <a id="play" class="btn btn-secondary" href="https://play.google.com/store/apps/details?id=com.mihailovv.vhrfrontend" target="_blank" rel="noopener">Google Play</a>
+    <a id="appstore" class="btn btn-secondary" href="https://apps.apple.com/app/id6820957515" target="_blank" rel="noopener">App Store</a>
+    <a id="web" class="btn btn-ghost" href="/">Продължи в браузъра</a>
+    <p class="hint" id="hint">Ако app-ът е инсталиран, бутонът по-горе го отваря директно (без Universal Links).</p>
+  </main>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var raw = params.get('to') || '/';
+      var lang = (params.get('lang') || '').toLowerCase();
+      var en = lang === 'en' || (raw.indexOf('/en/') === 0);
+
+      // Accept absolute or relative target; keep only path+query for the native scheme.
+      var path;
+      try {
+        if (/^https?:\/\//i.test(raw)) {
+          var u = new URL(raw);
+          path = u.pathname + u.search;
+        } else {
+          path = raw.charAt(0) === '/' ? raw : '/' + raw;
+        }
+      } catch (e) {
+        path = '/';
+      }
+      path = path.replace(/^\/+/, '');
+
+      var schemeUrl = 'service1001://' + path;
+      var playFallback = 'https://play.google.com/store/apps/details?id=com.mihailovv.vhrfrontend';
+      var intentUrl =
+        'intent://' + path +
+        '#Intent;scheme=service1001;package=com.mihailovv.vhrfrontend;S.browser_fallback_url=' +
+        encodeURIComponent(playFallback) + ';end';
+
+      var webUrl = '/' + path;
+      var isAndroid = /Android/i.test(navigator.userAgent);
+
+      var openBtn = document.getElementById('openApp');
+      openBtn.href = isAndroid ? intentUrl : schemeUrl;
+      document.getElementById('web').href = webUrl;
+
+      if (en) {
+        document.documentElement.lang = 'en';
+        document.getElementById('msg').textContent = 'Opening the app…';
+        openBtn.textContent = 'Open the app';
+        document.getElementById('web').textContent = 'Continue in browser';
+        document.getElementById('hint').textContent =
+          'If Veversal is installed, the button above opens it directly (no Universal Links needed).';
+      }
+
+      // Auto-try once; user can tap again if the OS blocked the first attempt.
+      setTimeout(function () {
+        window.location.href = openBtn.href;
+      }, 120);
+    })();
+  </script>
+</body>
+</html>
