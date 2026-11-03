@@ -287,20 +287,26 @@ export default function CreateRepairScreen({ navigation, route }) {
         if (orgId) setFleetOrganizationId(String(orgId));
         else setFleetOrganizationId(null);
 
+        const returnPath = buildRepairRequestReturnPath({
+          serviceCenter: preselectedShopId,
+          repairType: route.params?.repairType,
+          vehicleType: route.params?.vehicleType,
+          vehicleId: preselectedVehicleId || undefined,
+        });
+
+        const redirectToSignIn = async () => {
+          setLoading(false);
+          await navigateToSignIn(navigation, { returnPath });
+        };
+
         const loadPersonalVehicles = async () => {
           const vehicleRes = await fetch(`${API_BASE_URL}/api/vehicles/`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (vehicleRes.status === 401) {
-            await navigateToSignIn(navigation, {
-              returnPath: buildRepairRequestReturnPath({
-                serviceCenter: preselectedShopId,
-                repairType: route.params?.repairType,
-                vehicleType: route.params?.vehicleType,
-                vehicleId: preselectedVehicleId || undefined,
-              }),
-            });
-            return [];
+            const err = new Error('AUTH_REQUIRED');
+            err.code = 'AUTH_REQUIRED';
+            throw err;
           }
           if (!vehicleRes.ok) throw new Error('Failed to fetch form data');
           return vehicleRes.json();
@@ -321,15 +327,33 @@ export default function CreateRepairScreen({ navigation, route }) {
           }));
         };
 
+        const typePromise = fetch(`${API_BASE_URL}/api/repairs/types/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const requests = [
           orgId ? loadFleetVehicles(orgId) : loadPersonalVehicles(),
-          fetch(`${API_BASE_URL}/api/repairs/types/`, { headers: { Authorization: `Bearer ${token}` } }),
+          typePromise,
         ];
         if (isEditMode && editRepairId) {
           requests.push(getRepairById(token, editRepairId));
         }
-        const [vehicleData, typeRes, editRepair] = await Promise.all(requests);
+        let vehicleData;
+        let typeRes;
+        let editRepair;
+        try {
+          [vehicleData, typeRes, editRepair] = await Promise.all(requests);
+        } catch (err) {
+          if (err?.code === 'AUTH_REQUIRED' || err?.message === 'AUTH_REQUIRED') {
+            await redirectToSignIn();
+            return;
+          }
+          throw err;
+        }
 
+        if (typeRes.status === 401) {
+          await redirectToSignIn();
+          return;
+        }
         if (!typeRes.ok) throw new Error('Failed to fetch form data');
 
         setVehicles(Array.isArray(vehicleData) ? vehicleData : []);
@@ -388,7 +412,10 @@ export default function CreateRepairScreen({ navigation, route }) {
           setVehicleId(vehicleData[0].id.toString());
         }
       } catch (err) {
-        console.error('? Error:', err);
+        if (err?.code === 'AUTH_REQUIRED' || err?.message === 'AUTH_REQUIRED') {
+          return;
+        }
+        console.error('CreateRepair form load failed', err);
         setDialogMessage(t('requestService.loadFormError'));
         setDialogVisible(true);
       } finally {
