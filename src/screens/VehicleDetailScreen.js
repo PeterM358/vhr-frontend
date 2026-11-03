@@ -29,6 +29,7 @@ import OrgAppHeader from '../components/org/OrgAppHeader';
 import { useFabBottomOffset } from '../components/common/StickyFormFooter';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import { useVehicleListBack } from '../navigation/appNavBarBack';
+import { navigateToSignIn } from '../navigation/authNavigation';
 import { useScrollContentBottomPaddingWithFab } from '../utils/mobileWebInsets';
 import AppCard from '../components/ui/AppCard';
 import FloatingCard from '../components/ui/FloatingCard';
@@ -212,6 +213,14 @@ export default function VehicleDetailScreen({ route, navigation }) {
     const token = await AsyncStorage.getItem('@access_token');
     const shopFlag = await AsyncStorage.getItem('@is_shop');
     const treatAsShopView = shopFlag === 'true' && !isOrgFleet;
+    const returnPath = `dashboard/vehicles/${vehicleId}${
+      route.params?.expandReminders ? '?expandReminders=1' : ''
+    }`;
+    if (!token || token === 'null' || token === 'undefined') {
+      if (!silent) setLoading(false);
+      await navigateToSignIn(navigation, { returnPath });
+      return;
+    }
     if (!silent) {
       setLoading(true);
     }
@@ -219,6 +228,10 @@ export default function VehicleDetailScreen({ route, navigation }) {
       const res = await fetch(`${API_BASE_URL}/api/vehicles/${vehicleId}/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (res.status === 401) {
+        await navigateToSignIn(navigation, { returnPath });
+        return;
+      }
       if (!res.ok) {
         throw new Error('Failed to load vehicle');
       }

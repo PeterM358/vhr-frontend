@@ -174,10 +174,33 @@ export function useServiceCenterDiscovery({
   }, [loadFilterTaxonomy]);
 
   useEffect(() => {
-    if (!selectedRepairType) return;
-    const stillValid = repairTypeChipOptions.some((rt) => rt.slug === selectedRepairType);
-    if (!stillValid) setSelectedRepairType('');
-  }, [repairTypeChipOptions, selectedRepairType]);
+    // Deep links (e.g. /oil-change/sofia from reminder emails) set repair type before
+    // taxonomy loads. Do not clear while chips are still empty — that dropped the filter
+    // and showed unrelated pins (road assistance, etc.).
+    if (!selectedRepairType || !taxonomyLoaded) return;
+    const existsInCatalog = repairTypes.some((rt) => {
+      const normalized = normalizeRepairTypeForFilter(rt, { t, locale });
+      return normalized?.slug === selectedRepairType;
+    });
+    if (!existsInCatalog) {
+      setSelectedRepairType('');
+      return;
+    }
+    if (
+      selectedCategory
+      && !repairTypeChipOptions.some((rt) => rt.slug === selectedRepairType)
+    ) {
+      setSelectedCategory(null);
+    }
+  }, [
+    repairTypeChipOptions,
+    repairTypes,
+    selectedCategory,
+    selectedRepairType,
+    taxonomyLoaded,
+    t,
+    locale,
+  ]);
 
   const shouldUseCityFilter = useCallback((term, city, slug) => {
     if (!slug || !city || !term) return false;
