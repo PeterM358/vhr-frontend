@@ -10,6 +10,8 @@ import {
   Image,
   Platform,
   ScrollView,
+  Keyboard,
+  InputAccessoryView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -65,7 +67,7 @@ import ScreenBackground from '../components/ScreenBackground';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import { useReturnToBack, useGoBackOr, useRouteBackLabel, useHardwareBackHandler } from '../navigation/appNavBarBack';
 import RepairMediaThumbnail from '../components/repair/RepairMediaThumbnail';
-import { navigateToPartnerRepairOffer } from '../navigation/webNavigation';
+import { navigateToPartnerRepairOffer, navigateToPartnerWarehouse } from '../navigation/webNavigation';
 import { markRepairNotificationsRead } from '../api/notifications';
 import { WebSocketContext } from '../context/WebSocketManager';
 import {
@@ -120,7 +122,7 @@ import { uploadRepairDocument } from '../api/documents';
 import { confirmMessage, showMessage } from '../utils/crossPlatformAlert';
 import { messageFromApiError } from '../utils/apiErrorMessage';
 import { safeError } from '../utils/logger';
-import { getPartsExport, getServiceMenu } from '../api/serviceMenu';
+import { createServiceMenuItem, getPartsExport, getServiceMenu, updateServiceMenuItem } from '../api/serviceMenu';
 import OperationTypePickerSheet from '../components/repair/OperationTypePickerSheet';
 import { buildOperationTypePickerOptions } from '../utils/operationTypePickerOptions';
 import { presentPartsExportShareSheet } from '../utils/partsExportShare';
@@ -322,8 +324,14 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [operationActionId, setOperationActionId] = useState(null);
   const [opLaborDrafts, setOpLaborDrafts] = useState({});
   const [opLaborSavingId, setOpLaborSavingId] = useState(null);
+  const [opLaborFocusedId, setOpLaborFocusedId] = useState(null);
+  const OP_LABOR_ACCESSORY_ID = 'veversalOpLaborDone';
   /** Default on: writing labor also updates ShopServiceMenuItem price list. */
   const [opLaborSyncPriceList, setOpLaborSyncPriceList] = useState(true);
+  /** Inline from–to drafts when a type has no price-list labor yet. */
+  const [opMenuPriceDrafts, setOpMenuPriceDrafts] = useState({});
+  const [opMenuPriceSavingId, setOpMenuPriceSavingId] = useState(null);
+  const autoDefaultOpAttemptedRef = useRef(false);
   const [shopEmployees, setShopEmployees] = useState([]);
   const [shopUsesWorkforce, setShopUsesWorkforce] = useState(false);
   const [assignPickerOpId, setAssignPickerOpId] = useState(null);
@@ -1061,6 +1069,16 @@ export default function RepairDetailScreen({ route, navigation }) {
     setOperationTypePickerVisible(true);
   };
 
+  const handleQuickAddDefaultOperation = async () => {
+    if (!isMyShopRepair) return;
+    const defaultTypeId = resolveEffectiveServiceTypeId(finalRepairTypeId, repair);
+    if (!defaultTypeId) {
+      handleAddOperation();
+      return;
+    }
+    await handleConfirmOperationType(defaultTypeId);
+  };
+
   const handleEditOperationType = (operation) => {
     if (!isMyShopRepair || !operation?.id) return;
     const currentTypeId =
@@ -1126,10 +1144,13 @@ export default function RepairDetailScreen({ route, navigation }) {
         setOperationActionId('create');
         const nextSequence =
           (operations.reduce((max, row) => Math.max(max, Number(row.sequence) || 0), 0) || 0) + 10;
-        await createRepairOperation(token, repairId, {
+        const created = await createRepairOperation(token, repairId, {
           repair_type_id: parsedTypeId,
           sequence: nextSequence,
         });
+        if (created?.id != null) {
+          setOperationsExpanded((prev) => ({ ...prev, [created.id]: true }));
+        }
       }
       setOperationTypePickerVisible(false);
       setOperationTypePickerTargetId(null);
@@ -1176,7 +1197,8 @@ export default function RepairDetailScreen({ route, navigation }) {
       let changed = false;
       for (const op of operations) {
         const key = String(op.id);
-        if (opLaborSavingId === op.id) continue;
+        // Never overwrite while the tech is typing / keyboard is open.
+        if (opLaborSavingId === op.id || opLaborFocusedId === op.id) continue;
         const fromServer = moneyMinorToDraft(op.sales_snapshot_minor ?? op.fixed_price_minor);
         if (next[key] !== fromServer) {
           next[key] = fromServer;
@@ -1185,7 +1207,7 @@ export default function RepairDetailScreen({ route, navigation }) {
       }
       return changed ? next : prev;
     });
-  }, [operations, opLaborSavingId]);
+  }, [operations, opLaborSavingId, opLaborFocusedId]);
 
   const handleSaveOperationLabor = async (operation) => {
     if (!isMyShopRepair || !operation?.id) return;
@@ -1211,6 +1233,7 @@ export default function RepairDetailScreen({ route, navigation }) {
         fixed_price_minor: minor,
         sync_menu_labor: opLaborSyncPriceList,
       });
+      // Soft refresh — avoid fighting the keyboard remount mid-dismiss.
       await refreshRepair();
       await refreshParts();
     } catch (err) {
@@ -1220,6 +1243,80 @@ export default function RepairDetailScreen({ route, navigation }) {
       );
     } finally {
       setOpLaborSavingId(null);
+    }
+  };
+
+  const dismissOpLaborKeyboardAndSave = (operation) => {
+    Keyboard.dismiss();
+    setOpLaborFocusedId(null);
+    setTimeout(() => {
+      handleSaveOperationLabor(operation);
+    }, 80);
+  };
+
+  const handleSaveMenuLaborRange = async (operation) => {
+    if (!isMyShopRepair || !operation?.id || shopProfileId == null) return;
+    const typeId = Number(operation.repair_type_id ?? operation.operation_type_id);
+    if (!Number.isFinite(typeId)) return;
+    const draft = opMenuPriceDrafts[operation.id] || {};
+    const fromRaw = String(draft.laborFrom ?? '').trim().replace(',', '.');
+    const toRaw = String(draft.laborTo ?? '').trim().replace(',', '.');
+    const fromAmount = fromRaw === '' ? null : parseFloat(fromRaw);
+    const toAmount = toRaw === '' ? null : parseFloat(toRaw);
+    if (fromAmount == null || !Number.isFinite(fromAmount) || fromAmount < 0) {
+      showMessage(
+        t('repairs.detail.operationsPicker.laborInvalid', null, 'Invalid labor price'),
+        t('repairs.detail.operationsPicker.menuRangeInvalidHint', null, 'Enter a from price (and optional to).')
+      );
+      return;
+    }
+    if (toAmount != null && (!Number.isFinite(toAmount) || toAmount < fromAmount)) {
+      showMessage(
+        t('repairs.detail.operationsPicker.laborInvalid', null, 'Invalid labor price'),
+        t('repairs.detail.operationsPicker.menuRangeOrderHint', null, '“To” must be greater than or equal to “From”.')
+      );
+      return;
+    }
+    try {
+      setOpMenuPriceSavingId(operation.id);
+      const token = await AsyncStorage.getItem('@access_token');
+      const existing = menuItemForOperation(operation);
+      const payload = {
+        repair_type_id: typeId,
+        labor_from: fromAmount,
+        labor_to: toAmount != null ? toAmount : fromAmount,
+        is_published: existing?.is_published !== false,
+      };
+      if (existing?.id) {
+        await updateServiceMenuItem(token, shopProfileId, existing.id, payload);
+      } else {
+        await createServiceMenuItem(token, shopProfileId, payload);
+      }
+      // Also set this job’s labor to the from price when empty.
+      const currentDraft = String(opLaborDrafts[operation.id] ?? '').trim();
+      if (!currentDraft) {
+        setOpLaborDrafts((prev) => ({ ...prev, [operation.id]: String(fromAmount) }));
+        await updateRepairOperation(token, repairId, operation.id, {
+          pricing_mode: 'fixed',
+          fixed_price_minor: Math.round(fromAmount * 100),
+          sync_menu_labor: false,
+        });
+      }
+      const menu = await getServiceMenu(token, shopProfileId).catch(() => []);
+      setShopServiceMenu(Array.isArray(menu) ? menu : []);
+      await refreshRepair();
+      setOpMenuPriceDrafts((prev) => {
+        const next = { ...prev };
+        delete next[operation.id];
+        return next;
+      });
+    } catch (err) {
+      showMessage(
+        t('repairs.detail.operationsPicker.couldNotSaveMenuPrices', null, 'Could not save price list'),
+        messageFromApiError(err, t('repairs.detail.pleaseTryAgain', null, 'Please try again.'))
+      );
+    } finally {
+      setOpMenuPriceSavingId(null);
     }
   };
 
@@ -1282,17 +1379,58 @@ export default function RepairDetailScreen({ route, navigation }) {
     }
   };
 
+  const resolveOperationLaborAmount = (operation) => {
+    if (!operation) return 0;
+    const draftRaw = opLaborDrafts[operation.id];
+    if (draftRaw != null && String(draftRaw).trim() !== '') {
+      const n = parseFloat(String(draftRaw).replace(',', '.'));
+      if (Number.isFinite(n) && n >= 0) return n;
+    }
+    const snapshotMinor = operation.sales_snapshot_minor ?? operation.fixed_price_minor;
+    if (snapshotMinor != null && Number.isFinite(Number(snapshotMinor))) {
+      return Number(snapshotMinor) / 100;
+    }
+    return 0;
+  };
+
+  const menuItemForOperation = (operation) => {
+    const typeId = Number(operation?.repair_type_id ?? operation?.operation_type_id);
+    if (!Number.isFinite(typeId)) return null;
+    return (shopServiceMenu || []).find(
+      (item) => Number(item?.repair_type_id ?? item?.repair_type) === typeId
+    ) || null;
+  };
+
+  const menuLaborRangeLabel = (menuItem) => {
+    if (!menuItem) return null;
+    const from = parseFloat(menuItem.labor_from);
+    const to = parseFloat(menuItem.labor_to);
+    const hasFrom = Number.isFinite(from);
+    const hasTo = Number.isFinite(to);
+    if (hasFrom && hasTo && Math.abs(from - to) >= 0.005) {
+      return t(
+        'repairs.detail.operationsPicker.laborPriceListRange',
+        { from: formatMoneyAmount(from, DEFAULT_CURRENCY), to: formatMoneyAmount(to, DEFAULT_CURRENCY) },
+        `Price list ${formatMoneyAmount(from, DEFAULT_CURRENCY)}–${formatMoneyAmount(to, DEFAULT_CURRENCY)}`
+      );
+    }
+    if (hasFrom) {
+      return t(
+        'repairs.detail.operationsPicker.laborPriceListFrom',
+        { amount: formatMoneyAmount(from, DEFAULT_CURRENCY) },
+        `Price list from ${formatMoneyAmount(from, DEFAULT_CURRENCY)}`
+      );
+    }
+    return null;
+  };
+
   const computeOperationSubtotals = (operationId) => {
     const opParts = repairParts.filter(
       (part) => Number(part.service_order_operation_id) === Number(operationId)
     );
     const partsTotals = computePartsTotals(opParts);
     const op = operations.find((row) => Number(row.id) === Number(operationId));
-    const snapshotMinor = op?.sales_snapshot_minor ?? op?.fixed_price_minor;
-    const opLabor =
-      snapshotMinor != null && Number.isFinite(Number(snapshotMinor))
-        ? Number(snapshotMinor) / 100
-        : 0;
+    const opLabor = resolveOperationLaborAmount(op);
     const laborSum = Math.round((partsTotals.laborSum + opLabor) * 100) / 100;
     return {
       partsSum: partsTotals.partsSum,
@@ -1301,9 +1439,36 @@ export default function RepairDetailScreen({ route, navigation }) {
     };
   };
 
+  const liveOpsFooterTotals = useMemo(() => {
+    const currency = repair?.currency || DEFAULT_CURRENCY;
+    const openOps = (operations || []).filter((op) => !isClosedOperationStatus(op.status));
+    let partsSum = 0;
+    let laborSum = 0;
+    openOps.forEach((op) => {
+      const opParts = repairParts.filter(
+        (part) => Number(part.service_order_operation_id) === Number(op.id)
+      );
+      partsSum += computePartsTotals(opParts).partsSum;
+      laborSum += resolveOperationLaborAmount(op);
+    });
+    const orphanParts = repairParts.filter(
+      (part) => part.service_order_operation_id == null || part.service_order_operation_id === ''
+    );
+    partsSum += computePartsTotals(orphanParts).partsSum;
+    partsSum = Math.round(partsSum * 100) / 100;
+    laborSum = Math.round(laborSum * 100) / 100;
+    return {
+      partsSum,
+      laborSum,
+      total: Math.round((partsSum + laborSum) * 100) / 100,
+      currency,
+    };
+  }, [operations, repairParts, opLaborDrafts, repair?.currency]);
+
   const renderRepairTotalsFooter = () => {
     if (!repair || (!isMyShopRepair && !isShop)) return null;
-    if (footerTotals.total <= 0 && footerTotals.partsSum <= 0 && footerTotals.laborSum <= 0) {
+    const totals = liveOpsFooterTotals;
+    if (totals.total <= 0 && totals.partsSum <= 0 && totals.laborSum <= 0) {
       return null;
     }
     return (
@@ -1312,24 +1477,24 @@ export default function RepairDetailScreen({ route, navigation }) {
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>{t('repairs.detail.partsTotal', null, 'Parts total')}</Text>
           <Text style={styles.summaryValue}>
-            {formatMoneyAmount(footerTotals.partsSum, footerTotals.currency)}
+            {formatMoneyAmount(totals.partsSum, totals.currency)}
           </Text>
         </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>{t('repairs.detail.laborTotal', null, 'Labor total')}</Text>
           <Text style={styles.summaryValue}>
-            {formatMoneyAmount(footerTotals.laborSum, footerTotals.currency)}
+            {formatMoneyAmount(totals.laborSum, totals.currency)}
           </Text>
         </View>
         <View style={[styles.summaryRow, { borderBottomWidth: 0 }]}>
           <Text style={[styles.summaryLabel, { fontWeight: '700', color: COLORS.TEXT_DARK }]}>{t('repairs.detail.grandTotal', null, 'Grand total')}</Text>
           <Text style={[styles.summaryValue, styles.summaryValueEmphasis]}>
-            {formatMoneyAmount(footerTotals.total, footerTotals.currency)}
+            {formatMoneyAmount(totals.total, totals.currency)}
           </Text>
         </View>
         {repair.total_margin != null && repair.total_parts_cost != null ? (
           <Text style={[styles.mutedText, { marginTop: 8 }]}>
-            {t('repairs.detail.internalMargin', { amount: formatMoneyAmount(parseFloat(repair.total_margin), footerTotals.currency) }, `Internal margin: ${formatMoneyAmount(parseFloat(repair.total_margin), footerTotals.currency)}`)}
+            {t('repairs.detail.internalMargin', { amount: formatMoneyAmount(parseFloat(repair.total_margin), totals.currency) }, `Internal margin: ${formatMoneyAmount(parseFloat(repair.total_margin), totals.currency)}`)}
           </Text>
         ) : null}
       </FloatingCard>
@@ -1413,11 +1578,8 @@ export default function RepairDetailScreen({ route, navigation }) {
     ).length;
     const readOnly = isDoneStatus;
     const sectionExpanded = !readOnly || doneOperationsSectionExpanded;
-    const laborForHint =
-      footerTotals?.laborSum != null
-        ? footerTotals.laborSum
-        : visibleOperations.reduce((acc, op) => acc + computeOperationSubtotals(op.id).laborSum, 0);
-    const currencyForHint = footerTotals?.currency || DEFAULT_CURRENCY;
+    const laborForHint = liveOpsFooterTotals?.laborSum ?? 0;
+    const currencyForHint = liveOpsFooterTotals?.currency || DEFAULT_CURRENCY;
     const operationsCollapsedHint = t(
       'repairs.detail.operationsCollapsedHint',
       {
@@ -1463,7 +1625,40 @@ export default function RepairDetailScreen({ route, navigation }) {
           </Text>
         ) : null}
         {visibleOperations.length === 0 ? (
-          <Text style={styles.mutedText}>{t('repairs.detail.noOperationsYet', null, 'No operations yet — add one to organize parts and labor.')}</Text>
+          <View style={{ marginTop: 8, gap: 10 }}>
+            <Text style={styles.mutedText}>
+              {t(
+                'repairs.detail.noOperationsYet',
+                null,
+                'No operations yet — add one to organize parts and labor.'
+              )}
+            </Text>
+            {(() => {
+              const defaultTypeId = resolveEffectiveServiceTypeId(finalRepairTypeId, repair);
+              const defaultOption = operationTypePickerOptions.find(
+                (row) => String(row.id) === String(defaultTypeId)
+              );
+              const defaultLabel = defaultOption
+                ? translateRepairTypeLabel(defaultOption, t, { locale }) || defaultOption.name
+                : null;
+              if (!defaultLabel) return null;
+              return (
+                <Button
+                  mode="contained"
+                  icon="auto-fix"
+                  loading={operationActionId === 'create'}
+                  disabled={operationActionId != null || !canPickOperationTypes}
+                  onPress={handleQuickAddDefaultOperation}
+                >
+                  {t(
+                    'repairs.detail.operationsPicker.quickAddDefault',
+                    { name: defaultLabel },
+                    `Add ${defaultLabel}`
+                  )}
+                </Button>
+              );
+            })()}
+          </View>
         ) : (
           visibleOperations.map((op) => {
             // Done: compact one-line rows; expand only when tapped (never force-open all).
@@ -1584,16 +1779,37 @@ export default function RepairDetailScreen({ route, navigation }) {
                       </Text>
                     ) : (
                     <>
+                    <Text style={[styles.mutedText, { marginTop: 4, fontWeight: '600', color: COLORS.TEXT_DARK }]}>
+                      {t(
+                        'repairs.detail.operationsPicker.laborForThisJob',
+                        null,
+                        'Labor for this job'
+                      )}
+                    </Text>
                     <TextInput
                       mode="outlined"
                       dense
-                      label={t('repairs.detail.operationsPicker.laborPrice', null, 'Labor price')}
+                      label={t(
+                        'repairs.detail.operationsPicker.laborForThisJobShort',
+                        null,
+                        'This job'
+                      )}
                       keyboardType="decimal-pad"
+                      returnKeyType="done"
+                      blurOnSubmit
                       value={opLaborDrafts[op.id] ?? ''}
                       onChangeText={(text) =>
                         setOpLaborDrafts((prev) => ({ ...prev, [op.id]: text }))
                       }
-                      onBlur={() => handleSaveOperationLabor(op)}
+                      onFocus={() => setOpLaborFocusedId(op.id)}
+                      onBlur={() => {
+                        if (opLaborFocusedId === op.id) setOpLaborFocusedId(null);
+                        handleSaveOperationLabor(op);
+                      }}
+                      onSubmitEditing={() => dismissOpLaborKeyboardAndSave(op)}
+                      inputAccessoryViewID={
+                        Platform.OS === 'ios' ? OP_LABOR_ACCESSORY_ID : undefined
+                      }
                       disabled={opLaborSavingId != null || operationActionId != null}
                       right={
                         opLaborSavingId === op.id ? (
@@ -1604,6 +1820,126 @@ export default function RepairDetailScreen({ route, navigation }) {
                       }
                       style={{ marginTop: 4 }}
                     />
+                    {(() => {
+                      const menuItem = menuItemForOperation(op);
+                      const rangeLabel = menuLaborRangeLabel(menuItem);
+                      const hasMenuLabor =
+                        menuItem &&
+                        (parseFloat(menuItem.labor_from) >= 0 ||
+                          parseFloat(menuItem.labor_to) >= 0) &&
+                        (Number.isFinite(parseFloat(menuItem.labor_from)) ||
+                          Number.isFinite(parseFloat(menuItem.labor_to)));
+                      if (rangeLabel) {
+                        return (
+                          <Text style={styles.mutedText}>
+                            {rangeLabel}
+                            {' · '}
+                            {t(
+                              'repairs.detail.operationsPicker.laborEditThisJobHint',
+                              null,
+                              'edit above for this repair'
+                            )}
+                          </Text>
+                        );
+                      }
+                      if (!hasMenuLabor) {
+                        const draft = opMenuPriceDrafts[op.id] || {
+                          laborFrom: opLaborDrafts[op.id] || '',
+                          laborTo: '',
+                        };
+                        return (
+                          <View style={{ marginTop: 6, gap: 6 }}>
+                            <Text style={styles.mutedText}>
+                              {t(
+                                'repairs.detail.operationsPicker.noPriceListYet',
+                                null,
+                                'No price-list labor for this service yet. Set a from–to range for the menu, and the amount above for this job.'
+                              )}
+                            </Text>
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                              <TextInput
+                                mode="outlined"
+                                dense
+                                style={{ flex: 1 }}
+                                label={t(
+                                  'repairs.detail.operationsPicker.laborFrom',
+                                  null,
+                                  'From'
+                                )}
+                                keyboardType="decimal-pad"
+                                returnKeyType="done"
+                                blurOnSubmit
+                                value={draft.laborFrom}
+                                onChangeText={(text) =>
+                                  setOpMenuPriceDrafts((prev) => ({
+                                    ...prev,
+                                    [op.id]: { ...draft, laborFrom: text },
+                                  }))
+                                }
+                                onFocus={() => setOpLaborFocusedId(`menu-${op.id}`)}
+                                onBlur={() => {
+                                  if (opLaborFocusedId === `menu-${op.id}`) setOpLaborFocusedId(null);
+                                }}
+                                inputAccessoryViewID={
+                                  Platform.OS === 'ios' ? OP_LABOR_ACCESSORY_ID : undefined
+                                }
+                                disabled={opMenuPriceSavingId != null}
+                              />
+                              <TextInput
+                                mode="outlined"
+                                dense
+                                style={{ flex: 1 }}
+                                label={t(
+                                  'repairs.detail.operationsPicker.laborTo',
+                                  null,
+                                  'To'
+                                )}
+                                keyboardType="decimal-pad"
+                                returnKeyType="done"
+                                blurOnSubmit
+                                value={draft.laborTo}
+                                onChangeText={(text) =>
+                                  setOpMenuPriceDrafts((prev) => ({
+                                    ...prev,
+                                    [op.id]: { ...draft, laborTo: text },
+                                  }))
+                                }
+                                onFocus={() => setOpLaborFocusedId(`menu-${op.id}`)}
+                                onBlur={() => {
+                                  if (opLaborFocusedId === `menu-${op.id}`) setOpLaborFocusedId(null);
+                                }}
+                                inputAccessoryViewID={
+                                  Platform.OS === 'ios' ? OP_LABOR_ACCESSORY_ID : undefined
+                                }
+                                disabled={opMenuPriceSavingId != null}
+                              />
+                            </View>
+                            <Button
+                              compact
+                              mode="outlined"
+                              loading={opMenuPriceSavingId === op.id}
+                              disabled={opMenuPriceSavingId != null || operationActionId != null}
+                              onPress={() => handleSaveMenuLaborRange(op)}
+                            >
+                              {t(
+                                'repairs.detail.operationsPicker.saveMenuPrices',
+                                null,
+                                'Save to price list'
+                              )}
+                            </Button>
+                          </View>
+                        );
+                      }
+                      return (
+                        <Text style={styles.mutedText}>
+                          {t(
+                            'repairs.detail.operationsPicker.laborPriceHint',
+                            null,
+                            'Prefills from your price list. Edit here for this job.'
+                          )}
+                        </Text>
+                      );
+                    })()}
                     <View
                       style={{
                         flexDirection: 'row',
@@ -1626,13 +1962,6 @@ export default function RepairDetailScreen({ route, navigation }) {
                         disabled={opLaborSavingId != null || operationActionId != null}
                       />
                     </View>
-                    <Text style={styles.mutedText}>
-                      {t(
-                        'repairs.detail.operationsPicker.laborPriceHint',
-                        null,
-                        'Prefills from your price list. Saving also updates the price list unless you turn that off.'
-                      )}
-                    </Text>
                     {shopUsesWorkforce ? (
                       <View style={{ gap: 6, marginTop: 4 }}>
                         {operationAssignmentsFor(op.id).length ? (
@@ -1790,11 +2119,17 @@ export default function RepairDetailScreen({ route, navigation }) {
           mode="outlined"
           icon="plus"
           style={{ marginTop: 12 }}
-          loading={operationActionId === 'create'}
+          loading={operationActionId === 'create' && visibleOperations.length > 0}
           disabled={operationActionId != null || !canPickOperationTypes}
           onPress={handleAddOperation}
         >
-          {t('repairs.detail.operationsPicker.addOperation')}
+          {visibleOperations.length === 0
+            ? t(
+                'repairs.detail.operationsPicker.chooseOtherOperation',
+                null,
+                'Choose another service'
+              )
+            : t('repairs.detail.operationsPicker.addOperation')}
         </Button>
         ) : null}
         </>
@@ -1825,6 +2160,60 @@ export default function RepairDetailScreen({ route, navigation }) {
   );
 
   const canPickOperationTypes = operationTypePickerOptions.length > 0;
+
+  // Suggest the repair's service type as the first operation once the car is at the shop.
+  useEffect(() => {
+    if (autoDefaultOpAttemptedRef.current) return;
+    if (loading || !repair || !isMyShopRepair || !canPickOperationTypes) return;
+    if (String(repair.status || '').toLowerCase() !== 'ongoing') return;
+    const openOps = (operations || []).filter((op) => !isClosedOperationStatus(op.status));
+    if (openOps.length > 0) {
+      autoDefaultOpAttemptedRef.current = true;
+      return;
+    }
+    const defaultTypeId = resolveEffectiveServiceTypeId(finalRepairTypeId, repair);
+    if (!defaultTypeId) return;
+    autoDefaultOpAttemptedRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        setOperationActionId('create');
+        const token = await AsyncStorage.getItem('@access_token');
+        const created = await createRepairOperation(token, repairId, {
+          repair_type_id: parseInt(defaultTypeId, 10),
+          sequence: 10,
+        });
+        if (cancelled) return;
+        if (created?.id != null) {
+          setOperationsExpanded((prev) => ({ ...prev, [created.id]: true }));
+        }
+        await refreshRepair();
+      } catch {
+        if (!cancelled) autoDefaultOpAttemptedRef.current = false;
+      } finally {
+        if (!cancelled) setOperationActionId(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    loading,
+    repair,
+    isMyShopRepair,
+    canPickOperationTypes,
+    operations,
+    finalRepairTypeId,
+    repairId,
+  ]);
+
+  // Keep a single open operation expanded so labor is editable without an extra tap.
+  useEffect(() => {
+    const openOps = (operations || []).filter((op) => !isClosedOperationStatus(op.status));
+    if (openOps.length !== 1) return;
+    const onlyId = openOps[0].id;
+    setOperationsExpanded((prev) => (prev[onlyId] ? prev : { ...prev, [onlyId]: true }));
+  }, [operations]);
 
   const handleSavePaymentStatus = async (nextStatus) => {
     const statusToSave = nextStatus ?? paymentStatus;
@@ -3840,10 +4229,29 @@ export default function RepairDetailScreen({ route, navigation }) {
           </View>
         ) : null}
         {shopCanManagePartsOnRepair ? (
-          <View style={{ alignItems: 'flex-start', marginBottom: 8 }}>
+          <View style={{ alignItems: 'flex-start', marginBottom: 8, gap: 8 }}>
             <Button mode="outlined" onPress={navigateToManageParts}>
               {t('repairs.detail.manageParts', null, 'Manage parts')}
             </Button>
+            <Button
+              mode="text"
+              icon="warehouse"
+              compact
+              onPress={() => navigateToPartnerWarehouse(navigation)}
+            >
+              {t(
+                'repairs.detail.openWarehouseScanInvoice',
+                null,
+                'Warehouse — scan supplier invoice'
+              )}
+            </Button>
+            <Text style={styles.mutedText}>
+              {t(
+                'repairs.detail.warehousePartsHint',
+                null,
+                'Scan or import a supplier invoice into stock, then issue parts to this repair from Manage parts.'
+              )}
+            </Text>
           </View>
         ) : null}
         <Text style={styles.partsSectionLabel}>{t('repairs.detail.sectionPartsUsed')}</Text>
@@ -5333,11 +5741,34 @@ export default function RepairDetailScreen({ route, navigation }) {
         </View>
       </View>
     </Modal>
+    {Platform.OS === 'ios' ? (
+      <InputAccessoryView nativeID={OP_LABOR_ACCESSORY_ID}>
+        <View style={styles.opLaborAccessoryBar}>
+          <Button
+            compact
+            mode="text"
+            onPress={() => {
+              const focused = opLaborFocusedId;
+              Keyboard.dismiss();
+              setOpLaborFocusedId(null);
+              if (focused == null || String(focused).startsWith('menu-')) return;
+              const op = operations.find((row) => Number(row.id) === Number(focused));
+              if (op) {
+                setTimeout(() => handleSaveOperationLabor(op), 80);
+              }
+            }}
+          >
+            {t('common.done', null, 'Done')}
+          </Button>
+        </View>
+      </InputAccessoryView>
+    ) : null}
     <OperationTypePickerSheet
       visible={operationTypePickerVisible}
       onClose={closeOperationTypePicker}
       options={operationTypePickerOptions}
       selectedTypeId={operationTypePickerSelectedId}
+      suggestedTypeId={resolveEffectiveServiceTypeId(finalRepairTypeId, repair)}
       onConfirm={handleConfirmOperationType}
       loading={operationActionId != null}
       title={
@@ -5798,6 +6229,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: 'rgba(15,76,129,0.22)',
+  },
+  opLaborAccessoryBar: {
+    backgroundColor: '#e8eef5',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#cbd5e1',
+    alignItems: 'flex-end',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   lightActionCard: {
     backgroundColor: '#ffffff',

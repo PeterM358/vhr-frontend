@@ -59,8 +59,8 @@ function buildMenuRow(item, fromCatalog) {
     business_category_keys: fromCatalog?.business_category_keys,
     fromMenu: true,
     fromAvailable: false,
-    labor_from: item?.labor_from ?? null,
-    labor_to: item?.labor_to ?? null,
+    labor_from: item?.labor_from ?? item?.price_from ?? null,
+    labor_to: item?.labor_to ?? item?.price_to ?? null,
   };
 }
 

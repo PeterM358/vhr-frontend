@@ -16,11 +16,37 @@ import { getOperationIcon } from '../../icons/operationIconRegistry';
 import { groupRepairTypesByCategory, searchRepairTypes } from '../../utils/repairTypeSearch';
 import { translateRepairTypeLabel, translateServiceCategoryLabel } from '../../utils/translateShopTypeLabels';
 
+function laborHintForType(type, t) {
+  const from = type?.labor_from != null && String(type.labor_from).trim() !== ''
+    ? String(type.labor_from)
+    : null;
+  const to = type?.labor_to != null && String(type.labor_to).trim() !== ''
+    ? String(type.labor_to)
+    : null;
+  if (from && to && from !== to) {
+    return t('repairs.detail.operationsPicker.laborRangePriceList', {
+      from,
+      to,
+    });
+  }
+  if (from) {
+    return t('repairs.detail.operationsPicker.laborFromPriceList', {
+      amount: from,
+    });
+  }
+  return t(
+    'repairs.detail.operationsPicker.noLaborOnPriceList',
+    null,
+    'No labor on price list — add from–to after selecting'
+  );
+}
+
 export default function OperationTypePickerSheet({
   visible,
   onClose,
   options = [],
   selectedTypeId = '',
+  suggestedTypeId = '',
   onConfirm,
   loading = false,
   title,
@@ -43,11 +69,42 @@ export default function OperationTypePickerSheet({
 
   const filteredOptions = useMemo(() => {
     const rows = Array.isArray(options) ? options : [];
-    if (!String(query || '').trim()) return rows;
-    return searchRepairTypes(rows, query, { limit: 200 });
-  }, [options, query]);
+    const searched = String(query || '').trim()
+      ? searchRepairTypes(rows, query, { limit: 200 })
+      : rows;
+    const suggestedId = String(suggestedTypeId || '');
+    if (!suggestedId || String(query || '').trim()) return searched;
+    // Pin the repair's default service type to the top when browsing.
+    const suggested = searched.filter((row) => String(row.id) === suggestedId);
+    const rest = searched.filter((row) => String(row.id) !== suggestedId);
+    return [...suggested, ...rest];
+  }, [options, query, suggestedTypeId]);
 
-  const grouped = useMemo(() => groupRepairTypesByCategory(filteredOptions), [filteredOptions]);
+  const grouped = useMemo(() => {
+    if (!String(query || '').trim() && suggestedTypeId) {
+      const suggested = filteredOptions.filter(
+        (row) => String(row.id) === String(suggestedTypeId)
+      );
+      const rest = filteredOptions.filter(
+        (row) => String(row.id) !== String(suggestedTypeId)
+      );
+      const restGrouped = groupRepairTypesByCategory(rest);
+      if (!suggested.length) return restGrouped;
+      return [
+        {
+          slug: '__suggested__',
+          name: t(
+            'repairs.detail.operationsPicker.suggestedGroup',
+            null,
+            'Suggested for this repair'
+          ),
+          types: suggested,
+        },
+        ...restGrouped,
+      ];
+    }
+    return groupRepairTypesByCategory(filteredOptions);
+  }, [filteredOptions, query, suggestedTypeId, t]);
 
   const handleConfirm = () => {
     if (!pendingTypeId || loading) return;
@@ -99,10 +156,7 @@ export default function OperationTypePickerSheet({
                   {group.types.map((type) => {
                     const selected = String(type.id) === String(pendingTypeId);
                     const label = translateRepairTypeLabel(type, t, { locale });
-                    const laborFrom =
-                      type.labor_from != null && String(type.labor_from).trim() !== ''
-                        ? String(type.labor_from)
-                        : null;
+                    const laborHint = laborHintForType(type, t);
                     return (
                       <Pressable
                         key={type.id}
@@ -120,12 +174,8 @@ export default function OperationTypePickerSheet({
                           <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
                             {label}
                           </Text>
-                          {laborFrom ? (
-                            <Text style={styles.optionHint}>
-                              {t('repairs.detail.operationsPicker.laborFromPriceList', {
-                                amount: laborFrom,
-                              })}
-                            </Text>
+                          {laborHint ? (
+                            <Text style={styles.optionHint}>{laborHint}</Text>
                           ) : null}
                         </View>
                         {selected ? (
