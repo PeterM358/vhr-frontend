@@ -32,6 +32,54 @@ export function isUpcomingAppointment(repair) {
   return true;
 }
 
+/**
+ * Relative countdown until scheduled_start for health / active-repair copy.
+ * Returns null when there is no usable future (or today) slot.
+ */
+export function formatAppointmentCountdown(scheduledStart, translateFn) {
+  if (!scheduledStart || typeof translateFn !== 'function') return null;
+  const start = new Date(scheduledStart);
+  if (Number.isNaN(start.getTime())) return null;
+
+  const now = new Date();
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayDiff = Math.round((startDay.getTime() - today.getTime()) / 86400000);
+
+  if (dayDiff < 0) {
+    return translateFn('health.countdown.pastDue', null, 'Appointment date passed — confirm arrival');
+  }
+  if (dayDiff === 0) {
+    return translateFn('health.countdown.today', null, 'Today');
+  }
+  if (dayDiff === 1) {
+    return translateFn('health.countdown.tomorrow', null, 'Tomorrow');
+  }
+  if (dayDiff < 7) {
+    return translateFn('health.countdown.inDays', { count: dayDiff }, `In ${dayDiff} days`);
+  }
+  const weeks = Math.floor(dayDiff / 7);
+  const remDays = dayDiff % 7;
+  if (weeks === 1 && remDays === 0) {
+    return translateFn('health.countdown.inOneWeek', null, 'In 1 week');
+  }
+  if (weeks >= 1 && remDays === 0) {
+    return translateFn('health.countdown.inWeeks', { count: weeks }, `In ${weeks} weeks`);
+  }
+  if (weeks === 1) {
+    return translateFn(
+      'health.countdown.inOneWeekAndDays',
+      { count: remDays },
+      `In 1 week, ${remDays} days`
+    );
+  }
+  return translateFn(
+    'health.countdown.inWeeksAndDays',
+    { weeks, days: remDays },
+    `In ${weeks} weeks, ${remDays} days`
+  );
+}
+
 export function clientReportedArrival(repair) {
   return Boolean(repair?.client_arrival_reported_at) && !repair?.vehicle_arrived_at;
 }

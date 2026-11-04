@@ -58,7 +58,13 @@ const REASON_ACTION_META = {
   },
 };
 
-const SEVERITY_RANK = { needs_attention: 0, maintenance_recommended: 1, healthy: 2, in_service: 3 };
+const SEVERITY_RANK = {
+  needs_attention: 0,
+  maintenance_recommended: 1,
+  incoming_service: 2,
+  healthy: 3,
+  in_service: 4,
+};
 
 /** Matches VehicleHealthSection — primary issue stays on those cards. */
 const HEALTH_CARD_VISIBLE = 3;
@@ -83,7 +89,13 @@ export function buildRecommendedActions(vehicles = [], activeRepairs = [], trans
       activeRepairs
     );
     // In-service / healthy vehicles are covered by health cards (or need no action).
-    if (health.status === 'healthy' || health.status === 'in_service') continue;
+    if (
+      health.status === 'healthy' ||
+      health.status === 'in_service' ||
+      health.status === 'incoming_service'
+    ) {
+      continue;
+    }
 
     const vehicleName = vehicleDisplayTitle(vehicle, translateFn);
     const reasons = (health.reasons || []).filter((reason) => reason?.key !== 'active_repairs');

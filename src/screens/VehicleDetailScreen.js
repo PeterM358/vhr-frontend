@@ -33,7 +33,6 @@ import { navigateToSignIn } from '../navigation/authNavigation';
 import { useScrollContentBottomPaddingWithFab } from '../utils/mobileWebInsets';
 import AppCard from '../components/ui/AppCard';
 import FloatingCard from '../components/ui/FloatingCard';
-import StatusBadge from '../components/ui/StatusBadge';
 import { COLORS } from '../constants/colors';
 import { DEFAULT_CURRENCY } from '../constants/currency';
 import { resolveRepairDisplayTotal } from '../utils/repairDisplayTotal';
@@ -55,7 +54,17 @@ import {
   mileageConfidenceCategoryPill,
   resolveMileageFactorAction,
 } from '../utils/mileageConfidence';
-import { mapHealthFromApi } from '../utils/vehicleHealthStatus';
+import {
+  applyActiveRepairHealthOverride,
+  mapHealthFromApi,
+} from '../utils/vehicleHealthStatus';
+import {
+  clientReportedArrival,
+  formatAppointmentCountdown,
+  getVisitDisplayText,
+  isUpcomingAppointment,
+  isVehicleAtShop,
+} from '../utils/repairArrival';
 import { formatRevokeConfirmMessage } from '../utils/shopDataAccess';
 import { navigateToDashboard, navigateToVehicleServiceRecordNew, navigateToVehicleReminderNew, navigateToVehicleManageServiceCenters, navigateToVehicleSpecs } from '../navigation/webNavigation';
 import { openServiceCenters } from '../navigation/serviceCentersNavigation';
@@ -625,7 +634,15 @@ export default function VehicleDetailScreen({ route, navigation }) {
     [navigation, vehicleId, isOrgFleet, orgReturnParams]
   );
 
-  const vehicleHealth = useMemo(() => mapHealthFromApi(vehicle, t), [vehicle, t]);
+  const vehicleHealth = useMemo(
+    () =>
+      applyActiveRepairHealthOverride(
+        mapHealthFromApi(vehicle, t),
+        vehicle?.id,
+        activeRepairsList
+      ),
+    [vehicle, t, activeRepairsList]
+  );
 
   const handleHealthAction = useCallback(
     (actionKey, row) => {
@@ -979,33 +996,90 @@ export default function VehicleDetailScreen({ route, navigation }) {
     return isBike ? [...BASE_VEHICLE_REMINDER_SECTION_ROWS, SUSPENSION_REMINDER_ROW] : BASE_VEHICLE_REMINDER_SECTION_ROWS;
   }, [vehicle?.vehicle_type_code]);
 
-  const renderActiveRepairCard = (item) => (
-    <TouchableRipple
-      borderless={false}
-      style={[styles.repairCard, styles.activeRepairCard]}
-      onPress={() => navigation.navigate('RepairDetail', { repairId: item.id })}
-    >
-      <View>
-        <View style={styles.repairCardTop}>
-          <Text style={styles.repairTitle} numberOfLines={1}>
-            {repairTypeLine(item)}
+  const activeRepairPhase = (item) => {
+    if (isVehicleAtShop(item)) {
+      return {
+        label: t('vehicles.detail.repairPhaseAtShop'),
+        color: '#059669',
+        border: '#059669',
+      };
+    }
+    if (isUpcomingAppointment(item)) {
+      const countdown = formatAppointmentCountdown(item.scheduled_start, t);
+      return {
+        label: t('vehicles.detail.repairPhaseIncoming'),
+        detail: countdown,
+        color: '#2563eb',
+        border: '#2563eb',
+      };
+    }
+    if (clientReportedArrival(item)) {
+      return {
+        label: t('vehicles.detail.repairPhaseAwaitingCheckIn'),
+        color: '#d97706',
+        border: '#d97706',
+      };
+    }
+    return {
+      label: t('vehicles.detail.repairPhaseOpenRequest'),
+      color: COLORS.PRIMARY,
+      border: COLORS.PRIMARY,
+    };
+  };
+
+  const renderActiveRepairCard = (item) => {
+    const phase = activeRepairPhase(item);
+    const visitLine = getVisitDisplayText(item, t);
+    return (
+      <TouchableRipple
+        borderless={false}
+        style={[
+          styles.repairCard,
+          styles.activeRepairCard,
+          { borderLeftColor: phase.border },
+        ]}
+        onPress={() => navigation.navigate('RepairDetail', { repairId: item.id })}
+      >
+        <View>
+          <View style={styles.repairCardTop}>
+            <Text style={styles.repairTitle} numberOfLines={1}>
+              {repairTypeLine(item)}
+            </Text>
+            <View style={[styles.phaseChip, { backgroundColor: `${phase.color}22` }]}>
+              <Text style={[styles.phaseChipText, { color: phase.color }]} numberOfLines={1}>
+                {phase.label}
+              </Text>
+            </View>
+          </View>
+          {phase.detail ? (
+            <Text style={[styles.repairPhaseDetail, { color: phase.color }]} numberOfLines={1}>
+              {phase.detail}
+            </Text>
+          ) : null}
+          <Text style={styles.repairMeta} numberOfLines={2}>
+            {t('vehicles.detail.serviceProvider')}: {formatServiceRecordProvider(item, t)}
           </Text>
-          <StatusBadge status={item.status} label={translateRepairStatus(item.status, t)} />
+          {visitLine ? (
+            <Text style={styles.repairMeta} numberOfLines={2}>
+              {visitLine}
+            </Text>
+          ) : null}
+          {item.final_kilometers != null || (item.kilometers != null && item.kilometers !== '') ? (
+            <Text style={styles.repairMeta}>
+              {item.final_kilometers != null
+                ? t('vehicles.detail.currentKilometersRepair')
+                : t('vehicles.detail.requestKilometers')}
+              :{' '}
+              {item.final_kilometers != null
+                ? Number(item.final_kilometers).toLocaleString()
+                : Number(item.kilometers).toLocaleString()}
+            </Text>
+          ) : null}
+          <Text style={styles.repairTapHint}>{t('vehicles.detail.repairTapForProgress')}</Text>
         </View>
-        <Text style={styles.repairMeta} numberOfLines={2}>
-          {t('vehicles.detail.serviceProvider')}: {formatServiceRecordProvider(item, t)}
-        </Text>
-        {item.final_kilometers != null || (item.kilometers != null && item.kilometers !== '') ? (
-          <Text style={styles.repairMeta}>
-            {item.final_kilometers != null ? t('vehicles.detail.currentKilometersRepair') : t('vehicles.detail.requestKilometers')}:{' '}
-            {item.final_kilometers != null
-              ? Number(item.final_kilometers).toLocaleString()
-              : Number(item.kilometers).toLocaleString()}
-          </Text>
-        ) : null}
-      </View>
-    </TouchableRipple>
-  );
+      </TouchableRipple>
+    );
+  };
 
   const renderCompletedHistoryCard = (item) => {
     const currency = item.currency || DEFAULT_CURRENCY;
@@ -2201,6 +2275,29 @@ const styles = StyleSheet.create({
   activeRepairCard: {
     borderLeftWidth: 4,
     borderLeftColor: COLORS.PRIMARY,
+  },
+  phaseChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 999,
+    flexShrink: 0,
+    maxWidth: '48%',
+  },
+  phaseChipText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  repairPhaseDetail: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  repairTapHint: {
+    marginTop: 8,
+    fontSize: 12,
+    color: COLORS.TEXT_MUTED,
+    fontWeight: '600',
   },
   historyRepairCard: {
     borderLeftWidth: 4,

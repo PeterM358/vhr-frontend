@@ -1,9 +1,17 @@
 /**
  * Maps backend vehicle health payloads to UI presentation.
  * Health rules live in the API — keep icons/colors here only.
+ *
+ * FE override: active repairs split into incoming (future appointment),
+ * in-service / at shop, otherwise leave API status (usually needs_attention).
  */
 
-import { isTerminalRepairStatus, isVehicleAtShop } from './repairArrival';
+import {
+  formatAppointmentCountdown,
+  isTerminalRepairStatus,
+  isUpcomingAppointment,
+  isVehicleAtShop,
+} from './repairArrival';
 import {
   t,
   translateHealthAction,
@@ -33,6 +41,13 @@ function statusConfig(translateFn = t) {
       color: '#dc2626',
       bg: 'rgba(220,38,38,0.1)',
       border: 'rgba(220,38,38,0.35)',
+    },
+    incoming_service: {
+      label: translateFn('health.status.incoming_service'),
+      icon: 'calendar-clock',
+      color: '#2563eb',
+      bg: 'rgba(37,99,235,0.1)',
+      border: 'rgba(37,99,235,0.35)',
     },
     in_service: {
       label: translateFn('health.status.in_service'),
@@ -68,34 +83,72 @@ function repairVehicleId(repair) {
   return Number.isFinite(n) ? n : null;
 }
 
-/** When a vehicle has a non-terminal repair, show in-service instead of needs-attention. */
-export function applyActiveRepairHealthOverride(health, vehicleId, activeRepairs = []) {
+/** Prefer at-shop, then soonest upcoming appointment, then any open repair. */
+export function pickPrimaryActiveRepair(vehicleId, activeRepairs = []) {
   const vid = vehicleId != null ? Number(vehicleId) : null;
-  if (vid == null || Number.isNaN(vid)) return health;
+  if (vid == null || Number.isNaN(vid)) return null;
 
-  const activeRepair = (activeRepairs || []).find((repair) => {
+  const forVehicle = (activeRepairs || []).filter((repair) => {
     if (repairVehicleId(repair) !== vid) return false;
     return !isTerminalRepairStatus(repair?.status);
   });
+  if (!forVehicle.length) return null;
+
+  const atShop = forVehicle.find((r) => isVehicleAtShop(r));
+  if (atShop) return atShop;
+
+  const upcoming = forVehicle
+    .filter((r) => isUpcomingAppointment(r))
+    .sort((a, b) => new Date(a.scheduled_start) - new Date(b.scheduled_start));
+  if (upcoming[0]) return upcoming[0];
+
+  return forVehicle[0];
+}
+
+/** When a vehicle has a non-terminal repair, refine health for home/detail cards. */
+export function applyActiveRepairHealthOverride(health, vehicleId, activeRepairs = []) {
+  const activeRepair = pickPrimaryActiveRepair(vehicleId, activeRepairs);
   if (!activeRepair) return health;
 
   const atShop = isVehicleAtShop(activeRepair);
-  const cfg = inServiceHealth(atShop);
-  const shortReason = atShop
-    ? t('health.subtitle.at_service_center')
-    : activeRepair.scheduled_start
-      ? t('health.subtitle.in_service_scheduled')
-      : t('health.subtitle.in_service');
+  if (atShop) {
+    const cfg = inServiceHealth(true);
+    return {
+      ...health,
+      status: 'in_service',
+      ...cfg,
+      status_label: cfg.label,
+      subtitle: t('health.subtitle.at_service_center'),
+      shortReason: t('health.subtitle.at_service_center'),
+      reasons: [],
+      actions: [],
+      primaryRepairId: activeRepair.id,
+    };
+  }
 
+  if (isUpcomingAppointment(activeRepair)) {
+    const cfg = statusConfig().incoming_service;
+    const countdown = formatAppointmentCountdown(activeRepair.scheduled_start, t);
+    const subtitle =
+      countdown ||
+      t('health.subtitle.incoming_service', null, 'Scheduled service appointment coming up.');
+    return {
+      ...health,
+      status: 'incoming_service',
+      ...cfg,
+      status_label: cfg.label,
+      subtitle,
+      shortReason: subtitle,
+      reasons: [],
+      actions: [],
+      primaryRepairId: activeRepair.id,
+    };
+  }
+
+  // Open request without a confirmed slot — keep API health (usually needs_attention).
   return {
     ...health,
-    status: 'in_service',
-    ...cfg,
-    status_label: cfg.label,
-    subtitle: shortReason,
-    shortReason,
-    reasons: [],
-    actions: [],
+    primaryRepairId: activeRepair.id,
   };
 }
 

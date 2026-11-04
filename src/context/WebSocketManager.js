@@ -133,6 +133,16 @@ export const WebSocketProvider = ({ children }) => {
     setUnreadCount((prev) => Math.max(0, prev - 1));
   }, []);
 
+  // Keep iOS/Android home-screen badge in sync whenever unread changes
+  // (optimistic WS bump used to update the bell only).
+  useEffect(() => {
+    if (!isAuthenticated) {
+      syncAppBadge(0);
+      return;
+    }
+    syncAppBadge(unreadCount);
+  }, [unreadCount, isAuthenticated]);
+
   useEffect(() => {
     if (!isAuthenticated || !authToken) {
       setNotifications([]);
