@@ -33,7 +33,10 @@ function primaryIssueLabel(health, t) {
   return health?.status_label || health?.label || t('common.allClear');
 }
 
-function primaryCtaLabel(hasActiveRepair, t) {
+function primaryCtaLabel(health, hasActiveRepair, t) {
+  if (health?.status === 'incoming_service' || health?.status === 'missed_appointment') {
+    return t('dashboard.health.viewRequest');
+  }
   if (hasActiveRepair) return t('dashboard.health.viewRequest');
   return t('dashboard.health.requestService');
 }
@@ -78,9 +81,21 @@ export default function VehicleHealthSection({
       {rows.map(({ vehicle, health, activeRepair }) => {
         const title = vehicleDisplayTitle(vehicle, t);
         const issue = primaryIssueLabel(health, t);
-        const ctaLabel = primaryCtaLabel(Boolean(activeRepair), t);
+        const ctaLabel = primaryCtaLabel(health, Boolean(activeRepair), t);
+        const focusId = health.primaryRepairId || activeRepair?.id || null;
 
         const handlePrimaryPress = () => {
+          // Incoming / missed: land on vehicle detail with that repair highlighted
+          // so the home card and details stay aligned when several requests exist.
+          if (
+            focusId &&
+            (health.status === 'incoming_service' ||
+              health.status === 'missed_appointment' ||
+              health.status === 'in_service')
+          ) {
+            onVehiclePress?.(vehicle, { focusRepairId: focusId });
+            return;
+          }
           if (activeRepair?.id) {
             onViewRepair?.(activeRepair.id);
             return;
@@ -93,7 +108,7 @@ export default function VehicleHealthSection({
             key={String(vehicle.id)}
             statusAccent={health.status}
             style={styles.card}
-            onPress={() => onVehiclePress?.(vehicle)}
+            onPress={() => onVehiclePress?.(vehicle, focusId ? { focusRepairId: focusId } : {})}
             accessibilityRole="button"
             accessibilityLabel={t('dashboard.health.openVehicleA11y', { vehicle: title })}
           >

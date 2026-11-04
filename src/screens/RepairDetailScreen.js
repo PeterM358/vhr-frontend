@@ -78,6 +78,7 @@ import {
 import {
   isVehicleAtShop,
   isUpcomingAppointment,
+  isStaleMissedAppointment,
   clientReportedArrival,
   getVisitDisplayText,
   canCancelAppointment,
@@ -2373,6 +2374,7 @@ export default function RepairDetailScreen({ route, navigation }) {
   const isOngoingStatus = statusLower === 'ongoing';
   const vehicleAtShop = isVehicleAtShop(repair);
   const upcomingAppointment = isUpcomingAppointment(repair);
+  const missedAppointment = isStaleMissedAppointment(repair);
   const visitDisplayText = getVisitDisplayText(repair, t);
   const ownerCheckedIn = clientReportedArrival(repair);
   const isOwnerLoggedServiceRecord = sourceLower === 'owner_logged' && isDone;
@@ -4343,6 +4345,34 @@ export default function RepairDetailScreen({ route, navigation }) {
               </FloatingCard>
             ) : null}
 
+            {!isDone && missedAppointment && !isShop && isClientOwner ? (
+              <FloatingCard style={[styles.rescheduleCard, styles.missedAppointmentCard]}>
+                <Text style={[styles.cardTitle, { color: '#b45309' }]}>
+                  {t('repairs.detail.missedAppointment')}
+                </Text>
+                <Text style={styles.detailLine}>
+                  {t('repairs.detail.scheduled')}{' '}
+                  {repair.scheduled_start
+                    ? new Date(repair.scheduled_start).toLocaleString()
+                    : '—'}
+                </Text>
+                <Text style={styles.mutedText}>{t('repairs.detail.missedAppointmentBody')}</Text>
+                {ownerCheckedIn ? (
+                  <Text style={styles.mutedText}>{t('repairs.detail.checkedInWaiting')}</Text>
+                ) : null}
+                <Button
+                  mode="contained"
+                  onPress={handleCancelAppointment}
+                  loading={cancelingAppointment}
+                  disabled={cancelingAppointment}
+                  style={styles.cancelAppointmentButton}
+                  buttonColor="#b45309"
+                >
+                  {t('repairs.detail.closeAsDidNotHappen')}
+                </Button>
+              </FloatingCard>
+            ) : null}
+
             {!isDone &&
             isShop &&
             isMyShopRepair &&
@@ -5466,6 +5496,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderColor: 'rgba(245,158,11,0.35)',
     borderWidth: 1,
+  },
+  missedAppointmentCard: {
+    borderColor: 'rgba(180,83,9,0.45)',
+    backgroundColor: 'rgba(180,83,9,0.06)',
   },
   rescheduleActions: {
     flexDirection: 'row',

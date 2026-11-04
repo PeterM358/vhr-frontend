@@ -62,6 +62,7 @@ import {
   clientReportedArrival,
   formatAppointmentCountdown,
   getVisitDisplayText,
+  isStaleMissedAppointment,
   isUpcomingAppointment,
   isVehicleAtShop,
 } from '../utils/repairArrival';
@@ -123,10 +124,22 @@ export default function VehicleDetailScreen({ route, navigation }) {
     backLabelKey,
     returnTo,
     organizationId,
+    focusRepairId: focusRepairIdParam,
   } = route.params || {};
+  const focusRepairId =
+    focusRepairIdParam != null && focusRepairIdParam !== ''
+      ? Number(focusRepairIdParam)
+      : null;
   const isOrgFleet = organizationId != null && organizationId !== '';
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
   const handleBackToVehicleList = useVehicleListBack(navigation);
+  const focusedRepairYRef = useRef(null);
+  const didScrollToFocusedRepairRef = useRef(false);
+
+  useEffect(() => {
+    didScrollToFocusedRepairRef.current = false;
+    focusedRepairYRef.current = null;
+  }, [focusRepairId, vehicleId]);
   const fromHome = returnTo === 'Home' || returnTo === 'HomeMain';
   const backLabel =
     backLabelParam ||
@@ -472,8 +485,23 @@ export default function VehicleDetailScreen({ route, navigation }) {
   const inactiveRepairStatuses = useMemo(() => new Set(['done', 'canceled', 'cancelled', 'denied']), []);
 
   const activeRepairsList = useMemo(() => {
-    return repairs.filter((r) => !inactiveRepairStatuses.has(String(r.status || '').toLowerCase()));
-  }, [repairs, inactiveRepairStatuses]);
+    const active = repairs.filter(
+      (r) => !inactiveRepairStatuses.has(String(r.status || '').toLowerCase())
+    );
+    const rank = (r) => {
+      if (focusRepairId != null && Number(r.id) === focusRepairId) return 0;
+      if (isVehicleAtShop(r)) return 1;
+      if (isUpcomingAppointment(r)) return 2;
+      if (isStaleMissedAppointment(r)) return 3;
+      if (clientReportedArrival(r)) return 4;
+      return 5;
+    };
+    return [...active].sort((a, b) => {
+      const d = rank(a) - rank(b);
+      if (d !== 0) return d;
+      return Number(b.id) - Number(a.id);
+    });
+  }, [repairs, inactiveRepairStatuses, focusRepairId]);
 
   const serviceHistorySorted = useMemo(() => {
     const done = repairs.filter((r) => String(r.status || '').toLowerCase() === 'done');
@@ -1013,6 +1041,15 @@ export default function VehicleDetailScreen({ route, navigation }) {
         border: '#2563eb',
       };
     }
+    if (isStaleMissedAppointment(item)) {
+      return {
+        label: t('vehicles.detail.repairPhaseMissed'),
+        detail: t('vehicles.detail.repairPhaseMissedHint'),
+        color: '#b45309',
+        border: '#b45309',
+        stale: true,
+      };
+    }
     if (clientReportedArrival(item)) {
       return {
         label: t('vehicles.detail.repairPhaseAwaitingCheckIn'),
@@ -1030,54 +1067,81 @@ export default function VehicleDetailScreen({ route, navigation }) {
   const renderActiveRepairCard = (item) => {
     const phase = activeRepairPhase(item);
     const visitLine = getVisitDisplayText(item, t);
+    const isFocused = focusRepairId != null && Number(item.id) === focusRepairId;
     return (
-      <TouchableRipple
-        borderless={false}
-        style={[
-          styles.repairCard,
-          styles.activeRepairCard,
-          { borderLeftColor: phase.border },
-        ]}
-        onPress={() => navigation.navigate('RepairDetail', { repairId: item.id })}
+      <View
+        onLayout={(e) => {
+          if (!isFocused) return;
+          focusedRepairYRef.current = e.nativeEvent.layout.y;
+          if (!didScrollToFocusedRepairRef.current && scrollRef.current) {
+            didScrollToFocusedRepairRef.current = true;
+            const sectionY = sectionScrollYs.current.activeRepairs || 0;
+            scrollRef.current.scrollTo({
+              y: Math.max(0, sectionY + e.nativeEvent.layout.y - 12),
+              animated: true,
+            });
+          }
+        }}
       >
-        <View>
-          <View style={styles.repairCardTop}>
-            <Text style={styles.repairTitle} numberOfLines={1}>
-              {repairTypeLine(item)}
-            </Text>
-            <View style={[styles.phaseChip, { backgroundColor: `${phase.color}22` }]}>
-              <Text style={[styles.phaseChipText, { color: phase.color }]} numberOfLines={1}>
-                {phase.label}
+        <TouchableRipple
+          borderless={false}
+          style={[
+            styles.repairCard,
+            styles.activeRepairCard,
+            { borderLeftColor: phase.border },
+            isFocused ? styles.activeRepairCardFocused : null,
+            phase.stale ? styles.activeRepairCardStale : null,
+          ]}
+          onPress={() => navigation.navigate('RepairDetail', { repairId: item.id })}
+        >
+          <View>
+            {isFocused ? (
+              <Text style={styles.focusedRepairBanner}>
+                {t('vehicles.detail.repairFocusedFromHome')}
               </Text>
+            ) : null}
+            <View style={styles.repairCardTop}>
+              <Text style={styles.repairTitle} numberOfLines={1}>
+                {repairTypeLine(item)}
+              </Text>
+              <View style={[styles.phaseChip, { backgroundColor: `${phase.color}22` }]}>
+                <Text style={[styles.phaseChipText, { color: phase.color }]} numberOfLines={1}>
+                  {phase.label}
+                </Text>
+              </View>
             </View>
-          </View>
-          {phase.detail ? (
-            <Text style={[styles.repairPhaseDetail, { color: phase.color }]} numberOfLines={1}>
-              {phase.detail}
-            </Text>
-          ) : null}
-          <Text style={styles.repairMeta} numberOfLines={2}>
-            {t('vehicles.detail.serviceProvider')}: {formatServiceRecordProvider(item, t)}
-          </Text>
-          {visitLine ? (
+            {phase.detail ? (
+              <Text
+                style={[styles.repairPhaseDetail, { color: phase.color }]}
+                numberOfLines={phase.stale ? 2 : 1}
+              >
+                {phase.detail}
+              </Text>
+            ) : null}
             <Text style={styles.repairMeta} numberOfLines={2}>
-              {visitLine}
+              {t('vehicles.detail.serviceProvider')}: {formatServiceRecordProvider(item, t)}
             </Text>
-          ) : null}
-          {item.final_kilometers != null || (item.kilometers != null && item.kilometers !== '') ? (
-            <Text style={styles.repairMeta}>
-              {item.final_kilometers != null
-                ? t('vehicles.detail.currentKilometersRepair')
-                : t('vehicles.detail.requestKilometers')}
-              :{' '}
-              {item.final_kilometers != null
-                ? Number(item.final_kilometers).toLocaleString()
-                : Number(item.kilometers).toLocaleString()}
-            </Text>
-          ) : null}
-          <Text style={styles.repairTapHint}>{t('vehicles.detail.repairTapForProgress')}</Text>
-        </View>
-      </TouchableRipple>
+            {visitLine ? (
+              <Text style={styles.repairMeta} numberOfLines={2}>
+                {visitLine}
+              </Text>
+            ) : null}
+            {item.final_kilometers != null ||
+            (item.kilometers != null && item.kilometers !== '') ? (
+              <Text style={styles.repairMeta}>
+                {item.final_kilometers != null
+                  ? t('vehicles.detail.currentKilometersRepair')
+                  : t('vehicles.detail.requestKilometers')}
+                :{' '}
+                {item.final_kilometers != null
+                  ? Number(item.final_kilometers).toLocaleString()
+                  : Number(item.kilometers).toLocaleString()}
+              </Text>
+            ) : null}
+            <Text style={styles.repairTapHint}>{t('vehicles.detail.repairTapForProgress')}</Text>
+          </View>
+        </TouchableRipple>
+      </View>
     );
   };
 
@@ -2275,6 +2339,21 @@ const styles = StyleSheet.create({
   activeRepairCard: {
     borderLeftWidth: 4,
     borderLeftColor: COLORS.PRIMARY,
+  },
+  activeRepairCardFocused: {
+    borderWidth: 2,
+    borderColor: '#2563eb',
+    backgroundColor: 'rgba(37,99,235,0.06)',
+  },
+  activeRepairCardStale: {
+    backgroundColor: 'rgba(180,83,9,0.06)',
+  },
+  focusedRepairBanner: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#2563eb',
+    marginBottom: 6,
+    letterSpacing: 0.2,
   },
   phaseChip: {
     paddingHorizontal: 9,

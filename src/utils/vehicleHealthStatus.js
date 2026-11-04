@@ -8,6 +8,7 @@
 
 import {
   formatAppointmentCountdown,
+  isStaleMissedAppointment,
   isTerminalRepairStatus,
   isUpcomingAppointment,
   isVehicleAtShop,
@@ -48,6 +49,13 @@ function statusConfig(translateFn = t) {
       color: '#2563eb',
       bg: 'rgba(37,99,235,0.1)',
       border: 'rgba(37,99,235,0.35)',
+    },
+    missed_appointment: {
+      label: translateFn('health.status.missed_appointment'),
+      icon: 'calendar-remove',
+      color: '#b45309',
+      bg: 'rgba(180,83,9,0.12)',
+      border: 'rgba(180,83,9,0.45)',
     },
     in_service: {
       label: translateFn('health.status.in_service'),
@@ -102,6 +110,11 @@ export function pickPrimaryActiveRepair(vehicleId, activeRepairs = []) {
     .sort((a, b) => new Date(a.scheduled_start) - new Date(b.scheduled_start));
   if (upcoming[0]) return upcoming[0];
 
+  const stale = forVehicle
+    .filter((r) => isStaleMissedAppointment(r))
+    .sort((a, b) => new Date(b.scheduled_start) - new Date(a.scheduled_start));
+  if (stale[0]) return stale[0];
+
   return forVehicle[0];
 }
 
@@ -135,6 +148,26 @@ export function applyActiveRepairHealthOverride(health, vehicleId, activeRepairs
     return {
       ...health,
       status: 'incoming_service',
+      ...cfg,
+      status_label: cfg.label,
+      subtitle,
+      shortReason: subtitle,
+      reasons: [],
+      actions: [],
+      primaryRepairId: activeRepair.id,
+    };
+  }
+
+  if (isStaleMissedAppointment(activeRepair)) {
+    const cfg = statusConfig().missed_appointment;
+    const subtitle = t(
+      'health.subtitle.missed_appointment',
+      null,
+      'Scheduled visit passed — close it or confirm the car arrived.'
+    );
+    return {
+      ...health,
+      status: 'missed_appointment',
       ...cfg,
       status_label: cfg.label,
       subtitle,

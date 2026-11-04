@@ -60,10 +60,11 @@ const REASON_ACTION_META = {
 
 const SEVERITY_RANK = {
   needs_attention: 0,
-  maintenance_recommended: 1,
-  incoming_service: 2,
-  healthy: 3,
-  in_service: 4,
+  missed_appointment: 1,
+  maintenance_recommended: 2,
+  incoming_service: 3,
+  healthy: 4,
+  in_service: 5,
 };
 
 /** Matches VehicleHealthSection — primary issue stays on those cards. */
@@ -92,7 +93,8 @@ export function buildRecommendedActions(vehicles = [], activeRepairs = [], trans
     if (
       health.status === 'healthy' ||
       health.status === 'in_service' ||
-      health.status === 'incoming_service'
+      health.status === 'incoming_service' ||
+      health.status === 'missed_appointment'
     ) {
       continue;
     }

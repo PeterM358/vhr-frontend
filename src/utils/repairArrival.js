@@ -23,12 +23,34 @@ export function isVehicleAtShop(repair) {
   return new Date(repair.scheduled_start) <= new Date();
 }
 
-/** Booked/scheduled visit that has not checked in yet. */
+function scheduledStartDayDiff(scheduledStart) {
+  if (!scheduledStart) return null;
+  const start = new Date(scheduledStart);
+  if (Number.isNaN(start.getTime())) return null;
+  const now = new Date();
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((startDay.getTime() - today.getTime()) / 86400000);
+}
+
+/** Booked visit whose date already passed without shop arrival confirm. */
+export function isStaleMissedAppointment(repair) {
+  if (!repair?.scheduled_start || repair.vehicle_arrived_at) return false;
+  if (repair.pending_reschedule_proposal) return false;
+  if (isTerminalRepairStatus(repair.status)) return false;
+  if (isVehicleAtShop(repair)) return false;
+  const dayDiff = scheduledStartDayDiff(repair.scheduled_start);
+  return dayDiff != null && dayDiff < 0;
+}
+
+/** Booked/scheduled visit that has not checked in yet (today or future). */
 export function isUpcomingAppointment(repair) {
   if (!repair?.scheduled_start || repair.vehicle_arrived_at) return false;
   if (repair.pending_reschedule_proposal) return false;
   if (isTerminalRepairStatus(repair.status)) return false;
   if (isVehicleAtShop(repair)) return false;
+  const dayDiff = scheduledStartDayDiff(repair.scheduled_start);
+  if (dayDiff == null || dayDiff < 0) return false;
   return true;
 }
 

@@ -293,12 +293,14 @@ export default function HomeScreen({ navigation }) {
     navigateToVehicleAdd(root);
   };
   const goFindCenters = () => openServiceCenters(navigation);
-  const goVehicleDetail = (vehicle) => {
+  const goVehicleDetail = (vehicle, opts = {}) => {
     if (!vehicle?.id) return;
     const root = navigation.getParent?.() || navigation;
+    const focusRepairId = opts.focusRepairId ?? null;
     navigateToVehicleDetail(root, vehicle.id, {
       returnTo: 'Home',
       backLabelKey: 'navigation.back',
+      ...(focusRepairId != null ? { focusRepairId } : {}),
     });
   };
   const goVehicles = () => {
