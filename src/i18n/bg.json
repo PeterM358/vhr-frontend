@@ -3851,6 +3851,7 @@
       "openChat": "Отвори чат",
       "call": "Обади се",
       "bookOffer": "Резервирай оферта",
+      "offerSuperseded": "Заменена с по-нова оферта от този сервиз.",
       "bookPromotion": "Резервирай промоция",
       "cancelBooking": "Отмени резервацията",
       "guaranteeIncluded": "Включена гаранция",

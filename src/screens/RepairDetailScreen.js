@@ -3451,12 +3451,21 @@ export default function RepairDetailScreen({ route, navigation }) {
                     )}
                     {!isShop && (
                       <>
-                        {!hasBooked && !offer.is_booked ? (
+                        {!hasBooked && !offer.is_booked && offer.is_active !== false && offer.can_book !== false ? (
                           <Button mode="contained" onPress={() => handleBookOffer(offer.id)}>
                             {offer.is_promotion
                               ? t('repairs.detail.bookPromotion', null, 'Book promotion')
                               : t('repairs.detail.bookOffer', null, 'Book offer')}
                           </Button>
+                        ) : null}
+                        {!hasBooked && !offer.is_booked && offer.is_active === false ? (
+                          <Text style={styles.offerMetaText}>
+                            {t(
+                              'repairs.detail.offerSuperseded',
+                              null,
+                              'Replaced by a newer offer from this center.'
+                            )}
+                          </Text>
                         ) : null}
                         <Button mode="outlined" onPress={handleOpenOfferChat}>
                           {t('repairs.detail.openChat', null, 'Open chat')}

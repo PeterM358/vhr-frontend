@@ -13,7 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, TextInput, Button, Switch } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { createOffer, updateOffer } from '../api/offers';
+import { createOffer, getOffer, updateOffer } from '../api/offers';
+import { getRepairById } from '../api/repairs';
 import { getOfferDraft } from '../api/serviceMenu';
 import { getMyShopProfiles } from '../api/profiles';
 import { DEFAULT_CURRENCY, formatMoneyAmount } from '../constants/currency';
@@ -334,7 +335,14 @@ function pickupFromBringShortcut(bring, key) {
 export default function CreateOrUpdateOfferScreen({ route, navigation }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { existingOffer, selectedOfferParts = [], shopId: routeShopId } = route.params || {};
+  const {
+    existingOffer: routeExistingOffer,
+    offerId: routeOfferId,
+    selectedOfferParts = [],
+    shopId: routeShopId,
+  } = route.params || {};
+  const [loadedOffer, setLoadedOffer] = useState(null);
+  const existingOffer = routeExistingOffer || loadedOffer;
   const [repairId, setRepairId] = useState(route.params?.repairId || existingOffer?.repair || null);
   const [shopId, setShopId] = useState(routeShopId ?? existingOffer?.shop ?? null);
 
@@ -354,6 +362,7 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
   const [offerDraft, setOfferDraft] = useState(null);
   const [draftDismissed, setDraftDismissed] = useState(false);
   const hydratedAvailabilityOfferIdRef = useRef(null);
+  const hydratedPreferredRepairIdRef = useRef(null);
 
   const [pickerModalVisible, setPickerModalVisible] = useState(false);
   const [pickerTarget, setPickerTarget] = useState(null);
@@ -406,6 +415,46 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
       headerBackTitleVisible: true,
     });
   }, [navigation, existingOffer, t]);
+
+  // Repairs list / deep links pass offerId without the full existingOffer object.
+  // Load it so we UPDATE the active quote instead of creating a duplicate.
+  useEffect(() => {
+    let active = true;
+    const hydrateFromOfferId = async () => {
+      if (routeExistingOffer?.id) return;
+      const oid = routeOfferId ?? route.params?.offerId ?? null;
+      if (!oid) return;
+      if (loadedOffer?.id === oid) return;
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        if (!token) return;
+        const offer = await getOffer(token, oid);
+        if (!active || !offer?.id) return;
+        setLoadedOffer(offer);
+        if (!repairId && offer.repair) {
+          setRepairId(offer.repair);
+        }
+        if (shopId == null && offer.shop != null) {
+          setShopId(offer.shop);
+        }
+      } catch (err) {
+        if (__DEV__) {
+          console.warn('offer hydrate by id failed', err);
+        }
+      }
+    };
+    hydrateFromOfferId();
+    return () => {
+      active = false;
+    };
+  }, [
+    routeExistingOffer?.id,
+    routeOfferId,
+    route.params?.offerId,
+    loadedOffer?.id,
+    repairId,
+    shopId,
+  ]);
 
   const syncTotalFromEstimates = useCallback((nextLaborFrom, nextPartsFrom) => {
     if (priceManuallyEditedRef.current) return;
@@ -839,6 +888,50 @@ export default function CreateOrUpdateOfferScreen({ route, navigation }) {
 
     if (existingOffer?.phone_call_allowed != null) setPhoneCallAllowed(Boolean(existingOffer.phone_call_allowed));
   }, [route.params]);
+
+  // Prefill bring/pickup from the client's preferred visit on the request.
+  // Shop can still change only that slot before sending the offer.
+  useEffect(() => {
+    let active = true;
+    const loadPreferredVisit = async () => {
+      if (existingOffer?.id) return;
+      const rid = repairId ?? route.params?.repairId ?? null;
+      if (!rid) return;
+      if (hydratedPreferredRepairIdRef.current === rid) return;
+      if (bringAt) {
+        hydratedPreferredRepairIdRef.current = rid;
+        return;
+      }
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        if (!token) return;
+        const repair = await getRepairById(token, rid);
+        if (!active || !repair) return;
+        hydratedPreferredRepairIdRef.current = rid;
+        const startRaw = repair.client_preferred_start;
+        const endRaw = repair.client_preferred_end;
+        if (!startRaw) return;
+        const start = new Date(startRaw);
+        if (Number.isNaN(start.getTime())) return;
+        setBringAt(start);
+        setWorkingDate(new Date(start.getTime()));
+        if (endRaw) {
+          const end = new Date(endRaw);
+          if (!Number.isNaN(end.getTime()) && end.getTime() > start.getTime()) {
+            setPickupAt(end);
+          }
+        }
+      } catch (err) {
+        if (__DEV__) {
+          console.warn('offer preferred visit load failed', err);
+        }
+      }
+    };
+    loadPreferredVisit();
+    return () => {
+      active = false;
+    };
+  }, [repairId, route.params?.repairId, existingOffer?.id, bringAt]);
 
   useEffect(() => {
     let active = true;

@@ -14,6 +14,10 @@ export async function getClientOffers(token) {
 
 export async function bookOffer(token, offerId, vehicleId) {
   const url = `${API_BASE_URL}/api/offers/${offerId}/book/`;
+  const resolvedVehicleId =
+    vehicleId != null && typeof vehicleId === 'object'
+      ? vehicleId.id ?? vehicleId.pk ?? null
+      : vehicleId;
 
   const response = await fetch(url, {
     method: 'POST',
@@ -21,18 +25,31 @@ export async function bookOffer(token, offerId, vehicleId) {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ vehicle: vehicleId }),
+    body: JSON.stringify(
+      resolvedVehicleId != null && resolvedVehicleId !== ''
+        ? { vehicle: resolvedVehicleId }
+        : {}
+    ),
   });
 
   if (!response.ok) {
+    const raw = await response.text().catch(() => '');
     let err;
     try {
-      err = await response.json();
+      err = raw ? JSON.parse(raw) : null;
     } catch (e) {
       safeError('Failed to parse booking error response', e);
-      throw new Error('Booking failed');
+      throw new Error(raw?.slice(0, 200) || 'Booking failed');
     }
-    throw new Error(err.detail || 'Booking failed');
+    const detail = err?.detail;
+    if (typeof detail === 'string' && detail.trim()) {
+      throw new Error(detail);
+    }
+    throw new Error(
+      (detail && typeof detail === 'object' && detail.detail) ||
+        err?.message ||
+        'Booking failed'
+    );
   }
 
   return await response.json();
@@ -68,6 +85,23 @@ export async function getOffersForRepair(token, repairId) {
   });
 
   if (!response.ok) throw new Error('Failed to fetch offers for repair');
+  return await response.json();
+}
+
+export async function getOffer(token, offerId) {
+  const response = await fetch(`${API_BASE_URL}/api/offers/${offerId}/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const raw = await response.text().catch(() => '');
+    let detail = 'Failed to fetch offer';
+    try {
+      detail = (raw && JSON.parse(raw)?.detail) || detail;
+    } catch (_e) {
+      /* non-JSON */
+    }
+    throw new Error(detail);
+  }
   return await response.json();
 }
 
