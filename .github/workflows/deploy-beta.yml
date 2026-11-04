@@ -59,9 +59,13 @@ jobs:
           SSH_USER: ${{ secrets.SSH_USER }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_SHA: ${{ github.sha }}
+          DEPLOY_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           echo "Frontend deploy triggered by ${GITHUB_EVENT_NAME:-unknown} from ${GITHUB_REPOSITORY}@${GITHUB_SHA:0:7}"
+          # Frontend repo is public — HTTPS needs no token. Do not git-fetch private
+          # backend here (this workflow's GITHUB_TOKEN cannot read it). Use the
+          # deploy_frontend_beta.sh already on the server from the last backend deploy.
           ssh -i ~/.ssh/deploy_key \
             -p "$SSH_PORT" \
             -o StrictHostKeyChecking=yes \
@@ -70,12 +74,18 @@ jobs:
             "set -euo pipefail
              export GITHUB_REPOSITORY='${GITHUB_REPOSITORY}'
              export GITHUB_SHA='${GITHUB_SHA}'
-             cd /opt/veversal/backend
-             echo '==> Sync deploy scripts from origin/main'
-             git fetch origin main
+             export DEPLOY_GITHUB_TOKEN='${DEPLOY_GITHUB_TOKEN}'
+             cd /opt/veversal/frontend
+             echo '==> Sync frontend via HTTPS before deploy script'
+             git fetch --prune https://github.com/PeterM358/vhr-frontend.git +main:refs/remotes/origin/main
              git checkout main
              git reset --hard origin/main
-             echo \"==> Deploy scripts at: \$(git log -1 --oneline)\"
+             echo \"==> Frontend at: \$(git log -1 --oneline)\"
+             cd /opt/veversal/backend
+             test -f deploy/deploy_frontend_beta.sh || {
+               echo 'Missing deploy/deploy_frontend_beta.sh — run a backend Deploy Beta first'
+               exit 1
+             }
              exec bash deploy/deploy_frontend_beta.sh" \
             || {
               echo "::error::Remote deploy_frontend_beta.sh failed (repo=${GITHUB_REPOSITORY} sha=${GITHUB_SHA:0:7})."
