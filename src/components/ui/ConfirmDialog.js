@@ -1,10 +1,14 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Button, Modal, Portal, Text } from 'react-native-paper';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Button, Text } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { COLORS } from '../../constants/colors';
 
+/**
+ * Uses RN Modal (not Paper Portal) so confirms appear above other RN Modals
+ * (e.g. repair → warehouse receive sheet).
+ */
 export default function ConfirmDialog({
   visible,
   title,
@@ -18,50 +22,65 @@ export default function ConfirmDialog({
   onCancel,
 }) {
   return (
-    <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={loading ? undefined : onCancel}
-        contentContainerStyle={styles.modal}
-      >
-        <View style={[styles.iconWrap, destructive && styles.iconWrapDestructive]}>
-          <MaterialCommunityIcons
-            name={icon}
-            size={28}
-            color={destructive ? '#B91C1C' : COLORS.PRIMARY}
-          />
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={loading ? undefined : onCancel}
+    >
+      <View style={styles.backdrop}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={loading ? undefined : onCancel}
+          accessibilityRole="button"
+          accessibilityLabel={cancelLabel}
+        />
+        <View style={styles.modal} accessibilityViewIsModal>
+          <View style={[styles.iconWrap, destructive && styles.iconWrapDestructive]}>
+            <MaterialCommunityIcons
+              name={icon}
+              size={28}
+              color={destructive ? '#B91C1C' : COLORS.PRIMARY}
+            />
+          </View>
+          <Text style={styles.title}>{title}</Text>
+          {message ? <Text style={styles.message}>{message}</Text> : null}
+          <View style={styles.actions}>
+            <Button mode="text" onPress={onCancel} disabled={loading} style={styles.btn}>
+              {cancelLabel}
+            </Button>
+            <Button
+              mode="contained"
+              onPress={onConfirm}
+              loading={loading}
+              disabled={loading}
+              buttonColor={destructive ? '#DC2626' : COLORS.PRIMARY}
+              style={styles.btn}
+            >
+              {confirmLabel}
+            </Button>
+          </View>
         </View>
-        <Text style={styles.title}>{title}</Text>
-        {message ? <Text style={styles.message}>{message}</Text> : null}
-        <View style={styles.actions}>
-          <Button mode="text" onPress={onCancel} disabled={loading} style={styles.btn}>
-            {cancelLabel}
-          </Button>
-          <Button
-            mode="contained"
-            onPress={onConfirm}
-            loading={loading}
-            disabled={loading}
-            buttonColor={destructive ? '#DC2626' : COLORS.PRIMARY}
-            style={styles.btn}
-          >
-            {confirmLabel}
-          </Button>
-        </View>
-      </Modal>
-    </Portal>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
   modal: {
     backgroundColor: '#fff',
-    marginHorizontal: 24,
     borderRadius: 16,
     padding: 20,
     maxWidth: 420,
     alignSelf: 'center',
     width: '100%',
+    zIndex: 2,
   },
   iconWrap: {
     alignSelf: 'center',

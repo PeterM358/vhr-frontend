@@ -66,6 +66,7 @@ export function formatDrfErrorMessage(parsed, fallback = 'Request failed') {
       if (key === 'mileage_requires_odometer_photo') return [];
       if (key === 'vehicle_overlap_conflicts') return [];
       if (key === 'assignee_overlap_conflicts') return [];
+      if (key === 'duplicate_invoice') return [];
       const label = labelForField(key);
       if (Array.isArray(val)) {
         return val.map((v) => {
@@ -74,6 +75,12 @@ export function formatDrfErrorMessage(parsed, fallback = 'Request failed') {
           if (!text || isGenericHttpStatusMessage(text)) return '';
           if (key === 'non_field_errors') return text;
           if (key === 'vehicle_ids' || key === 'assignee_user_ids' || key === 'assignee') {
+            return text;
+          }
+          if (
+            (key === 'invoice_number' || key === 'batch') &&
+            /already received|already open|duplicate/i.test(text)
+          ) {
             return text;
           }
           if (text.toLowerCase().includes('this field is required')) {
@@ -89,6 +96,12 @@ export function formatDrfErrorMessage(parsed, fallback = 'Request failed') {
           return [`${label} is required.`];
         }
         if (key === 'vehicle_ids' || key === 'assignee_user_ids' || key === 'assignee') {
+          return [text];
+        }
+        if (
+          (key === 'invoice_number' || key === 'batch') &&
+          /already received|already open|duplicate/i.test(text)
+        ) {
           return [text];
         }
         return [`${label}: ${text}`];

@@ -157,6 +157,16 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
   const headerDraftRef = useRef(null);
   const [phase, setPhase] = useState(resumeBatchId ? 'work' : 'start');
   const [showValidation, setShowValidation] = useState(false);
+  const [actionBanner, setActionBanner] = useState(null);
+
+  const isDuplicateInvoiceMessage = (msg) =>
+    /already received|already open|duplicate/i.test(String(msg || ''));
+
+  const cleanApiMessage = (msg) =>
+    String(msg || '')
+      .replace(/^invoice[_ ]number:\s*/i, '')
+      .replace(/^batch:\s*/i, '')
+      .trim();
 
   const applyBatch = useCallback((session, preview = null) => {
     setBatch(session);
@@ -366,6 +376,7 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
     setBatch(null);
     setInvoicePreview(null);
     setShowValidation(false);
+    setActionBanner(null);
     setPhase('start');
   };
 
@@ -413,40 +424,16 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
   useImperativeHandle(
     ref,
     () => ({
-      /** Returns true when the sheet may close. Offers discard if a draft is open. */
+      /**
+       * Cancel / system back: close immediately and keep any unfinished draft
+       * under Warehouse → Documents. Use “Back — discard draft” to delete.
+       */
       async requestClose() {
-        if (!batch?.id || phase !== 'work') return true;
-        const leave = await confirmMessage(
-          t('partnerDashboard.warehouse.receiving.leaveTitle', null, 'Leave receiving?'),
-          t(
-            'partnerDashboard.warehouse.receiving.leaveBody',
-            null,
-            'You can discard this draft, or keep it under Warehouse → Documents and finish later.'
-          ),
-          {
-            confirmLabel: t('partnerDashboard.warehouse.receiving.leaveConfirm', null, 'Leave'),
-            cancelLabel: t('partnerDashboard.warehouse.receiving.stay', null, 'Stay'),
-          }
-        );
-        if (!leave) return false;
-        const discarded = await discardCurrentDraft({
-          thenReset: true,
-          confirm: true,
-          keepLabel: t(
-            'partnerDashboard.warehouse.receiving.keepAndClose',
-            null,
-            'Keep draft & close'
-          ),
-        });
-        // User chose Leave then declined discard → keep draft and still close
-        if (!discarded) {
-          resetToWizard();
-        }
         return true;
       },
       hasOpenDraft: () => Boolean(batch?.id && phase === 'work'),
     }),
-    [batch?.id, discardCurrentDraft, phase, t]
+    [batch?.id, phase]
   );
 
   const handleImportCsv = async () => {
@@ -508,6 +495,7 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
   const processInvoiceFile = async (picked) => {
     if (!picked || !batch?.id) return;
     setUploading(true);
+    setActionBanner(null);
     try {
       const token = await AsyncStorage.getItem('@access_token');
       const file =
@@ -519,6 +507,7 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
               mimeType: picked.type || 'application/pdf',
             };
       const result = await uploadReceivingInvoice(token, batch.id, file);
+      setActionBanner(null);
       applyBatch(result.batch, result.preview || null);
       const parsed = Number(result.preview?.lines_parsed) || 0;
       if (parsed === 0) {
@@ -532,18 +521,40 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
             : 'No line items read — add parts manually or view the document.')
       );
     } catch (err) {
-      setShowValidation(true);
-      const msg = err.message || 'Upload failed';
-      showMessage(
-        /already received|already open|duplicate/i.test(msg)
-          ? t(
-              'partnerDashboard.warehouse.receiving.duplicateTitle',
-              null,
-              'Duplicate invoice'
-            )
-          : 'Invoice',
-        msg
-      );
+      const msg = cleanApiMessage(err.message || 'Upload failed');
+      if (isDuplicateInvoiceMessage(msg)) {
+        setShowValidation(false);
+        setActionBanner({
+          tone: 'duplicate',
+          title: t(
+            'partnerDashboard.warehouse.receiving.duplicateTitle',
+            null,
+            'Duplicate invoice'
+          ),
+          body: msg,
+        });
+        showMessage(
+          t(
+            'partnerDashboard.warehouse.receiving.duplicateTitle',
+            null,
+            'Duplicate invoice'
+          ),
+          msg,
+          { variant: 'error' }
+        );
+      } else {
+        setShowValidation(true);
+        setActionBanner({
+          tone: 'error',
+          title: t(
+            'partnerDashboard.warehouse.receiving.uploadFailedTitle',
+            null,
+            'Could not read invoice'
+          ),
+          body: msg,
+        });
+        showMessage('Invoice', msg, { variant: 'error' });
+      }
     } finally {
       setUploading(false);
     }
@@ -625,17 +636,29 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
       onCommitted?.({ stayOpen: stayOpenAfterCommit });
       resetToWizard();
     } catch (err) {
-      const msg = err.message || 'Could not finish receiving';
-      showMessage(
-        /already received|already open|duplicate/i.test(msg)
-          ? t(
-              'partnerDashboard.warehouse.receiving.duplicateTitle',
-              null,
-              'Duplicate invoice'
-            )
-          : 'Complete',
-        msg
-      );
+      const msg = cleanApiMessage(err.message || 'Could not finish receiving');
+      if (isDuplicateInvoiceMessage(msg)) {
+        setActionBanner({
+          tone: 'duplicate',
+          title: t(
+            'partnerDashboard.warehouse.receiving.duplicateTitle',
+            null,
+            'Duplicate invoice'
+          ),
+          body: msg,
+        });
+        showMessage(
+          t(
+            'partnerDashboard.warehouse.receiving.duplicateTitle',
+            null,
+            'Duplicate invoice'
+          ),
+          msg,
+          { variant: 'error' }
+        );
+      } else {
+        showMessage('Complete', msg, { variant: 'error' });
+      }
     } finally {
       setCommitting(false);
     }
@@ -739,6 +762,20 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
         )}
       </Text>
 
+      {actionBanner ? (
+        <FloatingCard
+          style={[
+            styles.actionBannerCard,
+            actionBanner.tone === 'duplicate'
+              ? styles.actionBannerDuplicate
+              : styles.actionBannerError,
+          ]}
+        >
+          <Text style={styles.actionBannerTitle}>{actionBanner.title}</Text>
+          <Text style={styles.actionBannerBody}>{actionBanner.body}</Text>
+        </FloatingCard>
+      ) : null}
+
       <Chip compact style={styles.kindBadge}>
         {batchKind === 'credit_note' ? 'Supplier return' : 'Purchase invoice'}
       </Chip>
@@ -751,7 +788,7 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
         </FloatingCard>
       ) : null}
 
-      <MissingFieldsBanner batch={batch} visible={showValidation} />
+      <MissingFieldsBanner batch={batch} visible={showValidation && !actionBanner} />
 
       <ReceivingDocumentPreview
         batch={batch}
@@ -935,6 +972,31 @@ const styles = StyleSheet.create({
     color: TEXT_MUTED,
     lineHeight: 17,
     marginBottom: 10,
+  },
+  actionBannerCard: {
+    marginBottom: 10,
+    padding: 12,
+  },
+  actionBannerDuplicate: {
+    backgroundColor: '#fff7ed',
+    borderLeftWidth: 4,
+    borderLeftColor: '#ea580c',
+  },
+  actionBannerError: {
+    backgroundColor: '#fef2f2',
+    borderLeftWidth: 4,
+    borderLeftColor: '#dc2626',
+  },
+  actionBannerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: TEXT_DARK,
+    marginBottom: 4,
+  },
+  actionBannerBody: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#7c2d12',
   },
   kindBadge: { alignSelf: 'flex-start', marginBottom: 8, backgroundColor: '#dbeafe' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },

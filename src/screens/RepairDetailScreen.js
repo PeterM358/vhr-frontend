@@ -5819,21 +5819,11 @@ export default function RepairDetailScreen({ route, navigation }) {
       visible={warehouseReceiveOpen}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={async () => {
-        const ok = (await warehouseReceiveRef.current?.requestClose?.()) !== false;
-        if (ok) setWarehouseReceiveOpen(false);
-      }}
+      onRequestClose={() => setWarehouseReceiveOpen(false)}
     >
       <View style={[styles.warehouseReceiveModal, { paddingTop: Math.max(insets.top, 8) }]}>
         <View style={styles.warehouseReceiveHeader}>
-          <Button
-            mode="text"
-            compact
-            onPress={async () => {
-              const ok = (await warehouseReceiveRef.current?.requestClose?.()) !== false;
-              if (ok) setWarehouseReceiveOpen(false);
-            }}
-          >
+          <Button mode="text" compact onPress={() => setWarehouseReceiveOpen(false)}>
             {t('common.cancel', null, 'Cancel')}
           </Button>
           <Text style={styles.warehouseReceiveTitle}>
@@ -5851,7 +5841,7 @@ export default function RepairDetailScreen({ route, navigation }) {
           {t(
             'repairs.detail.warehouseReceiveHint',
             null,
-            'Upload 1–3 invoices one after another. After each confirm you stay here for the next. Cancel discards an unfinished draft; Done returns to the repair (drafts stay under Warehouse → Documents). Same supplier + invoice # cannot be received twice.'
+            'Upload 1–3 invoices one after another. After each confirm you stay here for the next. Cancel or Done returns to the repair (unfinished drafts stay under Warehouse → Documents — use Back — discard draft to delete). Same supplier + invoice # cannot be received twice.'
           )}
         </Text>
         <View style={styles.warehouseReceiveBody}>

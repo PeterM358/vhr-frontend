@@ -1,11 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Button, Modal, Portal, Text } from 'react-native-paper';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Button, Text } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { COLORS } from '../../constants/colors';
 import { registerMessageDialog } from '../../utils/messageDialogRef';
 
+/**
+ * Uses RN Modal (not Paper Portal) so messages appear above other RN Modals
+ * (e.g. repair → warehouse receive sheet).
+ */
 export default function MessageDialogHost() {
   const [visible, setVisible] = useState(false);
   const [title, setTitle] = useState('');
@@ -36,31 +40,50 @@ export default function MessageDialogHost() {
         : 'rgba(15,76,129,0.1)';
 
   return (
-    <Portal>
-      <Modal visible={visible} onDismiss={dismiss} contentContainerStyle={styles.modal}>
-        <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
-          <MaterialCommunityIcons name={iconName} size={32} color={iconColor} />
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={dismiss}>
+      <View style={styles.backdrop}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={dismiss}
+          accessibilityRole="button"
+          accessibilityLabel="OK"
+        />
+        <View style={styles.modal} accessibilityViewIsModal>
+          <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
+            <MaterialCommunityIcons name={iconName} size={32} color={iconColor} />
+          </View>
+          {title ? <Text style={styles.title}>{title}</Text> : null}
+          {message ? <Text style={styles.message}>{message}</Text> : null}
+          <Button
+            mode="contained"
+            onPress={dismiss}
+            style={styles.okBtn}
+            contentStyle={styles.okBtnContent}
+          >
+            OK
+          </Button>
         </View>
-        {title ? <Text style={styles.title}>{title}</Text> : null}
-        {message ? <Text style={styles.message}>{message}</Text> : null}
-        <Button mode="contained" onPress={dismiss} style={styles.okBtn} contentStyle={styles.okBtnContent}>
-          OK
-        </Button>
-      </Modal>
-    </Portal>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
   modal: {
     backgroundColor: '#fff',
-    marginHorizontal: 20,
     borderRadius: 18,
     paddingVertical: 24,
     paddingHorizontal: 22,
     maxWidth: 440,
     alignSelf: 'center',
     width: '100%',
+    zIndex: 2,
     shadowColor: '#000',
     shadowOpacity: 0.15,
     shadowRadius: 24,
