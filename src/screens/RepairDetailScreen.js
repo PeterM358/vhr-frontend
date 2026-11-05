@@ -335,6 +335,7 @@ export default function RepairDetailScreen({ route, navigation }) {
   const autoDefaultOpAttemptedRef = useRef(false);
   /** Inline warehouse receive (invoice → stock) without leaving the repair wizard. */
   const [warehouseReceiveOpen, setWarehouseReceiveOpen] = useState(false);
+  const warehouseReceiveRef = useRef(null);
   const [shopEmployees, setShopEmployees] = useState([]);
   const [shopUsesWorkforce, setShopUsesWorkforce] = useState(false);
   const [assignPickerOpId, setAssignPickerOpId] = useState(null);
@@ -5818,10 +5819,23 @@ export default function RepairDetailScreen({ route, navigation }) {
       visible={warehouseReceiveOpen}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={() => setWarehouseReceiveOpen(false)}
+      onRequestClose={async () => {
+        const ok = (await warehouseReceiveRef.current?.requestClose?.()) !== false;
+        if (ok) setWarehouseReceiveOpen(false);
+      }}
     >
       <View style={[styles.warehouseReceiveModal, { paddingTop: Math.max(insets.top, 8) }]}>
         <View style={styles.warehouseReceiveHeader}>
+          <Button
+            mode="text"
+            compact
+            onPress={async () => {
+              const ok = (await warehouseReceiveRef.current?.requestClose?.()) !== false;
+              if (ok) setWarehouseReceiveOpen(false);
+            }}
+          >
+            {t('common.cancel', null, 'Cancel')}
+          </Button>
           <Text style={styles.warehouseReceiveTitle}>
             {t(
               'repairs.detail.warehouseReceiveTitle',
@@ -5837,16 +5851,17 @@ export default function RepairDetailScreen({ route, navigation }) {
           {t(
             'repairs.detail.warehouseReceiveHint',
             null,
-            'Upload a PDF/photo or add lines manually. After confirm, return here and issue parts to this repair.'
+            'Upload 1–3 invoices one after another. After each confirm you stay here for the next. Cancel discards an unfinished draft; Done returns to the repair (drafts stay under Warehouse → Documents). Same supplier + invoice # cannot be received twice.'
           )}
         </Text>
         <View style={styles.warehouseReceiveBody}>
           {warehouseReceiveOpen ? (
             <ShopWarehouseReceiveScreen
+              ref={warehouseReceiveRef}
               navigation={navigation}
               embedded
+              stayOpenAfterCommit
               onCommitted={async () => {
-                setWarehouseReceiveOpen(false);
                 await refreshRepair();
                 await refreshParts();
                 showMessage(
@@ -5858,7 +5873,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                   t(
                     'repairs.detail.warehouseReceiveCommittedBody',
                     null,
-                    'Open Manage parts, add the stocked item, then tap Issue from stock.'
+                    'Upload another invoice here, or tap Done and issue parts to this repair from Manage parts.'
                   ),
                   { variant: 'success' }
                 );
@@ -6302,15 +6317,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
+    paddingHorizontal: 4,
     paddingBottom: 4,
+    gap: 4,
   },
   warehouseReceiveTitle: {
     flex: 1,
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     color: '#f8fafc',
-    paddingRight: 8,
+    textAlign: 'center',
   },
   warehouseReceiveHint: {
     paddingHorizontal: 16,

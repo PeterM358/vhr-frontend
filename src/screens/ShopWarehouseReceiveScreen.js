@@ -2,7 +2,7 @@
  * Pro warehouse receiving: invoice preview, manual lines, base-unit stock per center.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { View, FlatList, StyleSheet, Pressable, Platform, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
@@ -36,6 +36,7 @@ import {
   commitReceivingSession,
   createReceivingSession,
   deleteReceivingLine,
+  deleteReceivingSession,
   downloadBillingCsv,
   getReceivingSession,
   importReceivingCsv,
@@ -124,13 +125,15 @@ function LineRow({ line, onEdit, onDelete }) {
   );
 }
 
-export default function ShopWarehouseReceiveScreen({
+const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScreen({
   navigation,
   embedded = false,
   resumeBatchId = null,
   onCommitted,
   onResumeConsumed,
-}) {
+  /** When true (repair sheet), stay on start after commit so another invoice can be added. */
+  stayOpenAfterCommit = false,
+}, ref) {
   const { t } = useTranslation();
   const inDrawer = typeof navigation.openDrawer === 'function';
   const insets = useSafeAreaInsets();
@@ -366,6 +369,86 @@ export default function ShopWarehouseReceiveScreen({
     setPhase('start');
   };
 
+  const discardCurrentDraft = useCallback(async ({
+    thenReset = true,
+    confirm = true,
+    keepLabel = null,
+  } = {}) => {
+    if (!batch?.id) {
+      if (thenReset) resetToWizard();
+      return true;
+    }
+    if (confirm) {
+      const ok = await confirmMessage(
+        t('partnerDashboard.warehouse.receiving.discardTitle', null, 'Discard this document?'),
+        t(
+          'partnerDashboard.warehouse.receiving.discardBody',
+          null,
+          'The uploaded file and draft lines will be removed. Confirmed stock is not affected.'
+        ),
+        {
+          confirmLabel: t('partnerDashboard.warehouse.receiving.discardConfirm', null, 'Discard'),
+          cancelLabel:
+            keepLabel ||
+            t('common.cancel', null, 'Cancel'),
+          destructive: true,
+        }
+      );
+      if (!ok) return false;
+    }
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      await deleteReceivingSession(token, batch.id);
+    } catch (err) {
+      showMessage(
+        t('partnerDashboard.warehouse.receiving.discardFailed', null, 'Could not discard'),
+        err.message || t('repairs.detail.pleaseTryAgain', null, 'Please try again.')
+      );
+      return false;
+    }
+    if (thenReset) resetToWizard();
+    return true;
+  }, [batch?.id, t]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      /** Returns true when the sheet may close. Offers discard if a draft is open. */
+      async requestClose() {
+        if (!batch?.id || phase !== 'work') return true;
+        const leave = await confirmMessage(
+          t('partnerDashboard.warehouse.receiving.leaveTitle', null, 'Leave receiving?'),
+          t(
+            'partnerDashboard.warehouse.receiving.leaveBody',
+            null,
+            'You can discard this draft, or keep it under Warehouse → Documents and finish later.'
+          ),
+          {
+            confirmLabel: t('partnerDashboard.warehouse.receiving.leaveConfirm', null, 'Leave'),
+            cancelLabel: t('partnerDashboard.warehouse.receiving.stay', null, 'Stay'),
+          }
+        );
+        if (!leave) return false;
+        const discarded = await discardCurrentDraft({
+          thenReset: true,
+          confirm: true,
+          keepLabel: t(
+            'partnerDashboard.warehouse.receiving.keepAndClose',
+            null,
+            'Keep draft & close'
+          ),
+        });
+        // User chose Leave then declined discard → keep draft and still close
+        if (!discarded) {
+          resetToWizard();
+        }
+        return true;
+      },
+      hasOpenDraft: () => Boolean(batch?.id && phase === 'work'),
+    }),
+    [batch?.id, discardCurrentDraft, phase, t]
+  );
+
   const handleImportCsv = async () => {
     if (!batch?.id) {
       showMessage('Receiving session', 'No active session — refresh and try again.');
@@ -450,7 +533,17 @@ export default function ShopWarehouseReceiveScreen({
       );
     } catch (err) {
       setShowValidation(true);
-      showMessage('Invoice', err.message || 'Upload failed');
+      const msg = err.message || 'Upload failed';
+      showMessage(
+        /already received|already open|duplicate/i.test(msg)
+          ? t(
+              'partnerDashboard.warehouse.receiving.duplicateTitle',
+              null,
+              'Duplicate invoice'
+            )
+          : 'Invoice',
+        msg
+      );
     } finally {
       setUploading(false);
     }
@@ -520,13 +613,29 @@ export default function ShopWarehouseReceiveScreen({
       showMessage(
         'Done',
         warehouseEnabled
-          ? 'Document completed and stock updated.'
+          ? stayOpenAfterCommit
+            ? t(
+                'partnerDashboard.warehouse.receiving.committedStayOpen',
+                null,
+                'Stock updated. Upload another invoice, or tap Done to return to the repair.'
+              )
+            : 'Document completed and stock updated.'
           : 'Document completed — catalog saved (enable stock tracking to update quantities).'
       );
-      onCommitted?.();
+      onCommitted?.({ stayOpen: stayOpenAfterCommit });
       resetToWizard();
     } catch (err) {
-      showMessage('Complete', err.message || 'Could not finish receiving');
+      const msg = err.message || 'Could not finish receiving';
+      showMessage(
+        /already received|already open|duplicate/i.test(msg)
+          ? t(
+              'partnerDashboard.warehouse.receiving.duplicateTitle',
+              null,
+              'Duplicate invoice'
+            )
+          : 'Complete',
+        msg
+      );
     } finally {
       setCommitting(false);
     }
@@ -600,9 +709,35 @@ export default function ShopWarehouseReceiveScreen({
         onToggle={toggleWarehouse}
       />
 
-      <Button icon="arrow-left" mode="text" onPress={resetToWizard} compact style={styles.backWizard}>
-        New document
-      </Button>
+      <View style={styles.draftNavRow}>
+        <Button
+          icon="arrow-left"
+          mode="text"
+          onPress={() => discardCurrentDraft({ thenReset: true })}
+          compact
+          style={styles.backWizard}
+        >
+          {t(
+            'partnerDashboard.warehouse.receiving.backDiscard',
+            null,
+            'Back — discard draft'
+          )}
+        </Button>
+        <Button mode="text" compact onPress={resetToWizard}>
+          {t(
+            'partnerDashboard.warehouse.receiving.keepDraftNew',
+            null,
+            'Keep draft · new doc'
+          )}
+        </Button>
+      </View>
+      <Text style={styles.duplicateHint}>
+        {t(
+          'partnerDashboard.warehouse.receiving.duplicateHint',
+          null,
+          'Same supplier + invoice # cannot be received twice. Continue a draft from Documents, or change the number only if it is truly a new document.'
+        )}
+      </Text>
 
       <Chip compact style={styles.kindBadge}>
         {batchKind === 'credit_note' ? 'Supplier return' : 'Purchase invoice'}
@@ -776,7 +911,9 @@ export default function ShopWarehouseReceiveScreen({
       />
     </Wrapper>
   );
-}
+});
+
+export default ShopWarehouseReceiveScreen;
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
@@ -784,7 +921,21 @@ const styles = StyleSheet.create({
   embeddedRoot: { flex: 1, minHeight: 0 },
   embeddedPad: { paddingTop: 4 },
   wizardContent: { paddingBottom: 40 },
-  backWizard: { alignSelf: 'flex-start', marginBottom: 4 },
+  backWizard: { alignSelf: 'flex-start', marginBottom: 0 },
+  draftNavRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+    marginBottom: 6,
+  },
+  duplicateHint: {
+    fontSize: 12,
+    color: TEXT_MUTED,
+    lineHeight: 17,
+    marginBottom: 10,
+  },
   kindBadge: { alignSelf: 'flex-start', marginBottom: 8, backgroundColor: '#dbeafe' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   container: { paddingHorizontal: 12 },
