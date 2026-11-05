@@ -131,6 +131,7 @@ function DocumentDetail({ doc, onBack }) {
       {fileUrl ? (
         <ReceivingDocumentPreview
           batch={{
+            id: doc.import_batch_id || null,
             source_type: 'invoice_upload',
             source_file_stored: true,
             source_file_url: fileUrl,
@@ -142,7 +143,6 @@ function DocumentDetail({ doc, onBack }) {
           }}
           preview={{ message: 'Committed document — preview loads below.' }}
           readOnly
-          onAddManual={() => {}}
         />
       ) : null}
 
