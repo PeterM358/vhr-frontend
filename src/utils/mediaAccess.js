@@ -11,6 +11,21 @@ const LEGACY_PRIVATE_PREFIXES = [
   'network_claims/',
 ];
 
+/**
+ * Recover object keys that were wrongly absolutized against an API request
+ * path, e.g. /api/billing/receiving/4/staging/private/… → staging/private/…
+ */
+function recoverPrivateObjectKey(path) {
+  const decoded = String(path || '');
+  const envPrivate = decoded.match(
+    /((?:staging|production|local|beta|dev)\/private\/.+)$/i
+  );
+  if (envPrivate?.[1]) return envPrivate[1];
+  const plainPrivate = decoded.match(/(^|\/)(private\/.+)$/i);
+  if (plainPrivate?.[2]) return plainPrivate[2];
+  return decoded.replace(/^\//, '');
+}
+
 export function extractRelativeMediaPath(pathOrUrl) {
   if (!pathOrUrl) return '';
   const raw = String(pathOrUrl).trim();
@@ -20,14 +35,24 @@ export function extractRelativeMediaPath(pathOrUrl) {
       const parsed = new URL(raw);
       const idx = parsed.pathname.indexOf('/media/');
       if (idx >= 0) {
-        return decodeURIComponent(parsed.pathname.slice(idx + '/media/'.length));
+        return recoverPrivateObjectKey(
+          decodeURIComponent(parsed.pathname.slice(idx + '/media/'.length))
+        );
       }
-      return decodeURIComponent(parsed.pathname.replace(/^\//, ''));
+      return recoverPrivateObjectKey(decodeURIComponent(parsed.pathname));
     } catch {
-      return raw;
+      return recoverPrivateObjectKey(raw);
     }
   }
-  return raw.replace(/^\/?media\//, '').replace(/^\//, '');
+  // Already a storage key (preferred from API) or /media/… relative path.
+  if (
+    /^(?:staging|production|local|beta|dev)\/private\//i.test(raw) ||
+    /^private\//i.test(raw) ||
+    LEGACY_PRIVATE_PREFIXES.some((prefix) => raw.startsWith(prefix))
+  ) {
+    return raw.replace(/^\//, '');
+  }
+  return recoverPrivateObjectKey(raw.replace(/^\/?media\//, ''));
 }
 
 export function isPrivateMediaPath(pathOrUrl) {
