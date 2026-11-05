@@ -23,7 +23,9 @@ export default function CatalogSinglePicker({
   createLabel = '',
   emptyHint = 'Type to search the catalog.',
 }) {
-  const showList = searchValue.trim().length > 0 || !selectedId;
+  // When a value is selected, only show the chip + Change — search/list clutter
+  // the invoice header (duplicate supplier name rows).
+  const showList = !selectedId;
 
   return (
     <View style={styles.wrap}>

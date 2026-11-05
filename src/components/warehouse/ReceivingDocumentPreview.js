@@ -1,14 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, Pressable, Linking, Platform, ActivityIndicator } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Text, Button, Chip } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import FloatingCard from '../ui/FloatingCard';
 import { PRIMARY, TEXT_DARK, TEXT_MUTED } from '../../constants/colors';
 import { showMessage } from '../../utils/crossPlatformAlert';
-import useWebDocumentBlobUrl from '../../utils/useWebDocumentBlobUrl';
-import { normalizeMediaUrl, openPrivateDocument } from '../../utils/warehouseDocumentUrl';
+import { useTranslation } from '../../i18n';
+import useReceivingDocumentUrl from '../../utils/useReceivingDocumentUrl';
+import { openReceivingBatchDocument } from '../../utils/receivingDocumentAccess';
 import {
   buildInvoicePreviewFromBatch,
   isImageDocumentUrl,
@@ -30,7 +30,7 @@ function WebDocumentFrame({ url, isPdf, isImage, loadError, loading }) {
   if (loadError) {
     return (
       <Text style={styles.previewError}>
-        {loadError} — use Open file to view in a new tab.
+        {loadError}
       </Text>
     );
   }
@@ -42,7 +42,7 @@ function WebDocumentFrame({ url, isPdf, isImage, loadError, loading }) {
         alt="Supplier document"
         style={{
           width: '100%',
-          maxHeight: 480,
+          maxHeight: 360,
           objectFit: 'contain',
           borderRadius: 8,
           backgroundColor: '#fff',
@@ -58,7 +58,7 @@ function WebDocumentFrame({ url, isPdf, isImage, loadError, loading }) {
         type="application/pdf"
         style={{
           width: '100%',
-          height: 480,
+          height: 360,
           border: '1px solid #e2e8f0',
           borderRadius: 8,
           backgroundColor: '#fff',
@@ -69,7 +69,7 @@ function WebDocumentFrame({ url, isPdf, isImage, loadError, loading }) {
           src={url}
           style={{
             width: '100%',
-            height: 480,
+            height: 360,
             border: 'none',
             borderRadius: 8,
             backgroundColor: '#fff',
@@ -92,40 +92,42 @@ export default function ReceivingDocumentPreview({
   uploading = false,
   onUpload,
   onReupload,
-  onAddManual,
+  compact = false,
   readOnly = false,
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(!compact);
   const resolved = useMemo(
     () => buildInvoicePreviewFromBatch(batch, preview),
     [batch, preview]
   );
 
   const fileUrl = batch?.source_file_url || '';
-  const { displayUrl, loading: previewLoading, error: previewError } = useWebDocumentBlobUrl(fileUrl);
-  const isPdf = isPdfDocumentUrl(fileUrl);
+  const { displayUrl, loading: previewLoading, error: previewError } = useReceivingDocumentUrl(batch);
+  const isPdf = isPdfDocumentUrl(fileUrl) || String(fileUrl).toLowerCase().endsWith('.pdf');
   const isImage = isImageDocumentUrl(fileUrl);
-  const hasFile = Boolean(batch?.source_file_stored && fileUrl);
+  const hasFile = Boolean(batch?.id && (batch?.source_file_stored || fileUrl));
   const isInvoiceImport = batch?.source_type === 'invoice_upload';
+  const linesParsed = resolved?.lines_parsed ?? batch?.line_count ?? 0;
 
   const openFile = async () => {
-    if (!fileUrl) {
-      showMessage('Document', 'File not available yet.');
+    if (!batch?.id && !fileUrl) {
+      showMessage(
+        t('partnerDashboard.warehouse.receiving.fileUnavailableTitle', null, 'Document'),
+        t('partnerDashboard.warehouse.receiving.fileUnavailableBody', null, 'File not available yet.')
+      );
       return;
     }
     try {
-      const token = await AsyncStorage.getItem('@access_token');
-      const accessUrl = await openPrivateDocument(fileUrl, token);
+      const accessUrl = await openReceivingBatchDocument(batch, fileUrl);
       if (Platform.OS !== 'web' && accessUrl) {
         await Linking.openURL(accessUrl);
       }
-    } catch {
-      const fallback = normalizeMediaUrl(fileUrl);
-      if (Platform.OS === 'web' && fallback) {
-        window.open(fallback, '_blank', 'noopener,noreferrer');
-        return;
-      }
-      showMessage('Document', 'Could not open file.');
+    } catch (err) {
+      showMessage(
+        t('partnerDashboard.warehouse.receiving.openFileFailedTitle', null, 'Could not open file'),
+        err.message || t('repairs.detail.pleaseTryAgain', null, 'Please try again.')
+      );
     }
   };
 
@@ -135,9 +137,19 @@ export default function ReceivingDocumentPreview({
         <View style={styles.uploadHeader}>
           <MaterialCommunityIcons name="file-upload-outline" size={28} color={PRIMARY} />
           <View style={styles.uploadBody}>
-            <Text style={styles.uploadTitle}>Supplier invoice (optional)</Text>
+            <Text style={styles.uploadTitle}>
+              {t(
+                'partnerDashboard.warehouse.receiving.uploadInvoice',
+                null,
+                'Upload supplier invoice'
+              )}
+            </Text>
             <Text style={styles.uploadHint}>
-              Upload a PDF or photo to parse line items, or add parts manually below.
+              {t(
+                'partnerDashboard.warehouse.receiving.uploadInvoiceHint',
+                null,
+                'PDF or photo — we read line items when possible.'
+              )}
             </Text>
           </View>
         </View>
@@ -148,37 +160,58 @@ export default function ReceivingDocumentPreview({
           loading={uploading}
           buttonColor={PRIMARY}
         >
-          Choose invoice file
+          {t(
+            'partnerDashboard.warehouse.receiving.chooseInvoiceFile',
+            null,
+            'Choose invoice file'
+          )}
         </Button>
       </FloatingCard>
     );
   }
 
-  const linesParsed = resolved?.lines_parsed ?? batch?.line_count ?? 0;
-  const status = resolved?.ocr_status || batch?.ocr_status || 'unknown';
   const statusLabel =
-    status === 'ready'
-      ? `${linesParsed} line${linesParsed === 1 ? '' : 's'} parsed`
-      : status === 'no_text'
-        ? 'Scan / image PDF'
-        : linesParsed > 0
-          ? `${linesParsed} lines`
-          : 'No lines matched';
+    linesParsed > 0
+      ? t(
+          'partnerDashboard.warehouse.receiving.linesParsedChip',
+          { count: linesParsed },
+          '{count} lines'
+        )
+      : t('partnerDashboard.warehouse.receiving.noLinesChip', null, 'No lines matched');
 
   return (
     <FloatingCard style={styles.card}>
       <Pressable onPress={() => setExpanded((v) => !v)} style={styles.header}>
         <MaterialCommunityIcons
-          name={hasFile ? 'file-document-outline' : 'file-alert-outline'}
+          name={hasFile ? 'file-pdf-box' : 'file-alert-outline'}
           size={26}
           color={PRIMARY}
         />
         <View style={styles.headerBody}>
-          <Text style={styles.title}>Supplier document</Text>
+          <Text style={styles.title}>
+            {t(
+              'partnerDashboard.warehouse.receiving.invoiceFileTitle',
+              null,
+              'Invoice file'
+            )}
+          </Text>
           <Text style={styles.meta} numberOfLines={2}>
-            {batch?.supplier_name || 'Supplier unknown'}
+            {batch?.supplier_name || '—'}
             {batch?.invoice_number ? ` · ${batch.invoice_number}` : ''}
             {batch?.invoice_date ? ` · ${batch.invoice_date}` : ''}
+          </Text>
+          <Text style={styles.hint}>
+            {linesParsed > 0
+              ? t(
+                  'partnerDashboard.warehouse.receiving.linesParsedHint',
+                  { count: linesParsed },
+                  '{count} parts read — review the list below.'
+                )
+              : t(
+                  'partnerDashboard.warehouse.receiving.noLinesHint',
+                  null,
+                  'No lines matched — add parts manually or re-import.'
+                )}
           </Text>
         </View>
         <Chip compact style={styles.statusChip} textStyle={styles.statusChipText}>
@@ -191,50 +224,41 @@ export default function ReceivingDocumentPreview({
         />
       </Pressable>
 
-      {resolved?.message ? <Text style={styles.message}>{resolved.message}</Text> : null}
-
       {expanded && hasFile ? (
         <View style={styles.previewFrame}>
           <WebDocumentFrame
             url={displayUrl}
-            isPdf={isPdf}
+            isPdf={isPdf || !isImage}
             isImage={isImage}
             loading={previewLoading}
             loadError={previewError}
           />
-          {Platform.OS !== 'web' ? (
-            <View style={styles.nativePreviewHint}>
-              <MaterialCommunityIcons name="file-eye-outline" size={20} color={TEXT_MUTED} />
-              <Text style={styles.nativePreviewText}>
-                {isImage ? 'Image attached' : 'PDF attached'} — open to view side-by-side while
-                editing lines.
-              </Text>
-            </View>
-          ) : null}
         </View>
       ) : null}
 
       <View style={styles.actions}>
         {hasFile ? (
-          <Button mode="outlined" icon="open-in-new" onPress={openFile} compact>
-            Open file
+          <Button mode="contained" icon="open-in-new" onPress={openFile} compact buttonColor={PRIMARY}>
+            {t('partnerDashboard.warehouse.receiving.openFile', null, 'Open PDF')}
           </Button>
         ) : null}
         {!readOnly ? (
-          <>
-            <Button
-              mode="outlined"
-              icon="file-upload"
-              onPress={onReupload || onUpload}
-              loading={uploading}
-              compact
-            >
-              {isInvoiceImport ? 'Re-import' : 'Upload'}
-            </Button>
-            <Button mode="contained" icon="plus" onPress={onAddManual} buttonColor={PRIMARY} compact>
-              Add part
-            </Button>
-          </>
+          <Button
+            mode="outlined"
+            icon="file-upload"
+            onPress={onReupload || onUpload}
+            loading={uploading}
+            compact
+          >
+            {isInvoiceImport
+              ? t('partnerDashboard.warehouse.receiving.reimport', null, 'Re-import')
+              : t('partnerDashboard.warehouse.receiving.upload', null, 'Upload')}
+          </Button>
+        ) : null}
+        {!expanded && hasFile ? (
+          <Button mode="text" compact onPress={() => setExpanded(true)}>
+            {t('partnerDashboard.warehouse.receiving.showPreview', null, 'Show preview')}
+          </Button>
         ) : null}
       </View>
     </FloatingCard>
@@ -245,7 +269,7 @@ const styles = StyleSheet.create({
   card: {
     marginBottom: 10,
     padding: 14,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: '#f8fafc',
     borderLeftWidth: 4,
     borderLeftColor: PRIMARY,
   },
@@ -258,24 +282,12 @@ const styles = StyleSheet.create({
   headerBody: { flex: 1 },
   title: { fontSize: 16, fontWeight: '700', color: TEXT_DARK },
   meta: { fontSize: 12, color: TEXT_MUTED, marginTop: 2 },
+  hint: { fontSize: 12, color: TEXT_DARK, marginTop: 4, lineHeight: 17 },
   statusChip: { backgroundColor: '#dbeafe', maxWidth: 120 },
   statusChipText: { fontSize: 10, color: '#0F4C81' },
-  message: { fontSize: 13, color: TEXT_DARK, lineHeight: 18, marginBottom: 10 },
   previewFrame: { marginBottom: 10 },
   previewLoading: { alignItems: 'center', paddingVertical: 24, gap: 8 },
   previewError: { fontSize: 12, color: '#b91c1c', paddingVertical: 8, lineHeight: 17 },
   fallbackText: { fontSize: 12, color: TEXT_MUTED, paddingVertical: 8 },
-  nativePreviewHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-    padding: 10,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  nativePreviewText: { flex: 1, fontSize: 12, color: TEXT_MUTED, lineHeight: 17 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
 });

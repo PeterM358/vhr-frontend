@@ -28,6 +28,14 @@ import { getMyShopProfiles, updateShopProfile } from '../api/profiles';
 import { fetchUnits } from '../api/partCatalog';
 import { pickReceiptOrInvoiceAttachment } from '../utils/pickDocumentFile';
 import { showMessage, confirmMessage } from '../utils/crossPlatformAlert';
+
+/** Nested RN Modals (repair sheet) often swallow Paper/confirm hosts on web. */
+async function confirmDestructiveWebSafe(title, message, options = {}) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return window.confirm([title, message].filter(Boolean).join('\n\n'));
+  }
+  return confirmMessage(title, message, options);
+}
 import { buildInvoicePreviewFromBatch } from '../utils/warehouseInvoicePreview';
 import {
   HEADER_ISSUE_LABELS,
@@ -436,7 +444,7 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
       } = {}
     ) => {
       if (!draftId) return false;
-      const ok = await confirmMessage(
+      const ok = await confirmDestructiveWebSafe(
         title ||
           t(
             'partnerDashboard.warehouse.receiving.deleteDraftTitle',
@@ -515,7 +523,7 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
   const deleteAllPendingDrafts = useCallback(async () => {
     const ids = (pendingDrafts || []).map((d) => d.id).filter(Boolean);
     if (!ids.length) return;
-    const ok = await confirmMessage(
+    const ok = await confirmDestructiveWebSafe(
       t(
         'partnerDashboard.warehouse.receiving.deleteAllDraftsTitle',
         null,
@@ -594,7 +602,7 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
       return true;
     }
     if (confirm) {
-      const ok = await confirmMessage(
+      const ok = await confirmDestructiveWebSafe(
         t('partnerDashboard.warehouse.receiving.discardTitle', null, 'Discard this document?'),
         t(
           'partnerDashboard.warehouse.receiving.discardBody',
@@ -715,9 +723,9 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
       setActionBanner(null);
       applyBatch(result.batch, result.preview || null);
       const parsed = Number(result.preview?.lines_parsed) || 0;
-      if (parsed === 0) {
-        setShowValidation(true);
-      }
+      const headerMissing = (result.batch?.header_issues || []).length > 0;
+      const incompleteLines = Number(result.batch?.incomplete_count) || 0;
+      setShowValidation(parsed === 0 || headerMissing || incompleteLines > 0);
       showMessage(
         result.preview?.lines_parsed > 0 ? 'Invoice parsed' : 'Invoice uploaded',
         result.message ||
@@ -1023,21 +1031,26 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
   const headerIssues = batch?.header_issues || [];
   const readyToCommit = lines.length > 0 && incomplete === 0 && headerIssues.length === 0;
 
+  const statusTone = readyToCommit ? 'ok' : showValidation && (incomplete > 0 || headerIssues.length) ? 'warn' : 'neutral';
+
   const listHeader = (
     <View style={[styles.container, embedded ? styles.embeddedPad : { paddingTop: showAppNav ? 12 : 8 }]}>
-      <WarehouseStockToggle
-        enabled={warehouseEnabled}
-        toggling={warehouseToggling}
-        onToggle={toggleWarehouse}
-      />
+      {!embedded ? (
+        <WarehouseStockToggle
+          enabled={warehouseEnabled}
+          toggling={warehouseToggling}
+          onToggle={toggleWarehouse}
+        />
+      ) : null}
 
       <View style={styles.draftNavRow}>
         <Button
-          icon="arrow-left"
-          mode="text"
+          icon="delete-outline"
+          mode="outlined"
           onPress={() => discardCurrentDraft({ thenReset: true })}
           compact
-          style={styles.backWizard}
+          textColor="#b91c1c"
+          style={styles.discardBtn}
         >
           {t(
             'partnerDashboard.warehouse.receiving.backDiscard',
@@ -1053,13 +1066,6 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
           )}
         </Button>
       </View>
-      <Text style={styles.duplicateHint}>
-        {t(
-          'partnerDashboard.warehouse.receiving.duplicateHint',
-          null,
-          'Same supplier + invoice # cannot be received twice. If a draft already exists, continue it from the banner or the list on the start screen.'
-        )}
-      </Text>
 
       {actionBanner ? (
         <FloatingCard
@@ -1137,27 +1143,50 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
         </FloatingCard>
       ) : null}
 
-      <Chip compact style={styles.kindBadge}>
-        {batchKind === 'credit_note' ? 'Supplier return' : 'Purchase invoice'}
-      </Chip>
-
-      {batchKind === 'credit_note' ? (
-        <FloatingCard style={styles.infoCard}>
-          <Text style={styles.infoText}>
-            Credit note mode — quantities reduce stock at this center when you complete.
-          </Text>
-        </FloatingCard>
-      ) : null}
+      <View
+        style={[
+          styles.statusStrip,
+          statusTone === 'ok' ? styles.statusStripOk : null,
+          statusTone === 'warn' ? styles.statusStripWarn : null,
+        ]}
+      >
+        <MaterialCommunityIcons
+          name={readyToCommit ? 'check-circle' : 'clipboard-list-outline'}
+          size={18}
+          color={readyToCommit ? '#15803d' : statusTone === 'warn' ? '#b45309' : '#e2e8f0'}
+        />
+        <Text style={styles.statusStripText}>
+          {t(
+            'partnerDashboard.warehouse.receiving.statusParts',
+            { count: lines.length },
+            '{count} parts'
+          )}
+          {readyToCommit
+            ? ` · ${t('partnerDashboard.warehouse.receiving.statusReady', null, 'ready to complete')}`
+            : headerIssues.length
+              ? ` · ${t('partnerDashboard.warehouse.receiving.statusHeaderMissing', null, 'document fields missing')}`
+              : incomplete > 0
+                ? ` · ${t(
+                    'partnerDashboard.warehouse.receiving.statusLinesNeedFix',
+                    { count: incomplete },
+                    '{count} need edit'
+                  )}`
+                : ''}
+        </Text>
+      </View>
 
       <MissingFieldsBanner batch={batch} visible={showValidation && !actionBanner} />
 
+      <Text style={styles.sectionTitle}>
+        {t('partnerDashboard.warehouse.receiving.sectionDocument', null, '1. Document')}
+      </Text>
       <ReceivingDocumentPreview
         batch={batch}
         preview={invoicePreview}
         uploading={uploading}
         onUpload={handleUploadInvoice}
         onReupload={handleUploadInvoice}
-        onAddManual={() => openEditor(null)}
+        compact
       />
 
       <InvoiceHeaderCard
@@ -1169,72 +1198,40 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
         showValidation={showValidation}
       />
 
-      <FloatingCard style={styles.heroCard}>
-        <View style={styles.actionRow}>
+      <View style={styles.partsSectionHeader}>
+        <Text style={styles.sectionTitle}>
+          {t('partnerDashboard.warehouse.receiving.sectionParts', null, '2. Parts to stock')}
+        </Text>
+        <View style={styles.partsActions}>
           <Button
             mode="contained"
             icon="plus"
             onPress={() => openEditor(null)}
             buttonColor={PRIMARY}
-            style={styles.actionBtn}
+            compact
           >
-            Add part
+            {t('partnerDashboard.warehouse.receiving.addPart', null, 'Add part')}
           </Button>
-          <Button
-            mode="outlined"
-            icon="file-delimited"
-            onPress={handleImportCsv}
-            loading={importingCsv}
-            style={styles.actionBtn}
-          >
-            Import CSV
+          <Button mode="outlined" icon="file-delimited" onPress={handleImportCsv} loading={importingCsv} compact>
+            CSV
           </Button>
         </View>
-        <View style={styles.actionRow}>
-          <Button
-            compact
-            mode="text"
-            onPress={() => handleExport('import/catalog-template.csv', 'warehouse-import-template.csv')}
-          >
-            CSV template
-          </Button>
-          <Button
-            compact
-            mode="text"
-            onPress={() => handleExport('export/catalog.csv', 'catalog.csv')}
-          >
-            Export catalog
-          </Button>
-          <Button
-            compact
-            mode="text"
-            onPress={() => handleExport('export/stock-movements.csv', 'stock.csv')}
-          >
-            Export stock
-          </Button>
-          <Button
-            compact
-            mode="text"
-            onPress={() => handleExport('export/receiving-history.csv', 'receiving.csv')}
-          >
-            Export history
-          </Button>
-        </View>
-      </FloatingCard>
-
-      <View style={styles.summaryRow}>
-        <Text style={styles.summaryText}>
-          {lines.length} line{lines.length === 1 ? '' : 's'}
-          {headerIssues.length ? ` · doc ${headerIssues.length} missing` : ''}
-          {showValidation && incomplete > 0 ? ` · ${incomplete} need fix` : ''}
-          {readyToCommit ? ' · ready to complete' : ''}
-        </Text>
       </View>
+      <Text style={styles.partsLead}>
+        {t(
+          'partnerDashboard.warehouse.receiving.partsLead',
+          null,
+          'These lines become stock when you complete receiving. Tap Edit if anything looks wrong.'
+        )}
+      </Text>
     </View>
   );
 
   const listFooter = (
     <View style={styles.footerSection}>
+      <Text style={[styles.sectionTitle, styles.footerSectionTitle]}>
+        {t('partnerDashboard.warehouse.receiving.sectionComplete', null, '3. Complete')}
+      </Text>
       <ReceivingTotalsCard totals={batch?.totals} lineCount={lines.length} />
       {batch?.id ? (
         <View style={styles.footer}>
@@ -1246,11 +1243,29 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
             disabled={committing}
             buttonColor={readyToCommit ? PRIMARY : showValidation ? '#dc2626' : PRIMARY}
           >
-            Complete receiving
+            {t(
+              'partnerDashboard.warehouse.receiving.completeReceiving',
+              null,
+              'Complete receiving'
+            )}
           </Button>
           {showValidation && !readyToCommit ? (
-            <Text style={styles.footerHint}>Fix red fields above before completing.</Text>
-          ) : null}
+            <Text style={styles.footerHint}>
+              {t(
+                'partnerDashboard.warehouse.receiving.fixBeforeComplete',
+                null,
+                'Fix red fields above before completing.'
+              )}
+            </Text>
+          ) : (
+            <Text style={styles.footerKeepHint}>
+              {t(
+                'partnerDashboard.warehouse.receiving.fileKeptForever',
+                null,
+                'The invoice PDF stays on file for this service center after you complete.'
+              )}
+            </Text>
+          )}
         </View>
       ) : null}
     </View>
@@ -1320,13 +1335,68 @@ const styles = StyleSheet.create({
   embeddedPad: { paddingTop: 4 },
   wizardContent: { paddingBottom: 40 },
   backWizard: { alignSelf: 'flex-start', marginBottom: 0 },
+  discardBtn: {
+    borderColor: 'rgba(185, 28, 28, 0.45)',
+  },
   draftNavRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 4,
-    marginBottom: 6,
+    marginBottom: 10,
+  },
+  statusStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(15,23,42,0.72)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  statusStripOk: {
+    backgroundColor: 'rgba(22, 101, 52, 0.35)',
+  },
+  statusStripWarn: {
+    backgroundColor: 'rgba(180, 83, 9, 0.35)',
+  },
+  statusStripText: {
+    flex: 1,
+    color: '#f8fafc',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#e2e8f0',
+    marginBottom: 8,
+    letterSpacing: 0.2,
+  },
+  partsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  partsActions: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  partsLead: {
+    fontSize: 12,
+    color: '#94a3b8',
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  footerSectionTitle: { paddingHorizontal: 12, marginTop: 8 },
+  footerKeepHint: {
+    color: '#cbd5e1',
+    fontSize: 12,
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 17,
   },
   duplicateHint: {
     fontSize: 12,

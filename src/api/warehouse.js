@@ -71,6 +71,27 @@ export async function getReceivingSession(token, batchId) {
   return response.json();
 }
 
+/** Authenticated invoice PDF/image access for a receiving batch (presigned or blob). */
+export async function fetchReceivingInvoiceFileAccess(token, batchId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/billing/receiving/${batchId}/file/`,
+    { headers: await authHeaders(token) }
+  );
+  if (!response.ok) {
+    await throwApiError(response, 'Could not open invoice file');
+  }
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const payload = await response.json();
+    if (!payload?.url) {
+      throw new Error('Signed invoice URL missing from API response.');
+    }
+    return { url: payload.url, filename: payload.filename || '' };
+  }
+  const blob = await response.blob();
+  return { url: URL.createObjectURL(blob), filename: '' };
+}
+
 export async function uploadReceivingInvoice(token, batchId, file) {
   const form = new FormData();
   if (file?.file) {

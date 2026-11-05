@@ -77,12 +77,12 @@ export default function InvoiceHeaderCard({ batch, onChange, onDraft, showValida
           color={!showValidation ? TEXT_MUTED : complete ? '#15803d' : '#dc2626'}
         />
         <View style={styles.titleBody}>
-          <Text style={styles.title}>Supplier document</Text>
+          <Text style={styles.title}>Supplier · doc # · date</Text>
           <Text style={[styles.subtitle, showValidation && !complete && styles.subtitleWarn]}>
             {!showValidation
-              ? 'Filled from upload or enter below — saves as you type.'
+              ? 'From the invoice when possible — edit if needed. Saves as you type.'
               : complete
-                ? 'Header complete — add part lines below.'
+                ? 'Document fields look complete.'
                 : 'Fill supplier, doc #, and date before completing.'}
           </Text>
         </View>
