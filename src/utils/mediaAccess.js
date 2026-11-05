@@ -60,9 +60,11 @@ export async function fetchPrivateMediaAccessUrl(relativePath, token, shopHeader
     headers.Authorization = `Bearer ${token}`;
   }
 
+  // Prefer Bearer auth without cookies — avoids CORS preflight failures when
+  // Access-Control-Allow-Credentials is missing on a misconfigured edge.
   const response = await fetch(`${API_BASE_URL}/api/media/download/?${params.toString()}`, {
     headers,
-    credentials: 'include',
+    credentials: token ? 'omit' : 'include',
   });
 
   if (response.status === 401) {

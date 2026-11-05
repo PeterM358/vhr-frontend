@@ -44,7 +44,10 @@ export async function fetchDocumentBlobUrl(remoteUrl, token) {
 
   const url = normalizeMediaUrl(remoteUrl);
   const headers = await shopScopedHeaders(token);
-  const response = await fetch(url, { headers, credentials: 'include' });
+  const response = await fetch(url, {
+    headers,
+    credentials: token ? 'omit' : 'include',
+  });
   if (!response.ok) {
     throw new Error(`Could not load file (${response.status})`);
   }

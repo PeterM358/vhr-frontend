@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, Pressable, Linking, Platform, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Text, Button, Chip } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -7,7 +8,7 @@ import FloatingCard from '../ui/FloatingCard';
 import { PRIMARY, TEXT_DARK, TEXT_MUTED } from '../../constants/colors';
 import { showMessage } from '../../utils/crossPlatformAlert';
 import useWebDocumentBlobUrl from '../../utils/useWebDocumentBlobUrl';
-import { normalizeMediaUrl } from '../../utils/warehouseDocumentUrl';
+import { normalizeMediaUrl, openPrivateDocument } from '../../utils/warehouseDocumentUrl';
 import {
   buildInvoicePreviewFromBatch,
   isImageDocumentUrl,
@@ -107,17 +108,25 @@ export default function ReceivingDocumentPreview({
   const hasFile = Boolean(batch?.source_file_stored && fileUrl);
   const isInvoiceImport = batch?.source_type === 'invoice_upload';
 
-  const openFile = () => {
-    const target = normalizeMediaUrl(fileUrl);
-    if (!target) {
+  const openFile = async () => {
+    if (!fileUrl) {
       showMessage('Document', 'File not available yet.');
       return;
     }
-    if (Platform.OS === 'web') {
-      window.open(target, '_blank', 'noopener,noreferrer');
-      return;
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      const accessUrl = await openPrivateDocument(fileUrl, token);
+      if (Platform.OS !== 'web' && accessUrl) {
+        await Linking.openURL(accessUrl);
+      }
+    } catch {
+      const fallback = normalizeMediaUrl(fileUrl);
+      if (Platform.OS === 'web' && fallback) {
+        window.open(fallback, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      showMessage('Document', 'Could not open file.');
     }
-    Linking.openURL(target).catch(() => showMessage('Document', 'Could not open file.'));
   };
 
   if (!isInvoiceImport && !hasFile) {
