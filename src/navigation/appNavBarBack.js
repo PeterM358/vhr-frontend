@@ -34,7 +34,8 @@ export function useClientDashboardBack(navigation) {
 }
 
 export function usePartnerDashboardBack(navigation) {
-  return useCallback(() => navigateToShopDashboard(navigation), [navigation]);
+  // Prefer real stack history (e.g. Repair → Warehouse) over jumping to dashboard.
+  return useGoBackOr(navigation, navigateToShopDashboard);
 }
 
 export function useVehicleListBack(navigation) {

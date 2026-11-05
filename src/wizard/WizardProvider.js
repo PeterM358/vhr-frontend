@@ -215,13 +215,15 @@ export function WizardProvider({
     savedValuesRef.current = nextBaseline;
   }, []);
 
-  // Local progress: completed required steps / required steps. Optional steps
-  // still count toward the denominator once visited so the bar feels honest.
+  // Local progress: max of completed-step ratio and current position so the
+  // header % moves as the shop walks the wizard (even before dirty saves).
   const localProgress = useMemo(() => {
     if (!total) return 0;
     const completedCount = steps.filter((s) => completedStepIds.includes(s.id)).length;
-    return Math.min(1, completedCount / total);
-  }, [steps, completedStepIds, total]);
+    const byCompleted = completedCount / total;
+    const byPosition = total <= 1 ? 0 : index / (total - 1);
+    return Math.min(1, Math.max(byCompleted, byPosition));
+  }, [steps, completedStepIds, total, index]);
 
   const progress = useMemo(() => {
     const adapterPct =
@@ -300,7 +302,9 @@ export function WizardProvider({
       }
 
       // Nothing changed on a non-final step: advance without touching the API.
+      // Still mark the step completed so the step bar leaves red/incomplete.
       if (!mustPersist && !isLast) {
+        markCompleted(currentStep.id);
         setStatus('idle');
         goTo(index + 1);
         return { ok: true };
@@ -344,12 +348,13 @@ export function WizardProvider({
   const skip = useCallback(async () => {
     if (!currentStep || !currentStep.optional) return;
     setError(null);
+    markCompleted(currentStep.id);
     if (isLast) {
       if (onFinish) await onFinish(valuesRef.current);
       return;
     }
     goTo(index + 1);
-  }, [currentStep, isLast, onFinish, goTo, index]);
+  }, [currentStep, isLast, onFinish, goTo, index, markCompleted]);
 
   const finishLater = useCallback(async () => {
     try {

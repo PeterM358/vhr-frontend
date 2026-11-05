@@ -1,0 +1,48 @@
+%PDF-1.4
+1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
+2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
+3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj
+4 0 obj<< /Length 706 >>stream
+BT
+/F1 12 Tf
+50 780 Td
+(SAMPLE SUPPLIER INVOICE - for Veversal warehouse test) Tj
+0 -24 Td
+(Supplier: AutoParts Sofia EOOD) Tj
+0 -18 Td
+(EIK: 123456789  VAT: BG123456789) Tj
+0 -18 Td
+(Invoice No: INV-TEST-2026-001  Date: 2026-11-05) Tj
+0 -28 Td
+(Line 1: Engine oil 5W-30 5L   Qty 1   Unit 42.00 EUR ex VAT) Tj
+0 -18 Td
+(Line 2: Oil filter OEM   Qty 1   Unit 8.50 EUR ex VAT) Tj
+0 -18 Td
+(Line 3: Drain plug washer   Qty 1   Unit 1.20 EUR ex VAT) Tj
+0 -28 Td
+(Subtotal ex VAT: 51.70 EUR) Tj
+0 -18 Td
+(VAT 20%: 10.34 EUR) Tj
+0 -18 Td
+(Total: 62.04 EUR) Tj
+0 -28 Td
+(Note: OCR may be stubby - if lines empty, use Add manually) Tj
+0 -18 Td
+(with the same descriptions and prices, then Confirm to stock.) Tj
+ET
+
+endstream
+endobj
+5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000056 00000 n 
+0000000111 00000 n 
+0000000235 00000 n 
+0000000990 00000 n 
+trailer<< /Size 6 /Root 1 0 R >>
+startxref
+1058
+%%EOF

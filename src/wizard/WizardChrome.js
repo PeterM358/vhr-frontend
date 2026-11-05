@@ -45,6 +45,8 @@ function resolveStepVisualState(step, index, currentIndex, completedStepIds, ste
   const fromBackend = stepStatesById[step.id];
   if (fromBackend && KNOWN_STATES.has(fromBackend)) return fromBackend;
   if (completedStepIds.includes(step.id)) return 'completed';
+  // Already walked past this step in the session — don't keep it red.
+  if (index < currentIndex) return 'completed';
   if (step.optional) return 'optional_untouched';
   return 'required_incomplete';
 }

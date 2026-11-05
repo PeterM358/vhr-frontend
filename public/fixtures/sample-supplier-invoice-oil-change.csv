@@ -1,0 +1,4 @@
+part_type_slug,part_type_name,brand,part_number,quantity,unit_code,unit_price,shop_sku,description
+engine-oil,Engine Oil,TotalEnergies,OIL-5W30-5L,1,L,42.00,SKU-OIL-5L,Engine oil 5W-30 5L
+oil-filter,Oil Filter,Mann,OF-OEM-001,1,piece,8.50,SKU-OF-001,Oil filter OEM
+washer,Washer,Generic,WASHER-DP,1,piece,1.20,SKU-WASHER,Drain plug washer

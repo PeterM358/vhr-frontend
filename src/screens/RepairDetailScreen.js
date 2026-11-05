@@ -67,7 +67,8 @@ import ScreenBackground from '../components/ScreenBackground';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import { useReturnToBack, useGoBackOr, useRouteBackLabel, useHardwareBackHandler } from '../navigation/appNavBarBack';
 import RepairMediaThumbnail from '../components/repair/RepairMediaThumbnail';
-import { navigateToPartnerRepairOffer, navigateToPartnerWarehouse } from '../navigation/webNavigation';
+import { navigateToPartnerRepairOffer } from '../navigation/webNavigation';
+import ShopWarehouseReceiveScreen from './ShopWarehouseReceiveScreen';
 import { markRepairNotificationsRead } from '../api/notifications';
 import { WebSocketContext } from '../context/WebSocketManager';
 import {
@@ -332,6 +333,8 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [opMenuPriceDrafts, setOpMenuPriceDrafts] = useState({});
   const [opMenuPriceSavingId, setOpMenuPriceSavingId] = useState(null);
   const autoDefaultOpAttemptedRef = useRef(false);
+  /** Inline warehouse receive (invoice → stock) without leaving the repair wizard. */
+  const [warehouseReceiveOpen, setWarehouseReceiveOpen] = useState(false);
   const [shopEmployees, setShopEmployees] = useState([]);
   const [shopUsesWorkforce, setShopUsesWorkforce] = useState(false);
   const [assignPickerOpId, setAssignPickerOpId] = useState(null);
@@ -4234,22 +4237,21 @@ export default function RepairDetailScreen({ route, navigation }) {
               {t('repairs.detail.manageParts', null, 'Manage parts')}
             </Button>
             <Button
-              mode="text"
-              icon="warehouse"
-              compact
-              onPress={() => navigateToPartnerWarehouse(navigation)}
+              mode="contained-tonal"
+              icon="file-upload-outline"
+              onPress={() => setWarehouseReceiveOpen(true)}
             >
               {t(
                 'repairs.detail.openWarehouseScanInvoice',
                 null,
-                'Warehouse — scan supplier invoice'
+                'Add stock from supplier invoice'
               )}
             </Button>
             <Text style={styles.mutedText}>
               {t(
                 'repairs.detail.warehousePartsHint',
                 null,
-                'Scan or import a supplier invoice into stock, then issue parts to this repair from Manage parts.'
+                'Upload or enter the supplier invoice here (stays on this repair). Then Manage parts → add the line → Issue from stock.'
               )}
             </Text>
           </View>
@@ -5812,6 +5814,60 @@ export default function RepairDetailScreen({ route, navigation }) {
       finalizing={odometerSheetFinalizing}
       bottomInset={insets.bottom}
     />
+    <Modal
+      visible={warehouseReceiveOpen}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setWarehouseReceiveOpen(false)}
+    >
+      <View style={[styles.warehouseReceiveModal, { paddingTop: Math.max(insets.top, 8) }]}>
+        <View style={styles.warehouseReceiveHeader}>
+          <Text style={styles.warehouseReceiveTitle}>
+            {t(
+              'repairs.detail.warehouseReceiveTitle',
+              null,
+              'Supplier invoice → stock'
+            )}
+          </Text>
+          <Button mode="text" compact onPress={() => setWarehouseReceiveOpen(false)}>
+            {t('common.done', null, 'Done')}
+          </Button>
+        </View>
+        <Text style={styles.warehouseReceiveHint}>
+          {t(
+            'repairs.detail.warehouseReceiveHint',
+            null,
+            'Upload a PDF/photo or add lines manually. After confirm, return here and issue parts to this repair.'
+          )}
+        </Text>
+        <View style={styles.warehouseReceiveBody}>
+          {warehouseReceiveOpen ? (
+            <ShopWarehouseReceiveScreen
+              navigation={navigation}
+              embedded
+              onCommitted={async () => {
+                setWarehouseReceiveOpen(false);
+                await refreshRepair();
+                await refreshParts();
+                showMessage(
+                  t(
+                    'repairs.detail.warehouseReceiveCommittedTitle',
+                    null,
+                    'Stock updated'
+                  ),
+                  t(
+                    'repairs.detail.warehouseReceiveCommittedBody',
+                    null,
+                    'Open Manage parts, add the stocked item, then tap Issue from stock.'
+                  ),
+                  { variant: 'success' }
+                );
+              }}
+            />
+          ) : null}
+        </View>
+      </View>
+    </Modal>
     </>
   );
 }
@@ -6237,6 +6293,35 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  warehouseReceiveModal: {
+    flex: 1,
+    backgroundColor: '#0b1220',
+  },
+  warehouseReceiveHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingBottom: 4,
+  },
+  warehouseReceiveTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#f8fafc',
+    paddingRight: 8,
+  },
+  warehouseReceiveHint: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    fontSize: 13,
+    color: '#94a3b8',
+    lineHeight: 18,
+  },
+  warehouseReceiveBody: {
+    flex: 1,
+    minHeight: 0,
   },
   lightActionCard: {
     backgroundColor: '#ffffff',
