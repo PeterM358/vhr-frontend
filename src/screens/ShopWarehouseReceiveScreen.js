@@ -40,6 +40,7 @@ import {
   downloadBillingCsv,
   getReceivingSession,
   importReceivingCsv,
+  listPendingReceivingSessions,
   updateReceivingLine,
   updateReceivingSession,
   uploadReceivingInvoice,
@@ -158,6 +159,8 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
   const [phase, setPhase] = useState(resumeBatchId ? 'work' : 'start');
   const [showValidation, setShowValidation] = useState(false);
   const [actionBanner, setActionBanner] = useState(null);
+  const [pendingDrafts, setPendingDrafts] = useState([]);
+  const [draftActionBusy, setDraftActionBusy] = useState(false);
 
   const isDuplicateInvoiceMessage = (msg) =>
     /already received|already open|duplicate/i.test(String(msg || ''));
@@ -167,6 +170,17 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
       .replace(/^invoice[_ ]number:\s*/i, '')
       .replace(/^batch:\s*/i, '')
       .trim();
+
+  const refreshPendingDrafts = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      const rows = await listPendingReceivingSessions(token);
+      const list = Array.isArray(rows) ? rows : rows?.results || [];
+      setPendingDrafts(list.filter((b) => b?.status === 'pending' || !b?.status));
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
 
   const applyBatch = useCallback((session, preview = null) => {
     setBatch(session);
@@ -188,13 +202,14 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
       } catch (catalogErr) {
         console.error(catalogErr);
       }
+      await refreshPendingDrafts();
     } catch (err) {
       console.error(err);
       showMessage('Warehouse', err.message || 'Could not load center');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshPendingDrafts]);
 
   const openWorkSession = useCallback(
     async (session, { validate = false } = {}) => {
@@ -378,7 +393,86 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
     setShowValidation(false);
     setActionBanner(null);
     setPhase('start');
+    refreshPendingDrafts();
   };
+
+  const openDraftById = useCallback(
+    async (draftId, { discardCurrent = true } = {}) => {
+      if (!draftId) return;
+      setDraftActionBusy(true);
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        if (discardCurrent && batch?.id && Number(batch.id) !== Number(draftId)) {
+          try {
+            await deleteReceivingSession(token, batch.id);
+          } catch (err) {
+            // Current empty session may already be gone — continue to the draft.
+            console.warn(err);
+          }
+        }
+        const session = await getReceivingSession(token, draftId);
+        setActionBanner(null);
+        await openWorkSession(session, { validate: true });
+        await refreshPendingDrafts();
+      } catch (err) {
+        showMessage(
+          t('partnerDashboard.warehouse.receiving.openDraftFailed', null, 'Could not open draft'),
+          err.message || t('repairs.detail.pleaseTryAgain', null, 'Please try again.')
+        );
+      } finally {
+        setDraftActionBusy(false);
+      }
+    },
+    [batch?.id, openWorkSession, refreshPendingDrafts, t]
+  );
+
+  const deleteOtherDraft = useCallback(
+    async (draftId) => {
+      if (!draftId) return;
+      const ok = await confirmMessage(
+        t(
+          'partnerDashboard.warehouse.receiving.deleteOtherDraftTitle',
+          null,
+          'Delete the other draft?'
+        ),
+        t(
+          'partnerDashboard.warehouse.receiving.deleteOtherDraftBody',
+          null,
+          'Removes the unfinished draft with this invoice number so you can upload again here.'
+        ),
+        {
+          confirmLabel: t('partnerDashboard.warehouse.receiving.discardConfirm', null, 'Discard'),
+          cancelLabel: t('common.cancel', null, 'Cancel'),
+          destructive: true,
+        }
+      );
+      if (!ok) return;
+      setDraftActionBusy(true);
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        await deleteReceivingSession(token, draftId);
+        setActionBanner(null);
+        await refreshPendingDrafts();
+        showMessage(
+          t('partnerDashboard.warehouse.receiving.otherDraftDeletedTitle', null, 'Draft deleted'),
+          t(
+            'partnerDashboard.warehouse.receiving.otherDraftDeletedBody',
+            null,
+            'You can upload the invoice file again on this document.'
+          ),
+          { variant: 'success' }
+        );
+      } catch (err) {
+        showMessage(
+          t('partnerDashboard.warehouse.receiving.discardFailed', null, 'Could not discard'),
+          err.message || t('repairs.detail.pleaseTryAgain', null, 'Please try again.')
+        );
+      } finally {
+        setDraftActionBusy(false);
+      }
+    },
+    [refreshPendingDrafts, t]
+  );
 
   const discardCurrentDraft = useCallback(async ({
     thenReset = true,
@@ -418,8 +512,9 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
       return false;
     }
     if (thenReset) resetToWizard();
+    else await refreshPendingDrafts();
     return true;
-  }, [batch?.id, t]);
+  }, [batch?.id, refreshPendingDrafts, t]);
 
   useImperativeHandle(
     ref,
@@ -522,7 +617,7 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
       );
     } catch (err) {
       const msg = cleanApiMessage(err.message || 'Upload failed');
-      if (isDuplicateInvoiceMessage(msg)) {
+      if (isDuplicateInvoiceMessage(msg) || err.duplicateInvoice || err.duplicateBatchId) {
         setShowValidation(false);
         setActionBanner({
           tone: 'duplicate',
@@ -532,7 +627,9 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
             'Duplicate invoice'
           ),
           body: msg,
+          duplicateBatchId: err.duplicateBatchId || null,
         });
+        await refreshPendingDrafts();
         showMessage(
           t(
             'partnerDashboard.warehouse.receiving.duplicateTitle',
@@ -637,7 +734,7 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
       resetToWizard();
     } catch (err) {
       const msg = cleanApiMessage(err.message || 'Could not finish receiving');
-      if (isDuplicateInvoiceMessage(msg)) {
+      if (isDuplicateInvoiceMessage(msg) || err.duplicateInvoice || err.duplicateBatchId) {
         setActionBanner({
           tone: 'duplicate',
           title: t(
@@ -646,7 +743,9 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
             'Duplicate invoice'
           ),
           body: msg,
+          duplicateBatchId: err.duplicateBatchId || null,
         });
+        await refreshPendingDrafts();
         showMessage(
           t(
             'partnerDashboard.warehouse.receiving.duplicateTitle',
@@ -701,6 +800,67 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
             toggling={warehouseToggling}
             onToggle={toggleWarehouse}
           />
+          {pendingDrafts.length > 0 ? (
+            <FloatingCard style={styles.pendingDraftsCard}>
+              <Text style={styles.pendingDraftsTitle}>
+                {t(
+                  'partnerDashboard.warehouse.receiving.openDraftsTitle',
+                  null,
+                  'Unfinished drafts'
+                )}
+              </Text>
+              <Text style={styles.pendingDraftsLead}>
+                {t(
+                  'partnerDashboard.warehouse.receiving.openDraftsLead',
+                  null,
+                  'Continue here — no need to leave this repair for Warehouse → Documents.'
+                )}
+              </Text>
+              {pendingDrafts.map((draft) => (
+                <View key={draft.id} style={styles.pendingDraftRow}>
+                  <View style={styles.pendingDraftBody}>
+                    <Text style={styles.pendingDraftName} numberOfLines={1}>
+                      {draft.supplier_name ||
+                        draft.shop_supplier?.display_name ||
+                        t(
+                          'partnerDashboard.warehouse.receiving.draftNoSupplier',
+                          null,
+                          'No supplier yet'
+                        )}
+                    </Text>
+                    <Text style={styles.pendingDraftMeta} numberOfLines={1}>
+                      {draft.invoice_number
+                        ? `#${draft.invoice_number}`
+                        : t(
+                            'partnerDashboard.warehouse.receiving.draftNoNumber',
+                            null,
+                            'No doc #'
+                          )}
+                      {` · ${Number(draft.line_count) || (draft.lines || []).length || 0} ${t(
+                        'partnerDashboard.warehouse.receiving.draftLines',
+                        null,
+                        'lines'
+                      )}`}
+                    </Text>
+                  </View>
+                  <Button
+                    mode="contained"
+                    compact
+                    loading={draftActionBusy}
+                    disabled={draftActionBusy}
+                    onPress={() => openDraftById(draft.id, { discardCurrent: false })}
+                    buttonColor={PRIMARY}
+                  >
+                    {t(
+                      'partnerDashboard.warehouse.receiving.openDraft',
+                      null,
+                      'Continue draft'
+                    )}
+                  </Button>
+                </View>
+              ))}
+            </FloatingCard>
+          ) : null}
           {phase === 'start' ? (
             <ReceivingInvoiceStartStep
               onPick={(entryMode) => startNewSession('receipt', { openUpload: entryMode === 'upload' })}
@@ -758,7 +918,7 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
         {t(
           'partnerDashboard.warehouse.receiving.duplicateHint',
           null,
-          'Same supplier + invoice # cannot be received twice. Continue a draft from Documents, or change the number only if it is truly a new document.'
+          'Same supplier + invoice # cannot be received twice. If a draft already exists, continue it from the banner or the list on the start screen.'
         )}
       </Text>
 
@@ -773,6 +933,68 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
         >
           <Text style={styles.actionBannerTitle}>{actionBanner.title}</Text>
           <Text style={styles.actionBannerBody}>{actionBanner.body}</Text>
+          {actionBanner.tone === 'duplicate' ? (
+            <View style={styles.actionBannerActions}>
+              {actionBanner.duplicateBatchId ? (
+                <>
+                  <Button
+                    mode="contained"
+                    compact
+                    loading={draftActionBusy}
+                    disabled={draftActionBusy}
+                    onPress={() => openDraftById(actionBanner.duplicateBatchId)}
+                    buttonColor={PRIMARY}
+                  >
+                    {t(
+                      'partnerDashboard.warehouse.receiving.openDraft',
+                      null,
+                      'Continue draft'
+                    )}
+                  </Button>
+                  <Button
+                    mode="outlined"
+                    compact
+                    disabled={draftActionBusy}
+                    onPress={() => deleteOtherDraft(actionBanner.duplicateBatchId)}
+                    textColor="#b91c1c"
+                  >
+                    {t(
+                      'partnerDashboard.warehouse.receiving.deleteOtherDraft',
+                      null,
+                      'Delete that draft'
+                    )}
+                  </Button>
+                </>
+              ) : (
+                pendingDrafts
+                  .filter((d) => Number(d.id) !== Number(batch?.id))
+                  .slice(0, 3)
+                  .map((draft) => (
+                    <Button
+                      key={draft.id}
+                      mode="contained"
+                      compact
+                      loading={draftActionBusy}
+                      disabled={draftActionBusy}
+                      onPress={() => openDraftById(draft.id)}
+                      buttonColor={PRIMARY}
+                      style={styles.actionBannerDraftBtn}
+                    >
+                      {t(
+                        'partnerDashboard.warehouse.receiving.openDraftNamed',
+                        {
+                          name:
+                            draft.supplier_name ||
+                            draft.invoice_number ||
+                            `#${draft.id}`,
+                        },
+                        'Continue: {name}'
+                      )}
+                    </Button>
+                  ))
+              )}
+            </View>
+          ) : null}
         </FloatingCard>
       ) : null}
 
@@ -998,6 +1220,44 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: '#7c2d12',
   },
+  actionBannerActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  actionBannerDraftBtn: {
+    marginBottom: 4,
+  },
+  pendingDraftsCard: {
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: '#fff7ed',
+  },
+  pendingDraftsTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: TEXT_DARK,
+    marginBottom: 4,
+  },
+  pendingDraftsLead: {
+    fontSize: 12,
+    color: '#9a3412',
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  pendingDraftRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(154, 52, 18, 0.25)',
+  },
+  pendingDraftBody: { flex: 1, minWidth: 0 },
+  pendingDraftName: { fontSize: 14, fontWeight: '600', color: TEXT_DARK },
+  pendingDraftMeta: { fontSize: 12, color: TEXT_MUTED, marginTop: 2 },
   kindBadge: { alignSelf: 'flex-start', marginBottom: 8, backgroundColor: '#dbeafe' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   container: { paddingHorizontal: 12 },

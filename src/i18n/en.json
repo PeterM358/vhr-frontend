@@ -2518,8 +2518,21 @@
         "keepAndClose": "Keep draft & close",
         "committedStayOpen": "Stock updated. Upload another invoice, or tap Done to return to the repair.",
         "duplicateTitle": "Duplicate invoice",
-        "duplicateHint": "Same supplier + invoice # cannot be received twice. Continue a draft from Documents, or change the number only if it is truly a new document.",
-        "uploadFailedTitle": "Could not read invoice"
+        "duplicateHint": "Same supplier + invoice # cannot be received twice. If a draft already exists, continue it from the banner or the list on the start screen.",
+        "uploadFailedTitle": "Could not read invoice",
+        "openDraft": "Continue draft",
+        "openDraftNamed": "Continue: {name}",
+        "openDraftFailed": "Could not open draft",
+        "deleteOtherDraft": "Delete that draft",
+        "deleteOtherDraftTitle": "Delete the other draft?",
+        "deleteOtherDraftBody": "Removes the unfinished draft with this invoice number so you can upload again here.",
+        "otherDraftDeletedTitle": "Draft deleted",
+        "otherDraftDeletedBody": "You can upload the invoice file again on this document.",
+        "openDraftsTitle": "Unfinished drafts",
+        "openDraftsLead": "Continue here — no need to leave this repair for Warehouse → Documents.",
+        "draftNoSupplier": "No supplier yet",
+        "draftNoNumber": "No doc #",
+        "draftLines": "lines"
       }
     },
     "marketComparison": {

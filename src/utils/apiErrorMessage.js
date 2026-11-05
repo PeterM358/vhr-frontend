@@ -66,7 +66,7 @@ export function formatDrfErrorMessage(parsed, fallback = 'Request failed') {
       if (key === 'mileage_requires_odometer_photo') return [];
       if (key === 'vehicle_overlap_conflicts') return [];
       if (key === 'assignee_overlap_conflicts') return [];
-      if (key === 'duplicate_invoice') return [];
+      if (key === 'duplicate_invoice' || key === 'duplicate_batch_id') return [];
       const label = labelForField(key);
       if (Array.isArray(val)) {
         return val.map((v) => {

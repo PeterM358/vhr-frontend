@@ -1,11 +1,34 @@
 import { API_BASE_URL } from './config';
 import { Share } from 'react-native';
-import { messageFromApiResponseText } from '../utils/apiErrorMessage';
+import { enrichApiError, messageFromApiResponseText } from '../utils/apiErrorMessage';
 import { shopScopedHeaders } from '../utils/currentShop';
 
 async function parseError(response, fallback) {
   const text = await response.text();
   return messageFromApiResponseText(text, fallback);
+}
+
+async function throwApiError(response, fallback) {
+  const text = await response.text();
+  let parsed = null;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = null;
+  }
+  const err = new Error(messageFromApiResponseText(text, fallback));
+  if (parsed && typeof parsed === 'object') {
+    enrichApiError(err, parsed, fallback);
+    const rawDup = parsed.duplicate_batch_id;
+    const dupId = Array.isArray(rawDup) ? rawDup[0] : rawDup;
+    if (dupId != null && dupId !== '' && !Number.isNaN(Number(dupId))) {
+      err.duplicateBatchId = Number(dupId);
+    }
+    if (parsed.duplicate_invoice === true || parsed.duplicate_invoice?.[0] === true) {
+      err.duplicateInvoice = true;
+    }
+  }
+  throw err;
 }
 
 async function authHeaders(token) {
@@ -69,7 +92,7 @@ export async function uploadReceivingInvoice(token, batchId, file) {
     body: form,
   });
   if (!response.ok) {
-    throw new Error(await parseError(response, 'Could not read invoice'));
+    await throwApiError(response, 'Could not read invoice');
   }
   return response.json();
 }
@@ -155,7 +178,7 @@ export async function updateReceivingSession(token, batchId, payload) {
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    throw new Error(await parseError(response, 'Could not update receiving session'));
+    await throwApiError(response, 'Could not update receiving session');
   }
   return response.json();
 }
@@ -267,7 +290,7 @@ export async function commitReceivingSession(token, batchId) {
     headers: await authHeaders(token),
   });
   if (!response.ok) {
-    throw new Error(await parseError(response, 'Could not complete receiving'));
+    await throwApiError(response, 'Could not complete receiving');
   }
   return response.json();
 }
