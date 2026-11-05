@@ -2532,7 +2532,18 @@
         "openDraftsLead": "Continue here — no need to leave this repair for Warehouse → Documents.",
         "draftNoSupplier": "No supplier yet",
         "draftNoNumber": "No doc #",
-        "draftLines": "lines"
+        "draftLines": "lines",
+        "deleteDraft": "Delete",
+        "deleteDraftTitle": "Delete this draft?",
+        "deleteDraftBody": "The unfinished document and any uploaded file will be removed. Confirmed stock is not affected.",
+        "draftDeletedBody": "You can start a new invoice upload.",
+        "deleteAllDrafts": "Delete all drafts",
+        "deleteAllDraftsTitle": "Delete all unfinished drafts?",
+        "deleteAllDraftsBody": "Removes {count} unfinished receiving draft(s) so you can test from a clean start. Confirmed stock is not affected.",
+        "deleteAllDraftsConfirm": "Delete all",
+        "deleteAllDraftsPartial": "{failed} draft(s) could not be deleted. Try again.",
+        "deleteAllDraftsDoneTitle": "Drafts cleared",
+        "deleteAllDraftsDoneBody": "You can upload invoices from a clean start."
       }
     },
     "marketComparison": {

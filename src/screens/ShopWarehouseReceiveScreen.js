@@ -426,53 +426,163 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
     [batch?.id, openWorkSession, refreshPendingDrafts, t]
   );
 
-  const deleteOtherDraft = useCallback(
-    async (draftId) => {
-      if (!draftId) return;
+  const deleteDraftById = useCallback(
+    async (
+      draftId,
+      {
+        title = null,
+        body = null,
+        successBody = null,
+      } = {}
+    ) => {
+      if (!draftId) return false;
       const ok = await confirmMessage(
-        t(
-          'partnerDashboard.warehouse.receiving.deleteOtherDraftTitle',
-          null,
-          'Delete the other draft?'
-        ),
-        t(
-          'partnerDashboard.warehouse.receiving.deleteOtherDraftBody',
-          null,
-          'Removes the unfinished draft with this invoice number so you can upload again here.'
-        ),
+        title ||
+          t(
+            'partnerDashboard.warehouse.receiving.deleteDraftTitle',
+            null,
+            'Delete this draft?'
+          ),
+        body ||
+          t(
+            'partnerDashboard.warehouse.receiving.deleteDraftBody',
+            null,
+            'The unfinished document and any uploaded file will be removed. Confirmed stock is not affected.'
+          ),
         {
           confirmLabel: t('partnerDashboard.warehouse.receiving.discardConfirm', null, 'Discard'),
           cancelLabel: t('common.cancel', null, 'Cancel'),
           destructive: true,
         }
       );
-      if (!ok) return;
+      if (!ok) return false;
       setDraftActionBusy(true);
       try {
         const token = await AsyncStorage.getItem('@access_token');
         await deleteReceivingSession(token, draftId);
-        setActionBanner(null);
-        await refreshPendingDrafts();
+        if (batch?.id && Number(batch.id) === Number(draftId)) {
+          resetToWizard();
+        } else {
+          setActionBanner(null);
+          await refreshPendingDrafts();
+        }
         showMessage(
           t('partnerDashboard.warehouse.receiving.otherDraftDeletedTitle', null, 'Draft deleted'),
-          t(
-            'partnerDashboard.warehouse.receiving.otherDraftDeletedBody',
-            null,
-            'You can upload the invoice file again on this document.'
-          ),
+          successBody ||
+            t(
+              'partnerDashboard.warehouse.receiving.draftDeletedBody',
+              null,
+              'You can start a new invoice upload.'
+            ),
           { variant: 'success' }
         );
+        return true;
       } catch (err) {
         showMessage(
           t('partnerDashboard.warehouse.receiving.discardFailed', null, 'Could not discard'),
           err.message || t('repairs.detail.pleaseTryAgain', null, 'Please try again.')
         );
+        return false;
       } finally {
         setDraftActionBusy(false);
       }
     },
-    [refreshPendingDrafts, t]
+    [batch?.id, refreshPendingDrafts, t]
   );
+
+  const deleteOtherDraft = useCallback(
+    (draftId) =>
+      deleteDraftById(draftId, {
+        title: t(
+          'partnerDashboard.warehouse.receiving.deleteOtherDraftTitle',
+          null,
+          'Delete the other draft?'
+        ),
+        body: t(
+          'partnerDashboard.warehouse.receiving.deleteOtherDraftBody',
+          null,
+          'Removes the unfinished draft with this invoice number so you can upload again here.'
+        ),
+        successBody: t(
+          'partnerDashboard.warehouse.receiving.otherDraftDeletedBody',
+          null,
+          'You can upload the invoice file again on this document.'
+        ),
+      }),
+    [deleteDraftById, t]
+  );
+
+  const deleteAllPendingDrafts = useCallback(async () => {
+    const ids = (pendingDrafts || []).map((d) => d.id).filter(Boolean);
+    if (!ids.length) return;
+    const ok = await confirmMessage(
+      t(
+        'partnerDashboard.warehouse.receiving.deleteAllDraftsTitle',
+        null,
+        'Delete all unfinished drafts?'
+      ),
+      t(
+        'partnerDashboard.warehouse.receiving.deleteAllDraftsBody',
+        { count: ids.length },
+        'Removes {count} unfinished receiving draft(s) so you can test from a clean start. Confirmed stock is not affected.'
+      ),
+      {
+        confirmLabel: t(
+          'partnerDashboard.warehouse.receiving.deleteAllDraftsConfirm',
+          null,
+          'Delete all'
+        ),
+        cancelLabel: t('common.cancel', null, 'Cancel'),
+        destructive: true,
+      }
+    );
+    if (!ok) return;
+    setDraftActionBusy(true);
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      const failures = [];
+      for (const id of ids) {
+        try {
+          await deleteReceivingSession(token, id);
+        } catch (err) {
+          failures.push(id);
+          console.warn(err);
+        }
+      }
+      setActionBanner(null);
+      if (batch?.id && ids.some((id) => Number(id) === Number(batch.id))) {
+        resetToWizard();
+      } else {
+        await refreshPendingDrafts();
+      }
+      if (failures.length) {
+        showMessage(
+          t('partnerDashboard.warehouse.receiving.discardFailed', null, 'Could not discard'),
+          t(
+            'partnerDashboard.warehouse.receiving.deleteAllDraftsPartial',
+            { failed: failures.length },
+            '{failed} draft(s) could not be deleted. Try again.'
+          )
+        );
+      } else {
+        showMessage(
+          t(
+            'partnerDashboard.warehouse.receiving.deleteAllDraftsDoneTitle',
+            null,
+            'Drafts cleared'
+          ),
+          t(
+            'partnerDashboard.warehouse.receiving.deleteAllDraftsDoneBody',
+            null,
+            'You can upload invoices from a clean start.'
+          ),
+          { variant: 'success' }
+        );
+      }
+    } finally {
+      setDraftActionBusy(false);
+    }
+  }, [batch?.id, pendingDrafts, refreshPendingDrafts, t]);
 
   const discardCurrentDraft = useCallback(async ({
     thenReset = true,
@@ -816,6 +926,22 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
                   'Continue here — no need to leave this repair for Warehouse → Documents.'
                 )}
               </Text>
+              <Button
+                mode="outlined"
+                compact
+                icon="trash-can-outline"
+                disabled={draftActionBusy}
+                loading={draftActionBusy}
+                onPress={deleteAllPendingDrafts}
+                textColor="#b91c1c"
+                style={styles.deleteAllDraftsBtn}
+              >
+                {t(
+                  'partnerDashboard.warehouse.receiving.deleteAllDrafts',
+                  null,
+                  'Delete all drafts'
+                )}
+              </Button>
               {pendingDrafts.map((draft) => (
                 <View key={draft.id} style={styles.pendingDraftRow}>
                   <View style={styles.pendingDraftBody}>
@@ -843,6 +969,19 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
                       )}`}
                     </Text>
                   </View>
+                  <Button
+                    mode="text"
+                    compact
+                    disabled={draftActionBusy}
+                    onPress={() => deleteDraftById(draft.id)}
+                    textColor="#b91c1c"
+                  >
+                    {t(
+                      'partnerDashboard.warehouse.receiving.deleteDraft',
+                      null,
+                      'Delete'
+                    )}
+                  </Button>
                   <Button
                     mode="contained"
                     compact
@@ -1244,18 +1383,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9a3412',
     lineHeight: 17,
-    marginBottom: 10,
+    marginBottom: 8,
+  },
+  deleteAllDraftsBtn: {
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+    borderColor: 'rgba(185, 28, 28, 0.45)',
   },
   pendingDraftRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 8,
     paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(154, 52, 18, 0.25)',
   },
-  pendingDraftBody: { flex: 1, minWidth: 0 },
+  pendingDraftBody: { flex: 1, minWidth: 120 },
   pendingDraftName: { fontSize: 14, fontWeight: '600', color: TEXT_DARK },
   pendingDraftMeta: { fontSize: 12, color: TEXT_MUTED, marginTop: 2 },
   kindBadge: { alignSelf: 'flex-start', marginBottom: 8, backgroundColor: '#dbeafe' },

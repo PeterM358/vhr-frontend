@@ -2532,7 +2532,18 @@
         "openDraftsLead": "Продължете тук — няма нужда да излизате към Склад → Документи.",
         "draftNoSupplier": "Все още няма доставчик",
         "draftNoNumber": "Няма №",
-        "draftLines": "реда"
+        "draftLines": "реда",
+        "deleteDraft": "Изтрий",
+        "deleteDraftTitle": "Изтриване на тази чернова?",
+        "deleteDraftBody": "Недовършеният документ и каченият файл ще бъдат премахнати. Потвърдените наличности не се пипат.",
+        "draftDeletedBody": "Можете да започнете ново качване на фактура.",
+        "deleteAllDrafts": "Изтрий всички чернови",
+        "deleteAllDraftsTitle": "Изтриване на всички недовършени чернови?",
+        "deleteAllDraftsBody": "Премахва {count} недовършени чернови за приемане, за да тествате от чисто. Потвърдените наличности не се пипат.",
+        "deleteAllDraftsConfirm": "Изтрий всички",
+        "deleteAllDraftsPartial": "{failed} чернови не можаха да се изтрият. Опитайте отново.",
+        "deleteAllDraftsDoneTitle": "Черновите са изчистени",
+        "deleteAllDraftsDoneBody": "Можете да качвате фактури от чисто начало."
       }
     },
     "marketComparison": {
