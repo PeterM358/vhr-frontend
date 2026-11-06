@@ -15,6 +15,7 @@ import {
   listPendingReceivingSessions,
   listPurchaseDocuments,
   deleteReceivingSession,
+  deletePurchaseDocument,
   LINE_ISSUE_LABELS,
 } from '../../api/warehouse';
 import { useTranslation } from '../../i18n';
@@ -55,7 +56,7 @@ function DraftRow({ batch, onContinue, onDelete, deleting }) {
   );
 }
 
-function DocumentRow({ doc, onOpen }) {
+function DocumentRow({ doc, onOpen, onDelete, deleting }) {
   const label = doc.supplier_label || doc.supplier_name || 'Supplier unknown';
   const typeLabel = DOC_TYPE_LABELS[doc.document_type] || doc.document_type;
   const total = doc.total_amount_minor
@@ -76,6 +77,17 @@ function DocumentRow({ doc, onOpen }) {
               {typeLabel} · {doc.line_count || 0} lines{total ? ` · ${total}` : ''}
             </Text>
           </View>
+          <IconButton
+            icon="trash-can-outline"
+            size={20}
+            iconColor="#dc2626"
+            disabled={deleting}
+            onPress={(e) => {
+              e?.stopPropagation?.();
+              onDelete?.(doc);
+            }}
+            accessibilityLabel="Delete document"
+          />
           <MaterialCommunityIcons name="chevron-right" size={22} color={TEXT_MUTED} />
         </View>
       </FloatingCard>
@@ -103,7 +115,8 @@ function LineSummary({ line }) {
   );
 }
 
-function DocumentDetail({ doc, onBack }) {
+function DocumentDetail({ doc, onBack, onDelete, deleting }) {
+  const { t } = useTranslation();
   const fileUrl = doc?.file_url;
   return (
     <ScrollView
@@ -112,9 +125,22 @@ function DocumentDetail({ doc, onBack }) {
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator
     >
-      <Button icon="arrow-left" mode="text" onPress={onBack} compact>
-        All documents
-      </Button>
+      <View style={styles.detailTopRow}>
+        <Button icon="arrow-left" mode="text" onPress={onBack} compact>
+          {t('partnerDashboard.warehouse.allDocuments', null, 'All documents')}
+        </Button>
+        <Button
+          icon="trash-can-outline"
+          mode="outlined"
+          textColor="#dc2626"
+          onPress={() => onDelete?.(doc)}
+          loading={deleting}
+          disabled={deleting}
+          compact
+        >
+          {t('partnerDashboard.warehouse.deleteDocument', null, 'Delete')}
+        </Button>
+      </View>
       <FloatingCard style={styles.detailCard}>
         <Text style={styles.detailTitle}>
           {doc.supplier_label || doc.supplier_name || 'Document'}
@@ -126,6 +152,13 @@ function DocumentDetail({ doc, onBack }) {
         <Chip compact style={styles.typeChip}>
           {DOC_TYPE_LABELS[doc.document_type] || doc.document_type}
         </Chip>
+        <Text style={styles.testDeleteHint}>
+          {t(
+            'partnerDashboard.warehouse.deleteDocumentHint',
+            null,
+            'Test delete reverses stock from this invoice so you can re-import the same number.'
+          )}
+        </Text>
       </FloatingCard>
 
       {fileUrl ? (
@@ -192,18 +225,61 @@ export default function ShopWarehouseDocumentsPanel({ onEditDraft }) {
 
   const handleDeleteDraft = async (batch) => {
     const ok = await confirmMessage(
-      'Delete draft?',
-      'This removes the unfinished document and its lines.',
-      { confirmLabel: 'Delete' }
+      t('partnerDashboard.warehouse.receiving.deleteDraftTitle', null, 'Delete draft?'),
+      t(
+        'partnerDashboard.warehouse.receiving.deleteDraftBody',
+        null,
+        'This removes the unfinished document and its lines.'
+      ),
+      { confirmLabel: t('partnerDashboard.warehouse.receiving.deleteDraft', null, 'Delete') }
     );
     if (!ok) return;
-    setDeletingId(batch.id);
+    setDeletingId(`draft-${batch.id}`);
     try {
       const token = await AsyncStorage.getItem('@access_token');
       await deleteReceivingSession(token, batch.id);
       setDrafts((rows) => rows.filter((r) => r.id !== batch.id));
     } catch (err) {
-      showMessage('Delete', err.message);
+      showMessage(t('partnerDashboard.warehouse.deleteError', null, 'Delete'), err.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleDeleteDocument = async (doc) => {
+    const ok = await confirmMessage(
+      t('partnerDashboard.warehouse.deleteDocumentTitle', null, 'Delete this document?'),
+      t(
+        'partnerDashboard.warehouse.deleteDocumentBody',
+        null,
+        'Removes the invoice from the archive and reverses the stock received from it. Use only for testing — then you can re-upload the same invoice number.'
+      ),
+      {
+        confirmLabel: t(
+          'partnerDashboard.warehouse.deleteDocumentConfirm',
+          null,
+          'Delete & reverse stock'
+        ),
+      }
+    );
+    if (!ok) return;
+    setDeletingId(`doc-${doc.id}`);
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      await deletePurchaseDocument(token, doc.id);
+      setDocuments((rows) => rows.filter((r) => r.id !== doc.id));
+      setSelectedDoc(null);
+      showMessage(
+        t('partnerDashboard.warehouse.deleteDocumentDoneTitle', null, 'Document deleted'),
+        t(
+          'partnerDashboard.warehouse.deleteDocumentDoneBody',
+          null,
+          'Stock from this invoice was reversed. You can receive it again.'
+        ),
+        { variant: 'success' }
+      );
+    } catch (err) {
+      showMessage(t('partnerDashboard.warehouse.deleteError', null, 'Delete'), err.message);
     } finally {
       setDeletingId(null);
     }
@@ -233,7 +309,12 @@ export default function ShopWarehouseDocumentsPanel({ onEditDraft }) {
   if (selectedDoc) {
     return (
       <View style={styles.panelRoot}>
-        <DocumentDetail doc={selectedDoc} onBack={() => setSelectedDoc(null)} />
+        <DocumentDetail
+          doc={selectedDoc}
+          onBack={() => setSelectedDoc(null)}
+          onDelete={handleDeleteDocument}
+          deleting={deletingId === `doc-${selectedDoc.id}`}
+        />
       </View>
     );
   }
@@ -282,15 +363,26 @@ export default function ShopWarehouseDocumentsPanel({ onEditDraft }) {
               batch={item.batch}
               onContinue={onEditDraft}
               onDelete={handleDeleteDraft}
-              deleting={deletingId === item.batch.id}
+              deleting={deletingId === `draft-${item.batch.id}`}
             />
           );
         }
         if (item.type === 'docs-header') {
-          return <Text style={styles.sectionTitle}>Completed documents</Text>;
+          return (
+            <Text style={styles.sectionTitle}>
+              {t('partnerDashboard.warehouse.completedDocuments', null, 'Completed documents')}
+            </Text>
+          );
         }
         if (item.type === 'doc') {
-          return <DocumentRow doc={item.doc} onOpen={openDocument} />;
+          return (
+            <DocumentRow
+              doc={item.doc}
+              onOpen={openDocument}
+              onDelete={handleDeleteDocument}
+              deleting={deletingId === `doc-${item.doc.id}`}
+            />
+          );
         }
         return null;
       }}
@@ -317,9 +409,22 @@ const styles = StyleSheet.create({
   meta: { fontSize: 12, color: TEXT_MUTED, marginTop: 2 },
   detailScroll: { flex: 1, ...(Platform.OS === 'web' ? { overflow: 'auto' } : {}) },
   detailScrollContent: { padding: 12, paddingBottom: 48 },
+  detailTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 4,
+  },
   detailCard: { padding: 14, marginBottom: 10 },
   detailTitle: { fontSize: 17, fontWeight: '700', color: TEXT_DARK },
   typeChip: { alignSelf: 'flex-start', marginTop: 8, backgroundColor: '#dbeafe' },
+  testDeleteHint: {
+    marginTop: 10,
+    fontSize: 12,
+    color: '#b45309',
+    lineHeight: 17,
+  },
   linesHeading: {
     fontSize: 13,
     fontWeight: '700',

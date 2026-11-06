@@ -264,6 +264,18 @@ export async function getPurchaseDocument(token, documentId) {
   return response.json();
 }
 
+/** TEMP / QA — deletes committed doc + reverses goods-in stock. */
+export async function deletePurchaseDocument(token, documentId) {
+  const response = await fetch(`${API_BASE_URL}/api/billing/purchase-documents/${documentId}/`, {
+    method: 'DELETE',
+    headers: await authHeaders(token),
+  });
+  if (!response.ok) {
+    throw new Error(await parseError(response, 'Could not delete document'));
+  }
+  return true;
+}
+
 export async function listPendingReceivingSessions(token) {
   const response = await fetch(`${API_BASE_URL}/api/billing/receiving/`, {
     headers: await authHeaders(token),
