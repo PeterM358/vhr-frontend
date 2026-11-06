@@ -4252,7 +4252,7 @@ export default function RepairDetailScreen({ route, navigation }) {
               {t(
                 'repairs.detail.warehousePartsHint',
                 null,
-                'Upload or enter the supplier invoice here (stays on this repair). Then Manage parts → add the line → Issue from stock.'
+                'Upload the supplier invoice here (stays on this repair). Completed lines are added to the repair from stock — remove any you do not need under Manage parts.'
               )}
             </Text>
           </View>
@@ -5851,7 +5851,48 @@ export default function RepairDetailScreen({ route, navigation }) {
               navigation={navigation}
               embedded
               stayOpenAfterCommit
-              onCommitted={async () => {
+              onCommitted={async ({ batch: committedBatch } = {}) => {
+                const token = await AsyncStorage.getItem('@access_token');
+                const isCredit =
+                  committedBatch?.batch_kind === 'credit_note' ||
+                  committedBatch?.batch_kind === 'credit';
+                const lines =
+                  !isCredit && Array.isArray(committedBatch?.lines)
+                    ? committedBatch.lines
+                    : [];
+                let added = 0;
+                for (const line of lines) {
+                  const shopPartId = line?.shop_part;
+                  if (!shopPartId) continue;
+                  const qty = Number(line.quantity);
+                  if (!Number.isFinite(qty) || qty <= 0) continue;
+                  const minor = Number(
+                    line.unit_price_ex_vat_minor ?? line.unit_price_minor ?? 0
+                  );
+                  try {
+                    const created = await addRepairPart(token, repairId, {
+                      shop_part_id: shopPartId,
+                      quantity: qty,
+                      price_per_item_at_use: Number.isFinite(minor)
+                        ? (minor / 100).toFixed(2)
+                        : undefined,
+                      note: line.part_number
+                        ? `Invoice ${committedBatch?.invoice_number || ''}`.trim()
+                        : '',
+                    });
+                    added += 1;
+                    if (created?.id) {
+                      try {
+                        await issueRepairPartFromStock(token, repairId, created.id);
+                      } catch (issueErr) {
+                        // Part stays on the repair — staff can issue/remove from Manage parts.
+                        console.warn('Auto stock issue skipped', issueErr);
+                      }
+                    }
+                  } catch (addErr) {
+                    console.warn('Auto-add repair part failed', addErr);
+                  }
+                }
                 await refreshRepair();
                 await refreshParts();
                 showMessage(
@@ -5860,11 +5901,17 @@ export default function RepairDetailScreen({ route, navigation }) {
                     null,
                     'Stock updated'
                   ),
-                  t(
-                    'repairs.detail.warehouseReceiveCommittedBody',
-                    null,
-                    'Upload another invoice here, or tap Done and issue parts to this repair from Manage parts.'
-                  ),
+                  added > 0
+                    ? t(
+                        'repairs.detail.warehouseReceivePartsAddedBody',
+                        { count: added },
+                        `${added} part(s) added to this repair from stock. Remove any you do not need under Manage parts.`
+                      )
+                    : t(
+                        'repairs.detail.warehouseReceiveCommittedBody',
+                        null,
+                        'Upload another invoice here, or tap Done and issue parts to this repair from Manage parts.'
+                      ),
                   { variant: 'success' }
                 );
               }}

@@ -104,8 +104,12 @@ export default function ReceivingDocumentPreview({
 
   const fileUrl = batch?.source_file_url || '';
   const { displayUrl, loading: previewLoading, error: previewError } = useReceivingDocumentUrl(batch);
-  const isPdf = isPdfDocumentUrl(fileUrl) || String(fileUrl).toLowerCase().endsWith('.pdf');
-  const isImage = isImageDocumentUrl(fileUrl);
+  const nameHint = String(fileUrl || batch?.source_filename || displayUrl || '').toLowerCase();
+  const isPdf =
+    isPdfDocumentUrl(fileUrl) ||
+    nameHint.includes('.pdf') ||
+    (Boolean(displayUrl) && !isImageDocumentUrl(fileUrl) && !nameHint.match(/\.(png|jpe?g|webp|gif)(\?|$)/));
+  const isImage = isImageDocumentUrl(fileUrl) || Boolean(nameHint.match(/\.(png|jpe?g|webp|gif)(\?|$)/));
   const hasFile = Boolean(batch?.id && (batch?.source_file_stored || fileUrl));
   const isInvoiceImport = batch?.source_type === 'invoice_upload';
   const linesParsed = resolved?.lines_parsed ?? batch?.line_count ?? 0;

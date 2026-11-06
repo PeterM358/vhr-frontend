@@ -274,6 +274,10 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
 
   const triggerInvoicePickerRef = useRef(null);
 
+  const captureHeaderDraft = useCallback((payload) => {
+    headerDraftRef.current = payload;
+  }, []);
+
   const persistHeaderDraft = useCallback(
     async (payload) => {
       if (!batch?.id) return null;
@@ -333,11 +337,17 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
     initShop();
   }, [initShop, resumeBatchId, resumeSession]);
 
+  // One soft refresh when entering the work phase — not on every batch apply
+  // (that re-fetched /receiving/<id>/ in a tight loop with header autosave).
+  const focusRefreshDoneRef = useRef(false);
   useFocusEffect(
     useCallback(() => {
+      if (!batch?.id || phase !== 'work' || focusRefreshDoneRef.current) {
+        return undefined;
+      }
+      focusRefreshDoneRef.current = true;
       let cancelled = false;
       (async () => {
-        if (!batch?.id || phase !== 'work') return;
         try {
           const token = await AsyncStorage.getItem('@access_token');
           const refreshed = await getReceivingSession(token, batch.id);
@@ -353,6 +363,12 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
       };
     }, [batch?.id, applyBatch, phase])
   );
+
+  useEffect(() => {
+    if (phase !== 'work') {
+      focusRefreshDoneRef.current = false;
+    }
+  }, [phase]);
 
   const openEditor = (line = null) => {
     setEditingLine(line);
@@ -726,11 +742,19 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
       const headerMissing = (result.batch?.header_issues || []).length > 0;
       const incompleteLines = Number(result.batch?.incomplete_count) || 0;
       setShowValidation(parsed === 0 || headerMissing || incompleteLines > 0);
+      const parsedCount = Number(result.preview?.lines_parsed) || 0;
+      // Never show internal layout ids (qty_unit_label_v1, …) to the client.
+      const rawMsg = String(result.message || result.preview?.message || '');
+      const safeMsg = rawMsg
+        .replace(/\s*using layout\s+[\w.-]+/gi, '')
+        .replace(/\b(qty_unit_label_v\d+|stacked_column_v\d+|single_line_row_v\d+|inline_fallback_v\d+)\b/gi, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
       showMessage(
-        result.preview?.lines_parsed > 0 ? 'Invoice parsed' : 'Invoice uploaded',
-        result.message ||
-          (result.preview?.lines_parsed > 0
-            ? `${result.preview.lines_parsed} lines ready to review below.`
+        parsedCount > 0 ? 'Invoice parsed' : 'Invoice uploaded',
+        safeMsg ||
+          (parsedCount > 0
+            ? `${parsedCount} lines ready to review below.`
             : 'No line items read — add parts manually or view the document.')
       );
     } catch (err) {
@@ -835,7 +859,7 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
         showMessage('Cannot complete yet', blockers.join('\n\n'));
         return;
       }
-      await commitReceivingSession(token, session.id);
+      const committed = await commitReceivingSession(token, session.id);
       showMessage(
         'Done',
         warehouseEnabled
@@ -848,7 +872,10 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
             : 'Document completed and stock updated.'
           : 'Document completed — catalog saved (enable stock tracking to update quantities).'
       );
-      onCommitted?.({ stayOpen: stayOpenAfterCommit });
+      onCommitted?.({
+        stayOpen: stayOpenAfterCommit,
+        batch: committed || session,
+      });
       resetToWizard();
     } catch (err) {
       const msg = cleanApiMessage(err.message || 'Could not finish receiving');
@@ -1192,9 +1219,7 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
       <InvoiceHeaderCard
         batch={batch}
         onChange={persistHeaderDraft}
-        onDraft={(payload) => {
-          headerDraftRef.current = payload;
-        }}
+        onDraft={captureHeaderDraft}
         showValidation={showValidation}
       />
 

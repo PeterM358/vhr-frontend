@@ -23,6 +23,9 @@ export default function SupplierPicker({
   }, [selectedId, selectedLabel]);
 
   useEffect(() => {
+    // Selected supplier chip hides the search UI — skip list fetches so header
+    // autosave / batch refresh cannot spam GET /suppliers?search=…
+    if (selectedId) return undefined;
     const handle = setTimeout(async () => {
       try {
         const token = await AsyncStorage.getItem('@access_token');
@@ -33,7 +36,7 @@ export default function SupplierPicker({
       }
     }, 260);
     return () => clearTimeout(handle);
-  }, [search]);
+  }, [search, selectedId]);
 
   const items = useMemo(
     () =>

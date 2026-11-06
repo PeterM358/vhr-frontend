@@ -71,17 +71,22 @@ export async function getReceivingSession(token, batchId) {
   return response.json();
 }
 
-/** Authenticated invoice PDF/image access for a receiving batch (presigned or blob). */
-export async function fetchReceivingInvoiceFileAccess(token, batchId) {
+/**
+ * Authenticated invoice PDF/image access for a receiving batch.
+ * Prefer stream=1 (API proxy) so Ceph/Hetzner AccessDenied on bad presigns
+ * never lands as raw XML in the preview iframe.
+ */
+export async function fetchReceivingInvoiceFileAccess(token, batchId, { stream = true } = {}) {
+  const qs = stream ? '?stream=1' : '';
   const response = await fetch(
-    `${API_BASE_URL}/api/billing/receiving/${batchId}/file/`,
+    `${API_BASE_URL}/api/billing/receiving/${batchId}/file/${qs}`,
     { headers: await authHeaders(token) }
   );
   if (!response.ok) {
     await throwApiError(response, 'Could not open invoice file');
   }
   const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
+  if (!stream && contentType.includes('application/json')) {
     const payload = await response.json();
     if (!payload?.url) {
       throw new Error('Signed invoice URL missing from API response.');
@@ -89,6 +94,14 @@ export async function fetchReceivingInvoiceFileAccess(token, batchId) {
     return { url: payload.url, filename: payload.filename || '' };
   }
   const blob = await response.blob();
+  const textProbe = blob.type.includes('xml') || blob.type.includes('text');
+  if (textProbe && blob.size < 4000) {
+    const text = await blob.text();
+    if (/AccessDenied|NoSuchKey|InvalidAccessKeyId/i.test(text)) {
+      throw new Error('Could not open invoice file (storage access denied).');
+    }
+    return { url: URL.createObjectURL(new Blob([text], { type: blob.type })), filename: '' };
+  }
   return { url: URL.createObjectURL(blob), filename: '' };
 }
 

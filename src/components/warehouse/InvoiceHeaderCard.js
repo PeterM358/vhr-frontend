@@ -20,6 +20,12 @@ export default function InvoiceHeaderCard({ batch, onChange, onDraft, showValida
   const [invoiceNumber, setInvoiceNumber] = useState(batch?.invoice_number || '');
   const [invoiceDate, setInvoiceDate] = useState(batch?.invoice_date || '');
   const skipNextAutosave = useRef(true);
+  // Keep latest callbacks in refs so unstable parent lambdas cannot re-trigger
+  // the autosave effect (that loop was flooding PATCH /receiving/<id>/).
+  const onChangeRef = useRef(onChange);
+  const onDraftRef = useRef(onDraft);
+  onChangeRef.current = onChange;
+  onDraftRef.current = onDraft;
 
   useEffect(() => {
     setSupplierId(batch?.shop_supplier?.id || null);
@@ -27,7 +33,14 @@ export default function InvoiceHeaderCard({ batch, onChange, onDraft, showValida
     setInvoiceNumber(batch?.invoice_number || '');
     setInvoiceDate(batch?.invoice_date || '');
     skipNextAutosave.current = true;
-  }, [batch?.id, batch?.shop_supplier, batch?.supplier_name, batch?.invoice_number, batch?.invoice_date]);
+  }, [
+    batch?.id,
+    batch?.shop_supplier?.id,
+    batch?.shop_supplier?.display_name,
+    batch?.supplier_name,
+    batch?.invoice_number,
+    batch?.invoice_date,
+  ]);
 
   const buildPayload = () => ({
     shop_supplier_id: supplierId,
@@ -38,17 +51,19 @@ export default function InvoiceHeaderCard({ batch, onChange, onDraft, showValida
 
   useEffect(() => {
     if (!batch?.id) return;
-    onDraft?.(buildPayload());
+    onDraftRef.current?.(buildPayload());
     if (skipNextAutosave.current) {
       skipNextAutosave.current = false;
       return;
     }
-    if (!onChange) return;
+    if (!onChangeRef.current) return;
     const timer = setTimeout(() => {
-      onChange(buildPayload());
+      onChangeRef.current?.(buildPayload());
     }, AUTOSAVE_MS);
     return () => clearTimeout(timer);
-  }, [batch?.id, supplierId, supplierName, invoiceNumber, invoiceDate, onChange, onDraft]);
+    // Intentionally omit onChange/onDraft — see onChangeRef/onDraftRef above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batch?.id, supplierId, supplierName, invoiceNumber, invoiceDate]);
 
   const issues = showValidation ? batch?.header_issues || [] : [];
   const complete = showValidation ? batch?.header_complete : null;
