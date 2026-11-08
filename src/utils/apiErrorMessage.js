@@ -148,8 +148,11 @@ export function extractDrfFieldErrors(parsed) {
 export function messageFromApiResponseText(rawText, fallback = 'Request failed') {
   const raw = String(rawText || '').trim();
   if (!raw) return fallback;
-  if (raw.startsWith('<!DOCTYPE') || raw.startsWith('<html')) {
-    return extractHtmlExceptionMessage(raw) || fallback;
+  // Django DEBUG-off pages use lowercase <!doctype html>.
+  if (/^<!doctype\s+html/i.test(raw) || /^<html[\s>]/i.test(raw)) {
+    const fromHtml = extractHtmlExceptionMessage(raw);
+    if (fromHtml && !/^server error/i.test(fromHtml)) return fromHtml;
+    return fallback;
   }
   try {
     const parsed = JSON.parse(raw);
@@ -158,7 +161,7 @@ export function messageFromApiResponseText(rawText, fallback = 'Request failed')
     }
     return formatDrfErrorMessage(parsed, fallback);
   } catch {
-    if (raw.length > 280) return fallback;
+    if (raw.length > 280 || /<\/?[a-z][\s\S]*>/i.test(raw)) return fallback;
     return raw;
   }
 }
@@ -207,8 +210,10 @@ export function messageFromApiError(error, fallback = 'Request failed.') {
   if (fromBody) return fromBody;
   const msg = String(error?.message || '').trim();
   if (!msg || isGenericHttpStatusMessage(msg)) return fallback;
-  if (msg.startsWith('<!DOCTYPE') || msg.startsWith('<html')) {
-    return extractHtmlExceptionMessage(msg) || fallback;
+  if (/^<!doctype\s+html/i.test(msg) || /^<html[\s>]/i.test(msg)) {
+    const fromHtml = extractHtmlExceptionMessage(msg);
+    if (fromHtml && !/^server error/i.test(fromHtml)) return fromHtml;
+    return fallback;
   }
   return msg;
 }
