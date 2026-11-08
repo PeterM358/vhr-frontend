@@ -57,15 +57,26 @@ import {
 const SHOP_TOP_BAR = 'rgba(11,18,32,0.92)';
 
 function WarehouseStockToggle({ enabled, toggling, onToggle }) {
+  const { t } = useTranslation();
   return (
     <FloatingCard style={styles.warnCard}>
       <View style={styles.warehouseToggleRow}>
         <View style={styles.warehouseToggleText}>
-          <Text style={styles.warehouseToggleTitle}>Stock tracking</Text>
+          <Text style={styles.warehouseToggleTitle}>
+            {t('partnerDashboard.warehouse.receiving.stockTrackingTitle', null, 'Stock tracking')}
+          </Text>
           <Text style={styles.warnText}>
             {enabled
-              ? 'Quantities update when you complete receiving documents.'
-              : 'Off — you can still build your parts catalog. Turn on to track on-hand stock.'}
+              ? t(
+                  'partnerDashboard.warehouse.receiving.stockTrackingOn',
+                  null,
+                  'Quantities update when you complete receiving documents.'
+                )
+              : t(
+                  'partnerDashboard.warehouse.receiving.stockTrackingOff',
+                  null,
+                  'Off — you can still build your parts catalog. Turn on to track on-hand stock.'
+                )}
           </Text>
         </View>
         <Switch value={enabled} onValueChange={onToggle} disabled={toggling} />
@@ -75,10 +86,11 @@ function WarehouseStockToggle({ enabled, toggling, onToggle }) {
 }
 
 function IssueChips({ issues }) {
+  const { t } = useTranslation();
   if (!issues?.length) {
     return (
       <Chip compact style={styles.okChip} textStyle={styles.okChipText}>
-        Ready
+        {t('partnerDashboard.warehouse.receiving.lineReady', null, 'Ready')}
       </Chip>
     );
   }
@@ -86,7 +98,11 @@ function IssueChips({ issues }) {
     <View style={styles.issueRow}>
       {issues.map((code) => (
         <Chip key={code} compact style={styles.issueChip} textStyle={styles.issueChipText}>
-          {LINE_ISSUE_LABELS[code] || code}
+          {t(
+            `partnerDashboard.warehouse.receiving.issue.${code}`,
+            null,
+            LINE_ISSUE_LABELS[code] || code
+          )}
         </Chip>
       ))}
     </View>
@@ -94,6 +110,7 @@ function IssueChips({ issues }) {
 }
 
 function LineRow({ line, onEdit, onDelete }) {
+  const { t } = useTranslation();
   const priceEx = line.unit_price_ex_vat_minor ?? line.unit_price_minor;
   const priceExEur = priceEx ? (Number(priceEx) / 100).toFixed(2) : '—';
   const priceInc = line.unit_price_inc_vat_minor
@@ -109,24 +126,46 @@ function LineRow({ line, onEdit, onDelete }) {
         />
         <View style={styles.lineBody}>
           <Text style={styles.lineTitle} numberOfLines={2}>
-            {line.part_type_name || line.description || 'Part line'}
+            {line.part_type_name ||
+              line.description ||
+              t('partnerDashboard.warehouse.receiving.partLineFallback', null, 'Part line')}
           </Text>
           <Text style={styles.lineMeta}>
-            {line.part_number || '—'} · Qty {line.quantity} {line.unit_symbol || ''} · ex €{priceExEur}
-            {priceInc ? ` · inc €${priceInc}` : ''}
-            {line.brand_name ? ` · ${line.brand_name}` : ''}
+            {[
+              line.part_number || '—',
+              `${t('partnerDashboard.warehouse.receiving.qtyShort', null, 'Qty')} ${line.quantity}${
+                line.unit_symbol ? ` ${line.unit_symbol}` : ''
+              }`,
+              `${t('partnerDashboard.warehouse.receiving.exVatShort', null, 'ex')} €${priceExEur}`,
+              priceInc
+                ? `${t('partnerDashboard.warehouse.receiving.incVatShort', null, 'inc')} €${priceInc}`
+                : null,
+              line.brand_name || null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </Text>
           {line.stock_display ? (
-            <Text style={styles.stockMeta}>In stock: {line.stock_display}</Text>
+            <Text style={styles.stockMeta}>
+              {t(
+                'partnerDashboard.warehouse.receiving.inStockLabel',
+                { value: line.stock_display },
+                `In stock: ${line.stock_display}`
+              )}
+            </Text>
           ) : null}
           <IssueChips issues={line.issues} />
         </View>
         <View style={styles.lineActions}>
           <Pressable onPress={() => onEdit(line)} hitSlop={8}>
-            <Text style={styles.link}>Edit</Text>
+            <Text style={styles.link}>
+              {t('partnerDashboard.warehouse.receiving.editLine', null, 'Edit')}
+            </Text>
           </Pressable>
           <Pressable onPress={() => onDelete(line)} hitSlop={8}>
-            <Text style={styles.linkDanger}>Remove</Text>
+            <Text style={styles.linkDanger}>
+              {t('partnerDashboard.warehouse.receiving.removeLine', null, 'Remove')}
+            </Text>
           </Pressable>
         </View>
       </View>

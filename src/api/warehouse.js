@@ -316,10 +316,14 @@ export async function listStockInventory(
   return response.json();
 }
 
-export async function listStockMovements(token, { shopPartId, limit = 100 } = {}) {
+export async function listStockMovements(
+  token,
+  { shopPartId, limit = 100, movementType = '' } = {}
+) {
   const params = new URLSearchParams();
   if (shopPartId) params.set('shop_part_id', String(shopPartId));
   if (limit) params.set('limit', String(limit));
+  if (movementType) params.set('movement_type', movementType);
   const q = params.toString() ? `?${params.toString()}` : '';
   const response = await fetch(`${API_BASE_URL}/api/billing/stock/movements/${q}`, {
     headers: await authHeaders(token),

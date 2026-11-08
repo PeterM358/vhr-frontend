@@ -32,6 +32,7 @@ import {
 } from 'react-native-paper';
 
 import { getPartsCatalog, getSuggestedPartsForRepairType } from '../api/parts';
+import { listStockInventory, listStockMovements } from '../api/warehouse';
 import ScreenBackground from '../components/ScreenBackground';
 import BASE_STYLES from '../styles/base';
 import { stackContentPaddingTop } from '../navigation/stackContentInset';
@@ -39,6 +40,22 @@ import { partCatalogSubtitle } from '../utils/repairPartsTotals';
 import { showMessage } from '../utils/crossPlatformAlert';
 import { useTranslation } from '../i18n';
 import { translateMaterialCategoryLabel } from '../utils/translateShopTypeLabels';
+
+function stockRowToCatalogShape(row) {
+  const partId = row.part_id || row.partId;
+  if (!partId) return null;
+  return {
+    id: partId,
+    name: row.part_name || row.partName || '',
+    part_number: row.part_number || '',
+    shop_part: {
+      id: row.shop_part_id,
+      price: row.price != null ? String(row.price) : '0',
+    },
+    _stockQty: row.stock_quantity,
+    _invoice: row.invoice_number || row.reference || '',
+  };
+}
 
 function normalizeMoneyField(value) {
   if (value === '' || value === null || value === undefined) return '0';
@@ -71,7 +88,10 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingSuggested, setLoadingSuggested] = useState(false);
+  const [loadingStock, setLoadingStock] = useState(false);
   const [suggestedParts, setSuggestedParts] = useState([]);
+  const [inStockParts, setInStockParts] = useState([]);
+  const [recentReceivedParts, setRecentReceivedParts] = useState([]);
   const [results, setResults] = useState([]);
   const [selected, setSelected] = useState([...currentParts]);
 
@@ -126,6 +146,46 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
     };
   }, [repairTypeId]);
 
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      setLoadingStock(true);
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        if (!token) return;
+        const [stockRows, purchaseMoves] = await Promise.all([
+          listStockInventory(token, { inStock: true, sort: 'name' }),
+          listStockMovements(token, { limit: 40, movementType: 'purchase' }),
+        ]);
+        if (!active) return;
+        const stock = (Array.isArray(stockRows) ? stockRows : [])
+          .map(stockRowToCatalogShape)
+          .filter(Boolean)
+          .slice(0, 30);
+        setInStockParts(stock);
+
+        const seen = new Set();
+        const recent = [];
+        for (const mv of Array.isArray(purchaseMoves) ? purchaseMoves : []) {
+          const key = mv.shop_part_id || mv.part_id;
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          const shaped = stockRowToCatalogShape(mv);
+          if (shaped) recent.push(shaped);
+          if (recent.length >= 12) break;
+        }
+        setRecentReceivedParts(recent);
+      } catch (err) {
+        console.warn('Stock / recent receiving load failed', err);
+      } finally {
+        if (active) setLoadingStock(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleSearch = async () => {
     if (!query.trim()) {
       showMessage(
@@ -172,7 +232,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
   };
 
   const addCatalogItem = (item) => {
-    if (selected.some((p) => p.partsMasterId === item.id)) return;
+    if (!item?.id || selected.some((p) => p.partsMasterId === item.id)) return;
 
     setSelected((prev) => {
       const nextIndex = prev.length;
@@ -194,8 +254,72 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
     });
   };
 
+  const addManyCatalogItems = (items) => {
+    setSelected((prev) => {
+      const next = [...prev];
+      const newIndexes = [];
+      for (const item of items || []) {
+        if (!item?.id || next.some((p) => p.partsMasterId === item.id)) continue;
+        newIndexes.push(next.length);
+        next.push({
+          partsMasterId: item.id,
+          shopPartId: item.shop_part?.id ?? null,
+          quantity: 1,
+          price:
+            item.shop_part?.price != null && item.shop_part.price !== ''
+              ? String(item.shop_part.price)
+              : '0',
+          labor: '0',
+          note: '',
+          partsMaster: item,
+        });
+      }
+      if (newIndexes.length) {
+        setExpandedSelectedIndexes((exp) => [...new Set([...exp, ...newIndexes])]);
+      }
+      return next;
+    });
+  };
+
   const handleSelectFromCatalog = (item) => {
     addCatalogItem(item);
+  };
+
+  const renderQuickPickRow = (item, keyPrefix) => {
+    const picked = selected.some((p) => p.partsMasterId === item.id);
+    const subtitleBits = [
+      item.part_number ? `P/N ${item.part_number}` : null,
+      item._stockQty != null
+        ? t('selectRepairParts.stockQty', { value: item._stockQty }, `On hand: ${item._stockQty}`)
+        : null,
+      item._invoice
+        ? t('selectRepairParts.fromInvoice', { value: item._invoice }, `Invoice ${item._invoice}`)
+        : null,
+    ].filter(Boolean);
+    return (
+      <Card key={`${keyPrefix}-${item.id}`} style={styles.catalogCard}>
+        <Card.Title
+          title={item.name || t('selectRepairParts.materialFallback', null, 'Material')}
+          subtitle={subtitleBits.join(' · ') || partCatalogSubtitle(item)}
+          titleNumberOfLines={2}
+          right={() => (
+            <Button
+              mode={picked ? 'contained-tonal' : 'contained'}
+              compact
+              disabled={picked}
+              onPress={() => addCatalogItem(item)}
+              style={styles.selectButton}
+              contentStyle={styles.selectButtonContent}
+              labelStyle={styles.selectButtonLabel}
+            >
+              {picked
+                ? t('selectRepairParts.selected', null, 'Selected')
+                : t('selectRepairParts.addToRepair', null, 'Add to repair')}
+            </Button>
+          )}
+        />
+      </Card>
+    );
   };
 
   const handleRemoveSelected = (index) => {
@@ -378,9 +502,75 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
           {t(
             'selectRepairParts.helper',
             null,
-            "Platform materials catalog plus your shop listings. Other organizations' private warehouse stock is never shown. Your shop sets its own sell price."
+            'Start from stock or a recent invoice — no need to type each part. Search the catalog only when something is missing. Other shops’ stock is never shown.'
           )}
         </Text>
+
+        {loadingStock ? (
+          <Text style={styles.helperText}>
+            {t('selectRepairParts.loadingStock', null, 'Loading stock…')}
+          </Text>
+        ) : (
+          <>
+            <View style={styles.suggestedBlock}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.suggestedTitle}>
+                  {t('selectRepairParts.recentReceivedTitle', null, 'Recently received')}
+                </Text>
+                {recentReceivedParts.length > 1 ? (
+                  <Button
+                    mode="text"
+                    compact
+                    onPress={() => addManyCatalogItems(recentReceivedParts)}
+                    textColor="#E2E8F0"
+                  >
+                    {t('selectRepairParts.addAll', null, 'Add all')}
+                  </Button>
+                ) : null}
+              </View>
+              {recentReceivedParts.length === 0 ? (
+                <Text style={styles.emptyStateText}>
+                  {t(
+                    'selectRepairParts.recentReceivedEmpty',
+                    null,
+                    'No recent goods-in yet.'
+                  )}
+                </Text>
+              ) : (
+                recentReceivedParts.map((item) => renderQuickPickRow(item, 'recent'))
+              )}
+            </View>
+
+            <View style={styles.suggestedBlock}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.suggestedTitle}>
+                  {t('selectRepairParts.inStockTitle', null, 'In stock now')}
+                </Text>
+                {inStockParts.length > 1 ? (
+                  <Button
+                    mode="text"
+                    compact
+                    onPress={() => addManyCatalogItems(inStockParts)}
+                    textColor="#E2E8F0"
+                  >
+                    {t('selectRepairParts.addAll', null, 'Add all')}
+                  </Button>
+                ) : null}
+              </View>
+              {inStockParts.length === 0 ? (
+                <Text style={styles.emptyStateText}>
+                  {t(
+                    'selectRepairParts.inStockEmpty',
+                    null,
+                    'No on-hand stock yet — receive a supplier invoice first.'
+                  )}
+                </Text>
+              ) : (
+                inStockParts.map((item) => renderQuickPickRow(item, 'stock'))
+              )}
+            </View>
+          </>
+        )}
 
         {loadingSuggested ? (
           <Text style={styles.helperText}>
@@ -648,7 +838,14 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   suggestedBlock: { marginBottom: 12 },
-  suggestedTitle: { fontWeight: '600', marginBottom: 8, color: '#E2E8F0' },
+  suggestedTitle: { fontWeight: '600', marginBottom: 8, color: '#E2E8F0', flex: 1 },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 4,
+  },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   suggestChip: { marginBottom: 4 },
   selectButton: {
