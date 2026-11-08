@@ -738,25 +738,51 @@ const ShopWarehouseReceiveScreen = forwardRef(function ShopWarehouseReceiveScree
       const result = await uploadReceivingInvoice(token, batch.id, file);
       setActionBanner(null);
       applyBatch(result.batch, result.preview || null);
-      const parsed = Number(result.preview?.lines_parsed) || 0;
+      const parsedCount = Number(result.preview?.lines_parsed) || 0;
       const headerMissing = (result.batch?.header_issues || []).length > 0;
       const incompleteLines = Number(result.batch?.incomplete_count) || 0;
-      setShowValidation(parsed === 0 || headerMissing || incompleteLines > 0);
-      const parsedCount = Number(result.preview?.lines_parsed) || 0;
-      // Never show internal layout ids (qty_unit_label_v1, …) to the client.
-      const rawMsg = String(result.message || result.preview?.message || '');
-      const safeMsg = rawMsg
-        .replace(/\s*using layout\s+[\w.-]+/gi, '')
-        .replace(/\b(qty_unit_label_v\d+|stacked_column_v\d+|single_line_row_v\d+|inline_fallback_v\d+)\b/gi, '')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
-      showMessage(
-        parsedCount > 0 ? 'Invoice parsed' : 'Invoice uploaded',
-        safeMsg ||
-          (parsedCount > 0
-            ? `${parsedCount} lines ready to review below.`
-            : 'No line items read — add parts manually or view the document.')
-      );
+      setShowValidation(parsedCount === 0 || headerMissing || incompleteLines > 0);
+      // Client-facing copy — never "parsed" / layout ids. Counts drive clarity.
+      if (parsedCount > 0 && incompleteLines > 0) {
+        showMessage(
+          t(
+            'partnerDashboard.warehouse.receiving.invoiceReadTitle',
+            null,
+            'Invoice read — please check'
+          ),
+          t(
+            'partnerDashboard.warehouse.receiving.invoiceReadBodyWithIssues',
+            { count: parsedCount, issues: incompleteLines },
+            `We read ${parsedCount} material(s). ${incompleteLines} still need a fix (qty, price, VAT or part #). Check the list below and tap Edit.`
+          )
+        );
+      } else if (parsedCount > 0) {
+        showMessage(
+          t(
+            'partnerDashboard.warehouse.receiving.invoiceReadTitle',
+            null,
+            'Invoice read — please check'
+          ),
+          t(
+            'partnerDashboard.warehouse.receiving.invoiceReadBodyOk',
+            { count: parsedCount },
+            `We read ${parsedCount} material(s) from this invoice. Check quantities, prices and VAT below — tap Edit on anything wrong.`
+          )
+        );
+      } else {
+        showMessage(
+          t(
+            'partnerDashboard.warehouse.receiving.invoiceReadEmptyTitle',
+            null,
+            'Invoice uploaded'
+          ),
+          t(
+            'partnerDashboard.warehouse.receiving.invoiceReadBodyEmpty',
+            null,
+            'No materials were read automatically. Add parts manually or open the PDF and fill the list.'
+          )
+        );
+      }
     } catch (err) {
       const msg = cleanApiMessage(err.message || 'Upload failed');
       if (isDuplicateInvoiceMessage(msg) || err.duplicateInvoice || err.duplicateBatchId) {

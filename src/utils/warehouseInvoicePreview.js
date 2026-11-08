@@ -13,14 +13,14 @@ export function buildInvoicePreviewFromBatch(batch, uploadPreview = null) {
 
   let message = '';
   if (status === 'ready' && linesParsed > 0) {
-    message = `${linesParsed} line${linesParsed === 1 ? '' : 's'} parsed — review below and tap Edit on anything in red.`;
+    message = `${linesParsed} material(s) read — check quantities, prices and VAT below.`;
   } else if (status === 'no_text') {
     message =
-      'No readable text in this file (scan/photo). Add parts manually or re-scan with a text PDF.';
+      'No readable text in this file (scan/photo). Add parts manually or try a clearer PDF.';
   } else if (linesParsed === 0) {
-    message = 'No line items matched this layout — add parts manually while viewing the PDF.';
+    message = 'No materials were read — add parts manually while viewing the PDF.';
   } else {
-    message = 'Review parsed lines below.';
+    message = 'Check the materials list below.';
   }
 
   return {
