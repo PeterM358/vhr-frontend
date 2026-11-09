@@ -23,6 +23,8 @@ export const STORAGE_KEYS = {
   /** Partner home shop-name context bar dismissed for this shop (compact only) */
   partnerShopContextBarDismissedKey: (shopId) =>
     `@partner_shop_context_bar_dismissed_${shopId}`,
+  /** Combined shop name + partner intro card dismissed (replaces separate hero + context bar) */
+  partnerHomeIntroDismissedKey: (shopId) => `@partner_home_intro_dismissed_${shopId}`,
   logServiceRecordDraftKey: (vehicleId) => `@log_service_record_draft_${vehicleId}`,
   serviceRecordDraftKey: (vehicleId) => `serviceRecordDraft:${vehicleId}`,
   serviceRecordManualDraftKey: (vehicleId) => `serviceRecordManualDraft:${vehicleId}`,

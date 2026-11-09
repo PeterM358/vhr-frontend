@@ -29,7 +29,7 @@ import {
 import { setCachedShopRepairs } from '../utils/shopRepairsPrefetch';
 import PartnerRepairRequestCard from '../components/shop/PartnerRepairRequestCard';
 import PartnerAppHeader from '../components/partner/PartnerAppHeader';
-import PartnerShopContextBar from '../components/partner/PartnerShopContextBar';
+import PartnerHomeIntroCard from '../components/partner/PartnerHomeIntroCard';
 import { partnerInAppAlertCopy } from '../utils/partnerInAppAlert';
 import {
   comparePartnerLifecycle,
@@ -55,7 +55,6 @@ import { formatShopDisplayName } from '../utils/shopDisplayName';
 import { WebSocketContext } from '../context/WebSocketManager';
 import { AuthContext } from '../context/AuthManager';
 import ScreenBackground from '../components/ScreenBackground';
-import DashboardHero from '../components/dashboard/DashboardHero';
 import DashboardSection from '../components/dashboard/DashboardSection';
 import DashboardActionGrid from '../components/dashboard/DashboardActionGrid';
 import DashboardComingSoonSection from '../components/dashboard/DashboardComingSoonSection';
@@ -520,13 +519,13 @@ export default function ShopHomeScreen() {
         onLogoutPress={handleLogout}
       />
 
-      <PartnerShopContextBar
-        shopId={shopProfile?.id}
-        shopName={shopDisplayName}
-        onPress={() => openCenter()}
-      />
-
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <PartnerHomeIntroCard
+          shopId={shopProfile?.id}
+          shopName={shopDisplayName}
+          onPressShop={() => openCenter()}
+        />
+
         {!setupComplete ? (
           <ShopProfileSetupBanner
             missingFields={missingProfileFields}
@@ -546,12 +545,6 @@ export default function ShopHomeScreen() {
             }
           />
         ) : null}
-
-        <DashboardHero
-          compact
-          title={t('partnerDashboard.heroTitle')}
-          subtitle={t('partnerDashboard.heroSubtitle')}
-        />
 
         <DashboardSection
           title={t('partnerDashboard.openRepairRequests')}

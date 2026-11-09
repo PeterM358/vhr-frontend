@@ -598,7 +598,34 @@ export default function RepairsList() {
     const dateMetaLabel = isBookedAwaiting
       ? t('partnerDashboard.repairsList.status.booked')
       : repairListDateLabel(selectedTab, t);
-    const preferredVisit = localizePreferredVisitNote(item.availability_notes, t);
+    // Preferred-visit "Tomorrow / pending confirmation" is for open requests only.
+    // Done/ongoing jobs should not keep a stale relative slot from the original request.
+    // Prefer an absolute date from client_preferred_start over stored "Tomorrow" text.
+    let preferredVisit = null;
+    if (statusLower === 'open' && !item.scheduled_start) {
+      if (item.client_preferred_start) {
+        try {
+          const when = new Date(item.client_preferred_start);
+          preferredVisit = t(
+            'repairs.detail.preferredVisitPendingSlot',
+            {
+              slot: when.toLocaleString(undefined, {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+            },
+            `Preferred visit: ${when.toLocaleString()} (pending service center confirmation)`
+          );
+        } catch {
+          preferredVisit = localizePreferredVisitNote(item.availability_notes, t);
+        }
+      } else {
+        preferredVisit = localizePreferredVisitNote(item.availability_notes, t);
+      }
+    }
     const isSelected = selectedRepairIds.includes(item.id);
     const alreadyInvoiced = Boolean(item.has_issued_invoice);
     const paymentStatusText = formatRepairPaymentStatus(item.payment_status, t);
