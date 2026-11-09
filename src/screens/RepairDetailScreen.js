@@ -206,7 +206,11 @@ function formatPaymentStatus(status, translateFn = translate) {
   if (!status) return '—';
   const key = String(status);
   const map = {
-    unpaid: translateFn('repairs.detail.paymentUnpaid', null, 'Unpaid'),
+    unpaid: translateFn(
+      'repairs.detail.paymentDueOnPickup',
+      null,
+      'Will pay on pickup'
+    ),
     partially_paid: translateFn('repairs.detail.paymentPartiallyPaid', null, 'Partially paid'),
     paid: translateFn('repairs.detail.paymentPaid', null, 'Paid'),
     included_in_invoice: translateFn(
@@ -218,24 +222,24 @@ function formatPaymentStatus(status, translateFn = translate) {
   return map[key] || key.replace(/_/g, ' ');
 }
 
+/**
+ * Finalize / ongoing chips = settlement *plan*, not “money already cleared”
+ * (except deposit = partial cash already in the shop).
+ * True `paid` is set on pickup confirm or when staff mark settled later.
+ */
 function getPaymentStatusOptions(translateFn = translate) {
   return [
     {
-      value: 'paid',
-      label: translateFn('repairs.detail.paymentPaidOnPickup', null, 'Paid on pickup'),
-      hint: translateFn(
-        'repairs.detail.paymentPaidOnPickupHint',
-        null,
-        'Customer paid when collecting the vehicle'
-      ),
-    },
-    {
       value: 'unpaid',
-      label: translateFn('repairs.detail.paymentUnpaid', null, 'Unpaid'),
-      hint: translateFn(
-        'repairs.detail.paymentUnpaidHint',
+      label: translateFn(
+        'repairs.detail.paymentDueOnPickup',
         null,
-        'Bill later — common for fleet accounts'
+        'Will pay on pickup'
+      ),
+      hint: translateFn(
+        'repairs.detail.paymentDueOnPickupHint',
+        null,
+        'Retail default — collect the balance when the vehicle is handed over'
       ),
     },
     {
@@ -244,16 +248,16 @@ function getPaymentStatusOptions(translateFn = translate) {
       hint: translateFn(
         'repairs.detail.paymentMonthlyInvoiceHint',
         null,
-        'Company / fleet — settle on periodic invoice'
+        'Fleet / company — stack jobs and invoice at period end (replaces a bare Unpaid)'
       ),
     },
     {
       value: 'partially_paid',
-      label: translateFn('repairs.detail.paymentPartialDeposit', null, 'Partial deposit'),
+      label: translateFn('repairs.detail.paymentPartialDeposit', null, 'Deposit received'),
       hint: translateFn(
         'repairs.detail.paymentPartialDepositHint',
         null,
-        'Deposit received, balance outstanding'
+        'Customer already paid a deposit to the shop; balance still due'
       ),
     },
   ];
