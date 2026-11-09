@@ -307,6 +307,45 @@ export function repairPartSourceLabel(sourceType) {
   }
 }
 
+/** Thread messages on a repair (`/api/repairs/repair/<id>/messages/`). */
+export async function getRepairMessages(token, repairId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/repairs/repair/${encodeURIComponent(repairId)}/messages/`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!response.ok) {
+    const raw = await response.text().catch(() => '');
+    throw new Error(raw?.slice(0, 160) || 'Failed to fetch repair messages');
+  }
+  const data = await response.json();
+  return Array.isArray(data) ? data : data?.results || [];
+}
+
+export async function sendRepairMessage(token, repairId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/repairs/repair/${encodeURIComponent(repairId)}/messages/`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    },
+  );
+  if (!response.ok) {
+    let detail = 'Failed to send message';
+    try {
+      const err = await response.json();
+      if (typeof err?.detail === 'string') detail = err.detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  return response.json();
+}
+
 // ✅ Get or create RepairChat
 export async function getOrCreateRepairChat(token, repairId, shopId = null) {
   if (!shopId) {
@@ -573,6 +612,28 @@ export async function clientReportVehicleArrival(token, repairId) {
   });
   if (!response.ok) {
     await throwApiError(response, 'Could not check in');
+  }
+  return response.json();
+}
+
+export async function shopConfirmVehiclePickup(token, repairId) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair/${repairId}/pickup/shop/`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    await throwApiError(response, 'Could not confirm pickup');
+  }
+  return response.json();
+}
+
+export async function clientReportVehiclePickup(token, repairId) {
+  const response = await fetch(`${API_BASE_URL}/api/repairs/repair/${repairId}/pickup/client/`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    await throwApiError(response, 'Could not confirm pickup');
   }
   return response.json();
 }

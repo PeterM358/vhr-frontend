@@ -51,6 +51,8 @@ import {
   shopRespondRepairReschedule,
   shopConfirmVehicleArrival,
   clientReportVehicleArrival,
+  shopConfirmVehiclePickup,
+  clientReportVehiclePickup,
   cancelScheduledAppointment,
   cancelOpenRepairRequest,
   uploadRepairMedia,
@@ -414,6 +416,7 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [counterNote, setCounterNote] = useState('');
   const [submittingCounter, setSubmittingCounter] = useState(false);
   const [respondingArrival, setRespondingArrival] = useState(false);
+  const [respondingPickup, setRespondingPickup] = useState(false);
   const [cancelingAppointment, setCancelingAppointment] = useState(false);
   const [cancelingRequest, setCancelingRequest] = useState(false);
   const [relatedServiceHistory, setRelatedServiceHistory] = useState(null);
@@ -3109,6 +3112,58 @@ export default function RepairDetailScreen({ route, navigation }) {
     }
   };
 
+  const handleShopPickup = async () => {
+    try {
+      setRespondingPickup(true);
+      const token = await AsyncStorage.getItem('@access_token');
+      await shopConfirmVehiclePickup(token, repairId);
+      await refreshRepair();
+      showMessage(
+        t('repairs.detail.pickupConfirmedTitle', null, 'Vehicle handed over'),
+        t(
+          'repairs.detail.pickupConfirmedShopBody',
+          null,
+          'Pickup recorded. If settlement was pay-on-pickup, payment is marked paid.'
+        ),
+        { variant: 'success' }
+      );
+    } catch (err) {
+      showMessage(
+        t('repairs.detail.couldNotConfirmPickup', null, 'Could not confirm pickup'),
+        parseApiErrorMessage(err, t('repairs.detail.pleaseTryAgain')),
+        { variant: 'error' }
+      );
+    } finally {
+      setRespondingPickup(false);
+    }
+  };
+
+  const handleClientPickup = async () => {
+    try {
+      setRespondingPickup(true);
+      const token = await AsyncStorage.getItem('@access_token');
+      await clientReportVehiclePickup(token, repairId);
+      await refreshRepair();
+      showMessage(
+        t('repairs.detail.pickupConfirmedTitle', null, 'Vehicle handed over'),
+        t(
+          'repairs.detail.pickupConfirmedClientBody',
+          null,
+          'Thanks — we recorded that you collected your vehicle.'
+        ),
+        { variant: 'success' }
+      );
+    } catch (err) {
+      showMessage(
+        t('repairs.detail.couldNotConfirmPickup', null, 'Could not confirm pickup'),
+        parseApiErrorMessage(err, t('repairs.detail.pleaseTryAgain')),
+        { variant: 'error' }
+      );
+    } finally {
+      setRespondingPickup(false);
+    }
+  };
+
   const handleRequestVehicleHistory = async () => {
     const vehicleId = repair?.vehicle?.id || repair?.vehicle;
     if (!vehicleId) {
@@ -3988,6 +4043,12 @@ export default function RepairDetailScreen({ route, navigation }) {
                       </Text>
                     ) : null}
                     <Text style={styles.heroReference}>{heroReferenceLine}</Text>
+                    {isDone && repair.completed_at ? (
+                      <Text style={styles.heroMeta}>
+                        {t('repairs.detail.completedAtLabel')}{' '}
+                        {new Date(repair.completed_at).toLocaleString()}
+                      </Text>
+                    ) : null}
                     {repair.scheduled_start ? (
                       <Text style={styles.heroMeta}>
                         {t('repairs.detail.scheduled')}{' '}
@@ -3996,11 +4057,55 @@ export default function RepairDetailScreen({ route, navigation }) {
                     ) : null}
                     {repair.scheduled_end ? (
                       <Text style={styles.heroMeta}>
-                        {t('repairs.detail.estimatedCompletion')}{' '}
+                        {isDone
+                          ? t('repairs.detail.plannedReadyBy', null, 'Planned ready by:')
+                          : t('repairs.detail.estimatedCompletion')}{' '}
                         {new Date(repair.scheduled_end).toLocaleString()}
                       </Text>
                     ) : null}
-                    {repair.planned_labor_minutes != null && repair.planned_labor_minutes > 0 ? (
+                    {(() => {
+                      const wall =
+                        repair.scheduled_start && repair.scheduled_end
+                          ? Math.max(
+                              0,
+                              Math.round(
+                                (new Date(repair.scheduled_end) -
+                                  new Date(repair.scheduled_start)) /
+                                  60000
+                              )
+                            )
+                          : null;
+                      const labor = Number(repair.planned_labor_minutes) || 0;
+                      // Wall-clock bring→ready window = time at workshop, not labor.
+                      if (wall != null && wall > 0) {
+                        return (
+                          <Text style={styles.heroMeta}>
+                            {t('repairs.detail.workshopTimePlan', null, 'Time at workshop (plan):')}{' '}
+                            {formatDurationMinutes(wall)}
+                          </Text>
+                        );
+                      }
+                      if (labor > 0) {
+                        return (
+                          <Text style={styles.heroMeta}>
+                            {t('repairs.detail.plannedLabor')}{' '}
+                            {formatDurationMinutes(labor)}
+                          </Text>
+                        );
+                      }
+                      return null;
+                    })()}
+                    {Number(repair.planned_labor_minutes) > 0 &&
+                    repair.scheduled_start &&
+                    repair.scheduled_end &&
+                    Math.abs(
+                      Number(repair.planned_labor_minutes) -
+                        Math.round(
+                          (new Date(repair.scheduled_end) -
+                            new Date(repair.scheduled_start)) /
+                            60000
+                        )
+                    ) > 30 ? (
                       <Text style={styles.heroMeta}>
                         {t('repairs.detail.plannedLabor')}{' '}
                         {formatDurationMinutes(repair.planned_labor_minutes)}
@@ -4012,6 +4117,12 @@ export default function RepairDetailScreen({ route, navigation }) {
                     {isDone ? (
                       <Text style={styles.heroMeta}>
                         {t('repairs.detail.payment')}: {localizedPaymentStatus(repair.payment_status)}
+                      </Text>
+                    ) : null}
+                    {isDone && repair.vehicle_picked_up_at ? (
+                      <Text style={styles.heroMeta}>
+                        {t('repairs.detail.pickedUpAtLabel', null, 'Picked up:')}{' '}
+                        {new Date(repair.vehicle_picked_up_at).toLocaleString()}
                       </Text>
                     ) : null}
                     <Text style={styles.heroMeta}>
@@ -4648,9 +4759,21 @@ export default function RepairDetailScreen({ route, navigation }) {
 
             {!isShop && isDone && repair.shop_profile_name ? (
               <FloatingCard style={styles.readyPickupClientCard}>
-                <Text style={styles.cardTitle}>{t('repairs.detail.readyForPickup')}</Text>
+                <Text style={styles.cardTitle}>
+                  {repair.vehicle_picked_up_at
+                    ? t('repairs.detail.pickedUpTitle', null, 'Vehicle collected')
+                    : t('repairs.detail.readyForPickup')}
+                </Text>
                 <Text style={styles.mutedText}>
-                  {canOpenShopProfile ? (
+                  {repair.vehicle_picked_up_at
+                    ? t(
+                        'repairs.detail.pickedUpClientBody',
+                        {
+                          when: new Date(repair.vehicle_picked_up_at).toLocaleString(),
+                        },
+                        `Collected ${new Date(repair.vehicle_picked_up_at).toLocaleString()}.`
+                      )
+                    : canOpenShopProfile ? (
                     <>
                       <Text style={styles.shopNameLink} onPress={openShopProfile} accessibilityRole="link">
                         {repair.shop_profile_name}
@@ -4664,11 +4787,46 @@ export default function RepairDetailScreen({ route, navigation }) {
                     })
                   )}
                 </Text>
-                {canOpenShopProfile ? (
+                {!repair.vehicle_picked_up_at && isClientOwner ? (
+                  <Button
+                    mode="contained"
+                    onPress={handleClientPickup}
+                    loading={respondingPickup}
+                    disabled={respondingPickup}
+                    style={styles.arrivalButton}
+                  >
+                    {t('repairs.detail.confirmPickupClient', null, 'I picked up my vehicle')}
+                  </Button>
+                ) : null}
+                {canOpenShopProfile && !repair.vehicle_picked_up_at ? (
                   <Text style={[styles.shopTapHint, styles.shopTapHintLeft]}>
                     {t('vehicles.detail.tapForShopProfile')}
                   </Text>
                 ) : null}
+              </FloatingCard>
+            ) : null}
+
+            {isShop && isMyShopRepair && isDone && !repair.vehicle_picked_up_at ? (
+              <FloatingCard style={styles.readyPickupClientCard}>
+                <Text style={styles.cardTitle}>
+                  {t('repairs.detail.waitingForPickupTitle', null, 'Waiting for pickup')}
+                </Text>
+                <Text style={styles.mutedText}>
+                  {t(
+                    'repairs.detail.waitingForPickupShopBody',
+                    null,
+                    'Work is finished. Confirm when you hand the keys back — this also marks pay-on-pickup as paid.'
+                  )}
+                </Text>
+                <Button
+                  mode="contained"
+                  onPress={handleShopPickup}
+                  loading={respondingPickup}
+                  disabled={respondingPickup}
+                  style={styles.arrivalButton}
+                >
+                  {t('repairs.detail.confirmPickupShop', null, 'Vehicle handed over')}
+                </Button>
               </FloatingCard>
             ) : null}
 
