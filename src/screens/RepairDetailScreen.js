@@ -137,7 +137,8 @@ import {
 } from '../utils/shopErpAccess';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import FinalizeOdometerEvidenceSheet from '../components/repair/FinalizeOdometerEvidenceSheet';
-import { WizardEngine, createMemoryAdapter } from '../wizard';
+import { WizardEngine } from '../wizard';
+import { createShopRepairWizardAdapter } from '../wizard/adapters/shopRepairWizardAdapter';
 import { SHOP_REPAIR_WIZARD_STEPS } from './repair/ShopRepairWizardSteps';
 import RepairInvoicingCard from '../components/shop/RepairInvoicingCard';
 
@@ -316,7 +317,10 @@ export default function RepairDetailScreen({ route, navigation }) {
   useHardwareBackHandler(onBack);
   const { setNotifications, refreshUnreadFromRest } = useContext(WebSocketContext);
   const theme = useTheme();
-  const shopRepairWizardAdapter = useMemo(() => createMemoryAdapter({}), []);
+  const shopRepairWizardAdapter = useMemo(
+    () => createShopRepairWizardAdapter(repairId),
+    [repairId]
+  );
 
   const [repair, setRepair] = useState(null);
   const [repairParts, setRepairParts] = useState([]);
@@ -1597,7 +1601,7 @@ export default function RepairDetailScreen({ route, navigation }) {
       <FloatingCard style={styles.lightActionCard}>
         {readOnly ? (
           renderDoneCollapsibleHeader({
-            title: t('repairs.detail.operationsTitle', null, 'Operations'),
+            title: t('repairs.detail.operationsTitle', null, 'Operations / Labor'),
             hint: operationsCollapsedHint,
             expanded: sectionExpanded,
             onToggle: () => setDoneOperationsSectionExpanded((prev) => !prev),
@@ -1605,7 +1609,7 @@ export default function RepairDetailScreen({ route, navigation }) {
         ) : (
           <>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={styles.cardTitle}>{t('repairs.detail.operationsTitle', null, 'Operations')}</Text>
+              <Text style={styles.cardTitle}>{t('repairs.detail.operationsTitle', null, 'Operations / Labor')}</Text>
               {visibleOperations.length ? (
                 <Text style={styles.mutedText}>
                   {t('repairs.detail.operationsCompletedCount', { done: visibleCompletedCount, total: visibleOperations.length }, `${visibleCompletedCount}/${visibleOperations.length} completed`)}
@@ -2382,6 +2386,47 @@ export default function RepairDetailScreen({ route, navigation }) {
     </>
   );
 
+  /** Parts wizard step: show repair totals, edit labor only on Operations / Labor. */
+  const renderShopPartsStepFinancialSummary = () => (
+    <>
+      <Text style={styles.partsSectionLabel}>
+        {t('repairs.detail.repairFinancialSummary', null, 'Repair financial summary')}
+      </Text>
+      <View style={styles.summaryRow}>
+        <Text style={styles.summaryLabel}>{t('repairs.detail.parts', null, 'Parts')}</Text>
+        <Text style={styles.summaryValue}>
+          {formatMoneyAmount(summaryPartsAmount, DEFAULT_CURRENCY)}
+        </Text>
+      </View>
+      <View style={styles.summaryRow}>
+        <Text style={styles.summaryLabel}>{t('repairs.detail.labor')}</Text>
+        <Text style={styles.summaryValue}>
+          {formatMoneyAmount(summaryLaborAmount, DEFAULT_CURRENCY)}
+        </Text>
+      </View>
+      <View style={styles.summaryRow}>
+        <Text style={[styles.summaryLabel, { fontWeight: '600' }]}>{t('repairs.detail.total')}</Text>
+        <Text style={[styles.summaryValue, { fontWeight: '600' }]}>
+          {formatMoneyAmount(summaryTotalAmount, DEFAULT_CURRENCY)}
+        </Text>
+      </View>
+      <Text style={styles.mutedText}>
+        {t(
+          'repairs.detail.partsStepLaborHint',
+          null,
+          'Labor is set on Operations / Labor. Edit part lines via Manage parts.'
+        )}
+      </Text>
+      <Text style={styles.mutedText}>
+        {t(
+          'repairs.detail.allAmountsInCurrency',
+          { currency: DEFAULT_CURRENCY },
+          `All amounts are in ${DEFAULT_CURRENCY}.`
+        )}
+      </Text>
+    </>
+  );
+
   const openVehicleProfile = useCallback(() => {
     if (!canOpenVehicleProfile) return;
     navigation.navigate('VehicleDetail', {
@@ -2654,7 +2699,7 @@ export default function RepairDetailScreen({ route, navigation }) {
     );
   };
 
-  const renderRepairPartItem = ({ item }) => {
+  const renderRepairPartItem = ({ item, hideLabor = false }) => {
     const stockBacked = ['inventory', 'catalog', 'catalog_pick'].includes(item.source_type);
     const partLabel =
       item.partsMaster?.name ||
@@ -2685,9 +2730,11 @@ export default function RepairDetailScreen({ route, navigation }) {
         <Text style={{ flex: 1, textAlign: 'center' }}>
           {item.price_per_item_at_use ?? item.price ?? '—'}
         </Text>
-        <Text style={{ flex: 1, textAlign: 'center' }}>
-          {item.labor_cost ?? item.labor ?? '—'}
-        </Text>
+        {!hideLabor ? (
+          <Text style={{ flex: 1, textAlign: 'center' }}>
+            {item.labor_cost ?? item.labor ?? '—'}
+          </Text>
+        ) : null}
       </View>
       <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
         {repairPartSourceLabel(item.source_type)}
@@ -4224,9 +4271,15 @@ export default function RepairDetailScreen({ route, navigation }) {
 
   const renderShopWizardPartsLaborStep = () => (
     <Card mode="outlined" style={styles.headerCard}>
-      <Card.Title title={t('repairWizard.partsTitle', null, 'Parts & labor')} />
+      <Card.Title title={t('repairWizard.partsTitle', null, 'Parts')} />
       <Card.Content>
-        <Text style={styles.mutedText}>{t('repairs.detail.trackPartsLabor', null, 'Track parts, notes, and labor for this repair.')}</Text>
+        <Text style={styles.mutedText}>
+          {t(
+            'repairWizard.partsTrack',
+            null,
+            'Add parts from stock or a supplier invoice. Labor is set on Operations / Labor.'
+          )}
+        </Text>
         {vehicleAtShop ? (
           <View style={styles.serviceStateChip}>
             <Text style={styles.serviceStateChipText}>{t('repairs.detail.vehicleAtServiceCenter', null, 'Vehicle at service center')}</Text>
@@ -4266,21 +4319,20 @@ export default function RepairDetailScreen({ route, navigation }) {
               <Text style={{ flex: 2, fontWeight: 'bold' }}>{t('repairs.detail.partColumnShort', null, 'Part')}</Text>
               <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>{t('repairs.detail.qtyColumnShort', null, 'Qty')}</Text>
               <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>{t('repairs.detail.priceColumnShort', null, 'Price')}</Text>
-              <Text style={{ flex: 1, fontWeight: 'bold', textAlign: 'center' }}>{t('repairs.detail.laborColumnShort', null, 'Labor')}</Text>
             </View>
             {displayPartsList.map((item, index) => (
-              <View key={item.id || index}>{renderRepairPartItem({ item })}</View>
+              <View key={item.id || index}>{renderRepairPartItem({ item, hideLabor: true })}</View>
             ))}
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10 }}>
               <Text style={{ fontWeight: 'bold', marginRight: 10 }}>{t('repairs.detail.totalWithColon', null, 'Total:')}</Text>
-              <Text>{formatMoneyAmount(displayPartsTotals.total, DEFAULT_CURRENCY)}</Text>
+              <Text>{formatMoneyAmount(displayPartsTotals.partsSum, DEFAULT_CURRENCY)}</Text>
             </View>
           </>
         )}
         {renderPartsSupplierSection()}
         {shopCanFinalizeOngoing ? (
           <>
-            {renderShopEditableFinancialSummary()}
+            {renderShopPartsStepFinancialSummary()}
             <Button
               mode="contained"
               onPress={() => handleUpdateRepair()}
@@ -4428,6 +4480,11 @@ export default function RepairDetailScreen({ route, navigation }) {
   const onShopRepairWizardFinish = async () => {
     if (shopCanFinalizeOngoing) {
       await handleFinalizeRepair();
+      try {
+        await shopRepairWizardAdapter.clear?.();
+      } catch {
+        // ignore
+      }
     }
   };
 

@@ -262,9 +262,13 @@ export function WizardProvider({
       if (nextIndex < 0 || nextIndex >= total) return;
       setIndex(nextIndex);
       setError(null);
-      if (onStepChange) onStepChange(nextIndex, steps[nextIndex]);
+      const nextStep = steps[nextIndex];
+      if (nextStep?.id && typeof resolvedAdapter.setCurrentStepId === 'function') {
+        Promise.resolve(resolvedAdapter.setCurrentStepId(nextStep.id)).catch(() => {});
+      }
+      if (onStepChange) onStepChange(nextIndex, nextStep);
     },
-    [total, steps, onStepChange]
+    [total, steps, onStepChange, resolvedAdapter]
   );
 
   const goBack = useCallback(() => {
@@ -301,10 +305,17 @@ export function WizardProvider({
         }
       }
 
-      // Nothing changed on a non-final step: advance without touching the API.
-      // Still mark the step completed so the step bar leaves red/incomplete.
+      // Nothing changed on a non-final step: advance without API PATCH.
+      // Still persist progress so remount (e.g. Manage parts) keeps green dots.
       if (!mustPersist && !isLast) {
         markCompleted(currentStep.id);
+        if (typeof resolvedAdapter.saveStep === 'function') {
+          try {
+            await resolvedAdapter.saveStep(currentStep.id, valuesRef.current);
+          } catch {
+            // progress persistence is best-effort
+          }
+        }
         setStatus('idle');
         goTo(index + 1);
         return { ok: true };
@@ -336,6 +347,7 @@ export function WizardProvider({
     currentStep,
     context,
     persistStep,
+    resolvedAdapter,
     markStepSaved,
     markCompleted,
     refreshAdapterProgress,

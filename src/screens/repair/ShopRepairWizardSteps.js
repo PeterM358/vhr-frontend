@@ -50,13 +50,13 @@ export const SHOP_REPAIR_WIZARD_STEPS = [
   {
     id: 'operations',
     titleKey: 'repairWizard.operationsTitle',
-    title: 'Operations',
+    title: 'Operations / Labor',
     Component: ShopRepairOperationsStep,
   },
   {
     id: 'partsLabor',
     titleKey: 'repairWizard.partsTitle',
-    title: 'Parts & labor',
+    title: 'Parts',
     optional: true,
     Component: ShopRepairPartsLaborStep,
   },

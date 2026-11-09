@@ -17,6 +17,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +26,6 @@ import {
   Text,
   TextInput,
   Button,
-  Card,
   useTheme,
   Divider,
   IconButton,
@@ -149,6 +149,8 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
 
   const [expandedCatalogIndexes, setExpandedCatalogIndexes] = useState([]);
   const [noteOpenIndexes, setNoteOpenIndexes] = useState([]);
+  const [cartExpanded, setCartExpanded] = useState(true);
+  const [stockFilter, setStockFilter] = useState('');
 
   useEffect(() => {
     if (newCreatedPart && !selected.some(p => p.partsMasterId === newCreatedPart.id)) {
@@ -296,6 +298,15 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
     addCatalogItem(item);
   };
 
+  const filterStockRows = (rows) => {
+    const q = stockFilter.trim().toLowerCase();
+    if (!q) return rows;
+    return (rows || []).filter((row) => {
+      const hay = `${row.name || ''} ${row.part_number || ''} ${row._invoice || ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  };
+
   const renderQuickPickRow = (item, keyPrefix) => {
     const picked = selected.some((p) => p.partsMasterId === item.id);
     const subtitleBits = [
@@ -308,28 +319,26 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
         : null,
     ].filter(Boolean);
     return (
-      <Card key={`${keyPrefix}-${item.id}`} style={styles.catalogCard}>
-        <Card.Title
-          title={item.name || t('selectRepairParts.materialFallback', null, 'Material')}
-          subtitle={subtitleBits.join(' · ') || partCatalogSubtitle(item)}
-          titleNumberOfLines={2}
-          right={() => (
-            <Button
-              mode={picked ? 'contained-tonal' : 'contained'}
-              compact
-              disabled={picked}
-              onPress={() => addCatalogItem(item)}
-              style={styles.selectButton}
-              contentStyle={styles.selectButtonContent}
-              labelStyle={styles.selectButtonLabel}
-            >
-              {picked
-                ? t('selectRepairParts.selected', null, 'Selected')
-                : t('selectRepairParts.addToRepair', null, 'Add to repair')}
-            </Button>
-          )}
-        />
-      </Card>
+      <Pressable
+        key={`${keyPrefix}-${item.id}`}
+        onPress={() => (picked ? null : addCatalogItem(item))}
+        disabled={picked}
+        style={[styles.quickPickRow, picked && styles.quickPickRowPicked]}
+      >
+        <View style={styles.quickPickBody}>
+          <Text style={styles.quickPickName} numberOfLines={1}>
+            {item.name || t('selectRepairParts.materialFallback', null, 'Material')}
+          </Text>
+          <Text style={styles.quickPickMeta} numberOfLines={1}>
+            {subtitleBits.join(' · ')}
+          </Text>
+        </View>
+        <Text style={[styles.quickPickAction, picked && styles.quickPickActionDone]}>
+          {picked
+            ? t('selectRepairParts.selected', null, 'Selected')
+            : t('selectRepairParts.addShort', null, '+ Add')}
+        </Text>
+      </Pressable>
     );
   };
 
@@ -506,7 +515,8 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
       ? t('selectRepairParts.saveToRepair', null, 'Save materials to repair')
       : t('selectRepairParts.confirmSelection', null, 'Confirm selection');
 
-  const na = t('selectRepairParts.na', null, 'N/A');
+  const filteredRecent = filterStockRows(recentReceivedParts);
+  const filteredInStock = filterStockRows(inStockParts);
 
   return (
     <ScreenBackground safeArea={false}>
@@ -524,6 +534,195 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
         ]}
         keyboardShouldPersistTaps="handled"
       >
+        {/* Cart balloon — selected materials first */}
+        <View style={styles.cartBalloon}>
+          <Pressable
+            onPress={() => setCartExpanded((v) => !v)}
+            style={styles.cartHeader}
+          >
+            <View style={styles.cartHeaderText}>
+              <Text style={styles.cartTitle}>
+                {t('selectRepairParts.cartTitle', null, 'Selected for repair')}
+              </Text>
+              <Text style={styles.cartSubtitle}>
+                {selected.length === 0
+                  ? t('selectRepairParts.cartEmptyHint', null, 'Tap stock below to add')
+                  : t(
+                      'selectRepairParts.cartCount',
+                      { count: selected.length },
+                      `${selected.length} materials · tap to ${cartExpanded ? 'collapse' : 'expand'}`
+                    )}
+              </Text>
+            </View>
+            <IconButton
+              icon={cartExpanded ? 'chevron-up' : 'chevron-down'}
+              size={22}
+              iconColor="#0f172a"
+              style={{ margin: 0 }}
+            />
+          </Pressable>
+
+          {cartExpanded ? (
+            <View style={styles.cartBody}>
+              {selected.length === 0 ? (
+                <Text style={styles.cartEmptyText}>
+                  {t(
+                    'selectRepairParts.noneSelectedYet',
+                    null,
+                    'No materials selected yet.'
+                  )}
+                </Text>
+              ) : (
+                <>
+                  <Text style={styles.cartPricingHint}>
+                    {t(
+                      'selectRepairParts.pricingHint',
+                      null,
+                      'Sell price is suggested at ~35% over delivery cost. Change it anytime — the cost is only a guide.'
+                    )}
+                  </Text>
+                  {selected.map((part, index) => {
+                    const noteOpen = noteOpenIndexes.includes(index);
+                    const costMinor =
+                      part.costMinor ?? costMinorFromItem(part.partsMaster);
+                    const costLabel = formatEuroFromMinor(costMinor);
+                    const suggested = suggestSellPrice({
+                      shop_part: {
+                        price: part.partsMaster?.shop_part?.price,
+                        avg_cost_minor: costMinor,
+                      },
+                      _costMinor: costMinor,
+                    });
+                    const border = getBorderStyle(part);
+
+                    return (
+                      <View
+                        key={`${part.partsMasterId}-${index}`}
+                        style={[
+                          styles.selectedRow,
+                          border.borderWidth ? border : null,
+                        ]}
+                      >
+                        <View style={styles.selectedRowTop}>
+                          <View style={styles.selectedRowBody}>
+                            <Text style={styles.selectedName} numberOfLines={1}>
+                              {part.partsMaster?.name ||
+                                t(
+                                  'selectRepairParts.materialFallback',
+                                  null,
+                                  'Material'
+                                )}
+                            </Text>
+                            <Text style={styles.selectedMeta} numberOfLines={2}>
+                              {[
+                                part.partsMaster?.part_number
+                                  ? `P/N ${part.partsMaster.part_number}`
+                                  : null,
+                                costLabel
+                                  ? t(
+                                      'selectRepairParts.deliveryCost',
+                                      { value: costLabel },
+                                      `Cost €${costLabel}`
+                                    )
+                                  : t(
+                                      'selectRepairParts.deliveryCostUnknown',
+                                      null,
+                                      'Cost unknown'
+                                    ),
+                                costLabel
+                                  ? t(
+                                      'selectRepairParts.suggestedSell',
+                                      { value: suggested },
+                                      `Suggest €${suggested}`
+                                    )
+                                  : null,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </Text>
+                          </View>
+                          <IconButton
+                            icon="close"
+                            size={18}
+                            onPress={() => handleRemoveSelected(index)}
+                            iconColor={theme.colors.error}
+                            style={styles.selectedRemove}
+                          />
+                        </View>
+                        <View style={styles.selectedInputsRow}>
+                          <TextInput
+                            mode="outlined"
+                            dense
+                            label={t(
+                              'selectRepairParts.quantity',
+                              null,
+                              'Quantity'
+                            )}
+                            keyboardType="numeric"
+                            value={String(part.quantity)}
+                            onChangeText={(val) =>
+                              handleSelectedChange(index, 'quantity', val)
+                            }
+                            style={styles.selectedQtyInput}
+                          />
+                          <TextInput
+                            mode="outlined"
+                            dense
+                            label={t(
+                              'selectRepairParts.sellPrice',
+                              null,
+                              'Sell price'
+                            )}
+                            keyboardType="numeric"
+                            value={part.price}
+                            onChangeText={(val) =>
+                              handleSelectedChange(index, 'price', val)
+                            }
+                            style={styles.selectedPriceInput}
+                          />
+                          {costLabel ? (
+                            <Button
+                              mode="text"
+                              compact
+                              onPress={() => applySuggestedPrice(index)}
+                              style={styles.suggestBtn}
+                              labelStyle={styles.suggestBtnLabel}
+                            >
+                              {t('selectRepairParts.useSuggest', null, '+35%')}
+                            </Button>
+                          ) : null}
+                          <IconButton
+                            icon={
+                              noteOpen || part.note
+                                ? 'note-text'
+                                : 'note-text-outline'
+                            }
+                            size={20}
+                            onPress={() => toggleNoteOpen(index)}
+                            iconColor={part.note ? '#38bdf8' : '#94a3b8'}
+                          />
+                        </View>
+                        {noteOpen ? (
+                          <TextInput
+                            mode="outlined"
+                            dense
+                            label={t('selectRepairParts.note', null, 'Note')}
+                            value={part.note}
+                            onChangeText={(val) =>
+                              handleSelectedChange(index, 'note', val)
+                            }
+                            style={styles.selectedNoteInput}
+                          />
+                        ) : null}
+                      </View>
+                    );
+                  })}
+                </>
+              )}
+            </View>
+          ) : null}
+        </View>
+
         <Text style={styles.helperText}>
           {t(
             'selectRepairParts.helper',
@@ -531,6 +730,19 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
             'Start from stock or a recent invoice — no need to type each part. Search the catalog only when something is missing. Other shops’ stock is never shown.'
           )}
         </Text>
+
+        <TextInput
+          mode="outlined"
+          dense
+          label={t(
+            'selectRepairParts.stockFilterLabel',
+            null,
+            'Filter stock / recent'
+          )}
+          value={stockFilter}
+          onChangeText={setStockFilter}
+          style={styles.input}
+        />
 
         {loadingStock ? (
           <Text style={styles.helperText}>
@@ -541,20 +753,24 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
             <View style={styles.suggestedBlock}>
               <View style={styles.sectionHeaderRow}>
                 <Text style={styles.suggestedTitle}>
-                  {t('selectRepairParts.recentReceivedTitle', null, 'Recently received')}
+                  {t(
+                    'selectRepairParts.recentReceivedTitle',
+                    null,
+                    'Recently received'
+                  )}
                 </Text>
-                {recentReceivedParts.length > 1 ? (
+                {filteredRecent.length > 1 ? (
                   <Button
                     mode="text"
                     compact
-                    onPress={() => addManyCatalogItems(recentReceivedParts)}
+                    onPress={() => addManyCatalogItems(filteredRecent)}
                     textColor="#E2E8F0"
                   >
                     {t('selectRepairParts.addAll', null, 'Add all')}
                   </Button>
                 ) : null}
               </View>
-              {recentReceivedParts.length === 0 ? (
+              {filteredRecent.length === 0 ? (
                 <Text style={styles.emptyStateText}>
                   {t(
                     'selectRepairParts.recentReceivedEmpty',
@@ -563,7 +779,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
                   )}
                 </Text>
               ) : (
-                recentReceivedParts.map((item) => renderQuickPickRow(item, 'recent'))
+                filteredRecent.map((item) => renderQuickPickRow(item, 'recent'))
               )}
             </View>
 
@@ -572,18 +788,18 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
                 <Text style={styles.suggestedTitle}>
                   {t('selectRepairParts.inStockTitle', null, 'In stock now')}
                 </Text>
-                {inStockParts.length > 1 ? (
+                {filteredInStock.length > 1 ? (
                   <Button
                     mode="text"
                     compact
-                    onPress={() => addManyCatalogItems(inStockParts)}
+                    onPress={() => addManyCatalogItems(filteredInStock)}
                     textColor="#E2E8F0"
                   >
                     {t('selectRepairParts.addAll', null, 'Add all')}
                   </Button>
                 ) : null}
               </View>
-              {inStockParts.length === 0 ? (
+              {filteredInStock.length === 0 ? (
                 <Text style={styles.emptyStateText}>
                   {t(
                     'selectRepairParts.inStockEmpty',
@@ -592,7 +808,7 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
                   )}
                 </Text>
               ) : (
-                inStockParts.map((item) => renderQuickPickRow(item, 'stock'))
+                filteredInStock.map((item) => renderQuickPickRow(item, 'stock'))
               )}
             </View>
           </>
@@ -609,7 +825,11 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
         ) : suggestedParts.length > 0 ? (
           <View style={styles.suggestedBlock}>
             <Text style={styles.suggestedTitle}>
-              {t('selectRepairParts.typicalForService', null, 'Typical for this service')}
+              {t(
+                'selectRepairParts.typicalForService',
+                null,
+                'Typical for this service'
+              )}
             </Text>
             <View style={styles.chipRow}>
               {suggestedParts.map((item) => {
@@ -631,9 +851,15 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
           </View>
         ) : null}
 
+        <Divider style={{ marginVertical: 12 }} />
+
         <TextInput
           mode="outlined"
-          label={t('selectRepairParts.searchLabel', null, 'Search materials catalog')}
+          label={t(
+            'selectRepairParts.searchLabel',
+            null,
+            'Search materials catalog'
+          )}
           value={query}
           onChangeText={setQuery}
           style={styles.input}
@@ -647,215 +873,49 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
           const expanded = expandedCatalogIndexes.includes(idx);
           const picked = selected.some((p) => p.partsMasterId === item.id);
           return (
-            <Card key={item.id ?? idx} style={styles.catalogCard}>
-              <Card.Title
-                title={item.name}
-                subtitle={partCatalogSubtitle(item)}
-                titleNumberOfLines={2}
-                left={(props) => (
-                  <IconButton
-                    {...props}
-                    icon={expanded ? 'chevron-up' : 'chevron-down'}
-                    onPress={() => toggleCatalogExpand(idx)}
-                  />
-                )}
-                right={() => (
-                  <Button
-                    mode={picked ? 'contained-tonal' : 'contained'}
-                    compact
-                    disabled={picked}
-                    onPress={() => handleSelectFromCatalog(item)}
-                    style={styles.selectButton}
-                    contentStyle={styles.selectButtonContent}
-                    labelStyle={styles.selectButtonLabel}
-                  >
-                    {picked
-                      ? t('selectRepairParts.selected', null, 'Selected')
-                      : t('selectRepairParts.addToRepair', null, 'Add to repair')}
-                  </Button>
-                )}
-              />
-              {expanded && (
-                <Card.Content>
-                  <Text>
-                    {t(
-                      'selectRepairParts.category',
-                      {
-                        value: translateMaterialCategoryLabel(item.category, t, {
-                          locale,
-                        }) || item.category,
-                      },
-                      `Category: ${item.category}`
-                    )}
-                  </Text>
-                  <Text>
-                    {t(
-                      'selectRepairParts.description',
-                      { value: item.description },
-                      `Description: ${item.description}`
-                    )}
-                  </Text>
-                  <Text>
-                    {t(
-                      'selectRepairParts.partNumber',
-                      { value: item.part_number || na },
-                      `Part number: ${item.part_number || na}`
-                    )}
-                  </Text>
-                  {item.shop_part ? (
-                    <>
-                      <Divider style={{ marginVertical: 8 }} />
-                      <Text>
-                        {t(
-                          'selectRepairParts.shopPrice',
-                          { value: item.shop_part.price },
-                          `Shop price: ${item.shop_part.price}`
-                        )}
-                      </Text>
-                      <Text>
-                        {t(
-                          'selectRepairParts.shopSku',
-                          { value: item.shop_part.shop_sku || na },
-                          `Shop SKU: ${item.shop_part.shop_sku || na}`
-                        )}
-                      </Text>
-                    </>
-                  ) : (
-                    <Text style={{ fontStyle: 'italic', marginTop: 8 }}>
-                      {t('selectRepairParts.noShopPricing', null, 'No shop pricing set')}
-                    </Text>
-                  )}
-                </Card.Content>
-              )}
-            </Card>
-          );
-        })}
-
-        <Divider style={{ marginVertical: 20 }} />
-
-        <Text variant="titleMedium" style={{ marginBottom: 4, color: '#F8FAFC' }}>
-          {t('selectRepairParts.selectedEstimated', null, 'Selected estimated materials')}
-        </Text>
-        <Text style={[styles.helperText, { marginBottom: 10 }]}>
-          {t(
-            'selectRepairParts.pricingHint',
-            null,
-            'Sell price is suggested at ~35% over delivery cost. Change it anytime — the cost is only a guide.'
-          )}
-        </Text>
-        {selected.length === 0 ? (
-          <Text style={styles.emptyStateText}>
-            {t('selectRepairParts.noneSelectedYet', null, 'No materials selected yet.')}
-          </Text>
-        ) : null}
-        {selected.map((part, index) => {
-          const noteOpen = noteOpenIndexes.includes(index);
-          const costMinor = part.costMinor ?? costMinorFromItem(part.partsMaster);
-          const costLabel = formatEuroFromMinor(costMinor);
-          const suggested = suggestSellPrice({
-            shop_part: {
-              price: part.partsMaster?.shop_part?.price,
-              avg_cost_minor: costMinor,
-            },
-            _costMinor: costMinor,
-          });
-          const border = getBorderStyle(part);
-
-          return (
-            <View
-              key={`${part.partsMasterId}-${index}`}
-              style={[styles.selectedRow, border.borderWidth ? border : null]}
+            <Pressable
+              key={item.id ?? idx}
+              onPress={() => (picked ? null : handleSelectFromCatalog(item))}
+              disabled={picked}
+              style={[styles.quickPickRow, picked && styles.quickPickRowPicked]}
             >
-              <View style={styles.selectedRowTop}>
-                <View style={styles.selectedRowBody}>
-                  <Text style={styles.selectedName} numberOfLines={1}>
-                    {part.partsMaster?.name ||
-                      t('selectRepairParts.materialFallback', null, 'Material')}
-                  </Text>
-                  <Text style={styles.selectedMeta} numberOfLines={2}>
+              <View style={styles.quickPickBody}>
+                <Text style={styles.quickPickName} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={styles.quickPickMeta} numberOfLines={1}>
+                  {partCatalogSubtitle(item)}
+                </Text>
+                {expanded ? (
+                  <Text style={styles.quickPickMeta} numberOfLines={3}>
                     {[
-                      part.partsMaster?.part_number
-                        ? `P/N ${part.partsMaster.part_number}`
-                        : null,
-                      costLabel
-                        ? t(
-                            'selectRepairParts.deliveryCost',
-                            { value: costLabel },
-                            `Cost €${costLabel}`
-                          )
-                        : t(
-                            'selectRepairParts.deliveryCostUnknown',
-                            null,
-                            'Cost unknown'
-                          ),
-                      costLabel
-                        ? t(
-                            'selectRepairParts.suggestedSell',
-                            { value: suggested },
-                            `Suggest €${suggested}`
-                          )
-                        : null,
+                      translateMaterialCategoryLabel(item.category, t, {
+                        locale,
+                      }) || item.category,
+                      item.part_number || null,
                     ]
                       .filter(Boolean)
                       .join(' · ')}
                   </Text>
-                </View>
-                <IconButton
-                  icon="close"
-                  size={18}
-                  onPress={() => handleRemoveSelected(index)}
-                  iconColor={theme.colors.error}
-                  style={styles.selectedRemove}
-                />
-              </View>
-              <View style={styles.selectedInputsRow}>
-                <TextInput
-                  mode="outlined"
-                  dense
-                  label={t('selectRepairParts.quantity', null, 'Quantity')}
-                  keyboardType="numeric"
-                  value={String(part.quantity)}
-                  onChangeText={(val) => handleSelectedChange(index, 'quantity', val)}
-                  style={styles.selectedQtyInput}
-                />
-                <TextInput
-                  mode="outlined"
-                  dense
-                  label={t('selectRepairParts.sellPrice', null, 'Sell price')}
-                  keyboardType="numeric"
-                  value={part.price}
-                  onChangeText={(val) => handleSelectedChange(index, 'price', val)}
-                  style={styles.selectedPriceInput}
-                />
-                {costLabel ? (
-                  <Button
-                    mode="text"
-                    compact
-                    onPress={() => applySuggestedPrice(index)}
-                    style={styles.suggestBtn}
-                    labelStyle={styles.suggestBtnLabel}
-                  >
-                    {t('selectRepairParts.useSuggest', null, '+35%')}
-                  </Button>
                 ) : null}
-                <IconButton
-                  icon={noteOpen || part.note ? 'note-text' : 'note-text-outline'}
-                  size={20}
-                  onPress={() => toggleNoteOpen(index)}
-                  iconColor={part.note ? '#38bdf8' : '#94a3b8'}
-                />
               </View>
-              {noteOpen ? (
-                <TextInput
-                  mode="outlined"
-                  dense
-                  label={t('selectRepairParts.note', null, 'Note')}
-                  value={part.note}
-                  onChangeText={(val) => handleSelectedChange(index, 'note', val)}
-                  style={styles.selectedNoteInput}
-                />
-              ) : null}
-            </View>
+              <IconButton
+                icon={expanded ? 'chevron-up' : 'chevron-down'}
+                size={18}
+                onPress={() => toggleCatalogExpand(idx)}
+                iconColor="#94a3b8"
+              />
+              <Text
+                style={[
+                  styles.quickPickAction,
+                  picked && styles.quickPickActionDone,
+                ]}
+              >
+                {picked
+                  ? t('selectRepairParts.selected', null, 'Selected')
+                  : t('selectRepairParts.addShort', null, '+ Add')}
+              </Text>
+            </Pressable>
           );
         })}
 
@@ -865,7 +925,11 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
           style={styles.addCustomButton}
           textColor="#F8FAFC"
         >
-          {t('selectRepairParts.addCustomMaterial', null, 'Add custom material')}
+          {t(
+            'selectRepairParts.addCustomMaterial',
+            null,
+            'Add custom material'
+          )}
         </Button>
       </ScrollView>
 
@@ -900,6 +964,84 @@ const styles = StyleSheet.create({
   },
   input: { marginVertical: 8 },
   catalogCard: { marginVertical: 6 },
+  cartBalloon: {
+    backgroundColor: 'rgba(248,250,252,0.97)',
+    borderRadius: 14,
+    marginBottom: 14,
+    overflow: 'hidden',
+  },
+  cartHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 14,
+    paddingRight: 4,
+    paddingVertical: 10,
+  },
+  cartHeaderText: { flex: 1, minWidth: 0 },
+  cartTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  cartSubtitle: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  cartBody: {
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(15, 23, 42, 0.12)',
+  },
+  cartPricingHint: {
+    fontSize: 12,
+    color: '#475569',
+    marginTop: 8,
+    marginBottom: 8,
+    lineHeight: 16,
+  },
+  cartEmptyText: {
+    fontSize: 13,
+    color: '#64748b',
+    fontStyle: 'italic',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  quickPickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(248,250,252,0.92)',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: 4,
+    gap: 8,
+  },
+  quickPickRowPicked: {
+    opacity: 0.55,
+  },
+  quickPickBody: { flex: 1, minWidth: 0 },
+  quickPickName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  quickPickMeta: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 1,
+  },
+  quickPickAction: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1d4ed8',
+    paddingHorizontal: 4,
+  },
+  quickPickActionDone: {
+    color: '#64748b',
+    fontWeight: '600',
+  },
   selectedRow: {
     backgroundColor: 'rgba(248,250,252,0.96)',
     borderRadius: 10,
