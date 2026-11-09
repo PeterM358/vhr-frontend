@@ -41,9 +41,46 @@ import { showMessage } from '../utils/crossPlatformAlert';
 import { useTranslation } from '../i18n';
 import { translateMaterialCategoryLabel } from '../utils/translateShopTypeLabels';
 
+/** Default sell markup over delivery/avg cost when suggesting a price. */
+const DEFAULT_COST_MARKUP = 0.35;
+
+function costMinorFromItem(item) {
+  const raw =
+    item?.shop_part?.avg_cost_minor ??
+    item?.shop_part?.unit_cost_minor ??
+    item?._costMinor ??
+    item?.avg_cost_minor ??
+    item?.unit_cost_minor ??
+    null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function formatEuroFromMinor(minor) {
+  if (minor == null) return null;
+  return (Number(minor) / 100).toFixed(2);
+}
+
+/** Prefer cost+35% suggestion; fall back to shop list price; else 0. */
+function suggestSellPrice(item) {
+  const costMinor = costMinorFromItem(item);
+  if (costMinor != null) {
+    return (Math.round((costMinor / 100) * (1 + DEFAULT_COST_MARKUP) * 100) / 100).toFixed(2);
+  }
+  const list = parseFloat(item?.shop_part?.price);
+  if (Number.isFinite(list) && list > 0) return String(list);
+  return '0';
+}
+
 function stockRowToCatalogShape(row) {
   const partId = row.part_id || row.partId;
   if (!partId) return null;
+  const costMinor =
+    row.avg_cost_minor != null
+      ? Number(row.avg_cost_minor)
+      : row.unit_cost_minor != null
+        ? Number(row.unit_cost_minor)
+        : null;
   return {
     id: partId,
     name: row.part_name || row.partName || '',
@@ -51,7 +88,9 @@ function stockRowToCatalogShape(row) {
     shop_part: {
       id: row.shop_part_id,
       price: row.price != null ? String(row.price) : '0',
+      avg_cost_minor: Number.isFinite(costMinor) ? costMinor : undefined,
     },
+    _costMinor: Number.isFinite(costMinor) ? costMinor : null,
     _stockQty: row.stock_quantity,
     _invoice: row.invoice_number || row.reference || '',
   };
@@ -61,6 +100,19 @@ function normalizeMoneyField(value) {
   if (value === '' || value === null || value === undefined) return '0';
   const n = parseFloat(value);
   return Number.isFinite(n) ? String(value) : null;
+}
+
+function buildSelectedLine(item) {
+  return {
+    partsMasterId: item.id,
+    shopPartId: item.shop_part?.id ?? null,
+    quantity: 1,
+    price: suggestSellPrice(item),
+    labor: '0',
+    note: '',
+    costMinor: costMinorFromItem(item),
+    partsMaster: item,
+  };
 }
 
 export default function SelectRepairPartsScreen({ route, navigation }) {
@@ -96,27 +148,20 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
   const [selected, setSelected] = useState([...currentParts]);
 
   const [expandedCatalogIndexes, setExpandedCatalogIndexes] = useState([]);
-  const [expandedSelectedIndexes, setExpandedSelectedIndexes] = useState(
-    () => currentParts.map((_, index) => index),
-  );
+  const [noteOpenIndexes, setNoteOpenIndexes] = useState([]);
 
   useEffect(() => {
     if (newCreatedPart && !selected.some(p => p.partsMasterId === newCreatedPart.id)) {
-      setSelected(prev => {
-        const nextIndex = prev.length;
-        setExpandedSelectedIndexes(exp => (exp.includes(nextIndex) ? exp : [...exp, nextIndex]));
-        return [
-          ...prev,
-          {
-            partsMasterId: newCreatedPart.id,
-            quantity: 1,
-            price: '0',
-            labor: '0',
-            note: '',
-            partsMaster: newCreatedPart,
-          },
-        ];
-      });
+      setSelected((prev) => [
+        ...prev,
+        buildSelectedLine({
+          id: newCreatedPart.id,
+          name: newCreatedPart.name,
+          part_number: newCreatedPart.part_number,
+          shop_part: newCreatedPart.shop_part,
+          ...newCreatedPart,
+        }),
+      ]);
     }
   }, [newCreatedPart]);
 
@@ -225,57 +270,23 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
     );
   };
 
-  const toggleSelectedExpand = (index) => {
-    setExpandedSelectedIndexes(prev =>
-      prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
+  const toggleNoteOpen = (index) => {
+    setNoteOpenIndexes((prev) =>
+      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
     );
   };
 
   const addCatalogItem = (item) => {
     if (!item?.id || selected.some((p) => p.partsMasterId === item.id)) return;
-
-    setSelected((prev) => {
-      const nextIndex = prev.length;
-      setExpandedSelectedIndexes((exp) => (exp.includes(nextIndex) ? exp : [...exp, nextIndex]));
-      return [
-        ...prev,
-        {
-          partsMasterId: item.id,
-          shopPartId: item.shop_part?.id ?? null,
-          quantity: 1,
-          price: item.shop_part?.price != null && item.shop_part.price !== ''
-            ? String(item.shop_part.price)
-            : '0',
-          labor: '0',
-          note: '',
-          partsMaster: item,
-        },
-      ];
-    });
+    setSelected((prev) => [...prev, buildSelectedLine(item)]);
   };
 
   const addManyCatalogItems = (items) => {
     setSelected((prev) => {
       const next = [...prev];
-      const newIndexes = [];
       for (const item of items || []) {
         if (!item?.id || next.some((p) => p.partsMasterId === item.id)) continue;
-        newIndexes.push(next.length);
-        next.push({
-          partsMasterId: item.id,
-          shopPartId: item.shop_part?.id ?? null,
-          quantity: 1,
-          price:
-            item.shop_part?.price != null && item.shop_part.price !== ''
-              ? String(item.shop_part.price)
-              : '0',
-          labor: '0',
-          note: '',
-          partsMaster: item,
-        });
-      }
-      if (newIndexes.length) {
-        setExpandedSelectedIndexes((exp) => [...new Set([...exp, ...newIndexes])]);
+        next.push(buildSelectedLine(item));
       }
       return next;
     });
@@ -326,7 +337,22 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
     const updated = [...selected];
     updated.splice(index, 1);
     setSelected(updated);
-    setExpandedSelectedIndexes(prev => prev.filter(i => i !== index));
+    setNoteOpenIndexes((prev) =>
+      prev.filter((i) => i !== index).map((i) => (i > index ? i - 1 : i))
+    );
+  };
+
+  const applySuggestedPrice = (index) => {
+    const part = selected[index];
+    if (!part) return;
+    const suggested = suggestSellPrice({
+      shop_part: {
+        price: part.partsMaster?.shop_part?.price,
+        avg_cost_minor: part.costMinor ?? part.partsMaster?.shop_part?.avg_cost_minor,
+      },
+      _costMinor: part.costMinor,
+    });
+    handleSelectedChange(index, 'price', suggested);
   };
 
   const handleSelectedChange = (index, field, value) => {
@@ -707,8 +733,15 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
 
         <Divider style={{ marginVertical: 20 }} />
 
-        <Text variant="titleMedium" style={{ marginBottom: 8 }}>
+        <Text variant="titleMedium" style={{ marginBottom: 4, color: '#F8FAFC' }}>
           {t('selectRepairParts.selectedEstimated', null, 'Selected estimated materials')}
+        </Text>
+        <Text style={[styles.helperText, { marginBottom: 10 }]}>
+          {t(
+            'selectRepairParts.pricingHint',
+            null,
+            'Sell price is suggested at ~35% over delivery cost. Change it anytime — the cost is only a guide.'
+          )}
         </Text>
         {selected.length === 0 ? (
           <Text style={styles.emptyStateText}>
@@ -716,70 +749,113 @@ export default function SelectRepairPartsScreen({ route, navigation }) {
           </Text>
         ) : null}
         {selected.map((part, index) => {
-          const expanded = expandedSelectedIndexes.includes(index);
+          const noteOpen = noteOpenIndexes.includes(index);
+          const costMinor = part.costMinor ?? costMinorFromItem(part.partsMaster);
+          const costLabel = formatEuroFromMinor(costMinor);
+          const suggested = suggestSellPrice({
+            shop_part: {
+              price: part.partsMaster?.shop_part?.price,
+              avg_cost_minor: costMinor,
+            },
+            _costMinor: costMinor,
+          });
+          const border = getBorderStyle(part);
 
           return (
-            <Card
+            <View
               key={`${part.partsMasterId}-${index}`}
-              style={[styles.selectedCard, getBorderStyle(part)]}
+              style={[styles.selectedRow, border.borderWidth ? border : null]}
             >
-              <Card.Title
-                title={
-                  part.partsMaster?.name ||
-                  t('selectRepairParts.materialFallback', null, 'Material')
-                }
-                subtitle={partCatalogSubtitle(part.partsMaster)}
-                left={(props) => (
-                  <IconButton
-                    {...props}
-                    icon={expanded ? 'chevron-up' : 'chevron-down'}
-                    onPress={() => toggleSelectedExpand(index)}
-                  />
-                )}
-                right={(props) => (
-                  <IconButton
-                    {...props}
-                    icon="close"
-                    onPress={() => handleRemoveSelected(index)}
-                    iconColor={theme.colors.error}
-                  />
-                )}
-              />
-              {expanded && (
-                <Card.Content>
-                  <Text variant="bodyMedium" style={styles.detailLabel}>
-                    {t(
-                      'selectRepairParts.partNumber',
-                      { value: part.partsMaster?.part_number || na },
-                      `Part number: ${part.partsMaster?.part_number || na}`
-                    )}
+              <View style={styles.selectedRowTop}>
+                <View style={styles.selectedRowBody}>
+                  <Text style={styles.selectedName} numberOfLines={1}>
+                    {part.partsMaster?.name ||
+                      t('selectRepairParts.materialFallback', null, 'Material')}
                   </Text>
-                  <TextInput
-                    mode="outlined"
-                    label={t('selectRepairParts.quantity', null, 'Quantity')}
-                    keyboardType="numeric"
-                    value={part.quantity.toString()}
-                    onChangeText={(val) => handleSelectedChange(index, 'quantity', val)}
-                    style={styles.input}
-                  />
-                  <TextInput
-                    mode="outlined"
-                    label={t('selectRepairParts.priceEmptyZero', null, 'Price (empty = 0)')}
-                    keyboardType="numeric"
-                    value={part.price}
-                    onChangeText={(val) => handleSelectedChange(index, 'price', val)}
-                    style={styles.input}
-                  />
-                  <TextInput
-                    mode="outlined"
-                    label={t('selectRepairParts.note', null, 'Note')}
-                    value={part.note}
-                    onChangeText={(val) => handleSelectedChange(index, 'note', val)}
-                    style={styles.input}
-                  />
-                </Card.Content>
-              )}
-            </Card>
+                  <Text style={styles.selectedMeta} numberOfLines={2}>
+                    {[
+                      part.partsMaster?.part_number
+                        ? `P/N ${part.partsMaster.part_number}`
+                        : null,
+                      costLabel
+                        ? t(
+                            'selectRepairParts.deliveryCost',
+                            { value: costLabel },
+                            `Cost €${costLabel}`
+                          )
+                        : t(
+                            'selectRepairParts.deliveryCostUnknown',
+                            null,
+                            'Cost unknown'
+                          ),
+                      costLabel
+                        ? t(
+                            'selectRepairParts.suggestedSell',
+                            { value: suggested },
+                            `Suggest €${suggested}`
+                          )
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Text>
+                </View>
+                <IconButton
+                  icon="close"
+                  size={18}
+                  onPress={() => handleRemoveSelected(index)}
+                  iconColor={theme.colors.error}
+                  style={styles.selectedRemove}
+                />
+              </View>
+              <View style={styles.selectedInputsRow}>
+                <TextInput
+                  mode="outlined"
+                  dense
+                  label={t('selectRepairParts.quantity', null, 'Quantity')}
+                  keyboardType="numeric"
+                  value={String(part.quantity)}
+                  onChangeText={(val) => handleSelectedChange(index, 'quantity', val)}
+                  style={styles.selectedQtyInput}
+                />
+                <TextInput
+                  mode="outlined"
+                  dense
+                  label={t('selectRepairParts.sellPrice', null, 'Sell price')}
+                  keyboardType="numeric"
+                  value={part.price}
+                  onChangeText={(val) => handleSelectedChange(index, 'price', val)}
+                  style={styles.selectedPriceInput}
+                />
+                {costLabel ? (
+                  <Button
+                    mode="text"
+                    compact
+                    onPress={() => applySuggestedPrice(index)}
+                    style={styles.suggestBtn}
+                    labelStyle={styles.suggestBtnLabel}
+                  >
+                    {t('selectRepairParts.useSuggest', null, '+35%')}
+                  </Button>
+                ) : null}
+                <IconButton
+                  icon={noteOpen || part.note ? 'note-text' : 'note-text-outline'}
+                  size={20}
+                  onPress={() => toggleNoteOpen(index)}
+                  iconColor={part.note ? '#38bdf8' : '#94a3b8'}
+                />
+              </View>
+              {noteOpen ? (
+                <TextInput
+                  mode="outlined"
+                  dense
+                  label={t('selectRepairParts.note', null, 'Note')}
+                  value={part.note}
+                  onChangeText={(val) => handleSelectedChange(index, 'note', val)}
+                  style={styles.selectedNoteInput}
+                />
+              ) : null}
+            </View>
           );
         })}
 
@@ -824,14 +900,53 @@ const styles = StyleSheet.create({
   },
   input: { marginVertical: 8 },
   catalogCard: { marginVertical: 6 },
-  selectedCard: {
-    marginVertical: 8,
-    backgroundColor: '#f9f9f9',
-  },
-  detailLabel: {
+  selectedRow: {
+    backgroundColor: 'rgba(248,250,252,0.96)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 8,
     marginBottom: 8,
-    fontWeight: '600',
   },
+  selectedRowTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 4,
+  },
+  selectedRowBody: { flex: 1, minWidth: 0 },
+  selectedName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  selectedMeta: {
+    fontSize: 11,
+    color: '#475569',
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  selectedRemove: { margin: 0 },
+  selectedInputsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  selectedQtyInput: {
+    width: 72,
+    backgroundColor: '#fff',
+  },
+  selectedPriceInput: {
+    flex: 1,
+    minWidth: 88,
+    backgroundColor: '#fff',
+  },
+  selectedNoteInput: {
+    marginTop: 6,
+    backgroundColor: '#fff',
+  },
+  suggestBtn: { marginHorizontal: 0 },
+  suggestBtnLabel: { fontSize: 11, marginVertical: 0 },
   emptyStateText: {
     color: '#CBD5E1',
     fontStyle: 'italic',
