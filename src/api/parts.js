@@ -109,54 +109,109 @@ export async function deleteShopPart(token, shopPartId) {
   return true;
 }
 
+/** Resolve MaterialMaster id from draft picker rows or API JobMaterialLine shape. */
+export function resolvePartMasterId(part) {
+  const raw =
+    part?.partsMasterId ??
+    part?.part_master_id ??
+    part?.part_master ??
+    part?.partsMaster?.id ??
+    part?.part_master_detail?.id ??
+    part?.parts_master_detail?.id ??
+    part?.shop_part_detail?.part?.id ??
+    part?.shop_part?.part?.id;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function resolveShopPartId(part) {
+  const raw =
+    part?.shopPartId ??
+    part?.shop_part_id ??
+    part?.shop_part?.id ??
+    part?.shop_part_detail?.id;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function resolvePartQuantity(part) {
+  const n = parseFloat(part?.quantity);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+function resolvePartSellPrice(part) {
+  const n = parseFloat(
+    part?.price ?? part?.price_per_item_at_use ?? part?.price_per_item
+  );
+  return Number.isFinite(n) ? n : 0;
+}
+
+function resolvePartLabor(part) {
+  const n = parseFloat(part?.labor ?? part?.labor_cost);
+  return Number.isFinite(n) ? n : 0;
+}
+
 export async function prepareRepairPartsData(token, shopProfileId, selectedParts, shopParts) {
   const isShop = (await AsyncStorage.getItem('@is_shop')) === 'true';
 
   const repairPartsData = [];
-  const newShopParts = [...shopParts];
+  const newShopParts = [...(shopParts || [])];
+  let skippedMissingMaster = 0;
 
-  for (let part of selectedParts) {
-    if (!part.partsMasterId) continue;
+  for (const part of selectedParts || []) {
+    const partsMasterId = resolvePartMasterId(part);
+    if (!partsMasterId) {
+      skippedMissingMaster += 1;
+      continue;
+    }
+
+    const quantity = resolvePartQuantity(part);
+    const price = resolvePartSellPrice(part);
+    const labor = resolvePartLabor(part);
+    const note = part.note || '';
 
     if (!isShop) {
       // Client user → just append directly, no ShopPart creation
       repairPartsData.push({
-        quantity: parseInt(part.quantity),
-        price_per_item_at_use: part.price,
-        labor_cost: part.labor,
-        note: part.note,
-        part_master_id: parseInt(part.partsMasterId),
+        quantity,
+        price_per_item_at_use: price,
+        labor_cost: labor,
+        note,
+        part_master_id: partsMasterId,
       });
       continue;
     }
 
-    let shopPart = newShopParts.find(sp => sp.part.id === parseInt(part.partsMasterId));
+    let shopPart =
+      newShopParts.find((sp) => Number(sp?.part?.id) === partsMasterId) ||
+      newShopParts.find((sp) => Number(sp?.id) === Number(resolveShopPartId(part)));
 
     if (shopPart) {
       await updateShopPart(token, shopPart.id, {
-        price: part.price,
-        default_labor_cost: part.labor,
+        price,
+        default_labor_cost: labor,
       });
     } else {
-      const url = `${API_BASE_URL}/api/materials/org-materials/?part=${part.partsMasterId}&shop_profile=${shopProfileId}`;
+      const url = `${API_BASE_URL}/api/materials/org-materials/?part=${partsMasterId}&shop_profile=${shopProfileId}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const data = await res.json();
-        if (data.length > 0) {
-          shopPart = data[0];
+        const rows = Array.isArray(data) ? data : data?.results || [];
+        if (rows.length > 0) {
+          shopPart = rows[0];
           await updateShopPart(token, shopPart.id, {
-            price: part.price,
-            default_labor_cost: part.labor,
+            price,
+            default_labor_cost: labor,
           });
         }
       }
 
       if (!shopPart) {
         shopPart = await createShopPart(token, {
-          shop_profile: parseInt(shopProfileId),
-          part_id: parseInt(part.partsMasterId),
-          price: part.price || '0',
-          default_labor_cost: part.labor || '0',
+          shop_profile: parseInt(shopProfileId, 10),
+          part_id: partsMasterId,
+          price: String(price),
+          default_labor_cost: String(labor),
           shop_sku: '',
         });
       }
@@ -165,13 +220,26 @@ export async function prepareRepairPartsData(token, shopProfileId, selectedParts
     }
 
     repairPartsData.push({
-      part_master_id: parseInt(part.partsMasterId),
-      shop_part_id: part.shopPartId,
-      quantity: parseInt(part.quantity),
-      price_per_item_at_use: part.price,
-      labor_cost: part.labor,
-      note: part.note,
+      part_master_id: partsMasterId,
+      // Always prefer the resolved ShopPart id — draft rows often omit shopPartId.
+      shop_part_id: shopPart?.id ?? resolveShopPartId(part),
+      quantity,
+      price_per_item_at_use: price,
+      labor_cost: labor,
+      note,
     });
+  }
+
+  // Guard: never return an empty payload when the UI still had rows — empty
+  // repair_parts_data clears JobMaterialLine on the backend (finalize wipe bug).
+  if (
+    (selectedParts || []).length > 0 &&
+    repairPartsData.length === 0 &&
+    skippedMissingMaster > 0
+  ) {
+    throw new Error(
+      'Could not map materials to catalog ids. Re-open Manage parts and save again.'
+    );
   }
 
   return { repairPartsData, newShopParts };

@@ -18,5 +18,6 @@ export {
   deleteShopPart as deleteOrgMaterial,
   deleteShopPart,
   prepareRepairPartsData,
+  resolvePartMasterId,
   cleanRepairPartsData,
 } from './parts';

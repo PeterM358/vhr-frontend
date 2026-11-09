@@ -1480,7 +1480,18 @@ export default function RepairDetailScreen({ route, navigation }) {
   const renderRepairTotalsFooter = () => {
     if (!repair || (!isMyShopRepair && !isShop)) return null;
     const totals = liveOpsFooterTotals;
-    if (totals.total <= 0 && totals.partsSum <= 0 && totals.laborSum <= 0) {
+    // After a wipe bug, line items may be empty while parts_price still holds the sum.
+    const partsFallback =
+      totals.partsSum <= 0 && repair.parts_price != null
+        ? parseFloat(repair.parts_price) || 0
+        : totals.partsSum;
+    const laborFallback =
+      totals.laborSum <= 0 && repair.labor_price != null
+        ? parseFloat(repair.labor_price) || 0
+        : totals.laborSum;
+    const grand =
+      Math.round((partsFallback + laborFallback) * 100) / 100;
+    if (grand <= 0 && partsFallback <= 0 && laborFallback <= 0) {
       return null;
     }
     return (
@@ -1489,19 +1500,19 @@ export default function RepairDetailScreen({ route, navigation }) {
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>{t('repairs.detail.partsTotal', null, 'Parts total')}</Text>
           <Text style={styles.summaryValue}>
-            {formatMoneyAmount(totals.partsSum, totals.currency)}
+            {formatMoneyAmount(partsFallback, totals.currency)}
           </Text>
         </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>{t('repairs.detail.laborTotal', null, 'Labor total')}</Text>
           <Text style={styles.summaryValue}>
-            {formatMoneyAmount(totals.laborSum, totals.currency)}
+            {formatMoneyAmount(laborFallback, totals.currency)}
           </Text>
         </View>
         <View style={[styles.summaryRow, { borderBottomWidth: 0 }]}>
           <Text style={[styles.summaryLabel, { fontWeight: '700', color: COLORS.TEXT_DARK }]}>{t('repairs.detail.grandTotal', null, 'Grand total')}</Text>
           <Text style={[styles.summaryValue, styles.summaryValueEmphasis]}>
-            {formatMoneyAmount(totals.total, totals.currency)}
+            {formatMoneyAmount(grand, totals.currency)}
           </Text>
         </View>
         {repair.total_margin != null && repair.total_parts_cost != null ? (
