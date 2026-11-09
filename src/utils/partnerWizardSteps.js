@@ -19,3 +19,7 @@ export const WIZARD_STEP_IDS = [
 // Keep in sync with backend required_for_publish in profile_completion._SECTIONS.
 // prices is required (published ShopServiceMenuItem); photos/about/preview are soft.
 export const OPTIONAL_WIZARD_STEPS = new Set(['photos', 'about', 'preview']);
+
+// Soft for publish, but high-trust / conversion — orange “Recommended” in the hub.
+// Keep in sync with profiles/services/profile_completion.py recommended sections.
+export const RECOMMENDED_WIZARD_STEPS = new Set(['photos', 'about']);

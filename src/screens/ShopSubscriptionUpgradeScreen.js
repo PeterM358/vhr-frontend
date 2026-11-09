@@ -71,13 +71,11 @@ const PRO_FEATURE_KEYS = [
 
 // Premium growth benefits (everything in PRO, plus these).
 const PREMIUM_BENEFIT_KEYS = [
+  'subscription.premiumBenefitSponsoredAds',
   'subscription.premiumBenefitFeatured',
   'subscription.premiumBenefitRanking',
-  'subscription.premiumBenefitMap',
   'subscription.premiumBenefitBadge',
   'subscription.premiumBenefitHomepage',
-  'subscription.premiumBenefitVisibility',
-  'subscription.premiumBenefitInsights',
   'subscription.premiumBenefitSupport',
 ];
 
@@ -129,7 +127,8 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   const [optionsPayload, setOptionsPayload] = useState(null);
   const [selected, setSelected] = useState({ planKey: 'pro', billingInterval: 'annual' });
   const [paymentMethod, setPaymentMethod] = useState('card');
-  const [showPlanDetails, setShowPlanDetails] = useState(false);
+  const [showPlanDetails, setShowPlanDetails] = useState(true);
+  const [showCompare, setShowCompare] = useState(false);
   const [payment, setPayment] = useState(null);
   const [error, setError] = useState(null);
   const scrollRef = useRef(null);
@@ -202,14 +201,35 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   }, [expiresAt, cancelAtPeriodEnd, isActive, t]);
 
   const isAnnual = selected.billingInterval === 'annual';
-  const annualBadgePercent = useMemo(() => {
-    const pcts = ['pro', 'premium']
-      .map((k) => savingsPercent(findOption(options, k, 'annual')))
-      .filter((n) => n != null);
-    return pcts.length ? Math.max(...pcts) : null;
-  }, [options]);
+  // Badge must match the selected plan — max(pro,premium) caused "Save 16%" vs "Save 14%" mismatch.
+  const annualBadgePercent = useMemo(
+    () => savingsPercent(findOption(options, selected.planKey, 'annual')),
+    [options, selected.planKey]
+  );
 
   const selectedOption = findOption(options, selected.planKey, selected.billingInterval);
+  const profileNeedsWork = Boolean(completion && !completion.ready_for_paid_plan);
+  const freeListing = !currentPlan.isAssigned;
+  const completionPercent = useMemo(() => {
+    const score = Number(completion?.completion_score);
+    if (Number.isFinite(score)) return Math.round(score * 100);
+    const pct = Number(completion?.percent);
+    if (Number.isFinite(pct)) return pct <= 1 ? Math.round(pct * 100) : Math.round(pct);
+    return null;
+  }, [completion]);
+  const missingFieldLabels = useMemo(() => {
+    const missing = completion?.missing_fields || [];
+    const map = {
+      logo: 'subscription.missingLogo',
+      description: 'subscription.missingDescription',
+      address: 'subscription.missingAddress',
+      opening_hours: 'subscription.missingHours',
+      phone: 'subscription.missingPhone',
+      service_categories: 'subscription.missingServices',
+      shop: 'subscription.missingShop',
+    };
+    return missing.map((k) => t(map[k] || 'subscription.missingGeneric')).filter(Boolean);
+  }, [completion, t]);
 
   React.useEffect(() => {
     if (stripeIncomplete && !bankIncomplete) {
@@ -243,11 +263,10 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   }, [selectedOption, isAnnual, t]);
 
   const planDetailFeatures = useMemo(() => {
-    const keys =
-      selected.planKey === 'premium'
-        ? PREMIUM_BENEFIT_KEYS.slice(0, 4)
-        : PRO_FEATURE_KEYS.slice(0, 5);
-    return keys.map((k) => t(k));
+    if (selected.planKey === 'premium') {
+      return [t('subscription.premiumEverythingInPro'), ...PREMIUM_BENEFIT_KEYS.map((k) => t(k))];
+    }
+    return PRO_FEATURE_KEYS.map((k) => t(k));
   }, [selected.planKey, t]);
 
   const handlePrimaryPay = () => {
@@ -368,28 +387,57 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
           <ActivityIndicator style={{ marginTop: 48 }} color={COLORS.PRIMARY} />
         ) : (
           <>
+            {/* How this page works */}
+            <View style={styles.howtoCard}>
+              <Text style={styles.howtoTitle}>{t('subscription.howtoTitle')}</Text>
+              <Text style={styles.howtoStep}>
+                {`1. ${
+                  profileNeedsWork
+                    ? t('subscription.howtoStepProfileNeeded')
+                    : t('subscription.howtoStepProfileOk')
+                }`}
+              </Text>
+              <Text style={styles.howtoStep}>{`2. ${t('subscription.howtoStepPickPlan')}`}</Text>
+              <Text style={styles.howtoStep}>{`3. ${t('subscription.howtoStepPay')}`}</Text>
+            </View>
+
             {/* Current plan */}
             <View style={styles.hero}>
               <Text style={styles.heroEyebrow}>{t('subscription.currentPlan')}</Text>
-              <Text style={styles.heroPlan}>{planLabel}</Text>
-              <Text style={styles.heroTagline}>{currentTagline}</Text>
+              <Text style={styles.heroPlan}>
+                {freeListing ? t('subscription.planFreeListing') : planLabel}
+              </Text>
+              <Text style={styles.heroTagline}>
+                {freeListing ? t('subscription.planTaglineFreeListing') : currentTagline}
+              </Text>
               <View style={styles.heroMetaRow}>
-                {stateLabel ? (
-                  <View style={styles.statusChip}>
-                    <View style={[styles.statusDot, accepting ? styles.statusDotOk : styles.statusDotWarn]} />
-                    <Text style={styles.statusChipText}>{stateLabel}</Text>
-                  </View>
+                <View style={styles.statusChip}>
+                  <View
+                    style={[
+                      styles.statusDot,
+                      accepting && !freeListing ? styles.statusDotOk : styles.statusDotWarn,
+                    ]}
+                  />
+                  <Text style={styles.statusChipText}>
+                    {freeListing
+                      ? t('subscription.stateFreeListing')
+                      : stateLabel || t('subscription.stateActive')}
+                  </Text>
+                </View>
+                {expiryLine && !freeListing ? (
+                  <Text style={styles.heroState}>{expiryLine}</Text>
                 ) : null}
-                {expiryLine ? <Text style={styles.heroState}>{expiryLine}</Text> : null}
               </View>
-              {!accepting ? (
+              {freeListing || !accepting ? (
                 <View style={styles.inactiveBanner}>
                   <MaterialCommunityIcons name="store-alert-outline" size={18} color="#fff" />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.inactiveBannerText}>
                       {listingMessage || t('subscription.notAcceptingRequests')}
                     </Text>
-                    <Text style={styles.inactiveBannerHelp}>{t('subscription.inactiveHelp')}</Text>
+                    <Text style={styles.inactiveBannerHelp}>
+                      {t('subscription.inactiveHelp')}
+                    </Text>
                   </View>
                 </View>
               ) : null}
@@ -437,17 +485,32 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
               </View>
             ) : null}
 
-            {completion && !completion.ready_for_paid_plan ? (
+            {profileNeedsWork ? (
               <View style={styles.completeCard}>
                 <MaterialCommunityIcons name="clipboard-check-outline" size={22} color={COLORS.PRIMARY} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.completeTitle}>{t('subscription.completeProfileTitle')}</Text>
                   <Text style={styles.completeBody}>
-                    {completion.message || t('subscription.completeProfileBody')}
+                    {t('subscription.completeProfileBodyClear')}
+                  </Text>
+                  {completionPercent != null ? (
+                    <Text style={styles.completeMeta}>
+                      {t('subscription.completeProfileProgress', { percent: completionPercent })}
+                    </Text>
+                  ) : null}
+                  {missingFieldLabels.length ? (
+                    <Text style={styles.completeBody}>
+                      {t('subscription.completeProfileMissing', {
+                        items: missingFieldLabels.join(', '),
+                      })}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.completeBody}>
+                    {t('subscription.completeProfileOptionalHint')}
                   </Text>
                   <Button
-                    mode="outlined"
-                    style={{ marginTop: 10 }}
+                    mode="contained"
+                    style={{ marginTop: 12 }}
                     onPress={() => navigation.navigate('ShopProfile')}
                   >
                     {t('subscription.completeProfileCta')}
@@ -455,6 +518,41 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
                 </View>
               </View>
             ) : null}
+
+            <View style={styles.compareCard}>
+              <View style={styles.compareHeader}>
+                <Text style={styles.checkoutLabel}>{t('subscription.compareTitle')}</Text>
+                <Pressable
+                  onPress={() => setShowCompare((v) => !v)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('subscription.compareToggleA11y')}
+                >
+                  <MaterialCommunityIcons
+                    name={showCompare ? 'information' : 'information-outline'}
+                    size={22}
+                    color={COLORS.PRIMARY}
+                  />
+                </Pressable>
+              </View>
+              <View style={styles.compareRow}>
+                <View style={styles.compareCol}>
+                  <Text style={styles.comparePlan}>{t('subscription.planFreeShort')}</Text>
+                  <Text style={styles.compareBody}>{t('subscription.compareFree')}</Text>
+                </View>
+                <View style={[styles.compareCol, styles.compareColMid]}>
+                  <Text style={styles.comparePlan}>{t('subscription.planPro')}</Text>
+                  <Text style={styles.compareBody}>{t('subscription.comparePro')}</Text>
+                </View>
+                <View style={styles.compareCol}>
+                  <Text style={styles.comparePlan}>{t('subscription.planPremium')}</Text>
+                  <Text style={styles.compareBody}>{t('subscription.comparePremium')}</Text>
+                </View>
+              </View>
+              {showCompare ? (
+                <Text style={styles.compareFoot}>{t('subscription.compareFootnote')}</Text>
+              ) : null}
+            </View>
 
             <View style={styles.checkoutCard}>
               <Text style={styles.checkoutLabel}>{t('subscription.choosePlan')}</Text>
@@ -608,14 +706,14 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
 
               {paymentMethod === 'card' && stripeIncomplete ? (
                 <View style={styles.warnCardInline}>
-                  <Text style={styles.warnTitle}>{t('subscription.stripeConfigMissingTitle')}</Text>
-                  <Text style={styles.warnBody}>{t('subscription.stripeConfigMissingBody')}</Text>
+                  <Text style={styles.warnTitleInline}>{t('subscription.stripeConfigMissingTitle')}</Text>
+                  <Text style={styles.warnBodyInline}>{t('subscription.stripeConfigMissingBody')}</Text>
                 </View>
               ) : null}
               {paymentMethod === 'bank' && bankIncomplete ? (
                 <View style={styles.warnCardInline}>
-                  <Text style={styles.warnTitle}>{t('subscription.bankConfigMissingTitle')}</Text>
-                  <Text style={styles.warnBody}>{t('subscription.bankConfigMissingBody')}</Text>
+                  <Text style={styles.warnTitleInline}>{t('subscription.bankConfigMissingTitle')}</Text>
+                  <Text style={styles.warnBodyInline}>{t('subscription.bankConfigMissingBody')}</Text>
                 </View>
               ) : null}
               {!(paymentMethod === 'card' ? stripeIncomplete : bankIncomplete) ? (
@@ -880,6 +978,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  howtoCard: {
+    backgroundColor: COLORS.CARD_FLOATING,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(15,76,129,0.14)',
+  },
+  howtoTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.TEXT_DARK,
+    marginBottom: 8,
+  },
+  howtoStep: {
+    fontSize: 14,
+    color: COLORS.TEXT_MUTED,
+    lineHeight: 21,
+    marginTop: 2,
+  },
   completeCard: {
     flexDirection: 'row',
     gap: 12,
@@ -900,6 +1019,56 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_MUTED,
     marginTop: 4,
     lineHeight: 20,
+  },
+  completeMeta: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.PRIMARY_DARK,
+    marginTop: 8,
+  },
+  compareCard: {
+    backgroundColor: COLORS.CARD_FLOATING,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(15,76,129,0.14)',
+  },
+  compareHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  compareRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  compareCol: {
+    flex: 1,
+  },
+  compareColMid: {
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(15,23,42,0.12)',
+    paddingHorizontal: 8,
+  },
+  comparePlan: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.PRIMARY_DARK,
+    marginBottom: 4,
+  },
+  compareBody: {
+    fontSize: 12,
+    color: COLORS.TEXT_MUTED,
+    lineHeight: 17,
+  },
+  compareFoot: {
+    fontSize: 13,
+    color: COLORS.TEXT_MUTED,
+    lineHeight: 19,
+    marginTop: 12,
   },
   manageCard: {
     backgroundColor: COLORS.CARD_FLOATING,
@@ -1055,6 +1224,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(251, 191, 36, 0.15)',
     borderWidth: 1,
     borderColor: 'rgba(251, 191, 36, 0.35)',
+  },
+  warnTitleInline: {
+    fontWeight: '700',
+    color: COLORS.TEXT_DARK,
+  },
+  warnBodyInline: {
+    marginTop: 4,
+    color: COLORS.TEXT_MUTED,
+    lineHeight: 20,
   },
   enterpriseCardCompact: {
     flexDirection: 'row',

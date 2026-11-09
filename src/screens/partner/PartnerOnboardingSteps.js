@@ -961,13 +961,13 @@ export function PartnerPhotosStep() {
     <View>
       <FloatingCard>
         <Text style={styles.cardTitle}>
-          {t('partnerOnboarding.photosTitle', null, 'Photos (optional)')}
+          {t('partnerOnboarding.photosTitle', null, 'Photos — recommended')}
         </Text>
         <Text style={styles.hint}>
           {t(
             'partnerOnboarding.photosHint',
             null,
-            'A logo or shop photo builds trust. You can skip and add these later.'
+            'Upload your best repairs and cars — clients pick shops that look real. Logo or shop front also helps. Strongly recommended.'
           )}
         </Text>
         <ShopPhotoGallery
@@ -999,7 +999,7 @@ export function PartnerAboutStep() {
           {t(
             'partnerOnboarding.aboutHint',
             null,
-            'A short description helps customers choose you. Optional for publish.'
+            'A short description helps customers choose you. Strongly recommended — also needed before activating PRO.'
           )}
         </Text>
         <TextInput
@@ -1098,6 +1098,7 @@ export function PartnerPreviewStep() {
           latitude={values.latitude}
           longitude={values.longitude}
           phone={values.phone}
+          email={values.email}
           generatedSummary=""
           userDescription={values.description}
           workingHours={values.working_hours}
@@ -1143,6 +1144,10 @@ export function PartnerPublishStep() {
   const completion = context.getCompletion ? context.getCompletion() : null;
   const sections = completion?.step_states || completion?.sections || [];
   const readyToPublish = completion?.ready_to_publish;
+  const recommendedMissing = (completion?.recommended_missing || []).filter(Boolean);
+  const recommendedLabels = recommendedMissing.map((key) =>
+    t(SECTION_LABEL_KEYS[key] || '', null, key)
+  );
 
   const handleSectionPress = (section) => {
     if (section.complete) return;
@@ -1150,6 +1155,36 @@ export function PartnerPublishStep() {
     if (!stepId) return;
     const idx = findStepIndexById(stepId);
     if (idx >= 0) goTo(idx);
+  };
+
+  const statusForSection = (section) => {
+    if (section.complete) {
+      return {
+        label: t('partnerOnboarding.done', null, 'Done'),
+        style: styles.statusDone,
+        dotStyle: styles.dotDone,
+        mark: '✓',
+      };
+    }
+    const recommended =
+      section.recommended ||
+      section.state === 'recommended_incomplete' ||
+      section.key === 'photos' ||
+      section.key === 'about';
+    if (recommended) {
+      return {
+        label: t('partnerOnboarding.addRecommended', null, 'Add'),
+        style: styles.statusRecommended,
+        dotStyle: styles.dotRecommended,
+        mark: '•',
+      };
+    }
+    return {
+      label: t('partnerOnboarding.fix', null, 'Fix'),
+      style: styles.statusTodo,
+      dotStyle: styles.dotTodo,
+      mark: '•',
+    };
   };
 
   return (
@@ -1160,15 +1195,28 @@ export function PartnerPublishStep() {
           <Text style={styles.percentBig}>{completion?.percent ?? progressPercent}%</Text>
           <Text style={styles.readinessLead}>
             {readyToPublish
-              ? t('partnerOnboarding.readyToPublish', null, 'Your profile is ready to publish.')
+              ? recommendedLabels.length
+                ? t(
+                    'partnerOnboarding.readyButRecommended',
+                    null,
+                    'You can publish — still recommended for a stronger profile.'
+                  )
+                : t('partnerOnboarding.readyToPublish', null, 'Your profile is ready to publish.')
               : t('partnerOnboarding.notReady', null, 'A few things are left before you can publish.')}
           </Text>
         </View>
         <ProgressBar
           progress={completion ? completion.score : progress}
-          color={COLORS.PRIMARY}
+          color={recommendedLabels.length ? '#F97316' : COLORS.PRIMARY}
           style={styles.progressBar}
         />
+        {recommendedLabels.length ? (
+          <Text style={styles.recommendedBanner}>
+            {t('partnerOnboarding.stillMissingRecommended', {
+              items: recommendedLabels.join(', '),
+            }, `Still missing: ${recommendedLabels.join(', ')}. Upload your best repairs & cars.`)}
+          </Text>
+        ) : null}
       </FloatingCard>
 
       <FloatingCard>
@@ -1176,6 +1224,7 @@ export function PartnerPublishStep() {
         <ScrollView>
           {sections.map((section) => {
             const actionable = !section.complete;
+            const status = statusForSection(section);
             return (
               <Pressable
                 key={section.key}
@@ -1183,29 +1232,24 @@ export function PartnerPublishStep() {
                 disabled={!actionable}
                 style={styles.sectionRow}
               >
-                <Text style={[styles.sectionDot, section.complete ? styles.dotDone : styles.dotTodo]}>
-                  {section.complete ? '✓' : '•'}
-                </Text>
+                <Text style={[styles.sectionDot, status.dotStyle]}>{status.mark}</Text>
                 <Text style={styles.sectionLabel}>
                   {t(SECTION_LABEL_KEYS[section.key] || '', null, section.key)}
                 </Text>
-                <Text
-                  style={[
-                    styles.sectionStatus,
-                    section.complete ? styles.statusDone : styles.statusTodo,
-                  ]}
-                >
-                  {section.complete
-                    ? t('partnerOnboarding.done', null, 'Done')
-                    : t('partnerOnboarding.fix', null, 'Fix')}
-                </Text>
+                <Text style={[styles.sectionStatus, status.style]}>{status.label}</Text>
               </Pressable>
             );
           })}
         </ScrollView>
         <Text style={styles.hint}>
           {readyToPublish
-            ? t('partnerOnboarding.publishReadyHint', null, 'Finish to open your profile dashboard.')
+            ? recommendedLabels.length
+              ? t(
+                  'partnerOnboarding.publishRecommendedHint',
+                  null,
+                  'Tap Photos or About to finish — then open your dashboard.'
+                )
+              : t('partnerOnboarding.publishReadyHint', null, 'Finish to open your profile dashboard.')
             : t('partnerOnboarding.publishMissingHint', null, 'Tap a missing item to jump to its wizard step.')}
         </Text>
       </FloatingCard>
@@ -1316,6 +1360,13 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: 'rgba(15,23,42,0.08)',
   },
+  recommendedBanner: {
+    marginTop: 12,
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#C2410C',
+    fontWeight: '700',
+  },
   sectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1331,6 +1382,7 @@ const styles = StyleSheet.create({
   },
   dotDone: { color: '#16A34A' },
   dotTodo: { color: COLORS.TEXT_MUTED },
+  dotRecommended: { color: '#F97316' },
   sectionLabel: {
     flex: 1,
     fontSize: 14,
@@ -1344,6 +1396,7 @@ const styles = StyleSheet.create({
   },
   statusDone: { color: '#16A34A' },
   statusTodo: { color: COLORS.PRIMARY, fontWeight: '800' },
+  statusRecommended: { color: '#F97316', fontWeight: '800' },
   readinessCta: {
     marginTop: 12,
     borderRadius: 12,

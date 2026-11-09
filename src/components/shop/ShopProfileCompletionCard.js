@@ -6,7 +6,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import AppCard from '../ui/AppCard';
 import { COLORS } from '../../constants/colors';
 import { useTranslation } from '../../i18n';
-import { OPTIONAL_WIZARD_STEPS, WIZARD_STEP_IDS } from '../../utils/partnerWizardSteps';
+import { OPTIONAL_WIZARD_STEPS, RECOMMENDED_WIZARD_STEPS, WIZARD_STEP_IDS } from '../../utils/partnerWizardSteps';
 
 const STEP_TITLE_KEYS = {
   business: 'partnerOnboarding.step.business',
@@ -26,6 +26,7 @@ const STATE_COLORS = {
   completed: '#22C55E',
   started: '#EAB308',
   required_incomplete: '#EF4444',
+  recommended_incomplete: '#F97316',
   optional_untouched: '#94A3B8',
 };
 
@@ -33,6 +34,7 @@ const STATE_FILLS = {
   completed: 'rgba(34,197,94,0.22)',
   started: 'rgba(234,179,8,0.22)',
   required_incomplete: 'rgba(239,68,68,0.22)',
+  recommended_incomplete: 'rgba(249,115,22,0.22)',
   optional_untouched: 'rgba(148,163,184,0.18)',
 };
 
@@ -41,17 +43,41 @@ const KNOWN_STATES = new Set(Object.keys(STATE_COLORS));
 function resolveStepState(stepId, completion) {
   const rows = completion?.step_states || completion?.sections || [];
   const row = Array.isArray(rows) ? rows.find((s) => s?.key === stepId) : null;
-  if (row?.state && KNOWN_STATES.has(row.state)) return row.state;
+  const forceRecommended = (state) => {
+    if (
+      RECOMMENDED_WIZARD_STEPS.has(stepId) &&
+      state !== 'completed' &&
+      state !== 'started'
+    ) {
+      return 'recommended_incomplete';
+    }
+    return state;
+  };
+
+  if (row?.complete) return 'completed';
+  if (row?.state && KNOWN_STATES.has(row.state)) {
+    // Old API may still send optional_untouched for photos/about — treat as recommended.
+    return forceRecommended(row.state);
+  }
   if (row) {
-    if (row.complete) return 'completed';
     if (row.required) return 'required_incomplete';
+    if (row.recommended || RECOMMENDED_WIZARD_STEPS.has(stepId)) {
+      return 'recommended_incomplete';
+    }
     return 'optional_untouched';
   }
 
   // preview / publish are wizard-only (not in backend step_states).
-  if (completion?.ready_to_publish) return 'completed';
-  if (stepId === 'preview' || OPTIONAL_WIZARD_STEPS.has(stepId)) return 'optional_untouched';
-  if (stepId === 'publish') return 'required_incomplete';
+  if (completion?.ready_to_publish && !RECOMMENDED_WIZARD_STEPS.has(stepId)) {
+    return 'completed';
+  }
+  if (stepId === 'preview') return completion?.ready_to_publish ? 'completed' : 'optional_untouched';
+  if (OPTIONAL_WIZARD_STEPS.has(stepId) || RECOMMENDED_WIZARD_STEPS.has(stepId)) {
+    return forceRecommended('optional_untouched');
+  }
+  if (stepId === 'publish') {
+    return completion?.ready_to_publish ? 'completed' : 'required_incomplete';
+  }
   return 'required_incomplete';
 }
 
@@ -68,10 +94,8 @@ export default function ShopProfileCompletionCard({
 }) {
   const { t } = useTranslation();
   const safePercent = Math.max(0, Math.min(100, Number(percent) || 0));
-  // Visual "ready" only at 100%. ready_to_publish can be true earlier (optional polish left).
   const fullyReady = safePercent >= 100;
   const publishReady = Boolean(completion?.ready_to_publish);
-  const readyLook = fullyReady || publishReady;
 
   const steps = useMemo(
     () =>
@@ -83,6 +107,18 @@ export default function ShopProfileCompletionCard({
       })),
     [completion, t]
   );
+
+  const missingRecommended = useMemo(() => {
+    const fromApi = completion?.recommended_missing;
+    if (Array.isArray(fromApi) && fromApi.length) {
+      return fromApi
+        .map((id) => t(STEP_TITLE_KEYS[id] || '', null, id))
+        .filter(Boolean);
+    }
+    return steps
+      .filter((s) => RECOMMENDED_WIZARD_STEPS.has(s.id) && s.state !== 'completed')
+      .map((s) => s.title);
+  }, [completion, steps, t]);
 
   const handleStepPress = (stepId) => {
     if (typeof onSectionPress === 'function') {
@@ -97,15 +133,29 @@ export default function ShopProfileCompletionCard({
   const statusLabel = (state) => {
     if (state === 'completed') return t('partnerOnboarding.done', null, 'Done');
     if (state === 'started') return t('partnerProfile.stepStarted', null, 'In progress');
+    if (state === 'recommended_incomplete') {
+      return t('partnerProfile.stepRecommended', null, 'Recommended');
+    }
     if (state === 'optional_untouched') {
       return t('partnerProfile.stepOptional', null, 'Optional');
     }
     return t('partnerOnboarding.fix', null, 'Fix');
   };
 
-  const statusLine = readyLook
-    ? t('partnerProfile.hubStatusReady', null, 'Ready for clients')
-    : t('partnerProfile.hubStatusInProgress', null, 'Finish the steps below to go live');
+  let statusLine;
+  if (fullyReady) {
+    statusLine = t('partnerProfile.hubStatusReady', null, 'Ready for clients');
+  } else if (publishReady && missingRecommended.length) {
+    statusLine = t(
+      'partnerProfile.hubStatusNeedsRecommended',
+      null,
+      'Published — still missing for a strong profile'
+    );
+  } else if (publishReady) {
+    statusLine = t('partnerProfile.hubStatusReady', null, 'Ready for clients');
+  } else {
+    statusLine = t('partnerProfile.hubStatusInProgress', null, 'Finish the steps below to go live');
+  }
 
   const clickable =
     typeof onSectionPress === 'function' || typeof onContinueSetup === 'function';
@@ -113,7 +163,7 @@ export default function ShopProfileCompletionCard({
   return (
     <AppCard variant="dark" contentStyle={styles.inner}>
       <View style={styles.headerRow}>
-        <Text style={[styles.percent, readyLook && styles.percentComplete]}>
+        <Text style={[styles.percent, fullyReady && styles.percentComplete]}>
           {safePercent}%
         </Text>
         <View style={styles.statusBlock}>
@@ -122,11 +172,27 @@ export default function ShopProfileCompletionCard({
           </Text>
           <ProgressBar
             progress={safePercent / 100}
-            color={readyLook ? '#4ade80' : COLORS.PRIMARY}
+            color={fullyReady ? '#4ade80' : missingRecommended.length ? '#F97316' : COLORS.PRIMARY}
             style={styles.bar}
           />
         </View>
       </View>
+
+      {missingRecommended.length ? (
+        <View style={styles.missingBanner}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#F97316" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.missingTitle}>
+              {t('partnerProfile.stillMissingTitle', null, 'Still missing')}
+            </Text>
+            <Text style={styles.missingBody}>
+              {t('partnerProfile.stillMissingBody', {
+                items: missingRecommended.join(', '),
+              }, `Add: ${missingRecommended.join(', ')}. Best repair & car photos help clients choose you.`)}
+            </Text>
+          </View>
+        </View>
+      ) : null}
 
       {publicProfileAction ? (
         <View style={styles.publicAction}>{publicProfileAction}</View>
@@ -175,10 +241,18 @@ export default function ShopProfileCompletionCard({
       </View>
 
       {typeof onContinueSetup === 'function' ? (
-        <Button mode="contained" onPress={() => onContinueSetup()} style={styles.cta}>
-          {readyLook
-            ? t('partnerProfile.editViaWizard', null, 'Edit')
-            : t('partnerProfile.continueSetup', null, 'Continue setup')}
+        <Button
+          mode="contained"
+          onPress={() =>
+            onContinueSetup(missingRecommended.length ? 'photos' : undefined)
+          }
+          style={styles.cta}
+        >
+          {missingRecommended.length
+            ? t('partnerProfile.addRecommendedCta', null, 'Add photos & About')
+            : fullyReady
+              ? t('partnerProfile.editViaWizard', null, 'Edit')
+              : t('partnerProfile.continueSetup', null, 'Continue setup')}
         </Button>
       ) : null}
     </AppCard>
@@ -218,6 +292,28 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  missingBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: 'rgba(249,115,22,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(249,115,22,0.45)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  missingTitle: {
+    color: '#FDBA74',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  missingBody: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 2,
   },
   publicAction: {
     marginTop: 2,

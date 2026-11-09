@@ -26,6 +26,7 @@ const STATE_COLORS = {
   completed: '#22C55E',
   started: '#EAB308',
   required_incomplete: '#EF4444',
+  recommended_incomplete: '#F97316',
   optional_untouched: '#94A3B8',
   current: '#FFFFFF',
 };
@@ -34,6 +35,7 @@ const STATE_FILLS = {
   completed: 'rgba(34,197,94,0.28)',
   started: 'rgba(234,179,8,0.28)',
   required_incomplete: 'rgba(239,68,68,0.28)',
+  recommended_incomplete: 'rgba(249,115,22,0.28)',
   optional_untouched: 'rgba(148,163,184,0.28)',
   current: '#FFFFFF',
 };
