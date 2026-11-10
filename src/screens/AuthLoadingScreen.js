@@ -1,7 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { ActivityIndicator, View, StyleSheet, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ScreenBackground from '../components/ScreenBackground';
+import BrandLogo from '../components/BrandLogo';
+import { BRAND_LOCKUP_ASPECT, getBrandLoginSource } from '../constants/images';
+import { useTranslation } from '../i18n';
+import { AuthContext } from '../context/AuthManager';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import {
   resetToClientDashboard,
@@ -13,6 +17,9 @@ import { isProtectedWebPath, resetNavigationToCanonicalPath } from '../navigatio
 import { toCanonicalAppPath } from '../navigation/localizedRoutes';
 import { readOrganizationMemberships } from '../utils/orgWorkspace';
 
+const BRAND_WIDTH = 168;
+const BRAND_HEIGHT = Math.round(BRAND_WIDTH * BRAND_LOCKUP_ASPECT);
+
 function isClientDashboardPath(path) {
   const pathOnly = String(path || '').split('?')[0];
   const canonical = toCanonicalAppPath(pathOnly) || pathOnly;
@@ -20,10 +27,9 @@ function isClientDashboardPath(path) {
   return normalized === '/dashboard';
 }
 
-async function resolveSessionKind() {
-  const token = await AsyncStorage.getItem('@access_token');
-  if (!token) {
-    return { token: null, isPartner: false, isOrgOnly: false };
+async function resolveSessionKind(hasToken) {
+  if (!hasToken) {
+    return { isPartner: false, isOrgOnly: false };
   }
   const isShop = await AsyncStorage.getItem('@is_shop');
   const shopProfiles = await AsyncStorage.getItem('@shop_profiles');
@@ -36,22 +42,25 @@ async function resolveSessionKind() {
     (shopMemberships && shopMemberships !== '[]');
   const hasOrg = orgMemberships.length > 0;
   return {
-    token,
     isPartner: hasShopLinks,
     isOrgOnly: hasOrg && !hasShopLinks,
   };
 }
 
 export default function AuthLoadingScreen({ navigation }) {
+  const { isLoading, isAuthenticated } = useContext(AuthContext);
+
   useEffect(() => {
+    if (isLoading) return;
+
     const checkAuth = async () => {
-      const { token, isPartner, isOrgOnly } = await resolveSessionKind();
+      const { isPartner, isOrgOnly } = await resolveSessionKind(isAuthenticated);
 
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         const currentPath = `${window.location.pathname}${window.location.search}`;
         const trimmed = currentPath.replace(/^\//, '');
         if (trimmed && trimmed !== 'AuthLoading') {
-          if (!token) {
+          if (!isAuthenticated) {
             if (isProtectedWebPath(trimmed)) {
               await storeAuthReturnUrl(currentPath);
               resetToSignIn(navigation);
@@ -76,7 +85,7 @@ export default function AuthLoadingScreen({ navigation }) {
         }
       }
 
-      if (token) {
+      if (isAuthenticated) {
         if (isPartner || isOrgOnly) {
           const returnPath = await consumeAuthReturnUrl();
           if (returnPath && resetNavigationToCanonicalPath(navigation, returnPath)) {
@@ -94,12 +103,20 @@ export default function AuthLoadingScreen({ navigation }) {
     };
 
     checkAuth();
-  }, [navigation]);
+  }, [navigation, isLoading, isAuthenticated]);
+
+  const { locale } = useTranslation();
 
   return (
     <ScreenBackground>
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#fff" />
+        <BrandLogo
+          source={getBrandLoginSource(locale)}
+          width={BRAND_WIDTH}
+          height={BRAND_HEIGHT}
+          style={styles.brand}
+        />
+        <ActivityIndicator size="large" color="#fff" style={styles.spinner} />
       </View>
     </ScreenBackground>
   );
@@ -110,5 +127,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  brand: {
+    marginBottom: 28,
+  },
+  spinner: {
+    marginTop: 4,
   },
 });

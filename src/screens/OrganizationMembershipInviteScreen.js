@@ -11,7 +11,7 @@ import { acceptOrganizationMembershipInvite, previewOrganizationMembershipInvite
 import { fetchAuthSession, resendEmailVerification } from '../api/auth';
 import { AuthContext } from '../context/AuthManager';
 import { STORAGE_KEYS } from '../constants/storageKeys';
-import { BRAND_LOCKUP_ASPECT, IMAGES } from '../constants/images';
+import { BRAND_LOCKUP_ASPECT, getBrandLoginSource } from '../constants/images';
 import { useTranslation } from '../i18n';
 import { storeAuthReturnUrl } from '../navigation/authNavigation';
 import { resetNavigationToCanonicalPath } from '../navigation/webLinking';
@@ -36,7 +36,7 @@ function resolveInviteToken(route) {
 }
 
 export default function OrganizationMembershipInviteScreen({ route, navigation }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { isAuthenticated, isLoading: authLoading, userEmailOrPhone } = useContext(AuthContext);
   const token = useMemo(() => resolveInviteToken(route), [route]);
 
@@ -227,7 +227,7 @@ export default function OrganizationMembershipInviteScreen({ route, navigation }
       <ScrollView contentContainerStyle={styles.container}>
         <AuthLanguageSelector />
         <BrandLogo
-          source={IMAGES.brandLockup}
+          source={getBrandLoginSource(locale)}
           width={AUTH_BRAND_WIDTH}
           height={AUTH_BRAND_HEIGHT}
           style={styles.logo}

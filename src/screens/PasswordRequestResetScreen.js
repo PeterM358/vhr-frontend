@@ -10,7 +10,7 @@ import DashboardCard from '../components/dashboard/DashboardCard';
 import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
 import BrandLogo from '../components/BrandLogo';
 import BaseStyles from '../styles/base';
-import { BRAND_LOCKUP_ASPECT, IMAGES } from '../constants/images';
+import { BRAND_LOCKUP_ASPECT, getBrandLoginSource } from '../constants/images';
 import { COLORS } from '../constants/colors';
 import { useTranslation } from '../i18n';
 import { showMessage } from '../utils/crossPlatformAlert';
@@ -81,7 +81,7 @@ export default function PasswordRequestResetScreen({ navigation }) {
         <DashboardCard style={styles.authPanel}>
           <View style={BaseStyles.logoContainer}>
             <BrandLogo
-              source={IMAGES.brandLogin}
+              source={getBrandLoginSource(locale)}
               width={AUTH_BRAND_WIDTH}
               height={AUTH_BRAND_HEIGHT}
               accessibilityLabel="Veversal"

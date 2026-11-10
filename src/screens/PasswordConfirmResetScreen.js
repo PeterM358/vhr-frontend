@@ -26,7 +26,7 @@ import { resetToClientDashboard } from '../navigation/authNavigation';
 import { safeError } from '../utils/logger';
 import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
 import BrandLogo from '../components/BrandLogo';
-import { BRAND_LOCKUP_ASPECT, IMAGES } from '../constants/images';
+import { BRAND_LOCKUP_ASPECT, getBrandLoginSource } from '../constants/images';
 import { COLORS } from '../constants/colors';
 import { useTranslation } from '../i18n';
 
@@ -36,7 +36,7 @@ const AUTH_BRAND_HEIGHT = Math.round(AUTH_BRAND_WIDTH * BRAND_LOCKUP_ASPECT);
 
 export default function PasswordConfirmResetScreen({ route, navigation }) {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const insets = useSafeAreaInsets();
   const headerReserve = insets.top + (Platform.OS === 'ios' ? 52 : 56);
   const authContext = useContext(AuthContext);
@@ -131,7 +131,7 @@ export default function PasswordConfirmResetScreen({ route, navigation }) {
           <DashboardCard style={styles.authPanel}>
             <View style={BaseStyles.logoContainer}>
               <BrandLogo
-                source={IMAGES.brandLogin}
+                source={getBrandLoginSource(locale)}
                 width={AUTH_BRAND_WIDTH}
                 height={AUTH_BRAND_HEIGHT}
                 accessibilityLabel="Veversal"

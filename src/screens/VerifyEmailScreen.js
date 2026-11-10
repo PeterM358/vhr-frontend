@@ -9,7 +9,7 @@ import BrandLogo from '../components/BrandLogo';
 import DashboardCard from '../components/dashboard/DashboardCard';
 import AuthLanguageSelector from '../components/auth/AuthLanguageSelector';
 import { AuthContext } from '../context/AuthManager';
-import { BRAND_LOCKUP_ASPECT, IMAGES } from '../constants/images';
+import { BRAND_LOCKUP_ASPECT, getBrandLoginSource } from '../constants/images';
 import { useTranslation } from '../i18n';
 import {
   applyAuthSession,
@@ -48,7 +48,7 @@ function confirmEmailVerificationOnce(uid, token) {
 
 export default function VerifyEmailScreen({ route, navigation }) {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const insets = useSafeAreaInsets();
   const headerReserve = insets.top + (Platform.OS === 'ios' ? 52 : 56);
   const authContext = useContext(AuthContext);
@@ -103,7 +103,7 @@ export default function VerifyEmailScreen({ route, navigation }) {
       <View style={[styles.container, { paddingTop: headerReserve + 12 }]}>
         <AuthLanguageSelector />
         <BrandLogo
-          source={IMAGES.brandLockup}
+          source={getBrandLoginSource(locale)}
           width={AUTH_BRAND_WIDTH}
           height={AUTH_BRAND_HEIGHT}
           style={styles.logo}
