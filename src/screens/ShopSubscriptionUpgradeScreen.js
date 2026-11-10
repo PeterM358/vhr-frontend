@@ -208,7 +208,11 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   );
 
   const selectedOption = findOption(options, selected.planKey, selected.billingInterval);
-  const profileNeedsWork = Boolean(completion && !completion.ready_for_paid_plan);
+  // Once a paid plan is Active, don't nag Step-1 profile gate on Upgrade
+  // (shop can still finish Photos/About from profile — checkout already succeeded).
+  const profileNeedsWork = Boolean(
+    completion && !completion.ready_for_paid_plan && !isActive
+  );
   const freeListing = !currentPlan.isAssigned;
   const completionPercent = useMemo(() => {
     const score = Number(completion?.completion_score);

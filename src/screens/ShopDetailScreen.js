@@ -796,6 +796,18 @@ export default function ShopDetailScreen({ route, navigation }) {
           <View style={styles.heroTitleBlock}>
             <View style={styles.heroTitleRow}>
               <Text style={styles.heroTitle}>{serviceName}</Text>
+              {clientBadge.kind === 'premium' ? (
+                <Chip
+                  compact
+                  icon={({ size }) => (
+                    <MaterialCommunityIcons name="star-circle" size={size} color="#FDE68A" />
+                  )}
+                  style={styles.premiumChip}
+                  textStyle={styles.premiumChipText}
+                >
+                  {t('serviceCenters.badge.premiumPartner')}
+                </Chip>
+              ) : null}
               {clientBadge.kind === 'verified' ? (
                 <Chip
                   compact
@@ -1320,6 +1332,17 @@ const styles = StyleSheet.create({
   },
   verifiedChipText: {
     color: '#DCFCE7',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  premiumChip: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(234, 179, 8, 0.32)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(253, 230, 138, 0.65)',
+  },
+  premiumChipText: {
+    color: '#FEF3C7',
     fontSize: 12,
     fontWeight: '700',
   },

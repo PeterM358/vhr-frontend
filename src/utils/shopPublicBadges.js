@@ -26,9 +26,20 @@ function profileReady(shop) {
   return null;
 }
 
+function shopPremium(shop) {
+  const ents = shop?.entitlements;
+  if (ents?.has_premium_badge) return true;
+  const plan = String(
+    ents?.plan_key || shop?.subscription_plan_key || ''
+  )
+    .trim()
+    .toLowerCase();
+  return plan === 'premium' || plan === 'enterprise';
+}
+
 /**
  * Client-facing badge (single primary).
- * @returns {{ kind: 'not_accepting'|'verified'|'none', icon?: string }}
+ * @returns {{ kind: 'not_accepting'|'premium'|'verified'|'none', icon?: string }}
  */
 export function resolveShopClientBadge(shop) {
   if (!shop || shop.is_claimed === false) {
@@ -36,6 +47,10 @@ export function resolveShopClientBadge(shop) {
   }
   if (!shopAccepting(shop)) {
     return { kind: 'not_accepting', icon: 'pause-circle-outline' };
+  }
+  // Premium visibility badge (subscription) — ahead of generic verified.
+  if (shopPremium(shop)) {
+    return { kind: 'premium', icon: 'star-circle' };
   }
   if (shopVerified(shop)) {
     return { kind: 'verified', icon: 'shield-check' };

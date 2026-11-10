@@ -11,7 +11,9 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
+  Pressable,
 } from 'react-native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logout } from '../api/auth';
@@ -67,6 +69,8 @@ import {
   isLeadTeaserLocked,
   FEATURES,
   upgradeNavigationParams,
+  getShopEntitlements,
+  shopHasFeature,
 } from '../utils/partnerSubscription';
 import { todayCalendarRange, isScheduledToday } from '../utils/dashboardDate';
 import { showMessage } from '../utils/crossPlatformAlert';
@@ -127,6 +131,16 @@ export default function ShopHomeScreen() {
   );
   const partnerActive = isPartnerSubscriptionActive(shopProfile);
   const canSendOffers = canSendPartnerOffers(shopProfile);
+  const isPremiumPartner =
+    partnerActive && shopHasFeature(shopProfile, FEATURES.PREMIUM_BADGE);
+  const planKey = String(
+    getShopEntitlements(shopProfile)?.plan_key ||
+      shopProfile?.subscription_plan_key ||
+      ''
+  )
+    .trim()
+    .toLowerCase();
+  const showPremiumHomeBadge = isPremiumPartner || planKey === 'premium';
 
   const sortedDashboardRepairs = useMemo(
     () => [...activeDashboardRepairs].sort(comparePartnerLifecycle),
@@ -546,6 +560,26 @@ export default function ShopHomeScreen() {
           />
         ) : null}
 
+        {showPremiumHomeBadge ? (
+          <Pressable
+            onPress={() => navigation.navigate('ShopSubscriptionUpgrade')}
+            style={styles.premiumHomeBadge}
+            accessibilityRole="button"
+            accessibilityLabel={t('partnerDashboard.premiumActiveA11y')}
+          >
+            <MaterialCommunityIcons name="star-circle" size={20} color="#FDE68A" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.premiumHomeTitle}>
+                {t('partnerDashboard.premiumActiveTitle')}
+              </Text>
+              <Text style={styles.premiumHomeBody}>
+                {t('partnerDashboard.premiumActiveBody')}
+              </Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={18} color="rgba(253,230,138,0.7)" />
+          </Pressable>
+        ) : null}
+
         <DashboardSection
           title={t('partnerDashboard.openRepairRequests')}
           subtitle={
@@ -612,5 +646,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,255,255,0.78)',
     textAlign: 'center',
+  },
+  premiumHomeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: 'rgba(234, 179, 8, 0.18)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(253, 230, 138, 0.45)',
+  },
+  premiumHomeTitle: {
+    color: '#FEF3C7',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  premiumHomeBody: {
+    marginTop: 2,
+    color: 'rgba(254, 243, 199, 0.85)',
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
