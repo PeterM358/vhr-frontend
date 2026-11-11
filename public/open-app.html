@@ -30,11 +30,29 @@
       max-width: 420px;
       text-align: center;
     }
+    .logo {
+      display: block;
+      width: min(220px, 58vw);
+      height: auto;
+      margin: 0 auto 20px;
+      filter: drop-shadow(0 8px 24px rgba(15, 23, 42, 0.12));
+    }
     .brand {
       font-size: 28px;
       font-weight: 800;
       letter-spacing: -0.03em;
       margin: 0 0 8px;
+    }
+    .brand.sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
     p {
       margin: 0 0 16px;
@@ -79,7 +97,15 @@
 </head>
 <body>
   <main>
-    <h1 class="brand">Veversal</h1>
+    <img
+      id="logo"
+      class="logo"
+      src="/veversal-brand-bg.png"
+      width="220"
+      height="309"
+      alt="Veversal"
+    />
+    <h1 class="brand sr-only">Veversal</h1>
     <p id="msg">Избери как да продължиш</p>
     <a id="openApp" class="btn btn-primary" href="#">Отвори приложението</a>
     <a id="appstore" class="btn btn-secondary" href="https://apps.apple.com/app/id6820957515">App Store</a>
@@ -107,11 +133,9 @@
       }
       path = path.replace(/^\/+/, '');
       // Native linking routes are language-free (dashboard/vehicles/:id).
-      // Email links often include /bg/ or /en/ — strip so the app opens the vehicle.
-      path = path.replace(/^(en|bg|de|it|fr|es)(\/|$)/i, function (_, _lang, slash) {
-        return slash === '/' ? '' : '';
-      });
-      path = path.replace(/^\/+/, '');
+      // Email links often include /bg/ or /en/ — strip for scheme/intent only.
+      var nativePath = path.replace(/^(en|bg|de|it|fr|es)\//i, '');
+      nativePath = nativePath.replace(/^\/+/, '');
 
       var ua = navigator.userAgent || '';
       var isAndroid = /Android/i.test(ua);
@@ -121,14 +145,14 @@
       var appStoreHttps = 'https://apps.apple.com/bg/app/id6820957515';
       var appStoreNative = 'itms-apps://apps.apple.com/app/id6820957515';
       // Primary brand scheme; service1001 kept for older Android installs only.
-      var schemeUrl = 'veversal://' + path;
-      var legacySchemeUrl = 'service1001://' + path;
+      var schemeUrl = 'veversal://' + nativePath;
+      var legacySchemeUrl = 'service1001://' + nativePath;
       var intentUrl =
-        'intent://' + path +
+        'intent://' + nativePath +
         '#Intent;scheme=veversal;package=com.mihailovv.vhrfrontend;S.browser_fallback_url=' +
         encodeURIComponent(playUrl) + ';end';
       var legacyIntentUrl =
-        'intent://' + path +
+        'intent://' + nativePath +
         '#Intent;scheme=service1001;package=com.mihailovv.vhrfrontend;S.browser_fallback_url=' +
         encodeURIComponent(playUrl) + ';end';
       var webUrl = '/' + path;
@@ -139,6 +163,10 @@
       var webBtn = document.getElementById('web');
       var msg = document.getElementById('msg');
       var hint = document.getElementById('hint');
+      var logo = document.getElementById('logo');
+      if (logo) {
+        logo.src = en ? '/veversal-brand-en.png' : '/veversal-brand-bg.png';
+      }
 
       playBtn.href = playUrl;
       storeBtn.href = appStoreHttps;
@@ -195,16 +223,14 @@
           storeBtn.textContent = 'Open App Store';
           webBtn.textContent = 'Continue in browser';
           hint.textContent =
-            'Needs a build that registers veversal:// (or legacy service1001://). ' +
-            'Shop login (e.g. Kokis) is fine — the app still opens. If nothing happens, install the new TestFlight build or use the browser.';
+            'If the app does not open, install Veversal from the App Store or continue in the browser.';
         } else {
           msg.textContent = 'Отвори Veversal, или продължи в браузъра';
           openBtn.textContent = 'Отвори приложението';
           storeBtn.textContent = 'Отвори App Store';
           webBtn.textContent = 'Продължи в браузъра';
           hint.textContent =
-            'Трябва билд с veversal:// (или стария service1001://). ' +
-            'Логнат автосервиз (напр. Кокис) е ОК — app-ът пак трябва да се отвори. Ако нищо не стане: нов TestFlight билд или браузър.';
+            'Ако приложението не се отвори, инсталирай Veversal от App Store или продължи в браузъра.';
         }
         return;
       }
