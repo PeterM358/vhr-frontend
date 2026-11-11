@@ -570,8 +570,10 @@ function getRootNavigation(navigation) {
 
 /** Client/partner dashboard paths that require sign-in on web. */
 export function isProtectedWebPath(path) {
-  const pathOnly = String(path || '')
-    .split('?')[0]
+  const raw = String(path || '').split('?')[0];
+  // Email / localized links arrive as /bg/partner/upgrade — strip lang first.
+  const canonical = toCanonicalAppPath(raw) || raw;
+  const pathOnly = String(canonical || '')
     .replace(/^\//, '')
     .replace(/\/$/, '');
   return (

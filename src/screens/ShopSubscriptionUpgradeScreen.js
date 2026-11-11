@@ -3,7 +3,7 @@
  * Gates must use entitlements from the API, not plan-name hardcoding.
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useContext, useMemo, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -33,6 +33,8 @@ import { POLICY_SLUGS } from '../policies/policySlugs';
 import { COLORS } from '../constants/colors';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { useTranslation } from '../i18n';
+import { AuthContext } from '../context/AuthManager';
+import { navigateToSignIn } from '../navigation/authNavigation';
 import {
   getShopEntitlements,
   getCurrentPlanDisplay,
@@ -116,6 +118,7 @@ async function copyText(value) {
 export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   const { t } = useTranslation();
   const route = useRoute();
+  const { isAuthenticated, isLoading: authLoading } = useContext(AuthContext);
   const featureKey = route.params?.featureKey || null;
   const featureLabelParam = route.params?.featureLabel || null;
 
@@ -131,9 +134,25 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   const [showCompare, setShowCompare] = useState(false);
   const [payment, setPayment] = useState(null);
   const [error, setError] = useState(null);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   const scrollRef = useRef(null);
 
+  const returnToUpgradePath =
+    Platform.OS === 'web' && typeof window !== 'undefined'
+      ? `${window.location.pathname || '/partner/upgrade'}${window.location.search || ''}`
+      : '/partner/upgrade';
+
   const load = useCallback(async () => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      setNeedsSignIn(true);
+      setLoading(false);
+      setProfile(null);
+      setOptionsPayload(null);
+      await navigateToSignIn(navigation, { returnPath: returnToUpgradePath });
+      return;
+    }
+    setNeedsSignIn(false);
     setLoading(true);
     setError(null);
     try {
@@ -147,15 +166,23 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
         setOptionsPayload(opts);
       } else {
         setOptionsPayload(null);
+        setError(t('subscription.signInRequiredBody'));
       }
     } catch (e) {
       setProfile(null);
       setOptionsPayload(null);
-      setError(String(e?.message || e));
+      const msg = String(e?.message || e);
+      const unauthorized = /401|403|unauth|credentials|token/i.test(msg);
+      if (unauthorized) {
+        setNeedsSignIn(true);
+        await navigateToSignIn(navigation, { returnPath: returnToUpgradePath });
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authLoading, isAuthenticated, navigation, returnToUpgradePath, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -387,8 +414,20 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        {loading ? (
+        {loading || authLoading ? (
           <ActivityIndicator style={{ marginTop: 48 }} color={COLORS.PRIMARY} />
+        ) : needsSignIn || !profile ? (
+          <View style={styles.howtoCard}>
+            <Text style={styles.howtoTitle}>{t('subscription.signInRequiredTitle')}</Text>
+            <Text style={styles.howtoStep}>{t('subscription.signInRequiredBody')}</Text>
+            <Button
+              mode="contained"
+              style={{ marginTop: 16 }}
+              onPress={() => navigateToSignIn(navigation, { returnPath: returnToUpgradePath })}
+            >
+              {t('subscription.signInRequiredCta')}
+            </Button>
+          </View>
         ) : (
           <>
             {/* How this page works */}
