@@ -94,10 +94,20 @@ function findOption(options, planKey, billingInterval) {
   );
 }
 
+/**
+ * % saved vs paying monthly for 12 months.
+ * Must use monthly×12 as the base — NOT annual amount (49/299≈16% looks
+ * bigger but is wrong; 49/348≈14% is the real discount).
+ */
 function savingsPercent(annualOpt) {
-  const total = Number(annualOpt?.monthly_equivalent_annual_total);
-  const save = Number(annualOpt?.annual_savings);
-  if (!total || !save) return null;
+  if (!annualOpt) return null;
+  const explicit = Number(annualOpt.annual_savings_percent);
+  if (Number.isFinite(explicit) && explicit > 0) {
+    return Math.round(explicit);
+  }
+  const total = Number(annualOpt.monthly_equivalent_annual_total);
+  const save = Number(annualOpt.annual_savings);
+  if (!total || !save || total <= 0) return null;
   return Math.round((save / total) * 100);
 }
 
@@ -228,13 +238,12 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   }, [expiresAt, cancelAtPeriodEnd, isActive, t]);
 
   const isAnnual = selected.billingInterval === 'annual';
-  // Badge must match the selected plan — max(pro,premium) caused "Save 16%" vs "Save 14%" mismatch.
-  const annualBadgePercent = useMemo(
+  const selectedOption = findOption(options, selected.planKey, selected.billingInterval);
+  // One savings figure for the selected plan's annual option (toggle + price hero).
+  const annualSavePercent = useMemo(
     () => savingsPercent(findOption(options, selected.planKey, 'annual')),
     [options, selected.planKey]
   );
-
-  const selectedOption = findOption(options, selected.planKey, selected.billingInterval);
   // Once a paid plan is Active, don't nag Step-1 profile gate on Upgrade
   // (shop can still finish Photos/About from profile — checkout already succeeded).
   const profileNeedsWork = Boolean(
@@ -279,11 +288,11 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
     }
     const currency = opt.currency || 'EUR';
     if (isAnnual) {
-      const pct = savingsPercent(opt);
       return {
         main: `${opt.amount} ${currency}`,
         sub: t('subscription.billedAnnually', { amount: opt.amount, currency }),
-        savings: pct != null ? t('subscription.billingAnnualSave', { percent: pct }) : null,
+        // Savings % lives once under the period toggle — avoid 14% vs 16% double display.
+        savings: null,
       };
     }
     return {
@@ -636,31 +645,39 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
               <Text style={[styles.checkoutLabel, styles.checkoutLabelSpaced]}>
                 {t('subscription.billingIntervalLabel')}
               </Text>
-              <View style={styles.toggle}>
+              <View style={styles.periodToggle}>
                 <Pressable
                   onPress={() => setSelected((s) => ({ ...s, billingInterval: 'monthly' }))}
-                  style={[styles.toggleBtn, !isAnnual && styles.toggleBtnActiveLight]}
+                  style={[styles.periodToggleBtn, !isAnnual && styles.toggleBtnActiveLight]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: !isAnnual }}
                 >
-                  <Text style={[styles.toggleTextDark, !isAnnual && styles.toggleTextDarkActive]}>
+                  <Text
+                    style={[styles.periodToggleText, !isAnnual && styles.toggleTextDarkActive]}
+                    numberOfLines={1}
+                  >
                     {t('subscription.billingMonthly')}
                   </Text>
                 </Pressable>
                 <Pressable
                   onPress={() => setSelected((s) => ({ ...s, billingInterval: 'annual' }))}
-                  style={[styles.toggleBtn, isAnnual && styles.toggleBtnActiveLight]}
+                  style={[styles.periodToggleBtn, isAnnual && styles.toggleBtnActiveLight]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isAnnual }}
                 >
-                  <Text style={[styles.toggleTextDark, isAnnual && styles.toggleTextDarkActive]}>
+                  <Text
+                    style={[styles.periodToggleText, isAnnual && styles.toggleTextDarkActive]}
+                    numberOfLines={1}
+                  >
                     {t('subscription.billingAnnual')}
                   </Text>
-                  {annualBadgePercent ? (
-                    <View style={styles.toggleSaveBadgeDark}>
-                      <Text style={styles.toggleSaveBadgeDarkText}>
-                        {t('subscription.billingAnnualSave', { percent: annualBadgePercent })}
-                      </Text>
-                    </View>
-                  ) : null}
                 </Pressable>
               </View>
+              {annualSavePercent != null ? (
+                <Text style={styles.periodSaveHint}>
+                  {t('subscription.billingAnnualSave', { percent: annualSavePercent })}
+                </Text>
+              ) : null}
 
               <View style={styles.priceHero}>
                 <Text style={styles.priceHeroAmount}>{priceDisplay.main}</Text>
@@ -1195,16 +1212,34 @@ const styles = StyleSheet.create({
   toggleBtnDisabled: {
     opacity: 0.45,
   },
-  toggleSaveBadgeDark: {
-    backgroundColor: COLORS.PRIMARY,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 8,
+  periodToggle: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(15,23,42,0.06)',
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
   },
-  toggleSaveBadgeDarkText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
+  periodToggleBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 11,
+    minHeight: 44,
+  },
+  periodToggleText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.TEXT_MUTED,
+    textAlign: 'center',
+  },
+  periodSaveHint: {
+    marginTop: 8,
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.PRIMARY,
+    textAlign: 'center',
   },
   priceHero: {
     alignItems: 'center',
