@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { Text, TextInput, Button, ActivityIndicator, useTheme } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { login, googleLogin } from '../api/auth';
+import { composeAuthPhone, login, googleLogin } from '../api/auth';
 import { buildShopAuthReset, resolveShopEntryRoute } from '../utils/shopAuthNavigation';
 import {
   resetToClientDashboard,
@@ -160,8 +160,12 @@ export default function LoginScreen({ navigation, route }) {
   const handleLogin = async () => {
     const identifier =
       loginMethod === 'phone'
-        ? `${(phonePrefix || '').trim()}${(phoneNational || '').trim()}`
+        ? composeAuthPhone(phonePrefix, phoneNational)
         : (email || '').trim();
+    if (loginMethod === 'phone' && (!identifier || !identifier.startsWith('+'))) {
+      setError(t('auth.phoneRegisterInvalid'));
+      return;
+    }
     setError('');
     setLoading(true);
     try {
@@ -244,7 +248,15 @@ export default function LoginScreen({ navigation, route }) {
       }
     } catch (err) {
       safeError('Login failed', err);
-      setError(t('auth.loginFailed'));
+      const retrySec = Number(err?.retryAfterSeconds) || 0;
+      if (err?.status === 429 || retrySec > 0) {
+        const minutes = Math.max(1, Math.ceil(retrySec / 60));
+        setError(t('auth.loginRateLimited', { minutes }));
+      } else if (err?.message && err.message !== 'Login failed. Please check your credentials.') {
+        setError(err.message);
+      } else {
+        setError(t('auth.loginFailed'));
+      }
     } finally {
       setLoading(false);
     }

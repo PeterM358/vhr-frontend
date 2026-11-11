@@ -3,7 +3,7 @@ import { Platform, ScrollView, StyleSheet, View, Pressable } from 'react-native'
 import { Text, TextInput, Button, Portal, Dialog, ActivityIndicator, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { register } from '../api/auth';
+import { composeAuthPhone, register } from '../api/auth';
 import { AuthContext } from '../context/AuthManager';
 import BaseStyles from '../styles/base';
 import ScreenBackground from '../components/ScreenBackground';
@@ -39,7 +39,10 @@ export default function RegisterScreen({ navigation }) {
     [theme]
   );
 
-  const [emailOrPhone, setEmailOrPhone] = useState('');
+  const [contactMethod, setContactMethod] = useState('email');
+  const [email, setEmail] = useState('');
+  const [phonePrefix, setPhonePrefix] = useState('+359');
+  const [phoneNational, setPhoneNational] = useState('');
   const [password, setPassword] = useState('');
   const [accountKind, setAccountKind] = useState('person');
   const [saving, setSaving] = useState(false);
@@ -55,23 +58,27 @@ export default function RegisterScreen({ navigation }) {
   };
 
   const saveRegistration = async () => {
-    if (!emailOrPhone.trim()) {
-      setDialogMessage(t('auth.emailOrPhoneRequired'));
-      setDialogVisible(true);
-      return;
+    let identifier = '';
+    if (contactMethod === 'email') {
+      identifier = email.trim();
+      if (!identifier) {
+        setDialogMessage(t('auth.emailRequired'));
+        setDialogVisible(true);
+        return;
+      }
+    } else {
+      identifier = composeAuthPhone(phonePrefix, phoneNational);
+      if (!identifier || !identifier.startsWith('+')) {
+        setDialogMessage(t('auth.phoneRegisterInvalid'));
+        setDialogVisible(true);
+        return;
+      }
     }
 
     setSaving(true);
     try {
-      const identifier = emailOrPhone.trim();
       const isPerson = accountKind === 'person';
-      const result = await register(
-        identifier,
-        password,
-        isPerson,
-        false,
-        locale
-      );
+      const result = await register(identifier, password, isPerson, false, locale);
 
       await applyLocalAuthSession(result, identifier);
       await AsyncStorage.setItem(STORAGE_KEYS.SIGNUP_ACCOUNT_KIND, accountKind);
@@ -115,7 +122,8 @@ export default function RegisterScreen({ navigation }) {
           index: 0,
           routes: [{ name: 'Login' }],
         });
-      }    } catch (err) {
+      }
+    } catch (err) {
       safeError('Registration failed', err);
       setDialogMessage(err.message || t('auth.registerFailed'));
       setDialogVisible(true);
@@ -185,20 +193,75 @@ export default function RegisterScreen({ navigation }) {
             </Pressable>
           </View>
 
-          <TextInput
-            label={t('auth.emailOrPhone')}
-            mode="outlined"
-            theme={authInputTheme}
-            outlineColor="rgba(148,163,184,0.45)"
-            activeOutlineColor={COLORS.ACCENT}
-            textColor="#ffffff"
-            outlineStyle={styles.inputOutline}
-            value={emailOrPhone}
-            onChangeText={setEmailOrPhone}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            style={styles.input}
-          />
+          <View style={styles.methodSwitchRow}>
+            <Button
+              mode={contactMethod === 'email' ? 'contained' : 'outlined'}
+              onPress={() => setContactMethod('email')}
+              style={styles.methodBtn}
+              buttonColor={contactMethod === 'email' ? COLORS.PRIMARY : undefined}
+              textColor={contactMethod === 'email' ? COLORS.ON_PRIMARY : COLORS.ACCENT}
+            >
+              {t('common.email')}
+            </Button>
+            <Button
+              mode={contactMethod === 'phone' ? 'contained' : 'outlined'}
+              onPress={() => setContactMethod('phone')}
+              style={styles.methodBtn}
+              buttonColor={contactMethod === 'phone' ? COLORS.PRIMARY : undefined}
+              textColor={contactMethod === 'phone' ? COLORS.ON_PRIMARY : COLORS.ACCENT}
+            >
+              {t('auth.phoneNumber')}
+            </Button>
+          </View>
+
+          {contactMethod === 'email' ? (
+            <TextInput
+              label={t('common.email')}
+              mode="outlined"
+              theme={authInputTheme}
+              outlineColor="rgba(148,163,184,0.45)"
+              activeOutlineColor={COLORS.ACCENT}
+              textColor="#ffffff"
+              outlineStyle={styles.inputOutline}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              style={styles.input}
+            />
+          ) : (
+            <>
+              <View style={styles.phoneRow}>
+                <TextInput
+                  label={t('auth.phonePrefix')}
+                  mode="outlined"
+                  theme={authInputTheme}
+                  outlineColor="rgba(148,163,184,0.45)"
+                  activeOutlineColor={COLORS.ACCENT}
+                  textColor="#ffffff"
+                  outlineStyle={styles.inputOutline}
+                  value={phonePrefix}
+                  onChangeText={setPhonePrefix}
+                  keyboardType="phone-pad"
+                  style={[styles.input, styles.prefixInput]}
+                />
+                <TextInput
+                  label={t('auth.phoneNumber')}
+                  mode="outlined"
+                  theme={authInputTheme}
+                  outlineColor="rgba(148,163,184,0.45)"
+                  activeOutlineColor={COLORS.ACCENT}
+                  textColor="#ffffff"
+                  outlineStyle={styles.inputOutline}
+                  value={phoneNational}
+                  onChangeText={setPhoneNational}
+                  keyboardType="phone-pad"
+                  style={[styles.input, styles.phoneInput]}
+                />
+              </View>
+              <Text style={styles.helperText}>{t('auth.phoneRegisterHelper')}</Text>
+            </>
+          )}
 
           <TextInput
             label={t('auth.password')}
@@ -296,6 +359,30 @@ const styles = StyleSheet.create({
   inputOutline: {
     borderRadius: 14,
     overflow: 'visible',
+  },
+  methodSwitchRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  methodBtn: {
+    flex: 1,
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  prefixInput: {
+    flex: 0.7,
+  },
+  phoneInput: {
+    flex: 1.3,
+  },
+  helperText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.65)',
+    marginBottom: 8,
+    marginTop: -2,
   },
   rolePrompt: {
     fontSize: 14,

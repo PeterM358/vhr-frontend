@@ -7,6 +7,91 @@ import { messageFromApiError } from '../utils/apiErrorMessage';
 import { resetToPublicHome } from '../navigation/authNavigation';
 import { safeError } from '../utils/logger';
 import { getLocale } from '../i18n';
+import { STORAGE_KEYS } from '../constants/storageKeys';
+import { writeOrganizationMemberships } from '../utils/orgWorkspace';
+import { buildE164Phone } from '../utils/phoneE164';
+
+function isStoredToken(value) {
+  return !!(value && value !== 'null' && value !== 'undefined');
+}
+
+let refreshInFlight = null;
+
+async function clearStoredAuthTokens() {
+  await AsyncStorage.multiRemove([STORAGE_KEYS.ACCESS_TOKEN, STORAGE_KEYS.REFRESH_TOKEN]);
+}
+
+/**
+ * Exchange refresh token for a new access token (single-flight).
+ * @returns {Promise<string|null>} fresh access token, or null if refresh rejected
+ * @throws on network / unexpected errors (caller may keep stale access)
+ */
+export async function refreshAccessToken() {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    const refresh = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+    if (!isStoredToken(refresh)) return null;
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/token/refresh/`, { refresh });
+      const access = response.data?.access;
+      if (!access) return null;
+      await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, access);
+      if (response.data?.refresh) {
+        await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.data.refresh);
+      }
+      return access;
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 400) {
+        await clearStoredAuthTokens();
+        return null;
+      }
+      throw error;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
+/**
+ * Cold-start / resume session like Facebook: refresh when possible so expired
+ * access tokens (7d) do not leave the user "logged in" with broken API calls.
+ */
+export async function restoreSession() {
+  const [access, refresh] = await AsyncStorage.multiGet([
+    STORAGE_KEYS.ACCESS_TOKEN,
+    STORAGE_KEYS.REFRESH_TOKEN,
+  ]).then((pairs) => pairs.map(([, v]) => v));
+
+  const hasAccess = isStoredToken(access);
+  const hasRefresh = isStoredToken(refresh);
+
+  if (!hasAccess && !hasRefresh) {
+    return { token: null, authenticated: false };
+  }
+
+  if (hasRefresh) {
+    try {
+      const fresh = await refreshAccessToken();
+      if (fresh) {
+        return { token: fresh, authenticated: true };
+      }
+      return { token: null, authenticated: false };
+    } catch (error) {
+      safeError('Session refresh failed (keeping local token if any)', error);
+      if (hasAccess) {
+        return { token: access, authenticated: true };
+      }
+      return { token: null, authenticated: false };
+    }
+  }
+
+  return { token: access, authenticated: hasAccess };
+}
 
 const normalizeAuthLanguage = (locale) => {
   const value = String(locale || getLocale() || 'en').trim().toLowerCase().split('-')[0];
@@ -15,9 +100,26 @@ const normalizeAuthLanguage = (locale) => {
 
 const normalizeLoginPhone = (value) => {
   if (!value) return '';
-  const trimmed = value.trim().replace(/\s+/g, '').replace(/-/g, '');
-  if (trimmed.startsWith('00')) return `+${trimmed.slice(2)}`;
+  let trimmed = value.trim().replace(/\s+/g, '').replace(/-/g, '');
+  if (trimmed.startsWith('00')) trimmed = `+${trimmed.slice(2)}`;
+  if (!trimmed.startsWith('+')) return trimmed;
+  // Re-parse via E.164 helper to drop trunk 0 after country code (+3590… → +359…).
+  const digits = trimmed.slice(1);
+  for (const ccLen of [1, 2, 3]) {
+    if (digits.length <= ccLen + 1) continue;
+    const prefix = `+${digits.slice(0, ccLen)}`;
+    const national = digits.slice(ccLen);
+    const rebuilt = buildE164Phone(prefix, national);
+    if (rebuilt) return rebuilt;
+  }
   return trimmed;
+};
+
+/** Build E.164 from login/register prefix + national fields. */
+export const composeAuthPhone = (prefix, national) => {
+  const e164 = buildE164Phone(prefix, national);
+  if (e164) return e164;
+  return normalizeLoginPhone(`${prefix || ''}${national || ''}`);
 };
 
 const buildLoginIdentifierBody = (emailOrPhone, password) => {
@@ -37,6 +139,7 @@ export const register = async (emailOrPhone, password, isClient, isShop, languag
     const raw = (emailOrPhone || '').trim();
     const loginData = buildLoginIdentifierBody(raw, password);
     const authLanguage = normalizeAuthLanguage(language);
+    const phone = loginData.phone || '';
 
     if (raw.includes('@')) {
       registerData = {
@@ -47,8 +150,11 @@ export const register = async (emailOrPhone, password, isClient, isShop, languag
         language: authLanguage,
       };
     } else {
+      if (!phone.startsWith('+')) {
+        throw new Error('Phone number must include country code prefix (e.g. +359).');
+      }
       registerData = {
-        phone: normalizeLoginPhone(raw),
+        phone,
         password,
         is_client: isClient,
         is_shop: isShop,
@@ -60,15 +166,32 @@ export const register = async (emailOrPhone, password, isClient, isShop, languag
 
     const loginResponse = await axios.post(`${API_BASE_URL}/api/token/`, loginData);
 
-    await storeLoginData(loginResponse.data, emailOrPhone.trim());
+    const storedId = raw.includes('@') ? raw.toLowerCase() : phone;
+    await storeLoginData(loginResponse.data, storedId);
     await syncPushDeviceToken(loginResponse.data.access);
 
     return loginResponse.data;
   } catch (error) {
     safeError('Registration or login failed', error);
-    throw new Error(messageFromApiError(error, 'Registration or login failed.'));
+    if (error?.response) {
+      throw new Error(messageFromApiError(error, 'Registration or login failed.'));
+    }
+    throw error instanceof Error
+      ? error
+      : new Error(messageFromApiError(error, 'Registration or login failed.'));
   }
 };
+
+function loginErrorMessage(error) {
+  const data = error?.response?.data;
+  const retry = Number(data?.retry_after_seconds);
+  if (error?.response?.status === 429 || (Number.isFinite(retry) && retry > 0 && data?.detail)) {
+    const minutes = Math.max(1, Math.ceil(retry / 60));
+    const detail = typeof data?.detail === 'string' ? data.detail : 'Too many sign-in attempts. Please try again later.';
+    return `${detail} (~${minutes} min)`;
+  }
+  return messageFromApiError(error, 'Login failed. Please check your credentials.');
+}
 
 // ✅ Login
 export const login = async (emailOrPhone, password) => {
@@ -83,12 +206,12 @@ export const login = async (emailOrPhone, password) => {
     return response.data;
   } catch (error) {
     safeError('Login failed', error);
-    throw new Error('Login failed. Please check your credentials.');
+    const err = new Error(loginErrorMessage(error));
+    err.status = error?.response?.status;
+    err.retryAfterSeconds = Number(error?.response?.data?.retry_after_seconds) || 0;
+    throw err;
   }
 };
-
-import { STORAGE_KEYS } from '../constants/storageKeys';
-import { writeOrganizationMemberships } from '../utils/orgWorkspace';
 
 // ✅ Store Login Data Helper
 const storeLoginData = async (data, fallbackDisplay) => {
