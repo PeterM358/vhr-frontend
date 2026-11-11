@@ -140,7 +140,18 @@ export default function ShopHomeScreen() {
   )
     .trim()
     .toLowerCase();
-  const showPremiumHomeBadge = isPremiumPartner || planKey === 'premium';
+  const paidPlanLabel =
+    planKey === 'premium' || isPremiumPartner
+      ? t('subscription.planPremium')
+      : planKey === 'pro'
+        ? t('subscription.planPro')
+        : planKey === 'enterprise'
+          ? t('subscription.planEnterprise')
+          : null;
+  // PRO (and Premium) both need a clear "you paid" signal on Home — Premium-only
+  // badge left PRO shops looking unpaid after Stripe success.
+  const showPaidPlanHomeBadge = Boolean(partnerActive && paidPlanLabel);
+  const paidPlanIsPremium = planKey === 'premium' || isPremiumPartner;
 
   const sortedDashboardRepairs = useMemo(
     () => [...activeDashboardRepairs].sort(comparePartnerLifecycle),
@@ -560,23 +571,56 @@ export default function ShopHomeScreen() {
           />
         ) : null}
 
-        {showPremiumHomeBadge ? (
+        {showPaidPlanHomeBadge ? (
           <Pressable
             onPress={() => navigation.navigate('ShopSubscriptionUpgrade')}
-            style={styles.premiumHomeBadge}
+            style={[
+              styles.premiumHomeBadge,
+              !paidPlanIsPremium ? styles.paidPlanHomeBadge : null,
+            ]}
             accessibilityRole="button"
-            accessibilityLabel={t('partnerDashboard.premiumActiveA11y')}
+            accessibilityLabel={
+              paidPlanIsPremium
+                ? t('partnerDashboard.premiumActiveA11y')
+                : t('partnerDashboard.planActiveA11y', { plan: paidPlanLabel })
+            }
           >
-            <MaterialCommunityIcons name="star-circle" size={20} color="#FDE68A" />
+            <MaterialCommunityIcons
+              name={paidPlanIsPremium ? 'star-circle' : 'check-decagram'}
+              size={20}
+              color={paidPlanIsPremium ? '#FDE68A' : '#A7F3D0'}
+            />
             <View style={{ flex: 1 }}>
-              <Text style={styles.premiumHomeTitle}>
-                {t('partnerDashboard.premiumActiveTitle')}
+              <Text
+                style={[
+                  styles.premiumHomeTitle,
+                  !paidPlanIsPremium ? styles.paidPlanHomeTitle : null,
+                ]}
+              >
+                {paidPlanIsPremium
+                  ? t('partnerDashboard.premiumActiveTitle')
+                  : t('partnerDashboard.planActiveTitle', { plan: paidPlanLabel })}
               </Text>
-              <Text style={styles.premiumHomeBody}>
-                {t('partnerDashboard.premiumActiveBody')}
+              <Text
+                style={[
+                  styles.premiumHomeBody,
+                  !paidPlanIsPremium ? styles.paidPlanHomeBody : null,
+                ]}
+              >
+                {paidPlanIsPremium
+                  ? t('partnerDashboard.premiumActiveBody')
+                  : t('partnerDashboard.planActiveBody')}
               </Text>
             </View>
-            <MaterialCommunityIcons name="chevron-right" size={18} color="rgba(253,230,138,0.7)" />
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={18}
+              color={
+                paidPlanIsPremium
+                  ? 'rgba(253,230,138,0.7)'
+                  : 'rgba(167,243,208,0.75)'
+              }
+            />
           </Pressable>
         ) : null}
 
@@ -659,15 +703,25 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(253, 230, 138, 0.45)',
   },
+  paidPlanHomeBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.16)',
+    borderColor: 'rgba(167, 243, 208, 0.45)',
+  },
   premiumHomeTitle: {
     color: '#FEF3C7',
     fontSize: 15,
     fontWeight: '800',
+  },
+  paidPlanHomeTitle: {
+    color: '#D1FAE5',
   },
   premiumHomeBody: {
     marginTop: 2,
     color: 'rgba(254, 243, 199, 0.85)',
     fontSize: 13,
     lineHeight: 18,
+  },
+  paidPlanHomeBody: {
+    color: 'rgba(209, 250, 229, 0.88)',
   },
 });

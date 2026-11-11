@@ -811,7 +811,12 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
             </View>
 
             <View style={styles.enterpriseCardCompact}>
-              <Text style={styles.enterpriseBody}>{t('subscription.enterpriseTagline')}</Text>
+              <View style={styles.enterpriseCopy}>
+                <Text style={styles.enterpriseTitleCompact}>
+                  {t('subscription.enterpriseTitle')}
+                </Text>
+                <Text style={styles.enterpriseBody}>{t('subscription.enterpriseTagline')}</Text>
+              </View>
               <Button mode="text" compact onPress={contactSales} textColor={COLORS.PRIMARY}>
                 {t('subscription.enterpriseCta')}
               </Button>
@@ -1277,9 +1282,19 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_MUTED,
     lineHeight: 20,
   },
+  enterpriseTitleCompact: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.TEXT_DARK,
+    marginBottom: 4,
+  },
+  enterpriseCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
   enterpriseCardCompact: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 8,
     paddingHorizontal: 4,

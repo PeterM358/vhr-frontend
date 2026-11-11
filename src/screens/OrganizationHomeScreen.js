@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -753,6 +753,34 @@ export default function OrganizationHomeScreen() {
           <>
             <DashboardSummaryRow items={summaryItems} compact={!isDriver} />
 
+            {!isDriver ? (
+              <DashboardCard style={styles.enterpriseCard}>
+                <Text style={styles.enterpriseTitle}>
+                  {t('org.home.enterpriseTitle')}
+                </Text>
+                <Text style={styles.enterpriseBody}>
+                  {t('org.home.enterpriseBody')}
+                </Text>
+                <Button
+                  mode="contained"
+                  onPress={() => {
+                    const subject = encodeURIComponent(t('org.home.enterpriseEmailSubject'));
+                    const body = encodeURIComponent(
+                      t('org.home.enterpriseEmailBody', {
+                        org: org?.display_name || org?.name || '',
+                      })
+                    );
+                    Linking.openURL(
+                      `mailto:partners@veversal.com?subject=${subject}&body=${body}`
+                    );
+                  }}
+                  style={styles.enterpriseButton}
+                >
+                  {t('org.home.enterpriseCta')}
+                </Button>
+              </DashboardCard>
+            ) : null}
+
             {isDriver ? (
               <DashboardCard style={styles.tasksCard}>
                 <Text style={styles.tasksHeading}>
@@ -1335,5 +1363,24 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: 'rgba(255,255,255,0.48)',
     fontSize: 11,
+  },
+  enterpriseCard: {
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  enterpriseTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  enterpriseBody: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  enterpriseButton: {
+    alignSelf: 'flex-start',
   },
 });

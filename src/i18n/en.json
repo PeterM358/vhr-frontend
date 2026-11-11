@@ -204,7 +204,7 @@
       "storageLocations": "Storage locations",
       "priceList": "Price list",
       "notifications": "Notifications",
-      "billing": "Plans & payments",
+      "billing": "Payments",
       "switchCenter": "Switch service center",
       "explore": "Explore"
     }
@@ -276,6 +276,11 @@
       "greetingToast": "Hi, {name} — {org} dashboard",
       "workerGreeting": "Hi, {name}",
       "subtitle": "Shared workforce, fleet, documents, and operations for your company.",
+      "enterpriseTitle": "Company plan — price on request",
+      "enterpriseBody": "For 20+ people, multi-site, construction/fleet ERP, or custom turnover deals we quote personally. Soft-launch friends may stay free — ask us.",
+      "enterpriseCta": "Email for a quote",
+      "enterpriseEmailSubject": "Veversal company plan — price on request",
+      "enterpriseEmailBody": "Hello Veversal team,\n\nWe need a negotiated company plan quote.\n\nOrganization: {{org}}\nApprox. people / sites:\nNotes:\n\nThank you.",
       "fleetSubtitle": "Manage your company fleet and request repairs the same way customers do.",
       "driverSubtitle": "Pleasant work with {org}",
       "pleasantWork": "Pleasant work with {org}",
@@ -1999,6 +2004,9 @@
     "premiumActiveTitle": "Premium is active",
     "premiumActiveBody": "Public page shows the Premium partner badge. Manage payments or cancel renewals anytime.",
     "premiumActiveA11y": "Open payments — Premium is active",
+    "planActiveTitle": "{{plan}} is active",
+    "planActiveBody": "Payment confirmed. Open Payments anytime to manage the plan or cancel renewals.",
+    "planActiveA11y": "Open payments — {{plan}} is active",
     "homeIntroDismissA11y": "Hide shop intro",
     "openRepairRequests": "Open Repair Requests",
     "openRequestsEmptySubtitle": "New customer repair requests are waiting for your offer.",
@@ -2330,6 +2338,7 @@
         "vehicle_arrived": "Tap to open repair",
         "client_arrival_reported": "Tap to open repair",
         "owner_service_record_confirmation_requested": "Tap to confirm service record",
+        "subscription_payment_confirmed": "Tap to open Payments",
         "open_repair": "Tap to open repair",
         "open_promotion": "Tap to open promotion"
       },
@@ -2405,6 +2414,10 @@
         "owner_service_record_confirmation_rejected": {
           "title": "Service record rejected",
           "body": "The customer rejected the service record."
+        },
+        "subscription_payment_confirmed": {
+          "title": "Payment confirmed",
+          "body": "Your partner plan is active. Open Payments to manage renewals."
         }
       }
     },
@@ -5227,7 +5240,7 @@
     "cookiePolicy": "{app} Cookie Policy",
     "support": "{app} Support",
     "partnerTerms": "{app} Partner Terms",
-    "subscriptionUpgrade": "{app} Plans & payments",
+    "subscriptionUpgrade": "{app} Payments",
     "dpa": "{app} Data Processing Addendum",
     "subprocessors": "{app} Subprocessors",
     "vehicleDetails": "{app} Details",
@@ -5577,11 +5590,11 @@
     "premiumBenefitVisibility": "More customer visibility",
     "premiumBenefitInsights": "Performance insights",
     "premiumBenefitSupport": "Priority support",
-    "enterpriseTitle": "Enterprise",
-    "enterpriseTagline": "For chains, dealer groups and custom integrations.",
-    "enterpriseCta": "Contact Sales",
-    "enterpriseEmailSubject": "Veversal Enterprise enquiry",
-    "enterpriseEmailBody": "Hello Veversal team,\n\nWe'd like to talk about an Enterprise setup for our business.\n\nBusiness: {{shop}}\n\nThank you.",
+    "enterpriseTitle": "Enterprise — price on request",
+    "enterpriseTagline": "20+ people, multi-site chains, dealer groups, construction/fleet ERP, or custom deals — pricing is negotiated. Typical workshops use PRO or Premium above.",
+    "enterpriseCta": "Price on request",
+    "enterpriseEmailSubject": "Veversal Enterprise — price on request",
+    "enterpriseEmailBody": "Hello Veversal team,\n\nWe'd like a negotiated Enterprise quote.\n\nBusiness: {{shop}}\nApprox. people / sites: \nNotes:\n\nThank you.",
     "selectedSummary": "You're upgrading to {{plan}} · {{interval}}",
     "bankStepsTitle": "How bank transfer works",
     "bankStep1": "Choose your plan and request the payment details.",
@@ -5646,6 +5659,7 @@
     "notAnInvoice": "This is a payment instruction, not an accounting invoice.",
     "manageTitle": "Manage payments",
     "manageBody": "Cancel future renewals here. Refunds follow our cancellation policy — card refunds are not automatic in the app.",
+
     "cancelAtPeriodEndCta": "Cancel at period end",
     "cancelAtPeriodEndConfirm": "Stop renewal at the end of your paid period? You keep access until then.",
     "cancelScheduledTitle": "Cancellation scheduled",

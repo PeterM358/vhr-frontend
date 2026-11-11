@@ -23,7 +23,7 @@ const support = {
           'General support: [SUPPORT_EMAIL_PLACEHOLDER]',
           'Privacy / data requests: [DPO_OR_PRIVACY_EMAIL_PLACEHOLDER]',
           'Security incidents: [SECURITY_CONTACT_PLACEHOLDER]',
-          'Partner billing (subscriptions): [PARTNER_BILLING_EMAIL_PLACEHOLDER]',
+          'Partner payments (subscriptions): [PARTNER_BILLING_EMAIL_PLACEHOLDER]',
         ],
       },
       {
@@ -89,7 +89,7 @@ const support = {
           'Обща поддръжка: [SUPPORT_EMAIL_PLACEHOLDER]',
           'Поверителност / data requests: [DPO_OR_PRIVACY_EMAIL_PLACEHOLDER]',
           'Security инциденти: [SECURITY_CONTACT_PLACEHOLDER]',
-          'Partner billing: [PARTNER_BILLING_EMAIL_PLACEHOLDER]',
+          'Partner payments / плащания: [PARTNER_BILLING_EMAIL_PLACEHOLDER]',
         ],
       },
       {

@@ -28,7 +28,7 @@ const refund = {
         id: 'cancel',
         title: 'How to cancel a subscription',
         paragraphs: [
-          'You may cancel a partner subscription at any time from the partner billing / upgrade screens when available, or by emailing contact@veversal.com from the account email on file.',
+          'You may cancel a partner subscription at any time from Payments (partner upgrade screen) when available, or by emailing contact@veversal.com from the account email on file.',
           'Cancellation stops future renewals. Access typically continues until the end of the paid period, then the shop may enter read-only or inactive listing state as described in the Business & Partner Terms.',
           'Cancelling does not automatically delete repair history, invoices, or customer records already stored for your shop.',
         ],
@@ -48,7 +48,7 @@ const refund = {
         id: 'stripe-disputes',
         title: 'Chargebacks and Stripe',
         paragraphs: [
-          'Please contact us before opening a card dispute so we can resolve billing issues quickly. Unwarranted chargebacks may lead to suspension of partner access pending review.',
+          'Please contact us before opening a card dispute so we can resolve payment issues quickly. Unwarranted chargebacks may lead to suspension of partner access pending review.',
         ],
       },
       {
@@ -98,7 +98,7 @@ const refund = {
         id: 'cancel',
         title: 'Как да откажете абонамент',
         paragraphs: [
-          'Можете да откажете partner абонамент по всяко време от екраните за billing / upgrade, когато са налични, или с имейл до contact@veversal.com от имейла на акаунта.',
+          'Можете да откажете партньорски абонамент по всяко време от Плащания (екран за надграждане), когато е наличен, или с имейл до contact@veversal.com от имейла на акаунта.',
           'Отказът спира бъдещи подновявания. Достъпът обикновено продължава до края на платения период, след което shop профилът може да премине в read-only или inactive listing според Условията за бизнес и partners.',
           'Отказът не изтрива автоматично история на ремонти, фактури или клиентски записи.',
         ],
@@ -118,7 +118,7 @@ const refund = {
         id: 'stripe-disputes',
         title: 'Chargeback и Stripe',
         paragraphs: [
-          'Моля свържете се с нас преди card dispute, за да решим бързо billing проблеми. Неоснователни chargeback-и могат да доведат до временно спиране на partner достъп до преглед.',
+          'Моля свържете се с нас преди спор по карта, за да решим бързо проблеми с плащането. Неоснователни chargeback-и могат да доведат до временно спиране на партньорски достъп до преглед.',
         ],
       },
       {

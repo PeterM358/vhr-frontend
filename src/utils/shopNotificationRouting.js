@@ -169,6 +169,9 @@ export function resolveShopNotificationTarget(item) {
       }
       break;
 
+    case 'subscription_payment_confirmed':
+      return { route: 'ShopSubscriptionUpgrade', params: {} };
+
     default:
       break;
   }
@@ -262,6 +265,8 @@ export function notificationActionHint(item) {
       return 'Tap to open repair';
     case 'owner_service_record_confirmation_requested':
       return 'Tap to confirm service record';
+    case 'subscription_payment_confirmed':
+      return 'Tap to open Payments';
     default:
       break;
   }

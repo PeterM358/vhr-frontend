@@ -204,7 +204,7 @@
       "storageLocations": "Складови адреси",
       "priceList": "Ценоразпис",
       "notifications": "Известия",
-      "billing": "Планове и плащания",
+      "billing": "Плащания",
       "switchCenter": "Смени сервиз",
       "explore": "Разгледай"
     }
@@ -276,6 +276,11 @@
       "greetingToast": "Здравей, {name} — табло {org}",
       "workerGreeting": "Здравей, {name}",
       "subtitle": "Споделен персонал, автопарк, документи и операции за вашата фирма.",
+      "enterpriseTitle": "Фирмен план — цена по договаряне",
+      "enterpriseBody": "Над 20 души, няколко обекта, строителен/автопарк ERP или индивидуален оборот — офертата е лична. Приятелски soft-launch може да остане безплатен — питайте ни.",
+      "enterpriseCta": "Пишете за оферта",
+      "enterpriseEmailSubject": "Veversal фирмен план — цена по договаряне",
+      "enterpriseEmailBody": "Здравейте, екип на Veversal,\n\nНуждаем се от оферта по договаряне за фирмен план.\n\nОрганизация: {{org}}\nПриблизителен брой хора / обекти:\nБележки:\n\nБлагодаря.",
       "fleetSubtitle": "Управлявайте фирмения автопарк и заявявайте ремонт както клиентите.",
       "driverSubtitle": "Приятна работа с {org}",
       "pleasantWork": "Приятна работа с {org}",
@@ -1999,6 +2004,9 @@
     "premiumActiveTitle": "Premium е активен",
     "premiumActiveBody": "Публичната страница показва бадж „Premium партньор“. Плащания и отказ на подновяване — по всяко време.",
     "premiumActiveA11y": "Отвори плащанията — Premium е активен",
+    "planActiveTitle": "{{plan}} е активен",
+    "planActiveBody": "Плащането е потвърдено. Отворете Плащания по всяко време за управление на плана или отказ на подновяване.",
+    "planActiveA11y": "Отвори плащанията — {{plan}} е активен",
     "homeIntroDismissA11y": "Скрий интрото за сервиза",
     "openRepairRequests": "Отворени заявки за ремонт",
     "openRequestsEmptySubtitle": "Нови заявки за ремонт от клиенти очакват вашата оферта.",
@@ -2330,6 +2338,7 @@
         "vehicle_arrived": "Докоснете, за да отворите ремонта",
         "client_arrival_reported": "Докоснете, за да отворите ремонта",
         "owner_service_record_confirmation_requested": "Докоснете, за да потвърдите сервизния запис",
+        "subscription_payment_confirmed": "Докоснете, за да отворите Плащания",
         "open_repair": "Докоснете, за да отворите ремонта",
         "open_promotion": "Докоснете, за да отворите промоцията"
       },
@@ -2405,6 +2414,10 @@
         "owner_service_record_confirmation_rejected": {
           "title": "Сервизният запис е отхвърлен",
           "body": "Клиентът отхвърли сервизния запис."
+        },
+        "subscription_payment_confirmed": {
+          "title": "Плащането е потвърдено",
+          "body": "Партньорският план е активен. Отворете Плащания за управление на подновяванията."
         }
       }
     },
@@ -5179,7 +5192,7 @@
     "cookiePolicy": "{app} — Политика за бисквитки",
     "support": "{app} — Поддръжка",
     "partnerTerms": "{app} — Бизнес условия",
-    "subscriptionUpgrade": "{app} — Планове и плащания",
+    "subscriptionUpgrade": "{app} — Плащания",
     "dpa": "{app} — DPA",
     "subprocessors": "{app} — Subprocessors",
     "vehicleDetails": "{app} — Детайли",
@@ -5529,11 +5542,11 @@
     "premiumBenefitVisibility": "Повече видимост пред клиентите",
     "premiumBenefitInsights": "Анализи на представянето",
     "premiumBenefitSupport": "Приоритетна поддръжка",
-    "enterpriseTitle": "Enterprise",
-    "enterpriseTagline": "За вериги, дилърски групи и персонализирани интеграции.",
-    "enterpriseCta": "Свържете се с продажби",
-    "enterpriseEmailSubject": "Запитване за Veversal Enterprise",
-    "enterpriseEmailBody": "Здравейте, екип на Veversal,\n\nБихме искали да обсъдим Enterprise решение за нашия бизнес.\n\nБизнес: {{shop}}\n\nБлагодаря.",
+    "enterpriseTitle": "Enterprise — цена по договаряне",
+    "enterpriseTagline": "Над 20 души, вериги с няколко обекта, дилърски групи, строителен/автопарк ERP или индивидуални условия — цената е по договаряне. Обикновените сервизи ползват PRO или Premium по-горе.",
+    "enterpriseCta": "Цена по договаряне",
+    "enterpriseEmailSubject": "Veversal Enterprise — цена по договаряне",
+    "enterpriseEmailBody": "Здравейте, екип на Veversal,\n\nИскаме оферта по договаряне за Enterprise.\n\nФирма: {{shop}}\nПриблизителен брой хора / обекти:\nБележки:\n\nБлагодаря.",
     "selectedSummary": "Надграждате до {{plan}} · {{interval}}",
     "bankStepsTitle": "Как работи банковият превод",
     "bankStep1": "Изберете план и заявете данните за плащане.",
@@ -5597,7 +5610,7 @@
     "paymentStatus": "Статус",
     "notAnInvoice": "Това е платежна инструкция, не счетоводна фактура.",
     "manageTitle": "Управление на плащанията",
-    "manageBody": "Отказ на бъдещи подновявания от тук. Възстановяванията следват политиката ни — картови refund-и не са автоматични в приложението.",
+    "manageBody": "Отказ на бъдещи подновявания от тук. Възстановяванията следват политиката ни — възстановявания по карта не са автоматични в приложението.",
     "cancelAtPeriodEndCta": "Отказ в края на периода",
     "cancelAtPeriodEndConfirm": "Да спрем подновяването в края на платения период? Достъпът остава до тогава.",
     "cancelScheduledTitle": "Отказът е насрочен",
