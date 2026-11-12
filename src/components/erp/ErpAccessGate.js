@@ -19,76 +19,77 @@ export default function ErpAccessGate({
   onBack,
   title,
   children,
+  embedded = false,
 }) {
   const { t } = useTranslation();
   const navigation = useNavigation();
 
-  if (loading) {
+  const wrap = (inner) => {
+    if (embedded) {
+      return <View style={styles.embeddedRoot}>{inner}</View>;
+    }
     return (
       <ScreenBackground>
         <AppNavigationBar title={title} onBack={onBack} />
-        <View style={styles.center}>
-          <ActivityIndicator />
-        </View>
+        {inner}
       </ScreenBackground>
+    );
+  };
+
+  if (loading) {
+    return wrap(
+      <View style={styles.center}>
+        <ActivityIndicator />
+      </View>
     );
   }
 
   if (error) {
-    return (
-      <ScreenBackground>
-        <AppNavigationBar title={title} onBack={onBack} />
-        <View style={styles.body}>
-          <AppCard>
-            <Text style={styles.error}>{error}</Text>
-          </AppCard>
-        </View>
-      </ScreenBackground>
+    return wrap(
+      <View style={styles.body}>
+        <AppCard>
+          <Text style={styles.error}>{error}</Text>
+        </AppCard>
+      </View>
     );
   }
 
   const deniedReason = getPartnerRouteDeniedReason(routeName, { profile: shopProfile, membership });
   if (deniedReason) {
     if (deniedReason === 'subscription') {
-      return (
-        <ScreenBackground>
-          <AppNavigationBar title={title} onBack={onBack} />
-          <View style={styles.body}>
-            <AppCard>
-              <Text variant="titleMedium">{t('subscription.gateLockedTitle')}</Text>
-              <Text style={styles.muted}>{t('subscription.gateLockedBody')}</Text>
-              <Button
-                mode="contained"
-                style={{ marginTop: 16 }}
-                onPress={() =>
-                  navigation.navigate(
-                    'ShopSubscriptionUpgrade',
-                    upgradeNavigationParams({ featureKey: FEATURES.ERP })
-                  )
-                }
-              >
-                {t('subscription.upgradeCta')}
-              </Button>
-            </AppCard>
-          </View>
-        </ScreenBackground>
+      return wrap(
+        <View style={styles.body}>
+          <AppCard>
+            <Text variant="titleMedium">{t('subscription.gateLockedTitle')}</Text>
+            <Text style={styles.muted}>{t('subscription.gateLockedBody')}</Text>
+            <Button
+              mode="contained"
+              style={{ marginTop: 16 }}
+              onPress={() =>
+                navigation.navigate(
+                  'ShopSubscriptionUpgrade',
+                  upgradeNavigationParams({ featureKey: FEATURES.ERP })
+                )
+              }
+            >
+              {t('subscription.upgradeCta')}
+            </Button>
+          </AppCard>
+        </View>
       );
     }
     const isCapability = deniedReason === 'capability';
-    return (
-      <ScreenBackground>
-        <AppNavigationBar title={title} onBack={onBack} />
-        <View style={styles.body}>
-          <AppCard>
-            <Text variant="titleMedium">
-              {isCapability ? t('erp.access.capabilityDisabledTitle') : t('erp.access.permissionDeniedTitle')}
-            </Text>
-            <Text style={styles.muted}>
-              {isCapability ? t('erp.access.capabilityDisabledBody') : t('erp.access.permissionDeniedBody')}
-            </Text>
-          </AppCard>
-        </View>
-      </ScreenBackground>
+    return wrap(
+      <View style={styles.body}>
+        <AppCard>
+          <Text variant="titleMedium">
+            {isCapability ? t('erp.access.capabilityDisabledTitle') : t('erp.access.permissionDeniedTitle')}
+          </Text>
+          <Text style={styles.muted}>
+            {isCapability ? t('erp.access.capabilityDisabledBody') : t('erp.access.permissionDeniedBody')}
+          </Text>
+        </AppCard>
+      </View>
     );
   }
 
@@ -96,6 +97,7 @@ export default function ErpAccessGate({
 }
 
 const styles = StyleSheet.create({
+  embeddedRoot: { flex: 1, minHeight: 0 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   body: { padding: 16 },
   error: { color: '#b00020' },

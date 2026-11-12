@@ -34,7 +34,6 @@ import {
   navigateToPartnerDocumentImports,
   navigateToPartnerComplaints,
   navigateToPartnerPurchaseOrders,
-  navigateToPartnerStorageLocations,
   navigateToPartnerNetworkOrganization,
   navigateToPartnerUpgrade,
   navigateToOrgHome,
@@ -110,7 +109,6 @@ function CustomDrawerContent(props) {
   const showDocumentImports = canAccessPartnerRoute('ShopDocumentImports', erpContext);
   const showComplaints = canAccessPartnerRoute('ShopComplaints', erpContext);
   const showPurchaseOrders = canAccessPartnerRoute('ShopPurchaseOrders', erpContext);
-  const showStorageLocations = canAccessPartnerRoute('ShopStorageLocations', erpContext);
   const showBusinessNetwork = canAccessPartnerRoute('NetworkOrganization', erpContext);
 
   const openStackRoute = (webNav, routeName) => {
@@ -131,6 +129,7 @@ function CustomDrawerContent(props) {
       <View style={drawerGlassStyles.menuContainer}>
         <Text style={drawerGlassStyles.drawerTitle}>{t('drawer.partner.title')}</Text>
 
+        {/* Daily ops — center first, then work */}
         <DrawerItem
           label={t('common.home')}
           onPress={() => props.navigation.closeDrawer()}
@@ -142,24 +141,11 @@ function CustomDrawerContent(props) {
           label={t('drawer.partner.centerDetails')}
           onPress={() => {
             props.navigation.closeDrawer();
-            // Incomplete shops go into the guided wizard; ready shops edit the
-            // full profile.
             openPartnerCenter(navigation, shopProfile);
           }}
           icon={({ color, size }) => <DrawerMenuIcon name="store-outline" color={color} size={size} />}
           {...itemProps}
         />
-
-        <DrawerItem
-          label={t('drawer.partner.billing')}
-          onPress={() => openStackRoute(navigateToPartnerUpgrade, 'ShopSubscriptionUpgrade')}
-          icon={({ color, size }) => (
-            <DrawerMenuIcon name="credit-card-outline" color={color} size={size} />
-          )}
-          {...itemProps}
-        />
-
-        {/* Calendar lives in PartnerAppHeader (top navbar) — avoid duplicate entry */}
 
         <DrawerItem
           label={t('drawer.partner.repairs')}
@@ -183,16 +169,32 @@ function CustomDrawerContent(props) {
           {...itemProps}
         />
 
-        {showInvoicing ? (
+        {showComplaints ? (
           <DrawerItem
-            label={t('drawer.partner.invoicing')}
-            onPress={() => openStackRoute(navigateToPartnerInvoicing, 'ShopInvoicing')}
+            label={t('drawer.partner.complaints')}
+            onPress={() => openStackRoute(navigateToPartnerComplaints, 'ShopComplaints')}
             icon={({ color, size }) => (
-              <DrawerMenuIcon name="file-document-outline" color={color} size={size} />
+              <DrawerMenuIcon name="alert-circle-outline" color={color} size={size} />
             )}
             {...itemProps}
           />
         ) : null}
+
+        {/* Commercial offering — price list + promos sit together (not under Repairs tabs yet) */}
+        <DrawerItem
+          label={t('drawer.partner.priceList')}
+          onPress={() => {
+            if (Platform.OS === 'web') {
+              navigateToPartnerServices(navigation);
+            } else {
+              resetFromShopDrawer(navigation, 'ShopServiceMenu');
+            }
+          }}
+          icon={({ color, size }) => (
+            <DrawerMenuIcon name="clipboard-list-outline" color={color} size={size} />
+          )}
+          {...itemProps}
+        />
 
         <DrawerItem
           label={t('drawer.partner.promotions')}
@@ -207,6 +209,27 @@ function CustomDrawerContent(props) {
           {...itemProps}
         />
 
+        {/* Money — Veversal plan, then shop→customer invoices */}
+        <DrawerItem
+          label={t('drawer.partner.billing')}
+          onPress={() => openStackRoute(navigateToPartnerUpgrade, 'ShopSubscriptionUpgrade')}
+          icon={({ color, size }) => (
+            <DrawerMenuIcon name="credit-card-outline" color={color} size={size} />
+          )}
+          {...itemProps}
+        />
+
+        {showInvoicing ? (
+          <DrawerItem
+            label={t('drawer.partner.invoicing')}
+            onPress={() => openStackRoute(navigateToPartnerInvoicing, 'ShopInvoicing')}
+            icon={({ color, size }) => (
+              <DrawerMenuIcon name="file-document-outline" color={color} size={size} />
+            )}
+            {...itemProps}
+          />
+        ) : null}
+
         {showWarehouse ? (
           <DrawerItem
             label={t('drawer.partner.warehouse')}
@@ -216,6 +239,7 @@ function CustomDrawerContent(props) {
           />
         ) : null}
 
+        {/* Secondary ERP — entitlement-gated */}
         {showAnalytics ? (
           <DrawerItem
             label={t('drawer.partner.analytics')}
@@ -243,15 +267,6 @@ function CustomDrawerContent(props) {
           />
         ) : null}
 
-        {showComplaints ? (
-          <DrawerItem
-            label={t('drawer.partner.complaints')}
-            onPress={() => openStackRoute(navigateToPartnerComplaints, 'ShopComplaints')}
-            icon={({ color, size }) => <DrawerMenuIcon name="alert-circle-outline" color={color} size={size} />}
-            {...itemProps}
-          />
-        ) : null}
-
         {showPurchaseOrders ? (
           <DrawerItem
             label={t('drawer.partner.purchaseOrders')}
@@ -261,15 +276,17 @@ function CustomDrawerContent(props) {
           />
         ) : null}
 
-        {showStorageLocations ? (
-          <DrawerItem
-            label={t('drawer.partner.storageLocations')}
-            onPress={() => openStackRoute(navigateToPartnerStorageLocations, 'ShopStorageLocations')}
-            icon={({ color, size }) => <DrawerMenuIcon name="map-marker-path" color={color} size={size} />}
-            {...itemProps}
-          />
-        ) : null}
+        <DrawerItem
+          label={t('drawer.partner.explore')}
+          onPress={() => {
+            props.navigation.closeDrawer();
+            navigateToPartnerServiceCenters(navigation);
+          }}
+          icon={({ color, size }) => <DrawerMenuIcon name="map-search-outline" color={color} size={size} />}
+          {...itemProps}
+        />
 
+        {/* Company spine — firm/legal entity + B2B network (not the public shop listing) */}
         {showBusinessNetwork ? (
           <DrawerItem
             label={t('drawer.partner.businessNetwork')}
@@ -283,37 +300,10 @@ function CustomDrawerContent(props) {
           <DrawerItem
             label={t('drawer.partner.organizationWorkspace', null, 'Organization workspace')}
             onPress={() => openStackRoute(navigateToOrgHome, 'OrgHome')}
-            icon={({ color, size }) => <DrawerMenuIcon name="domain" color={color} size={size} />}
+            icon={({ color, size }) => <DrawerMenuIcon name="office-building-outline" color={color} size={size} />}
             {...itemProps}
           />
         ) : null}
-
-        <DrawerItem
-          label={t('drawer.partner.priceList')}
-          onPress={() => {
-            if (Platform.OS === 'web') {
-              navigateToPartnerServices(navigation);
-            } else {
-              resetFromShopDrawer(navigation, 'ShopServiceMenu');
-            }
-          }}
-          icon={({ color, size }) => (
-            <DrawerMenuIcon name="clipboard-list-outline" color={color} size={size} />
-          )}
-          {...itemProps}
-        />
-
-        {/* Notifications live in PartnerAppHeader (bell) — avoid duplicate entry */}
-
-        <DrawerItem
-          label={t('drawer.partner.explore')}
-          onPress={() => {
-            props.navigation.closeDrawer();
-            navigateToPartnerServiceCenters(navigation);
-          }}
-          icon={({ color, size }) => <DrawerMenuIcon name="map-search-outline" color={color} size={size} />}
-          {...itemProps}
-        />
 
         {shopProfileCount > 1 ? (
           <DrawerItem

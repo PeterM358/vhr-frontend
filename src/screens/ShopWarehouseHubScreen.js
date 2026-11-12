@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 
 import ScreenBackground from '../components/ScreenBackground';
@@ -7,17 +7,37 @@ import ProTabBar from '../components/ui/ProTabBar';
 import ShopWarehouseReceiveScreen from './ShopWarehouseReceiveScreen';
 import ShopWarehouseDocumentsPanel from '../components/warehouse/ShopWarehouseDocumentsPanel';
 import ShopWarehouseStockPanel from '../components/warehouse/ShopWarehouseStockPanel';
+import ShopStorageLocationsScreen from './ShopStorageLocationsScreen';
+import useShopErpContext from '../hooks/useShopErpContext';
+import { canAccessPartnerRoute } from '../utils/shopErpAccess';
 import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import { useTranslation } from '../i18n';
 
 export default function ShopWarehouseHubScreen({ navigation }) {
   const { t } = useTranslation();
   const handleBack = usePartnerDashboardBack(navigation);
-  const hubTabs = [
-    { value: 'add', label: t('partnerDashboard.warehouse.addDocument'), icon: 'plus' },
-    { value: 'documents', label: t('partnerDashboard.warehouse.documents'), icon: 'file-document-multiple-outline' },
-    { value: 'stock', label: t('partnerDashboard.warehouse.stock'), icon: 'warehouse' },
-  ];
+  const { shopProfile, membership } = useShopErpContext();
+  const showLocations = canAccessPartnerRoute('ShopStorageLocations', {
+    profile: shopProfile,
+    membership,
+  });
+
+  const hubTabs = useMemo(() => {
+    const tabs = [
+      { value: 'add', label: t('partnerDashboard.warehouse.addDocument'), icon: 'plus' },
+      { value: 'documents', label: t('partnerDashboard.warehouse.documents'), icon: 'file-document-multiple-outline' },
+      { value: 'stock', label: t('partnerDashboard.warehouse.stock'), icon: 'warehouse' },
+    ];
+    if (showLocations) {
+      tabs.push({
+        value: 'locations',
+        label: t('partnerDashboard.warehouse.locationsTab'),
+        icon: 'map-marker-path',
+      });
+    }
+    return tabs;
+  }, [showLocations, t]);
+
   const [tab, setTab] = useState('add');
   const [resumeBatchId, setResumeBatchId] = useState(null);
   const [addResetKey, setAddResetKey] = useState(0);
@@ -63,6 +83,8 @@ export default function ShopWarehouseHubScreen({ navigation }) {
           />
         ) : tab === 'documents' ? (
           <ShopWarehouseDocumentsPanel onEditDraft={openDraft} />
+        ) : tab === 'locations' ? (
+          <ShopStorageLocationsScreen embedded />
         ) : (
           <ShopWarehouseStockPanel />
         )}

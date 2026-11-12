@@ -19,7 +19,7 @@ import {
 import { shopHasPermission } from '../utils/shopErpAccess';
 import { useTranslation } from '../i18n';
 
-export default function ShopStorageLocationsScreen() {
+export default function ShopStorageLocationsScreen({ embedded = false } = {}) {
   const navigation = useNavigation();
   const onBack = usePartnerDashboardBack(navigation);
   const { t } = useTranslation();
@@ -80,6 +80,51 @@ export default function ShopStorageLocationsScreen() {
     await Linking.openURL(url);
   };
 
+  const body = (
+    <ScrollView contentContainerStyle={styles.content}>
+      {loading ? <ActivityIndicator /> : null}
+      {loadError ? <Text style={styles.error}>{loadError}</Text> : null}
+      {canManage ? (
+        <AppCard>
+          <TextInput label={t('erp.procurement.locationCode')} value={code} onChangeText={setCode} />
+          <TextInput label={t('erp.procurement.locationName')} value={name} onChangeText={setName} />
+          <Button mode="contained" style={styles.bigButton} onPress={addLocation}>
+            {t('erp.procurement.addLocation')}
+          </Button>
+        </AppCard>
+      ) : null}
+      {!locations.length ? <Text>{t('erp.common.empty')}</Text> : null}
+      {locations.map((row) => (
+        <AppCard key={row.id}>
+          <Text variant="titleMedium">{row.full_code}</Text>
+          <Text>
+            {row.name} · {row.level}
+          </Text>
+          <Button mode="outlined" style={styles.bigButton} onPress={() => printLabel(row.id)}>
+            {t('erp.procurement.printLabel')}
+          </Button>
+        </AppCard>
+      ))}
+    </ScrollView>
+  );
+
+  if (embedded) {
+    return (
+      <ErpAccessGate
+        routeName="ShopStorageLocations"
+        shopProfile={shopProfile}
+        membership={membership}
+        loading={loading}
+        error={error}
+        onBack={onBack}
+        title={t('erp.procurement.storageLocations')}
+        embedded
+      >
+        {body}
+      </ErpAccessGate>
+    );
+  }
+
   return (
     <ErpAccessGate
       routeName="ShopStorageLocations"
@@ -92,29 +137,7 @@ export default function ShopStorageLocationsScreen() {
     >
       <ScreenBackground>
         <AppNavigationBar title={t('erp.procurement.storageLocations')} onBack={onBack} />
-        <ScrollView contentContainerStyle={styles.content}>
-          {loading ? <ActivityIndicator /> : null}
-          {loadError ? <Text style={styles.error}>{loadError}</Text> : null}
-          {canManage ? (
-            <AppCard>
-              <TextInput label={t('erp.procurement.locationCode')} value={code} onChangeText={setCode} />
-              <TextInput label={t('erp.procurement.locationName')} value={name} onChangeText={setName} />
-              <Button mode="contained" style={styles.bigButton} onPress={addLocation}>
-                {t('erp.procurement.addLocation')}
-              </Button>
-            </AppCard>
-          ) : null}
-          {!locations.length ? <Text>{t('erp.common.empty')}</Text> : null}
-          {locations.map((row) => (
-            <AppCard key={row.id}>
-              <Text variant="titleMedium">{row.full_code}</Text>
-              <Text>{row.name} · {row.level}</Text>
-              <Button mode="outlined" style={styles.bigButton} onPress={() => printLabel(row.id)}>
-                {t('erp.procurement.printLabel')}
-              </Button>
-            </AppCard>
-          ))}
-        </ScrollView>
+        {body}
       </ScreenBackground>
     </ErpAccessGate>
   );
