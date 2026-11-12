@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import ScreenBackground from '../components/ScreenBackground';
@@ -41,7 +41,8 @@ function monthLabel(ym, locale) {
 }
 
 export default function ShopAnalyticsScreen() {
-  const onBack = usePartnerDashboardBack();
+  const navigation = useNavigation();
+  const onBack = usePartnerDashboardBack(navigation);
   const { t, locale } = useTranslation();
   const { loading, shopProfile, membership, shopId, error } = useShopErpContext();
   const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
