@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logout } from '../api/auth';
 import { getRepairs, getShopCalendar } from '../api/repairs';
 import { getMyOffers } from '../api/offers';
+import { getOwnerAnalyticsSummary } from '../api/erp';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import {
   cacheUnscheduledCount,
@@ -155,6 +156,11 @@ export default function ShopHomeScreen() {
   const showPaidPlanHomeBadge = Boolean(
     partnerActive && paidPlanLabel && !paidPlanBadgeDismissed
   );
+  const [hasCompletedRepairs, setHasCompletedRepairs] = useState(false);
+  const [analyticsNudgeDismissed, setAnalyticsNudgeDismissed] = useState(false);
+  const showAnalyticsNudge = Boolean(
+    partnerActive && hasCompletedRepairs && !analyticsNudgeDismissed
+  );
 
   React.useEffect(() => {
     let cancelled = false;
@@ -177,6 +183,23 @@ export default function ShopHomeScreen() {
     };
   }, [shopProfile?.id, paidPlanLabel]);
 
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const shopId =
+        shopProfile?.id != null
+          ? shopProfile.id
+          : await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
+      if (!shopId) return;
+      const key = STORAGE_KEYS.partnerAnalyticsNudgeDismissedKey(shopId);
+      const raw = await AsyncStorage.getItem(key);
+      if (!cancelled) setAnalyticsNudgeDismissed(raw === '1' || raw === 'true');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [shopProfile?.id]);
+
   const dismissPaidPlanBadge = React.useCallback(async () => {
     setPaidPlanBadgeDismissed(true);
     const shopId =
@@ -187,6 +210,21 @@ export default function ShopHomeScreen() {
     const key = STORAGE_KEYS.partnerPaidPlanBadgeDismissedKey(shopId);
     await AsyncStorage.setItem(key, '1');
   }, [shopProfile?.id]);
+
+  const dismissAnalyticsNudge = React.useCallback(async () => {
+    setAnalyticsNudgeDismissed(true);
+    const shopId =
+      shopProfile?.id != null
+        ? shopProfile.id
+        : await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
+    if (!shopId) return;
+    await AsyncStorage.setItem(STORAGE_KEYS.partnerAnalyticsNudgeDismissedKey(shopId), '1');
+  }, [shopProfile?.id]);
+
+  const openAnalyticsAndDismissNudge = React.useCallback(() => {
+    dismissAnalyticsNudge();
+    navigation.navigate('ShopAnalytics');
+  }, [dismissAnalyticsNudge, navigation]);
 
   const openPaymentsAndDismissBadge = React.useCallback(() => {
     dismissPaidPlanBadge();
@@ -249,15 +287,19 @@ export default function ShopHomeScreen() {
 
       // Ongoing repairs are loaded by loadDashboardRepairs (which also feeds the
       // open-requests list), so we only fetch offers + today's calendar here.
-      const [offers, calendar] = await Promise.all([
+      const [offers, calendar, analytics] = await Promise.all([
         getMyOffers(token).catch(() => []),
         getShopCalendar(token, { from, to, shopId }).catch(() => ({ scheduled: [] })),
+        shopId
+          ? getOwnerAnalyticsSummary(token, shopId, { months: 1 }).catch(() => null)
+          : Promise.resolve(null),
       ]);
 
       const offerRows = Array.isArray(offers) ? offers : [];
       setPendingOffers(offerRows.filter((o) => !o.is_booked));
       const scheduled = Array.isArray(calendar?.scheduled) ? calendar.scheduled : [];
       setTodayBookings(scheduled.filter(isScheduledToday));
+      setHasCompletedRepairs(Number(analytics?.completed_repairs) > 0);
     } finally {
       setDashboardLoading(false);
     }
@@ -458,6 +500,13 @@ export default function ShopHomeScreen() {
             ? openPartnerPublicPreview(navigation)
             : openCenter(),
       },
+      {
+        key: 'analytics',
+        icon: 'chart-line',
+        title: t('partnerDashboard.modules.reports.title'),
+        subtitle: t('partnerDashboard.modules.reports.subtitle'),
+        onPress: () => navigation.navigate('ShopAnalytics'),
+      },
     ],
     [
       navigation,
@@ -480,22 +529,6 @@ export default function ShopHomeScreen() {
           showMessage(t('partnerDashboard.comingSoonDialog.title'), t('partnerDashboard.comingSoonDialog.documentsBody'), {
             variant: 'info',
           }),
-      },
-      {
-        key: 'reports',
-        icon: 'chart-line',
-        title: t('partnerDashboard.modules.reports.title'),
-        subtitle: t('partnerDashboard.modules.reports.subtitle'),
-        onPress: () =>
-          showMessage(
-            t('partnerDashboard.comingSoonDialog.title'),
-            t('partnerDashboard.comingSoonDialog.reportsBody', {
-              open: openRepairs.length,
-              active: ongoingRepairs.length,
-              pending: pendingOffers.length,
-            }),
-            { variant: 'info' }
-          ),
       },
       {
         key: 'customers',
@@ -522,7 +555,7 @@ export default function ShopHomeScreen() {
           ),
       },
     ],
-    [openRepairs.length, ongoingRepairs.length, pendingOffers.length, t]
+    [t]
   );
 
   const renderDashboardRepair = (item) => (
@@ -629,6 +662,36 @@ export default function ShopHomeScreen() {
               ]}
               accessibilityRole="button"
               accessibilityLabel={t('partnerDashboard.paidPlanDismissA11y')}
+            >
+              <MaterialCommunityIcons name="close" size={18} color="#0B1220" />
+            </Pressable>
+          </View>
+        ) : null}
+
+        {showAnalyticsNudge ? (
+          <View style={styles.analyticsNudge}>
+            <Pressable
+              onPress={openAnalyticsAndDismissNudge}
+              style={styles.premiumHomeBadgeMain}
+              accessibilityRole="button"
+              accessibilityLabel={t('partnerDashboard.analyticsNudgeA11y')}
+            >
+              <MaterialCommunityIcons name="chart-bar" size={20} color="#BAE6FD" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.analyticsNudgeTitle}>
+                  {t('partnerDashboard.analyticsNudgeTitle')}
+                </Text>
+                <Text style={styles.analyticsNudgeBody}>
+                  {t('partnerDashboard.analyticsNudgeBody')}
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable
+              onPress={dismissAnalyticsNudge}
+              hitSlop={12}
+              style={styles.analyticsNudgeDismiss}
+              accessibilityRole="button"
+              accessibilityLabel={t('partnerDashboard.analyticsNudgeDismissA11y')}
             >
               <MaterialCommunityIcons name="close" size={18} color="#0B1220" />
             </Pressable>
@@ -744,5 +807,37 @@ const styles = StyleSheet.create({
   },
   paidPlanHomeTitle: {
     color: '#D1FAE5',
+  },
+  analyticsNudge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+    paddingVertical: 10,
+    paddingLeft: 12,
+    paddingRight: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(14, 165, 233, 0.18)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(186, 230, 253, 0.45)',
+  },
+  analyticsNudgeTitle: {
+    color: '#E0F2FE',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  analyticsNudgeBody: {
+    marginTop: 2,
+    color: 'rgba(224, 242, 254, 0.88)',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  analyticsNudgeDismiss: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#BAE6FD',
   },
 });

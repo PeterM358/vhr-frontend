@@ -30,6 +30,8 @@ export const STORAGE_KEYS = {
     `@partner_paid_plan_badge_dismissed_${shopId}`,
   /** Invoice numbering sub-option shown once before first issued tax invoice */
   invoiceSeriesSetupSeenKey: (shopId) => `@invoice_series_setup_seen_${shopId}`,
+  /** Partner home analytics nudge after first completed repair */
+  partnerAnalyticsNudgeDismissedKey: (shopId) => `@partner_analytics_nudge_dismissed_${shopId}`,
   logServiceRecordDraftKey: (vehicleId) => `@log_service_record_draft_${vehicleId}`,
   serviceRecordDraftKey: (vehicleId) => `serviceRecordDraft:${vehicleId}`,
   serviceRecordManualDraftKey: (vehicleId) => `serviceRecordManualDraft:${vehicleId}`,
