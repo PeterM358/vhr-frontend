@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logout } from '../api/auth';
 import { getRepairs, getShopCalendar } from '../api/repairs';
 import { getMyOffers } from '../api/offers';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 import {
   cacheUnscheduledCount,
   readCachedUnscheduledCount,
@@ -98,7 +99,7 @@ export default function ShopHomeScreen() {
   const navigation = useNavigation();
   const { t } = useTranslation();
   const { setAuthToken, setIsAuthenticated, setUserEmailOrPhone } = useContext(AuthContext);
-  const { notifications, unreadCount, refreshUnreadFromRest } = useContext(WebSocketContext);
+  const { notifications, unreadCount } = useContext(WebSocketContext);
 
   const [loading, setLoading] = useState(true);
   const [shopProfile, setShopProfile] = useState(null);
@@ -150,7 +151,48 @@ export default function ShopHomeScreen() {
           : null;
   // PRO (and Premium) both need a clear "you paid" signal on Home — Premium-only
   // badge left PRO shops looking unpaid after Stripe success.
-  const showPaidPlanHomeBadge = Boolean(partnerActive && paidPlanLabel);
+  const [paidPlanBadgeDismissed, setPaidPlanBadgeDismissed] = useState(false);
+  const showPaidPlanHomeBadge = Boolean(
+    partnerActive && paidPlanLabel && !paidPlanBadgeDismissed
+  );
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const shopId =
+        shopProfile?.id != null
+          ? shopProfile.id
+          : await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
+      if (!shopId || !paidPlanLabel) {
+        // Do not flip dismissed→false while shop id is still loading — that
+        // re-showed the banner after every soft remount.
+        return;
+      }
+      const key = STORAGE_KEYS.partnerPaidPlanBadgeDismissedKey(shopId);
+      const raw = await AsyncStorage.getItem(key);
+      if (!cancelled) setPaidPlanBadgeDismissed(raw === '1' || raw === 'true');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [shopProfile?.id, paidPlanLabel]);
+
+  const dismissPaidPlanBadge = React.useCallback(async () => {
+    setPaidPlanBadgeDismissed(true);
+    const shopId =
+      shopProfile?.id != null
+        ? shopProfile.id
+        : await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
+    if (!shopId) return;
+    const key = STORAGE_KEYS.partnerPaidPlanBadgeDismissedKey(shopId);
+    await AsyncStorage.setItem(key, '1');
+  }, [shopProfile?.id]);
+
+  const openPaymentsAndDismissBadge = React.useCallback(() => {
+    dismissPaidPlanBadge();
+    navigation.navigate('ShopSubscriptionUpgrade');
+  }, [dismissPaidPlanBadge, navigation]);
+
   const paidPlanIsPremium = planKey === 'premium' || isPremiumPartner;
 
   const sortedDashboardRepairs = useMemo(
@@ -307,10 +349,7 @@ export default function ShopHomeScreen() {
       loadDashboardRepairs();
       loadDashboardMetrics();
       loadUnscheduledBadge();
-      if (typeof refreshUnreadFromRest === 'function') {
-        refreshUnreadFromRest();
-      }
-    }, [refreshProfileGate, loadDashboardRepairs, loadDashboardMetrics, refreshUnreadFromRest])
+    }, [refreshProfileGate, loadDashboardRepairs, loadDashboardMetrics])
   );
 
   const handleRepairPress = (repair) => {
@@ -379,16 +418,6 @@ export default function ShopHomeScreen() {
   const operationsTiles = useMemo(
     () => [
       {
-        key: 'requests',
-        icon: 'clipboard-text-outline',
-        title: t('partnerDashboard.openRepairRequests'),
-        subtitle: partnerActive
-          ? t('partnerDashboard.operationsRequestsSubtitle')
-          : t('partnerDashboard.operationsRequestsLockedSubtitle'),
-        count: openRepairs.length || ongoingRepairs.length || undefined,
-        onPress: () => resetShopDrawerRepairs(navigation),
-      },
-      {
         key: 'bookings-calendar',
         icon: 'calendar-month-outline',
         title: t('partnerDashboard.bookingsCalendarTitle'),
@@ -413,22 +442,11 @@ export default function ShopHomeScreen() {
       {
         key: 'warehouse',
         icon: 'warehouse',
-        title: t('drawer.partner.warehouse', null, 'Warehouse'),
-        subtitle: t(
-          'partnerDashboard.warehouseSubtitle',
-          null,
-          'Receive supplier invoices, stock and materials.',
-        ),
+        title: t('drawer.partner.warehouse'),
+        subtitle: t('partnerDashboard.warehouseSubtitle'),
         onPress: () => {
           navigateToPartnerWarehouse(navigation);
         },
-      },
-      {
-        key: 'profile',
-        icon: 'store-cog-outline',
-        title: t('partnerDashboard.serviceCenterProfileTitle'),
-        subtitle: t('partnerDashboard.serviceCenterProfileSubtitle'),
-        onPress: () => openCenter(),
       },
       {
         key: 'public-preview',
@@ -444,11 +462,8 @@ export default function ShopHomeScreen() {
     [
       navigation,
       todayBookings.length,
-      openRepairs.length,
-      ongoingRepairs.length,
       unscheduledCount,
       setupComplete,
-      partnerActive,
       openCenter,
       t,
     ]
@@ -535,7 +550,6 @@ export default function ShopHomeScreen() {
     <ScreenBackground safeArea={false}>
       <PartnerAppHeader
         mode="dashboard"
-        title={shopDisplayName}
         unreadCount={unreadCount}
         calendarBadgeCount={unscheduledCount}
         loadCalendarBadge={false}
@@ -572,56 +586,53 @@ export default function ShopHomeScreen() {
         ) : null}
 
         {showPaidPlanHomeBadge ? (
-          <Pressable
-            onPress={() => navigation.navigate('ShopSubscriptionUpgrade')}
+          <View
             style={[
               styles.premiumHomeBadge,
               !paidPlanIsPremium ? styles.paidPlanHomeBadge : null,
             ]}
-            accessibilityRole="button"
-            accessibilityLabel={
-              paidPlanIsPremium
-                ? t('partnerDashboard.premiumActiveA11y')
-                : t('partnerDashboard.planActiveA11y', { plan: paidPlanLabel })
-            }
           >
-            <MaterialCommunityIcons
-              name={paidPlanIsPremium ? 'star-circle' : 'check-decagram'}
-              size={20}
-              color={paidPlanIsPremium ? '#FDE68A' : '#A7F3D0'}
-            />
-            <View style={{ flex: 1 }}>
-              <Text
-                style={[
-                  styles.premiumHomeTitle,
-                  !paidPlanIsPremium ? styles.paidPlanHomeTitle : null,
-                ]}
-              >
-                {paidPlanIsPremium
-                  ? t('partnerDashboard.premiumActiveTitle')
-                  : t('partnerDashboard.planActiveTitle', { plan: paidPlanLabel })}
-              </Text>
-              <Text
-                style={[
-                  styles.premiumHomeBody,
-                  !paidPlanIsPremium ? styles.paidPlanHomeBody : null,
-                ]}
-              >
-                {paidPlanIsPremium
-                  ? t('partnerDashboard.premiumActiveBody')
-                  : t('partnerDashboard.planActiveBody')}
-              </Text>
-            </View>
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={18}
-              color={
+            <Pressable
+              onPress={openPaymentsAndDismissBadge}
+              style={styles.premiumHomeBadgeMain}
+              accessibilityRole="button"
+              accessibilityLabel={
                 paidPlanIsPremium
-                  ? 'rgba(253,230,138,0.7)'
-                  : 'rgba(167,243,208,0.75)'
+                  ? t('partnerDashboard.premiumActiveA11y')
+                  : t('partnerDashboard.planActiveA11y', { plan: paidPlanLabel })
               }
-            />
-          </Pressable>
+            >
+              <MaterialCommunityIcons
+                name={paidPlanIsPremium ? 'star-circle' : 'check-decagram'}
+                size={20}
+                color={paidPlanIsPremium ? '#FDE68A' : '#A7F3D0'}
+              />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[
+                    styles.premiumHomeTitle,
+                    !paidPlanIsPremium ? styles.paidPlanHomeTitle : null,
+                  ]}
+                >
+                  {paidPlanIsPremium
+                    ? t('partnerDashboard.premiumActiveTitle')
+                    : t('partnerDashboard.planActiveTitle', { plan: paidPlanLabel })}
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable
+              onPress={dismissPaidPlanBadge}
+              hitSlop={12}
+              style={[
+                styles.premiumHomeDismiss,
+                !paidPlanIsPremium ? styles.paidPlanHomeDismiss : null,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('partnerDashboard.paidPlanDismissA11y')}
+            >
+              <MaterialCommunityIcons name="close" size={18} color="#0B1220" />
+            </Pressable>
+          </View>
         ) : null}
 
         <DashboardSection
@@ -631,7 +642,7 @@ export default function ShopHomeScreen() {
               ? t('partnerDashboard.openRequestsLockedSubtitle')
               : lifecycleCounterLine || t('partnerDashboard.openRequestsEmptySubtitle')
           }
-          actionLabel={t('partnerDashboard.viewRequests')}
+          actionLabel={t('partnerDashboard.viewAllRequests')}
           onActionPress={() => resetShopDrawerRepairs(navigation)}
         >
           {repairsLoading ? (
@@ -694,14 +705,33 @@ const styles = StyleSheet.create({
   premiumHomeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     marginBottom: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 10,
+    paddingLeft: 12,
+    paddingRight: 10,
     borderRadius: 14,
     backgroundColor: 'rgba(234, 179, 8, 0.18)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(253, 230, 138, 0.45)',
+  },
+  premiumHomeBadgeMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 2,
+  },
+  premiumHomeDismiss: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FDE68A',
+  },
+  paidPlanHomeDismiss: {
+    backgroundColor: '#A7F3D0',
   },
   paidPlanHomeBadge: {
     backgroundColor: 'rgba(16, 185, 129, 0.16)',
@@ -714,14 +744,5 @@ const styles = StyleSheet.create({
   },
   paidPlanHomeTitle: {
     color: '#D1FAE5',
-  },
-  premiumHomeBody: {
-    marginTop: 2,
-    color: 'rgba(254, 243, 199, 0.85)',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  paidPlanHomeBody: {
-    color: 'rgba(209, 250, 229, 0.88)',
   },
 });

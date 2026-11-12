@@ -16,9 +16,79 @@ function isStoredToken(value) {
 }
 
 let refreshInFlight = null;
+const sessionInvalidListeners = new Set();
+
+/** Subscribe to forced sign-out (expired / revoked session). Returns unsubscribe. */
+export function onSessionInvalid(listener) {
+  if (typeof listener !== 'function') return () => {};
+  sessionInvalidListeners.add(listener);
+  return () => sessionInvalidListeners.delete(listener);
+}
+
+function emitSessionInvalid(reason) {
+  sessionInvalidListeners.forEach((listener) => {
+    try {
+      listener(reason);
+    } catch (error) {
+      safeError('Session invalid listener failed', error);
+    }
+  });
+}
+
+function decodeJwtPayload(token) {
+  const part = String(token || '').split('.')[1];
+  if (!part) return null;
+  const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+  try {
+    const raw =
+      typeof globalThis.atob === 'function'
+        ? globalThis.atob(padded)
+        : typeof Buffer !== 'undefined'
+          ? Buffer.from(padded, 'base64').toString('utf8')
+          : null;
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** True when access JWT `exp` is past (30s skew). Unknown shape → false. */
+export function isAccessTokenExpired(token, skewMs = 30_000) {
+  const payload = decodeJwtPayload(token);
+  if (!payload || typeof payload.exp !== 'number') return false;
+  return Date.now() >= payload.exp * 1000 - skewMs;
+}
 
 async function clearStoredAuthTokens() {
   await AsyncStorage.multiRemove([STORAGE_KEYS.ACCESS_TOKEN, STORAGE_KEYS.REFRESH_TOKEN]);
+}
+
+async function clearStoredWorkspaceFlags() {
+  await AsyncStorage.multiRemove([
+    STORAGE_KEYS.IS_SHOP,
+    STORAGE_KEYS.IS_CLIENT,
+    STORAGE_KEYS.SHOP_PROFILES,
+    STORAGE_KEYS.SHOP_MEMBERSHIPS,
+    STORAGE_KEYS.CURRENT_SHOP_ID,
+    STORAGE_KEYS.ORGANIZATION_MEMBERSHIPS,
+    STORAGE_KEYS.CURRENT_ORGANIZATION_ID,
+    STORAGE_KEYS.WORKSPACE_MODE,
+    STORAGE_KEYS.USER_ID,
+    STORAGE_KEYS.EMAIL_VERIFIED,
+  ]);
+}
+
+/**
+ * Clear local auth and notify listeners (AppNavigator → Login).
+ * Does not navigate by itself.
+ */
+export async function invalidateLocalSession(reason = 'expired') {
+  await clearStoredAuthTokens();
+  await clearStoredWorkspaceFlags();
+  clearVehiclesCache();
+  emitSessionInvalid(reason);
 }
 
 /**
@@ -58,8 +128,107 @@ export async function refreshAccessToken() {
 }
 
 /**
+ * Persist shop/org workspace flags from login or GET /api/users/session/.
+ * Does not write tokens — callers that receive tokens write those separately.
+ */
+export async function applyWorkspaceSessionFlags(data = {}, { fallbackDisplay } = {}) {
+  const {
+    is_client,
+    is_shop,
+    user_id,
+    email,
+    phone,
+    shop_profiles,
+    shop_memberships,
+    organization_memberships,
+    email_verified,
+  } = data || {};
+
+  let userDisplay = '';
+  if (email && String(email).trim()) userDisplay = String(email).trim();
+  else if (phone && String(phone).trim()) userDisplay = String(phone).trim();
+  else if (fallbackDisplay) userDisplay = String(fallbackDisplay).trim();
+
+  const hasShopProfiles = Array.isArray(shop_profiles) && shop_profiles.length > 0;
+  const hasShopMemberships = Array.isArray(shop_memberships) && shop_memberships.length > 0;
+  // Linked shop access counts as partner even if the API flag is briefly stale.
+  const shopMode = Boolean(is_shop) || hasShopProfiles || hasShopMemberships;
+
+  const itemsToStore = [
+    [STORAGE_KEYS.IS_CLIENT, is_client ? 'true' : 'false'],
+    [STORAGE_KEYS.IS_SHOP, shopMode ? 'true' : 'false'],
+    [STORAGE_KEYS.USER_ID, user_id != null ? String(user_id) : ''],
+    [STORAGE_KEYS.EMAIL_VERIFIED, email_verified ? 'true' : 'false'],
+  ];
+
+  if (userDisplay) {
+    itemsToStore.push(['@user_email_or_phone', userDisplay]);
+  }
+  if (email && String(email).trim()) {
+    itemsToStore.push(['@login_email', String(email).trim()]);
+  }
+  if (phone && String(phone).trim()) {
+    itemsToStore.push(['@login_phone', String(phone).trim()]);
+  }
+
+  if (shopMode && hasShopProfiles) {
+    itemsToStore.push([STORAGE_KEYS.SHOP_PROFILES, JSON.stringify(shop_profiles)]);
+    const shopId = shop_profiles[0]?.id;
+    if (shopId != null) {
+      itemsToStore.push([STORAGE_KEYS.CURRENT_SHOP_ID, String(shopId)]);
+    }
+  } else if (shopMode && hasShopMemberships) {
+    const shopId = shop_memberships[0]?.shop_id ?? shop_memberships[0]?.shopId;
+    if (shopId != null) {
+      itemsToStore.push([STORAGE_KEYS.CURRENT_SHOP_ID, String(shopId)]);
+    }
+  } else {
+    await AsyncStorage.multiRemove([
+      STORAGE_KEYS.SHOP_PROFILES,
+      STORAGE_KEYS.SHOP_MEMBERSHIPS,
+      STORAGE_KEYS.CURRENT_SHOP_ID,
+    ]);
+  }
+  if (shopMode && hasShopMemberships) {
+    itemsToStore.push([STORAGE_KEYS.SHOP_MEMBERSHIPS, JSON.stringify(shop_memberships)]);
+  } else if (shopMode && !hasShopMemberships) {
+    await AsyncStorage.removeItem(STORAGE_KEYS.SHOP_MEMBERSHIPS);
+  }
+
+  const orgMemberships = Array.isArray(organization_memberships) ? organization_memberships : [];
+  await writeOrganizationMemberships(orgMemberships);
+  await AsyncStorage.multiSet(itemsToStore);
+  return { shopMode, hasShopProfiles, hasShopMemberships };
+}
+
+/**
+ * Re-read workspace flags from the server after token restore / tab resume.
+ * @returns {Promise<object|null>} session payload, or null if session was invalidated
+ */
+export async function hydrateAuthSession(accessToken) {
+  if (!isStoredToken(accessToken)) return null;
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/users/session/`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    await applyWorkspaceSessionFlags(response.data);
+    return response.data;
+  } catch (error) {
+    const status = error?.response?.status;
+    if (status === 401 || status === 403) {
+      await invalidateLocalSession('session_rejected');
+      return null;
+    }
+    safeError('Auth session hydrate failed', error);
+    throw error;
+  }
+}
+
+/**
  * Cold-start / resume session like Facebook: refresh when possible so expired
  * access tokens (7d) do not leave the user "logged in" with broken API calls.
+ * Always re-hydrates shop/org flags from GET /api/users/session/ so a stale
+ * browser tab cannot land a partner on the empty client dashboard.
  */
 export async function restoreSession() {
   const [access, refresh] = await AsyncStorage.multiGet([
@@ -74,23 +243,47 @@ export async function restoreSession() {
     return { token: null, authenticated: false };
   }
 
+  let token = null;
+
   if (hasRefresh) {
     try {
       const fresh = await refreshAccessToken();
       if (fresh) {
-        return { token: fresh, authenticated: true };
+        token = fresh;
+      } else {
+        // Refresh rejected (401/400) — tokens already cleared; drop role flags too.
+        await clearStoredWorkspaceFlags();
+        emitSessionInvalid('refresh_rejected');
+        return { token: null, authenticated: false };
       }
-      return { token: null, authenticated: false };
     } catch (error) {
       safeError('Session refresh failed (keeping local token if any)', error);
       if (hasAccess) {
-        return { token: access, authenticated: true };
+        token = access;
+      } else {
+        await clearStoredWorkspaceFlags();
+        return { token: null, authenticated: false };
       }
-      return { token: null, authenticated: false };
     }
+  } else if (hasAccess) {
+    token = access;
   }
 
-  return { token: access, authenticated: hasAccess };
+  if (!token) {
+    await clearStoredWorkspaceFlags();
+    return { token: null, authenticated: false };
+  }
+
+  try {
+    const workspace = await hydrateAuthSession(token);
+    if (workspace === null) {
+      return { token: null, authenticated: false };
+    }
+    return { token, authenticated: true, workspace };
+  } catch {
+    // Network / 5xx while hydrating — keep token; local flags may be used until next resume.
+    return { token, authenticated: true };
+  }
 }
 
 const normalizeAuthLanguage = (locale) => {
@@ -215,68 +408,12 @@ export const login = async (emailOrPhone, password) => {
 
 // ✅ Store Login Data Helper
 const storeLoginData = async (data, fallbackDisplay) => {
-  const {
-    access,
-    refresh,
-    is_client,
-    is_shop,
-    user_id,
-    email,
-    phone,
-    shop_profiles,
-    shop_memberships,
-    organization_memberships,
-    email_verified,
-  } = data;
-
-  let userDisplay = '';
-  if (email && email.trim()) userDisplay = email.trim();
-  else if (phone && phone.trim()) userDisplay = phone.trim();
-  else userDisplay = fallbackDisplay;
-
-  const hasShopProfiles = Array.isArray(shop_profiles) && shop_profiles.length > 0;
-  const hasShopMemberships = Array.isArray(shop_memberships) && shop_memberships.length > 0;
-  // Linked shop access counts as partner even if the API flag is briefly stale.
-  const shopMode = Boolean(is_shop) || hasShopProfiles || hasShopMemberships;
-
-  const itemsToStore = [
-    ['@access_token', access],
-    ['@refresh_token', refresh],
-    ['@is_client', is_client ? 'true' : 'false'],
-    ['@is_shop', shopMode ? 'true' : 'false'],
-    ['@user_id', user_id?.toString() || ''],
-    ['@user_email_or_phone', userDisplay],
-    ['@login_email', email && String(email).trim() ? String(email).trim() : ''],
-    ['@login_phone', phone && String(phone).trim() ? String(phone).trim() : ''],
-    [STORAGE_KEYS.EMAIL_VERIFIED, email_verified ? 'true' : 'false'],
-  ];
-
-  if (shopMode && hasShopProfiles) {
-    itemsToStore.push(['@shop_profiles', JSON.stringify(shop_profiles)]);
-    const shopId = shop_profiles[0]?.id;
-    if (shopId != null) {
-      itemsToStore.push(['@current_shop_id', String(shopId)]);
-    }
-  } else if (shopMode && hasShopMemberships) {
-    const shopId = shop_memberships[0]?.shop_id ?? shop_memberships[0]?.shopId;
-    if (shopId != null) {
-      itemsToStore.push(['@current_shop_id', String(shopId)]);
-    }
-  } else {
-    await AsyncStorage.multiRemove([
-      STORAGE_KEYS.SHOP_PROFILES,
-      STORAGE_KEYS.SHOP_MEMBERSHIPS,
-      STORAGE_KEYS.CURRENT_SHOP_ID,
-    ]);
-  }
-  if (shopMode && hasShopMemberships) {
-    itemsToStore.push(['@shop_memberships', JSON.stringify(shop_memberships)]);
-  }
-
-  const orgMemberships = Array.isArray(organization_memberships) ? organization_memberships : [];
-  await writeOrganizationMemberships(orgMemberships);
-
-  await AsyncStorage.multiSet(itemsToStore);
+  const { access, refresh } = data || {};
+  await AsyncStorage.multiSet([
+    [STORAGE_KEYS.ACCESS_TOKEN, access],
+    [STORAGE_KEYS.REFRESH_TOKEN, refresh],
+  ]);
+  await applyWorkspaceSessionFlags(data, { fallbackDisplay });
 };
 
 // ✅ Example of an authenticated API call
@@ -330,14 +467,18 @@ export const resendEmailVerification = async (email, language = getLocale()) => 
   }
 };
 
-// ✅ Refresh authenticated session flags (email_verified, etc.)
+// ✅ Refresh authenticated session flags (email_verified, shop/org, etc.)
 export const fetchAuthSession = async (accessToken) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/users/session/`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    return response.data;
+    const data = await hydrateAuthSession(accessToken);
+    if (data == null) {
+      throw new Error('Session expired. Please sign in again.');
+    }
+    return data;
   } catch (error) {
+    if (error?.message === 'Session expired. Please sign in again.') {
+      throw error;
+    }
     safeError('Auth session fetch failed', error);
     throw new Error(messageFromApiError(error, 'Failed to refresh account status.'));
   }

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,6 +16,7 @@ import FloatingCard from '../components/ui/FloatingCard';
 import AppCard from '../components/ui/AppCard';
 import StatusBadge from '../components/ui/StatusBadge';
 import EmptyStateCard from '../components/ui/EmptyStateCard';
+import FloatingSaveBar from '../components/ui/FloatingSaveBar';
 import { COLORS } from '../constants/colors';
 import PartnerAppHeader from '../components/partner/PartnerAppHeader';
 import { useScrollShadow } from '../hooks/useScrollShadow';
@@ -38,6 +39,7 @@ import {
   invoiceTotalLabel,
 } from '../utils/billingInvoices';
 import { formatRepairListDate } from '../utils/repairListUtils';
+import { showMessage } from '../utils/crossPlatformAlert';
 import { useTranslation } from '../i18n';
 
 function buildRecentMonthOptions(count = 18, allMonthsLabel = 'All months') {
@@ -262,24 +264,35 @@ export default function ShopInvoicingScreen() {
   const [invoices, setInvoices] = useState([]);
   const [uninvoicedRepairs, setUninvoicedRepairs] = useState([]);
   const [series, setSeries] = useState(null);
+  const [seriesReady, setSeriesReady] = useState(false);
+  const [seriesPanelOpen, setSeriesPanelOpen] = useState(false);
   const [sectionTab, setSectionTab] = useState('invoices');
   const [statusFilter, setStatusFilter] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [monthFilter, setMonthFilter] = useState(MONTH_ALL);
   const [creatingRepairId, setCreatingRepairId] = useState(null);
   const [erpSummary, setErpSummary] = useState(null);
+  const [invoiceSelectMode, setInvoiceSelectMode] = useState(false);
+  const [selectedRepairIds, setSelectedRepairIds] = useState([]);
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
 
-  const loadInvoices = useCallback(async () => {
-    const token = await AsyncStorage.getItem('@access_token');
-    const [invoiceRows, seriesRows, profiles] = await Promise.all([
-      getInvoices(token, { status: statusFilter || undefined }),
+  const needsSeriesSetup = seriesReady && !series?.id;
+
+  const markSeriesSetupSeen = useCallback(async () => {
+    const shopId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
+    if (!shopId) return;
+    await AsyncStorage.setItem(STORAGE_KEYS.invoiceSeriesSetupSeenKey(shopId), '1');
+  }, []);
+
+  const loadSeriesAndErp = useCallback(async (token) => {
+    const [seriesRows, profiles] = await Promise.all([
       getInvoiceSeries(token),
       getMyShopProfiles().catch(() => []),
     ]);
-    setInvoices(Array.isArray(invoiceRows) ? invoiceRows : []);
     const rows = Array.isArray(seriesRows) ? seriesRows : [];
     const activeSeries = rows.find((row) => row?.is_active) || rows[0] || null;
     setSeries(activeSeries);
+    setSeriesReady(true);
 
     const currentId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
     const profile =
@@ -293,20 +306,32 @@ export default function ShopInvoicingScreen() {
     } else {
       setErpSummary(null);
     }
-  }, [statusFilter]);
+    return activeSeries;
+  }, []);
+
+  const loadInvoices = useCallback(async () => {
+    const token = await AsyncStorage.getItem('@access_token');
+    const [invoiceRows] = await Promise.all([
+      getInvoices(token, { status: statusFilter || undefined }),
+      loadSeriesAndErp(token),
+    ]);
+    setInvoices(Array.isArray(invoiceRows) ? invoiceRows : []);
+  }, [statusFilter, loadSeriesAndErp]);
 
   const loadUninvoicedRepairs = useCallback(async () => {
     const token = await AsyncStorage.getItem('@access_token');
-    const rows = await getRepairs(token, { status: 'done', uninvoiced: true }, { force: true });
+    const [rows] = await Promise.all([
+      getRepairs(token, { status: 'done', uninvoiced: true }, { force: true }),
+      loadSeriesAndErp(token),
+    ]);
     setUninvoicedRepairs(Array.isArray(rows) ? rows : []);
-  }, []);
+  }, [loadSeriesAndErp]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       if (sectionTab === 'invoices') {
         await loadInvoices();
-        setUninvoicedRepairs([]);
       } else {
         await loadUninvoicedRepairs();
       }
@@ -321,13 +346,42 @@ export default function ShopInvoicingScreen() {
     } finally {
       setLoading(false);
     }
-  }, [sectionTab, loadInvoices, loadUninvoicedRepairs]);
+  }, [sectionTab, loadInvoices, loadUninvoicedRepairs, t]);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
     }, [loadData])
   );
+
+  useEffect(() => {
+    if (!seriesReady) return;
+    let cancelled = false;
+    (async () => {
+      if (!series?.id) {
+        if (!cancelled) setSeriesPanelOpen(true);
+        return;
+      }
+      // Before first issued invoice on this series: show numbering once, then only via sub-option.
+      if (series.config_editable === false) return;
+      const shopId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_SHOP_ID);
+      if (!shopId || cancelled) return;
+      const seen = await AsyncStorage.getItem(STORAGE_KEYS.invoiceSeriesSetupSeenKey(shopId));
+      if (!cancelled && seen !== '1' && seen !== 'true') {
+        setSeriesPanelOpen(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [seriesReady, series?.id, series?.config_editable]);
+
+  useEffect(() => {
+    if (sectionTab !== 'uninvoiced') {
+      setInvoiceSelectMode(false);
+      setSelectedRepairIds([]);
+    }
+  }, [sectionTab]);
 
   const filteredInvoices = useMemo(
     () =>
@@ -344,7 +398,85 @@ export default function ShopInvoicingScreen() {
     navigation.navigate('ShopInvoiceDetail', { invoiceId });
   };
 
+  const ensureSeriesConfigured = useCallback(() => {
+    if (series?.id) return true;
+    setSeriesPanelOpen(true);
+    showMessage(
+      t('partnerDashboard.invoicing.numberingSetupRequiredTitle'),
+      t('partnerDashboard.invoicing.numberingSetupRequiredBody'),
+      { variant: 'info' }
+    );
+    return false;
+  }, [series?.id, t]);
+
+  const exitInvoiceSelectMode = useCallback(() => {
+    setInvoiceSelectMode(false);
+    setSelectedRepairIds([]);
+  }, []);
+
+  const toggleRepairSelection = useCallback(
+    (item) => {
+      setSelectedRepairIds((prev) => {
+        const id = item.id;
+        if (prev.includes(id)) {
+          return prev.filter((rowId) => rowId !== id);
+        }
+        if (prev.length > 0) {
+          const anchor = uninvoicedRepairs.find((r) => r.id === prev[0]);
+          const anchorClient = anchor?.client ?? null;
+          const nextClient = item.client ?? null;
+          if (
+            anchorClient != null &&
+            nextClient != null &&
+            Number(anchorClient) !== Number(nextClient)
+          ) {
+            const selectedName = String(anchor?.client_display_name || '').trim();
+            const nextName = String(item?.client_display_name || '').trim();
+            showMessage(
+              t('common.notice'),
+              selectedName && nextName
+                ? t('partnerDashboard.invoicing.invoiceDifferentClientsNamed', {
+                    selected: selectedName,
+                    next: nextName,
+                  })
+                : t('partnerDashboard.invoicing.invoiceDifferentClients'),
+              { variant: 'info' }
+            );
+            return prev;
+          }
+        }
+        return [...prev, id];
+      });
+    },
+    [uninvoicedRepairs, t]
+  );
+
+  const handleCreateCombinedInvoice = useCallback(async () => {
+    if (selectedRepairIds.length === 0) return;
+    if (!ensureSeriesConfigured()) return;
+    setCreatingInvoice(true);
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      const invoice = await draftInvoiceFromRepairs(token, selectedRepairIds);
+      exitInvoiceSelectMode();
+      navigation.navigate('ShopInvoiceDetail', { invoiceId: invoice.id });
+      loadUninvoicedRepairs().catch(() => {});
+    } catch (err) {
+      Alert.alert(t('common.error'), err.message || t('partnerDashboard.invoicing.createDraftError'));
+    } finally {
+      setCreatingInvoice(false);
+    }
+  }, [
+    selectedRepairIds,
+    ensureSeriesConfigured,
+    exitInvoiceSelectMode,
+    navigation,
+    loadUninvoicedRepairs,
+    t,
+  ]);
+
   const handleCreateInvoiceFromRepair = async (repairId) => {
+    if (!ensureSeriesConfigured()) return;
     setCreatingRepairId(repairId);
     try {
       const token = await AsyncStorage.getItem('@access_token');
@@ -359,7 +491,9 @@ export default function ShopInvoicingScreen() {
   };
 
   const renderUninvoicedRepair = (repair) => {
-    const title = `${repair.vehicle_make ?? ''} ${repair.vehicle_model ?? ''}`.trim() || t('partnerDashboard.card.vehicleFallback');
+    const title =
+      `${repair.vehicle_make ?? ''} ${repair.vehicle_model ?? ''}`.trim() ||
+      t('partnerDashboard.card.vehicleFallback');
     const plate = String(repair.vehicle_license_plate || '').trim();
     const clientName = String(repair.client_display_name || '').trim();
     const completed = formatRepairListDate(repair.completed_at || repair.created_at);
@@ -368,24 +502,42 @@ export default function ShopInvoicingScreen() {
       repair.currency
     );
     const busy = creatingRepairId === repair.id;
+    const selected = selectedRepairIds.includes(repair.id);
 
     return (
       <FloatingCard
         key={repair.id}
-        onPress={busy ? undefined : () => handleCreateInvoiceFromRepair(repair.id)}
+        onPress={
+          busy
+            ? undefined
+            : () =>
+                invoiceSelectMode
+                  ? toggleRepairSelection(repair)
+                  : handleCreateInvoiceFromRepair(repair.id)
+        }
+        style={selected ? styles.cardSelected : null}
       >
         <View style={styles.invoiceRow}>
+          {invoiceSelectMode ? (
+            <MaterialCommunityIcons
+              name={selected ? 'checkbox-marked-circle' : 'checkbox-blank-circle-outline'}
+              size={24}
+              color={selected ? COLORS.PRIMARY : COLORS.TEXT_MUTED}
+              style={styles.selectIcon}
+            />
+          ) : null}
           <View style={styles.invoiceMain}>
             <Text style={styles.invoiceNumber}>{title}</Text>
             <Text style={styles.invoiceSub} numberOfLines={2}>
-              {[plate, clientName, completed].filter(Boolean).join(' · ') || t('partnerDashboard.invoicing.completedRepair')}
+              {[plate, clientName, completed].filter(Boolean).join(' · ') ||
+                t('partnerDashboard.invoicing.completedRepair')}
             </Text>
             {total ? <Text style={styles.invoiceTotal}>{total}</Text> : null}
           </View>
           <View style={styles.invoiceAside}>
             {busy ? (
               <ActivityIndicator size="small" color={COLORS.PRIMARY} />
-            ) : (
+            ) : invoiceSelectMode ? null : (
               <>
                 <MaterialCommunityIcons
                   name="file-plus-outline"
@@ -413,7 +565,11 @@ export default function ShopInvoicingScreen() {
       <ScrollView
         onScroll={onScroll}
         scrollEventThrottle={scrollEventThrottle}
-        contentContainerStyle={[styles.content, { paddingTop: 12 }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: 12 },
+          invoiceSelectMode && selectedRepairIds.length > 0 ? styles.contentWithBar : null,
+        ]}
       >
         <AppCard variant="dark" style={styles.heroCard}>
           <Text style={styles.heroSubtitle}>{t('partnerDashboard.invoicing.heroSubtitle')}</Text>
@@ -440,45 +596,47 @@ export default function ShopInvoicingScreen() {
           </FloatingCard>
         ) : null}
 
-        <SeriesEditor
-          key={series?.id || 'new'}
-          series={series}
-          t={t}
-          onSaved={(updated) => {
-            setSeries(updated);
-            loadInvoices().catch(() => {});
-          }}
-        />
-
-        <View style={styles.sectionTabRow}>
-          {sectionTabs.map((item) => {
-            const active = sectionTab === item.key;
-            return (
+        {seriesPanelOpen ? (
+          <>
+            {!needsSeriesSetup ? (
               <Pressable
-                key={item.key}
-                onPress={() => setSectionTab(item.key)}
-                style={[styles.sectionTab, active && styles.sectionTabActive]}
+                onPress={() => {
+                  markSeriesSetupSeen().catch(() => {});
+                  setSeriesPanelOpen(false);
+                }}
+                style={styles.backToListBtn}
+                accessibilityRole="button"
               >
-                <Text style={[styles.sectionTabText, active && styles.sectionTabTextActive]}>
-                  {item.label}
+                <MaterialCommunityIcons name="arrow-left" size={18} color="#fff" />
+                <Text style={styles.backToListText}>
+                  {t('partnerDashboard.invoicing.backToInvoices')}
                 </Text>
               </Pressable>
-            );
-          })}
-        </View>
-
-        {sectionTab === 'invoices' ? (
+            ) : null}
+            <SeriesEditor
+              key={series?.id || 'new'}
+              series={series}
+              t={t}
+              onSaved={(updated) => {
+                setSeries(updated);
+                markSeriesSetupSeen().catch(() => {});
+                setSeriesPanelOpen(false);
+                loadInvoices().catch(() => {});
+              }}
+            />
+          </>
+        ) : (
           <>
-            <View style={styles.filterRow}>
-              {statusFilters.map((item) => {
-                const active = statusFilter === item.key;
+            <View style={styles.sectionTabRow}>
+              {sectionTabs.map((item) => {
+                const active = sectionTab === item.key;
                 return (
                   <Pressable
-                    key={item.key || 'all'}
-                    onPress={() => setStatusFilter(item.key)}
-                    style={[styles.filterChip, active && styles.filterChipActive]}
+                    key={item.key}
+                    onPress={() => setSectionTab(item.key)}
+                    style={[styles.sectionTab, active && styles.sectionTabActive]}
                   >
-                    <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                    <Text style={[styles.sectionTabText, active && styles.sectionTabTextActive]}>
                       {item.label}
                     </Text>
                   </Pressable>
@@ -486,85 +644,199 @@ export default function ShopInvoicingScreen() {
               })}
             </View>
 
-            {showInvoiceListFilters ? (
-              <FloatingCard style={styles.invoiceFiltersCard}>
-                <Text style={styles.sectionTitle}>{t('partnerDashboard.invoicing.filterInvoices')}</Text>
-                <TextInput
-                  mode="outlined"
-                  label={t('partnerDashboard.invoicing.clientSearch')}
-                  value={clientSearch}
-                  onChangeText={setClientSearch}
-                  style={styles.input}
-                  placeholder={t('partnerDashboard.invoicing.clientSearchPlaceholder')}
-                />
-                <Text style={styles.pickerLabel}>{t('partnerDashboard.invoicing.monthIssued')}</Text>
-                <View style={styles.pickerShell}>
-                  <Picker
-                    selectedValue={monthFilter}
-                    onValueChange={setMonthFilter}
-                    style={styles.picker}
-                    dropdownIconColor={COLORS.TEXT_MUTED}
-                  >
-                    {monthOptions.map((option) => (
-                      <Picker.Item key={option.value || 'all'} label={option.label} value={option.value} />
-                    ))}
-                  </Picker>
-                </View>
-              </FloatingCard>
-            ) : null}
-
-            {loading ? (
-              <ActivityIndicator style={styles.loader} color={COLORS.PRIMARY} />
-            ) : filteredInvoices.length === 0 ? (
-              <FloatingCard>
-                <Text style={styles.emptyTitle}>
-                  {invoices.length === 0
-                    ? t('partnerDashboard.invoicing.noInvoices')
-                    : t('partnerDashboard.invoicing.noInvoicesFiltered')}
-                </Text>
-                <Text style={styles.emptyText}>
-                  {invoices.length === 0
-                    ? t('partnerDashboard.invoicing.noInvoicesHint')
-                    : t('partnerDashboard.invoicing.noInvoicesFilterHint')}
-                </Text>
-              </FloatingCard>
-            ) : (
-              filteredInvoices.map((invoice) => (
-                <FloatingCard key={invoice.id} onPress={() => openInvoice(invoice.id)}>
-                  <View style={styles.invoiceRow}>
-                    <View style={styles.invoiceMain}>
-                      <Text style={styles.invoiceNumber}>{invoiceDisplayNumber(invoice)}</Text>
-                      <Text style={styles.invoiceSub} numberOfLines={2}>
-                        {invoiceListSubtitle(invoice)}
-                      </Text>
-                      <Text style={styles.invoiceTotal}>{invoiceTotalLabel(invoice)}</Text>
-                    </View>
-                    <View style={styles.invoiceAside}>
-                      <StatusBadge status={invoice.status} />
-                      <MaterialCommunityIcons name="chevron-right" size={22} color={COLORS.TEXT_MUTED} />
-                    </View>
+            {sectionTab === 'invoices' ? (
+              <>
+                <Pressable
+                  onPress={() => setSeriesPanelOpen(true)}
+                  style={styles.numberingLink}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('partnerDashboard.invoicing.numberingSuboption')}
+                >
+                  <MaterialCommunityIcons name="pound" size={18} color="#fff" />
+                  <View style={styles.numberingLinkMain}>
+                    <Text style={styles.numberingLinkTitle}>
+                      {t('partnerDashboard.invoicing.numberingSuboption')}
+                    </Text>
+                    <Text style={styles.numberingLinkHint} numberOfLines={2}>
+                      {series?.example_number
+                        ? t('partnerDashboard.invoicing.activeSeriesSummary', {
+                            prefix: series?.prefix || '—',
+                            width: series?.sequence_width ?? '—',
+                            next: series?.next_sequence ?? '—',
+                            example: series.example_number,
+                          })
+                        : t('partnerDashboard.invoicing.numberingSuboptionHint')}
+                    </Text>
                   </View>
-                </FloatingCard>
-              ))
-            )}
-          </>
-        ) : (
-          <>
-            <Text style={styles.sectionHint}>{t('partnerDashboard.invoicing.uninvoicedHint')}</Text>
-            {loading ? (
-              <ActivityIndicator style={styles.loader} color={COLORS.PRIMARY} />
-            ) : uninvoicedRepairs.length === 0 ? (
-              <EmptyStateCard
-                icon="file-document-check-outline"
-                title={t('partnerDashboard.invoicing.allCaughtUpTitle')}
-                subtitle={t('partnerDashboard.invoicing.allCaughtUpSubtitle')}
-              />
+                  <MaterialCommunityIcons name="chevron-right" size={20} color="rgba(255,255,255,0.75)" />
+                </Pressable>
+
+                <View style={styles.filterRow}>
+                  {statusFilters.map((item) => {
+                    const active = statusFilter === item.key;
+                    return (
+                      <Pressable
+                        key={item.key || 'all'}
+                        onPress={() => setStatusFilter(item.key)}
+                        style={[styles.filterChip, active && styles.filterChipActive]}
+                      >
+                        <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                          {item.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                {showInvoiceListFilters ? (
+                  <FloatingCard style={styles.invoiceFiltersCard}>
+                    <Text style={styles.sectionTitle}>
+                      {t('partnerDashboard.invoicing.filterInvoices')}
+                    </Text>
+                    <TextInput
+                      mode="outlined"
+                      label={t('partnerDashboard.invoicing.clientSearch')}
+                      value={clientSearch}
+                      onChangeText={setClientSearch}
+                      style={styles.input}
+                      placeholder={t('partnerDashboard.invoicing.clientSearchPlaceholder')}
+                    />
+                    <Text style={styles.pickerLabel}>{t('partnerDashboard.invoicing.monthIssued')}</Text>
+                    <View style={styles.pickerShell}>
+                      <Picker
+                        selectedValue={monthFilter}
+                        onValueChange={setMonthFilter}
+                        style={styles.picker}
+                        dropdownIconColor={COLORS.TEXT_MUTED}
+                      >
+                        {monthOptions.map((option) => (
+                          <Picker.Item
+                            key={option.value || 'all'}
+                            label={option.label}
+                            value={option.value}
+                          />
+                        ))}
+                      </Picker>
+                    </View>
+                  </FloatingCard>
+                ) : null}
+
+                {loading ? (
+                  <ActivityIndicator style={styles.loader} color={COLORS.PRIMARY} />
+                ) : filteredInvoices.length === 0 ? (
+                  <FloatingCard>
+                    <Text style={styles.emptyTitle}>
+                      {invoices.length === 0
+                        ? t('partnerDashboard.invoicing.noInvoices')
+                        : t('partnerDashboard.invoicing.noInvoicesFiltered')}
+                    </Text>
+                    <Text style={styles.emptyText}>
+                      {invoices.length === 0
+                        ? t('partnerDashboard.invoicing.noInvoicesHint')
+                        : t('partnerDashboard.invoicing.noInvoicesFilterHint')}
+                    </Text>
+                  </FloatingCard>
+                ) : (
+                  filteredInvoices.map((invoice) => (
+                    <FloatingCard key={invoice.id} onPress={() => openInvoice(invoice.id)}>
+                      <View style={styles.invoiceRow}>
+                        <View style={styles.invoiceMain}>
+                          <Text style={styles.invoiceNumber}>{invoiceDisplayNumber(invoice)}</Text>
+                          <Text style={styles.invoiceSub} numberOfLines={2}>
+                            {invoiceListSubtitle(invoice)}
+                          </Text>
+                          <Text style={styles.invoiceTotal}>{invoiceTotalLabel(invoice)}</Text>
+                        </View>
+                        <View style={styles.invoiceAside}>
+                          <StatusBadge status={invoice.status} />
+                          <MaterialCommunityIcons
+                            name="chevron-right"
+                            size={22}
+                            color={COLORS.TEXT_MUTED}
+                          />
+                        </View>
+                      </View>
+                    </FloatingCard>
+                  ))
+                )}
+              </>
             ) : (
-              uninvoicedRepairs.map((repair) => renderUninvoicedRepair(repair))
+              <>
+                {uninvoicedRepairs.length > 0 ? (
+                  <View style={styles.invoiceActionRow}>
+                    {invoiceSelectMode ? (
+                      <>
+                        <Pressable
+                          onPress={exitInvoiceSelectMode}
+                          style={[styles.invoiceActionBtn, styles.invoiceActionBtnCancel]}
+                          accessibilityRole="button"
+                        >
+                          <MaterialCommunityIcons name="close" size={18} color="#ffffff" />
+                          <Text style={styles.invoiceActionBtnLabel} numberOfLines={1}>
+                            {t('partnerDashboard.invoicing.cancelSelection')}
+                          </Text>
+                        </Pressable>
+                        <View style={styles.selectBannerInline}>
+                          <MaterialCommunityIcons
+                            name="file-document-multiple-outline"
+                            size={18}
+                            color="#fff"
+                          />
+                          <Text style={styles.selectBannerText}>
+                            {t('partnerDashboard.invoicing.selectInvoiceHint')}
+                            {selectedRepairIds.length > 0
+                              ? ` (${selectedRepairIds.length})`
+                              : ''}
+                          </Text>
+                        </View>
+                      </>
+                    ) : (
+                      <Pressable
+                        onPress={() => setInvoiceSelectMode(true)}
+                        style={[styles.invoiceActionBtn, styles.invoiceActionBtnSelect]}
+                        accessibilityRole="button"
+                      >
+                        <MaterialCommunityIcons
+                          name="file-document-outline"
+                          size={18}
+                          color="#ffffff"
+                        />
+                        <Text style={styles.invoiceActionBtnLabel} numberOfLines={1}>
+                          {t('partnerDashboard.invoicing.selectToInvoice')}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                ) : null}
+                <Text style={styles.sectionHintLight}>
+                  {t('partnerDashboard.invoicing.uninvoicedHint')}
+                </Text>
+                {loading ? (
+                  <ActivityIndicator style={styles.loader} color={COLORS.PRIMARY} />
+                ) : uninvoicedRepairs.length === 0 ? (
+                  <EmptyStateCard
+                    icon="file-document-check-outline"
+                    title={t('partnerDashboard.invoicing.allCaughtUpTitle')}
+                    subtitle={t('partnerDashboard.invoicing.allCaughtUpSubtitle')}
+                  />
+                ) : (
+                  uninvoicedRepairs.map((repair) => renderUninvoicedRepair(repair))
+                )}
+              </>
             )}
           </>
         )}
       </ScrollView>
+      {invoiceSelectMode && selectedRepairIds.length > 0 && !seriesPanelOpen ? (
+        <FloatingSaveBar
+          label={t('partnerDashboard.invoicing.createInvoiceCount', {
+            count: selectedRepairIds.length,
+          })}
+          icon="file-plus-outline"
+          onPress={handleCreateCombinedInvoice}
+          loading={creatingInvoice}
+        />
+      ) : null}
     </ScreenBackground>
   );
 }
@@ -737,5 +1009,102 @@ const styles = StyleSheet.create({
   invoiceAside: {
     alignItems: 'flex-end',
     gap: 6,
+  },
+  numberingLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  numberingLinkMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  numberingLinkTitle: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  numberingLinkHint: {
+    marginTop: 2,
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  backToListBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  backToListText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  invoiceActionRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  invoiceActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+  },
+  invoiceActionBtnSelect: {
+    backgroundColor: COLORS.PRIMARY,
+  },
+  invoiceActionBtnCancel: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  invoiceActionBtnLabel: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  selectBannerInline: {
+    flex: 1,
+    minWidth: 160,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  selectBannerText: {
+    flex: 1,
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  sectionHintLight: {
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  cardSelected: {
+    borderWidth: 2,
+    borderColor: COLORS.PRIMARY,
+  },
+  selectIcon: {
+    marginRight: 2,
+  },
+  contentWithBar: {
+    paddingBottom: 96,
   },
 });

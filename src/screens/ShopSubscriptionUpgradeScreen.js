@@ -387,6 +387,9 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
 
   const showManageSubscription =
     isActive && currentPlan.isAssigned && planKeyLower && planKeyLower !== 'trial';
+  /** Don't keep a checkout sticky CTA when the selected plan is already active. */
+  const alreadyOnSelectedPaidPlan =
+    showManageSubscription && selected.planKey === planKeyLower;
 
   const handleCancelAtPeriodEnd = () => {
     if (!profile?.id || cancelSubmitting) return;
@@ -439,19 +442,21 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
           </View>
         ) : (
           <>
-            {/* How this page works */}
-            <View style={styles.howtoCard}>
-              <Text style={styles.howtoTitle}>{t('subscription.howtoTitle')}</Text>
-              <Text style={styles.howtoStep}>
-                {`1. ${
-                  profileNeedsWork
-                    ? t('subscription.howtoStepProfileNeeded')
-                    : t('subscription.howtoStepProfileOk')
-                }`}
-              </Text>
-              <Text style={styles.howtoStep}>{`2. ${t('subscription.howtoStepPickPlan')}`}</Text>
-              <Text style={styles.howtoStep}>{`3. ${t('subscription.howtoStepPay')}`}</Text>
-            </View>
+            {/* Upgrade howto — only before a paid plan is active */}
+            {!showManageSubscription ? (
+              <View style={styles.howtoCard}>
+                <Text style={styles.howtoTitle}>{t('subscription.howtoTitle')}</Text>
+                <Text style={styles.howtoStep}>
+                  {`1. ${
+                    profileNeedsWork
+                      ? t('subscription.howtoStepProfileNeeded')
+                      : t('subscription.howtoStepProfileOk')
+                  }`}
+                </Text>
+                <Text style={styles.howtoStep}>{`2. ${t('subscription.howtoStepPickPlan')}`}</Text>
+                <Text style={styles.howtoStep}>{`3. ${t('subscription.howtoStepPay')}`}</Text>
+              </View>
+            ) : null}
 
             {/* Current plan */}
             <View style={styles.hero}>
@@ -844,7 +849,7 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
         )}
       </ScrollView>
 
-      {!loading && selectedOption ? (
+      {!loading && selectedOption && !alreadyOnSelectedPaidPlan ? (
         <View style={styles.stickyBar} pointerEvents="box-none">
           <Pressable
             onPress={handlePrimaryPay}

@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { getShopCalendar } from '../api/repairs';
 import { WebSocketContext } from '../context/WebSocketManager';
+import { isWsConnected } from '../notifications/wsConnectionState';
 import {
   navigateToPartnerCalendar,
   navigateToPartnerNotifications,
@@ -51,7 +52,8 @@ export default function usePartnerHeaderChrome({
             }
           }
         }
-        if (typeof refreshUnreadFromRest === 'function') {
+        // Badge comes from WebSocket while connected — avoid GET /notifications on every focus.
+        if (!isWsConnected() && typeof refreshUnreadFromRest === 'function') {
           refreshUnreadFromRest();
         }
       };

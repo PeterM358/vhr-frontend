@@ -8,6 +8,7 @@ import { NavigationContainer, getPathFromState } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBackHeaderLeft } from '../components/navigation/BackHeaderButton';
 import { AuthContext } from '../context/AuthManager';
+import SessionResumeBridge from './SessionResumeBridge';
 import {
   flushPendingNotificationNavigation,
   setNotificationNavigationRef,
@@ -355,6 +356,7 @@ export default function AppNavigator() {
       onReady={handleNavigationReady}
       onStateChange={handleNavigationStateChange}
     >
+      <SessionResumeBridge navigationRef={navigationRef} />
       <Stack.Navigator
         initialRouteName="AuthLoading"
         screenOptions={{
@@ -747,11 +749,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ShopInvoiceDetail"
           component={ShopInvoiceDetailScreen}
-          options={{
-            title: 'Invoice',
-            headerBackTitle: 'Back',
-            headerBackTitleVisible: true,
-          }}
+          options={{ ...appNavBarScreenOptions, title: 'Invoice' }}
         />
         
         <Stack.Screen name="AddShopPartScreen" component={AddShopPartScreen} options={{ title: 'Add Parts to Inventory' }}/>

@@ -25,6 +25,11 @@ export const STORAGE_KEYS = {
     `@partner_shop_context_bar_dismissed_${shopId}`,
   /** Combined shop name + partner intro card dismissed (replaces separate hero + context bar) */
   partnerHomeIntroDismissedKey: (shopId) => `@partner_home_intro_dismissed_${shopId}`,
+  /** Paid plan celebration on Shop Home — dismissed once per shop (any paid plan) */
+  partnerPaidPlanBadgeDismissedKey: (shopId, _planKey) =>
+    `@partner_paid_plan_badge_dismissed_${shopId}`,
+  /** Invoice numbering sub-option shown once before first issued tax invoice */
+  invoiceSeriesSetupSeenKey: (shopId) => `@invoice_series_setup_seen_${shopId}`,
   logServiceRecordDraftKey: (vehicleId) => `@log_service_record_draft_${vehicleId}`,
   serviceRecordDraftKey: (vehicleId) => `serviceRecordDraft:${vehicleId}`,
   serviceRecordManualDraftKey: (vehicleId) => `serviceRecordManualDraft:${vehicleId}`,

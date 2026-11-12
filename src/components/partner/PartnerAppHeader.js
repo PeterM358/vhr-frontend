@@ -46,9 +46,10 @@ export default function PartnerAppHeader({
 }) {
   const isDashboard = mode === 'dashboard';
   const isCompactChrome = useIsCompactChrome();
-  // Phone / mobile-web: free the bar for icons — shop name lives on Center details (storefront).
-  const chromeTitle = isDashboard && isCompactChrome ? undefined : title;
-  const chromeSubtitle = isDashboard && isCompactChrome ? undefined : subtitle;
+  // Dashboard: no shop name in the chrome — long names truncate badly; intro card +
+  // storefront icon open Center details instead.
+  const chromeTitle = isDashboard ? undefined : title;
+  const chromeSubtitle = isDashboard ? undefined : isCompactChrome ? undefined : subtitle;
   const chrome = usePartnerHeaderChrome({
     loadCalendarBadge: showCalendar && loadCalendarBadge && calendarBadgeProp == null,
     refreshCalendarBadge: isDashboard,

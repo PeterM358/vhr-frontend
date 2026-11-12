@@ -14,12 +14,18 @@ const notificationsInFlight = new Map();
 const NOTIFICATIONS_TTL_MS = 30_000;
 const notificationsCache = new Map();
 
+const unreadCountInFlight = new Map();
+const unreadCountCache = new Map();
+const UNREAD_COUNT_TTL_MS = 15_000;
+
 export function invalidateNotificationsCache(token) {
   if (token) {
     notificationsCache.delete(token);
+    unreadCountCache.delete(token);
     return;
   }
   notificationsCache.clear();
+  unreadCountCache.clear();
 }
 
 /**
@@ -50,6 +56,38 @@ export async function getNotifications(token, { force = false } = {}) {
     notificationsInFlight.delete(key);
   });
   notificationsInFlight.set(key, request);
+  return request;
+}
+
+/**
+ * Lightweight badge probe — COUNT only, not the full inbox list.
+ * Prefer this for header/home badge refresh; use getNotifications for the inbox screen.
+ */
+export async function getUnreadNotificationCount(token, { force = false } = {}) {
+  const key = token || '';
+  if (!force) {
+    const cached = unreadCountCache.get(key);
+    if (cached && Date.now() - cached.at < UNREAD_COUNT_TTL_MS) {
+      return cached.count;
+    }
+  }
+
+  const pending = unreadCountInFlight.get(key);
+  if (pending) return pending;
+
+  const request = (async () => {
+    const response = await fetch(`${API_BASE_URL}/api/notifications/unread-count/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Failed to fetch unread count');
+    const data = await response.json();
+    const count = Math.max(0, Number(data?.unread_count) || 0);
+    unreadCountCache.set(key, { at: Date.now(), count });
+    return count;
+  })().finally(() => {
+    unreadCountInFlight.delete(key);
+  });
+  unreadCountInFlight.set(key, request);
   return request;
 }
 

@@ -11,11 +11,15 @@ import React, {
 import { AppState, Platform } from 'react-native';
 import { AuthContext } from './AuthManager';
 import { WS_BASE_URL, WS_ENABLED, wsSkipReason } from '../env';
-import { getNotifications, invalidateNotificationsCache } from '../api/notifications';
+import {
+  getNotifications,
+  getUnreadNotificationCount,
+  invalidateNotificationsCache,
+} from '../api/notifications';
 import { normalizeNotification } from '../utils/normalizeNotification';
 import { devLog, safeError, safeWarn } from '../utils/logger';
 import { markNotificationSeen, resetNotificationDedup } from '../notifications/notificationDedup';
-import { setWsConnected } from '../notifications/wsConnectionState';
+import { isWsConnected, setWsConnected } from '../notifications/wsConnectionState';
 
 export const WebSocketContext = createContext();
 
@@ -24,9 +28,11 @@ const MAX_RECONNECT_ATTEMPTS = 8;
 const RECONNECT_BASE_MS = 1000;
 const ABNORMAL_CLOSE_CODE = 1006;
 const RAPID_1006_HINT_THRESHOLD = 3;
-/** Shared REST badge backup — WS is primary when connected. */
-const NOTIFICATIONS_POLL_MS = 60_000;
-/** Coalesce WS-triggered REST confirms so bursts do not spam GET /notifications/. */
+/** REST badge backup when WebSocket is down / disabled. */
+const NOTIFICATIONS_POLL_MS_WS_DOWN = 60_000;
+/** Rare safety net while WS is healthy — Channels is the live path. */
+const NOTIFICATIONS_POLL_MS_WS_UP = 5 * 60_000;
+/** Coalesce WS-triggered REST confirms so bursts do not spam badge probes. */
 const WS_UNREAD_CONFIRM_DEBOUNCE_MS = 2_500;
 
 function isUiVisible() {
@@ -104,9 +110,7 @@ export const WebSocketProvider = ({ children }) => {
       return;
     }
     try {
-      const data = await getNotifications(authToken, { force });
-      const rows = (Array.isArray(data) ? data : data?.results ?? []).map(normalizeNotification);
-      const unread = rows.filter((row) => !row.is_read).length;
+      const unread = await getUnreadNotificationCount(authToken, { force });
       setUnreadCount(unread);
       await syncAppBadge(unread);
     } catch (error) {
@@ -120,11 +124,13 @@ export const WebSocketProvider = ({ children }) => {
       const data = await getNotifications(authToken, { force });
       const rows = (Array.isArray(data) ? data : data?.results ?? []).map(normalizeNotification);
       setNotifications((prev) => mergeNotificationLists(prev, rows));
-      await refreshUnreadFromRest({ force });
+      const unread = rows.filter((row) => !row.is_read).length;
+      setUnreadCount(unread);
+      await syncAppBadge(unread);
     } catch (error) {
       safeWarn('Failed to refresh notifications', error);
     }
-  }, [authToken, refreshUnreadFromRest]);
+  }, [authToken]);
 
   const removeNotification = useCallback((id) => {
     setNotifications((prev) =>
@@ -236,6 +242,8 @@ export const WebSocketProvider = ({ children }) => {
         reconnectAttempt.current = 0;
         abnormalCloseCount.current = 0;
         setWsConnected(true);
+        // Switch from 60s backup poll to rare safety net while Channels is live.
+        if (typeof armPoll === 'function') armPoll();
         logWsDev({ url, state: 'open', reconnectAttempt: 0 });
       };
 
@@ -272,6 +280,8 @@ export const WebSocketProvider = ({ children }) => {
 
       socket.onclose = (e) => {
         setWsConnected(false);
+        // Fall back to denser REST badge poll until Channels reconnects.
+        if (typeof armPoll === 'function') armPoll();
         logWsDev({
           url,
           state: 'closed',
@@ -303,6 +313,37 @@ export const WebSocketProvider = ({ children }) => {
       };
     };
 
+    // REST badge backup:
+    // - WS down / disabled → every 60s while visible
+    // - WS up → rare 5min safety net only (Channels pushes live updates)
+    // Hidden tab/app never polls.
+    let pollId = null;
+    const clearPoll = () => {
+      if (pollId) {
+        clearInterval(pollId);
+        pollId = null;
+      }
+    };
+    const armPoll = () => {
+      clearPoll();
+      if (cancelled) return;
+      const interval = isWsConnected()
+        ? NOTIFICATIONS_POLL_MS_WS_UP
+        : NOTIFICATIONS_POLL_MS_WS_DOWN;
+      pollId = setInterval(() => {
+        if (cancelled || !isUiVisible()) return;
+        // Re-arm if WS connectivity flipped since last tick.
+        const nextInterval = isWsConnected()
+          ? NOTIFICATIONS_POLL_MS_WS_UP
+          : NOTIFICATIONS_POLL_MS_WS_DOWN;
+        if (nextInterval !== interval) {
+          armPoll();
+          return;
+        }
+        refreshUnreadFromRest();
+      }, interval);
+    };
+
     (async () => {
       try {
         const data = await getNotifications(authToken);
@@ -325,15 +366,13 @@ export const WebSocketProvider = ({ children }) => {
       logWsDev({ state: 'skipped' });
       devLog(wsSkipReason());
     }
-
-    // Backup REST poll for badge freshness when WS is off / dropped.
-    // Pause while the tab/app is hidden — was a major source of Network spam.
-    const pollId = setInterval(() => {
-      if (!cancelled && isUiVisible()) refreshUnreadFromRest();
-    }, NOTIFICATIONS_POLL_MS);
+    armPoll();
 
     const onBecameVisible = () => {
-      if (!cancelled && isUiVisible()) refreshUnreadFromRest();
+      if (cancelled || !isUiVisible()) return;
+      // Live inbox already comes from Channels while connected — no REST storm on focus.
+      if (isWsConnected()) return;
+      refreshUnreadFromRest();
     };
     const onAppStateChange = (next) => {
       if (next === 'active') onBecameVisible();
@@ -345,7 +384,7 @@ export const WebSocketProvider = ({ children }) => {
 
     return () => {
       cancelled = true;
-      clearInterval(pollId);
+      clearPoll();
       clearReconnectTimer();
       clearUnreadConfirmTimer();
       appStateSub?.remove?.();

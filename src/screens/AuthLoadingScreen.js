@@ -1,6 +1,5 @@
 import React, { useContext, useEffect } from 'react';
 import { ActivityIndicator, View, StyleSheet, Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import ScreenBackground from '../components/ScreenBackground';
 import BrandLogo from '../components/BrandLogo';
 import { BRAND_LOCKUP_ASPECT, getBrandLoginSource } from '../constants/images';
@@ -15,7 +14,8 @@ import {
 } from '../navigation/authNavigation';
 import { isProtectedWebPath, resetNavigationToCanonicalPath } from '../navigation/webLinking';
 import { toCanonicalAppPath } from '../navigation/localizedRoutes';
-import { readOrganizationMemberships } from '../utils/orgWorkspace';
+import { resolveIsPartnerSession } from '../utils/partnerSession';
+import { resolveIsOrgOnlySession } from '../utils/orgWorkspace';
 
 const BRAND_WIDTH = 168;
 const BRAND_HEIGHT = Math.round(BRAND_WIDTH * BRAND_LOCKUP_ASPECT);
@@ -31,20 +31,12 @@ async function resolveSessionKind(hasToken) {
   if (!hasToken) {
     return { isPartner: false, isOrgOnly: false };
   }
-  const isShop = await AsyncStorage.getItem('@is_shop');
-  const shopProfiles = await AsyncStorage.getItem('@shop_profiles');
-  const shopMemberships = await AsyncStorage.getItem('@shop_memberships');
-  const orgMemberships = await readOrganizationMemberships();
-  const flaggedShop = String(isShop || '').trim().toLowerCase() === 'true';
-  const hasShopLinks =
-    flaggedShop ||
-    (shopProfiles && shopProfiles !== '[]') ||
-    (shopMemberships && shopMemberships !== '[]');
-  const hasOrg = orgMemberships.length > 0;
-  return {
-    isPartner: hasShopLinks,
-    isOrgOnly: hasOrg && !hasShopLinks,
-  };
+  const isPartner = await resolveIsPartnerSession();
+  if (isPartner) {
+    return { isPartner: true, isOrgOnly: false };
+  }
+  const isOrgOnly = await resolveIsOrgOnlySession();
+  return { isPartner: false, isOrgOnly };
 }
 
 export default function AuthLoadingScreen({ navigation }) {

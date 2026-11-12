@@ -5,13 +5,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Button, Text } from 'react-native-paper';
 
 import ScreenBackground from '../components/ScreenBackground';
+import PartnerAppHeader from '../components/partner/PartnerAppHeader';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import InvoiceDocumentPreview from '../components/shop/InvoiceDocumentPreview';
 import { COLORS } from '../constants/colors';
 import { getInvoiceById, issueInvoice, markInvoicePaid } from '../api/billing';
 import { navigateToPartnerProfile } from '../navigation/webNavigation';
+import { useScrollShadow } from '../hooks/useScrollShadow';
+import { useTranslation } from '../i18n';
 
 export default function ShopInvoiceDetailScreen() {
+  const { t } = useTranslation();
   const route = useRoute();
   const navigation = useNavigation();
   const invoiceId = route.params?.invoiceId;
@@ -20,6 +24,7 @@ export default function ShopInvoiceDetailScreen() {
   const [issuing, setIssuing] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
   const [confirmIssue, setConfirmIssue] = useState(false);
+  const { scrolled, onScroll, scrollEventThrottle } = useScrollShadow();
 
   const loadInvoice = useCallback(async () => {
     if (!invoiceId) return;
@@ -29,13 +34,13 @@ export default function ShopInvoiceDetailScreen() {
       const data = await getInvoiceById(token, invoiceId);
       setInvoice(data);
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to load invoice', [
-        { text: 'OK', onPress: () => navigation.goBack() },
+      Alert.alert(t('common.error'), err.message || t('partnerDashboard.invoiceDetail.loadError'), [
+        { text: t('common.ok'), onPress: () => navigation.goBack() },
       ]);
     } finally {
       setLoading(false);
     }
-  }, [invoiceId, navigation]);
+  }, [invoiceId, navigation, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -58,9 +63,12 @@ export default function ShopInvoiceDetailScreen() {
       const updated = await issueInvoice(token, invoiceId);
       setInvoice(updated);
       setConfirmIssue(false);
-      Alert.alert('Issued', `Tax invoice ${updated.number} is ready.`);
+      Alert.alert(
+        t('partnerDashboard.invoiceDetail.issuedSuccessTitle'),
+        t('partnerDashboard.invoiceDetail.issuedSuccessBody', { number: updated.number })
+      );
     } catch (err) {
-      Alert.alert('Error', err.message || 'Could not issue invoice');
+      Alert.alert(t('common.error'), err.message || t('partnerDashboard.invoiceDetail.issueError'));
     } finally {
       setIssuing(false);
     }
@@ -73,7 +81,10 @@ export default function ShopInvoiceDetailScreen() {
       const updated = await markInvoicePaid(token, invoiceId);
       setInvoice(updated);
     } catch (err) {
-      Alert.alert('Error', err.message || 'Could not mark invoice paid');
+      Alert.alert(
+        t('common.error'),
+        err.message || t('partnerDashboard.invoiceDetail.markPaidError')
+      );
     } finally {
       setMarkingPaid(false);
     }
@@ -81,7 +92,12 @@ export default function ShopInvoiceDetailScreen() {
 
   if (loading) {
     return (
-      <ScreenBackground>
+      <ScreenBackground safeArea={false}>
+        <PartnerAppHeader
+          title={t('partnerDashboard.invoiceDetail.title')}
+          onBack={() => navigation.goBack()}
+          iconOnlyBack
+        />
         <ActivityIndicator style={styles.loader} color={COLORS.PRIMARY} />
       </ScreenBackground>
     );
@@ -99,25 +115,38 @@ export default function ShopInvoiceDetailScreen() {
       : !invoice.issuer_eik_number && !invoice.issuer_vat_number);
 
   return (
-    <ScreenBackground>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.screenHint}>
-          {isDraft
-            ? 'Draft / Proforma — preview only until you issue a numbered tax invoice. Offers stay separate commercial estimates.'
-            : 'Issued tax invoice — fiscal document with a number. Offers remain commercial estimates, not invoices.'}
-        </Text>
+    <ScreenBackground safeArea={false}>
+      <PartnerAppHeader
+        title={t('partnerDashboard.invoiceDetail.title')}
+        onBack={() => navigation.goBack()}
+        iconOnlyBack
+        scrolled={scrolled}
+      />
+      <ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={scrollEventThrottle}
+        contentContainerStyle={styles.content}
+      >
+        <View style={styles.hintCard}>
+          <Text style={styles.screenHint}>
+            {isDraft
+              ? t('partnerDashboard.invoiceDetail.draftHint')
+              : t('partnerDashboard.invoiceDetail.issuedHint')}
+          </Text>
+        </View>
 
         <InvoiceDocumentPreview invoice={invoice} />
 
         {missingIssuer ? (
           <View style={styles.warningBox}>
-            <Text style={styles.warningTitle}>Complete invoice settings on your center profile</Text>
+            <Text style={styles.warningTitle}>
+              {t('partnerDashboard.invoiceDetail.missingIssuerTitle')}
+            </Text>
             <Text style={styles.warningText}>
-              Add legal company name, VAT / ДДС number, and invoice address under Center details → Invoice
-              settings, then save. Issuing stays blocked until these are filled.
+              {t('partnerDashboard.invoiceDetail.missingIssuerBody')}
             </Text>
             <Button mode="outlined" onPress={openInvoiceSettings}>
-              Open invoice settings
+              {t('partnerDashboard.invoiceDetail.openInvoiceSettings')}
             </Button>
           </View>
         ) : null}
@@ -130,27 +159,24 @@ export default function ShopInvoiceDetailScreen() {
               loading={issuing}
               disabled={missingIssuer || issuing}
             >
-              Issue tax invoice
+              {t('partnerDashboard.invoiceDetail.issueTaxInvoice')}
             </Button>
           ) : null}
           {isIssued && isUnpaid ? (
             <Button mode="contained-tonal" onPress={handleMarkPaid} loading={markingPaid}>
-              Mark as paid
+              {t('partnerDashboard.invoiceDetail.markAsPaid')}
             </Button>
           ) : null}
         </View>
 
-        <Text style={styles.helpText}>
-          Draft / Proforma → Issue for a numbered tax invoice. Mark paid when the customer pays on pickup;
-          your accountant can also reconcile from the export later.
-        </Text>
+        <Text style={styles.helpText}>{t('partnerDashboard.invoiceDetail.helpText')}</Text>
       </ScrollView>
 
       <ConfirmDialog
         visible={confirmIssue}
-        title="Issue tax invoice?"
-        message="This assigns a fiscal number and locks supplier/buyer snapshots. The draft stays a proforma until you issue. The client is notified when linked to this repair."
-        confirmLabel="Issue"
+        title={t('partnerDashboard.invoiceDetail.confirmIssueTitle')}
+        message={t('partnerDashboard.invoiceDetail.confirmIssueBody')}
+        confirmLabel={t('partnerDashboard.invoiceDetail.confirmIssue')}
         loading={issuing}
         icon="file-document-check-outline"
         onCancel={() => !issuing && setConfirmIssue(false)}
@@ -169,10 +195,18 @@ const styles = StyleSheet.create({
   loader: {
     marginTop: 48,
   },
+  hintCard: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
   screenHint: {
-    color: 'rgba(255,255,255,0.88)',
+    color: 'rgba(255,255,255,0.9)',
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 19,
   },
   warningBox: {
     backgroundColor: 'rgba(245,158,11,0.12)',

@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { listOrgFleet } from '../api/fleet';
 import { WebSocketContext } from '../context/WebSocketManager';
+import { isWsConnected } from '../notifications/wsConnectionState';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import {
   navigateToNotifications,
@@ -75,7 +76,8 @@ export default function useOrgHeaderChrome({ loadCalendarBadge = true } = {}) {
         } catch {
           /* keep prior badge */
         }
-        if (typeof refreshUnreadFromRest === 'function') {
+        // Live badge from Channels while WS is up — skip REST on every screen focus.
+        if (!isWsConnected() && typeof refreshUnreadFromRest === 'function') {
           refreshUnreadFromRest();
         }
       };
