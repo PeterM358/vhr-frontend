@@ -5139,9 +5139,26 @@
     },
     "workforce": {
       "title": "Workforce",
+      "lead": "Add technicians here, then assign them on a repair’s Operations step.",
+      "tabList": "Team",
+      "tabAdd": "Add",
       "departments": "Departments",
       "employees": "Employees",
-      "billableRate": "Billable rate (minor)"
+      "billableRate": "Billable rate",
+      "billableRateMajor": "Billable rate (EUR / hour, optional)",
+      "displayName": "Name",
+      "employeeNumber": "Employee number (optional)",
+      "addTitle": "Add worker",
+      "addHelper": "Creates a shop roster entry (no login required). You can assign them on repairs once time tracking is on.",
+      "addCta": "Add worker",
+      "addSuccess": "Worker added.",
+      "addError": "Could not add worker.",
+      "emptyTitle": "No workers yet",
+      "emptyBody": "Add your first technician to assign work on repairs.",
+      "hasLogin": "Has app login",
+      "noLogin": "No app login yet",
+      "timeTrackingTitle": "Assign workers on repairs",
+      "timeTrackingHint": "Turns on employee time tracking so Operations can assign technicians and log hours."
     },
     "documentImports": {
       "title": "Document imports",

@@ -106,6 +106,19 @@ export async function listShopEmployees(token, shopId) {
   return response.json();
 }
 
+export async function createShopEmployee(token, shopId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/employees/`,
+    {
+      method: 'POST',
+      headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to create employee'));
+  return response.json();
+}
+
 export async function listShopDepartments(token, shopId) {
   const response = await fetch(
     `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/departments/`,

@@ -25,10 +25,11 @@ export const PARTNER_ERP_ROUTES = {
     drawerKey: 'analytics',
     requiresManage: true,
   },
+  // Roster create lives here — do not hide behind time-tracking (chicken-and-egg).
+  // Assign worker on repairs still checks uses_employee_time_tracking.
   ShopWorkforce: {
     drawerKey: 'workforce',
-    capability: 'uses_employee_time_tracking',
-    requiresAccess: true,
+    requiresManage: true,
   },
   ShopDocumentImports: {
     drawerKey: 'documentImports',
