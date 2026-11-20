@@ -26,6 +26,7 @@ import {
   getSubscriptionPaymentOptions,
   createSubscriptionPaymentRequest,
   createSubscriptionCheckout,
+  createSubscriptionEpayCheckout,
   cancelSubscriptionAtPeriodEnd,
 } from '../api/profiles';
 import { openPolicyPath } from '../policies/policyPaths';
@@ -214,9 +215,11 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
     (ents?.account_state || ents?.subscription_state) === 'active';
   const bank = optionsPayload?.bank || {};
   const stripe = optionsPayload?.stripe || {};
+  const epay = optionsPayload?.epay || {};
   const options = optionsPayload?.options;
   const bankIncomplete = Boolean(bank.incomplete || bank.configured === false);
   const stripeIncomplete = Boolean(stripe.incomplete || stripe.configured === false);
+  const epayIncomplete = Boolean(epay.incomplete || epay.configured === false);
   const stripeSubscriptionId = optionsPayload?.stripe_subscription_id;
   const featureRequested =
     featureLabelParam ||
@@ -272,10 +275,17 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   }, [completion, t]);
 
   React.useEffect(() => {
-    if (stripeIncomplete && !bankIncomplete) {
-      setPaymentMethod('bank');
+    if (paymentMethod === 'card' && stripeIncomplete) {
+      if (!bankIncomplete) setPaymentMethod('bank');
+      else if (!epayIncomplete) setPaymentMethod('easypay');
+    } else if (paymentMethod === 'bank' && bankIncomplete) {
+      if (!stripeIncomplete) setPaymentMethod('card');
+      else if (!epayIncomplete) setPaymentMethod('easypay');
+    } else if (paymentMethod === 'easypay' && epayIncomplete) {
+      if (!stripeIncomplete) setPaymentMethod('card');
+      else if (!bankIncomplete) setPaymentMethod('bank');
     }
-  }, [stripeIncomplete, bankIncomplete]);
+  }, [stripeIncomplete, bankIncomplete, epayIncomplete, paymentMethod]);
 
   React.useEffect(() => {
     setPayment(null);
@@ -314,14 +324,21 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
       payByCard();
       return;
     }
+    if (paymentMethod === 'easypay') {
+      requestEpayPayment();
+      return;
+    }
     requestPayment();
   };
 
   const primaryPayBusy = paymentMethod === 'card' ? checkoutSubmitting : submitting;
-  const primaryPayDisabled =
-    !selectedOption ||
-    primaryPayBusy ||
-    (paymentMethod === 'card' ? stripeIncomplete : bankIncomplete);
+  const methodIncomplete =
+    paymentMethod === 'card'
+      ? stripeIncomplete
+      : paymentMethod === 'easypay'
+        ? epayIncomplete
+        : bankIncomplete;
+  const primaryPayDisabled = !selectedOption || primaryPayBusy || methodIncomplete;
 
   const requestPayment = async () => {
     if (!profile?.id || bankIncomplete) return;
@@ -329,6 +346,24 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
     setError(null);
     try {
       const row = await createSubscriptionPaymentRequest(profile.id, {
+        planKey: selected.planKey,
+        billingInterval: selected.billingInterval,
+      });
+      setPayment(row);
+      scrollRef.current?.scrollToEnd({ animated: true });
+    } catch (e) {
+      setError(String(e?.message || e));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const requestEpayPayment = async () => {
+    if (!profile?.id || epayIncomplete) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const row = await createSubscriptionEpayCheckout(profile.id, {
         planKey: selected.planKey,
         billingInterval: selected.billingInterval,
       });
@@ -720,12 +755,13 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
               <Text style={[styles.checkoutLabel, styles.checkoutLabelSpaced]}>
                 {t('subscription.paymentMethodLabel')}
               </Text>
-              <View style={styles.toggle}>
+              <View style={[styles.toggle, styles.paymentMethodToggle]}>
                 <Pressable
                   onPress={() => setPaymentMethod('card')}
                   disabled={stripeIncomplete}
                   style={[
                     styles.toggleBtn,
+                    styles.paymentMethodBtn,
                     paymentMethod === 'card' && styles.toggleBtnActiveLight,
                     stripeIncomplete && styles.toggleBtnDisabled,
                   ]}
@@ -749,6 +785,7 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
                   disabled={bankIncomplete}
                   style={[
                     styles.toggleBtn,
+                    styles.paymentMethodBtn,
                     paymentMethod === 'bank' && styles.toggleBtnActiveLight,
                     bankIncomplete && styles.toggleBtnDisabled,
                   ]}
@@ -767,6 +804,30 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
                     {t('subscription.payWithBank')}
                   </Text>
                 </Pressable>
+                <Pressable
+                  onPress={() => setPaymentMethod('easypay')}
+                  disabled={epayIncomplete}
+                  style={[
+                    styles.toggleBtn,
+                    styles.paymentMethodBtn,
+                    paymentMethod === 'easypay' && styles.toggleBtnActiveLight,
+                    epayIncomplete && styles.toggleBtnDisabled,
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="storefront-outline"
+                    size={18}
+                    color={paymentMethod === 'easypay' ? COLORS.PRIMARY_DARK : COLORS.TEXT_MUTED}
+                  />
+                  <Text
+                    style={[
+                      styles.toggleTextDark,
+                      paymentMethod === 'easypay' && styles.toggleTextDarkActive,
+                    ]}
+                  >
+                    {t('subscription.payWithEpay')}
+                  </Text>
+                </Pressable>
               </View>
 
               {paymentMethod === 'card' && stripeIncomplete ? (
@@ -781,11 +842,19 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
                   <Text style={styles.warnBodyInline}>{t('subscription.bankConfigMissingBody')}</Text>
                 </View>
               ) : null}
-              {!(paymentMethod === 'card' ? stripeIncomplete : bankIncomplete) ? (
+              {paymentMethod === 'easypay' && epayIncomplete ? (
+                <View style={styles.warnCardInline}>
+                  <Text style={styles.warnTitleInline}>{t('subscription.epayConfigMissingTitle')}</Text>
+                  <Text style={styles.warnBodyInline}>{t('subscription.epayConfigMissingBody')}</Text>
+                </View>
+              ) : null}
+              {!methodIncomplete ? (
                 <Text style={styles.payHint}>
                   {paymentMethod === 'card'
                     ? t('subscription.cardCheckoutIntroShort')
-                    : t('subscription.bankTransferIntroShort')}
+                    : paymentMethod === 'easypay'
+                      ? t('subscription.epayIntroShort')
+                      : t('subscription.bankTransferIntroShort')}
                 </Text>
               ) : null}
 
@@ -830,6 +899,35 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
                   <Text style={styles.footnote}>{t('subscription.notAnInvoice')}</Text>
                 </View>
               ) : null}
+
+              {payment && paymentMethod === 'easypay' ? (
+                <View style={styles.instructions}>
+                  <Text style={styles.instructionsTitle}>{t('subscription.epayInstructionsTitle')}</Text>
+                  <Text style={styles.instructionsHint}>{t('subscription.epayInstructionsBody')}</Text>
+                  <CopyRow
+                    label={t('subscription.epayCode')}
+                    value={payment.epay_idn}
+                    onCopy={() => copyText(payment.epay_idn)}
+                    emphasize
+                  />
+                  <CopyRow
+                    label={t('subscription.amount')}
+                    value={`${payment.amount} ${payment.currency}`}
+                    onCopy={() => copyText(`${payment.amount} ${payment.currency}`)}
+                  />
+                  <CopyRow
+                    label={t('subscription.paymentReference')}
+                    value={payment.payment_reference}
+                    onCopy={() => copyText(payment.payment_reference)}
+                  />
+                  {payment.epay_exp_at ? (
+                    <Text style={styles.metaLine}>
+                      {t('subscription.epayExpires')}: {String(payment.epay_exp_at).slice(0, 10)}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.footnote}>{t('subscription.notAnInvoice')}</Text>
+                </View>
+              ) : null}
             </View>
 
             <View style={styles.enterpriseCardCompact}>
@@ -868,7 +966,9 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
                   <Text style={styles.stickyBtnLabel}>
                     {paymentMethod === 'card'
                       ? t('subscription.payByCardCta')
-                      : t('subscription.requestPaymentInstructions')}
+                      : paymentMethod === 'easypay'
+                        ? t('subscription.payByEpayCta')
+                        : t('subscription.requestPaymentInstructions')}
                   </Text>
                   <Text style={styles.stickyBtnSub}>
                     {`${selectedPlanName} · ${selectedIntervalName}`}
@@ -1359,6 +1459,14 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 4,
     marginBottom: 4,
+  },
+  paymentMethodToggle: {
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  paymentMethodBtn: {
+    minWidth: '30%',
+    flexGrow: 1,
   },
   toggleBtn: {
     flex: 1,
