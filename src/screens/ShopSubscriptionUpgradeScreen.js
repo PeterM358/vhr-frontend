@@ -242,6 +242,12 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
 
   const isAnnual = selected.billingInterval === 'annual';
   const selectedOption = findOption(options, selected.planKey, selected.billingInterval);
+  const earlyRenewalMeta = optionsPayload?.early_renewal || {};
+  const earlyRenewalEligible = Boolean(earlyRenewalMeta.eligible);
+  const earlyRenewalPercent = Number(earlyRenewalMeta.percent) || 20;
+  const selectedIsEarlyRenewal = Boolean(
+    selectedOption?.early_renewal && selected.billingInterval === 'annual'
+  );
   // One savings figure for the selected plan's annual option (toggle + price hero).
   const annualSavePercent = useMemo(
     () => savingsPercent(findOption(options, selected.planKey, 'annual')),
@@ -436,12 +442,6 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
   /** Same paid plan already active — avoid "pay again" confusion for monthly. */
   const alreadyOnSelectedPaidPlan =
     showManageSubscription && selected.planKey === planKeyLower;
-  const earlyRenewalMeta = optionsPayload?.early_renewal || {};
-  const earlyRenewalEligible = Boolean(earlyRenewalMeta.eligible);
-  const earlyRenewalPercent = Number(earlyRenewalMeta.percent) || 20;
-  const selectedIsEarlyRenewal = Boolean(
-    selectedOption?.early_renewal && selected.billingInterval === 'annual'
-  );
   /** Sticky pay only when upgrading, first buy, or intentional early annual renew. */
   const showStickyPay =
     Boolean(selectedOption) &&
