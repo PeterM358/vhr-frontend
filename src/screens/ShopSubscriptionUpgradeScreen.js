@@ -297,12 +297,23 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
       return { main: t('subscription.priceUnavailable'), sub: '', savings: null };
     }
     const currency = opt.currency || 'EUR';
+    const listAmount = opt.list_amount || opt.amount;
+    const isEarly = Boolean(opt.early_renewal) && isAnnual;
     if (isAnnual) {
       return {
         main: `${opt.amount} ${currency}`,
-        sub: t('subscription.billedAnnually', { amount: opt.amount, currency }),
-        // Savings % lives once under the period toggle — avoid 14% vs 16% double display.
-        savings: null,
+        sub: isEarly
+          ? t('subscription.earlyRenewalPriceSub', {
+              list: listAmount,
+              currency,
+              percent: opt.early_renewal_percent || earlyRenewalPercent,
+            })
+          : t('subscription.billedAnnually', { amount: opt.amount, currency }),
+        savings: isEarly
+          ? t('subscription.earlyRenewalBadge', {
+              percent: opt.early_renewal_percent || earlyRenewalPercent,
+            })
+          : null,
       };
     }
     return {
@@ -310,7 +321,7 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
       sub: t('subscription.billedMonthly'),
       savings: null,
     };
-  }, [selectedOption, isAnnual, t]);
+  }, [selectedOption, isAnnual, earlyRenewalPercent, t]);
 
   const planDetailFeatures = useMemo(() => {
     if (selected.planKey === 'premium') {
@@ -422,9 +433,19 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
 
   const showManageSubscription =
     isActive && currentPlan.isAssigned && planKeyLower && planKeyLower !== 'trial';
-  /** Don't keep a checkout sticky CTA when the selected plan is already active. */
+  /** Same paid plan already active — avoid "pay again" confusion for monthly. */
   const alreadyOnSelectedPaidPlan =
     showManageSubscription && selected.planKey === planKeyLower;
+  const earlyRenewalMeta = optionsPayload?.early_renewal || {};
+  const earlyRenewalEligible = Boolean(earlyRenewalMeta.eligible);
+  const earlyRenewalPercent = Number(earlyRenewalMeta.percent) || 20;
+  const selectedIsEarlyRenewal = Boolean(
+    selectedOption?.early_renewal && selected.billingInterval === 'annual'
+  );
+  /** Sticky pay only when upgrading, first buy, or intentional early annual renew. */
+  const showStickyPay =
+    Boolean(selectedOption) &&
+    (!alreadyOnSelectedPaidPlan || selectedIsEarlyRenewal);
 
   const handleCancelAtPeriodEnd = () => {
     if (!profile?.id || cancelSubmitting) return;
@@ -545,7 +566,23 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
 
             {showManageSubscription ? (
               <View style={styles.manageCard}>
-                <Text style={styles.manageTitle}>{t('subscription.manageTitle')}</Text>
+                <Text style={styles.paidBannerTitle}>{t('subscription.alreadyPaidTitle')}</Text>
+                <Text style={styles.manageBody}>
+                  {expiresAt
+                    ? t('subscription.alreadyPaidBody', {
+                        plan: planLabel,
+                        date: String(expiresAt).slice(0, 10),
+                      })
+                    : t('subscription.alreadyPaidBodyNoDate', { plan: planLabel })}
+                </Text>
+                {earlyRenewalEligible ? (
+                  <Text style={[styles.manageBody, styles.earlyRenewHint]}>
+                    {t('subscription.earlyRenewalHint', { percent: earlyRenewalPercent })}
+                  </Text>
+                ) : null}
+                <Text style={[styles.manageTitle, { marginTop: 14 }]}>
+                  {t('subscription.manageTitle')}
+                </Text>
                 <Text style={styles.manageBody}>{t('subscription.manageBody')}</Text>
                 {cancelAtPeriodEnd ? (
                   <>
@@ -850,12 +887,17 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
               ) : null}
               {!methodIncomplete ? (
                 <Text style={styles.payHint}>
-                  {paymentMethod === 'card'
-                    ? t('subscription.cardCheckoutIntroShort')
-                    : paymentMethod === 'easypay'
-                      ? t('subscription.epayIntroShort')
-                      : t('subscription.bankTransferIntroShort')}
+                  {selectedIsEarlyRenewal && paymentMethod === 'card'
+                    ? t('subscription.earlyRenewalCardNote')
+                    : paymentMethod === 'card'
+                      ? t('subscription.cardCheckoutIntroShort')
+                      : paymentMethod === 'easypay'
+                        ? t('subscription.epayIntroShort')
+                        : t('subscription.bankTransferIntroShort')}
                 </Text>
+              ) : null}
+              {alreadyOnSelectedPaidPlan && !isAnnual ? (
+                <Text style={styles.payHint}>{t('subscription.alreadyPaidPickAnnual')}</Text>
               ) : null}
 
               {payment && paymentMethod === 'bank' ? (
@@ -947,7 +989,7 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
         )}
       </ScrollView>
 
-      {!loading && selectedOption && !alreadyOnSelectedPaidPlan ? (
+      {!loading && showStickyPay ? (
         <View style={styles.stickyBar} pointerEvents="box-none">
           <Pressable
             onPress={handlePrimaryPay}
@@ -964,7 +1006,9 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
               <>
                 <View style={styles.stickyTextWrap}>
                   <Text style={styles.stickyBtnLabel}>
-                    {paymentMethod === 'card'
+                    {selectedIsEarlyRenewal
+                      ? t('subscription.earlyRenewalCta', { percent: earlyRenewalPercent })
+                      : paymentMethod === 'card'
                       ? t('subscription.payByCardCta')
                       : paymentMethod === 'easypay'
                         ? t('subscription.payByEpayCta')
@@ -1247,6 +1291,17 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderWidth: 1,
     borderColor: 'rgba(15,76,129,0.2)',
+  },
+  paidBannerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: COLORS.PRIMARY_DARK,
+    marginBottom: 6,
+  },
+  earlyRenewHint: {
+    marginTop: 10,
+    color: COLORS.PRIMARY_DARK,
+    fontWeight: '600',
   },
   manageTitle: {
     fontSize: 16,
