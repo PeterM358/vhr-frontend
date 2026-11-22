@@ -61,11 +61,12 @@ export default function ShopWorkforceScreen() {
   const [employeeNumber, setEmployeeNumber] = useState('');
   const [phone, setPhone] = useState('');
   const [billableRate, setBillableRate] = useState('');
-  /** Base wage: '' | hourly | daily — percent stacks optionally. */
-  const [compensationBase, setCompensationBase] = useState('');
-  const [plusPercent, setPlusPercent] = useState(false);
-  const [wageRate, setWageRate] = useState('');
-  const [dailyRate, setDailyRate] = useState('');
+  /** Two independent switches: fixed wage and/or percent (both can be on). */
+  const [useFixedPay, setUseFixedPay] = useState(false);
+  const [fixedUnit, setFixedUnit] = useState('daily'); // hourly | daily — same money, different unit
+  const [fixedAmount, setFixedAmount] = useState('');
+  const [dayHours, setDayHours] = useState(8); // 4 | 8 | 12
+  const [usePercent, setUsePercent] = useState(false);
   const [compensationPercent, setCompensationPercent] = useState('');
   const [percentBasis, setPercentBasis] = useState('labor');
   const [internalNotes, setInternalNotes] = useState('');
@@ -133,25 +134,73 @@ export default function ShopWorkforceScreen() {
     setEmployeeNumber('');
     setPhone('');
     setBillableRate('');
-    setCompensationBase('');
-    setPlusPercent(false);
-    setWageRate('');
-    setDailyRate('');
+    setUseFixedPay(false);
+    setFixedUnit('daily');
+    setFixedAmount('');
+    setDayHours(8);
+    setUsePercent(false);
     setCompensationPercent('');
     setPercentBasis('labor');
     setInternalNotes('');
   }, []);
 
   const resolveCompensationMode = useCallback(() => {
-    if (compensationBase === 'hourly') {
-      return plusPercent ? 'hourly_plus_percent' : 'hourly';
+    if (useFixedPay && usePercent) {
+      return fixedUnit === 'hourly' ? 'hourly_plus_percent' : 'daily_plus_percent';
     }
-    if (compensationBase === 'daily') {
-      return plusPercent ? 'daily_plus_percent' : 'daily';
-    }
-    if (plusPercent) return 'percent';
+    if (useFixedPay) return fixedUnit === 'hourly' ? 'hourly' : 'daily';
+    if (usePercent) return 'percent';
     return '';
-  }, [compensationBase, plusPercent]);
+  }, [useFixedPay, usePercent, fixedUnit]);
+
+  const payPreview = useMemo(() => {
+    const parts = [];
+    if (useFixedPay && fixedAmount.trim()) {
+      parts.push(
+        fixedUnit === 'hourly'
+          ? t('erp.workforce.previewHourly', { amount: fixedAmount.trim() })
+          : t('erp.workforce.previewDaily', { amount: fixedAmount.trim() })
+      );
+    }
+    if (usePercent && compensationPercent.trim()) {
+      const basis =
+        percentBasis === 'turnover'
+          ? t('erp.workforce.basisTurnover')
+          : t('erp.workforce.basisLabor');
+      parts.push(
+        t('erp.workforce.previewPercent', {
+          percent: compensationPercent.trim(),
+          basis,
+        })
+      );
+    }
+    if (!parts.length) return t('erp.workforce.previewEmpty');
+    return t('erp.workforce.previewJoin', { parts: parts.join(' + ') });
+  }, [
+    useFixedPay,
+    fixedAmount,
+    fixedUnit,
+    usePercent,
+    compensationPercent,
+    percentBasis,
+    t,
+  ]);
+
+  const switchFixedUnit = useCallback(
+    (nextUnit) => {
+      if (nextUnit === fixedUnit) return;
+      const minor = parseMoneyToMinor(fixedAmount);
+      if (minor != null && dayHours > 0) {
+        if (fixedUnit === 'hourly' && nextUnit === 'daily') {
+          setFixedAmount(((minor * dayHours) / 100).toFixed(2));
+        } else if (fixedUnit === 'daily' && nextUnit === 'hourly') {
+          setFixedAmount((minor / dayHours / 100).toFixed(2));
+        }
+      }
+      setFixedUnit(nextUnit);
+    },
+    [fixedUnit, fixedAmount, dayHours]
+  );
 
   const addEmployee = useCallback(async () => {
     const name = displayName.trim();
@@ -170,16 +219,23 @@ export default function ShopWorkforceScreen() {
       if (rateMinor != null) payload.default_customer_billable_rate_minor = rateMinor;
 
       const mode = resolveCompensationMode();
-      if (mode) payload.compensation_mode = mode;
-      if (compensationBase === 'hourly' || mode === 'hourly_plus_percent') {
-        const wageMinor = parseMoneyToMinor(wageRate);
-        if (wageMinor != null) payload.compensation_hourly_rate_minor = wageMinor;
+      if (mode) {
+        payload.compensation_mode = mode;
+        payload.compensation_day_hours = String(dayHours);
       }
-      if (compensationBase === 'daily' || mode === 'daily_plus_percent') {
-        const dayMinor = parseMoneyToMinor(dailyRate);
-        if (dayMinor != null) payload.compensation_daily_rate_minor = dayMinor;
+      if (useFixedPay) {
+        const amountMinor = parseMoneyToMinor(fixedAmount);
+        if (amountMinor != null) {
+          if (fixedUnit === 'hourly') {
+            payload.compensation_hourly_rate_minor = amountMinor;
+            payload.compensation_daily_rate_minor = Math.round(amountMinor * dayHours);
+          } else {
+            payload.compensation_daily_rate_minor = amountMinor;
+            payload.compensation_hourly_rate_minor = Math.round(amountMinor / dayHours);
+          }
+        }
       }
-      if (plusPercent || mode === 'percent') {
+      if (usePercent) {
         const pct = Number(String(compensationPercent || '').trim().replace(',', '.'));
         if (Number.isFinite(pct)) payload.compensation_percent = pct.toFixed(2);
         payload.compensation_percent_basis = percentBasis === 'turnover' ? 'turnover' : 'labor';
@@ -205,10 +261,11 @@ export default function ShopWorkforceScreen() {
     employeeNumber,
     phone,
     billableRate,
-    compensationBase,
-    plusPercent,
-    wageRate,
-    dailyRate,
+    useFixedPay,
+    fixedUnit,
+    fixedAmount,
+    dayHours,
+    usePercent,
     compensationPercent,
     percentBasis,
     internalNotes,
@@ -360,95 +417,120 @@ export default function ShopWorkforceScreen() {
                 style={styles.input}
                 textColor={COLORS.TEXT_DARK}
               />
-              <Text style={styles.fieldLabel}>{t('erp.workforce.compModeLabel')}</Text>
-              <Text style={styles.helper}>{t('erp.workforce.compModeHint')}</Text>
-              <View style={styles.compTrack}>
-                {[
-                  { id: '', labelKey: 'erp.workforce.compModeNone' },
-                  { id: 'hourly', labelKey: 'erp.workforce.compModeHourly' },
-                  { id: 'daily', labelKey: 'erp.workforce.compModeDaily' },
-                ].map((opt) => {
-                  const selected = compensationBase === opt.id;
-                  return (
-                    <Pressable
-                      key={opt.id || 'none'}
-                      onPress={() => setCompensationBase(opt.id)}
-                      style={[styles.compCell, selected && styles.compCellActive]}
-                    >
-                      <Text style={[styles.compLabel, selected && styles.compLabelActive]}>
-                        {t(opt.labelKey)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              {compensationBase === 'hourly' ? (
-                <>
-                  <TextInput
-                    label={t('erp.workforce.wageRateMajor')}
-                    value={wageRate}
-                    onChangeText={setWageRate}
-                    mode="outlined"
-                    keyboardType="decimal-pad"
-                    style={styles.input}
-                    textColor={COLORS.TEXT_DARK}
-                  />
-                  <Text style={styles.helper}>{t('erp.workforce.hourlyDayHint')}</Text>
-                </>
-              ) : null}
-              {compensationBase === 'daily' ? (
-                <>
-                  <TextInput
-                    label={t('erp.workforce.dailyRateMajor')}
-                    value={dailyRate}
-                    onChangeText={setDailyRate}
-                    mode="outlined"
-                    keyboardType="decimal-pad"
-                    style={styles.input}
-                    textColor={COLORS.TEXT_DARK}
-                  />
-                  <Text style={styles.helper}>{t('erp.workforce.dailyDayHint')}</Text>
-                </>
-              ) : null}
-              <View style={styles.toggleRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.fieldLabel}>{t('erp.workforce.plusPercentTitle')}</Text>
-                  <Text style={styles.helper}>{t('erp.workforce.plusPercentHint')}</Text>
-                </View>
-                <Switch value={plusPercent} onValueChange={setPlusPercent} />
-              </View>
-              {plusPercent ? (
-                <>
-                  <TextInput
-                    label={t('erp.workforce.compPercent')}
-                    value={compensationPercent}
-                    onChangeText={setCompensationPercent}
-                    mode="outlined"
-                    keyboardType="decimal-pad"
-                    style={styles.input}
-                    textColor={COLORS.TEXT_DARK}
-                  />
-                  <View style={styles.compTrack}>
-                    {[
-                      { id: 'labor', labelKey: 'erp.workforce.basisLabor' },
-                      { id: 'turnover', labelKey: 'erp.workforce.basisTurnover' },
-                    ].map((opt) => {
-                      const selected = percentBasis === opt.id;
-                      return (
-                        <Pressable
-                          key={opt.id}
-                          onPress={() => setPercentBasis(opt.id)}
-                          style={[styles.compCell, selected && styles.compCellActive]}
-                        >
-                          <Text style={[styles.compLabel, selected && styles.compLabelActive]}>
-                            {t(opt.labelKey)}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
+              <Text style={styles.fieldLabel}>{t('erp.workforce.payHowTitle')}</Text>
+              <Text style={styles.helper}>{t('erp.workforce.payHowHint')}</Text>
+
+              <View style={[styles.payBlock, useFixedPay && styles.payBlockOn]}>
+                <View style={styles.toggleRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>{t('erp.workforce.fixedPayTitle')}</Text>
+                    <Text style={styles.helper}>{t('erp.workforce.fixedPayHint')}</Text>
                   </View>
-                </>
-              ) : null}
+                  <Switch value={useFixedPay} onValueChange={setUseFixedPay} />
+                </View>
+                {useFixedPay ? (
+                  <>
+                    <Text style={styles.helper}>{t('erp.workforce.dayLengthLabel')}</Text>
+                    <View style={styles.compTrack}>
+                      {[4, 8, 12].map((h) => {
+                        const selected = dayHours === h;
+                        return (
+                          <Pressable
+                            key={h}
+                            onPress={() => setDayHours(h)}
+                            style={[styles.compCell, selected && styles.compCellActive]}
+                          >
+                            <Text style={[styles.compLabel, selected && styles.compLabelActive]}>
+                              {t('erp.workforce.dayHoursChip', { hours: h })}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    <View style={styles.compTrack}>
+                      {[
+                        { id: 'daily', labelKey: 'erp.workforce.unitDaily' },
+                        { id: 'hourly', labelKey: 'erp.workforce.unitHourly' },
+                      ].map((opt) => {
+                        const selected = fixedUnit === opt.id;
+                        return (
+                          <Pressable
+                            key={opt.id}
+                            onPress={() => switchFixedUnit(opt.id)}
+                            style={[styles.compCell, selected && styles.compCellActive]}
+                          >
+                            <Text style={[styles.compLabel, selected && styles.compLabelActive]}>
+                              {t(opt.labelKey)}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    <TextInput
+                      label={
+                        fixedUnit === 'hourly'
+                          ? t('erp.workforce.wageRateMajor')
+                          : t('erp.workforce.dailyRateMajor')
+                      }
+                      value={fixedAmount}
+                      onChangeText={setFixedAmount}
+                      mode="outlined"
+                      keyboardType="decimal-pad"
+                      style={styles.input}
+                      textColor={COLORS.TEXT_DARK}
+                    />
+                    <Text style={styles.helper}>
+                      {fixedUnit === 'daily'
+                        ? t('erp.workforce.dailyDayHint')
+                        : t('erp.workforce.hourlyDayHint', { hours: dayHours })}
+                    </Text>
+                  </>
+                ) : null}
+              </View>
+
+              <View style={[styles.payBlock, usePercent && styles.payBlockOn]}>
+                <View style={styles.toggleRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>{t('erp.workforce.percentPayTitle')}</Text>
+                    <Text style={styles.helper}>{t('erp.workforce.percentPayHint')}</Text>
+                  </View>
+                  <Switch value={usePercent} onValueChange={setUsePercent} />
+                </View>
+                {usePercent ? (
+                  <>
+                    <TextInput
+                      label={t('erp.workforce.compPercent')}
+                      value={compensationPercent}
+                      onChangeText={setCompensationPercent}
+                      mode="outlined"
+                      keyboardType="decimal-pad"
+                      style={styles.input}
+                      textColor={COLORS.TEXT_DARK}
+                    />
+                    <View style={styles.compTrack}>
+                      {[
+                        { id: 'labor', labelKey: 'erp.workforce.basisLabor' },
+                        { id: 'turnover', labelKey: 'erp.workforce.basisTurnover' },
+                      ].map((opt) => {
+                        const selected = percentBasis === opt.id;
+                        return (
+                          <Pressable
+                            key={opt.id}
+                            onPress={() => setPercentBasis(opt.id)}
+                            style={[styles.compCell, selected && styles.compCellActive]}
+                          >
+                            <Text style={[styles.compLabel, selected && styles.compLabelActive]}>
+                              {t(opt.labelKey)}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : null}
+              </View>
+
+              <Text style={styles.preview}>{payPreview}</Text>
               <TextInput
                 label={t('erp.workforce.billableRateMajor')}
                 value={billableRate}
@@ -612,6 +694,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 13,
     marginTop: 4,
+  },
+  payBlock: {
+    borderWidth: 1,
+    borderColor: 'rgba(15,76,129,0.14)',
+    borderRadius: 12,
+    padding: 10,
+    gap: 6,
+    backgroundColor: '#fff',
+  },
+  payBlockOn: {
+    borderColor: COLORS.PRIMARY,
+    backgroundColor: 'rgba(15,76,129,0.04)',
+  },
+  preview: {
+    marginTop: 4,
+    marginBottom: 4,
+    color: COLORS.PRIMARY_DARK,
+    fontWeight: '700',
+    fontSize: 14,
+    lineHeight: 20,
   },
   compTrack: {
     flexDirection: 'row',
