@@ -10,6 +10,7 @@ import {
   describeApiListShape,
   normalizeApiListResponse,
 } from '../utils/normalizeApiList';
+import { messageFromApiResponseText } from '../utils/apiErrorMessage';
 
 function buildCityQuery(options = {}) {
   const params = new URLSearchParams();
@@ -304,7 +305,6 @@ export async function createSubscriptionPaymentRequest(shopId, { planKey, billin
 
 /** Register EasyPay cash-desk code (ePay.bg IDN). Server resolves amounts. */
 export async function createSubscriptionEpayCheckout(shopId, { planKey, billingInterval }) {
-  const { messageFromApiResponseText } = await import('../utils/apiErrorMessage');
   const token = await AsyncStorage.getItem('@access_token');
   const res = await fetch(
     `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/subscription-epay-checkout/`,
