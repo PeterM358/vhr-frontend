@@ -59,7 +59,12 @@ export default function ShopWorkforceScreen() {
 
   const [displayName, setDisplayName] = useState('');
   const [employeeNumber, setEmployeeNumber] = useState('');
+  const [phone, setPhone] = useState('');
   const [billableRate, setBillableRate] = useState('');
+  const [compensationMode, setCompensationMode] = useState(''); // '' | hourly | percent
+  const [wageRate, setWageRate] = useState('');
+  const [compensationPercent, setCompensationPercent] = useState('');
+  const [internalNotes, setInternalNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saveOk, setSaveOk] = useState('');
@@ -119,6 +124,17 @@ export default function ShopWorkforceScreen() {
     [shopId, canManage, trackingBusy, reload, t]
   );
 
+  const resetAddForm = useCallback(() => {
+    setDisplayName('');
+    setEmployeeNumber('');
+    setPhone('');
+    setBillableRate('');
+    setCompensationMode('');
+    setWageRate('');
+    setCompensationPercent('');
+    setInternalNotes('');
+  }, []);
+
   const addEmployee = useCallback(async () => {
     const name = displayName.trim();
     if (!shopId || !name || saving) return;
@@ -130,12 +146,25 @@ export default function ShopWorkforceScreen() {
       const payload = { display_name: name };
       const number = employeeNumber.trim();
       if (number) payload.employee_number = number;
+      const phoneVal = phone.trim();
+      if (phoneVal) payload.phone = phoneVal;
       const rateMinor = parseMoneyToMinor(billableRate);
       if (rateMinor != null) payload.default_customer_billable_rate_minor = rateMinor;
+      if (compensationMode === 'hourly' || compensationMode === 'percent') {
+        payload.compensation_mode = compensationMode;
+      }
+      if (compensationMode === 'hourly') {
+        const wageMinor = parseMoneyToMinor(wageRate);
+        if (wageMinor != null) payload.compensation_hourly_rate_minor = wageMinor;
+      }
+      if (compensationMode === 'percent') {
+        const pct = Number(String(compensationPercent || '').trim().replace(',', '.'));
+        if (Number.isFinite(pct)) payload.compensation_percent = pct.toFixed(2);
+      }
+      const notes = internalNotes.trim();
+      if (notes) payload.internal_notes = notes;
       await createShopEmployee(token, shopId, payload);
-      setDisplayName('');
-      setEmployeeNumber('');
-      setBillableRate('');
+      resetAddForm();
       setSaveOk(t('erp.workforce.addSuccess'));
       setMode('list');
       await load();
@@ -151,14 +180,38 @@ export default function ShopWorkforceScreen() {
     shopId,
     displayName,
     employeeNumber,
+    phone,
     billableRate,
+    compensationMode,
+    wageRate,
+    compensationPercent,
+    internalNotes,
     saving,
     load,
     t,
     timeTrackingOn,
     canManage,
     toggleTimeTracking,
+    resetAddForm,
   ]);
+
+  const compensationLabel = useCallback(
+    (row) => {
+      const mode = String(row?.compensation_mode || '');
+      if (mode === 'hourly') {
+        return t('erp.workforce.compHourlySummary', {
+          rate: formatRateMinor(row.compensation_hourly_rate_minor),
+        });
+      }
+      if (mode === 'percent') {
+        return t('erp.workforce.compPercentSummary', {
+          percent: row.compensation_percent != null ? String(row.compensation_percent) : '—',
+        });
+      }
+      return t('erp.workforce.compNotSet');
+    },
+    [t]
+  );
 
   const visibleModes = canManage ? MODES : MODES.filter((m) => m.id === 'list');
 
@@ -242,6 +295,15 @@ export default function ShopWorkforceScreen() {
                 textColor={COLORS.TEXT_DARK}
               />
               <TextInput
+                label={t('erp.workforce.phone')}
+                value={phone}
+                onChangeText={setPhone}
+                mode="outlined"
+                keyboardType="phone-pad"
+                style={styles.input}
+                textColor={COLORS.TEXT_DARK}
+              />
+              <TextInput
                 label={t('erp.workforce.employeeNumber')}
                 value={employeeNumber}
                 onChangeText={setEmployeeNumber}
@@ -249,6 +311,50 @@ export default function ShopWorkforceScreen() {
                 style={styles.input}
                 textColor={COLORS.TEXT_DARK}
               />
+              <Text style={styles.fieldLabel}>{t('erp.workforce.compModeLabel')}</Text>
+              <Text style={styles.helper}>{t('erp.workforce.compModeHint')}</Text>
+              <View style={styles.compTrack}>
+                {[
+                  { id: '', labelKey: 'erp.workforce.compModeNone' },
+                  { id: 'hourly', labelKey: 'erp.workforce.compModeHourly' },
+                  { id: 'percent', labelKey: 'erp.workforce.compModePercent' },
+                ].map((opt) => {
+                  const selected = compensationMode === opt.id;
+                  return (
+                    <Pressable
+                      key={opt.id || 'none'}
+                      onPress={() => setCompensationMode(opt.id)}
+                      style={[styles.compCell, selected && styles.compCellActive]}
+                    >
+                      <Text style={[styles.compLabel, selected && styles.compLabelActive]}>
+                        {t(opt.labelKey)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {compensationMode === 'hourly' ? (
+                <TextInput
+                  label={t('erp.workforce.wageRateMajor')}
+                  value={wageRate}
+                  onChangeText={setWageRate}
+                  mode="outlined"
+                  keyboardType="decimal-pad"
+                  style={styles.input}
+                  textColor={COLORS.TEXT_DARK}
+                />
+              ) : null}
+              {compensationMode === 'percent' ? (
+                <TextInput
+                  label={t('erp.workforce.compPercent')}
+                  value={compensationPercent}
+                  onChangeText={setCompensationPercent}
+                  mode="outlined"
+                  keyboardType="decimal-pad"
+                  style={styles.input}
+                  textColor={COLORS.TEXT_DARK}
+                />
+              ) : null}
               <TextInput
                 label={t('erp.workforce.billableRateMajor')}
                 value={billableRate}
@@ -258,6 +364,17 @@ export default function ShopWorkforceScreen() {
                 style={styles.input}
                 textColor={COLORS.TEXT_DARK}
               />
+              <Text style={styles.helper}>{t('erp.workforce.billableRateHint')}</Text>
+              <TextInput
+                label={t('erp.workforce.internalNotes')}
+                value={internalNotes}
+                onChangeText={setInternalNotes}
+                mode="outlined"
+                multiline
+                style={styles.input}
+                textColor={COLORS.TEXT_DARK}
+              />
+              <Text style={styles.helper}>{t('erp.workforce.internalNotesHint')}</Text>
               <Button
                 mode="contained"
                 loading={saving}
@@ -288,13 +405,20 @@ export default function ShopWorkforceScreen() {
               {employees.map((e) => (
                 <AppCard key={e.id} style={styles.card}>
                   <Text style={styles.employeeName}>{e.display_name}</Text>
+                  {e.phone ? (
+                    <Text style={styles.meta}>
+                      {t('erp.workforce.phone')}: {e.phone}
+                    </Text>
+                  ) : null}
                   {e.employee_number ? (
                     <Text style={styles.meta}>
                       {t('erp.workforce.employeeNumber')}: {e.employee_number}
                     </Text>
                   ) : null}
+                  <Text style={styles.meta}>{compensationLabel(e)}</Text>
                   <Text style={styles.meta}>
-                    {t('erp.workforce.billableRate')}: {formatRateMinor(e.default_customer_billable_rate_minor)}
+                    {t('erp.workforce.billableRate')}:{' '}
+                    {formatRateMinor(e.default_customer_billable_rate_minor)}
                   </Text>
                   <Text style={styles.meta}>
                     {e.has_login
@@ -387,6 +511,41 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_MUTED,
     fontSize: 13,
     lineHeight: 18,
+    marginBottom: 4,
+  },
+  fieldLabel: {
+    color: COLORS.TEXT_DARK,
+    fontWeight: '700',
+    fontSize: 13,
+    marginTop: 4,
+  },
+  compTrack: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 8,
+  },
+  compCell: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(15,76,129,0.2)',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+  },
+  compCellActive: {
+    borderColor: COLORS.PRIMARY,
+    backgroundColor: 'rgba(15,76,129,0.08)',
+  },
+  compLabel: {
+    color: COLORS.TEXT_MUTED,
+    fontWeight: '600',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  compLabelActive: {
+    color: COLORS.PRIMARY_DARK,
   },
   input: {
     backgroundColor: '#fff',
