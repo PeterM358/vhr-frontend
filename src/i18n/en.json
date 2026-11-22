@@ -5744,6 +5744,7 @@
     "earlyRenewalPriceSub": "Was {{list}} {{currency}} — {{percent}}% off for early annual renewal",
     "earlyRenewalCta": "Renew early (−{{percent}}%)",
     "earlyRenewalCardNote": "Card checkout uses the list price unless a Stripe coupon is configured. For the early-renewal discount, pay by bank transfer or EasyPay.",
+    "epayEmethodError": "EasyPay could not issue a payment code (ePay EMETHOD). Usually the merchant CIN/secret does not match demo/prod, or EasyPay cash is not enabled on the ePay contract yet. Use bank transfer for now, or retry after ePay activates the live merchant.",
 
     "cancelAtPeriodEndCta": "Cancel at period end",
     "cancelAtPeriodEndConfirm": "Stop renewal at the end of your paid period? You keep access until then.",

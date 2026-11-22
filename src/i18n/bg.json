@@ -5696,6 +5696,7 @@
     "earlyRenewalPriceSub": "Беше {{list}} {{currency}} — {{percent}}% отстъпка за ранно годишно подновяване",
     "earlyRenewalCta": "Поднови рано (−{{percent}}%)",
     "earlyRenewalCardNote": "Плащането с карта е на каталожната цена, освен ако няма Stripe купон. За отстъпката при ранно подновяване ползвайте банков превод или EasyPay.",
+    "epayEmethodError": "EasyPay не издаде код за плащане (ePay EMETHOD). Обикновено CIN/secret не съвпадат с demo/prod средата, или „плащане на каса“ още не е активирано по договора с ePay. Засега ползвайте банков превод или опитайте отново след като ePay пусне live търговеца.",
     "cancelAtPeriodEndCta": "Отказ в края на периода",
     "cancelAtPeriodEndConfirm": "Да спрем подновяването в края на платения период? Достъпът остава до тогава.",
     "cancelScheduledTitle": "Отказът е насрочен",

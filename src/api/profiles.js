@@ -304,6 +304,7 @@ export async function createSubscriptionPaymentRequest(shopId, { planKey, billin
 
 /** Register EasyPay cash-desk code (ePay.bg IDN). Server resolves amounts. */
 export async function createSubscriptionEpayCheckout(shopId, { planKey, billingInterval }) {
+  const { messageFromApiResponseText } = await import('../utils/apiErrorMessage');
   const token = await AsyncStorage.getItem('@access_token');
   const res = await fetch(
     `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/subscription-epay-checkout/`,
@@ -320,8 +321,11 @@ export async function createSubscriptionEpayCheckout(shopId, { planKey, billingI
     }
   );
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(JSON.stringify(errorData));
+    const text = await res.text().catch(() => '');
+    throw new Error(
+      messageFromApiResponseText(text, 'EasyPay registration failed') ||
+        'EasyPay registration failed'
+    );
   }
   return res.json();
 }

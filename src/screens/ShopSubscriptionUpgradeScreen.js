@@ -387,7 +387,12 @@ export default function ShopSubscriptionUpgradeScreen({ navigation }) {
       setPayment(row);
       scrollRef.current?.scrollToEnd({ animated: true });
     } catch (e) {
-      setError(String(e?.message || e));
+      const raw = String(e?.message || e);
+      setError(
+        /EMETHOD/i.test(raw)
+          ? t('subscription.epayEmethodError')
+          : raw
+      );
     } finally {
       setSubmitting(false);
     }
