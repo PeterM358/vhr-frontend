@@ -61,9 +61,13 @@ export default function ShopWorkforceScreen() {
   const [employeeNumber, setEmployeeNumber] = useState('');
   const [phone, setPhone] = useState('');
   const [billableRate, setBillableRate] = useState('');
-  const [compensationMode, setCompensationMode] = useState(''); // '' | hourly | percent
+  /** Base wage: '' | hourly | daily — percent stacks optionally. */
+  const [compensationBase, setCompensationBase] = useState('');
+  const [plusPercent, setPlusPercent] = useState(false);
   const [wageRate, setWageRate] = useState('');
+  const [dailyRate, setDailyRate] = useState('');
   const [compensationPercent, setCompensationPercent] = useState('');
+  const [percentBasis, setPercentBasis] = useState('labor');
   const [internalNotes, setInternalNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -129,11 +133,25 @@ export default function ShopWorkforceScreen() {
     setEmployeeNumber('');
     setPhone('');
     setBillableRate('');
-    setCompensationMode('');
+    setCompensationBase('');
+    setPlusPercent(false);
     setWageRate('');
+    setDailyRate('');
     setCompensationPercent('');
+    setPercentBasis('labor');
     setInternalNotes('');
   }, []);
+
+  const resolveCompensationMode = useCallback(() => {
+    if (compensationBase === 'hourly') {
+      return plusPercent ? 'hourly_plus_percent' : 'hourly';
+    }
+    if (compensationBase === 'daily') {
+      return plusPercent ? 'daily_plus_percent' : 'daily';
+    }
+    if (plusPercent) return 'percent';
+    return '';
+  }, [compensationBase, plusPercent]);
 
   const addEmployee = useCallback(async () => {
     const name = displayName.trim();
@@ -150,16 +168,21 @@ export default function ShopWorkforceScreen() {
       if (phoneVal) payload.phone = phoneVal;
       const rateMinor = parseMoneyToMinor(billableRate);
       if (rateMinor != null) payload.default_customer_billable_rate_minor = rateMinor;
-      if (compensationMode === 'hourly' || compensationMode === 'percent') {
-        payload.compensation_mode = compensationMode;
-      }
-      if (compensationMode === 'hourly') {
+
+      const mode = resolveCompensationMode();
+      if (mode) payload.compensation_mode = mode;
+      if (compensationBase === 'hourly' || mode === 'hourly_plus_percent') {
         const wageMinor = parseMoneyToMinor(wageRate);
         if (wageMinor != null) payload.compensation_hourly_rate_minor = wageMinor;
       }
-      if (compensationMode === 'percent') {
+      if (compensationBase === 'daily' || mode === 'daily_plus_percent') {
+        const dayMinor = parseMoneyToMinor(dailyRate);
+        if (dayMinor != null) payload.compensation_daily_rate_minor = dayMinor;
+      }
+      if (plusPercent || mode === 'percent') {
         const pct = Number(String(compensationPercent || '').trim().replace(',', '.'));
         if (Number.isFinite(pct)) payload.compensation_percent = pct.toFixed(2);
+        payload.compensation_percent_basis = percentBasis === 'turnover' ? 'turnover' : 'labor';
       }
       const notes = internalNotes.trim();
       if (notes) payload.internal_notes = notes;
@@ -182,9 +205,12 @@ export default function ShopWorkforceScreen() {
     employeeNumber,
     phone,
     billableRate,
-    compensationMode,
+    compensationBase,
+    plusPercent,
     wageRate,
+    dailyRate,
     compensationPercent,
+    percentBasis,
     internalNotes,
     saving,
     load,
@@ -193,19 +219,42 @@ export default function ShopWorkforceScreen() {
     canManage,
     toggleTimeTracking,
     resetAddForm,
+    resolveCompensationMode,
   ]);
 
   const compensationLabel = useCallback(
     (row) => {
       const mode = String(row?.compensation_mode || '');
+      const pct = row.compensation_percent != null ? String(row.compensation_percent) : '—';
+      const basis =
+        row.compensation_percent_basis === 'turnover'
+          ? t('erp.workforce.basisTurnover')
+          : t('erp.workforce.basisLabor');
       if (mode === 'hourly') {
         return t('erp.workforce.compHourlySummary', {
           rate: formatRateMinor(row.compensation_hourly_rate_minor),
         });
       }
+      if (mode === 'daily') {
+        return t('erp.workforce.compDailySummary', {
+          rate: formatRateMinor(row.compensation_daily_rate_minor),
+        });
+      }
       if (mode === 'percent') {
-        return t('erp.workforce.compPercentSummary', {
-          percent: row.compensation_percent != null ? String(row.compensation_percent) : '—',
+        return t('erp.workforce.compPercentSummary', { percent: pct, basis });
+      }
+      if (mode === 'hourly_plus_percent') {
+        return t('erp.workforce.compHourlyPlusPercentSummary', {
+          rate: formatRateMinor(row.compensation_hourly_rate_minor),
+          percent: pct,
+          basis,
+        });
+      }
+      if (mode === 'daily_plus_percent') {
+        return t('erp.workforce.compDailyPlusPercentSummary', {
+          rate: formatRateMinor(row.compensation_daily_rate_minor),
+          percent: pct,
+          basis,
         });
       }
       return t('erp.workforce.compNotSet');
@@ -317,13 +366,13 @@ export default function ShopWorkforceScreen() {
                 {[
                   { id: '', labelKey: 'erp.workforce.compModeNone' },
                   { id: 'hourly', labelKey: 'erp.workforce.compModeHourly' },
-                  { id: 'percent', labelKey: 'erp.workforce.compModePercent' },
+                  { id: 'daily', labelKey: 'erp.workforce.compModeDaily' },
                 ].map((opt) => {
-                  const selected = compensationMode === opt.id;
+                  const selected = compensationBase === opt.id;
                   return (
                     <Pressable
                       key={opt.id || 'none'}
-                      onPress={() => setCompensationMode(opt.id)}
+                      onPress={() => setCompensationBase(opt.id)}
                       style={[styles.compCell, selected && styles.compCellActive]}
                     >
                       <Text style={[styles.compLabel, selected && styles.compLabelActive]}>
@@ -333,27 +382,72 @@ export default function ShopWorkforceScreen() {
                   );
                 })}
               </View>
-              {compensationMode === 'hourly' ? (
-                <TextInput
-                  label={t('erp.workforce.wageRateMajor')}
-                  value={wageRate}
-                  onChangeText={setWageRate}
-                  mode="outlined"
-                  keyboardType="decimal-pad"
-                  style={styles.input}
-                  textColor={COLORS.TEXT_DARK}
-                />
+              {compensationBase === 'hourly' ? (
+                <>
+                  <TextInput
+                    label={t('erp.workforce.wageRateMajor')}
+                    value={wageRate}
+                    onChangeText={setWageRate}
+                    mode="outlined"
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                    textColor={COLORS.TEXT_DARK}
+                  />
+                  <Text style={styles.helper}>{t('erp.workforce.hourlyDayHint')}</Text>
+                </>
               ) : null}
-              {compensationMode === 'percent' ? (
-                <TextInput
-                  label={t('erp.workforce.compPercent')}
-                  value={compensationPercent}
-                  onChangeText={setCompensationPercent}
-                  mode="outlined"
-                  keyboardType="decimal-pad"
-                  style={styles.input}
-                  textColor={COLORS.TEXT_DARK}
-                />
+              {compensationBase === 'daily' ? (
+                <>
+                  <TextInput
+                    label={t('erp.workforce.dailyRateMajor')}
+                    value={dailyRate}
+                    onChangeText={setDailyRate}
+                    mode="outlined"
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                    textColor={COLORS.TEXT_DARK}
+                  />
+                  <Text style={styles.helper}>{t('erp.workforce.dailyDayHint')}</Text>
+                </>
+              ) : null}
+              <View style={styles.toggleRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.fieldLabel}>{t('erp.workforce.plusPercentTitle')}</Text>
+                  <Text style={styles.helper}>{t('erp.workforce.plusPercentHint')}</Text>
+                </View>
+                <Switch value={plusPercent} onValueChange={setPlusPercent} />
+              </View>
+              {plusPercent ? (
+                <>
+                  <TextInput
+                    label={t('erp.workforce.compPercent')}
+                    value={compensationPercent}
+                    onChangeText={setCompensationPercent}
+                    mode="outlined"
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                    textColor={COLORS.TEXT_DARK}
+                  />
+                  <View style={styles.compTrack}>
+                    {[
+                      { id: 'labor', labelKey: 'erp.workforce.basisLabor' },
+                      { id: 'turnover', labelKey: 'erp.workforce.basisTurnover' },
+                    ].map((opt) => {
+                      const selected = percentBasis === opt.id;
+                      return (
+                        <Pressable
+                          key={opt.id}
+                          onPress={() => setPercentBasis(opt.id)}
+                          style={[styles.compCell, selected && styles.compCellActive]}
+                        >
+                          <Text style={[styles.compLabel, selected && styles.compLabelActive]}>
+                            {t(opt.labelKey)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
               ) : null}
               <TextInput
                 label={t('erp.workforce.billableRateMajor')}
