@@ -132,10 +132,15 @@ export async function updateShopEmployee(token, shopId, employeeId, payload) {
   return response.json();
 }
 
-export async function fetchShopWorkforceEarnings(token, shopId, { year, month } = {}) {
+export async function fetchShopWorkforceEarnings(
+  token,
+  shopId,
+  { year, month, employeeId } = {},
+) {
   const qs = new URLSearchParams();
   if (year != null) qs.set('year', String(year));
   if (month != null) qs.set('month', String(month));
+  if (employeeId != null) qs.set('employee_id', String(employeeId));
   const suffix = qs.toString() ? `?${qs}` : '';
   const response = await fetch(
     `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/workforce-earnings/${suffix}`,
