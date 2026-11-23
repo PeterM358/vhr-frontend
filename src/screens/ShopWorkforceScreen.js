@@ -95,7 +95,6 @@ export default function ShopWorkforceScreen() {
   const [displayName, setDisplayName] = useState('');
   const [employeeNumber, setEmployeeNumber] = useState('');
   const [phone, setPhone] = useState('');
-  const [billableRate, setBillableRate] = useState('');
   /** Monthly gross + optional %; workday chips 4/8/12 for how they are scheduled. */
   const [monthlyGross, setMonthlyGross] = useState('');
   const [dayHours, setDayHours] = useState(8); // 4 | 8 | 12
@@ -171,7 +170,6 @@ export default function ShopWorkforceScreen() {
     setDisplayName('');
     setEmployeeNumber('');
     setPhone('');
-    setBillableRate('');
     setMonthlyGross('');
     setDayHours(8);
     setUsePercent(false);
@@ -283,8 +281,6 @@ export default function ShopWorkforceScreen() {
       if (number) payload.employee_number = number;
       const phoneVal = phone.trim();
       if (phoneVal) payload.phone = phoneVal;
-      const rateMinor = parseMoneyToMinor(billableRate);
-      if (rateMinor != null) payload.default_customer_billable_rate_minor = rateMinor;
 
       const mode = resolveCompensationMode();
       if (mode) {
@@ -324,7 +320,6 @@ export default function ShopWorkforceScreen() {
     displayName,
     employeeNumber,
     phone,
-    billableRate,
     monthlyGross,
     dayHours,
     usePercent,
@@ -664,17 +659,6 @@ export default function ShopWorkforceScreen() {
                 textColor={COLORS.TEXT_DARK}
               />
 
-              <Text style={styles.fieldLabel}>{t('erp.workforce.invoiceRateTitle')}</Text>
-              <TextInput
-                label={t('erp.workforce.billableRateMajor')}
-                value={billableRate}
-                onChangeText={setBillableRate}
-                mode="outlined"
-                keyboardType="decimal-pad"
-                style={styles.input}
-                textColor={COLORS.TEXT_DARK}
-              />
-              <Text style={styles.helper}>{t('erp.workforce.billableRateHint')}</Text>
               <TextInput
                 label={t('erp.workforce.internalNotes')}
                 value={internalNotes}
@@ -790,13 +774,6 @@ export default function ShopWorkforceScreen() {
                       })}
                     </Text>
                   )}
-                  {e.default_customer_billable_rate_minor != null &&
-                  e.default_customer_billable_rate_minor !== '' ? (
-                    <Text style={styles.meta}>
-                      {t('erp.workforce.billableRate')}:{' '}
-                      {formatRateMinor(e.default_customer_billable_rate_minor)} EUR/ч
-                    </Text>
-                  ) : null}
                   <Text style={styles.meta}>
                     {e.has_login
                       ? t('erp.workforce.hasLogin')
