@@ -18,6 +18,7 @@ import {
   listShopDepartments,
   listShopEmployees,
   postWorkforceInsuranceAdjustment,
+  updateShopEmployee,
 } from '../api/erp';
 import { getMyShopProfiles, updateShopProfile } from '../api/profiles';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -126,6 +127,7 @@ export default function ShopWorkforceScreen() {
   const [adjWithhold, setAdjWithhold] = useState('');
   const [adjNote, setAdjNote] = useState('');
   const [adjSaving, setAdjSaving] = useState(false);
+  const [editingEmployeeId, setEditingEmployeeId] = useState(null);
 
   const ESTIMATE_CEILING = 2400;
   const ESTIMATE_TAX_RATE = 0.1;
@@ -207,7 +209,41 @@ export default function ShopWorkforceScreen() {
     setInsuranceYears('');
     setContractType('');
     setInternalNotes('');
+    setEditingEmployeeId(null);
   }, []);
+
+  const startEditEmployee = useCallback(
+    (row) => {
+      if (!row?.id || !canManage) return;
+      setEditingEmployeeId(row.id);
+      setDisplayName(row.display_name || '');
+      setEmployeeNumber(row.employee_number || '');
+      setPhone(row.phone || '');
+      setMonthlyGross(
+        row.monthly_salary != null && row.monthly_salary !== ''
+          ? String(row.monthly_salary)
+          : ''
+      );
+      const dh = Number(row.compensation_day_hours);
+      setDayHours(dh === 4 || dh === 12 ? dh : 8);
+      const pct = row.compensation_percent != null ? String(row.compensation_percent) : '';
+      const mode = String(row.compensation_mode || '');
+      const hasPct = Boolean(pct) && (mode.includes('percent') || Number(pct) > 0);
+      setUsePercent(hasPct);
+      setCompensationPercent(hasPct ? pct : '');
+      setPercentBasis(row.compensation_percent_basis === 'turnover' ? 'turnover' : 'labor');
+      setBirthYear(row.birth_year != null ? String(row.birth_year) : '');
+      setInsuranceYears(
+        row.insurance_service_years != null ? String(row.insurance_service_years) : ''
+      );
+      setContractType(row.contract_type || '');
+      setInternalNotes(row.internal_notes || '');
+      setSaveError('');
+      setSaveOk('');
+      setMode('add');
+    },
+    [canManage]
+  );
 
   const loadEarnings = useCallback(async () => {
     if (!shopId) return;
@@ -340,40 +376,53 @@ export default function ShopWorkforceScreen() {
       const payload = { display_name: name };
       const number = employeeNumber.trim();
       if (number) payload.employee_number = number;
+      else if (editingEmployeeId) payload.employee_number = '';
       const phoneVal = phone.trim();
       if (phoneVal) payload.phone = phoneVal;
+      else if (editingEmployeeId) payload.phone = '';
 
       const mode = resolveCompensationMode();
-      if (mode) {
-        payload.compensation_mode = mode;
-        payload.compensation_day_hours = String(dayHours);
-      }
+      payload.compensation_mode = mode || '';
+      payload.compensation_day_hours = String(dayHours);
       const grossMinor = parseMoneyToMinor(monthlyGross);
       if (grossMinor != null) {
         payload.monthly_salary = (grossMinor / 100).toFixed(2);
+      } else if (editingEmployeeId) {
+        payload.monthly_salary = null;
       }
       if (usePercent) {
         const pct = Number(String(compensationPercent || '').trim().replace(',', '.'));
         if (Number.isFinite(pct)) payload.compensation_percent = pct.toFixed(2);
         payload.compensation_percent_basis = percentBasis === 'turnover' ? 'turnover' : 'labor';
+      } else if (editingEmployeeId) {
+        payload.compensation_percent = null;
       }
       const by = Number(String(birthYear || '').trim());
       if (Number.isFinite(by) && by >= 1940 && by <= 2010) payload.birth_year = by;
+      else if (editingEmployeeId) payload.birth_year = null;
       const sy = Number(String(insuranceYears || '').trim().replace(',', '.'));
       if (Number.isFinite(sy) && sy >= 0) payload.insurance_service_years = sy.toFixed(2);
-      if (contractType) payload.contract_type = contractType;
-      const notes = internalNotes.trim();
-      if (notes) payload.internal_notes = notes;
-      await createShopEmployee(token, shopId, payload);
-      resetAddForm();
-      setSaveOk(t('erp.workforce.addSuccess'));
+      else if (editingEmployeeId) payload.insurance_service_years = null;
+      payload.contract_type = contractType || '';
+      payload.internal_notes = internalNotes.trim();
+      if (editingEmployeeId) {
+        await updateShopEmployee(token, shopId, editingEmployeeId, payload);
+        resetAddForm();
+        setSaveOk(t('erp.workforce.editSuccess'));
+      } else {
+        await createShopEmployee(token, shopId, payload);
+        resetAddForm();
+        setSaveOk(t('erp.workforce.addSuccess'));
+        if (!timeTrackingOn && canManage) {
+          await toggleTimeTracking(true);
+        }
+      }
       setMode('list');
       await load();
-      if (!timeTrackingOn && canManage) {
-        await toggleTimeTracking(true);
-      }
     } catch (e) {
-      setSaveError(e.message || t('erp.workforce.addError'));
+      setSaveError(
+        e.message || (editingEmployeeId ? t('erp.workforce.editError') : t('erp.workforce.addError'))
+      );
     } finally {
       setSaving(false);
     }
@@ -399,6 +448,7 @@ export default function ShopWorkforceScreen() {
     toggleTimeTracking,
     resetAddForm,
     resolveCompensationMode,
+    editingEmployeeId,
   ]);
 
   const employeePayLines = useCallback(
@@ -642,8 +692,12 @@ export default function ShopWorkforceScreen() {
 
           {mode === 'add' && canManage ? (
             <AppCard style={styles.card}>
-              <Text style={styles.cardTitle}>{t('erp.workforce.addTitle')}</Text>
-              <Text style={styles.helper}>{t('erp.workforce.addHelper')}</Text>
+              <Text style={styles.cardTitle}>
+                {editingEmployeeId ? t('erp.workforce.editTitle') : t('erp.workforce.addTitle')}
+              </Text>
+              <Text style={styles.helper}>
+                {editingEmployeeId ? t('erp.workforce.editHelper') : t('erp.workforce.addHelper')}
+              </Text>
               <Text style={styles.helper}>{t('erp.workforce.requiredFieldsHint')}</Text>
               <TextInput
                 label={t('erp.workforce.displayNameRequired')}
@@ -817,8 +871,13 @@ export default function ShopWorkforceScreen() {
                 disabled={saving || !displayName.trim()}
                 onPress={addEmployee}
               >
-                {t('erp.workforce.addCta')}
+                {editingEmployeeId ? t('erp.workforce.editCta') : t('erp.workforce.addCta')}
               </Button>
+              {editingEmployeeId ? (
+                <Button mode="text" disabled={saving} onPress={resetAddForm}>
+                  {t('erp.workforce.editCancel')}
+                </Button>
+              ) : null}
               {!displayName.trim() && !saving ? (
                 <Text style={styles.error}>{t('erp.workforce.addDisabledNeedName')}</Text>
               ) : null}
@@ -1081,6 +1140,11 @@ export default function ShopWorkforceScreen() {
                       ? t('erp.workforce.hasLogin')
                       : t('erp.workforce.noLogin')}
                   </Text>
+                  {canManage ? (
+                    <Button mode="outlined" style={{ marginTop: 8 }} onPress={() => startEditEmployee(e)}>
+                      {t('erp.workforce.editCta')}
+                    </Button>
+                  ) : null}
                 </AppCard>
               ))}
 

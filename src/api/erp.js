@@ -119,6 +119,19 @@ export async function createShopEmployee(token, shopId, payload) {
   return response.json();
 }
 
+export async function updateShopEmployee(token, shopId, employeeId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/employees/${employeeId}/`,
+    {
+      method: 'PATCH',
+      headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to update employee'));
+  return response.json();
+}
+
 export async function fetchShopWorkforceEarnings(token, shopId, { year, month } = {}) {
   const qs = new URLSearchParams();
   if (year != null) qs.set('year', String(year));
