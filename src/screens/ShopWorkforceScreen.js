@@ -408,27 +408,48 @@ export default function ShopWorkforceScreen() {
   );
 
   const teamPayTotals = useMemo(() => {
-    let monthly = 0;
+    let fixedSum = 0;
     let withFixed = 0;
+    let percentSum = 0;
     let withPercent = 0;
+    let laborPercentCount = 0;
+    let turnoverPercentCount = 0;
     for (const row of employees) {
       const fixed = fixedMonthlyMajorFromEmployee(row);
       if (fixed > 0) {
-        monthly += fixed;
+        fixedSum += fixed;
         withFixed += 1;
       }
       const mode = String(row?.compensation_mode || '');
+      const pct = Number(row?.compensation_percent);
       if (
-        row?.compensation_percent != null &&
-        Number(row.compensation_percent) > 0 &&
+        Number.isFinite(pct) &&
+        pct > 0 &&
         (mode.includes('percent') || mode === 'percent')
       ) {
+        percentSum += pct;
         withPercent += 1;
+        if (row.compensation_percent_basis === 'turnover') turnoverPercentCount += 1;
+        else laborPercentCount += 1;
       }
     }
+    const avgFixed = withFixed > 0 ? fixedSum / withFixed : 0;
+    const avgPercent = withPercent > 0 ? percentSum / withPercent : null;
+    const percentBasisHint =
+      withPercent === 0
+        ? null
+        : turnoverPercentCount > 0 && laborPercentCount > 0
+          ? 'mixed'
+          : turnoverPercentCount > 0
+            ? 'turnover'
+            : 'labor';
     return {
-      monthly: monthly.toFixed(2),
-      yearly: (monthly * 12).toFixed(2),
+      fixedMonthly: fixedSum.toFixed(2),
+      fixedYearly: (fixedSum * 12).toFixed(2),
+      avgFixed: avgFixed.toFixed(2),
+      avgPercent:
+        avgPercent == null ? null : avgPercent.toFixed(avgPercent % 1 === 0 ? 0 : 2),
+      percentBasisHint,
       withFixed,
       withPercent,
       headcount: employees.length,
@@ -686,18 +707,41 @@ export default function ShopWorkforceScreen() {
                 <AppCard style={styles.card}>
                   <Text style={styles.cardTitle}>{t('erp.workforce.teamTotalsTitle')}</Text>
                   <Text style={styles.summaryLine}>
-                    {t('erp.workforce.teamTotalMonthly', { amount: teamPayTotals.monthly })}
+                    {t('erp.workforce.teamAvgFixed', { amount: teamPayTotals.avgFixed })}
                   </Text>
                   <Text style={styles.summaryLine}>
-                    {t('erp.workforce.teamTotalYearly', { amount: teamPayTotals.yearly })}
-                  </Text>
-                  <Text style={styles.helper}>
-                    {t('erp.workforce.teamTotalsHint', {
-                      count: teamPayTotals.withFixed,
-                      headcount: teamPayTotals.headcount,
-                      percentCount: teamPayTotals.withPercent,
+                    {t('erp.workforce.teamTotalFixedMonthly', {
+                      amount: teamPayTotals.fixedMonthly,
                     })}
                   </Text>
+                  <Text style={styles.summaryLine}>
+                    {t('erp.workforce.teamTotalFixedYearly', {
+                      amount: teamPayTotals.fixedYearly,
+                    })}
+                  </Text>
+                  {teamPayTotals.avgPercent != null ? (
+                    <Text style={styles.summaryLine}>
+                      {t('erp.workforce.teamAvgPercent', {
+                        percent: teamPayTotals.avgPercent,
+                        basis:
+                          teamPayTotals.percentBasisHint === 'turnover'
+                            ? t('erp.workforce.basisTurnoverShort')
+                            : teamPayTotals.percentBasisHint === 'mixed'
+                              ? t('erp.workforce.basisMixedShort')
+                              : t('erp.workforce.basisLaborShort'),
+                      })}
+                    </Text>
+                  ) : (
+                    <Text style={styles.summaryLine}>
+                      {t('erp.workforce.teamAvgPercentNone')}
+                    </Text>
+                  )}
+                  <Text style={styles.summaryLine}>
+                    {t('erp.workforce.teamTotalAll', {
+                      amount: teamPayTotals.fixedMonthly,
+                    })}
+                  </Text>
+                  <Text style={styles.helper}>{t('erp.workforce.teamTotalsSplitHint')}</Text>
                 </AppCard>
               ) : null}
               <Text style={styles.sectionTitle}>{t('erp.workforce.employees')}</Text>
