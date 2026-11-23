@@ -44,6 +44,41 @@ function formatRateMinor(minor) {
   return (n / 100).toFixed(2);
 }
 
+/** Assumed working days for “average daily wage” from monthly gross. */
+const AVG_WORKING_DAYS = 22;
+
+function formatMoneyMajor(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return n.toFixed(2);
+}
+
+function averageDailyFromMonthly(monthly) {
+  const n = Number(monthly);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return (n / AVG_WORKING_DAYS).toFixed(2);
+}
+
+/** Fixed monthly cost estimate from an employee row (excludes % of labor/turnover). */
+function fixedMonthlyMajorFromEmployee(row) {
+  if (!row) return 0;
+  const mode = String(row.compensation_mode || '');
+  if (row.monthly_salary != null && row.monthly_salary !== '') {
+    const n = Number(row.monthly_salary);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const dayH = Number(row.compensation_day_hours) > 0 ? Number(row.compensation_day_hours) : 8;
+  if (mode === 'daily' || mode === 'daily_plus_percent') {
+    const daily = Number(row.compensation_daily_rate_minor) / 100;
+    if (Number.isFinite(daily) && daily > 0) return daily * AVG_WORKING_DAYS;
+  }
+  if (mode === 'hourly' || mode === 'hourly_plus_percent') {
+    const hourly = Number(row.compensation_hourly_rate_minor) / 100;
+    if (Number.isFinite(hourly) && hourly > 0) return hourly * dayH * AVG_WORKING_DAYS;
+  }
+  return 0;
+}
+
 export default function ShopWorkforceScreen() {
   const navigation = useNavigation();
   const onBack = usePartnerDashboardBack(navigation);
@@ -61,19 +96,22 @@ export default function ShopWorkforceScreen() {
   const [employeeNumber, setEmployeeNumber] = useState('');
   const [phone, setPhone] = useState('');
   const [billableRate, setBillableRate] = useState('');
-  /** Two independent switches: fixed wage and/or percent (both can be on). */
-  const [useFixedPay, setUseFixedPay] = useState(false);
-  const [fixedUnit, setFixedUnit] = useState('daily'); // hourly | daily — same money, different unit
-  const [fixedAmount, setFixedAmount] = useState('');
+  /** Monthly gross + optional %; workday chips 4/8/12 for how they are scheduled. */
+  const [monthlyGross, setMonthlyGross] = useState('');
   const [dayHours, setDayHours] = useState(8); // 4 | 8 | 12
   const [usePercent, setUsePercent] = useState(false);
   const [compensationPercent, setCompensationPercent] = useState('');
   const [percentBasis, setPercentBasis] = useState('labor');
+  const [birthYear, setBirthYear] = useState('');
+  const [insuranceYears, setInsuranceYears] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saveOk, setSaveOk] = useState('');
   const [trackingBusy, setTrackingBusy] = useState(false);
+
+  const ESTIMATE_CEILING = 2400;
+  const ESTIMATE_TAX_RATE = 0.1;
 
   const canManage = useMemo(() => {
     const role = String(membership?.role || '').toLowerCase();
@@ -134,73 +172,103 @@ export default function ShopWorkforceScreen() {
     setEmployeeNumber('');
     setPhone('');
     setBillableRate('');
-    setUseFixedPay(false);
-    setFixedUnit('daily');
-    setFixedAmount('');
+    setMonthlyGross('');
     setDayHours(8);
     setUsePercent(false);
     setCompensationPercent('');
     setPercentBasis('labor');
+    setBirthYear('');
+    setInsuranceYears('');
     setInternalNotes('');
   }, []);
 
   const resolveCompensationMode = useCallback(() => {
-    if (useFixedPay && usePercent) {
-      return fixedUnit === 'hourly' ? 'hourly_plus_percent' : 'daily_plus_percent';
-    }
-    if (useFixedPay) return fixedUnit === 'hourly' ? 'hourly' : 'daily';
+    const hasGross = parseMoneyToMinor(monthlyGross) != null;
+    if (hasGross && usePercent) return 'monthly_plus_percent';
+    if (hasGross) return 'monthly';
     if (usePercent) return 'percent';
     return '';
-  }, [useFixedPay, usePercent, fixedUnit]);
+  }, [monthlyGross, usePercent]);
 
-  const payPreview = useMemo(() => {
-    const parts = [];
-    if (useFixedPay && fixedAmount.trim()) {
-      parts.push(
-        fixedUnit === 'hourly'
-          ? t('erp.workforce.previewHourly', { amount: fixedAmount.trim() })
-          : t('erp.workforce.previewDaily', { amount: fixedAmount.trim() })
-      );
+  const payEstimate = useMemo(() => {
+    const grossMinor = parseMoneyToMinor(monthlyGross);
+    if (grossMinor == null && !(usePercent && compensationPercent.trim())) {
+      return null;
     }
+    const gross = (grossMinor || 0) / 100;
+    // Ceiling tax on agreed monthly only — % of repair labor is settled later.
+    const excess = Math.max(0, gross - ESTIMATE_CEILING);
+    const tax = Math.round(excess * ESTIMATE_TAX_RATE * 100) / 100;
+    const net = Math.round((gross - tax) * 100) / 100;
+    const avgDaily = averageDailyFromMonthly(gross);
+    let pctLabel = null;
     if (usePercent && compensationPercent.trim()) {
-      const basis =
-        percentBasis === 'turnover'
-          ? t('erp.workforce.basisTurnover')
-          : t('erp.workforce.basisLabor');
-      parts.push(
-        t('erp.workforce.previewPercent', {
-          percent: compensationPercent.trim(),
-          basis,
-        })
-      );
-    }
-    if (!parts.length) return t('erp.workforce.previewEmpty');
-    return t('erp.workforce.previewJoin', { parts: parts.join(' + ') });
-  }, [
-    useFixedPay,
-    fixedAmount,
-    fixedUnit,
-    usePercent,
-    compensationPercent,
-    percentBasis,
-    t,
-  ]);
-
-  const switchFixedUnit = useCallback(
-    (nextUnit) => {
-      if (nextUnit === fixedUnit) return;
-      const minor = parseMoneyToMinor(fixedAmount);
-      if (minor != null && dayHours > 0) {
-        if (fixedUnit === 'hourly' && nextUnit === 'daily') {
-          setFixedAmount(((minor * dayHours) / 100).toFixed(2));
-        } else if (fixedUnit === 'daily' && nextUnit === 'hourly') {
-          setFixedAmount((minor / dayHours / 100).toFixed(2));
-        }
+      const pct = Number(String(compensationPercent).trim().replace(',', '.'));
+      if (Number.isFinite(pct) && pct > 0) {
+        pctLabel = pct.toFixed(pct % 1 === 0 ? 0 : 2);
       }
-      setFixedUnit(nextUnit);
-    },
-    [fixedUnit, fixedAmount, dayHours]
-  );
+    }
+    return {
+      gross: formatMoneyMajor(gross),
+      avgDaily,
+      tax: tax.toFixed(2),
+      net: net.toFixed(2),
+      dayHours,
+      pctLabel,
+      percentBasis,
+    };
+  }, [monthlyGross, usePercent, compensationPercent, dayHours, percentBasis]);
+
+  const paySummaryLines = useMemo(() => {
+    if (!payEstimate) return [];
+    const lines = [];
+    if (parseMoneyToMinor(monthlyGross) != null) {
+      lines.push({
+        key: 'agreed',
+        text: t('erp.workforce.lineAgreedMonthly', { amount: payEstimate.gross }),
+      });
+      lines.push({
+        key: 'avgMonthly',
+        text: t('erp.workforce.lineAvgMonthly', { amount: payEstimate.gross }),
+      });
+      if (payEstimate.avgDaily) {
+        lines.push({
+          key: 'avgDaily',
+          text: t('erp.workforce.lineAvgDaily', {
+            amount: payEstimate.avgDaily,
+            days: AVG_WORKING_DAYS,
+          }),
+        });
+      }
+    }
+    lines.push({
+      key: 'day',
+      text: t('erp.workforce.lineDayHours', { hours: payEstimate.dayHours }),
+    });
+    if (payEstimate.pctLabel) {
+      const basis =
+        payEstimate.percentBasis === 'turnover'
+          ? t('erp.workforce.basisTurnoverShort')
+          : t('erp.workforce.basisLaborShort');
+      lines.push({
+        key: 'pct',
+        text: t('erp.workforce.lineAvgPercent', {
+          percent: payEstimate.pctLabel,
+          basis,
+        }),
+      });
+    }
+    if (parseMoneyToMinor(monthlyGross) != null) {
+      lines.push({
+        key: 'tax',
+        text: t('erp.workforce.lineTaxEstimate', {
+          tax: payEstimate.tax,
+          net: payEstimate.net,
+        }),
+      });
+    }
+    return lines;
+  }, [payEstimate, monthlyGross, t]);
 
   const addEmployee = useCallback(async () => {
     const name = displayName.trim();
@@ -223,23 +291,19 @@ export default function ShopWorkforceScreen() {
         payload.compensation_mode = mode;
         payload.compensation_day_hours = String(dayHours);
       }
-      if (useFixedPay) {
-        const amountMinor = parseMoneyToMinor(fixedAmount);
-        if (amountMinor != null) {
-          if (fixedUnit === 'hourly') {
-            payload.compensation_hourly_rate_minor = amountMinor;
-            payload.compensation_daily_rate_minor = Math.round(amountMinor * dayHours);
-          } else {
-            payload.compensation_daily_rate_minor = amountMinor;
-            payload.compensation_hourly_rate_minor = Math.round(amountMinor / dayHours);
-          }
-        }
+      const grossMinor = parseMoneyToMinor(monthlyGross);
+      if (grossMinor != null) {
+        payload.monthly_salary = (grossMinor / 100).toFixed(2);
       }
       if (usePercent) {
         const pct = Number(String(compensationPercent || '').trim().replace(',', '.'));
         if (Number.isFinite(pct)) payload.compensation_percent = pct.toFixed(2);
         payload.compensation_percent_basis = percentBasis === 'turnover' ? 'turnover' : 'labor';
       }
+      const by = Number(String(birthYear || '').trim());
+      if (Number.isFinite(by) && by >= 1940 && by <= 2010) payload.birth_year = by;
+      const sy = Number(String(insuranceYears || '').trim().replace(',', '.'));
+      if (Number.isFinite(sy) && sy >= 0) payload.insurance_service_years = sy.toFixed(2);
       const notes = internalNotes.trim();
       if (notes) payload.internal_notes = notes;
       await createShopEmployee(token, shopId, payload);
@@ -261,13 +325,13 @@ export default function ShopWorkforceScreen() {
     employeeNumber,
     phone,
     billableRate,
-    useFixedPay,
-    fixedUnit,
-    fixedAmount,
+    monthlyGross,
     dayHours,
     usePercent,
     compensationPercent,
     percentBasis,
+    birthYear,
+    insuranceYears,
     internalNotes,
     saving,
     load,
@@ -279,45 +343,97 @@ export default function ShopWorkforceScreen() {
     resolveCompensationMode,
   ]);
 
-  const compensationLabel = useCallback(
+  const employeePayLines = useCallback(
     (row) => {
       const mode = String(row?.compensation_mode || '');
-      const pct = row.compensation_percent != null ? String(row.compensation_percent) : '—';
       const basis =
         row.compensation_percent_basis === 'turnover'
-          ? t('erp.workforce.basisTurnover')
-          : t('erp.workforce.basisLabor');
-      if (mode === 'hourly') {
-        return t('erp.workforce.compHourlySummary', {
-          rate: formatRateMinor(row.compensation_hourly_rate_minor),
-        });
+          ? t('erp.workforce.basisTurnoverShort')
+          : t('erp.workforce.basisLaborShort');
+      const pct =
+        row.compensation_percent != null && row.compensation_percent !== ''
+          ? String(row.compensation_percent)
+          : null;
+      const salary =
+        row.monthly_salary != null && row.monthly_salary !== ''
+          ? formatMoneyMajor(row.monthly_salary)
+          : null;
+      const dayH = row.compensation_day_hours != null ? Number(row.compensation_day_hours) : 8;
+      const lines = [];
+
+      if (salary && (mode === 'monthly' || mode === 'monthly_plus_percent' || !mode)) {
+        lines.push(t('erp.workforce.lineAgreedMonthly', { amount: salary }));
+        lines.push(t('erp.workforce.lineAvgMonthly', { amount: salary }));
+        const avgDaily = averageDailyFromMonthly(salary);
+        if (avgDaily) {
+          lines.push(
+            t('erp.workforce.lineAvgDaily', { amount: avgDaily, days: AVG_WORKING_DAYS })
+          );
+        }
+      } else if (mode === 'daily' || mode === 'daily_plus_percent') {
+        const daily = formatRateMinor(row.compensation_daily_rate_minor);
+        lines.push(t('erp.workforce.lineAgreedDaily', { amount: daily }));
+        const monthlyAvg = (Number(daily) * AVG_WORKING_DAYS).toFixed(2);
+        if (Number.isFinite(Number(daily))) {
+          lines.push(t('erp.workforce.lineAvgMonthly', { amount: monthlyAvg }));
+          lines.push(
+            t('erp.workforce.lineAvgDaily', { amount: daily, days: AVG_WORKING_DAYS })
+          );
+        }
+      } else if (mode === 'hourly' || mode === 'hourly_plus_percent') {
+        const hourly = formatRateMinor(row.compensation_hourly_rate_minor);
+        lines.push(t('erp.workforce.lineAgreedHourly', { amount: hourly }));
+        const daily = (Number(hourly) * (dayH || 8)).toFixed(2);
+        const monthlyAvg = (Number(daily) * AVG_WORKING_DAYS).toFixed(2);
+        if (Number.isFinite(Number(hourly))) {
+          lines.push(t('erp.workforce.lineAvgMonthly', { amount: monthlyAvg }));
+          lines.push(
+            t('erp.workforce.lineAvgDaily', { amount: daily, days: AVG_WORKING_DAYS })
+          );
+        }
       }
-      if (mode === 'daily') {
-        return t('erp.workforce.compDailySummary', {
-          rate: formatRateMinor(row.compensation_daily_rate_minor),
-        });
+
+      if (Number.isFinite(dayH) && dayH > 0) {
+        lines.push(t('erp.workforce.lineDayHours', { hours: dayH }));
       }
-      if (mode === 'percent') {
-        return t('erp.workforce.compPercentSummary', { percent: pct, basis });
+      if (pct && (mode.includes('percent') || mode === 'percent')) {
+        lines.push(t('erp.workforce.lineAvgPercent', { percent: pct, basis }));
       }
-      if (mode === 'hourly_plus_percent') {
-        return t('erp.workforce.compHourlyPlusPercentSummary', {
-          rate: formatRateMinor(row.compensation_hourly_rate_minor),
-          percent: pct,
-          basis,
-        });
+      if (!lines.length) {
+        lines.push(t('erp.workforce.compNotSet'));
       }
-      if (mode === 'daily_plus_percent') {
-        return t('erp.workforce.compDailyPlusPercentSummary', {
-          rate: formatRateMinor(row.compensation_daily_rate_minor),
-          percent: pct,
-          basis,
-        });
-      }
-      return t('erp.workforce.compNotSet');
+      return lines;
     },
     [t]
   );
+
+  const teamPayTotals = useMemo(() => {
+    let monthly = 0;
+    let withFixed = 0;
+    let withPercent = 0;
+    for (const row of employees) {
+      const fixed = fixedMonthlyMajorFromEmployee(row);
+      if (fixed > 0) {
+        monthly += fixed;
+        withFixed += 1;
+      }
+      const mode = String(row?.compensation_mode || '');
+      if (
+        row?.compensation_percent != null &&
+        Number(row.compensation_percent) > 0 &&
+        (mode.includes('percent') || mode === 'percent')
+      ) {
+        withPercent += 1;
+      }
+    }
+    return {
+      monthly: monthly.toFixed(2),
+      yearly: (monthly * 12).toFixed(2),
+      withFixed,
+      withPercent,
+      headcount: employees.length,
+    };
+  }, [employees]);
 
   const visibleModes = canManage ? MODES : MODES.filter((m) => m.id === 'list');
 
@@ -392,14 +508,19 @@ export default function ShopWorkforceScreen() {
             <AppCard style={styles.card}>
               <Text style={styles.cardTitle}>{t('erp.workforce.addTitle')}</Text>
               <Text style={styles.helper}>{t('erp.workforce.addHelper')}</Text>
+              <Text style={styles.helper}>{t('erp.workforce.requiredFieldsHint')}</Text>
               <TextInput
-                label={t('erp.workforce.displayName')}
+                label={t('erp.workforce.displayNameRequired')}
                 value={displayName}
                 onChangeText={setDisplayName}
                 mode="outlined"
                 style={styles.input}
                 textColor={COLORS.TEXT_DARK}
+                error={!displayName.trim()}
               />
+              {!displayName.trim() ? (
+                <Text style={styles.error}>{t('erp.workforce.displayNameRequiredError')}</Text>
+              ) : null}
               <TextInput
                 label={t('erp.workforce.phone')}
                 value={phone}
@@ -420,79 +541,38 @@ export default function ShopWorkforceScreen() {
               <Text style={styles.fieldLabel}>{t('erp.workforce.payHowTitle')}</Text>
               <Text style={styles.helper}>{t('erp.workforce.payHowHint')}</Text>
 
-              <View style={[styles.payBlock, useFixedPay && styles.payBlockOn]}>
-                <View style={styles.toggleRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.fieldLabel}>{t('erp.workforce.fixedPayTitle')}</Text>
-                    <Text style={styles.helper}>{t('erp.workforce.fixedPayHint')}</Text>
-                  </View>
-                  <Switch value={useFixedPay} onValueChange={setUseFixedPay} />
-                </View>
-                {useFixedPay ? (
-                  <>
-                    <Text style={styles.helper}>{t('erp.workforce.dayLengthLabel')}</Text>
-                    <View style={styles.compTrack}>
-                      {[4, 8, 12].map((h) => {
-                        const selected = dayHours === h;
-                        return (
-                          <Pressable
-                            key={h}
-                            onPress={() => setDayHours(h)}
-                            style={[styles.compCell, selected && styles.compCellActive]}
-                          >
-                            <Text style={[styles.compLabel, selected && styles.compLabelActive]}>
-                              {t('erp.workforce.dayHoursChip', { hours: h })}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                    <View style={styles.compTrack}>
-                      {[
-                        { id: 'daily', labelKey: 'erp.workforce.unitDaily' },
-                        { id: 'hourly', labelKey: 'erp.workforce.unitHourly' },
-                      ].map((opt) => {
-                        const selected = fixedUnit === opt.id;
-                        return (
-                          <Pressable
-                            key={opt.id}
-                            onPress={() => switchFixedUnit(opt.id)}
-                            style={[styles.compCell, selected && styles.compCellActive]}
-                          >
-                            <Text style={[styles.compLabel, selected && styles.compLabelActive]}>
-                              {t(opt.labelKey)}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                    <TextInput
-                      label={
-                        fixedUnit === 'hourly'
-                          ? t('erp.workforce.wageRateMajor')
-                          : t('erp.workforce.dailyRateMajor')
-                      }
-                      value={fixedAmount}
-                      onChangeText={setFixedAmount}
-                      mode="outlined"
-                      keyboardType="decimal-pad"
-                      style={styles.input}
-                      textColor={COLORS.TEXT_DARK}
-                    />
-                    <Text style={styles.helper}>
-                      {fixedUnit === 'daily'
-                        ? t('erp.workforce.dailyDayHint')
-                        : t('erp.workforce.hourlyDayHint', { hours: dayHours })}
-                    </Text>
-                  </>
-                ) : null}
+              <TextInput
+                label={t('erp.workforce.monthlyGrossMajor')}
+                value={monthlyGross}
+                onChangeText={setMonthlyGross}
+                mode="outlined"
+                keyboardType="decimal-pad"
+                style={styles.input}
+                textColor={COLORS.TEXT_DARK}
+              />
+
+              <Text style={styles.fieldLabel}>{t('erp.workforce.dayLengthLabel')}</Text>
+              <View style={styles.compTrack}>
+                {[4, 8, 12].map((h) => {
+                  const selected = dayHours === h;
+                  return (
+                    <Pressable
+                      key={h}
+                      onPress={() => setDayHours(h)}
+                      style={[styles.compCell, selected && styles.compCellActive]}
+                    >
+                      <Text style={[styles.compLabel, selected && styles.compLabelActive]}>
+                        {t('erp.workforce.dayHoursChip', { hours: h })}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
 
               <View style={[styles.payBlock, usePercent && styles.payBlockOn]}>
                 <View style={styles.toggleRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.fieldLabel}>{t('erp.workforce.percentPayTitle')}</Text>
-                    <Text style={styles.helper}>{t('erp.workforce.percentPayHint')}</Text>
                   </View>
                   <Switch value={usePercent} onValueChange={setUsePercent} />
                 </View>
@@ -530,7 +610,40 @@ export default function ShopWorkforceScreen() {
                 ) : null}
               </View>
 
-              <Text style={styles.preview}>{payPreview}</Text>
+              {paySummaryLines.length ? (
+                <View style={styles.summaryBox}>
+                  <Text style={styles.fieldLabel}>{t('erp.workforce.summaryTitle')}</Text>
+                  {paySummaryLines.map((line) => (
+                    <Text key={line.key} style={styles.summaryLine}>
+                      {line.text}
+                    </Text>
+                  ))}
+                  <Text style={styles.helper}>{t('erp.workforce.estimateDisclaimer')}</Text>
+                </View>
+              ) : null}
+
+              <Text style={styles.fieldLabel}>{t('erp.workforce.dossierTitle')}</Text>
+              <Text style={styles.helper}>{t('erp.workforce.dossierHint')}</Text>
+              <TextInput
+                label={t('erp.workforce.birthYear')}
+                value={birthYear}
+                onChangeText={setBirthYear}
+                mode="outlined"
+                keyboardType="number-pad"
+                style={styles.input}
+                textColor={COLORS.TEXT_DARK}
+              />
+              <TextInput
+                label={t('erp.workforce.insuranceYears')}
+                value={insuranceYears}
+                onChangeText={setInsuranceYears}
+                mode="outlined"
+                keyboardType="decimal-pad"
+                style={styles.input}
+                textColor={COLORS.TEXT_DARK}
+              />
+
+              <Text style={styles.fieldLabel}>{t('erp.workforce.invoiceRateTitle')}</Text>
               <TextInput
                 label={t('erp.workforce.billableRateMajor')}
                 value={billableRate}
@@ -559,6 +672,9 @@ export default function ShopWorkforceScreen() {
               >
                 {t('erp.workforce.addCta')}
               </Button>
+              {!displayName.trim() && !saving ? (
+                <Text style={styles.error}>{t('erp.workforce.addDisabledNeedName')}</Text>
+              ) : null}
               {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
               {saveOk ? <Text style={styles.success}>{saveOk}</Text> : null}
             </AppCard>
@@ -566,6 +682,24 @@ export default function ShopWorkforceScreen() {
 
           {mode === 'list' ? (
             <>
+              {employees.length && canManage ? (
+                <AppCard style={styles.card}>
+                  <Text style={styles.cardTitle}>{t('erp.workforce.teamTotalsTitle')}</Text>
+                  <Text style={styles.summaryLine}>
+                    {t('erp.workforce.teamTotalMonthly', { amount: teamPayTotals.monthly })}
+                  </Text>
+                  <Text style={styles.summaryLine}>
+                    {t('erp.workforce.teamTotalYearly', { amount: teamPayTotals.yearly })}
+                  </Text>
+                  <Text style={styles.helper}>
+                    {t('erp.workforce.teamTotalsHint', {
+                      count: teamPayTotals.withFixed,
+                      headcount: teamPayTotals.headcount,
+                      percentCount: teamPayTotals.withPercent,
+                    })}
+                  </Text>
+                </AppCard>
+              ) : null}
               <Text style={styles.sectionTitle}>{t('erp.workforce.employees')}</Text>
               {!employees.length && !fetching ? (
                 <AppCard style={styles.card}>
@@ -591,11 +725,34 @@ export default function ShopWorkforceScreen() {
                       {t('erp.workforce.employeeNumber')}: {e.employee_number}
                     </Text>
                   ) : null}
-                  <Text style={styles.meta}>{compensationLabel(e)}</Text>
-                  <Text style={styles.meta}>
-                    {t('erp.workforce.billableRate')}:{' '}
-                    {formatRateMinor(e.default_customer_billable_rate_minor)}
-                  </Text>
+                  {employeePayLines(e).map((line, idx) => (
+                    <Text key={`${e.id}-pay-${idx}`} style={styles.meta}>
+                      {line}
+                    </Text>
+                  ))}
+                  {e.pay_estimate?.net_estimate ? (
+                    <Text style={styles.meta}>
+                      {t('erp.workforce.lineTaxEstimate', {
+                        net: e.pay_estimate.net_estimate,
+                        tax: e.pay_estimate.tax_estimate || '0.00',
+                      })}
+                    </Text>
+                  ) : null}
+                  {(e.birth_year || e.insurance_service_years) && (
+                    <Text style={styles.meta}>
+                      {t('erp.workforce.dossierListLine', {
+                        year: e.birth_year || '—',
+                        years: e.insurance_service_years != null ? String(e.insurance_service_years) : '—',
+                      })}
+                    </Text>
+                  )}
+                  {e.default_customer_billable_rate_minor != null &&
+                  e.default_customer_billable_rate_minor !== '' ? (
+                    <Text style={styles.meta}>
+                      {t('erp.workforce.billableRate')}:{' '}
+                      {formatRateMinor(e.default_customer_billable_rate_minor)} EUR/ч
+                    </Text>
+                  ) : null}
                   <Text style={styles.meta}>
                     {e.has_login
                       ? t('erp.workforce.hasLogin')
@@ -706,6 +863,16 @@ const styles = StyleSheet.create({
   payBlockOn: {
     borderColor: COLORS.PRIMARY,
     backgroundColor: 'rgba(15,76,129,0.04)',
+  },
+  summaryBox: {
+    gap: 4,
+    paddingVertical: 4,
+  },
+  summaryLine: {
+    color: COLORS.TEXT_DARK,
+    fontWeight: '600',
+    fontSize: 14,
+    lineHeight: 20,
   },
   preview: {
     marginTop: 4,
