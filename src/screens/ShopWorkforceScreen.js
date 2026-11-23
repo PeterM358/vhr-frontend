@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -13,8 +13,11 @@ import { usePartnerDashboardBack } from '../navigation/appNavBarBack';
 import { useScrollShadow } from '../hooks/useScrollShadow';
 import {
   createShopEmployee,
+  fetchMyWorkforceEarnings,
+  fetchShopWorkforceEarnings,
   listShopDepartments,
   listShopEmployees,
+  postWorkforceInsuranceAdjustment,
 } from '../api/erp';
 import { getMyShopProfiles, updateShopProfile } from '../api/profiles';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -24,6 +27,7 @@ import { useTranslation } from '../i18n';
 
 const MODES = [
   { id: 'list', labelKey: 'erp.workforce.tabList' },
+  { id: 'earnings', labelKey: 'erp.workforce.tabEarnings' },
   { id: 'add', labelKey: 'erp.workforce.tabAdd' },
 ];
 
@@ -103,11 +107,25 @@ export default function ShopWorkforceScreen() {
   const [percentBasis, setPercentBasis] = useState('labor');
   const [birthYear, setBirthYear] = useState('');
   const [insuranceYears, setInsuranceYears] = useState('');
+  const [contractType, setContractType] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saveOk, setSaveOk] = useState('');
   const [trackingBusy, setTrackingBusy] = useState(false);
+
+  const now = new Date();
+  const [earnYear, setEarnYear] = useState(now.getFullYear());
+  const [earnMonth, setEarnMonth] = useState(now.getMonth() + 1);
+  const [teamEarnings, setTeamEarnings] = useState(null);
+  const [myEarnings, setMyEarnings] = useState(null);
+  const [earnError, setEarnError] = useState('');
+  const [earnLoading, setEarnLoading] = useState(false);
+  const [adjEmployeeId, setAdjEmployeeId] = useState('');
+  const [adjEmployer, setAdjEmployer] = useState('');
+  const [adjWithhold, setAdjWithhold] = useState('');
+  const [adjNote, setAdjNote] = useState('');
+  const [adjSaving, setAdjSaving] = useState(false);
 
   const ESTIMATE_CEILING = 2400;
   const ESTIMATE_TAX_RATE = 0.1;
@@ -146,6 +164,16 @@ export default function ShopWorkforceScreen() {
     }, [load])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      if (mode === 'earnings') loadEarnings();
+    }, [mode, loadEarnings])
+  );
+
+  useEffect(() => {
+    if (mode === 'earnings') loadEarnings();
+  }, [mode, earnYear, earnMonth, loadEarnings]);
+
   const toggleTimeTracking = useCallback(
     async (enabled) => {
       if (!shopId || !canManage || trackingBusy) return;
@@ -177,8 +205,41 @@ export default function ShopWorkforceScreen() {
     setPercentBasis('labor');
     setBirthYear('');
     setInsuranceYears('');
+    setContractType('');
     setInternalNotes('');
   }, []);
+
+  const loadEarnings = useCallback(async () => {
+    if (!shopId) return;
+    setEarnError('');
+    setEarnLoading(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      if (canManage) {
+        const team = await fetchShopWorkforceEarnings(token, shopId, {
+          year: earnYear,
+          month: earnMonth,
+        });
+        setTeamEarnings(team);
+      } else {
+        setTeamEarnings(null);
+      }
+      try {
+        const mine = await fetchMyWorkforceEarnings(token, shopId, {
+          year: earnYear,
+          month: earnMonth,
+        });
+        setMyEarnings(mine);
+      } catch {
+        setMyEarnings(null);
+      }
+    } catch (e) {
+      setTeamEarnings(null);
+      setEarnError(e.message || t('erp.common.error'));
+    } finally {
+      setEarnLoading(false);
+    }
+  }, [shopId, canManage, earnYear, earnMonth, t]);
 
   const resolveCompensationMode = useCallback(() => {
     const hasGross = parseMoneyToMinor(monthlyGross) != null;
@@ -300,6 +361,7 @@ export default function ShopWorkforceScreen() {
       if (Number.isFinite(by) && by >= 1940 && by <= 2010) payload.birth_year = by;
       const sy = Number(String(insuranceYears || '').trim().replace(',', '.'));
       if (Number.isFinite(sy) && sy >= 0) payload.insurance_service_years = sy.toFixed(2);
+      if (contractType) payload.contract_type = contractType;
       const notes = internalNotes.trim();
       if (notes) payload.internal_notes = notes;
       await createShopEmployee(token, shopId, payload);
@@ -327,6 +389,7 @@ export default function ShopWorkforceScreen() {
     percentBasis,
     birthYear,
     insuranceYears,
+    contractType,
     internalNotes,
     saving,
     load,
@@ -451,7 +514,64 @@ export default function ShopWorkforceScreen() {
     };
   }, [employees]);
 
-  const visibleModes = canManage ? MODES : MODES.filter((m) => m.id === 'list');
+  const shiftEarnMonth = useCallback(
+    (delta) => {
+      let y = earnYear;
+      let m = earnMonth + delta;
+      if (m < 1) {
+        m = 12;
+        y -= 1;
+      } else if (m > 12) {
+        m = 1;
+        y += 1;
+      }
+      setEarnYear(y);
+      setEarnMonth(m);
+    },
+    [earnYear, earnMonth]
+  );
+
+  const saveInsuranceAdj = useCallback(async () => {
+    const empId = Number(adjEmployeeId);
+    if (!shopId || !canManage || !Number.isFinite(empId) || empId <= 0 || adjSaving) return;
+    setAdjSaving(true);
+    setEarnError('');
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      await postWorkforceInsuranceAdjustment(token, shopId, {
+        employee_id: empId,
+        year: earnYear,
+        month: earnMonth,
+        employer_contribution: adjEmployer || '0',
+        employee_withhold: adjWithhold || '0',
+        note: adjNote,
+      });
+      setAdjEmployer('');
+      setAdjWithhold('');
+      setAdjNote('');
+      await loadEarnings();
+    } catch (e) {
+      setEarnError(e.message || t('erp.common.error'));
+    } finally {
+      setAdjSaving(false);
+    }
+  }, [
+    shopId,
+    canManage,
+    adjEmployeeId,
+    adjSaving,
+    earnYear,
+    earnMonth,
+    adjEmployer,
+    adjWithhold,
+    adjNote,
+    loadEarnings,
+    t,
+  ]);
+
+  const visibleModes = canManage
+    ? MODES
+    : MODES.filter((m) => m.id === 'list' || m.id === 'earnings');
 
   return (
     <ErpAccessGate
@@ -640,6 +760,28 @@ export default function ShopWorkforceScreen() {
 
               <Text style={styles.fieldLabel}>{t('erp.workforce.dossierTitle')}</Text>
               <Text style={styles.helper}>{t('erp.workforce.dossierHint')}</Text>
+              <Text style={styles.helper}>{t('erp.workforce.contractTypeLabel')}</Text>
+              <View style={styles.compTrack}>
+                {[
+                  { id: '', labelKey: 'erp.workforce.contractUnknown' },
+                  { id: 'employment_td', labelKey: 'erp.workforce.contractTd' },
+                  { id: 'civil_gd', labelKey: 'erp.workforce.contractGd' },
+                  { id: 'self', labelKey: 'erp.workforce.contractSelf' },
+                ].map((opt) => {
+                  const selected = contractType === opt.id;
+                  return (
+                    <Pressable
+                      key={opt.id || 'unknown'}
+                      onPress={() => setContractType(opt.id)}
+                      style={[styles.compCell, selected && styles.compCellActive]}
+                    >
+                      <Text style={[styles.compLabel, selected && styles.compLabelActive]}>
+                        {t(opt.labelKey)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
               <TextInput
                 label={t('erp.workforce.birthYear')}
                 value={birthYear}
@@ -683,6 +825,166 @@ export default function ShopWorkforceScreen() {
               {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
               {saveOk ? <Text style={styles.success}>{saveOk}</Text> : null}
             </AppCard>
+          ) : null}
+
+          {mode === 'earnings' ? (
+            <>
+              <AppCard style={styles.card}>
+                <Text style={styles.cardTitle}>{t('erp.workforce.earningsTitle')}</Text>
+                <Text style={styles.helper}>{t('erp.workforce.earningsHint')}</Text>
+                <View style={styles.compTrack}>
+                  <Pressable
+                    onPress={() => shiftEarnMonth(-1)}
+                    style={[styles.compCell, styles.compCellActive]}
+                  >
+                    <Text style={[styles.compLabel, styles.compLabelActive]}>
+                      {t('erp.workforce.earningsPrevMonth')}
+                    </Text>
+                  </Pressable>
+                  <View style={[styles.compCell, { flex: 1.4 }]}>
+                    <Text style={styles.compLabel}>
+                      {t('erp.workforce.earningsPeriod', {
+                        year: earnYear,
+                        month: earnMonth,
+                      })}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => shiftEarnMonth(1)}
+                    style={[styles.compCell, styles.compCellActive]}
+                  >
+                    <Text style={[styles.compLabel, styles.compLabelActive]}>
+                      {t('erp.workforce.earningsNextMonth')}
+                    </Text>
+                  </Pressable>
+                </View>
+                {earnLoading ? (
+                  <ActivityIndicator color={COLORS.PRIMARY} style={{ marginTop: 8 }} />
+                ) : null}
+                {earnError ? <Text style={styles.error}>{earnError}</Text> : null}
+              </AppCard>
+
+              {myEarnings ? (
+                <AppCard style={styles.card}>
+                  <Text style={styles.cardTitle}>{t('erp.workforce.myEarningsTitle')}</Text>
+                  <Text style={styles.summaryLine}>
+                    {t('erp.workforce.earnFixed', { amount: myEarnings.fixed_prorated })}
+                  </Text>
+                  <Text style={styles.summaryLine}>
+                    {t('erp.workforce.earnPercent', { amount: myEarnings.percent_earned })}
+                  </Text>
+                  <Text style={styles.summaryLine}>
+                    {t('erp.workforce.earnGross', { amount: myEarnings.gross_earned })}
+                  </Text>
+                  {myEarnings.insurance_adjustment ? (
+                    <Text style={styles.meta}>
+                      {t('erp.workforce.earnInsuranceAdj', {
+                        employer: myEarnings.insurance_adjustment.employer_contribution,
+                        withhold: myEarnings.insurance_adjustment.employee_withhold,
+                      })}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.helper}>{myEarnings.disclaimer}</Text>
+                </AppCard>
+              ) : (
+                <AppCard style={styles.card}>
+                  <Text style={styles.helper}>{t('erp.workforce.myEarningsNeedLink')}</Text>
+                </AppCard>
+              )}
+
+              {canManage && teamEarnings ? (
+                <AppCard style={styles.card}>
+                  <Text style={styles.cardTitle}>{t('erp.workforce.teamEarningsTitle')}</Text>
+                  <Text style={styles.summaryLine}>
+                    {t('erp.workforce.teamEarnFixed', {
+                      amount: teamEarnings.totals?.fixed_prorated,
+                    })}
+                  </Text>
+                  <Text style={styles.summaryLine}>
+                    {t('erp.workforce.teamEarnPercent', {
+                      amount: teamEarnings.totals?.percent_earned,
+                    })}
+                  </Text>
+                  <Text style={styles.summaryLine}>
+                    {t('erp.workforce.teamEarnGross', {
+                      amount: teamEarnings.totals?.gross_earned,
+                    })}
+                  </Text>
+                  {(teamEarnings.employees || []).map((row) => (
+                    <View key={row.employee_id} style={{ marginTop: 8 }}>
+                      <Text style={styles.employeeName}>{row.display_name}</Text>
+                      <Text style={styles.meta}>
+                        {t('erp.workforce.earnFixed', { amount: row.fixed_prorated })}
+                      </Text>
+                      <Text style={styles.meta}>
+                        {t('erp.workforce.earnPercent', { amount: row.percent_earned })}
+                      </Text>
+                      <Text style={styles.meta}>
+                        {t('erp.workforce.earnGross', { amount: row.gross_earned })}
+                      </Text>
+                    </View>
+                  ))}
+                </AppCard>
+              ) : null}
+
+              {canManage ? (
+                <AppCard style={styles.card}>
+                  <Text style={styles.cardTitle}>{t('erp.workforce.insuranceAdjTitle')}</Text>
+                  <Text style={styles.helper}>{t('erp.workforce.insuranceAdjHint')}</Text>
+                  <Text style={styles.helper}>{t('erp.workforce.insuranceAdjPick')}</Text>
+                  <View style={styles.compTrack}>
+                    {employees.map((e) => {
+                      const selected = String(adjEmployeeId) === String(e.id);
+                      return (
+                        <Pressable
+                          key={e.id}
+                          onPress={() => setAdjEmployeeId(String(e.id))}
+                          style={[styles.compCell, selected && styles.compCellActive]}
+                        >
+                          <Text style={[styles.compLabel, selected && styles.compLabelActive]}>
+                            {e.display_name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <TextInput
+                    label={t('erp.workforce.insuranceAdjEmployer')}
+                    value={adjEmployer}
+                    onChangeText={setAdjEmployer}
+                    mode="outlined"
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                    textColor={COLORS.TEXT_DARK}
+                  />
+                  <TextInput
+                    label={t('erp.workforce.insuranceAdjWithhold')}
+                    value={adjWithhold}
+                    onChangeText={setAdjWithhold}
+                    mode="outlined"
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                    textColor={COLORS.TEXT_DARK}
+                  />
+                  <TextInput
+                    label={t('erp.workforce.insuranceAdjNote')}
+                    value={adjNote}
+                    onChangeText={setAdjNote}
+                    mode="outlined"
+                    style={styles.input}
+                    textColor={COLORS.TEXT_DARK}
+                  />
+                  <Button
+                    mode="contained"
+                    loading={adjSaving}
+                    disabled={adjSaving || !adjEmployeeId.trim()}
+                    onPress={saveInsuranceAdj}
+                  >
+                    {t('erp.workforce.insuranceAdjSave')}
+                  </Button>
+                </AppCard>
+              ) : null}
+            </>
           ) : null}
 
           {mode === 'list' ? (

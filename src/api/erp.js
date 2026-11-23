@@ -119,6 +119,47 @@ export async function createShopEmployee(token, shopId, payload) {
   return response.json();
 }
 
+export async function fetchShopWorkforceEarnings(token, shopId, { year, month } = {}) {
+  const qs = new URLSearchParams();
+  if (year != null) qs.set('year', String(year));
+  if (month != null) qs.set('month', String(month));
+  const suffix = qs.toString() ? `?${qs}` : '';
+  const response = await fetch(
+    `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/workforce-earnings/${suffix}`,
+    { headers: await shopScopedHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load workforce earnings'));
+  return response.json();
+}
+
+export async function fetchMyWorkforceEarnings(token, shopId, { year, month } = {}) {
+  const qs = new URLSearchParams();
+  if (year != null) qs.set('year', String(year));
+  if (month != null) qs.set('month', String(month));
+  const suffix = qs.toString() ? `?${qs}` : '';
+  const response = await fetch(
+    `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/workforce-earnings/me/${suffix}`,
+    { headers: await shopScopedHeaders(token) },
+  );
+  if (!response.ok) throw new Error(await parseError(response, 'Failed to load my earnings'));
+  return response.json();
+}
+
+export async function postWorkforceInsuranceAdjustment(token, shopId, payload) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/workforce-insurance-adjustments/`,
+    {
+      method: 'POST',
+      headers: { ...(await shopScopedHeaders(token)), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(await parseError(response, 'Failed to save insurance adjustment'));
+  }
+  return response.json();
+}
+
 export async function listShopDepartments(token, shopId) {
   const response = await fetch(
     `${API_BASE_URL}/api/profiles/shop-profiles/${shopId}/departments/`,
