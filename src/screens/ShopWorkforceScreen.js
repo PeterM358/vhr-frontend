@@ -160,16 +160,42 @@ export default function ShopWorkforceScreen() {
     }
   }, [shopId, t]);
 
+  const loadEarnings = useCallback(async () => {
+    if (!shopId) return;
+    setEarnError('');
+    setEarnLoading(true);
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      if (canManage) {
+        const team = await fetchShopWorkforceEarnings(token, shopId, {
+          year: earnYear,
+          month: earnMonth,
+        });
+        setTeamEarnings(team);
+      } else {
+        setTeamEarnings(null);
+      }
+      try {
+        const mine = await fetchMyWorkforceEarnings(token, shopId, {
+          year: earnYear,
+          month: earnMonth,
+        });
+        setMyEarnings(mine);
+      } catch {
+        setMyEarnings(null);
+      }
+    } catch (e) {
+      setTeamEarnings(null);
+      setEarnError(e.message || t('erp.common.error'));
+    } finally {
+      setEarnLoading(false);
+    }
+  }, [shopId, canManage, earnYear, earnMonth, t]);
+
   useFocusEffect(
     useCallback(() => {
       load();
     }, [load])
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      if (mode === 'earnings') loadEarnings();
-    }, [mode, loadEarnings])
   );
 
   useEffect(() => {
@@ -227,8 +253,8 @@ export default function ShopWorkforceScreen() {
       const dh = Number(row.compensation_day_hours);
       setDayHours(dh === 4 || dh === 12 ? dh : 8);
       const pct = row.compensation_percent != null ? String(row.compensation_percent) : '';
-      const mode = String(row.compensation_mode || '');
-      const hasPct = Boolean(pct) && (mode.includes('percent') || Number(pct) > 0);
+      const modeStr = String(row.compensation_mode || '');
+      const hasPct = Boolean(pct) && (modeStr.includes('percent') || Number(pct) > 0);
       setUsePercent(hasPct);
       setCompensationPercent(hasPct ? pct : '');
       setPercentBasis(row.compensation_percent_basis === 'turnover' ? 'turnover' : 'labor');
@@ -244,38 +270,6 @@ export default function ShopWorkforceScreen() {
     },
     [canManage]
   );
-
-  const loadEarnings = useCallback(async () => {
-    if (!shopId) return;
-    setEarnError('');
-    setEarnLoading(true);
-    try {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      if (canManage) {
-        const team = await fetchShopWorkforceEarnings(token, shopId, {
-          year: earnYear,
-          month: earnMonth,
-        });
-        setTeamEarnings(team);
-      } else {
-        setTeamEarnings(null);
-      }
-      try {
-        const mine = await fetchMyWorkforceEarnings(token, shopId, {
-          year: earnYear,
-          month: earnMonth,
-        });
-        setMyEarnings(mine);
-      } catch {
-        setMyEarnings(null);
-      }
-    } catch (e) {
-      setTeamEarnings(null);
-      setEarnError(e.message || t('erp.common.error'));
-    } finally {
-      setEarnLoading(false);
-    }
-  }, [shopId, canManage, earnYear, earnMonth, t]);
 
   const resolveCompensationMode = useCallback(() => {
     const hasGross = parseMoneyToMinor(monthlyGross) != null;
