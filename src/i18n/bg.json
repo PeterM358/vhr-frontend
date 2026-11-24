@@ -4177,7 +4177,7 @@
       "noNotesCaptured": "Няма записани бележки за този запис.",
       "partsAmountSummaryOnly": "Части (обобщение): {amount} — няма редове с материали.",
       "paymentUpdateHint": "Плащането може да се актуализира в картата по-горе, когато клиентът плати.",
-      "operationsCompletedHelp": "Работни линии, завършени при това посещение — труд и материали по-долу."
+      "operationsCompletedHelp": "Работни линии, завършени при това посещение — труд и материали по-долу. Разгъни линия, за да назначиш кой е свършил работата."
     },
     "invoicing": {
       "title": "Фактуриране",
@@ -5125,6 +5125,7 @@
       "analyticsFixed": "Твърди заплати",
       "analyticsPercent": "От проценти",
       "analyticsInsurance": "Осигуровки (работодател)",
+      "analyticsInsuranceEmployee": "Осигуровки (служител)",
       "filterAll": "Всички",
       "filterFixed": "Твърдо",
       "filterPercent": "%",

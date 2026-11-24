@@ -687,8 +687,9 @@ export default function ShopWorkforceScreen() {
     const totals = teamEarnings?.totals || {};
     const fixed = Number(totals.fixed_monthly || teamPayTotals.fixedMonthly) || 0;
     const percent = Number(totals.percent_earned) || 0;
-    const insurance = Number(totals.insurance_employer) || 0;
-    const max = Math.max(fixed, percent, insurance, 1);
+    const insuranceEmployer = Number(totals.insurance_employer) || 0;
+    const insuranceEmployee = Number(totals.insurance_employee) || 0;
+    const max = Math.max(fixed, percent, insuranceEmployer, insuranceEmployee, 1);
     const rows = [
       {
         id: 'fixed',
@@ -705,11 +706,23 @@ export default function ShopWorkforceScreen() {
       {
         id: 'insurance',
         label: t('erp.workforce.analyticsInsurance'),
-        amount: insurance,
+        amount: insuranceEmployer,
         color: '#e9c46a',
+      },
+      {
+        id: 'insurance_employee',
+        label: t('erp.workforce.analyticsInsuranceEmployee'),
+        amount: insuranceEmployee,
+        color: '#f4a261',
       },
     ];
     if (analyticsFilter === 'all') return { rows, max };
+    if (analyticsFilter === 'insurance') {
+      return {
+        rows: rows.filter((r) => r.id === 'insurance' || r.id === 'insurance_employee'),
+        max,
+      };
+    }
     return { rows: rows.filter((r) => r.id === analyticsFilter), max };
   }, [teamEarnings, teamPayTotals.fixedMonthly, analyticsFilter, t]);
 

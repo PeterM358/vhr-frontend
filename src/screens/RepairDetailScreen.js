@@ -1988,6 +1988,47 @@ export default function RepairDetailScreen({ route, navigation }) {
                         disabled={opLaborSavingId != null || operationActionId != null}
                       />
                     </View>
+                    {['planned', 'approved', 'in_progress', 'waiting_parts'].includes(
+                      String(op.status || '').toLowerCase()
+                    ) ? (
+                      <Button
+                        compact
+                        mode="text"
+                        disabled={operationActionId != null || !canPickOperationTypes}
+                        onPress={() => handleEditOperationType(op)}
+                      >
+                        {t('repairs.detail.operationsPicker.changeType')}
+                      </Button>
+                    ) : null}
+                    {canExecuteOperationLifecycle(op) &&
+                    op.status !== 'completed' &&
+                    op.status !== 'cancelled' &&
+                    op.status !== 'declined' ? (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {op.status !== 'in_progress' ? (
+                          <Button
+                            compact
+                            mode="outlined"
+                            loading={operationActionId === op.id}
+                            disabled={operationActionId != null}
+                            onPress={() => handleOperationLifecycle(op.id, 'start')}
+                          >
+                            {t('repairs.detail.operationsPicker.start', null, 'Start')}
+                          </Button>
+                        ) : null}
+                        <Button
+                          compact
+                          mode="contained"
+                          loading={operationActionId === op.id}
+                          disabled={operationActionId != null}
+                          onPress={() => handleOperationLifecycle(op.id, 'complete')}
+                        >
+                          {t('repairs.detail.operationsPicker.complete', null, 'Complete')}
+                        </Button>
+                      </View>
+                    ) : null}
+                    </>
+                    )}
                     {shopUsesWorkforce ? (
                       <View style={{ gap: 6, marginTop: 4 }}>
                         {operationAssignmentsFor(op.id).length ? (
@@ -2092,47 +2133,6 @@ export default function RepairDetailScreen({ route, navigation }) {
                     ) : op.assigned_mechanics?.length ? (
                       <Text style={styles.mutedText}>{t('repairs.detail.mechanicsLabel', { names: op.assigned_mechanics.join(', ') }, `Mechanics: ${op.assigned_mechanics.join(', ')}`)}</Text>
                     ) : null}
-                    {['planned', 'approved', 'in_progress', 'waiting_parts'].includes(
-                      String(op.status || '').toLowerCase()
-                    ) ? (
-                      <Button
-                        compact
-                        mode="text"
-                        disabled={operationActionId != null || !canPickOperationTypes}
-                        onPress={() => handleEditOperationType(op)}
-                      >
-                        {t('repairs.detail.operationsPicker.changeType')}
-                      </Button>
-                    ) : null}
-                    {canExecuteOperationLifecycle(op) &&
-                    op.status !== 'completed' &&
-                    op.status !== 'cancelled' &&
-                    op.status !== 'declined' ? (
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                        {op.status !== 'in_progress' ? (
-                          <Button
-                            compact
-                            mode="outlined"
-                            loading={operationActionId === op.id}
-                            disabled={operationActionId != null}
-                            onPress={() => handleOperationLifecycle(op.id, 'start')}
-                          >
-                            {t('repairs.detail.operationsPicker.start', null, 'Start')}
-                          </Button>
-                        ) : null}
-                        <Button
-                          compact
-                          mode="contained"
-                          loading={operationActionId === op.id}
-                          disabled={operationActionId != null}
-                          onPress={() => handleOperationLifecycle(op.id, 'complete')}
-                        >
-                          {t('repairs.detail.operationsPicker.complete', null, 'Complete')}
-                        </Button>
-                      </View>
-                    ) : null}
-                    </>
-                    )}
                     {op.notes ? <Text style={styles.mutedText}>{op.notes}</Text> : null}
                   </View>
                 ) : null}

@@ -4224,7 +4224,7 @@
       "noNotesCaptured": "No notes captured for this record.",
       "partsAmountSummaryOnly": "Parts (summary): {amount} — no line items recorded.",
       "paymentUpdateHint": "Payment can be updated in the card above when the customer pays.",
-      "operationsCompletedHelp": "Work lines completed on this visit — labor and materials below."
+      "operationsCompletedHelp": "Work lines completed on this visit — labor and materials below. Expand a line to assign who did the work."
     },
     "invoicing": {
       "title": "Invoicing",
@@ -5168,11 +5168,12 @@
       "basisTurnoverShort": "turnover",
       "summaryTitle": "At a glance",
       "analyticsTitle": "Workforce — costs",
-      "analyticsHint": "Aggregates only (not personal salaries). Filter fixed / % / insurance.",
+      "analyticsHint": "Aggregates only (not personal salaries). Filter fixed / % / social security.",
       "analyticsPrivacyHint": "Personal amounts live on the worker profile — tap a name in the list.",
       "analyticsFixed": "Fixed wages",
       "analyticsPercent": "From percent",
       "analyticsInsurance": "Insurance (employer)",
+      "analyticsInsuranceEmployee": "Insurance (employee)",
       "filterAll": "All",
       "filterFixed": "Fixed",
       "filterPercent": "%",
