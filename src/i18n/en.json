@@ -3968,6 +3968,7 @@
         "laborInvalidHint": "Enter a non-negative amount.",
         "couldNotSaveLabor": "Could not save labor price",
         "assignWorker": "Assign worker",
+        "assignNeedsEmployees": "Add a worker in Personnel first",
         "pickWorker": "Choose worker…",
         "confirmAssign": "Assign",
         "unassign": "Remove",
@@ -4224,7 +4225,9 @@
       "noNotesCaptured": "No notes captured for this record.",
       "partsAmountSummaryOnly": "Parts (summary): {amount} — no line items recorded.",
       "paymentUpdateHint": "Payment can be updated in the card above when the customer pays.",
-      "operationsCompletedHelp": "Work lines completed on this visit — labor and materials below. Expand a line to assign who did the work."
+      "operationsCompletedHelp": "Work lines completed on this visit — labor and materials below.",
+      "operationsCompletedHelpAssign": "Work lines for this visit. Assign who did each job below.",
+      "partsOnRepairNotLinked": "Parts on this repair (not linked to the line — OK for a single job)"
     },
     "invoicing": {
       "title": "Invoicing",

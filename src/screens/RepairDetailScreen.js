@@ -60,6 +60,7 @@ import {
 } from '../api/repairs';
 import { getShopParts, prepareRepairPartsData } from '../api/parts';
 import { listShopEmployees } from '../api/erp';
+import { getMyShopProfiles } from '../api/profiles';
 import { getOffersForRepair, bookOffer, unbookOffer, deleteOffer } from '../api/offers';
 import { RepairsList } from '../components/shop/RepairsList';
 import RepairOutcomePanel from '../components/client/RepairOutcomePanel';
@@ -785,25 +786,66 @@ export default function RepairDetailScreen({ route, navigation }) {
         const currentShopId = await AsyncStorage.getItem('@current_shop_id');
         parsedShopId = parseInt(currentShopId, 10);
         setShopProfileId(parsedShopId);
-        const [profilesRaw, memberships] = await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEYS.SHOP_PROFILES),
-          readShopMemberships(),
-        ]);
+        const memberships = await readShopMemberships();
         let profile = null;
-        if (profilesRaw) {
-          try {
-            const profiles = JSON.parse(profilesRaw);
-            profile = profiles.find((row) => Number(row.id) === parsedShopId) || null;
-          } catch {
-            profile = null;
+        // Live shop row first — AsyncStorage often lags the “Закачане по ремонти” toggle,
+        // which hid Assign worker on done repairs even after a hard refresh.
+        try {
+          if (token && Number.isFinite(parsedShopId)) {
+            const oneRes = await fetch(
+              `${API_BASE_URL}/api/profiles/shop-profiles/${parsedShopId}/`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            if (oneRes.ok) {
+              profile = await oneRes.json();
+            }
+          }
+          if (!profile) {
+            const fresh = await getMyShopProfiles();
+            const list = Array.isArray(fresh)
+              ? fresh
+              : Array.isArray(fresh?.results)
+                ? fresh.results
+                : [];
+            await AsyncStorage.setItem(STORAGE_KEYS.SHOP_PROFILES, JSON.stringify(list));
+            profile = list.find((row) => Number(row.id) === parsedShopId) || null;
+          } else {
+            try {
+              const fresh = await getMyShopProfiles();
+              const list = Array.isArray(fresh)
+                ? fresh
+                : Array.isArray(fresh?.results)
+                  ? fresh.results
+                  : [];
+              const merged = list.map((row) =>
+                Number(row.id) === Number(profile.id) ? { ...row, ...profile } : row
+              );
+              if (!merged.some((row) => Number(row.id) === Number(profile.id))) {
+                merged.push(profile);
+              }
+              await AsyncStorage.setItem(STORAGE_KEYS.SHOP_PROFILES, JSON.stringify(merged));
+            } catch {
+              /* cache warm is best-effort */
+            }
+          }
+        } catch {
+          const profilesRaw = await AsyncStorage.getItem(STORAGE_KEYS.SHOP_PROFILES);
+          if (profilesRaw) {
+            try {
+              const profiles = JSON.parse(profilesRaw);
+              profile = profiles.find((row) => Number(row.id) === parsedShopId) || null;
+            } catch {
+              profile = null;
+            }
           }
         }
         setShopProfile(profile);
         const membership = shopMembershipFor(memberships, parsedShopId);
+        const workforceOn = shopCapabilityEnabled(profile, 'uses_employee_time_tracking');
         setShopUsesInventory(shopCapabilityEnabled(profile, 'uses_inventory'));
-        setShopUsesWorkforce(shopCapabilityEnabled(profile, 'uses_employee_time_tracking'));
+        setShopUsesWorkforce(workforceOn);
         setCanIssueStock(shopHasPermission(membership, 'move_stock'));
-        if (shopCapabilityEnabled(profile, 'uses_employee_time_tracking') && token) {
+        if (workforceOn && token) {
           try {
             const empPayload = await listShopEmployees(token, parsedShopId);
             setShopEmployees(Array.isArray(empPayload) ? empPayload : empPayload?.results || []);
@@ -1643,11 +1685,17 @@ export default function RepairDetailScreen({ route, navigation }) {
         <>
         {readOnly ? (
           <Text style={[styles.mutedText, { marginTop: 8 }]}>
-            {t(
-              'repairs.detail.operationsCompletedHelp',
-              null,
-              'Work lines completed on this visit — labor and materials below.'
-            )}
+            {shopUsesWorkforce
+              ? t(
+                  'repairs.detail.operationsCompletedHelpAssign',
+                  null,
+                  'Work lines for this visit. Assign who did each job below.'
+                )
+              : t(
+                  'repairs.detail.operationsCompletedHelp',
+                  null,
+                  'Work lines completed on this visit — labor and materials below.'
+                )}
           </Text>
         ) : null}
         {visibleOperations.length === 0 ? (
@@ -1687,14 +1735,160 @@ export default function RepairDetailScreen({ route, navigation }) {
           </View>
         ) : (
           visibleOperations.map((op) => {
-            // Done: compact one-line rows; expand only when tapped (never force-open all).
+            // Done: show assign immediately; expand only for parts/labor detail.
             const expanded = Boolean(operationsExpanded[op.id]);
             const opParts = repairParts.filter(
               (part) => Number(part.service_order_operation_id) === Number(op.id)
             );
+            const orphanParts = repairParts.filter(
+              (part) =>
+                part.service_order_operation_id == null || part.service_order_operation_id === ''
+            );
+            const displayParts =
+              opParts.length > 0
+                ? opParts
+                : visibleOperations.length === 1 && orphanParts.length
+                  ? orphanParts
+                  : [];
+            const partsAreOrphansOnly = opParts.length === 0 && displayParts.length > 0;
             const opTotals = computeOperationSubtotals(op.id);
             const canRemove = !readOnly && operationCanHardDelete(op, repairParts);
             const removeDisabled = readOnly || operationActionId != null || !canRemove;
+            const assignBlock = shopUsesWorkforce ? (
+              <View style={{ gap: 6, marginTop: 8 }}>
+                {operationAssignmentsFor(op.id).length ? (
+                  operationAssignmentsFor(op.id).map((row) => (
+                    <View
+                      key={row.id}
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                    >
+                      <Text style={styles.mutedText}>
+                        {t('repairs.detail.operationsPicker.assignedTo', null, 'Assigned')}:{' '}
+                        {row.employee_display_name ||
+                          t(
+                            'repairs.detail.employeeFallback',
+                            { id: row.employee_id },
+                            `Employee #${row.employee_id}`
+                          )}
+                      </Text>
+                      <Button
+                        compact
+                        mode="text"
+                        disabled={assignSaving || operationActionId != null}
+                        onPress={() => handleUnassignWorker(row.id)}
+                      >
+                        {t('repairs.detail.operationsPicker.unassign', null, 'Remove')}
+                      </Button>
+                    </View>
+                  ))
+                ) : op.assigned_mechanics?.length ? (
+                  <Text style={styles.mutedText}>
+                    {t('repairs.detail.operationsPicker.assignedTo', null, 'Assigned')}:{' '}
+                    {op.assigned_mechanics.join(', ')}
+                  </Text>
+                ) : (
+                  <Text style={styles.mutedText}>
+                    {t(
+                      'repairs.detail.operationsPicker.noWorker',
+                      null,
+                      'No worker assigned yet.'
+                    )}
+                  </Text>
+                )}
+                {assignPickerOpId === op.id ? (
+                  <View style={{ gap: 6 }}>
+                    <View
+                      style={{
+                        borderWidth: StyleSheet.hairlineWidth,
+                        borderColor: '#ccc',
+                        borderRadius: 4,
+                      }}
+                    >
+                      <Picker
+                        selectedValue={assignPickerEmployeeId}
+                        onValueChange={(value) => setAssignPickerEmployeeId(String(value))}
+                      >
+                        <Picker.Item
+                          label={t(
+                            'repairs.detail.operationsPicker.pickWorker',
+                            null,
+                            'Choose worker…'
+                          )}
+                          value=""
+                        />
+                        {shopEmployees
+                          .filter((emp) => emp?.is_active !== false)
+                          .map((emp) => (
+                            <Picker.Item
+                              key={emp.id}
+                              label={
+                                emp.display_name ||
+                                t(
+                                  'repairs.detail.employeeFallback',
+                                  { id: emp.id },
+                                  `Employee #${emp.id}`
+                                )
+                              }
+                              value={String(emp.id)}
+                            />
+                          ))}
+                      </Picker>
+                    </View>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      <Button
+                        compact
+                        mode="contained"
+                        loading={assignSaving}
+                        disabled={assignSaving || !assignPickerEmployeeId}
+                        onPress={() => handleAssignWorker(op)}
+                      >
+                        {t('repairs.detail.operationsPicker.confirmAssign', null, 'Assign')}
+                      </Button>
+                      <Button
+                        compact
+                        mode="text"
+                        disabled={assignSaving}
+                        onPress={() => {
+                          setAssignPickerOpId(null);
+                          setAssignPickerEmployeeId('');
+                        }}
+                      >
+                        {t('common.cancel')}
+                      </Button>
+                    </View>
+                  </View>
+                ) : (
+                  <Button
+                    mode="contained"
+                    disabled={operationActionId != null || assignSaving || shopEmployees.length === 0}
+                    onPress={() => {
+                      setAssignPickerOpId(op.id);
+                      setAssignPickerEmployeeId('');
+                    }}
+                  >
+                    {shopEmployees.length === 0
+                      ? t(
+                          'repairs.detail.operationsPicker.assignNeedsEmployees',
+                          null,
+                          'Add a worker in Personnel first'
+                        )
+                      : t(
+                          'repairs.detail.operationsPicker.assignWorker',
+                          null,
+                          'Assign worker'
+                        )}
+                  </Button>
+                )}
+              </View>
+            ) : op.assigned_mechanics?.length ? (
+              <Text style={[styles.mutedText, { marginTop: 6 }]}>
+                {t(
+                  'repairs.detail.mechanicsLabel',
+                  { names: op.assigned_mechanics.join(', ') },
+                  `Mechanics: ${op.assigned_mechanics.join(', ')}`
+                )}
+              </Text>
+            ) : null;
             return (
               <View
                 key={op.id}
@@ -1780,12 +1974,21 @@ export default function RepairDetailScreen({ route, navigation }) {
                   </Pressable>
                   ) : null}
                 </View>
+                {assignBlock}
                 {expanded ? (
                   <View style={{ marginTop: 8, gap: 6 }}>
-                    {opParts.length ? (
+                    {displayParts.length ? (
                       <View>
-                        <Text style={styles.mutedText}>{t('repairs.detail.parts', null, 'Parts')}</Text>
-                        {opParts.map((part) => (
+                        <Text style={styles.mutedText}>
+                          {partsAreOrphansOnly
+                            ? t(
+                                'repairs.detail.partsOnRepairNotLinked',
+                                null,
+                                'Parts on this repair (not linked to the line — OK for a single job)'
+                              )
+                            : t('repairs.detail.parts', null, 'Parts')}
+                        </Text>
+                        {displayParts.map((part) => (
                           <Text key={part.id} style={styles.detailLine}>
                             {(part.description || part.part_master_detail?.name || t('repairs.detail.partFallback', null, 'Part')).trim()} ×{' '}
                             {part.quantity || 1}
@@ -2029,110 +2232,6 @@ export default function RepairDetailScreen({ route, navigation }) {
                     ) : null}
                     </>
                     )}
-                    {shopUsesWorkforce ? (
-                      <View style={{ gap: 6, marginTop: 4 }}>
-                        {operationAssignmentsFor(op.id).length ? (
-                          operationAssignmentsFor(op.id).map((row) => (
-                            <View
-                              key={row.id}
-                              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-                            >
-                              <Text style={styles.mutedText}>
-                                {t('repairs.detail.operationsPicker.assignedTo', null, 'Assigned')}:{' '}
-                                {row.employee_display_name || t('repairs.detail.employeeFallback', { id: row.employee_id }, `Employee #${row.employee_id}`)}
-                              </Text>
-                              <Button
-                                compact
-                                mode="text"
-                                disabled={assignSaving || operationActionId != null}
-                                onPress={() => handleUnassignWorker(row.id)}
-                              >
-                                {t('repairs.detail.operationsPicker.unassign', null, 'Remove')}
-                              </Button>
-                            </View>
-                          ))
-                        ) : op.assigned_mechanics?.length ? (
-                          <Text style={styles.mutedText}>
-                            {t('repairs.detail.operationsPicker.assignedTo', null, 'Assigned')}:{' '}
-                            {op.assigned_mechanics.join(', ')}
-                          </Text>
-                        ) : (
-                          <Text style={styles.mutedText}>
-                            {t(
-                              'repairs.detail.operationsPicker.noWorker',
-                              null,
-                              'No worker assigned yet.'
-                            )}
-                          </Text>
-                        )}
-                        {assignPickerOpId === op.id ? (
-                          <View style={{ gap: 6 }}>
-                            <View
-                              style={{
-                                borderWidth: StyleSheet.hairlineWidth,
-                                borderColor: '#ccc',
-                                borderRadius: 4,
-                              }}
-                            >
-                              <Picker
-                                selectedValue={assignPickerEmployeeId}
-                                onValueChange={(value) => setAssignPickerEmployeeId(String(value))}
-                              >
-                                <Picker.Item
-                                  label={t('repairs.detail.operationsPicker.pickWorker', null, 'Choose worker…')}
-                                  value=""
-                                />
-                                {shopEmployees
-                                  .filter((emp) => emp?.is_active !== false)
-                                  .map((emp) => (
-                                    <Picker.Item
-                                      key={emp.id}
-                                      label={emp.display_name || t('repairs.detail.employeeFallback', { id: emp.id }, `Employee #${emp.id}`)}
-                                      value={String(emp.id)}
-                                    />
-                                  ))}
-                              </Picker>
-                            </View>
-                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                              <Button
-                                compact
-                                mode="contained"
-                                loading={assignSaving}
-                                disabled={assignSaving || !assignPickerEmployeeId}
-                                onPress={() => handleAssignWorker(op)}
-                              >
-                                {t('repairs.detail.operationsPicker.confirmAssign', null, 'Assign')}
-                              </Button>
-                              <Button
-                                compact
-                                mode="text"
-                                disabled={assignSaving}
-                                onPress={() => {
-                                  setAssignPickerOpId(null);
-                                  setAssignPickerEmployeeId('');
-                                }}
-                              >
-                                {t('common.cancel')}
-                              </Button>
-                            </View>
-                          </View>
-                        ) : (
-                          <Button
-                            compact
-                            mode="outlined"
-                            disabled={operationActionId != null || assignSaving || shopEmployees.length === 0}
-                            onPress={() => {
-                              setAssignPickerOpId(op.id);
-                              setAssignPickerEmployeeId('');
-                            }}
-                          >
-                            {t('repairs.detail.operationsPicker.assignWorker', null, 'Assign worker')}
-                          </Button>
-                        )}
-                      </View>
-                    ) : op.assigned_mechanics?.length ? (
-                      <Text style={styles.mutedText}>{t('repairs.detail.mechanicsLabel', { names: op.assigned_mechanics.join(', ') }, `Mechanics: ${op.assigned_mechanics.join(', ')}`)}</Text>
-                    ) : null}
                     {op.notes ? <Text style={styles.mutedText}>{op.notes}</Text> : null}
                   </View>
                 ) : null}
