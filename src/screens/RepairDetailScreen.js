@@ -23,7 +23,6 @@ import {
   Switch,
   useTheme,
 } from 'react-native-paper';
-import { Picker } from '@react-native-picker/picker';
 import { API_BASE_URL } from '../api/config';
 import {
   getRepairById,
@@ -351,6 +350,7 @@ export default function RepairDetailScreen({ route, navigation }) {
   const [shopUsesWorkforce, setShopUsesWorkforce] = useState(false);
   const [assignPickerOpId, setAssignPickerOpId] = useState(null);
   const [assignPickerEmployeeId, setAssignPickerEmployeeId] = useState('');
+  const [assignPickerQuery, setAssignPickerQuery] = useState('');
   const [assignSaving, setAssignSaving] = useState(false);
   const [selectedParts, setSelectedParts] = useState([]);
   const [availableShopParts, setAvailableShopParts] = useState([]);
@@ -1396,6 +1396,7 @@ export default function RepairDetailScreen({ route, navigation }) {
     if (existing.some((row) => Number(row.employee_id) === employeeId)) {
       setAssignPickerOpId(null);
       setAssignPickerEmployeeId('');
+      setAssignPickerQuery('');
       return;
     }
     try {
@@ -1408,6 +1409,7 @@ export default function RepairDetailScreen({ route, navigation }) {
       });
       setAssignPickerOpId(null);
       setAssignPickerEmployeeId('');
+      setAssignPickerQuery('');
       await refreshRepair();
     } catch (err) {
       showMessage(
@@ -1797,43 +1799,115 @@ export default function RepairDetailScreen({ route, navigation }) {
                 )}
                 {assignPickerOpId === op.id ? (
                   <View style={{ gap: 6 }}>
-                    <View
-                      style={{
-                        borderWidth: StyleSheet.hairlineWidth,
-                        borderColor: '#ccc',
-                        borderRadius: 4,
+                    <TextInput
+                      mode="outlined"
+                      dense
+                      autoFocus
+                      label={t(
+                        'repairs.detail.operationsPicker.searchWorker',
+                        null,
+                        'Type to find worker'
+                      )}
+                      placeholder={t(
+                        'repairs.detail.operationsPicker.pickWorker',
+                        null,
+                        'Choose worker…'
+                      )}
+                      value={assignPickerQuery}
+                      onChangeText={(text) => {
+                        setAssignPickerQuery(text);
+                        setAssignPickerEmployeeId('');
                       }}
-                    >
-                      <Picker
-                        selectedValue={assignPickerEmployeeId}
-                        onValueChange={(value) => setAssignPickerEmployeeId(String(value))}
-                      >
-                        <Picker.Item
-                          label={t(
-                            'repairs.detail.operationsPicker.pickWorker',
-                            null,
-                            'Choose worker…'
-                          )}
-                          value=""
-                        />
-                        {shopEmployees
-                          .filter((emp) => emp?.is_active !== false)
-                          .map((emp) => (
-                            <Picker.Item
-                              key={emp.id}
-                              label={
-                                emp.display_name ||
-                                t(
-                                  'repairs.detail.employeeFallback',
-                                  { id: emp.id },
-                                  `Employee #${emp.id}`
-                                )
-                              }
-                              value={String(emp.id)}
-                            />
-                          ))}
-                      </Picker>
-                    </View>
+                      disabled={assignSaving}
+                    />
+                    {(() => {
+                      const q = assignPickerQuery.trim().toLowerCase();
+                      const active = shopEmployees.filter((emp) => emp?.is_active !== false);
+                      const filtered = q
+                        ? active.filter((emp) => {
+                            const name = String(emp.display_name || '').toLowerCase();
+                            const num = String(emp.employee_number || '').toLowerCase();
+                            const phone = String(emp.phone || '').toLowerCase();
+                            return (
+                              name.includes(q) || num.includes(q) || phone.includes(q)
+                            );
+                          })
+                        : active;
+                      const shown = filtered.slice(0, 12);
+                      if (!active.length) {
+                        return (
+                          <Text style={styles.mutedText}>
+                            {t(
+                              'repairs.detail.operationsPicker.assignNeedsEmployees',
+                              null,
+                              'Add a worker in Personnel first'
+                            )}
+                          </Text>
+                        );
+                      }
+                      if (!shown.length) {
+                        return (
+                          <Text style={styles.mutedText}>
+                            {t(
+                              'repairs.detail.operationsPicker.noWorkerMatch',
+                              null,
+                              'No worker matches that name.'
+                            )}
+                          </Text>
+                        );
+                      }
+                      return (
+                        <View style={{ gap: 4 }}>
+                          {shown.map((emp) => {
+                            const selected = String(assignPickerEmployeeId) === String(emp.id);
+                            const label =
+                              emp.display_name ||
+                              t(
+                                'repairs.detail.employeeFallback',
+                                { id: emp.id },
+                                `Employee #${emp.id}`
+                              );
+                            return (
+                              <Pressable
+                                key={emp.id}
+                                onPress={() => {
+                                  setAssignPickerEmployeeId(String(emp.id));
+                                  setAssignPickerQuery(label);
+                                }}
+                                style={{
+                                  paddingVertical: 10,
+                                  paddingHorizontal: 12,
+                                  borderRadius: 6,
+                                  borderWidth: StyleSheet.hairlineWidth,
+                                  borderColor: selected ? COLORS.PRIMARY : '#ccc',
+                                  backgroundColor: selected
+                                    ? 'rgba(13, 71, 161, 0.08)'
+                                    : 'transparent',
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    color: COLORS.TEXT_DARK,
+                                    fontWeight: selected ? '600' : '400',
+                                  }}
+                                >
+                                  {label}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                          {filtered.length > shown.length ? (
+                            <Text style={styles.mutedText}>
+                              {t(
+                                'repairs.detail.operationsPicker.typeToNarrowWorkers',
+                                { more: filtered.length - shown.length },
+                                `+${filtered.length - shown.length} more — keep typing to narrow`
+                              )}
+                            </Text>
+                          ) : null}
+                        </View>
+                      );
+                    })()}
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                       <Button
                         compact
@@ -1851,6 +1925,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                         onPress={() => {
                           setAssignPickerOpId(null);
                           setAssignPickerEmployeeId('');
+                          setAssignPickerQuery('');
                         }}
                       >
                         {t('common.cancel')}
@@ -1864,6 +1939,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                     onPress={() => {
                       setAssignPickerOpId(op.id);
                       setAssignPickerEmployeeId('');
+                      setAssignPickerQuery('');
                     }}
                   >
                     {shopEmployees.length === 0
@@ -1995,9 +2071,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                           </Text>
                         ))}
                       </View>
-                    ) : (
-                      <Text style={styles.mutedText}>{t('repairs.detail.noPartsOnOperation', null, 'No parts on this operation yet.')}</Text>
-                    )}
+                    ) : null}
                     {readOnly ? (
                       <Text style={styles.detailLine}>
                         {t(
