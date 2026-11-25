@@ -1798,20 +1798,15 @@ export default function RepairDetailScreen({ route, navigation }) {
                   </Text>
                 )}
                 {assignPickerOpId === op.id ? (
-                  <View style={{ gap: 6 }}>
+                  <View style={{ gap: 8 }}>
                     <TextInput
                       mode="outlined"
                       dense
                       autoFocus
-                      label={t(
+                      placeholder={t(
                         'repairs.detail.operationsPicker.searchWorker',
                         null,
                         'Type to find worker'
-                      )}
-                      placeholder={t(
-                        'repairs.detail.operationsPicker.pickWorker',
-                        null,
-                        'Choose worker…'
                       )}
                       value={assignPickerQuery}
                       onChangeText={(text) => {
@@ -1819,6 +1814,17 @@ export default function RepairDetailScreen({ route, navigation }) {
                         setAssignPickerEmployeeId('');
                       }}
                       disabled={assignSaving}
+                      right={
+                        assignPickerQuery ? (
+                          <TextInput.Icon
+                            icon="close"
+                            onPress={() => {
+                              setAssignPickerQuery('');
+                              setAssignPickerEmployeeId('');
+                            }}
+                          />
+                        ) : null
+                      }
                     />
                     {(() => {
                       const q = assignPickerQuery.trim().toLowerCase();
@@ -1832,8 +1838,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                               name.includes(q) || num.includes(q) || phone.includes(q)
                             );
                           })
-                        : active;
-                      const shown = filtered.slice(0, 12);
+                        : active.slice(0, 8);
                       if (!active.length) {
                         return (
                           <Text style={styles.mutedText}>
@@ -1845,7 +1850,7 @@ export default function RepairDetailScreen({ route, navigation }) {
                           </Text>
                         );
                       }
-                      if (!shown.length) {
+                      if (q && !filtered.length) {
                         return (
                           <Text style={styles.mutedText}>
                             {t(
@@ -1857,9 +1862,8 @@ export default function RepairDetailScreen({ route, navigation }) {
                         );
                       }
                       return (
-                        <View style={{ gap: 4 }}>
-                          {shown.map((emp) => {
-                            const selected = String(assignPickerEmployeeId) === String(emp.id);
+                        <View>
+                          {filtered.map((emp, idx) => {
                             const label =
                               emp.display_name ||
                               t(
@@ -1870,67 +1874,82 @@ export default function RepairDetailScreen({ route, navigation }) {
                             return (
                               <Pressable
                                 key={emp.id}
-                                onPress={() => {
+                                disabled={assignSaving}
+                                onPress={async () => {
                                   setAssignPickerEmployeeId(String(emp.id));
                                   setAssignPickerQuery(label);
+                                  // One tap: pick + assign (no second Confirm).
+                                  const employeeId = parseInt(String(emp.id), 10);
+                                  if (!Number.isFinite(employeeId)) return;
+                                  try {
+                                    setAssignSaving(true);
+                                    const token = await AsyncStorage.getItem('@access_token');
+                                    const existing = operationAssignmentsFor(op.id);
+                                    await createRepairAssignment(token, repairId, {
+                                      employee_id: employeeId,
+                                      service_order_operation_id: op.id,
+                                      role: existing.length ? 'assistant' : 'primary',
+                                    });
+                                    setAssignPickerOpId(null);
+                                    setAssignPickerEmployeeId('');
+                                    setAssignPickerQuery('');
+                                    await refreshRepair();
+                                  } catch (err) {
+                                    showMessage(
+                                      t(
+                                        'repairs.detail.operationsPicker.couldNotAssign',
+                                        null,
+                                        'Could not assign worker'
+                                      ),
+                                      messageFromApiError(
+                                        err,
+                                        t(
+                                          'repairs.detail.pleaseTryAgain',
+                                          null,
+                                          'Please try again.'
+                                        )
+                                      )
+                                    );
+                                  } finally {
+                                    setAssignSaving(false);
+                                  }
                                 }}
                                 style={{
-                                  paddingVertical: 10,
-                                  paddingHorizontal: 12,
-                                  borderRadius: 6,
-                                  borderWidth: StyleSheet.hairlineWidth,
-                                  borderColor: selected ? COLORS.PRIMARY : '#ccc',
-                                  backgroundColor: selected
-                                    ? 'rgba(13, 71, 161, 0.08)'
-                                    : 'transparent',
+                                  paddingVertical: 12,
+                                  borderTopWidth: idx === 0 ? 0 : StyleSheet.hairlineWidth,
+                                  borderTopColor: '#ddd',
                                 }}
                               >
-                                <Text
-                                  style={{
-                                    color: COLORS.TEXT_DARK,
-                                    fontWeight: selected ? '600' : '400',
-                                  }}
-                                >
+                                <Text style={{ color: COLORS.PRIMARY, fontWeight: '600' }}>
                                   {label}
                                 </Text>
                               </Pressable>
                             );
                           })}
-                          {filtered.length > shown.length ? (
-                            <Text style={styles.mutedText}>
+                          {!q && active.length > filtered.length ? (
+                            <Text style={[styles.mutedText, { marginTop: 4 }]}>
                               {t(
                                 'repairs.detail.operationsPicker.typeToNarrowWorkers',
-                                { more: filtered.length - shown.length },
-                                `+${filtered.length - shown.length} more — keep typing to narrow`
+                                { more: active.length - filtered.length },
+                                `+${active.length - filtered.length} more — keep typing to narrow`
                               )}
                             </Text>
                           ) : null}
                         </View>
                       );
                     })()}
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                      <Button
-                        compact
-                        mode="contained"
-                        loading={assignSaving}
-                        disabled={assignSaving || !assignPickerEmployeeId}
-                        onPress={() => handleAssignWorker(op)}
-                      >
-                        {t('repairs.detail.operationsPicker.confirmAssign', null, 'Assign')}
-                      </Button>
-                      <Button
-                        compact
-                        mode="text"
-                        disabled={assignSaving}
-                        onPress={() => {
-                          setAssignPickerOpId(null);
-                          setAssignPickerEmployeeId('');
-                          setAssignPickerQuery('');
-                        }}
-                      >
-                        {t('common.cancel')}
-                      </Button>
-                    </View>
+                    <Button
+                      compact
+                      mode="text"
+                      disabled={assignSaving}
+                      onPress={() => {
+                        setAssignPickerOpId(null);
+                        setAssignPickerEmployeeId('');
+                        setAssignPickerQuery('');
+                      }}
+                    >
+                      {t('common.cancel')}
+                    </Button>
                   </View>
                 ) : (
                   <Button
