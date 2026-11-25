@@ -1,7 +1,7 @@
 // PATH: src/components/shop/RepairsList.js
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useContext } from 'react';
-import { View, FlatList, StyleSheet, Pressable } from 'react-native';
+import { View, FlatList, StyleSheet, Pressable, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import {
@@ -10,11 +10,16 @@ import {
   Searchbar,
   Checkbox,
   Button,
+  TextInput,
 } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { getRepairs } from '../../api/repairs';
+import { getRepairs, updateRepair, createRepairAssignment } from '../../api/repairs';
+import { listShopEmployees } from '../../api/erp';
 import { draftInvoiceFromRepairs } from '../../api/billing';
+import { STORAGE_KEYS } from '../../constants/storageKeys';
+import { shopCapabilityEnabled } from '../../utils/shopErpAccess';
+import { messageFromApiError } from '../../utils/apiErrorMessage';
 import {
   fetchShopProfileCompleteness,
   gateRepairNavigation,
@@ -127,6 +132,12 @@ export default function RepairsList() {
   const [selectedRepairIds, setSelectedRepairIds] = useState([]);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [invoicingRepairId, setInvoicingRepairId] = useState(null);
+  const [assignTarget, setAssignTarget] = useState(null);
+  const [assignEmployees, setAssignEmployees] = useState([]);
+  const [assignQuery, setAssignQuery] = useState('');
+  const [assignSaving, setAssignSaving] = useState(false);
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [workforceEnabled, setWorkforceEnabled] = useState(false);
   const handlePartnerBack = usePartnerDashboardBack(navigation);
   const handleBack = useCallback(() => {
     const returnTo = route.params?.returnTo;
@@ -508,6 +519,100 @@ export default function RepairsList() {
     [invoicingRepairId, navigation, t]
   );
 
+  const openAssignWorker = useCallback(async (item) => {
+    if (!item?.id) return;
+    setAssignTarget(item);
+    setAssignQuery('');
+    setAssignLoading(true);
+    try {
+      const token = await AsyncStorage.getItem('@access_token');
+      const shopIdRaw = await AsyncStorage.getItem('@current_shop_id');
+      const shopId = parseInt(shopIdRaw, 10);
+      const profilesRaw = await AsyncStorage.getItem(STORAGE_KEYS.SHOP_PROFILES);
+      let profile = null;
+      try {
+        const profiles = profilesRaw ? JSON.parse(profilesRaw) : [];
+        profile = (Array.isArray(profiles) ? profiles : []).find(
+          (row) => Number(row.id) === shopId
+        );
+      } catch {
+        profile = null;
+      }
+      const trackingOn = shopCapabilityEnabled(profile, 'uses_employee_time_tracking');
+      setWorkforceEnabled(trackingOn);
+      if (!Number.isFinite(shopId)) {
+        setAssignEmployees([]);
+        return;
+      }
+      const empPayload = await listShopEmployees(token, shopId);
+      setAssignEmployees(Array.isArray(empPayload) ? empPayload : empPayload?.results || []);
+    } catch {
+      setAssignEmployees([]);
+    } finally {
+      setAssignLoading(false);
+    }
+  }, []);
+
+  const closeAssignWorker = useCallback(() => {
+    if (assignSaving) return;
+    setAssignTarget(null);
+    setAssignQuery('');
+  }, [assignSaving]);
+
+  const confirmAssignWorker = useCallback(
+    async (employee) => {
+      if (!assignTarget?.id || !employee?.id || assignSaving) return;
+      const employeeId = parseInt(String(employee.id), 10);
+      if (!Number.isFinite(employeeId)) return;
+      setAssignSaving(true);
+      try {
+        const token = await AsyncStorage.getItem('@access_token');
+        await updateRepair(token, assignTarget.id, { primary_technician_id: employeeId });
+        const opId = assignTarget.first_operation_id;
+        if (workforceEnabled && opId != null) {
+          try {
+            await createRepairAssignment(token, assignTarget.id, {
+              employee_id: employeeId,
+              service_order_operation_id: opId,
+              role: 'primary',
+            });
+          } catch {
+            /* primary already set; assignment may already exist */
+          }
+        }
+        const name =
+          employee.display_name ||
+          t('partnerDashboard.repairsList.workerFallback', { id: employeeId }, `Worker #${employeeId}`);
+        setRepairs((prev) =>
+          prev.map((row) =>
+            Number(row.id) === Number(assignTarget.id)
+              ? { ...row, primary_technician_name: name }
+              : row
+          )
+        );
+        setAssignTarget(null);
+        setAssignQuery('');
+        showMessage(
+          t('partnerDashboard.repairsList.workerMarked', null, 'Worker marked'),
+          name,
+          { variant: 'success' }
+        );
+      } catch (err) {
+        showMessage(
+          t('common.error'),
+          messageFromApiError(
+            err,
+            t('partnerDashboard.repairsList.workerMarkError', null, 'Could not mark worker')
+          ),
+          { variant: 'error' }
+        );
+      } finally {
+        setAssignSaving(false);
+      }
+    },
+    [assignTarget, assignSaving, workforceEnabled, t]
+  );
+
   const handleRepairPress = (repairId) => {
     if (repairId == null || repairId === '') return;
     if (
@@ -718,37 +823,76 @@ export default function RepairsList() {
           </Text>
         ) : null}
 
-        {selectedTab === 'done' && !alreadyInvoiced && paymentStatusText ? (
-          <Text
-            style={[
-              styles.paymentHint,
-              paymentSettled ? styles.paymentHintPaid : styles.paymentHintUnpaid,
-            ]}
-          >
-            {t('partnerDashboard.repairsList.paymentLabel', { status: paymentStatusText })}
-          </Text>
+        {selectedTab === 'done' ? (
+          <View style={styles.doneMetaRow}>
+            <View style={styles.doneMetaLeft}>
+              {!alreadyInvoiced && paymentStatusText ? (
+                <Text
+                  style={[
+                    styles.paymentHint,
+                    paymentSettled ? styles.paymentHintPaid : styles.paymentHintUnpaid,
+                  ]}
+                >
+                  {t('partnerDashboard.repairsList.paymentLabel', { status: paymentStatusText })}
+                </Text>
+              ) : null}
+              <Text style={styles.performerHint} numberOfLines={1}>
+                {item.primary_technician_name
+                  ? t(
+                      'partnerDashboard.repairsList.performedBy',
+                      { name: item.primary_technician_name },
+                      `Performed by: ${item.primary_technician_name}`
+                    )
+                  : t(
+                      'partnerDashboard.repairsList.performerNotMarked',
+                      null,
+                      'Performed by: not marked'
+                    )}
+              </Text>
+            </View>
+            {!alreadyInvoiced && !invoiceSelectMode ? (
+              <Pressable
+                onPress={(e) => {
+                  e?.stopPropagation?.();
+                  handleInvoiceSingleRepair(item);
+                }}
+                disabled={invoicingRepairId === item.id}
+                style={({ pressed }) => [
+                  styles.invoiceCta,
+                  pressed && { opacity: 0.85 },
+                  invoicingRepairId === item.id && { opacity: 0.6 },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={t('partnerDashboard.repairsList.createInvoice')}
+              >
+                <MaterialCommunityIcons name="file-plus-outline" size={16} color={PRIMARY} />
+                <Text style={styles.invoiceCtaText}>
+                  {invoicingRepairId === item.id
+                    ? t('partnerDashboard.repairsList.creatingInvoice')
+                    : t('partnerDashboard.repairsList.invoice')}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
         ) : null}
 
-        {selectedTab === 'done' && !alreadyInvoiced && !invoiceSelectMode ? (
+        {selectedTab === 'done' && !invoiceSelectMode && !item.primary_technician_name ? (
           <Pressable
             onPress={(e) => {
               e?.stopPropagation?.();
-              handleInvoiceSingleRepair(item);
+              openAssignWorker(item);
             }}
-            disabled={invoicingRepairId === item.id}
-            style={({ pressed }) => [
-              styles.invoiceCta,
-              pressed && { opacity: 0.85 },
-              invoicingRepairId === item.id && { opacity: 0.6 },
-            ]}
+            style={({ pressed }) => [styles.markWorkerCta, pressed && { opacity: 0.85 }]}
             accessibilityRole="button"
-            accessibilityLabel={t('partnerDashboard.repairsList.createInvoice')}
+            accessibilityLabel={t(
+              'partnerDashboard.repairsList.markWorker',
+              null,
+              'Mark worker'
+            )}
           >
-            <MaterialCommunityIcons name="file-plus-outline" size={16} color={PRIMARY} />
-            <Text style={styles.invoiceCtaText}>
-              {invoicingRepairId === item.id
-                ? t('partnerDashboard.repairsList.creatingInvoice')
-                : t('partnerDashboard.repairsList.invoice')}
+            <MaterialCommunityIcons name="account-hard-hat" size={16} color={PRIMARY} />
+            <Text style={styles.markWorkerCtaText}>
+              {t('partnerDashboard.repairsList.markWorker', null, 'Mark worker')}
             </Text>
           </Pressable>
         ) : null}
@@ -1076,6 +1220,93 @@ export default function RepairsList() {
           loading={creatingInvoice}
         />
       ) : null}
+      <Modal
+        visible={Boolean(assignTarget)}
+        transparent
+        animationType="fade"
+        onRequestClose={closeAssignWorker}
+      >
+        <Pressable style={styles.assignOverlay} onPress={closeAssignWorker}>
+          <Pressable style={styles.assignSheet} onPress={(e) => e?.stopPropagation?.()}>
+            <Text style={styles.assignTitle}>
+              {t('partnerDashboard.repairsList.markWorkerTitle', null, 'Who did this job?')}
+            </Text>
+            <TextInput
+              mode="outlined"
+              dense
+              autoFocus
+              placeholder={t(
+                'partnerDashboard.repairsList.markWorkerSearch',
+                null,
+                'Type to find worker'
+              )}
+              value={assignQuery}
+              onChangeText={setAssignQuery}
+              disabled={assignSaving}
+              style={{ marginBottom: 8 }}
+            />
+            {assignLoading ? <ActivityIndicator color={PRIMARY} /> : null}
+            {!assignLoading
+              ? (() => {
+                  const q = assignQuery.trim().toLowerCase();
+                  const active = assignEmployees.filter((emp) => emp?.is_active !== false);
+                  const filtered = q
+                    ? active.filter((emp) => {
+                        const name = String(emp.display_name || '').toLowerCase();
+                        const num = String(emp.employee_number || '').toLowerCase();
+                        const phone = String(emp.phone || '').toLowerCase();
+                        return name.includes(q) || num.includes(q) || phone.includes(q);
+                      })
+                    : active.slice(0, 8);
+                  if (!active.length) {
+                    return (
+                      <Text style={styles.assignHint}>
+                        {t(
+                          'partnerDashboard.repairsList.markWorkerEmpty',
+                          null,
+                          'Add workers under Personnel first.'
+                        )}
+                      </Text>
+                    );
+                  }
+                  if (q && !filtered.length) {
+                    return (
+                      <Text style={styles.assignHint}>
+                        {t(
+                          'partnerDashboard.repairsList.markWorkerNoMatch',
+                          null,
+                          'No worker matches that name.'
+                        )}
+                      </Text>
+                    );
+                  }
+                  return filtered.map((emp) => {
+                    const label =
+                      emp.display_name ||
+                      t(
+                        'partnerDashboard.repairsList.workerFallback',
+                        { id: emp.id },
+                        `Worker #${emp.id}`
+                      );
+                    return (
+                      <Pressable
+                        key={emp.id}
+                        disabled={assignSaving}
+                        onPress={() => confirmAssignWorker(emp)}
+                        style={styles.assignRow}
+                      >
+                        <Text style={styles.assignRowText}>{label}</Text>
+                      </Pressable>
+                    );
+                  });
+                })()
+              : null}
+            <Button mode="text" disabled={assignSaving} onPress={closeAssignWorker}>
+              {t('common.cancel')}
+            </Button>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScreenBackground>
   );
 }
@@ -1235,10 +1466,21 @@ const styles = StyleSheet.create({
     color: '#15803D',
     marginBottom: 4,
   },
+  doneMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 4,
+  },
+  doneMetaLeft: {
+    flex: 1,
+    minWidth: 0,
+  },
   paymentHint: {
     fontSize: 12,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   paymentHintPaid: {
     color: '#15803D',
@@ -1246,18 +1488,70 @@ const styles = StyleSheet.create({
   paymentHintUnpaid: {
     color: '#b45309',
   },
+  performerHint: {
+    fontSize: 12,
+    color: TEXT_MUTED,
+    marginBottom: 2,
+  },
   invoiceCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+    flexShrink: 0,
+  },
+  invoiceCtaText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: PRIMARY,
+  },
+  markWorkerCta: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginBottom: 6,
     paddingVertical: 4,
-    paddingHorizontal: 2,
   },
-  invoiceCtaText: {
+  markWorkerCtaText: {
     fontSize: 13,
     fontWeight: '700',
+    color: PRIMARY,
+  },
+  assignOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  assignSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
+    maxHeight: '70%',
+  },
+  assignTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: TEXT_DARK,
+    marginBottom: 10,
+  },
+  assignHint: {
+    fontSize: 13,
+    color: TEXT_MUTED,
+    marginBottom: 8,
+  },
+  assignRow: {
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#ddd',
+  },
+  assignRowText: {
+    fontSize: 15,
+    fontWeight: '600',
     color: PRIMARY,
   },
   paymentFilterRow: {

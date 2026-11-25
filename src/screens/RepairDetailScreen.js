@@ -810,14 +810,12 @@ export default function RepairDetailScreen({ route, navigation }) {
             await AsyncStorage.setItem(STORAGE_KEYS.SHOP_PROFILES, JSON.stringify(list));
             profile = list.find((row) => Number(row.id) === parsedShopId) || null;
           } else {
+            // Single-shop GET already succeeded — refresh list cache without a second list round-trip.
             try {
-              const fresh = await getMyShopProfiles();
-              const list = Array.isArray(fresh)
-                ? fresh
-                : Array.isArray(fresh?.results)
-                  ? fresh.results
-                  : [];
-              const merged = list.map((row) =>
+              const profilesRaw = await AsyncStorage.getItem(STORAGE_KEYS.SHOP_PROFILES);
+              const list = profilesRaw ? JSON.parse(profilesRaw) : [];
+              const rows = Array.isArray(list) ? list : [];
+              const merged = rows.map((row) =>
                 Number(row.id) === Number(profile.id) ? { ...row, ...profile } : row
               );
               if (!merged.some((row) => Number(row.id) === Number(profile.id))) {
@@ -871,25 +869,28 @@ export default function RepairDetailScreen({ route, navigation }) {
         let serviceMenuData = [];
         let loadedRepairParts = [];
         if (shopFlag === 'true') {
-          const [r, partsData, shopPartsData, repairTypesRes, serviceMenuRes] = await Promise.all([
-            getRepairById(token, repairId),
-            getRepairParts(token, repairId),
-            getShopParts(token),
-            fetch(`${API_BASE_URL}/api/repairs/types/`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-            Number.isFinite(parsedShopId)
-              ? getServiceMenu(token, parsedShopId).catch(() => [])
-              : Promise.resolve([]),
+          // Repair first — done jobs skip catalog/shop-parts/offers fan-out.
+          repairData = await getRepairById(token, repairId);
+          const isDoneRepair = String(repairData?.status || '').toLowerCase() === 'done';
+          const [partsData, shopPartsData, repairTypesRes, serviceMenuRes] = await Promise.all([
+            getRepairParts(token, repairId).catch(() => []),
+            isDoneRepair ? Promise.resolve([]) : getShopParts(token),
+            isDoneRepair
+              ? Promise.resolve({ ok: false })
+              : fetch(`${API_BASE_URL}/api/repairs/types/`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                }),
+            isDoneRepair || !Number.isFinite(parsedShopId)
+              ? Promise.resolve([])
+              : getServiceMenu(token, parsedShopId).catch(() => []),
           ]);
-          repairData = r;
           loadedRepairParts = Array.isArray(partsData) ? partsData : [];
-          if (repairTypesRes.ok) {
+          if (repairTypesRes?.ok) {
             repairTypesData = await repairTypesRes.json();
           }
           serviceMenuData = Array.isArray(serviceMenuRes) ? serviceMenuRes : [];
-          setRepairParts(partsData);
-          setAvailableShopParts(shopPartsData);
+          setRepairParts(loadedRepairParts);
+          setAvailableShopParts(Array.isArray(shopPartsData) ? shopPartsData : []);
         } else {
           repairData = await getRepairById(token, repairId);
           loadedRepairParts = Array.isArray(repairData.repair_parts) ? repairData.repair_parts : [];
@@ -899,7 +900,7 @@ export default function RepairDetailScreen({ route, navigation }) {
         setRepair(repairData);
         const loadedOperations = Array.isArray(repairData.operations) ? repairData.operations : [];
         setOperations(loadedOperations);
-        if (shopFlag === 'true') {
+        if (shopFlag === 'true' && String(repairData?.status || '').toLowerCase() !== 'done') {
           const emptyClosed = loadedOperations.filter(
             (op) => isClosedOperationStatus(op.status) && operationCanHardDelete(op, loadedRepairParts)
           );
@@ -929,8 +930,13 @@ export default function RepairDetailScreen({ route, navigation }) {
         );
         setRepairTypes(Array.isArray(repairTypesData) ? repairTypesData : []);
         setShopServiceMenu(serviceMenuData);
-        const offersData = await getOffersForRepair(token, repairId);
-        setOffers(offersData);
+        // Offers matter for open/ongoing; skip on done to cut another round-trip.
+        if (String(repairData?.status || '').toLowerCase() !== 'done') {
+          const offersData = await getOffersForRepair(token, repairId);
+          setOffers(offersData);
+        } else {
+          setOffers([]);
+        }
 
       } catch (error) {
         console.error(error);
@@ -1022,11 +1028,24 @@ export default function RepairDetailScreen({ route, navigation }) {
   // If using useLayoutEffect to set navigation options, ensure selectedParts is in the dependency array.
   // (Not present in this file, but if you add one, include selectedParts as a dependency.)
 
-  // Refresh offers and repair when coming back to this screen
+  // Refresh when returning to this screen — skip the first focus (mount already loads once).
+  // Without this guard, focus + mount double/triple every repair/parts/offers request.
+  const skipNextFocusRefreshRef = useRef(true);
+  const repairStatusRef = useRef('');
   useEffect(() => {
+    repairStatusRef.current = String(repair?.status || '').toLowerCase();
+  }, [repair?.status]);
+  useEffect(() => {
+    skipNextFocusRefreshRef.current = true;
     const unsubscribe = navigation.addListener('focus', () => {
+      if (skipNextFocusRefreshRef.current) {
+        skipNextFocusRefreshRef.current = false;
+        return;
+      }
       refreshRepair();
-      refreshOffers();
+      if (repairStatusRef.current !== 'done') {
+        refreshOffers();
+      }
     });
     return unsubscribe;
   }, [navigation, repairId]);
