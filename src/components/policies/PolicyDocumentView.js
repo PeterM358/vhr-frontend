@@ -36,6 +36,13 @@ function PolicyParagraph({ text }) {
   );
 }
 
+function formatEffectiveDate(raw) {
+  const value = String(raw || '').trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return value;
+  return `${match[3]}.${match[2]}.${match[1]}`;
+}
+
 export default function PolicyDocumentView({ content, meta }) {
   const { t } = useTranslation();
 
@@ -47,19 +54,21 @@ export default function PolicyDocumentView({ content, meta }) {
     );
   }
 
+  const effective = formatEffectiveDate(meta?.effectiveDate);
+  const version = meta?.version ? String(meta.version) : '';
+
   return (
     <View>
-      <View style={styles.metaRow}>
-        <Chip compact style={styles.chip}>
-          {t('policies.versionLabel')}: {meta.version}
-        </Chip>
-        <Chip compact style={styles.chip}>
-          {t('policies.effectiveDateLabel')}: {meta.effectiveDate}
-        </Chip>
-        <Chip compact style={styles.chip}>
-          {t('policies.checksumLabel')}: {meta.checksum}
-        </Chip>
-      </View>
+      {effective || version ? (
+        <Text style={styles.metaLine} variant="bodySmall">
+          {[
+            effective ? `${t('policies.effectiveDateLabel')}: ${effective}` : null,
+            version ? `${t('policies.versionLabel')} ${version}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </Text>
+      ) : null}
       {meta?.status === 'draft-beta' ? (
         <Text style={styles.draftNote} variant="bodySmall">
           {t('policies.draftStatus')}
@@ -91,14 +100,9 @@ export default function PolicyDocumentView({ content, meta }) {
 }
 
 const styles = StyleSheet.create({
-  metaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  chip: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+  metaLine: {
+    color: 'rgba(226,232,240,0.72)',
+    marginBottom: 16,
   },
   draftNote: {
     color: 'rgba(226,232,240,0.72)',
