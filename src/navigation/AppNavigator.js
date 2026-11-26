@@ -411,7 +411,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="PublicPolicyPage"
           component={PublicPolicyPageScreen}
-          options={{ title: 'Veversal' }}
+          options={{ headerShown: false, title: 'Veversal' }}
         />
         <Stack.Screen
           name="ShopDetail"
