@@ -1,7 +1,7 @@
 const partnerTerms = {
   key: 'partner-terms',
   slug: 'partner-terms',
-  version: '1.1.0',
+  version: '1.1.1',
   effectiveDate: '2026-11-26',
   status: 'draft-beta',
   leadingLanguage: 'en',
@@ -14,7 +14,7 @@ const partnerTerms = {
         paragraphs: [
           'These Business & Partner Terms (“Partner Terms”) supplement the Veversal Terms of Use for service centers (Partners / Shops) and business Organizations that use paid or operational Partner features.',
           'If there is a conflict on Subscription billing, payment methods, activation, or cancellation of Partner plans, these Partner Terms and the Cancellation & Refund Policy prevail over the general Terms for those topics.',
-          'Provider: Veversal EOOD (ВИВЪРСАЛ ЕООД), Bulgaria. Billing and contract contact: contact@veversal.com.',
+          'Provider: Veversal EOOD (ВИВЪРСАЛ ЕООД), Bulgaria. Registered seat: ul. Zlaten Klas 623, zh.k. 20-ti May, Sofia, Bulgaria. Billing and contract contact: contact@veversal.com.',
         ],
       },
       {
@@ -129,7 +129,7 @@ const partnerTerms = {
         paragraphs: [
           'Настоящите Условия за бизнес и партньори („Партньорски условия“) допълват Общите условия на Veversal за сервизни центрове (Партньори / Сервизи) и бизнес Организации, които ползват платени или оперативни партньорски функции.',
           'При противоречие относно таксуване на Абонамент, начини на плащане, активиране или отказ на партньорски планове, тези Партньорски условия и Политиката за отказ и възстановяване имат предимство пред общите Условия по тези теми.',
-          'Доставчик: „ВИВЪРСАЛ“ ЕООД (Veversal EOOD), България. Контакт за фактуриране и договори: contact@veversal.com.',
+          'Доставчик: „ВИВЪРСАЛ“ ЕООД (Veversal EOOD), България. Седалище и адрес на управление: ул. Златен клас № 623, ж.к. 20-ти май, София, България. Контакт за фактуриране и договори: contact@veversal.com.',
         ],
       },
       {

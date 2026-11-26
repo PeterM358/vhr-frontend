@@ -4,7 +4,7 @@
 const terms = {
   key: 'terms',
   slug: 'terms',
-  version: '1.1.0',
+  version: '1.1.1',
   effectiveDate: '2026-11-26',
   status: 'draft-beta',
   leadingLanguage: 'en',
@@ -17,7 +17,7 @@ const terms = {
         paragraphs: [
           'These Terms of Use (“Terms”) govern access to and use of the Veversal platform — including the website, mobile applications, and related online services (together, the “Service”).',
           'By creating an account, signing in, or otherwise using the Service, you agree to these Terms and to the related policies listed below. If you do not agree, you must not use the Service.',
-          'Veversal is operated by Veversal EOOD (ВИВЪРСАЛ ЕООД), a company registered in the Republic of Bulgaria (“Veversal”, “we”, “us”). Contact for legal and support matters: contact@veversal.com.',
+          'Veversal is operated by Veversal EOOD (ВИВЪРСАЛ ЕООД), a company registered in the Republic of Bulgaria (“Veversal”, “we”, “us”), with registered seat at: ul. Zlaten Klas 623, zh.k. 20-ti May, Sofia, Bulgaria. Contact for legal and support matters: contact@veversal.com.',
           'These Terms are provided in English and Bulgarian. For users in Bulgaria, the Bulgarian text prevails in case of conflict, unless a written agreement states otherwise.',
         ],
       },
@@ -151,7 +151,7 @@ const terms = {
         paragraphs: [
           'Настоящите Общи условия („Условията“) уреждат достъпа до и ползването на платформата Veversal — включително уебсайта, мобилните приложения и свързаните онлайн услуги (заедно „Услугата“).',
           'Създавайки акаунт, влизайки в системата или по друг начин ползвайки Услугата, вие приемате тези Условия и свързаните политики по-долу. Ако не сте съгласни, не използвайте Услугата.',
-          'Veversal се предоставя от „ВИВЪРСАЛ“ ЕООД (Veversal EOOD), дружество, регистрирано в Република България („Veversal“, „ние“). За правни и поддържащи въпроси: contact@veversal.com.',
+          'Veversal се предоставя от „ВИВЪРСАЛ“ ЕООД (Veversal EOOD), дружество, регистрирано в Република България („Veversal“, „ние“), със седалище и адрес на управление: ул. Златен клас № 623, ж.к. 20-ти май, София, България. За правни и поддържащи въпроси: contact@veversal.com.',
           'Условията са налични на български и английски. За потребители в България при противоречие преобладава българският текст, освен ако писмено споразумение не предвижда друго.',
         ],
       },

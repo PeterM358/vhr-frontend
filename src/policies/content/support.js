@@ -17,13 +17,13 @@ const support = {
       },
       {
         id: 'contact',
-        title: 'Contact (placeholders)',
-        lawyerReview: true,
+        title: 'Contact',
         bullets: [
-          'General support: [SUPPORT_EMAIL_PLACEHOLDER]',
-          'Privacy / data requests: [DPO_OR_PRIVACY_EMAIL_PLACEHOLDER]',
-          'Security incidents: [SECURITY_CONTACT_PLACEHOLDER]',
-          'Partner payments (subscriptions): [PARTNER_BILLING_EMAIL_PLACEHOLDER]',
+          'General support: contact@veversal.com',
+          'Privacy / data requests: contact@veversal.com',
+          'Security incidents: contact@veversal.com (subject: Security)',
+          'Partner payments (subscriptions): contact@veversal.com (subject: Billing)',
+          'Provider: Veversal EOOD — ul. Zlaten Klas 623, zh.k. 20-ti May, Sofia, Bulgaria',
         ],
       },
       {
@@ -83,13 +83,13 @@ const support = {
       },
       {
         id: 'contact',
-        title: 'Контакт (placeholders)',
-        lawyerReview: true,
+        title: 'Контакт',
         bullets: [
-          'Обща поддръжка: [SUPPORT_EMAIL_PLACEHOLDER]',
-          'Поверителност / data requests: [DPO_OR_PRIVACY_EMAIL_PLACEHOLDER]',
-          'Security инциденти: [SECURITY_CONTACT_PLACEHOLDER]',
-          'Partner payments / плащания: [PARTNER_BILLING_EMAIL_PLACEHOLDER]',
+          'Обща поддръжка: contact@veversal.com',
+          'Поверителност / искания за данни: contact@veversal.com',
+          'Инциденти по сигурността: contact@veversal.com (тема: Security)',
+          'Партньорски плащания / абонаменти: contact@veversal.com (тема: Billing)',
+          'Доставчик: „ВИВЪРСАЛ“ ЕООД — ул. Златен клас № 623, ж.к. 20-ти май, София, България',
         ],
       },
       {

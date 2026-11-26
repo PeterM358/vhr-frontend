@@ -21,7 +21,7 @@ const privacy = {
         paragraphs: [
           'Veversal is currently offered as a beta preview. Features, data flows, and this policy may change before production sign-off.',
           'Do not rely on the beta environment as your sole legal archive. Keep copies of documents you upload and export data you need independently.',
-          'Support contact (placeholder): [SUPPORT_EMAIL_PLACEHOLDER].',
+          'Support contact: contact@veversal.com.',
         ],
       },
       {
@@ -29,9 +29,9 @@ const privacy = {
         title: 'Who processes your data',
         lawyerReview: true,
         paragraphs: [
-          'Data controller (placeholder): [LEGAL_ENTITY_NAME_PLACEHOLDER], registered at [REGISTERED_ADDRESS_PLACEHOLDER], company ID [EIK_PLACEHOLDER], VAT [VAT_NUMBER_PLACEHOLDER] (if applicable).',
-          'Data Protection Officer / privacy contact (placeholder): [DPO_OR_PRIVACY_EMAIL_PLACEHOLDER].',
-          'Governing jurisdiction for this draft (placeholder): [JURISDICTION_PLACEHOLDER].',
+          'Data controller: Veversal EOOD (ВИВЪРСАЛ ЕООД), registered seat: ul. Zlaten Klas 623, zh.k. 20-ti May, Sofia, Bulgaria.',
+          'Privacy contact: contact@veversal.com.',
+          'Governing law: Republic of Bulgaria, subject to mandatory EU data-protection rules.',
         ],
       },
       {
@@ -185,7 +185,7 @@ const privacy = {
         paragraphs: [
           'Veversal в момента се предлага като бета преглед. Функции, потоци от данни и тази политика могат да се променят преди финално production одобрение.',
           'Не разчитайте на бета средата като единствен правен архив. Запазвайте копия от качените документи и независимо експортирайте данни, които ви трябват.',
-          'Контакт за поддръжка (placeholder): [SUPPORT_EMAIL_PLACEHOLDER].',
+          'Контакт за поддръжка: contact@veversal.com.',
         ],
       },
       {
@@ -193,9 +193,9 @@ const privacy = {
         title: 'Кой обработва вашите данни',
         lawyerReview: true,
         paragraphs: [
-          'Администратор на данни (placeholder): [LEGAL_ENTITY_NAME_PLACEHOLDER], със седалище [REGISTERED_ADDRESS_PLACEHOLDER], ЕИК [EIK_PLACEHOLDER], ДДС [VAT_NUMBER_PLACEHOLDER] (ако е приложимо).',
-          'Длъжностно лице по защита на данните / контакт за поверителност (placeholder): [DPO_OR_PRIVACY_EMAIL_PLACEHOLDER].',
-          'Приложима юрисдикция за този чернови текст (placeholder): [JURISDICTION_PLACEHOLDER].',
+          'Администратор на данни: „ВИВЪРСАЛ“ ЕООД (Veversal EOOD), със седалище и адрес на управление: ул. Златен клас № 623, ж.к. 20-ти май, София, България.',
+          'Контакт за поверителност: contact@veversal.com.',
+          'Приложимо право: Република България, при спазване на императивните правила на ЕС за защита на данните.',
         ],
       },
       {
