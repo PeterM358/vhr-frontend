@@ -5911,16 +5911,16 @@
     "draftStatus": "Бета чернова — не е финален правен текст.",
     "relatedPolicies": "Свързани политики",
     "alternateLocale": "Прочети на",
-    "seoDescription": "Veversal {title} — бета преглед.",
+    "seoDescription": "Veversal {title}.",
     "pageTitles": {
       "privacy": "Политика за поверителност",
       "terms": "Условия за ползване",
       "refund": "Политика за отказ и възстановяване",
       "cookies": "Политика за бисквитките",
       "support": "Поддръжка",
-      "partner-terms": "Условия за бизнес и partners",
+      "partner-terms": "Условия за бизнес и партньори",
       "dpa": "Споразумение за обработка на данни",
-      "subprocessors": "Subprocessors"
+      "subprocessors": "Подизпълнители"
     }
   },
   "operationStatuses": {

@@ -1,18 +1,18 @@
 const support = {
   key: 'support',
   slug: 'support',
-  version: '0.1.0-beta',
-  effectiveDate: '2026-07-25',
-  status: 'draft-beta',
+  version: '1.2.0',
+  effectiveDate: '2026-11-26',
+  status: 'published',
   leadingLanguage: 'en',
   en: {
     title: 'Support',
     sections: [
       {
         id: 'beta-notice',
-        title: 'Beta support',
+        title: 'Support overview',
         paragraphs: [
-          'Veversal beta support is best-effort. Response times and channels may change before production launch.',
+          'Veversal support is provided by email. We aim to respond in Bulgarian and English on business days.',
         ],
       },
       {
@@ -30,8 +30,8 @@ const support = {
         id: 'hours',
         title: 'Hours and languages',
         paragraphs: [
-          'Support hours (placeholder): [SUPPORT_HOURS_PLACEHOLDER].',
-          'We aim to respond in Bulgarian and English for beta testers.',
+          'We typically respond on Bulgarian business days. Urgent billing or security issues: mark the subject clearly.',
+          'Languages: Bulgarian and English.',
         ],
       },
       {
@@ -56,7 +56,7 @@ const support = {
       },
       {
         id: 'not-support',
-        title: 'Out of scope for beta support',
+        title: 'Out of scope for support',
         paragraphs: [
           'Legal advice, tax filing, or emergency roadside assistance.',
           'Data subject requests may require identity verification — allow extra time.',
@@ -66,7 +66,7 @@ const support = {
         id: 'policies',
         title: 'Policies and documentation',
         paragraphs: [
-          'See Privacy Policy, Terms of Use, Cookie Policy, Partner Terms, DPA placeholder, and Subprocessors for data handling details.',
+          'See Privacy Policy, Terms of Use, Cookie Policy, Partner Terms, DPA, and Subprocessors for data-handling details.',
         ],
       },
     ],
@@ -76,9 +76,9 @@ const support = {
     sections: [
       {
         id: 'beta-notice',
-        title: 'Бета поддръжка',
+        title: 'Преглед',
         paragraphs: [
-          'Поддръжката за Veversal beta е best-effort. Сроковете и каналите могат да се променят преди production.',
+          'Поддръжката на Veversal е по имейл. Стремим се да отговаряме на български и английски в работни дни.',
         ],
       },
       {
@@ -96,8 +96,8 @@ const support = {
         id: 'hours',
         title: 'Работно време и езици',
         paragraphs: [
-          'Работно време (placeholder): [SUPPORT_HOURS_PLACEHOLDER].',
-          'Стремим се да отговаряме на български и английски за beta testers.',
+          'Обикновено отговаряме в български работни дни. Спешни въпроси за плащане или сигурност: посочете ясно темата.',
+          'Езици: български и английски.',
         ],
       },
       {
@@ -122,7 +122,7 @@ const support = {
       },
       {
         id: 'not-support',
-        title: 'Извън обхвата на beta поддръжка',
+        title: 'Извън обхвата на поддръжката',
         paragraphs: [
           'Правни/данъчни консултации или пътна помощ при авария.',
           'DSAR заявки може да изискват верификация — очаквайте допълнително време.',
@@ -132,7 +132,7 @@ const support = {
         id: 'policies',
         title: 'Политики и документация',
         paragraphs: [
-          'Вижте Политика за поверителност, Условия, Cookie Policy, Partner Terms, DPA placeholder и Subprocessors.',
+          'Вижте Политиката за поверителност, Общите условия, Политиката за бисквитките, Условията за бизнес и партньори, Споразумението за обработка на данни и Подизпълнителите.',
         ],
       },
     ],
