@@ -60,16 +60,18 @@ export default function PolicyDocumentView({ content, meta }) {
           {t('policies.checksumLabel')}: {meta.checksum}
         </Chip>
       </View>
-      <Text style={styles.draftNote} variant="bodySmall">
-        {t('policies.draftStatus')}
-      </Text>
+      {meta?.status === 'draft-beta' ? (
+        <Text style={styles.draftNote} variant="bodySmall">
+          {t('policies.draftStatus')}
+        </Text>
+      ) : null}
 
       {content.sections.map((section) => (
         <View key={section.id} nativeID={`policy-section-${section.id}`} style={styles.section}>
           <Text variant="titleMedium" style={styles.sectionTitle}>
             {section.title}
           </Text>
-          {section.lawyerReview ? (
+          {section.lawyerReview && meta?.status === 'draft-beta' ? (
             <Chip icon="scale-balance" compact style={styles.reviewChip}>
               {t('policies.lawyerReviewBadge')}
             </Chip>

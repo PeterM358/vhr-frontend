@@ -70,14 +70,16 @@ export default function PublicPolicyPageScreen({ route, navigation }) {
           <AuthLanguageSelector compact />
         </View>
 
-        <DashboardCard style={styles.betaCard}>
-          <Text variant="titleSmall" style={styles.betaTitle}>
-            {t('policies.betaNoticeTitle')}
-          </Text>
-          <Text variant="bodySmall" style={styles.betaBody}>
-            {t('policies.betaNoticeBody')}
-          </Text>
-        </DashboardCard>
+        {payload.meta?.status === 'draft-beta' ? (
+          <DashboardCard style={styles.betaCard}>
+            <Text variant="titleSmall" style={styles.betaTitle}>
+              {t('policies.betaNoticeTitle')}
+            </Text>
+            <Text variant="bodySmall" style={styles.betaBody}>
+              {t('policies.betaNoticeBody')}
+            </Text>
+          </DashboardCard>
+        ) : null}
 
         <DashboardCard>
           <Text variant="headlineSmall" style={styles.title}>

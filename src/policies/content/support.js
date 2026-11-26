@@ -23,7 +23,7 @@ const support = {
           'Privacy / data requests: contact@veversal.com',
           'Security incidents: contact@veversal.com (subject: Security)',
           'Partner payments (subscriptions): contact@veversal.com (subject: Billing)',
-          'Provider: Veversal EOOD — ul. Zlaten Klas 623, zh.k. 20-ti May, Sofia, Bulgaria',
+          'Provider: Veversal EOOD — Sofia, ul. Zlaten Klas 623, 20, Bulgaria',
         ],
       },
       {
@@ -89,7 +89,7 @@ const support = {
           'Поверителност / искания за данни: contact@veversal.com',
           'Инциденти по сигурността: contact@veversal.com (тема: Security)',
           'Партньорски плащания / абонаменти: contact@veversal.com (тема: Billing)',
-          'Доставчик: „ВИВЪРСАЛ“ ЕООД — ул. Златен клас № 623, ж.к. 20-ти май, София, България',
+          'Доставчик: „ВИВЪРСАЛ“ ЕООД — София, ул. Златен клас 623, 20, България',
         ],
       },
       {

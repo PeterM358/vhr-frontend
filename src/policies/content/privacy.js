@@ -2,7 +2,7 @@
 
 /** @typedef {{ title: string, sections: PolicySection[] }} PolicyLocaleContent */
 
-/** @typedef {{ key: string, slug: string, version: string, effectiveDate: string, status: 'draft-beta', leadingLanguage: 'en' | 'bg', en: PolicyLocaleContent, bg: PolicyLocaleContent }} PolicyDocument */
+/** @typedef {{ key: string, slug: string, version: string, effectiveDate: string, status: 'draft-beta' | 'published', leadingLanguage: 'en' | 'bg', en: PolicyLocaleContent, bg: PolicyLocaleContent }} PolicyDocument */
 
 /** @type {PolicyDocument} */
 const privacy = {
@@ -29,7 +29,7 @@ const privacy = {
         title: 'Who processes your data',
         lawyerReview: true,
         paragraphs: [
-          'Data controller: Veversal EOOD (ВИВЪРСАЛ ЕООД), registered seat: ul. Zlaten Klas 623, zh.k. 20-ti May, Sofia, Bulgaria.',
+          'Data controller: Veversal EOOD (ВИВЪРСАЛ ЕООД), registered seat: Sofia, ul. Zlaten Klas 623, 20, Bulgaria.',
           'Privacy contact: contact@veversal.com.',
           'Governing law: Republic of Bulgaria, subject to mandatory EU data-protection rules.',
         ],
@@ -193,7 +193,7 @@ const privacy = {
         title: 'Кой обработва вашите данни',
         lawyerReview: true,
         paragraphs: [
-          'Администратор на данни: „ВИВЪРСАЛ“ ЕООД (Veversal EOOD), със седалище и адрес на управление: ул. Златен клас № 623, ж.к. 20-ти май, София, България.',
+          'Администратор на данни: „ВИВЪРСАЛ“ ЕООД (Veversal EOOD), със седалище и адрес на управление: София, ул. Златен клас 623, 20, България.',
           'Контакт за поверителност: contact@veversal.com.',
           'Приложимо право: Република България, при спазване на императивните правила на ЕС за защита на данните.',
         ],

@@ -1,9 +1,9 @@
 const refund = {
   key: 'refund',
   slug: 'refund',
-  version: '1.1.1',
+  version: '1.2.0',
   effectiveDate: '2026-11-26',
-  status: 'draft-beta',
+  status: 'published',
   leadingLanguage: 'en',
   en: {
     title: 'Cancellation & Refund Policy',
@@ -20,7 +20,7 @@ const refund = {
         id: 'provider',
         title: '2. Merchant of record',
         paragraphs: [
-          'Platform Subscription fees are sold by Veversal EOOD (ВИВЪРСАЛ ЕООД), Bulgaria, registered seat: ul. Zlaten Klas 623, zh.k. 20-ti May, Sofia, Bulgaria. Stripe, ePay.bg / EasyPay, and banks act as payment facilitators or operators; Veversal remains the seller of the software Subscription.',
+          'Platform Subscription fees are sold by Veversal EOOD (ВИВЪРСАЛ ЕООД), Bulgaria, registered seat: Sofia, ul. Zlaten Klas 623, 20, Bulgaria. Stripe, ePay.bg / EasyPay, and banks act as payment facilitators or operators; Veversal remains the seller of the software Subscription.',
           'Billing, cancellation, and refund requests: contact@veversal.com (subject: Subscription refund / cancellation). Use the email registered on the Partner account.',
         ],
       },
@@ -104,7 +104,7 @@ const refund = {
         id: 'provider',
         title: '2. Търговец',
         paragraphs: [
-          'Таксите за платформен Абонамент се продават от „ВИВЪРСАЛ“ ЕООД (Veversal EOOD), България, със седалище и адрес на управление: ул. Златен клас № 623, ж.к. 20-ти май, София, България. Stripe, ePay.bg / EasyPay и банките действат като платежни посредници или оператори; Veversal остава продавач на софтуерния Абонамент.',
+          'Таксите за платформен Абонамент се продават от „ВИВЪРСАЛ“ ЕООД (Veversal EOOD), България, със седалище и адрес на управление: София, ул. Златен клас 623, 20, България. Stripe, ePay.bg / EasyPay и банките действат като платежни посредници или оператори; Veversal остава продавач на софтуерния Абонамент.',
           'Запитвания за фактуриране, отказ и възстановяване: contact@veversal.com (тема: Възстановяване / отказ на абонамент). Ползвайте имейла, регистриран в партньорския акаунт.',
         ],
       },

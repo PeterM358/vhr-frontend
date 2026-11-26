@@ -59,7 +59,7 @@ export function getPolicyLocaleContent(policyKey, locale) {
       status: doc.status,
       leadingLanguage: doc.leadingLanguage,
       checksum: computePolicyChecksum(doc),
-      published: doc.status === 'draft-beta',
+      published: doc.status === 'published',
     },
     content: doc[lang],
     alternateLocale: lang === 'en' ? 'bg' : 'en',
