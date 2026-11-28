@@ -51,7 +51,21 @@ export default function PublicPolicyPageScreen({ route, navigation }) {
     <ScreenBackground routeName="PublicPolicyPage" contentMaxWidth={840}>
       <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 12 }]}>
         <View style={styles.topBar}>
-          <View style={styles.topBarSpacer} />
+          <Pressable
+            onPress={() => {
+              if (navigation.canGoBack?.()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate('PublicHome');
+              }
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('policies.backToHome')}
+            hitSlop={8}
+            style={styles.backPressable}
+          >
+            <Text style={styles.backLink}>← {t('policies.backToHome')}</Text>
+          </Pressable>
           <AuthLanguageSelector compact />
         </View>
 
@@ -124,12 +138,18 @@ const styles = StyleSheet.create({
   },
   topBar: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+    gap: 12,
   },
-  topBarSpacer: {
-    flex: 1,
+  backPressable: {
+    flexShrink: 1,
+  },
+  backLink: {
+    color: '#e2e8f0',
+    fontSize: 15,
+    fontWeight: '600',
   },
   betaCard: {
     marginBottom: 12,
